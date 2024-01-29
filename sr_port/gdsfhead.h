@@ -44,6 +44,7 @@ error_def(ERR_GVIS);
 error_def(ERR_GVSUBOFLOW);
 error_def(ERR_MMFILETOOLARGE);
 error_def(ERR_NCTCOLLSPGBL);
+error_def(ERR_DBNOREGION);
 error_def(ERR_OFRZAUTOREL);
 error_def(ERR_OFRZCRITREL);
 error_def(ERR_OFRZCRITSTUCK);
@@ -3425,20 +3426,23 @@ MBSTART {								\
 	{	/* Overflow occurred while adding the global name OR	\
 		 * after adding the last subscript OR in the middle of	\
 		 * adding a subscript (not necessarily last). In all	\
-		 * cases, add a '*' at end to indicate incompleteness.	\
+		 * cases, add a '...' at end to indicate		\
+		 * incompleteness.					\
 		 */							\
 		if (')' == END[-1])					\
 			(END)--;					\
 		/* ensure we have space to write 1 byte */		\
-		assert((char *)(END) + 1 <= ((char *)ARRAYTOP(BUFF)));	\
-		*(END)++ = '*';						\
+		assert((char *)(END) + 3 <= ((char *)ARRAYTOP(BUFF)));	\
+		*(END)++ = '.';						\
+		*(END)++ = '.';						\
+		*(END)++ = '.';						\
 	}								\
 } MBEND
 
 #define	KEY_COMPLETE_FALSE	FALSE
 #define	KEY_COMPLETE_TRUE	TRUE
 
-#define	ISSUE_GVSUBOFLOW_ERROR(GVKEY, IS_KEY_COMPLETE)							\
+#define	ISSUE_GVSUBOFLOW_ERROR(GVKEY, IS_KEY_COMPLETE, LEN, MAXLEN, REG)				\
 MBSTART {												\
 	GBLREF	gv_key	*gv_currkey;									\
 	unsigned char	*endBuff, fmtBuff[MAX_ZWR_KEY_SZ];						\
@@ -3450,8 +3454,12 @@ MBSTART {												\
 		GV_SET_LAST_SUBSCRIPT_INCOMPLETE(fmtBuff, endBuff); /* Note: might update "endBuff" */	\
 	if (GVKEY == gv_currkey)									\
 		gv_currkey->end = 0;	/* to show the key is not valid */				\
-	RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_GVSUBOFLOW, 0, ERR_GVIS, 2,				\
-			endBuff - fmtBuff, fmtBuff);							\
+	if (NULL != REG)										\
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(10) ERR_GVSUBOFLOW, 4, LEN, MAXLEN, REG_LEN_STR(REG),	\
+					ERR_GVIS, 2, endBuff - fmtBuff, fmtBuff);			\
+	else												\
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(10) ERR_GVSUBOFLOW, 2, LEN, MAXLEN, ERR_DBNOREGION,	\
+					0, ERR_GVIS, 2, endBuff - fmtBuff, fmtBuff);			\
 } MBEND
 
 #define COPY_SUBS_TO_GVCURRKEY(mvarg, reg, gv_currkey, was_null, is_null)					\
@@ -3460,7 +3468,7 @@ MBSTART {													\
 	GBLREF unsigned char	*msp, *stackwarn, *stacktop;							\
 	mval			temp;										\
 	unsigned char		buff[MAX_ZWR_KEY_SZ], *end;							\
-	int			len;										\
+	int			len, max_len, tmp_len;								\
 	mstr			opstr;										\
 	size_t			stlen;										\
 														\
@@ -3485,8 +3493,8 @@ MBSTART {													\
 		} else												\
 		{												\
 			len = mvarg->str.len;									\
-			if (gv_currkey->end + len - 1 >= gv_currkey->top)					\
-				ISSUE_GVSUBOFLOW_ERROR(gv_currkey, KEY_COMPLETE_FALSE);				\
+			if ((tmp_len = gv_currkey->end + len) > (max_len = gv_currkey->top))			\
+				ISSUE_GVSUBOFLOW_ERROR(gv_currkey, KEY_COMPLETE_FALSE, tmp_len, max_len, reg);	\
 			stlen = len;										\
 			assert(((gv_currkey->base) + (gv_currkey->end) + stlen) <= 				\
 				((gv_currkey->base) + gv_currkey->top));					\

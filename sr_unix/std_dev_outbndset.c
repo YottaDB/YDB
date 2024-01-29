@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -21,7 +21,7 @@
 #define SHFT_MSK 0x00000001
 
 GBLREF boolean_t		ctrlc_on, hup_on;
-GBLREF volatile io_pair	io_std_device;
+GBLREF volatile io_pair		io_std_device;
 GBLREF volatile bool		std_dev_outbnd;
 
 /* NOTE: xfer_set_handlers() returns success or failure for attempts to set
@@ -36,20 +36,25 @@ void std_dev_outbndset(int4 ob_char)
 	d_tt_struct	*tt_ptr;
 
 	assertpro(MAXOUTOFBAND >= ob_char);
-	if ((NULL != io_std_device.in) && (tt == io_std_device.in->type))
-	{	/* The NULL check above protects against a <CTRL-C> hitting while we're initializing the terminal */
-		tt_ptr = (d_tt_struct *)io_std_device.in->dev_sp;
-		std_dev_outbnd = TRUE;
-		mask = SHFT_MSK << ob_char;
-		if (mask & tt_ptr->enbld_outofbands.mask)
-			(void)xfer_set_handlers(ctrap, ob_char, FALSE);
-		else if (CTRLC_MSK & mask)
+	if ((NULL != io_std_device.in))
+	{
+		/* The NULL check above protects against a <CTRL-C> hitting while we're initializing the device */
+		if (tt == io_std_device.in->type)
 		{
-			if (ctrlc_on)
-				(void)xfer_set_handlers(ctrlc, 0, FALSE);
-		} else if (hup_on && (SIGHUP_MSK & mask))
+			tt_ptr = (d_tt_struct *)io_std_device.in->dev_sp;
+			std_dev_outbnd = TRUE;
+			mask = SHFT_MSK << ob_char;
+			if (mask & tt_ptr->enbld_outofbands.mask)
+				(void)xfer_set_handlers(ctrap, ob_char, FALSE);
+			else if (CTRLC_MSK & mask)
+			{
+				if (ctrlc_on)
+					(void)xfer_set_handlers(ctrlc, 0, FALSE);
+			} else if (hup_on && (SIGHUP_MSK & mask))
+				(void)xfer_set_handlers(sighup, ob_char, FALSE);
+			else
+				assert(OUTOFBAND_MSK & mask);
+		} else if ((gtmsocket == io_std_device.in->type) && hup_on && (CTRLD == ob_char))
 			(void)xfer_set_handlers(sighup, ob_char, FALSE);
-		else
-			assertpro((mask & tt_ptr->enbld_outofbands.mask) || (OUTOFBAND_MSK & mask));
 	}
 }

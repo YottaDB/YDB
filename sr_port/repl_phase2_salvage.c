@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2016-2020 Fidelity National Information	*
+ * Copyright (c) 2016-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -61,6 +61,7 @@ void	repl_phase2_salvage(jnlpool_addrs *jpa, jnlpool_ctl_ptr_t jpl, jpl_phase2_i
 	{	/* The reserved space for this seqno is still somewhere in the journal pool (has not yet overflown the pool).
 		 * So fill the space with a JRT_NULL record.
 		 */
+		assert(start_write_addr >= jpl->contig_addr);
 		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_JNLPOOLPHS2SALVAGE, 6, deadCmt->process_id,
 			DB_LEN_STR(jpa->jnlpool_dummy_reg), &deadCmt->jnl_seqno, &start_write_addr, deadCmt->tot_jrec_len);
 		null_rec.prefix.jrec_type = JRT_NULL;

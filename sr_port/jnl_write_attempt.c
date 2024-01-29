@@ -62,7 +62,7 @@ static uint4 jnl_sub_write_attempt(jnl_private_control *jpc, unsigned int *lcnt,
 	sgmnt_addrs		*csa;
 	jnl_buffer_ptr_t	jb;
 	unsigned int		status;
-	boolean_t		was_crit, exact_check, freeze_waiter = FALSE, freeze_cleared;
+	boolean_t		was_crit, exact_check, freeze_waiter = FALSE, freeze_cleared, was_frozen = FALSE;
 	/**** Note static/local */
 	static uint4		loop_image_count, writer;	/* assumes calls from one loop at a time */
 	uint4			new_dskaddr, new_dsk;
@@ -71,7 +71,11 @@ static uint4 jnl_sub_write_attempt(jnl_private_control *jpc, unsigned int *lcnt,
 	static uint4		stuck_cnt = 0;
 	jnlpool_addrs_ptr_t	local_jnlpool;
 	intrpt_state_t		prev_intrpt_state = INTRPT_NUM_STATES;
+	char			wait_comment[MAX_FREEZE_COMMENT_LEN], comparator[MAX_FREEZE_COMMENT_LEN];
+	int			real_comment_off;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	/* Some callers of jnl_sub_write_attempt (jnl_flush->jnl_write_attempt, jnl_write->jnl_write_attempt) are in
 	 * crit, and some other (jnl_wait->jnl_write_attempt) are not. Callers in crit do not need worry about journal
 	 * buffer fields (dskaddr, freeaddr) changing underneath them, but for those not in crit, jnl_sub_write_attempt
@@ -83,6 +87,7 @@ static uint4 jnl_sub_write_attempt(jnl_private_control *jpc, unsigned int *lcnt,
 	csa = &FILE_INFO(jpc->region)->s_addrs;
 	was_crit = csa->now_crit;
 	exact_check = was_crit && (threshold == jb->rsrv_freeaddr); /* see comment in jnl_write_attempt() for why this is needed */
+	GENERATE_INST_FROZEN_COMMENT(wait_comment, MAX_FREEZE_COMMENT_LEN, ERR_JNLPROCSTUCK);
 	while (exact_check ? (jb->dskaddr != threshold) : (jb->dskaddr < threshold))
 	{
 		if (jb->io_in_prog_latch.u.parts.latch_pid == process_id)
@@ -109,11 +114,12 @@ static uint4 jnl_sub_write_attempt(jnl_private_control *jpc, unsigned int *lcnt,
 		if ((ERR_JNLWRTNOWWRTR != status) && (ERR_JNLWRTDEFER != status))
 		{
 			assert(!freeze_waiter);
+			SET_FREEZE_INVISIBLE_IF_DEFERRING(TREF(defer_instance_freeze));
 			return status;
 		}
 		if (freeze_waiter)
 		{
-			if (!IS_REPL_INST_FROZEN)
+			if (!IS_REPL_INST_FROZEN(TREF(defer_instance_freeze)))
 			{	/* Somehow the freeze was lifted by someone else */
 				ENABLE_INTERRUPTS(INTRPT_IN_RETRY_LOOP, prev_intrpt_state);
 				freeze_waiter = FALSE;
@@ -164,7 +170,7 @@ static uint4 jnl_sub_write_attempt(jnl_private_control *jpc, unsigned int *lcnt,
 				rel_crit(jpc->region);
 			/* this is the interesting case: a process is stuck */
 			BG_TRACE_PRO_ANY(csa, jnl_blocked_writer_stuck);
-			if (IS_REPL_INST_FROZEN)
+			if (IS_REPL_INST_FROZEN(TREF(defer_instance_freeze)))
 			{	/* Restart if instance frozen. */
 				*lcnt = 1;
 				continue;
@@ -176,18 +182,34 @@ static uint4 jnl_sub_write_attempt(jnl_private_control *jpc, unsigned int *lcnt,
 				gtm_white_box_test_case_enabled = FALSE;
 #			endif
 			stuck_cnt++;
-			if (IS_REPL_INST_FROZEN)
-			{	/* The instance wasn't frozen above, but it is now, so most likely we froze it.
-				 * Note the fact.
-				 * Deferring interrupts here prevents possible hangs in GET_C_STACK_FROM_SCRIPT.
+			if (IS_REPL_INST_FROZEN(TREF(defer_instance_freeze)))
+			{
+				was_frozen = TRUE;
+				assert(jnlpool && jnlpool->jnlpool_ctl);
+				/* Calling library functions like memcpy on memory that is subject to race conditions is
+				 * undefined behavior, so copy it ourselves into a private buffer and then compare.
 				 */
-				DEFER_INTERRUPTS(INTRPT_IN_RETRY_LOOP, prev_intrpt_state);
-				freeze_waiter = TRUE;
+				for (real_comment_off = 0; real_comment_off < MAX_FREEZE_COMMENT_LEN; real_comment_off++)
+				{
+					comparator[real_comment_off] = jnlpool->jnlpool_ctl->freeze_comment[real_comment_off];
+					if ('\0' == comparator[real_comment_off])
+						break;
+				}
+				comparator[MAX_FREEZE_COMMENT_LEN - 1] = '\0';
+				if (STRNCMP_STR(wait_comment, comparator, MAX_FREEZE_COMMENT_LEN) == 0)
+				{
+					/* Note the fact that we started and must revert the freeze.
+					 * Deferring interrupts here prevents possible hangs in GET_C_STACK_FROM_SCRIPT.
+					 */
+					DEFER_INTERRUPTS(INTRPT_IN_RETRY_LOOP, prev_intrpt_state);
+					freeze_waiter = TRUE;
+				}
 			}
 			GET_C_STACK_FROM_SCRIPT("JNLPROCSTUCK", process_id, writer, stuck_cnt);
 			*lcnt = 1;	/* ??? is it necessary to limit this, and if so, how ??? */
-			if (freeze_waiter)
+			if (was_frozen)
 			{	/* We are frozen, so restart. */
+				was_frozen = FALSE;
 				continue;
 			}
 			status = ERR_JNLPROCSTUCK;
@@ -208,6 +230,7 @@ static uint4 jnl_sub_write_attempt(jnl_private_control *jpc, unsigned int *lcnt,
 		REPORT_INSTANCE_UNFROZEN(freeze_cleared);
 		ENABLE_INTERRUPTS(INTRPT_IN_RETRY_LOOP, prev_intrpt_state);
 	}
+	SET_FREEZE_INVISIBLE_IF_DEFERRING(TREF(defer_instance_freeze));
 	return status;
 }
 

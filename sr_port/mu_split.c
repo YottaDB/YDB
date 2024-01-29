@@ -109,7 +109,7 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 	sm_uc_ptr_t 	prev_blk2_frec_base, curr_blk2_frec_base;
 	int 		prev_blk1_top_off, prev_blk1_last_keysz, prev_blk1_last_rec_size, prev_blk1_last_cmpc, prev_new_blk1_size,
 			prev_new_blk2_size, curr_blk1_top_off, curr_blk1_last_cmpc, curr_blk1_last_keysz, curr_blk1_last_rec_size,
-			curr_new_blk1_size, curr_new_blk2_size;
+			exp_level, curr_new_blk1_size, curr_new_blk2_size;
 	unsigned char 	prev_blk1_last_key[MAX_KEY_SZ + 3], curr_blk1_last_key[MAX_KEY_SZ + 3];
 	bool		prev_splits_ins_and_curr, curr_splits_ins_and_curr, prev_ins_starts_rt, curr_ins_starts_rt;
 
@@ -308,12 +308,13 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 		{	/* cur_rec is not first key */
 			if (cdb_sc_normal != (status = gvcst_expand_any_key(old_blk1_hist_ptr,	/* WARNING assignment */
 				old_blk1_base + old_blk1_hist_ptr->curr_rec.offset,
-				&curr_prev_key[0], &rec_size, &tkeylen, &tkeycmpc, NULL)))
+				&curr_prev_key[0], &rec_size, &tkeylen, &tkeycmpc, NULL, &exp_level)))
 			{
 				assert(t_tries < CDB_STAGNATE);
 				NONTP_TRACE_HIST_MOD(old_blk1_hist_ptr, t_blkmod_mu_split);
 				CLEAR_BLKFMT_AND_RETURN(cdb_sc_blkmod);
 			}
+			assert((level == exp_level) || (t_tries < CDB_STAGNATE));
 			if (old_ances_currkeycmpc)
 			{
 				assert(ances_currkey);
@@ -429,6 +430,9 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 					curr_blk1_top_off += curr_blk1_last_rec_size;
 					curr_blk2_frec_base += curr_blk1_last_rec_size;
 					curr_blk1_last_keysz += curr_blk1_last_cmpc;
+					/* Following assert guaranteed by the check in read_record */
+					assert((curr_blk1_last_keysz <= MAX_KEY_SZ)
+							|| ((cdb_sc_normal != status) && (cdb_sc_starrecord != status)));
 				}
 				/* Finish maintaining READ_RECORD meta-results */
 				if ((cdb_sc_starrecord == status) && (curr_blk1_top_off == old_blk1_sz))
@@ -504,9 +508,8 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 					else
 						curr_new_blk2_size += EVAL_CMPC((rec_hdr_ptr_t)curr_blk2_frec_base);
 					/* Calculate expansion of first record of block 2 end */
-				} else
-					/* curr_ and new_ins records will go to the left. */
-				{
+				} else if (curr_blk1_top_off <= old_blk1_sz)
+				{	/* curr_ and new_ins records will go to the left. */
 					curr_ins_starts_rt = false;
 					curr_splits_ins_and_curr = false;
 					/* Calculate baseline size start */
@@ -544,7 +547,13 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 					 */
 					curr_new_blk2_size += EVAL_CMPC((rec_hdr_ptr_t)curr_blk2_frec_base);
 					/* Calculate expansion of first record of block 2 end */
-				} /* Finish calculation of new blk1 and blk2 sizes */
+				} else
+				{	/* We've overrun the buffer. Instead of segfaulting on the EVAL_CMPC, stop here */
+					assert(t_tries < CDB_STAGNATE);
+					status = cdb_sc_blkmod;
+					break;
+				}
+				/* Finish calculation of new blk1 and blk2 sizes */
 			} /* Finish READ_RECORD for-loop */
 			if (prev_new_blk1_size > max_fill)
 			{

@@ -85,7 +85,7 @@ cache_rec_ptr_t	db_csh_getn(block_id block)
 	bt_rec_ptr_t		bt;
 	gd_region		*reg;
 	unsigned int		lcnt, ocnt;
-	int			max_ent, pass0, pass0cnt, pass1, pass2, pass3, rip;
+	int			max_ent, iter0, iter0cnt, iter1, iter2, iter3, rip;
 	int4			flsh_trigger;
 	uint4			first_r_epid = 0, latest_r_epid;
 	sgmnt_addrs		*csa;
@@ -114,22 +114,22 @@ cache_rec_ptr_t	db_csh_getn(block_id block)
 	max_ent = csd->n_bts;
 	hdr = csa->acc_meth.bg.cache_state->cache_array + (block % csd->bt_buckets);
 	start_cr = csa->acc_meth.bg.cache_state->cache_array + csd->bt_buckets;
-	pass0 = csa->gbuff_limit;		/* gbuff_limit set by VIEW "POOLLIMIT":<region> */
-	pass0cnt = (0 == pass0) ? 0 : 3;	/* Used both as a flag we are limiting and a counter for 2 limited trips,
+	iter0 = csa->gbuff_limit;		/* gbuff_limit set by VIEW "POOLLIMIT":<region> */
+	iter0cnt = (0 == iter0) ? 0 : 3;	/* Used both as a flag we are limiting and a counter for 2 limited trips,
 						 * over 3 passes in total.
 						 */
-	pass1 = max_ent;			/* skip referred or dirty or read-into cache records */
-	pass2 = 2 * max_ent;			/* skip referred cache records */
-	pass3 = 3 * max_ent;			/* skip nothing */
+	iter1 = max_ent;			/* skip referred or dirty or read-into cache records */
+	iter2 = 2 * max_ent;			/* skip referred cache records */
+	iter3 = 3 * max_ent;			/* skip nothing */
 	midnite = start_cr + max_ent;		/* "on the clock" - point at which we have to wrap or change tactics */
 	cr = (cache_rec_ptr_t)GDS_REL2ABS(csa->nl->cur_lru_cache_rec_off);
-	if (pass0cnt)
+	if (iter0cnt)
 	{
-		our_midnite = csa->our_midnite;		/* local copy of private "hand" for efficiency - only used if pass0cnt */
+		our_midnite = csa->our_midnite;		/* local copy of private "hand" for efficiency - only used if iter0cnt */
 		assert(start_cr < our_midnite);
 		/* Try starting where we left off from the last invocation of db_csh_getn */
 		poollimit_cr = cr = (cache_rec_ptr_t)GDS_REL2ABS(csa->our_lru_cache_rec_off);
-		assert(WITHIN_POOLLIMIT_BOUNDS(cr, our_midnite, start_cr, pass0, max_ent));
+		assert(WITHIN_POOLLIMIT_BOUNDS(cr, our_midnite, start_cr, iter0, max_ent));
 		if (cr < our_midnite)
 		{	/* We can only set midnite = our_midnite if our interval is not wrapped, or if it is wrapped cr must be
 			 * before our_midnite (i.e. we wrapped previously). In either case, cr < our_midnite.
@@ -139,13 +139,14 @@ cache_rec_ptr_t	db_csh_getn(block_id block)
 	}
 	assert((start_cr <= cr) && ((start_cr + max_ent) > cr));
 	dont_flush_buff = reg->read_only || (!(dollar_tlevel ? sgm_info_ptr->update_trans : update_trans)
-			&& (DBG_ASSERT(!csa->jnlpool || (csa->jnlpool == jnlpool)) IS_REPL_INST_FROZEN));
+			&& (DBG_ASSERT(!csa->jnlpool || (csa->jnlpool == jnlpool))
+				IS_REPL_INST_FROZEN(TREF(defer_instance_freeze))));
 	INCR_DB_CSH_COUNTER(csa, n_db_csh_getns, 1);
 	asyncio = csd->asyncio;
 	DEFER_INTERRUPTS(INTRPT_IN_DB_CSH_GETN, prev_intrpt_state);
 	for (lcnt = 0;  ; lcnt++)
 	{
-		if (lcnt > pass3)
+		if (lcnt > iter3)
 		{
 			BG_TRACE_PRO(wc_blocked_db_csh_getn_loopexceed);
 			assert(FALSE);
@@ -155,7 +156,7 @@ cache_rec_ptr_t	db_csh_getn(block_id block)
 		if (cr >= midnite)	/* == should work but >= is slightly safer and no more expensive */
 		{
 			cr = start_cr;
-			if (pass0cnt)
+			if (iter0cnt)
 			{	/* doing restricted looking */
 				assert(our_midnite);
 				if (midnite != our_midnite)
@@ -164,25 +165,25 @@ cache_rec_ptr_t	db_csh_getn(block_id block)
 					midnite = our_midnite;
 				} else
 				{	/* Here we perform retries on the local pool:
-					 * pass0cnt == 3: We start from where we last left off, walk to our_midnite
-					 * pass0cnt == 2: We start from our_midnite - pass0, and walk to our_midnite
-					 * pass0cnt == 1: We start from our_midnite - pass0, and walk to where we
-					 *                last left off (where we started in pass0cnt == 3).
+					 * iter0cnt == 3: We start from where we last left off, walk to our_midnite
+					 * iter0cnt == 2: We start from our_midnite - iter0, and walk to our_midnite
+					 * iter0cnt == 1: We start from our_midnite - iter0, and walk to where we
+					 *                last left off (where we started in iter0cnt == 3).
 					 * This way we end up doing two full passes over the entire local pool.
 					 */
-					pass0cnt--;
-					if (2 == pass0cnt)
+					iter0cnt--;
+					if (2 == iter0cnt)
 					{
-						cr = our_midnite - pass0;		/* in our restricted area */
+						cr = our_midnite - iter0;		/* in our restricted area */
 						if (cr < start_cr)
 						{	/* wrap before our_midnite */
 							cr += max_ent;
 							midnite = start_cr + max_ent;
 						}
-					} else if (1 == pass0cnt)
+					} else if (1 == iter0cnt)
 					{
 						assert(poollimit_cr);
-						cr = our_midnite - pass0;
+						cr = our_midnite - iter0;
 						our_midnite = poollimit_cr + 1;
 						if (cr < start_cr)
 						{
@@ -191,10 +192,10 @@ cache_rec_ptr_t	db_csh_getn(block_id block)
 						} else
 							midnite = our_midnite;
 						assert(cr < midnite);
-						/* we must have already restarted the search from our_midnite - pass0
-						 * (in pass0cnt == 2)
+						/* we must have already restarted the search from our_midnite - iter0
+						 * (in iter0cnt == 2)
 						 */
-						assert(lcnt == pass0);
+						assert(lcnt == iter0);
 					} else
 					{	/* or the limited area did not suffice - adopt the normal clock */
 						cr = (cache_rec_ptr_t)GDS_REL2ABS(csa->nl->cur_lru_cache_rec_off);
@@ -212,13 +213,13 @@ cache_rec_ptr_t	db_csh_getn(block_id block)
 		 * the "wcs_wtfini" cleanup so proceed even in case of a FALSE return. Hence not checking the return
 		 * value.
 		 */
-		if (asyncio && ((lcnt == pass1) || (lcnt == pass2)))
+		if (asyncio && ((lcnt == iter1) || (lcnt == iter2)))
 		{
 			DEBUG_ONLY(dbg_wtfini_lcnt = dbg_wtfini_db_csh_getn);	/* used by "wcs_wtfini" */
 			/* do not do heavyweight "is_proc_alive" check inside crit */
 			wcs_wtfini(reg, CHECK_IS_PROC_ALIVE_FALSE, NULL);
 		}
-		if (cr->refer && (lcnt < pass2))
+		if (cr->refer && (lcnt < iter2))
 		{	/* in passes 1 & 2, set refer to FALSE and skip; in the third pass attempt reuse even if TRUE == refer */
 			cr->refer = FALSE;
 			continue;
@@ -289,7 +290,7 @@ cache_rec_ptr_t	db_csh_getn(block_id block)
 			 */
 			if (dont_flush_buff)
 				continue;
-			if (lcnt < pass1)
+			if (lcnt < iter1)
 				continue;
 #			ifdef DEBUG
 			/* If this cr is a newer twin check that the older twin has a 0 value of "in_cw_set" (bg_update_phase2
@@ -334,7 +335,7 @@ cache_rec_ptr_t	db_csh_getn(block_id block)
 		{	/* possible if a concurrent "wcs_wtstart" has set cr->dirty to 0 but not yet
 			 * cleared the latch. this should be very rare though.
 			 */
-			if (lcnt < pass2)
+			if (lcnt < iter2)
 				continue; /* try to find some other cache-record to reuse until the 3rd pass */
 			for (ocnt = 1; (MAXWRTLATCHWAIT >= ocnt) && (LATCH_CLEAR != WRITE_LATCH_VAL(cr)); ocnt++)
 				wcs_sleep(SLEEP_WRTLATCHWAIT);	/* since it is a short lock, sleep the minimum */
@@ -353,7 +354,7 @@ cache_rec_ptr_t	db_csh_getn(block_id block)
 		LOCK_BUFF_FOR_READ(cr, rip);	/* lock is too long for a general form spin lock but too granular for a mutex */
 		if (0 != rip)
 		{
-			if (lcnt < pass2)
+			if (lcnt < iter2)
 			{	/* someone is reading into this cache record. leave it for two passes.
 				 * this is because if somebody is reading it, it is most likely to be referred to very soon.
 				 * if we replace this, we will definitely be causing a restart for the reader.
@@ -458,16 +459,16 @@ cache_rec_ptr_t	db_csh_getn(block_id block)
 		q0 = (cache_rec_ptr_t)((sm_uc_ptr_t)cr + cr->blkque.fl);
 		shuffqth((que_ent_ptr_t)q0, (que_ent_ptr_t)hdr);
 		assert(0 == cr->dirty);
-		if (!pass0cnt)
+		if (!iter0cnt)
 			csa->nl->cur_lru_cache_rec_off = GDS_ABS2REL(cr);
-		if (pass0 && pass0cnt)
-		{	/* pass0cnt != 0 implies we found a cr within our POOLLIMIT bounds. Assert that and update
+		if (iter0 && iter0cnt)
+		{	/* iter0cnt != 0 implies we found a cr within our POOLLIMIT bounds. Assert that and update
 			 * our_lru_cache_rec_off in this case. If we fell through to the general pool, then never mind.
 			 */
-			assert(WITHIN_POOLLIMIT_BOUNDS(cr, csa->our_midnite, start_cr, pass0, max_ent));
+			assert(WITHIN_POOLLIMIT_BOUNDS(cr, csa->our_midnite, start_cr, iter0, max_ent));
 			csa->our_lru_cache_rec_off = GDS_ABS2REL(cr);
 		}
-		if (lcnt > pass1)
+		if (lcnt > iter1)
 			csa->nl->cache_hits = 0;
 		csa->nl->cache_hits++;
 		if (csa->nl->cache_hits > csd->n_bts)

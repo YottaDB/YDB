@@ -143,6 +143,9 @@ GBLREF	int4			strm_index;
 GBLREF	jnl_gbls_t		jgbl;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	uint4			process_id;
+#ifdef DEBUG
+GBLREF	bool			only_usr_jnlpool_flush;
+#endif
 
 error_def(ERR_CRITSEMFAIL);
 error_def(ERR_DBFILOPERR);
@@ -627,7 +630,9 @@ int4 mur_open_files(boolean_t retry)
 				JPL_TRACE_PRO(jnlpool->jnlpool_ctl, jnl_pool_write_sleep);
 				SLEEP_USEC(1, FALSE);
 			}
+			DEBUG_ONLY(only_usr_jnlpool_flush = murgbl.repl_standalone;)
 			repl_inst_flush_jnlpool(FALSE, FALSE);
+			DEBUG_ONLY(only_usr_jnlpool_flush = false;)
 			assert((0 == jnlpool->jnlpool_ctl->onln_rlbk_pid)
 				|| !is_proc_alive(jnlpool->jnlpool_ctl->onln_rlbk_pid, 0));
 			jnlpool->jnlpool_ctl->onln_rlbk_pid = process_id;

@@ -511,6 +511,10 @@ THREADGBLDEF(nontp_jbuf_rsrv,			jbuf_rsrv_struct_t *)	/* Pointer to structure co
 									 * on the journal buffer for current non-TP transaction.
 									 */
 THREADGBLDEF(source_line,			int4)		/* keep track of line number in M file while compiling */
+THREADGBLDEF(defer_instance_freeze,		uint4)		/* system for deferring recognition of certain kinds of freezes
+								 * while a commit is in-flight so long as the commit does not
+								 * cause the freeze.
+								 */
 /* Debug values */
 #ifdef DEBUG
 THREADGBLDEF(donot_commit,			boolean_t)			/* debug-only - see gdsfhead.h for purpose */
@@ -554,6 +558,7 @@ THREADGBLDEF(fork_without_child_wait,		boolean_t)	/*  we did a FORK but did not 
 THREADGBLDEF(in_bm_getfree_gdsfilext,           boolean_t)	/* bm_getfree() did a preemptive crit grab before doing a
 								 * file extension.
 								 */
+THREADGBLDEF(cur_cmt_step,			enum cmt_step)	/* Current step of commit. Intended to validate t_commit_cleanup */
 #endif	/* #ifdef DEBUG */
 /* (DEBUG_ONLY relevant points reproduced from the comment at the top of this file)
  *   5. It is important for ANY DEBUG_ONLY fields to go at the VERY END. Failure to do this breaks gtmpcat.

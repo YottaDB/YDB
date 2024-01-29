@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -91,7 +91,8 @@ void fake_enospc(void)
 	 * we cannot do a IS_REPL_INST_FROZEN check which looks at a field inside jnlpool_ctl. Account for that below.
 	 */
 	if (syslog_deferred
-		|| (!ok_to_interrupt && ((INTRPT_IN_SHMDT == intrpt_ok_state) || !IS_REPL_INST_FROZEN)) || !CUSTOM_ERRORS_LOADED)
+		|| (!ok_to_interrupt && ((INTRPT_IN_SHMDT == intrpt_ok_state) || !IS_REPL_INST_FROZEN(RECOGNIZE_FREEZES)))
+		|| !CUSTOM_ERRORS_LOADED)
 	{	/* We have to skip this because we have just fallen into deferred zone or we are currently in it */
 		/* Try again in a second */
 		start_timer((TID)fake_enospc, ENOSPC_RETRY_INTERVAL, fake_enospc, 0, NULL);
@@ -109,7 +110,7 @@ void fake_enospc(void)
 	 * malloc/frees in debug-only code
 	 */
 	assert(MAX_REGIONS >= addr_ptr->n_regions);
-	if (!IS_REPL_INST_FROZEN)
+	if (!IS_REPL_INST_FROZEN(RECOGNIZE_FREEZES))
 	{	/* We are in an UNFROZEN state, and about to be FROZEN due to ENOSPC */
 		assert(MAX_REGIONS >= addr_ptr->n_regions);
 		for (i = 0; i < addr_ptr->n_regions; i++)

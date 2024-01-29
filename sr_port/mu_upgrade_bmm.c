@@ -1275,7 +1275,9 @@ enum cdb_sc adjust_master_map(block_id blks_in_way, gd_region *reg)
 	sgmnt_data	*csd;
 	srch_blk_status	bml_hist;
 	unix_db_info	*udi;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	csa = cs_addrs;
 	csd = cs_data;
 	udi = FILE_INFO(reg);	/* Allocate an aligned buffer for new bmm (in case AIO), see DIO_BUFF_EXPAND_IF_NEEDED */

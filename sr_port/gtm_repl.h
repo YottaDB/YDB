@@ -42,7 +42,10 @@ error_def(ERR_TLSCLOSE);
 #define CLEAR_REPL_TLS_REQUESTED	repl_tls.id[0] = '\0'
 #define REPL_TLS_ENABLED		(repl_tls.enabled)
 #define CLEAR_REPL_TLS_ENABLED		repl_tls.enabled = FALSE
-#define PLAINTEXT_FALLBACK		(repl_tls.plaintext_fallback)
+#define CFG_PLAINTEXT_FALLBACK		((NULL != repl_tls.sock) && (repl_tls.sock->flags & GTMTLS_OP_PLAINTEXT_FALLBACK))
+#define PLAINTEXT_FALLBACK		(repl_tls.plaintext_fallback || CFG_PLAINTEXT_FALLBACK)
+#define RCVR_SIDE_STR			"Receiver side"
+#define SRC_SIDE_STR			"Source side"
 
 #define DEFAULT_RENEGOTIATE_TIMEOUT	(2 * 60) /* About 2 hours between renegotiation. */
 #define MIN_RENEGOTIATE_TIMEOUT		1

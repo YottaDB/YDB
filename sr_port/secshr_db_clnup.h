@@ -22,7 +22,7 @@ enum secshr_db_state
 enum secshr_accounting_caller_t		/* abbreviated as "sac_" prefix below */
 {
 	sac_secshr_db_clnup = 1,		/* 1 */
-	sac_secshr_finish_CMT08_to_CMT14,	/* 2 */
+	sac_secshr_finish_CMT09_to_CMT15,	/* 2 */
 	sac_secshr_blk_full_build,		/* 3 */
 	sac_secshr_finish_CMT18,		/* 4 */
 };
@@ -72,7 +72,7 @@ MBSTART {									\
 } MBEND
 
 void	secshr_db_clnup(enum secshr_db_state state);
-void	secshr_finish_CMT08_to_CMT14(sgmnt_addrs *csa, jnlpool_addrs_ptr_t update_jnlpool);
+void	secshr_finish_CMT09_to_CMT15(sgmnt_addrs *csa, jnlpool_addrs_ptr_t update_jnlpool);
 void	secshr_rel_crit(gd_region *reg, boolean_t is_exiting, boolean_t is_repl_reg);
 int	secshr_blk_full_build(boolean_t is_tp, sgmnt_addrs *csa,
 		 sgmnt_data_ptr_t csd, boolean_t is_bg, struct cw_set_element_struct *cs, sm_uc_ptr_t blk_ptr, trans_num currtn);

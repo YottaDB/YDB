@@ -91,7 +91,7 @@ LITDEF	err_msg merrors[] = {
 	{ "GVORDERFAIL", "Global variable $ORDER or $NEXT function failed.  Failure code: !AD.", 2, 0 },
 	{ "GVPUTFAIL", "Global variable put failed.  Failure code: !AD.", 2, 0 },
 	{ "PATTABSYNTAX", "Error in !AD at line !UL", 3, 0 },
-	{ "GVSUBOFLOW", "Maximum combined length of subscripts exceeded", 0, 0 },
+	{ "GVSUBOFLOW", "The combined length of subscripts (!UL) is greater than maximum (!UL) for region: !AD", 4, 0 },
 	{ "GVUNDEF", "Global variable undefined: !AD", 2, 0 },
 	{ "TRANSNEST", "Maximum transaction nesting levels exceeded", 0, 0 },
 	{ "INDEXTRACHARS", "Indirection string contains extra trailing characters", 0, 0 },
@@ -729,7 +729,7 @@ LITDEF	err_msg merrors[] = {
 	{ "GTMSECSHRSSIDF", "gtmsecshr server setsid failed", 0, 0 },
 	{ "GTMSECSHRFORKF", "gtmsecshr server unable to fork off a child process", 0, 0 },
 	{ "DBFSYNCERR", "Error synchronizing database file !AD to disk", 2, 0 },
-	{ "EXCEEDRCTLRNDWN", "Maximum relinkctl rundown retries limit of !UL exceeded", 1, 0 },
+	{ "UNUSEDMSG898", "EXCEEDRCTLRNDWN removed from code after V7.1-002 Sep 2023", 0, 0 },
 	{ "SCNDDBNOUPD", "Database Updates not allowed on the secondary", 0, 0 },
 	{ "MUINFOUINT4", "!AD : !UL [0x!XL]", 4, 0 },
 	{ "NLMISMATCHCALC", "Location of !AD expected at 0x!XL, but found at 0x!XL", 4, 0 },
@@ -817,7 +817,7 @@ LITDEF	err_msg merrors[] = {
 	{ "LOWSPACECRE", "Disk space for database file !AD is not enough for !UL future extensions.  !@ZQ !UL-byte blocks are needed, only !@ZQ available.", 6, 0 },
 	{ "WAITDSKSPACE", "Process 0x!XL will wait !UL seconds for necessary disk space to become available for !AD ", 4, 0 },
 	{ "OUTOFSPACE", "Database file !AD ran out of disk space.  Detected by process !UL.  !/Exit without clearing shared memory due to the disk space constraints.  !/Make space and then perform mupip rundown to ensure database integrity.", 3, 0 },
-	{ "JNLPVTINFO", "Pid 0x!XL cycle 0x!XL fd_mismatch 0x!XL channel 0x!XL sync_io 0x!XL pini_addr 0x!XL qio_active 0x!XL old_channel 0x!XL", 8, 0 },
+	{ "JNLPVTINFO", "Pid 0x!XL cycle 0x!XL fd_mismatch 0x!XL channel 0x!XL sync_io 0x!XL pini_addr 0x!XL qio_active 0x!XL", 7, 0 },
 	{ "NOSPACEEXT", "Not enough disk space for file !AD to extend.  !@UQ blocks needed.  !@UQ blocks available.", 4, 0 },
 	{ "WCBLOCKED", "Field !AD is set by process !UL at transaction number 0x!16@XQ for database file !AD", 6, 0 },
 	{ "REPLJNLCLOSED", "Replication in jeopardy as journaling got closed for database file !AD. Current region seqno is !@ZQ [0x!16@XQ] and system seqno is !@ZQ [0x!16@XQ]", 6, 0 },
@@ -936,7 +936,7 @@ LITDEF	err_msg merrors[] = {
 	{ "DELIMWIDTH", "Delimiter length !UL exceeds device width !UL", 2, 0 },
 	{ "DBBMLCORRUPT", "Database !AD : Bitmap blk [0x!16@XQ] is corrupt (size = [0x!XL], levl = [0x!XL], tn = [0x!16@XQ]) : Dbtn = [0x!16@XQ] : Database integrity errors likely", 7, 0 },
 	{ "DLCKAVOIDANCE", "Possible deadlock detected: Database !AD : Dbtn [0x!16@XQ] : t_tries [0x!XL] : dollar_trestart [0x!XL] : now_crit [0x!XL] : TP transaction restarted", 6, 0 },
-	{ "WRITERSTUCK", "Buffer flush stuck waiting for [0x!XL] concurrent writers to finish writing to database file !AD", 3, 0 },
+	{ "WRITERSTUCK", "Buffer flush stuck waiting for concurrent writer PID !UL (!UL of !UL) to finish writing to database file !AD", 5, 0 },
 	{ "PATNOTFOUND", "Current pattern table has no characters with pattern code !AD", 2, 0 },
 	{ "INVZDIRFORM", "Invalid value (!UL) specified for ZDIR_FORM", 1, 0 },
 	{ "ZDIROUTOFSYNC", "$ZDIRECTORY !AD is not the same as its cached value !AD", 4, 0 },
@@ -946,7 +946,7 @@ LITDEF	err_msg merrors[] = {
 	{ "JNLALIGNSZCHG", "Journal ALIGNSIZE is rounded up to !UL blocks (closest next higher power of two)", 1, 0 },
 	{ "SEFCTNEEDSFULLB", "Current side effect setting does not permit full Boolean to be turned off", 0, 0 },
 	{ "GVFAILCORE", "A core file is being created for later analysis if necessary", 0, 0 },
-	{ "UNUSEDMSG1115", "DBCDBNOCERTIFY removed from code in V7.0-000 Nov 2020", 0, 0 },
+	{ "RLNKCTLOPENDEL", "The relinkctl file !AZ for $ZROUTINES directory !AD has been deleted by another process, will try to reconnect. (retry = !UL)", 4, 0 },
 	{ "DBFRZRESETSUC", "Freeze released successfully on database file !AD", 2, 0 },
 	{ "JNLFILEXTERR", "Error during extension of journal file !AD", 2, 0 },
 	{ "JOBEXAMDONE", "GT.M process !UL successfully executed $ZJOBEXAM() into !AD", 3, 0 },
@@ -1043,7 +1043,7 @@ LITDEF	err_msg merrors[] = {
 	{ "DBBTUWRNG", "The blocks-to-upgrade file-header field is incorrect. Expected 0x!16@XQ, found 0x!16@XQ", 2, 5 },
 	{ "DBBTUFIXED", "The blocks-to-upgrade file-header field has been changed to the correct value", 0, 0 },
 	{ "DBMAXREC2BIG", "Maximum record size (!UL) is too large for this block size (!UL) - Maximum is !UL", 3, 0 },
-	{ "UNUSEDMSG1212", "DBCSCNNOTCMPLT removed from code in V7.0-000 Nov 2020", 0, 0 },
+	{ "SOCKHANGUP", "Socket has disconnected", 0, 0 },
 	{ "UNUSEDMSG1213", "DBCBADFILE removed from code in V7.0-000 Nov 2020", 0, 0 },
 	{ "UNUSEDMSG1214", "DBCNOEXTND removed from code in V7.0-000 Nov 2020", 0, 0 },
 	{ "UNUSEDMSG1215", "DBCINTEGERR removed from code in V7.0-000 Nov 2020", 0, 0 },
@@ -1075,7 +1075,7 @@ LITDEF	err_msg merrors[] = {
 	{ "BKUPTMPFILWRITE", "Write to backup temporary file !AD failed", 2, 0 },
 	{ "SHMHUGETLB", "Could not back shared memory with huge pages, using base pages instead !AD", 2, 0 },
 	{ "SHMLOCK", "Could not pin shared memory into physical memory", 0, 0 },
-	{ "UNUSEDMSG1244", "LOADEDSZ2 last used in V6.3-009", 0, 0 },
+	{ "SPCFCBUFDELAY", "Request for block 0x!16@XQ in database file !AD delayed by PID !UL", 4, 0 },
 	{ "REPLINSTMISMTCH", "Process has replication instance file !AD (jnlpool shmid = !UL) open but database !AD is bound to instance file !AD (jnlpool shmid = !UL)", 8, 0 },
 	{ "REPLINSTREAD", "Error reading [0x!XL] bytes at offset [0x!16@XQ] from replication instance file !AD", 4, 0 },
 	{ "REPLINSTDBMATCH", "Replication instance file !AD has seqno [0x!16@XQ] while database has a different seqno [0x!16@XQ]", 4, 0 },
@@ -1380,7 +1380,7 @@ LITDEF	err_msg merrors[] = {
 	{ "TLSHANDSHAKE", "Connection to remote side using TLS/SSL protocol failed", 0, 0 },
 	{ "TLSCONNINFO", "Failed to obtain information on the TLS/SSL connection", 0, 0 },
 	{ "TLSIOERROR", "Error during TLS/SSL !AD operation", 2, 0 },
-	{ "TLSRENEGOTIATE", "Failed to renegotiate TLS/SSL connection", 0, 0 },
+	{ "TLSRENEGOTIATE", "Failed to !AZ TLS/SSL connection", 1, 0 },
 	{ "REPLNOTLS", "!AD requested TLS/SSL communication but the !AD was either not started with TLSID qualifier or does not support TLS/SSL protocol", 4, 0 },
 	{ "COLTRANSSTR2LONG", "Output string after collation transformation is too long", 0, 0 },
 	{ "SOCKPASS", "Socket pass failed", 0, 0 },
@@ -2283,7 +2283,7 @@ LITDEF	int ERR_GTMSECSHRSGIDF = 150378056;
 LITDEF	int ERR_GTMSECSHRSSIDF = 150378064;
 LITDEF	int ERR_GTMSECSHRFORKF = 150378076;
 LITDEF	int ERR_DBFSYNCERR = 150378082;
-LITDEF	int ERR_EXCEEDRCTLRNDWN = 150378090;
+LITDEF	int ERR_UNUSEDMSG898 = 150378090;
 LITDEF	int ERR_SCNDDBNOUPD = 150378098;
 LITDEF	int ERR_MUINFOUINT4 = 150378107;
 LITDEF	int ERR_NLMISMATCHCALC = 150378114;
@@ -2500,7 +2500,7 @@ LITDEF	int ERR_INVMNEMCSPC = 150379794;
 LITDEF	int ERR_JNLALIGNSZCHG = 150379803;
 LITDEF	int ERR_SEFCTNEEDSFULLB = 150379810;
 LITDEF	int ERR_GVFAILCORE = 150379818;
-LITDEF	int ERR_UNUSEDMSG1115 = 150379826;
+LITDEF	int ERR_RLNKCTLOPENDEL = 150379824;
 LITDEF	int ERR_DBFRZRESETSUC = 150379835;
 LITDEF	int ERR_JNLFILEXTERR = 150379842;
 LITDEF	int ERR_JOBEXAMDONE = 150379851;
@@ -2597,7 +2597,7 @@ LITDEF	int ERR_STPEXPFAIL = 150380570;
 LITDEF	int ERR_DBBTUWRNG = 150380576;
 LITDEF	int ERR_DBBTUFIXED = 150380587;
 LITDEF	int ERR_DBMAXREC2BIG = 150380594;
-LITDEF	int ERR_UNUSEDMSG1212 = 150380602;
+LITDEF	int ERR_SOCKHANGUP = 150380602;
 LITDEF	int ERR_UNUSEDMSG1213 = 150380610;
 LITDEF	int ERR_UNUSEDMSG1214 = 150380618;
 LITDEF	int ERR_UNUSEDMSG1215 = 150380626;
@@ -2629,7 +2629,7 @@ LITDEF	int ERR_BKUPTMPFILOPEN = 418816282;
 LITDEF	int ERR_BKUPTMPFILWRITE = 418816290;
 LITDEF	int ERR_SHMHUGETLB = 150380840;
 LITDEF	int ERR_SHMLOCK = 150380848;
-LITDEF	int ERR_UNUSEDMSG1244 = 150380858;
+LITDEF	int ERR_SPCFCBUFDELAY = 150380856;
 LITDEF	int ERR_REPLINSTMISMTCH = 150380866;
 LITDEF	int ERR_REPLINSTREAD = 418816330;
 LITDEF	int ERR_REPLINSTDBMATCH = 150380882;

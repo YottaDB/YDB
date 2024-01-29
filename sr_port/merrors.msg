@@ -257,7 +257,7 @@ BACKUPDBFILE	<DB file !AD backed up in file !AD>/info/fao=4!/ansi=0
 GVORDERFAIL	<Global variable $ORDER or $NEXT function failed.  Failure code: !AD.>/error/fao=2!/ansi=0
 GVPUTFAIL	<Global variable put failed.  Failure code: !AD.>/error/fao=2!/ansi=0
 PATTABSYNTAX	<Error in !AD at line !UL>/error/fao=3!/ansi=0
-GVSUBOFLOW	<Maximum combined length of subscripts exceeded>/error/fao=0!/ansi=0
+GVSUBOFLOW	<The combined length of subscripts (!UL) is greater than maximum (!UL) for region: !AD>/error/fao=4!/ansi=0
 GVUNDEF		<Global variable undefined: !AD>/error/fao=2!/ansi=7
 TRANSNEST	<Maximum transaction nesting levels exceeded>/error/fao=0!/ansi=0
 INDEXTRACHARS	<Indirection string contains extra trailing characters>/error/fao=0!/ansi=0
@@ -895,7 +895,7 @@ GTMSECSHRSGIDF	<gtmsecshr server setgid to root failed>/warning/fao=0!/ansi=0
 GTMSECSHRSSIDF	<gtmsecshr server setsid failed>/warning/fao=0!/ansi=0
 GTMSECSHRFORKF	<gtmsecshr server unable to fork off a child process>/fatal/fao=0!/ansi=0
 DBFSYNCERR	<Error synchronizing database file !AD to disk>/error/fao=2!/ansi=0
-EXCEEDRCTLRNDWN	<Maximum relinkctl rundown retries limit of !UL exceeded>/error/fao=1!/ansi=0
+UNUSEDMSG898	<EXCEEDRCTLRNDWN removed from code after V7.1-002 Sep 2023>/error/fao=0!/ansi=0
 SCNDDBNOUPD	<Database Updates not allowed on the secondary>/error/fao=0!/ansi=0
 MUINFOUINT4	<!AD : !UL [0x!XL]>/info/fao=4!/ansi=0
 NLMISMATCHCALC	<Location of !AD expected at 0x!XL, but found at 0x!XL>/error/fao=4!/ansi=0
@@ -983,7 +983,7 @@ NOSPACECRE	<Not enough space to create database file !AD.  !@ZQ blocks are neede
 LOWSPACECRE	<Disk space for database file !AD is not enough for !UL future extensions.  !@ZQ !UL-byte blocks are needed, only !@ZQ available.>/warning/fao=6!/ansi=0
 WAITDSKSPACE	<Process 0x!XL will wait !UL seconds for necessary disk space to become available for !AD >/info/fao=4!/ansi=0
 OUTOFSPACE	<Database file !AD ran out of disk space.  Detected by process !UL.  !/Exit without clearing shared memory due to the disk space constraints.  !/Make space and then perform mupip rundown to ensure database integrity.>/fatal/fao=3!/ansi=0
-JNLPVTINFO	<Pid 0x!XL cycle 0x!XL fd_mismatch 0x!XL channel 0x!XL sync_io 0x!XL pini_addr 0x!XL qio_active 0x!XL old_channel 0x!XL>/info/fao=8!/ansi=0
+JNLPVTINFO	<Pid 0x!XL cycle 0x!XL fd_mismatch 0x!XL channel 0x!XL sync_io 0x!XL pini_addr 0x!XL qio_active 0x!XL>/info/fao=7!/ansi=0
 NOSPACEEXT	<Not enough disk space for file !AD to extend.  !@UQ blocks needed.  !@UQ blocks available.>/error/fao=4!/ansi=0
 WCBLOCKED	<Field !AD is set by process !UL at transaction number 0x!16@XQ for database file !AD>/warning/fao=6!/ansi=0
 REPLJNLCLOSED	<Replication in jeopardy as journaling got closed for database file !AD. Current region seqno is !@ZQ [0x!16@XQ] and system seqno is !@ZQ [0x!16@XQ]>/error/fao=6!/ansi=0
@@ -1102,7 +1102,7 @@ JNLFSYNCLSTCK	<Journaling fsync lock is stuck in journal file !AD>/warning/fao=2
 DELIMWIDTH	<Delimiter length !UL exceeds device width !UL>/error/fao=2!/ansi=0
 DBBMLCORRUPT	<Database !AD : Bitmap blk [0x!16@XQ] is corrupt (size = [0x!XL], levl = [0x!XL], tn = [0x!16@XQ]) : Dbtn = [0x!16@XQ] : Database integrity errors likely>/error/fao=7!/ansi=0
 DLCKAVOIDANCE	<Possible deadlock detected: Database !AD : Dbtn [0x!16@XQ] : t_tries [0x!XL] : dollar_trestart [0x!XL] : now_crit [0x!XL] : TP transaction restarted>/error/fao=6!/ansi=0
-WRITERSTUCK	<Buffer flush stuck waiting for [0x!XL] concurrent writers to finish writing to database file !AD>/error/fao=3!/ansi=0
+WRITERSTUCK	<Buffer flush stuck waiting for concurrent writer PID !UL (!UL of !UL) to finish writing to database file !AD>/error/fao=5!/ansi=0
 PATNOTFOUND	<Current pattern table has no characters with pattern code !AD>/error/fao=2!/ansi=0
 INVZDIRFORM	<Invalid value (!UL) specified for ZDIR_FORM>/error/fao=1!/ansi=0
 ZDIROUTOFSYNC	<$ZDIRECTORY !AD is not the same as its cached value !AD>/warning/fao=4!/ansi=0
@@ -1112,7 +1112,7 @@ INVMNEMCSPC	<Unsupported mnemonicspace !AD>/error/fao=2!/ansi=35
 JNLALIGNSZCHG	<Journal ALIGNSIZE is rounded up to !UL blocks (closest next higher power of two)>/info/fao=1!/ansi=0
 SEFCTNEEDSFULLB	<Current side effect setting does not permit full Boolean to be turned off>/error/fao=0!/ansi=0
 GVFAILCORE	<A core file is being created for later analysis if necessary>/error/fao=0!/ansi=0
-UNUSEDMSG1115	<DBCDBNOCERTIFY removed from code in V7.0-000 Nov 2020>/error/fao=0!/ansi=0
+RLNKCTLOPENDEL	<The relinkctl file !AZ for $ZROUTINES directory !AD has been deleted by another process, will try to reconnect. (retry = !UL)>/warning/fao=4!/ansi=0
 DBFRZRESETSUC	<Freeze released successfully on database file !AD>/info/fao=2!/ansi=0
 JNLFILEXTERR	<Error during extension of journal file !AD>/error/fao=2!/ansi=0
 JOBEXAMDONE	<GT.M process !UL successfully executed $ZJOBEXAM() into !AD>/info/fao=3!/ansi=0
@@ -1209,7 +1209,7 @@ STPEXPFAIL	<Stringpool expansion failed. It could not expand to !UL bytes.>/erro
 DBBTUWRNG	<The blocks-to-upgrade file-header field is incorrect. Expected 0x!16@XQ, found 0x!16@XQ>/warning/fao=2!/ansi=0/T
 DBBTUFIXED	<The blocks-to-upgrade file-header field has been changed to the correct value>/info/fao=0!/ansi=0
 DBMAXREC2BIG	<Maximum record size (!UL) is too large for this block size (!UL) - Maximum is !UL>/error/fao=3!/ansi=0
-UNUSEDMSG1212	<DBCSCNNOTCMPLT removed from code in V7.0-000 Nov 2020>/error/fao=0!/ansi=0
+SOCKHANGUP	<Socket has disconnected>/error/fao=0!/ansi=0
 UNUSEDMSG1213	<DBCBADFILE removed from code in V7.0-000 Nov 2020>/error/fao=0!/ansi=0
 UNUSEDMSG1214	<DBCNOEXTND removed from code in V7.0-000 Nov 2020>/error/fao=0!/ansi=0
 UNUSEDMSG1215	<DBCINTEGERR removed from code in V7.0-000 Nov 2020>/error/fao=0!/ansi=0
@@ -1241,7 +1241,7 @@ BKUPTMPFILOPEN	<Open of backup temporary file !AD failed>/error/fao=2!/ansi=0//1
 BKUPTMPFILWRITE	<Write to backup temporary file !AD failed>/error/fao=2!/ansi=0//1
 SHMHUGETLB	<Could not back shared memory with huge pages, using base pages instead !AD>/warning/fao=2!/ansi=0
 SHMLOCK		<Could not pin shared memory into physical memory>/warning/fao=0!/ansi=0
-UNUSEDMSG1244	<LOADEDSZ2 last used in V6.3-009>/error/fao=0!/ansi=0
+SPCFCBUFDELAY	<Request for block 0x!16@XQ in database file !AD delayed by PID !UL>/warning/fao=4!/ansi=0
 REPLINSTMISMTCH	<Process has replication instance file !AD (jnlpool shmid = !UL) open but database !AD is bound to instance file !AD (jnlpool shmid = !UL)>/error/fao=8!/ansi=0
 REPLINSTREAD	<Error reading [0x!XL] bytes at offset [0x!16@XQ] from replication instance file !AD>/error/fao=4!/ansi=0//1
 REPLINSTDBMATCH	<Replication instance file !AD has seqno [0x!16@XQ] while database has a different seqno [0x!16@XQ]>/error/fao=4!/ansi=0
@@ -1548,7 +1548,7 @@ TLSCONVSOCK	<Failed to convert Unix TCP/IP socket to TLS/SSL aware socket>/error
 TLSHANDSHAKE	<Connection to remote side using TLS/SSL protocol failed>/error/fao=0!/ansi=0
 TLSCONNINFO	<Failed to obtain information on the TLS/SSL connection>/warning/fao=0!/ansi=0
 TLSIOERROR	<Error during TLS/SSL !AD operation>/error/fao=2!/ansi=0
-TLSRENEGOTIATE	<Failed to renegotiate TLS/SSL connection>/error/fao=0!/ansi=0
+TLSRENEGOTIATE	<Failed to !AZ TLS/SSL connection>/error/fao=1!/ansi=0
 REPLNOTLS	<!AD requested TLS/SSL communication but the !AD was either not started with TLSID qualifier or does not support TLS/SSL protocol>/error/fao=4!/ansi=0
 COLTRANSSTR2LONG	<Output string after collation transformation is too long>/error/fao=0!/ansi=0
 SOCKPASS	<Socket pass failed>/error/fao=0!/ansi=0

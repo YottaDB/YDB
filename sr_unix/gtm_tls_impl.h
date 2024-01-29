@@ -31,7 +31,6 @@ typedef struct gtmtls_passwd_list_struct
 STATICFNDEF gtmtls_passwd_list_t *gtm_tls_find_pwent(const char *input_env_name);
 
 #define GET_SOCKFD(TLS)			SSL_get_fd((SSL *)TLS)
-#define VERIFY_PEER(FLAGS)		(FLAGS & GTMTLS_OP_VERIFY_PEER)
 #define CLIENT_MODE(FLAGS)		(FLAGS & GTMTLS_OP_CLIENT_MODE)
 #define DEFAULT_SESSION_TIMEOUT		3600		/* Old sessions can be reused upto 1 hour since the creation time. */
 

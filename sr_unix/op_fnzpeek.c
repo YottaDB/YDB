@@ -447,7 +447,7 @@ void	op_fnzpeek(mval *structid, int offset, int len, mval *format, mval *ret)
 	unsigned int		full_len;
 	unsigned char		argument_uc_buf[ARGUMENT_MAX_LEN];
 	sgmnt_addrs		*csa;
-	int			pass;
+	int			iter;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -495,10 +495,10 @@ void	op_fnzpeek(mval *structid, int offset, int len, mval *format, mval *ret)
 			 * so first check if region as is does exist. If so use that. If not, do uppercase.
 			 */
 			assert(arglen);
-			pass = (ISLOWER_ASCII(argptr[0]) ? PASS1 : PASS2);
+			iter = (ISLOWER_ASCII(argptr[0]) ? PASS1 : PASS2);
 			for ( ; ; )
 			{
-				if (PASS1 != pass)
+				if (PASS1 != iter)
 				{
 					lower_to_upper(argument_uc_buf, argptr, arglen);
 					argptr = argument_uc_buf;	/* Reset now to point to upper case version */
@@ -517,7 +517,7 @@ void	op_fnzpeek(mval *structid, int offset, int len, mval *format, mval *ret)
 				{
 					if (r_ptr >= r_top)
 					{
-						if (PASS1 == pass)
+						if (PASS1 == iter)
 							break;
 						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_BADZPEEKARG, 2,
 							RTS_ERROR_LITERAL("mnemonic argument (region name)"));
@@ -533,8 +533,8 @@ void	op_fnzpeek(mval *structid, int offset, int len, mval *format, mval *ret)
 					 * region name. In that case, it is possible we find the region in the gld only when we
 					 * convert the entire region name into upper case.
 					 */
-					assert(PASS1 == pass);
-					pass = PASS2;
+					assert(PASS1 == iter);
+					iter = PASS2;
 					continue;
 				}
 				/* Cache new region access for followup references */

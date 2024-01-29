@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -511,7 +511,10 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 #					endif
 				}
 				if (cdb_sc_instancefreeze == status)
+				{
+					assert(!(TREF(defer_instance_freeze) & DEFER_FREEZES));
 					WAIT_FOR_REPL_INST_UNFREEZE_NOCSA;
+				}
 				/* fall through */
 			default:
 				if (CDB_STAGNATE < ++t_tries)

@@ -69,7 +69,9 @@ uint4 mur_process_intrpt_recov()
 	jnl_record			*jnlrec;
 	jnl_file_header			*jfh;
 	jnl_tm_t			now;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	for (rctl = mur_ctl, rctl_top = mur_ctl + murgbl.reg_total; rctl < rctl_top; rctl++)
 	{
 		TP_CHANGE_REG(rctl->gd);

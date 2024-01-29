@@ -850,9 +850,9 @@ void	repl_inst_dump_gtmsourcelocal(gtmsource_local_ptr_t gtmsourcelocal_ptr)
 				string, gtmsourcelocal_ptr->read_state);
 		}
 
-		PRINT_OFFSET_PREFIX(offsetof(gtmsource_local_struct, jnlfileonly), SIZEOF(gtmsourcelocal_ptr->jnlfileonly));
+		PRINT_OFFSET_PREFIX(offsetof(gtmsource_local_struct, read_algo), SIZEOF(gtmsourcelocal_ptr->read_algo));
 		PRINT_BOOLEAN(PREFIX_SOURCELOCAL "Journal File Only                   !R12AZ",
-				gtmsourcelocal_ptr->jnlfileonly, idx);
+				gtmsourcelocal_ptr->read_algo, idx);
 
 		PRINT_OFFSET_PREFIX(offsetof(gtmsource_local_struct, read), SIZEOF(gtmsourcelocal_ptr->read));
 		util_out_print( PREFIX_SOURCELOCAL "Relative Read Offset                  !10UL [0x!XL]", TRUE, idx,

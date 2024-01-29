@@ -28,9 +28,11 @@ static inline void jpl_phase2_write_complete(struct jnlpool_addrs_struct *jnlpoo
 	GBLREF	uint4		process_id;
 	GBLREF	jnl_gbls_t	jgbl;
 	GBLREF	void		repl_phase2_cleanup(jnlpool_addrs *jpa);
+#	ifdef DEBUG
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+#	endif
 	tot_jrec_len = jnlpool->jrs.tot_jrec_len;
 	assert(tot_jrec_len);
 	index = jnlpool->jrs.phase2_commit_index;

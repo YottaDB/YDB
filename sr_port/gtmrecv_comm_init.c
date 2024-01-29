@@ -40,8 +40,9 @@
 #include "repl_log.h"
 #include "repl_comm.h"
 
-GBLDEF	int                gtmrecv_listen_sock_fd = FD_INVALID;
-GBLREF	gtmrecv_options_t  gtmrecv_options;
+GBLDEF	int                	gtmrecv_listen_sock_fd = FD_INVALID;
+GBLREF	gtmrecv_options_t  	gtmrecv_options;
+GBLREF	intrpt_state_t		intrpt_ok_state;
 
 error_def(ERR_GETADDRINFO);
 error_def(ERR_REPLCOMM);
@@ -66,6 +67,7 @@ int gtmrecv_comm_init(in_port_t port)
 	char                    local_port_buffer[NI_MAXSERV];
 	unsigned int		save_errno;
 	GTM_SOCKLEN_TYPE        len;
+	intrpt_state_t		prev_intrpt_state;
 
 	if (FD_INVALID != gtmrecv_listen_sock_fd) /* Initialization done already */
 		return (0);
@@ -86,24 +88,31 @@ int gtmrecv_comm_init(in_port_t port)
 	/* Make it known to the world that you are ready for a Source Server */
 	SERVER_HINTS(hints, af);
 	SNPRINTF(port_buffer, NI_MAXSERV, "%hu", port);
+	DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 	if (0 != (errcode = getaddrinfo(NULL, port_buffer, &hints, &ai_ptr)))
 	{
+		ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 		CLOSEFILE(temp_sock_fd, rc);
 		RTS_ERROR_ADDRINFO_CTX(NULL, ERR_GETADDRINFO, errcode, "FAILED in obtaining IP address on receiver server.");
 		return -1;
 	}
 	gtmrecv_listen_sock_fd = temp_sock_fd;
 	if (0 > setsockopt(gtmrecv_listen_sock_fd, SOL_SOCKET, SO_LINGER, (const void *)&disable_linger, SIZEOF(disable_linger)))
+	{
+		ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
 			RTS_ERROR_LITERAL("Error with receiver server listen socket disable linger"), ERRNO);
+	}
 	if (0 > setsockopt(gtmrecv_listen_sock_fd, SOL_SOCKET, SO_REUSEADDR, (const void *)&enable_reuseaddr,
 			SIZEOF(enable_reuseaddr)))
 	{
+		ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
 			RTS_ERROR_LITERAL("Error with receiver server listen socket enable reuseaddr"), ERRNO);
 	}
 	if (0 != (errcode = get_send_sock_buff_size(gtmrecv_listen_sock_fd, &send_buffsize)))
 	{
+		ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 		SNPRINTF(err_buffer, SIZEOF(err_buffer), "Error getting socket send buffsize : %s", STRERROR(errcode));
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, LEN_AND_STR(err_buffer));
 	}
@@ -113,6 +122,7 @@ int gtmrecv_comm_init(in_port_t port)
 		{
 			if (send_buffsize < GTMRECV_MIN_TCP_SEND_BUFSIZE)
 			{
+				ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 				SNPRINTF(err_buffer, SIZEOF(err_buffer), "Could not set TCP send buffer size to %d : %s",
 						GTMRECV_MIN_TCP_SEND_BUFSIZE, STRERROR(errcode));
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) MAKE_MSG_INFO(ERR_REPLCOMM), 0,
@@ -122,6 +132,7 @@ int gtmrecv_comm_init(in_port_t port)
 	}
 	if (0 != (errcode = get_recv_sock_buff_size(gtmrecv_listen_sock_fd, &recv_buffsize)))
 	{
+		ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 		SNPRINTF(err_buffer, SIZEOF(err_buffer), "Error getting socket recv buffsize : %s", STRERROR(errcode));
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, LEN_AND_STR(err_buffer));
 	}
@@ -134,6 +145,7 @@ int gtmrecv_comm_init(in_port_t port)
 			;
 		if (tcp_r_buffsize < GTMRECV_MIN_TCP_RECV_BUFSIZE)
 		{
+			ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 			SNPRINTF(err_buffer, SIZEOF(err_buffer), "Could not set TCP receive buffer size in range [%d, %d], last "
 					"known error : %s", GTMRECV_MIN_TCP_RECV_BUFSIZE, gtmrecv_options.recv_buffsize,
 					STRERROR(errcode));
@@ -147,6 +159,7 @@ int gtmrecv_comm_init(in_port_t port)
 		SNPRINTF(err_buffer, 512, "Could not bind local address. Local Port : %hu", port);
 		SEND_SYSMSG_REPLCOMM(LEN_AND_STR(err_buffer));
 		freeaddrinfo(ai_ptr);
+		ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 		CLOSEFILE_RESET(gtmrecv_listen_sock_fd, rc);	/* resets "gtmrecv_listen_sock_fd" to FD_INVALID */
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
 				RTS_ERROR_STRING(err_buffer), ERRNO);
@@ -164,11 +177,13 @@ int gtmrecv_comm_init(in_port_t port)
 		GTM_WHITE_BOX_TEST(WBTEST_REPL_INIT_ERR2, save_errno, 98);
 		SEND_SYSMSG_REPLCOMM(LEN_AND_STR(err_buffer));
 		freeaddrinfo(ai_ptr);
+		ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 		CLOSEFILE_RESET(gtmrecv_listen_sock_fd, rc);	/* resets "gtmrecv_listen_sock_fd" to FD_INVALID */
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
 				 RTS_ERROR_STRING(err_buffer), save_errno);
 		return (-1);
 	}
 	freeaddrinfo(ai_ptr);
+	ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 	return (0);
 }

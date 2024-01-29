@@ -111,15 +111,15 @@ void lvzwr_out_targkey(mstr *one)
 
 void lvzwr_out(lv_val *lvp)
 {
-	char 			buff;
+	char			buff;
 	uchar_ptr_t		lastc;
-	int			n, nsubs, sbs_depth;
-	lv_val			*dst_lv, *res_lv, *lvpc;
-	mstr 			one;
-	mval 			*subscp, *val, outindx;
+	int			n, nsubs, sbs_depth, tmp_len;
+	lv_val			*dst_lv, *lvpc, *res_lv;
+	mstr			one;
+	mval			outindx, *subscp, *val;
 	ht_ent_addr		*tabent_addr;
 	ht_ent_mname		*tabent_mname;
-	boolean_t		htent_added, dump_container;
+	boolean_t		dump_container, htent_added;
 	zwr_alias_var		*newzav, *zav;
 	mident_fixed		zwrt_varname;
 	lvzwrite_datablk	*newzwrb;
@@ -319,8 +319,9 @@ void lvzwr_out(lv_val *lvp)
 			/* For spanning globals, "gv_cur_region" points to the target region for ^gvn1 only now.
 			 * So do the GVSUBOFLOW check (both for spanning and non-spanning globals) now.
 			 */
-			if (gv_currkey->end >= gv_cur_region->max_key_size)
-				ISSUE_GVSUBOFLOW_ERROR(gv_currkey, KEY_COMPLETE_TRUE);
+			if ((tmp_len = gv_currkey->end) >= gv_cur_region->max_key_size)
+				ISSUE_GVSUBOFLOW_ERROR(gv_currkey, KEY_COMPLETE_TRUE, (tmp_len+1),
+									gv_cur_region->max_key_size, gv_cur_region);
 			op_gvput(val);
 		} else
 		{	/* Target is a local var : pre-process target in case it is a container */

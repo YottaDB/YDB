@@ -52,11 +52,12 @@ GBLREF	int			num_additional_processors;
 GBLREF	uint4			process_id;
 GBLREF	boolean_t		multi_proc_in_use;
 
-error_def(ERR_DBFILERR);
-error_def(ERR_WAITDSKSPACE);
-error_def(ERR_GBLOFLOW);
 error_def(ERR_BUFSPCDELAY);
 error_def(ERR_BUFOWNERSTUCK);
+error_def(ERR_DBFILERR);
+error_def(ERR_GBLOFLOW);
+error_def(ERR_SPCFCBUFDELAY);
+error_def(ERR_WAITDSKSPACE);
 
 #define	WCS_CONFLICT_TRACE_ARRAYSIZE	64
 #define	LCNT_INTERVAL			DIVIDE_ROUND_UP(UNIX_GETSPACEWAIT, WCS_CONFLICT_TRACE_ARRAYSIZE)
@@ -214,7 +215,12 @@ boolean_t wcs_get_space(gd_region *reg, int needed, cache_rec_ptr_t cr)
 		for (lcnt = 1; 0 != cr->dirty; ++lcnt)
 		{
 			if (0 == (lcnt % UNIX_GETSPACEWAIT))
-				send_msg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_BUFSPCDELAY, 3, needed, REG_LEN_STR(reg));
+			{
+				send_msg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_SPCFCBUFDELAY, 4, &(cr->blk), DB_LEN_STR(reg), cr->epid);
+				if (cr->dirty && cr->epid && !is_proc_alive(cr->epid, 0))
+					return FALSE;
+				INVOKE_C_STACK_APPROPRIATE(cr, csa, lcnt);
+			}
 			if (0 == (lcnt % LCNT_INTERVAL))
 			{
 				this_idx = (lcnt / LCNT_INTERVAL);

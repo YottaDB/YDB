@@ -60,7 +60,9 @@ void jnl_fsync(gd_region *reg, uint4 fsync_addr)
 	int			fsync_ret, save_errno;
 	intrpt_state_t		prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;
 	DEBUG_ONLY(uint4	onln_rlbk_pid;)
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	csa = &FILE_INFO(reg)->s_addrs;
 	jpc = csa->jnl;
 	jb  = jpc->jnl_buff;

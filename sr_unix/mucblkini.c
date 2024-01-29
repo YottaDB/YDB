@@ -61,7 +61,9 @@ void mucblkini(enum db_ver desired_db_ver)
 	int4			bmpsize, status;
 	block_id		blk;
 	boolean_t		isv7blk;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	isv7blk = (GDSV7m <= desired_db_ver);
 	udi = FILE_INFO(gv_cur_region);
 	bp1 = (blk_hdr_ptr_t)malloc(cs_addrs->hdr->blk_size);

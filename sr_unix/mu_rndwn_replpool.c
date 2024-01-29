@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -67,6 +67,9 @@ GBLREF	mur_gbls_t		murgbl;
 GBLREF	mur_opt_struct		mur_options;
 GBLREF	uint4			mutex_per_process_init_pid;
 GBLREF	uint4			process_id;
+#ifdef DEBUG
+GBLREF	bool			only_usr_jnlpool_flush;
+#endif
 
 LITREF char             	gtm_release_name[];
 LITREF int4             	gtm_release_name_len;
@@ -164,7 +167,9 @@ int     mu_rndwn_replpool2(replpool_identifier *replpool_id, repl_inst_hdr_ptr_t
 					&& (0 != repl_inst_filehdr->jnlpool_semid_ctime));
 			jnlpool->repl_inst_filehdr->jnlpool_semid = repl_inst_filehdr->jnlpool_semid;
 			jnlpool->repl_inst_filehdr->jnlpool_semid_ctime = repl_inst_filehdr->jnlpool_semid_ctime;
+			DEBUG_ONLY(only_usr_jnlpool_flush = true;)
 			repl_inst_flush_jnlpool(FALSE, reset_crash);
+			DEBUG_ONLY(only_usr_jnlpool_flush = false;)
 			assert(!jnlpool->repl_inst_filehdr->crash || !reset_crash);
 			/* Refresh local copy (repl_inst_filehdr) with the copy that was just
 				flushed (jnlpool->repl_inst_filehdr) */

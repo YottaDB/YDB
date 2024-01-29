@@ -225,8 +225,15 @@ typedef enum {
 	WBTEST_BACKUP_FORCE_MV_RV,		/* 175 : Force error during MUPIP BACKUP mv phase */
 	WBTEST_RTNOBJ_INTEG,			/* 176 : Inject a loop into the relinkctl linked list to trigger rtnobj_integ() */
 	WBTEST_INDUCE_TLSIOERR,			/* 177 : Source Server does not close the network socket in error shutdown */
-	WBTEST_MU_STOP_THREAD			/* 178 : Will sleep in gtm_multi_thread to let us verify that first two MUPIP STOPs
+	WBTEST_MU_STOP_THREAD,			/* 178 : Will sleep in gtm_multi_thread to let us verify that first two MUPIP STOPs
                                                  *       are indeed deferred in the interrupt-deferred zone, but the third isn't */
+	WBTEST_FLUSH_FH,			/* 179 : Sleep in repl_inst_flush_gtmsrc_lcl to validate concurrency controls. */
+	WBTEST_PHS1_PRESLEEP,			/* 180 : Sleep right after releasing instance crit. */
+	WBTEST_PHS1_POSTSLEEP,			/* 181 : Sleep right after finishing phase1. */
+	WBTEST_SEQNO_PREKILL,			/* 182 : Kill right after incrementing the sequence number. */
+	WBTEST_REL_LOCK_PREKILL,		/* 183 : Kill right before releaseing instance crit. */
+	WBTEST_REL_LOCK_POSTKILL,		/* 184 : Kill after releasing instance crit and sleeping for a second. */
+	WBTEST_PHS1_NOSPACE			/* 185 : Set fake enospc right before releasing instance crit. */
 
 	/* Note 1: when adding new white box test cases, please make use of WBTEST_ENABLED and WBTEST_ASSIGN_ONLY (defined below)
 	 * whenever applicable

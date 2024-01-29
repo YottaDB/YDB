@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -56,11 +56,11 @@ void gtcml_chkreg(void)
 			if (reg->region->wakeup < wakeup)
 			{
 				gtcml_chklck(reg, FALSE);
-				reg->pass = CM_BLKPASS;
-			} else if (0 == --reg->pass)
+				reg->tries_left = CM_BLKPASS;
+			} else if (0 == --reg->tries_left)
 			{
 				gtcml_chklck(reg, TRUE);
-				reg->pass = CM_BLKPASS;
+				reg->tries_left = CM_BLKPASS;
 			}
 			reg->region->wakeup = wakeup;	/* done for both cases above due to possibility of wakeup rollover */
 		}

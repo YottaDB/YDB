@@ -208,12 +208,13 @@ error_def(ERR_JNLENDIANLITTLE);
 #define	JNL_WRITE_APPROPRIATE(CSA, JPC, RECTYPE, JREC, JFB)								\
 MBSTART {														\
 	GBLREF	boolean_t		is_replicator;									\
+	GBLREF	jnl_gbls_t		jgbl;										\
 															\
 	assert(JNL_ENABLED(CSA) || REPL_WAS_ENABLED(CSA));								\
 	assert((NULL == JFB) || (RECTYPE == ((jnl_record *)(((jnl_format_buffer *)JFB)->buff))->prefix.jrec_type));	\
 	if (JNL_ENABLED(CSA))												\
 		jnl_write(JPC, RECTYPE, JREC, JFB); 	/* write to jnlbuffer */					\
-	if (REPL_ALLOWED(CSA) && is_replicator)										\
+	if (REPL_ALLOWED(CSA) && is_replicator && !jgbl.skip_jplwrites)							\
 	{														\
 		assert(REPL_ENABLED(CSA) || REPL_WAS_ENABLED(CSA));							\
 		jnl_pool_write(CSA, RECTYPE, JREC, JFB);	/* write to jnlpool */					\
@@ -580,8 +581,10 @@ typedef struct jnl_private_control_struct
 {
 	jnl_buffer_ptr_t	jnl_buff;		/* pointer to shared memory */
 	gd_region		*region;		/* backpointer to region head */
-	fd_type			channel,		/* output channel, aka fd in UNIX */
-				old_channel;		/* VMS only - for dealing with deferred deassign */
+	fd_type			channel;		/* output channel, aka fd in UNIX */
+	uint4			next_align_addr;	/* Private copy of the jnlbuff next_align_addr taken after acquiring crit.
+							 * Makes it possible to defer writing updates to shared memory.
+							 */
 	gd_id			fileid;			/* currently initialized and used only by source-server */
 	uint4			pini_addr,		/* virtual on-disk address for JRT_PINI record, if journaling */
 				new_freeaddr;
@@ -1176,7 +1179,7 @@ typedef struct
 	token_num			mur_jrec_strm_seqno;	/* This is the strm_seqno of the current record that backward
 								 * recovery/rollback is playing in its forward phase.
 								 */
-	unsigned short			filler_short;
+	unsigned short			skip_jplwrites;
 	unsigned short			mur_jrec_participants;
 	jnl_tm_t			gbl_jrec_time;
 	jnl_tm_t			mur_tp_resolve_time;	/* tp resolve time as determined by journal recovery.
@@ -1285,6 +1288,16 @@ MBSTART {													\
 #else	/* #ifdef DEBUG */
 #define DECR_INDEX2_AND_KILL(IDX2, IDX1)	/* No-OP */
 #endif	/* #ifdef DEBUG */
+
+#ifdef DEBUG
+#define SET_CUR_CMT_STEP_IF(CONDITION, TARGET, STEP)								\
+MBSTART {													\
+	if (CONDITION)												\
+		TARGET = STEP;											\
+} MBEND
+#else
+#define SET_CUR_CMT_STEP_IF(CONDITION, TARGET, STEP)
+#endif
 
 #define	UPDATE_JBP_RSRV_FREEADDR(CSA, JPC, JBP, JPL, RLEN, INDEX, IN_PHASE2, JNL_SEQNO, STRM_SEQNO, REPLICATION)	\
 MBSTART {														\
@@ -1395,17 +1408,20 @@ MBSTART {											\
 #define	FINISH_JNL_PHASE2_IN_JNLBUFF(CSA, JRS)										\
 MBSTART {														\
 	assert(NEED_TO_FINISH_JNL_PHASE2(JRS));										\
-	jnl_write_phase2(CSA, JRS);			/* Mark jnl record writing into jnlbuffer as complete */	\
+	jnl_write_phase2(CSA, JRS);		/* Mark jnl record writing into jnlbuffer as complete */		\
 	assert(!NEED_TO_FINISH_JNL_PHASE2(JRS));									\
 } MBEND
 
 #define	FINISH_JNL_PHASE2_IN_JNLPOOL_IF_NEEDED(REPLICATION, JNLPOOL)							\
 MBSTART {														\
+	GBLREF jnl_gbls_t jgbl;												\
+															\
+	assert(!REPLICATION || !jgbl.skip_jplwrites || !JNLPOOL->jrs.tot_jrec_len);					\
 	if (REPLICATION && JNLPOOL->jrs.tot_jrec_len)									\
 	{														\
-		JPL_PHASE2_WRITE_COMPLETE(JNLPOOL);	/* Mark jnl record writing into jnlpool   as complete */	\
-		assert(0 == JNLPOOL->jrs.tot_jrec_len);									\
+		JPL_PHASE2_WRITE_COMPLETE(JNLPOOL);	/* Mark jnl record writing into jnlpool as complete */		\
 	}														\
+	assert(!REPLICATION || !JNLPOOL->jrs.tot_jrec_len);								\
 } MBEND
 
 #define	NONTP_FINISH_JNL_PHASE2_IN_JNLBUFF_AND_JNLPOOL(CSA, JRS, REPLICATION, JNLPOOL)					\
@@ -1427,10 +1443,14 @@ MBSTART {														\
 		jrs = si->jbuf_rsrv_ptr;										\
 		assert(JNL_ALLOWED(csa));										\
 		assert(!REPLICATION || (!csa->jnlpool || (csa->jnlpool == JNLPOOL)));					\
+		SET_CUR_CMT_STEP_IF((TREF(cur_cmt_step) < DECL_CMT16), TREF(cur_cmt_step), DECL_CMT16); 		\
 		if (NEED_TO_FINISH_JNL_PHASE2(jrs))									\
 			FINISH_JNL_PHASE2_IN_JNLBUFF(csa, jrs);		/* Step CMT16 (if BG) */			\
+		SET_CUR_CMT_STEP_IF(JNL_FENCE_LIST_END == csa->next_fenced, TREF(cur_cmt_step), CMT16); 		\
 	}														\
-	FINISH_JNL_PHASE2_IN_JNLPOOL_IF_NEEDED(replication, JNLPOOL);	/* Step CMT17 (if BG) */			\
+	SET_CUR_CMT_STEP_IF(TRUE, TREF(cur_cmt_step), DECL_CMT17);							\
+	FINISH_JNL_PHASE2_IN_JNLPOOL_IF_NEEDED(REPLICATION, JNLPOOL);	/* Step CMT17 (if BG) */			\
+	SET_CUR_CMT_STEP_IF(TRUE, TREF(cur_cmt_step), CMT17);								\
 } MBEND
 
 /* BEGIN : Structures used by "jnl_write_reserve" */
@@ -1472,8 +1492,15 @@ MBSTART {									\
 	}									\
 } MBEND
 
+#define SET_JNLBUF_NEXT_ALIGN_ADDR(JPC, JBP)					\
+MBSTART {									\
+	assert(JPC->next_align_addr >= JBP->next_align_addr);			\
+	JBP->next_align_addr = JPC->next_align_addr;				\
+} MBEND
+
 #define	UPDATE_JRS_RSRV_FREEADDR(CSA, JPC, JBP, JRS, JPL, JNL_FENCE_CTL, REPLICATION)			\
 MBSTART {												\
+	SET_JNLBUF_NEXT_ALIGN_ADDR(JPC, JBP);								\
 	SET_JNLBUFF_PREV_JREC_TIME(JBP, jgbl.gbl_jrec_time, DO_GBL_JREC_TIME_CHECK_TRUE);		\
 		/* Keep jb->prev_jrec_time up to date */						\
 	assert(JNL_ENABLED(CSA));									\

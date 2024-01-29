@@ -92,6 +92,7 @@ block_id bm_getfree(block_id hint_arg, boolean_t *blk_used, unsigned int cw_work
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	assert(!TREF(defer_instance_freeze));
 	total_blks = (dba_mm == cs_data->acc_meth) ? cs_addrs->total_blks : cs_addrs->ti->total_blks;
 	hint = (((ublock_id)hint_arg >= total_blks) ? 1 : hint_arg);	/* avoid any chance of treating TP chain.flag as a sign */
 	hint_cycled = DIVIDE_ROUND_UP(total_blks, BLKS_PER_LMAP);
@@ -138,10 +139,10 @@ block_id bm_getfree(block_id hint_arg, boolean_t *blk_used, unsigned int cw_work
 					if (FROZEN_CHILLED(cs_addrs))
 						DO_CHILLED_AUTORELEASE(cs_addrs, cs_data);
 					assert(FROZEN(cs_data) || !cs_addrs->jnlpool || (cs_addrs->jnlpool == jnlpool));
-					if (FROZEN(cs_data) || IS_REPL_INST_FROZEN)
+					if (FROZEN(cs_data) || IS_REPL_INST_FROZEN(TREF(defer_instance_freeze)))
 					{
 						rel_crit(gv_cur_region);
-						while (FROZEN(cs_data) || IS_REPL_INST_FROZEN)
+						while (FROZEN(cs_data) || IS_REPL_INST_FROZEN(TREF(defer_instance_freeze)))
 						{
 							hiber_start(1000);
 							if (FROZEN_CHILLED(cs_addrs) && CHILLED_AUTORELEASE(cs_addrs))

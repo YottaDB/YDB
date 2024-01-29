@@ -63,7 +63,7 @@ Return:
 	failure code on concurrency failure
  *******************************************************************************************/
 enum cdb_sc gvcst_expand_any_key(srch_blk_status *blk_stat, sm_uc_ptr_t rec_top, sm_uc_ptr_t expanded_key,
-	int *rec_size, int *keylen, int *keycmpc, srch_hist *hist_ptr)
+	int *rec_size, int *keylen, int *keycmpc, srch_hist *hist_ptr, int *reached_level)
 {
 	block_id		tblk_num;
 	boolean_t		long_blk_id;
@@ -79,7 +79,7 @@ enum cdb_sc gvcst_expand_any_key(srch_blk_status *blk_stat, sm_uc_ptr_t rec_top,
 	blk_base = blk_stat->buffaddr;
 	long_blk_id = IS_64_BLK_ID(blk_base);
 	blk_id_sz = SIZEOF_BLK_ID(long_blk_id);
-	cur_level = blk_stat->level;
+	*reached_level = cur_level = blk_stat->level;
 	curptr = blk_base + SIZEOF(blk_hdr);
 	*rec_size = *keycmpc = *keylen = 0;
 	while (curptr < rec_top)
@@ -146,7 +146,7 @@ enum cdb_sc gvcst_expand_any_key(srch_blk_status *blk_stat, sm_uc_ptr_t rec_top,
 			 * sub-tree, of which, the original block is root
 			 */
 			if (cdb_sc_normal != (status = (gvcst_expand_any_key(&hist_ptr->h[cur_level], blk_base + tblk_size,
-				expanded_star_key, &star_rec_size, &star_keylen, &star_keycmpc, hist_ptr))))
+				expanded_star_key, &star_rec_size, &star_keylen, &star_keycmpc, hist_ptr, &cur_level))))
 				return status;
 			if (*keylen + *keycmpc) /* Previous key exists */
 			{
@@ -155,11 +155,14 @@ enum cdb_sc gvcst_expand_any_key(srch_blk_status *blk_stat, sm_uc_ptr_t rec_top,
 			memcpy(expanded_key, expanded_star_key, star_keylen + star_keycmpc);
 			*keylen = star_keylen + star_keycmpc - *keycmpc;
 			*rec_size = *keylen + *keycmpc + bstar_rec_size(long_blk_id);
+			assert(0 == cur_level);
+			*reached_level = 0;
 			return cdb_sc_normal;
 		} /* end else if *-record */
 	}/* end of "while" loop */
 	if (curptr == rec_top)
 	{
+		assert(*reached_level == cur_level);
 		return cdb_sc_normal;
 	}
 	else

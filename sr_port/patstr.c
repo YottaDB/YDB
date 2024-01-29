@@ -43,9 +43,26 @@ typedef struct
 	ptstr		altpat;
 } alternation;
 
+static inline void free_alts(alternation *init_altp)
+{
+	alternation	*cur_altp = NULL, *next_altp = NULL;
+
+	assert(init_altp);
+	if (!init_altp)
+		return;
+	for (cur_altp = (alternation *)init_altp->next; cur_altp && (cur_altp != init_altp); cur_altp = next_altp)
+	{
+		next_altp = (alternation *)cur_altp->next;
+		free(cur_altp);
+	}
+	init_altp->next = NULL;
+	init_altp->altpat.len = 0;
+	return;
+}
+
 #define	TERMINATE_DFA(PATMASKPTR, OUTCHAR, DFA_FIXED_LEN, LV_PTR, LEAF_NUM, EXP_PTR, FSTCHAR,			\
 			TOPCHAR, MIN, MAX, SIZE, TOTAL_MIN, TOTAL_MAX, COUNT, LASTPATPTR, LAST_INFINITE,	\
-			MIN_DFA, ALTMIN, ALTMAX, INSTR, INCHAR, DFA)						\
+			MIN_DFA, ALTMIN, ALTMAX, INSTR, INCHAR, DFA, INIT_ALTP)					\
 {														\
 	int			cursize, i;									\
 														\
@@ -85,6 +102,7 @@ typedef struct
 			&LAST_INFINITE, &FSTCHAR, &OUTCHAR, &LASTPATPTR))					\
 		{												\
 			INSTR->addr = (char *)INCHAR;								\
+			free_alts(INIT_ALTP);									\
 			return ERR_PATMAXLEN;									\
 		}												\
 		assert(OUTCHAR <= TOPCHAR);									\
@@ -137,7 +155,7 @@ typedef struct
 int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 {
 	alternation	*cur_alt = NULL, init_alt;
-	boolean_t	dfa, dfa_fixed_len, done, done_free, fixed_len, infinite, last_infinite,
+	boolean_t	dfa, dfa_fixed_len, done, fixed_len, infinite, last_infinite,
 			prev_fixed_len, split_atom, start_dfa = FALSE;
 	boolean_t	topseen = FALSE;/* If TRUE it means we found inchar to be == in_top and so did NOT scan the NEXT
 					 * byte in inchar (to be stored in curchar). Therefore from this point onwards,
@@ -176,7 +194,6 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 	memset(&expand, 0, SIZEOF(expand));
 	init_alt.next = NULL;
 	init_alt.altpat.len = 0;
-	done_free = TRUE;
 	fstchar = &obj->buff[0];
 	saveinstr = (char *) &instr->addr[0];
 	for (allmask = 0, chidx = 'A'; chidx <= 'X'; chidx++)
@@ -206,6 +223,7 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 			if (topseen)
 			{
 				instr->addr = (char *)(in_top + 1);
+				free_alts(&init_alt);
 				return ERR_COMMAORRPAREXP;
 			}
 			if ((',' == curchar) || (')' == curchar))
@@ -250,11 +268,12 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 				{	/* Note: Below macro can do a "return ERR_PATMAXLEN" if there is not enough space */
 					TERMINATE_DFA(patmaskptr, outchar, dfa_fixed_len, lv_ptr, leaf_num, exp_ptr, fstchar,
 						topchar, min, max, size, total_min, total_max, count, lastpatptr, last_infinite,
-						min_dfa, altmin, altmax, instr, inchar, dfa);
+						min_dfa, altmin, altmax, instr, inchar, dfa, &init_alt);
 				}
 				if (outchar == &obj->buff[PAT_MASK_BEGIN_OFFSET])
 				{
 					instr->addr = (char *)inchar;
+					free_alts(&init_alt);
 					return ERR_PATCODE;
 				}
 				patmaskptr = &obj->buff[0];
@@ -263,6 +282,7 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 				if ((outchar + 3 + ((fixed_len ? 2 : 3) * count)) > topchar)
 				{
 					instr->addr = (char *)inchar;
+					free_alts(&init_alt);
 					return ERR_PATMAXLEN;
 				}
 				*patmaskptr = (uint4)(outchar - patmaskptr); /* unit is SIZEOF(uint4) */
@@ -281,6 +301,7 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 				assert(!topseen || (inchar == in_top));
 				assert(inchar <= in_top);
 				instr->addr = (topseen ? (char *)inchar : (char *)inchar - 1);
+				free_alts(&init_alt);
 				return 0;
 			}
 			if (!topseen && (curchar != '.'))
@@ -292,6 +313,7 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 				{
 					assert(inchar == in_top);
 					instr->addr = (char *)inchar + 1;
+					free_alts(&init_alt);
 					return ERR_PATCLASS;
 				}
 				assert(!topseen);
@@ -307,7 +329,10 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 						split_atom = TRUE;
 						if ((count >= (MAX_PATTERN_ATOMS - 1)) ||
 								(atom_map >= (MAX_PATTERN_ATOMS -2)))
+						{
+							free_alts(&init_alt);
 							return ERR_PATMAXLEN;
+						}
 
 					} else
 					{
@@ -336,13 +361,17 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 					if (upper_bound < lower_bound)
 					{
 						instr->addr = (char *)inchar;
+						free_alts(&init_alt);
 						return ERR_PATUPPERLIM;
 					}
 				}
 			}
 			instr->addr = (char *)inchar;
 			if (count >= MAX_PATTERN_ATOMS)
+			{
+				free_alts(&init_alt);
 				return ERR_PATMAXLEN;
+			}
 		}
 		if (!altend)
 		{
@@ -360,6 +389,7 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 					{
 						assert(inchar == in_top);
 						instr->addr = (char *)inchar + 1;
+						free_alts(&init_alt);
 						return ERR_PATLIT;
 					}
 					curchar = *inchar;
@@ -385,6 +415,7 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 						if (!UTF8_VALID(inchar, in_top, bytelen))
 						{
 							instr->addr = (char *)inchar;
+							free_alts(&init_alt);
 							return ERR_PATLIT;
 						}
 						assert(1 <= bytelen);
@@ -396,6 +427,7 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 					if (strlit.bytelen >= alloclen)
 					{
 						instr->addr = (char *)inchar;
+						free_alts(&init_alt);
 						return ERR_PATMAXLEN;
 					}
 					do
@@ -421,13 +453,14 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 					/* Note: Below macro can do a "return ERR_PATMAXLEN" if there is not enough space */
 					TERMINATE_DFA(patmaskptr, outchar, dfa_fixed_len, lv_ptr, leaf_num, exp_ptr, fstchar,
 						topchar, min, max, size, total_min, total_max, count, lastpatptr, last_infinite,
-						min_dfa, altmin, altmax, instr, inchar, dfa);
+						min_dfa, altmin, altmax, instr, inchar, dfa, &init_alt);
 				}
 				start_dfa = FALSE;	/* reset start_dfa for entire duration of alternation */
 				if (inchar >= in_top)
 				{
 					assert(inchar == in_top);
 					instr->addr = (char *)inchar + 1;
+					free_alts(&init_alt);
 					return ERR_PATCODE;
 				}
 				pattern_mask = PATM_ALT;
@@ -438,6 +471,7 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 				if (status)
 				{
 					instr->addr = (char *)alttail.addr;
+					free_alts(&init_alt);
 					return status;
 				}
 				saw_delimiter = 1;
@@ -458,25 +492,27 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 				if (!altactive)
 				{
 					instr->addr = (char *)inchar;
+					free_alts(&init_alt);
 					return ERR_PATCLASS;
 				}
 				if (inchar >= in_top)
 				{
 					assert(inchar == in_top);
 					instr->addr = (char *)inchar + 1;
+					free_alts(&init_alt);
 					return ERR_PATCODE;
 				}
 				assert(cur_alt);
 				cur_alt->next = (unsigned char *)malloc(SIZEOF(alternation));
 				cur_alt = (alternation *)cur_alt->next;
 				cur_alt->next = NULL;
-				done_free = FALSE;
 				alttail.addr = (char *)inchar;
 				alttail.len = instr->len - (int4)((char *)inchar - saveinstr);
 				status = patstr(&alttail, &cur_alt->altpat, &inchar);
 				if (status)
 				{
 					instr->addr = (char *)alttail.addr;
+					free_alts(&init_alt);
 					return status;
 				}
 				saw_delimiter = 1;
@@ -494,6 +530,7 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 				if (!altactive)
 				{
 					instr->addr = (char *)inchar;
+					free_alts(&init_alt);
 					return ERR_PATCLASS;
 				}
 				altactive = 0;
@@ -510,6 +547,7 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 				if (topseen)
 				{
 					instr->addr = (char *)inchar + 1;
+					free_alts(&init_alt);
 					return ERR_PATCLASS;
 				}
 				pattern_mask = 0;
@@ -521,6 +559,7 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 					else if (('Y' - 'A' == chidx) || ('Z' - 'A' == chidx))
 					{	/* YxxxY and ZxxxZ codes not yet implemented */
 						instr->addr = (char *)inchar;
+						free_alts(&init_alt);
 						return ERR_PATCLASS;
 					} else
 					{
@@ -537,6 +576,7 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 				} while (TRUE);
 				if (0 == pattern_mask)
 				{
+					free_alts(&init_alt);
 					if (any_alt)
 					{
 						instr->addr = alttail.addr + 1;
@@ -590,6 +630,7 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 						&last_infinite, &fstchar, &outchar, &lastpatptr))
 				{
 					instr->addr = (char *)inchar;
+					free_alts(&init_alt);
 					return ERR_PATMAXLEN;
 				}
 				assert(outchar <= topchar);
@@ -666,6 +707,7 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 						if ((outchar + (jump - PAT_MASK_BEGIN_OFFSET + 1)) > topchar)
 						{
 							instr->addr = (char *)inchar;
+							free_alts(&init_alt);
 							return ERR_PATMAXLEN;
 						}
 						for (seq = PAT_MASK_BEGIN_OFFSET; seq <= jump; seq++)
@@ -687,6 +729,7 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 						if ((outchar + 3) > topchar)
 						{
 							instr->addr = (char *)inchar;
+							free_alts(&init_alt);
 							return ERR_PATMAXLEN;
 						}
 						*outchar++ = lower_bound;
@@ -697,6 +740,7 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 							if ((outchar + 2 + cur_alt->altpat.len) > topchar)
 							{
 								instr->addr = (char *)inchar;
+								free_alts(&init_alt);
 								return ERR_PATMAXLEN;
 							}
 							*outchar++ = cur_alt->altpat.len;
@@ -706,7 +750,6 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 						}
 						*outchar++ = 0;
 						assert(outchar <= topchar);
-						done_free = TRUE;
 					}
 				}
 			} else
@@ -726,7 +769,7 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 					/* Note: Below macro can do a "return ERR_PATMAXLEN" if there is not enough space */
 					TERMINATE_DFA(patmaskptr, outchar, dfa_fixed_len, lv_ptr, leaf_num, exp_ptr, fstchar,
 						topchar, min, max, size, total_min, total_max, count, lastpatptr, last_infinite,
-						min_dfa, altmin, altmax, instr, inchar, dfa);
+						min_dfa, altmin, altmax, instr, inchar, dfa, &init_alt);
 					start_dfa = ((MAX_DFA_STRLEN >= charpos) /* Try another DFA for remainder if possible */
 							&& (infinite || ((lower_bound == upper_bound) && lower_bound))
 							&& leaf_num);
@@ -739,7 +782,10 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 				{
 					memset(&exp_temp[0], 0, SIZEOF(exp_temp));
 					if (atom_map >= MAX_PATTERN_ATOMS)
+					{
+						free_alts(&init_alt);
 						return ERR_PATMAXLEN;
+					}
 					min[atom_map] = lower_bound;
 					max[atom_map] = upper_bound;
 					size[atom_map] = strlit.bytelen;
@@ -811,7 +857,10 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 						}
 					}
 					if (atom_map >= MAX_PATTERN_ATOMS)
+					{
+						free_alts(&init_alt);
 						return ERR_PATMAXLEN;
+					}
 					min[atom_map] = lower_bound;
 					max[atom_map] = upper_bound;
 					size[atom_map] = 1;
@@ -860,7 +909,7 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 					/* Note: Below macro can do a "return ERR_PATMAXLEN" if there is not enough space */
 					TERMINATE_DFA(patmaskptr, outchar, dfa_fixed_len, lv_ptr, leaf_num, exp_ptr, fstchar,
 						topchar, min, max, size, total_min, total_max, count, lastpatptr, last_infinite,
-						min_dfa, altmin, altmax, instr, inchar, dfa);
+						min_dfa, altmin, altmax, instr, inchar, dfa, &init_alt);
 					start_dfa = curr_leaf_num; /* Try another DFA for remainder if possible */
 					done = FALSE;
 					continue;
@@ -884,14 +933,8 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 		}
 		if (dfa && infinite)
 			dfa_fixed_len = FALSE;
-		for (cur_alt = &init_alt; cur_alt; )
-		{
-			let_go = (cur_alt != (alternation *)&init_alt) ? (unsigned char *)cur_alt : NULL;
-			cur_alt = (alternation *)cur_alt->next;
-			if (let_go)
-				free(let_go);
-		}
-		init_alt.next = NULL;
-		init_alt.altpat.len = 0;
+		free_alts(&init_alt);
 	}
+	assert(FALSE);
+	free_alts(&init_alt);
 }

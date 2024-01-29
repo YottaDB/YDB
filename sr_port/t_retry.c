@@ -462,7 +462,7 @@ void t_retry(enum cdb_sc failure)
 		{
 			assert(csa->hdr->clustered);
 			CCP_FID_MSG(gv_cur_region, CCTR_FLUSHLK);
-			ccp_userwait(gv_cur_region, CCST_MASK_HAVE_DIRTY_BUFFERS, 0, cnl->ccp_cycle);
+			ccp_userwait(gv_cur_region, CCST_MASK_HAVE_DIRTY_BUFFERS, 0, 0);
 		}
 		cw_set_depth = 0;
 		cw_map_depth = 0;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2009-2018 Fidelity National Information	*
+ * Copyright (c) 2009-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -112,7 +112,7 @@ gid_t	gtm_get_group_id(struct stat *stat_buff)
 boolean_t gtm_member_group_id(uid_t uid, gid_t gid, struct perm_diag_data *pdd)
 {
 	struct group	*grp;
-	struct passwd	*pwd;
+	struct passwd	*uinfo;
 
 #	ifdef DEBUG
 	if (WBTEST_HELPOUT_FAILGROUPCHECK == gtm_white_box_test_case_number)
@@ -131,11 +131,11 @@ boolean_t gtm_member_group_id(uid_t uid, gid_t gid, struct perm_diag_data *pdd)
 		return GID_IN_GID_LIST(gid);
 	}
 	/* Get "uid" details */
-	pwd = getpwuid(uid);
-	if (NULL == pwd)
+	uinfo = getpwuid(uid);
+	if (NULL == uinfo)
 		return(FALSE); 	/* If user id not found then assume uid not a member */
 	/* If the gid of the file is the same as the gid for the process uid we are done */
-	if (gid == pwd->pw_gid)
+	if (gid == uinfo->pw_gid)
 		return(TRUE);
 	/* Else get "gid" details */
 	grp = getgrgid(gid);
@@ -144,7 +144,7 @@ boolean_t gtm_member_group_id(uid_t uid, gid_t gid, struct perm_diag_data *pdd)
 	/* Else we have to compare the name stored in pwd struct with the names of the group members in the group struct */
 	while (NULL != *(grp->gr_mem))
 	{
-		if (!strcmp(pwd->pw_name, *(grp->gr_mem++)))
+		if (!strcmp(uinfo->pw_name, *(grp->gr_mem++)))
 			return(TRUE);
 	}
 	return(FALSE);

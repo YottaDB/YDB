@@ -52,6 +52,10 @@
 #include "gdsbgtr.h"
 #include "mu_updwn_ver_inline.h"
 
+#ifdef DEBUG
+#include "anticipatory_freeze.h"
+#endif
+
 GBLREF	boolean_t		certify_all_blocks;
 GBLREF	boolean_t		need_kip_incr;
 GBLREF	cw_set_element		cw_set[];
@@ -75,15 +79,14 @@ GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 
 error_def(ERR_WCBLOCKED);
 
-/* Roll forward commit steps CMT08 thru CMT14 on region whose "csa" is an input parameter.
- * This function is called from "secshr_db_clnup" only if it was called with the "COMMIT_INCOMPLETE" parameter
- * by "t_commit_cleanup" so we are guaranteed that the commit logic has gone past CMT07 step. And it is called
- * once for each region participating in the commit logic. This function simulates the commit steps CMT08 thru CMT14
- * for the input region if not already executed. Otherwise, it is a no-op and returns right away.
- * Note that in a multi-region TP transaction, it is possible one region is at commit step CMT10 whereas later
- * participating regions have not even executed CMT08.
+/* Roll forward commit steps CMT09 thru CMT15 on region whose "csa" is an input parameter.
+ * This function is called from "secshr_db_clnup" only if it detected that the process was in-commit and that the commit logic
+ * had gone past CMT09 step. And it is called once for each region participating in the commit logic. This function simulates
+ * the commit steps CMT09 thru CMT15 for the input region if not already executed. Otherwise, it is a no-op and returns right away.
+ * Note that in a multi-region TP transaction, it is possible that crit has been released on one or more regions at commit step
+ * CMT15 whereas later participating regions have not even executed CMT09.
  */
-void	secshr_finish_CMT08_to_CMT14(sgmnt_addrs *csa, jnlpool_addrs_ptr_t update_jnlpool)
+void	secshr_finish_CMT09_to_CMT15(sgmnt_addrs *csa, jnlpool_addrs_ptr_t update_jnlpool)
 {
 	boolean_t		is_bg;
 	cache_que_heads_ptr_t	cache_state;
@@ -121,12 +124,14 @@ void	secshr_finish_CMT08_to_CMT14(sgmnt_addrs *csa, jnlpool_addrs_ptr_t update_j
 		|| (T_COMMIT_CRIT_PHASE1 == csa->t_commit_crit) || (T_COMMIT_CRIT_PHASE2 == csa->t_commit_crit));
 	if (!csa->now_crit)
 	{
+		assert(DECL_CMT15 <= TREF(cur_cmt_step));
 		assert(T_COMMIT_CRIT_PHASE1 != csa->t_commit_crit);
-		return;	/* We are guaranteed Step CMT14 is complete in this region. Can return safely right away */
+		return;	/* We are guaranteed Step CMT15 is complete in this region. Can return safely right away */
 	}
+	assert((TREF(defer_instance_freeze) & DEFER_FREEZES) || !jnl_fence_ctl.replication);
 	numargs = 0;
 	SECSHR_ACCOUNTING(numargs, argarray, __LINE__);
-	SECSHR_ACCOUNTING(numargs, argarray, sac_secshr_finish_CMT08_to_CMT14);
+	SECSHR_ACCOUNTING(numargs, argarray, sac_secshr_finish_CMT09_to_CMT15);
 	SECSHR_ACCOUNTING(numargs, argarray, process_id);
 	SECSHR_ACCOUNTING(numargs, argarray, csa->now_crit);
 	SECSHR_ACCOUNTING(numargs, argarray, csa->t_commit_crit);
@@ -140,7 +145,7 @@ void	secshr_finish_CMT08_to_CMT14(sgmnt_addrs *csa, jnlpool_addrs_ptr_t update_j
 		updTrans = si->update_trans;
 		numargs = 0;
 		SECSHR_ACCOUNTING(numargs, argarray, __LINE__);
-		SECSHR_ACCOUNTING(numargs, argarray, sac_secshr_finish_CMT08_to_CMT14);
+		SECSHR_ACCOUNTING(numargs, argarray, sac_secshr_finish_CMT09_to_CMT15);
 		SECSHR_ACCOUNTING(numargs, argarray, dollar_tlevel);
 		SECSHR_ACCOUNTING(numargs, argarray, (INTPTR_T)first_cw_set);
 		SECSHR_ACCOUNTING(numargs, argarray, si->cw_set_depth);
@@ -152,7 +157,7 @@ void	secshr_finish_CMT08_to_CMT14(sgmnt_addrs *csa, jnlpool_addrs_ptr_t update_j
 		updTrans = update_trans;
 		numargs = 0;
 		SECSHR_ACCOUNTING(numargs, argarray, __LINE__);
-		SECSHR_ACCOUNTING(numargs, argarray, sac_secshr_finish_CMT08_to_CMT14);
+		SECSHR_ACCOUNTING(numargs, argarray, sac_secshr_finish_CMT09_to_CMT15);
 		SECSHR_ACCOUNTING(numargs, argarray, dollar_tlevel);
 		SECSHR_ACCOUNTING(numargs, argarray, (INTPTR_T)first_cw_set);
 		SECSHR_ACCOUNTING(numargs, argarray, cw_set_depth);
@@ -173,48 +178,44 @@ void	secshr_finish_CMT08_to_CMT14(sgmnt_addrs *csa, jnlpool_addrs_ptr_t update_j
 		}
 		ctn = csd->trans_hist.curr_tn;
 		if (csd->trans_hist.early_tn != ctn)
-		{	/* Process got an error in this region after CMT07 but before CMT14 */
-			/* If Non-TP, there is only one region so Step CMT08 must have been executed in that region in order
-			 * to even reach this function. And Step CMT09 is done right after that in "t_end" so both these
-			 * steps are guaranteed to have been executed. So no need to simulate them.
-			 * But in case of TP, it is possible this is a multi-region transaction and some regions have not
-			 * executed Step CMT08 or CMT09. Both these steps are idempotent (i.e. safe to redo even if already done).
-			 * So do them unconditionally in case of TP.
-			 */
+		{	/* Process got an error in this region after CMT08 but before CMT15 */
 			assert(csd->trans_hist.early_tn == (ctn + 1));
 			if (dollar_tlevel)
-			{
 				SET_T_COMMIT_CRIT_PHASE1(csa, cnl, ctn);	/* Step CMT08 for TP */
-				if (jnl_fence_ctl.replication && REPL_ALLOWED(csa))
-				{	/* Indication that this is an update to a replicated region that bumps the journal seqno.
-					 * So finish CMT09. Note: In "tp_tend", the variable "supplementary" is TRUE if
-					 * "jnl_fence_ctl.strm_seqno" is non-zero. We use that here since the local variable
-					 * "supplementary" is not available here.
-					 */
-					strm_seqno = GET_STRM_SEQ60(jnl_fence_ctl.strm_seqno);
-#					ifdef DEBUG
-					repl_reg = update_jnlpool ? update_jnlpool->jnlpool_dummy_reg : NULL;
-					repl_csa = ((NULL != repl_reg) && repl_reg->open) ? REG2CSA(repl_reg) : NULL;
-					assert(!jnl_fence_ctl.strm_seqno
-						|| ((INVALID_SUPPL_STRM != strm_index)
-							&& (GET_STRM_INDEX(jnl_fence_ctl.strm_seqno) == strm_index)));
-					assert((NULL != repl_csa) && repl_csa->now_crit);
-					/* see "jnlpool_init" for relationship between critical and jpl */
-					jpl = (jnlpool_ctl_ptr_t)((sm_uc_ptr_t)repl_csa->critical - JNLPOOL_CTL_SIZE);
-					assert(jpl == update_jnlpool->jnlpool_ctl);
-					assert(jpl->jnl_seqno == (jnl_fence_ctl.token + 1));
-					assert(!jnl_fence_ctl.strm_seqno || (jpl->strm_seqno[strm_index] == (strm_seqno + 1)));
-#					endif
-					/* It is possible CMT09 has already been done in which case csa->hdr->reg_seqno
-					 * would be equal to jnl_fence_ctl.token + 1. Therefore we want to avoid the assert
-					 * inside the SET_REG_SEQNO macro which checks that reg_seqno is LESS than token + 1.
-					 * Hence the SKIP_ASSERT_TRUE parameter usage below.
-					 */
-					SET_REG_SEQNO(csa, jnl_fence_ctl.token + 1, jnl_fence_ctl.strm_seqno,	\
-						strm_index, strm_seqno + 1, SKIP_ASSERT_TRUE); /* Step CMT09 for TP */
-				}
-			} else
+			else
 				assert(T_COMMIT_CRIT_PHASE1 == csa->t_commit_crit);
+			if (jnl_fence_ctl.replication && REPL_ALLOWED(csa))
+			{	/* Indication that this is an update to a replicated region that bumps the journal seqno.
+				 * So finish CMT10. Note: In "tp_[t]end", the variable "supplementary" is TRUE if
+				 * "jnl_fence_ctl.strm_seqno" is non-zero. We use that here since the local variable
+				 * "supplementary" is not available here.
+				 */
+				strm_seqno = GET_STRM_SEQ60(jnl_fence_ctl.strm_seqno);
+#				ifdef DEBUG
+				repl_reg = update_jnlpool ? update_jnlpool->jnlpool_dummy_reg : NULL;
+				repl_csa = ((NULL != repl_reg) && repl_reg->open) ? REG2CSA(repl_reg) : NULL;
+				assert(!jnl_fence_ctl.strm_seqno
+					|| ((INVALID_SUPPL_STRM != strm_index)
+						&& (GET_STRM_INDEX(jnl_fence_ctl.strm_seqno) == strm_index)));
+				assert((NULL != repl_csa));
+				/* see "jnlpool_init" for relationship between critical and jpl */
+				jpl = (jnlpool_ctl_ptr_t)((sm_uc_ptr_t)repl_csa->critical - JNLPOOL_CTL_SIZE);
+				assert(jpl == update_jnlpool->jnlpool_ctl);
+				assert(jpl->jnl_seqno > (jnl_fence_ctl.token));
+				assert(!jnl_fence_ctl.strm_seqno || (jpl->strm_seqno[strm_index] > strm_seqno));
+#				endif
+				/* It is possible CMT10 has already been done in which case csa->hdr->reg_seqno
+				 * would be equal to jnl_fence_ctl.token + 1. Therefore we want to avoid the assert
+				 * inside the SET_REG_SEQNO macro which checks that reg_seqno is LESS than token + 1.
+				 * Hence the SKIP_ASSERT_TRUE parameter usage below.
+				 */
+				assert((DECL_CMT10 > csa->nl->cur_cmt_step) ?
+						(csa->hdr->reg_seqno < (jnl_fence_ctl.token + 1)) :
+						((CMT10 <= csa->nl->cur_cmt_step) ?
+						 (csa->hdr->reg_seqno == (jnl_fence_ctl.token + 1)) : TRUE));
+				SET_REG_SEQNO(csa, jnl_fence_ctl.token + 1, jnl_fence_ctl.strm_seqno,
+						strm_index, strm_seqno + 1, SKIP_ASSERT_TRUE); /* Step CMT09 for TP */
+			}
 			if (NULL != first_cw_set)
 			{
 				if (is_bg)
@@ -240,7 +241,7 @@ void	secshr_finish_CMT08_to_CMT14(sgmnt_addrs *csa, jnlpool_addrs_ptr_t update_j
 				cs_top = (dollar_tlevel ? NULL : (cs + cw_set_depth));
 				for (next_cs = cs; cs_top != cs; cs = next_cs)
 				{
-					/* Step CMT10 start */
+					/* Step CMT11 start */
 					if (dollar_tlevel)
 					{
 						next_cs = next_cs->next_cw_set;
@@ -369,7 +370,7 @@ void	secshr_finish_CMT08_to_CMT14(sgmnt_addrs *csa, jnlpool_addrs_ptr_t update_j
 								numargs = 0;
 								SECSHR_ACCOUNTING(numargs, argarray, __LINE__);
 								SECSHR_ACCOUNTING(numargs, argarray,
-											sac_secshr_finish_CMT08_to_CMT14);
+											sac_secshr_finish_CMT09_to_CMT15);
 								SECSHR_ACCOUNTING(numargs, argarray, (INTPTR_T)cs);
 								SECSHR_ACCOUNTING(numargs, argarray, cs->blk);
 								SECSHR_ACCOUNTING(numargs, argarray, cs->tn);
@@ -491,7 +492,7 @@ void	secshr_finish_CMT08_to_CMT14(sgmnt_addrs *csa, jnlpool_addrs_ptr_t update_j
 						assert(cr->blk == cs->cr->blk);
 					} else
 						blk_ptr = MM_BASE_ADDR(csa) + (off_t)blk_size * cs->blk;
-					/* Step CMT10 end */
+					/* Step CMT11 end */
 					/* If BG and DSE, it is possible cache-records corresponding to global buffers which
 					 * are pointed to by the update array are not pinned (because dse passes "dummy_hist"
 					 * to "t_end"). In that case, we cannot wait to finish the phase2 of commit outside
@@ -502,17 +503,17 @@ void	secshr_finish_CMT08_to_CMT14(sgmnt_addrs *csa, jnlpool_addrs_ptr_t update_j
 					assert(!dse_running || !dollar_tlevel);
 					if (!is_bg || (!dollar_tlevel && ((gds_t_writemap == cs->mode) || dse_running))
 						|| (dollar_tlevel && IS_BG_PHASE2_COMMIT_IN_CRIT(cs, cs->mode)))
-					{	/* Below is Step 10a (comprises Steps CMT16 and CMT18 */
+					{	/* Below is Step 11a and 11b (comprises Steps CMT16 and CMT18 */
 						if (dollar_tlevel)
 						{
 							assert(si);
 							jrs = si->jbuf_rsrv_ptr;
 						} else
 							jrs = TREF(nontp_jbuf_rsrv);
-						/* Below is Step CMT16 (done as part of CMT10a) */
+						/* Below is Step CMT16 (done as part of CMT11a) */
 						if (NEED_TO_FINISH_JNL_PHASE2(jrs))
 							FINISH_JNL_PHASE2_IN_JNLBUFF(csa, jrs);
-						/* Below is Step CMT18 (done as part of CMT10a) */
+						/* Below is Step CMT18 (done as part of CMT11b) */
 						if (0 != secshr_finish_CMT18(csa, csd, is_bg, cs, blk_ptr, ctn))
 							continue;	/* error during CMT18, move on to next cs */
 					}
@@ -521,13 +522,13 @@ void	secshr_finish_CMT08_to_CMT14(sgmnt_addrs *csa, jnlpool_addrs_ptr_t update_j
 			if (dollar_tlevel)
 			{
 				assert(si);
-				si->update_trans = updTrans | UPDTRNS_TCOMMIT_STARTED_MASK;	/* Step CMT11 for TP */
+				si->update_trans = updTrans | UPDTRNS_TCOMMIT_STARTED_MASK;	/* Step CMT12 for TP */
 			} else
-				update_trans = updTrans | UPDTRNS_TCOMMIT_STARTED_MASK;	/* Step CMT11 for Non-TP */
-			INCREMENT_CURR_TN(csd);	/* roll forward Step (CMT12) */
+				update_trans = updTrans | UPDTRNS_TCOMMIT_STARTED_MASK;	/* Step CMT12 for Non-TP */
+			INCREMENT_CURR_TN(csd);	/* roll forward Step (CMT13) */
 		}
-		/* else : early_tn == curr_tn and so Step CMT12 is done */
-		csa->t_commit_crit = T_COMMIT_CRIT_PHASE2;			/* Step CMT13 */
+		/* else : early_tn == curr_tn and so Step CMT13 is done */
+		csa->t_commit_crit = T_COMMIT_CRIT_PHASE2;			/* Step CMT14 */
 		/* Check if kill_in_prog flag in file header has to be incremented. */
 		if (dollar_tlevel)
 		{
@@ -569,6 +570,7 @@ void	secshr_finish_CMT08_to_CMT14(sgmnt_addrs *csa, jnlpool_addrs_ptr_t update_j
 		}
 	}	/* if (updtrans) */
 	assert(csa->region->open);
+	SET_CUR_CMT_STEP_IF(TRUE, csa->nl->cur_cmt_step, CMT00);
 	secshr_rel_crit(csa->region, IS_EXITING_FALSE, IS_REPL_REG_FALSE);	/* Step CMT14 */
 	return;
 }

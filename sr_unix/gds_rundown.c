@@ -169,7 +169,9 @@ int4 gds_rundown(boolean_t cleanup_udi)
 	node_local_ptr_t	baseDBnl;
 	sgm_info		*si;
 	DEBUG_ONLY(boolean_t	orig_we_are_last_writer = FALSE);
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	jnl_status = 0;
 	reg = gv_cur_region;			/* Local copy */
 	/* Early out for cluster regions
@@ -288,7 +290,7 @@ int4 gds_rundown(boolean_t cleanup_udi)
 	canceled_dbsync_timer = FALSE;
 	CANCEL_DB_TIMERS(reg, csa, canceled_dbsync_timer);
 	we_are_last_user = FALSE;
-	inst_is_frozen = IS_REPL_INST_FROZEN && REPL_ALLOWED(csa->hdr);
+	inst_is_frozen = IS_REPL_INST_FROZEN(TREF(defer_instance_freeze)) && REPL_ALLOWED(csa->hdr);
 	if (FREEZE_LATCH_HELD(csa))
 		rel_latch(&cnl->freeze_latch);
 	if (!csa->persistent_freeze)

@@ -249,7 +249,7 @@ STATICFNDEF int ssl_error(gtm_tls_socket_t *tls_sock, int err, long verify_resul
 {
 	int		ssl_error_code, reason_code, err_lib;
 	unsigned long	error_code;
-	char		*errptr, *end;
+	char		*base, *errptr, *end;
 	SSL		*ssl;
 #ifdef DEBUG
 	int		is_wb = FALSE;
@@ -257,6 +257,7 @@ STATICFNDEF int ssl_error(gtm_tls_socket_t *tls_sock, int err, long verify_resul
 
 	ssl = tls_sock->ssl;
 	ssl_error_code = SSL_get_error(ssl, err); /* generic error code */
+	SSL_DPRINT(stderr, "Error code: %d\n", ssl_error_code);
 #ifdef DEBUG
 	/* Change the error code to induce error in case of
 	 * WBTEST_REPL_TLS_RECONN white box.
@@ -281,6 +282,8 @@ STATICFNDEF int ssl_error(gtm_tls_socket_t *tls_sock, int err, long verify_resul
 
 		case SSL_ERROR_SYSCALL:
 			tls_errno = errno;
+			SSL_DPRINT(stderr, "SSL_ERROR_SYSCALL: %d\n", tls_errno);
+			gtm_tls_set_error(tls_sock, "SSL_ERROR_SYSCALL: %s", strerror(tls_errno));
 			if (0 == tls_errno)   /* If no error at underlying socket, consisder a connecton reset */
 				tls_errno = ECONNRESET;
 			tls_sock->flags |= GTMTLS_OP_NOSHUTDOWN;
@@ -299,7 +302,7 @@ STATICFNDEF int ssl_error(gtm_tls_socket_t *tls_sock, int err, long verify_resul
 
 		case SSL_ERROR_SSL:
 		case SSL_ERROR_NONE:
-			errptr = (char *)gtm_tls_get_error(tls_sock);
+			base = errptr = (char *)gtm_tls_get_error(tls_sock);
 			assert(errptr != NULL);
 			end = errptr + MAX_GTMCRYPT_ERR_STRLEN;
 			tls_errno = -1;
@@ -341,6 +344,11 @@ STATICFNDEF int ssl_error(gtm_tls_socket_t *tls_sock, int err, long verify_resul
 					((SSL_R_DECRYPTION_FAILED_OR_BAD_RECORD_MAC == reason_code) ||
 					(SSL_R_SSLV3_ALERT_BAD_RECORD_MAC == reason_code)))
 					tls_errno = ECONNRESET;
+#if OPENSSL_VERSION_NUMBER >= 0x10101000L
+				if ((TLS1_3_VERSION == SSL_version(tls_sock->ssl))
+						&& (SSL_R_EXTENSION_NOT_RECEIVED == reason_code))
+					tls_sock->flags |= GTMTLS_OP_PHA_EXT_NOT_RECEIVED;
+#endif
 				tls_sock->flags |= GTMTLS_OP_NOSHUTDOWN;
 			}
 			do
@@ -348,7 +356,7 @@ STATICFNDEF int ssl_error(gtm_tls_socket_t *tls_sock, int err, long verify_resul
 				error_code = ERR_get_error();
 				if (0 == error_code)
 				{
-					if (errptr == tls_sock->errstr)
+					if (errptr == base)
 					{
 						/* Very first call to ERR_get_error returned 0. This is very unlikely. Nevertheless
 						 * handle this by updating the error string with a generic error.
@@ -357,7 +365,7 @@ STATICFNDEF int ssl_error(gtm_tls_socket_t *tls_sock, int err, long verify_resul
 						return -1;
 					}
 					break;
-				} else if ((errptr < end) && (errptr != tls_sock->errstr))
+				} else if ((errptr < end) && (errptr != base))
 					*errptr++ = ';';
 				if (errptr >= end)
 					continue;	/* We could break here, but we want to clear the OpenSSL error stack. */
@@ -532,6 +540,7 @@ gtm_tls_ctx_t *gtm_tls_init(int version, int flags)
 	const char		*verify_level_string;
 	char			*config_env, *parse_ptr, *optionendptr;
 	int			rv, rv1, rv2, fips_requested, fips_enabled, verify_mode, parse_len, verify_level;
+	int	 		use_plaintext_fallback = 0, use_pha_fallback = 0;
 #	if (((LIBCONFIG_VER_MAJOR == 1) && (LIBCONFIG_VER_MINOR >= 4)) || (LIBCONFIG_VER_MAJOR > 1))
 	int			verify_depth, session_timeout;
 #	else
@@ -649,6 +658,10 @@ gtm_tls_ctx_t *gtm_tls_init(int version, int flags)
 		}
 	}
 	/* Get global SSL configuration parameters */
+	if ((config_lookup_int(cfg, "tls.plaintext-fallback", &use_plaintext_fallback) && (0 < use_plaintext_fallback)))
+		flags |= GTMTLS_OP_PLAINTEXT_FALLBACK;	/* Enable Plaintext fallback */
+	if ((config_lookup_int(cfg, "tls.post-handshake-fallback", &use_pha_fallback) && (0 < use_pha_fallback)))
+		flags |= GTMTLS_OP_PHA_EXT_FALLBACK;	/* Enable PHA fallback */
 	if (config_lookup_int(cfg, "tls.verify-depth", &verify_depth))
 		SSL_CTX_set_verify_depth(ctx, verify_depth);
 	if (CONFIG_TRUE == config_lookup_string(cfg, "tls.verify-mode", &verify_mode_string))
@@ -668,7 +681,22 @@ gtm_tls_ctx_t *gtm_tls_init(int version, int flags)
 			config_destroy(cfg);
 			return NULL;
 		}
+		if (0 == strlen(verify_mode_string))
+		{	/* Do not treat empty strings as SSL_VERIFY_NONE */
+			gtm_tls_set_error(NULL, "verify-mode string '%s' is the null string", verify_mode_string);
+			SSL_CTX_free(ctx);
+			config_destroy(cfg);
+			return NULL;
+		}
 		verify_mode = (int)verify_long;
+		if ((SSL_VERIFY_NONE != verify_mode) && !(verify_mode & SSL_VERIFY_PEER))
+		{
+			gtm_tls_set_error(NULL, "verify-mode string '%s' needs SSL_VERIFY_PEER "
+					"to enable other options", verify_mode_string);
+			SSL_CTX_free(ctx);
+			config_destroy(cfg);
+			return NULL;
+		}
 		SSL_CTX_set_verify(ctx, verify_mode, NULL);
 	} else
 		flags |= GTMTLS_OP_ABSENT_VERIFYMODE;
@@ -1008,6 +1036,10 @@ int gtm_tls_add_config(gtm_tls_ctx_t *tls_ctx, const char *idstr, const char *co
 		return -1;
 	if (-1 == copy_tlsid_elem(&tmpcfg, cfg, tlsid, idstr, "format", CONFIG_TYPE_STRING))
 		return -1;
+	if (-1 == copy_tlsid_elem(&tmpcfg, cfg, tlsid, idstr, "plaintext-fallback", CONFIG_TYPE_INT))
+		return -1;
+	if (-1 == copy_tlsid_elem(&tmpcfg, cfg, tlsid, idstr, "post-handshake-fallback", CONFIG_TYPE_INT))
+		return -1;
 	if (-1 == copy_tlsid_elem(&tmpcfg, cfg, tlsid, idstr, "ssl-options", CONFIG_TYPE_STRING))
 		return -1;
 	if (-1 == copy_tlsid_elem(&tmpcfg, cfg, tlsid, idstr, "verify-depth", CONFIG_TYPE_INT))
@@ -1028,6 +1060,7 @@ gtm_tls_socket_t *gtm_tls_socket(gtm_tls_ctx_t *tls_ctx, gtm_tls_socket_t *prev_
 	int			len, verify_mode, verify_mode_set, nocert, nopkey, parse_len, verify_level, verify_level_set;
 	int			tlscafile;
 	int			session_id_len;
+	int	 		use_plaintext_fallback, use_pha_fallback;
 	long			options_mask, options_current, options_clear, verify_long, level_long, level_clear;
 	char			*optionendptr, *parse_ptr;
 #	if (((LIBCONFIG_VER_MAJOR == 1) && (LIBCONFIG_VER_MINOR >= 4)) || (LIBCONFIG_VER_MAJOR > 1))
@@ -1092,16 +1125,33 @@ gtm_tls_socket_t *gtm_tls_socket(gtm_tls_ctx_t *tls_ctx, gtm_tls_socket_t *prev_
 				SSL_free(ssl);
 				return NULL;
 			}
+			if (0 == strlen(verify_mode_string))
+			{	/* Do not treat empty strings as SSL_VERIFY_NONE */
+				gtm_tls_set_error(NULL, "verify-mode string '%s' is the null string", verify_mode_string);
+				SSL_CTX_free(ctx);
+				config_destroy(cfg);
+				return NULL;
+			}
 			verify_mode = (int)verify_long;
-			if (SSL_VERIFY_PEER & verify_mode)
-				flags |= GTMTLS_OP_VERIFY_PEER;
+			if ((SSL_VERIFY_NONE != verify_mode) && !(verify_mode & SSL_VERIFY_PEER))
+			{
+				gtm_tls_set_error(NULL, "In TLSID: %s - verify-mode string '%s' needs SSL_VERIFY_PEER "
+						"to enable other options", id, verify_mode_string);
+				SSL_free(ssl);
+				return NULL;
+			}
 			verify_mode_set = TRUE;
 		} else if (GTMTLS_OP_ABSENT_VERIFYMODE & tls_ctx->flags)
 		{
 			verify_mode = SSL_VERIFY_PEER;
+			if ((flags & GTMTLS_OP_FORCE_VERIFY_PEER) && (!CLIENT_MODE(flags)))
+				verify_mode |= SSL_VERIFY_FAIL_IF_NO_PEER_CERT;
 			verify_mode_set = TRUE;
 		} else
+		{
 			verify_mode_set = FALSE;
+			verify_mode = SSL_VERIFY_NONE;
+		}
 		SNPRINTF(cfg_path, MAX_CONFIG_LOOKUP_PATHLEN, "tls.%s.verify-level", id);
 		if (CONFIG_TRUE == config_lookup_string(cfg, cfg_path, &verify_level_string))
 		{
@@ -1140,7 +1190,7 @@ gtm_tls_socket_t *gtm_tls_socket(gtm_tls_ctx_t *tls_ctx, gtm_tls_socket_t *prev_
 		SSL_free(ssl);
 		return NULL;
 	} else
-	{
+	{	/* No TLS ID supplied */
 		assert(GTMTLS_OP_SOCKET_DEV & flags);
 		cipher_list = NULL;
 		if (GTMTLS_OP_ABSENT_VERIFYMODE & tls_ctx->flags)
@@ -1151,35 +1201,38 @@ gtm_tls_socket_t *gtm_tls_socket(gtm_tls_ctx_t *tls_ctx, gtm_tls_socket_t *prev_
 			verify_mode_set = FALSE;
 		verify_level_set = FALSE;
 	}
-	if (verify_mode_set)
-#if OPENSSL_VERSION_NUMBER >= 0x10101000L
+	verify_mode = (verify_mode_set) ? verify_mode : SSL_get_verify_mode(ssl); /* Use parent verify_mode if not set by TLSID */
+	if (SSL_VERIFY_NONE != verify_mode)
 	{
-		if (CLIENT_MODE(flags) /* Using PHA flag in clients induces undesired behavior in TLS library */
-			|| (flags & GTMTLS_OP_RENEGOTIATE_REQUESTED)) /* Receiver Server currently does not handle PHA */
-			verify_mode &= ~SSL_VERIFY_POST_HANDSHAKE;
-		SSL_set_verify(ssl, verify_mode, NULL);
-		if (CLIENT_MODE(flags) && (SSL_VERIFY_PEER & verify_mode))
-			/* For client mode, Enable post-handshake with peer verification; Harmless for pre-TLSv1.3 */
-			SSL_set_post_handshake_auth(ssl, 1);
-	} else if (PHA_MACROS_ENABLED & (verify_mode = SSL_get_verify_mode(ssl)))
-	{	/* verify-mode was set by the main configuration */
-		if ((SSL_VERIFY_POST_HANDSHAKE & verify_mode)
-			&& (CLIENT_MODE(flags) /* Using PHA flag in clients induces undesired behavior in TLS library */
-				|| (flags & GTMTLS_OP_RENEGOTIATE_REQUESTED))) /* Receiver Server currently does not handle PHA */
-		{
-			verify_mode &= ~SSL_VERIFY_POST_HANDSHAKE;
-			SSL_set_verify(ssl, verify_mode, NULL);
-		}
-		/* When SSL_VERIFY_PEER is set, enable PHA in client mode. Doing so just sends the PHA extension in the
-		 * CLIENT_HELLO. It is up to the server to request and validate PHA. OpenSSL handles presenting the client
-		 * ceritificate(s) without any explicit action. Enabling PHA is harmless for pre-TLSv1.3
-		 */
-		if (CLIENT_MODE(flags) && (SSL_VERIFY_PEER | verify_mode))
-			SSL_set_post_handshake_auth(ssl, 1);
-	}
-#else
-		SSL_set_verify(ssl, verify_mode, NULL);
+		assert((CLIENT_MODE(flags)) || (verify_mode & SSL_VERIFY_PEER));
+		if (CLIENT_MODE(flags))
+		{	/* In client mode, options other than SSL_VERIFY_PEER are supposed to be ignored, but may be treated like
+			 * SSL_VERIFY_PEER. The man pages recommend removing all other options. Do this silently to easily share
+			 * client and server settings
+			 */
+			verify_mode_set = (~SSL_VERIFY_PEER & verify_mode);
+			verify_mode &= SSL_VERIFY_PEER;
+#if OPENSSL_VERSION_NUMBER >= 0x10101000L
+			/* When SSL_VERIFY_PEER is set, enable PHA in client mode. Doing so just sends the PHA extension in the
+			 * CLIENT_HELLO. It is up to the server to request and validate PHA. OpenSSL handles presenting the client
+			 * ceritificate(s) without any explicit action. Enabling PHA is harmless for pre-TLSv1.3
+			 */
+			if (SSL_VERIFY_PEER | verify_mode)
+				SSL_set_post_handshake_auth(ssl, 1);
 #endif
+		} else if (GTMTLS_OP_PHA_EXT_NOT_RECEIVED & flags)
+		{	/* Receiver Server disabled PHA after an error */
+			assert(!CLIENT_MODE(flags));
+#if OPENSSL_VERSION_NUMBER >= 0x10101000L
+			verify_mode_set = (SSL_VERIFY_POST_HANDSHAKE | verify_mode);
+			verify_mode &= ~SSL_VERIFY_POST_HANDSHAKE;
+#else
+			assert(FALSE); /* Should not get here with prior OpenSSL versions */
+#endif
+		}
+	}
+	if (verify_mode_set)
+		SSL_set_verify(ssl, verify_mode, NULL);
 	if (verify_level_set)
 		flags = (GTMTLS_OP_VERIFY_LEVEL_CMPLMNT & flags) | verify_level;
 	else
@@ -1370,8 +1423,16 @@ gtm_tls_socket_t *gtm_tls_socket(gtm_tls_ctx_t *tls_ctx, gtm_tls_socket_t *prev_
 	{
 		SSL_set_mode(ssl, SSL_MODE_ENABLE_PARTIAL_WRITE);
 	}
+	/* Carry forward the main configuration fallback settings */
+	use_plaintext_fallback = (GTMTLS_OP_PLAINTEXT_FALLBACK & tls_ctx->flags);
+	use_pha_fallback = (GTMTLS_OP_PHA_EXT_FALLBACK & tls_ctx->flags);
 	if ('\0' != id[0])
 	{
+		/* use_(plaintext|pha)_fallback are unchanged if not present */
+		SNPRINTF(cfg_path, MAX_CONFIG_LOOKUP_PATHLEN, "tls.%s.plaintext-fallback", id);
+		(void)config_lookup_int(cfg, cfg_path, &use_plaintext_fallback);
+		SNPRINTF(cfg_path, MAX_CONFIG_LOOKUP_PATHLEN, "tls.%s.post-handshake-fallback", id);
+		(void)config_lookup_int(cfg, cfg_path, &use_pha_fallback);
 		SNPRINTF(cfg_path, MAX_CONFIG_LOOKUP_PATHLEN, "tls.%s.ssl-options", id);
 		if (CONFIG_TRUE == config_lookup_string(cfg, cfg_path, &options_string))
 		{
@@ -1401,6 +1462,14 @@ gtm_tls_socket_t *gtm_tls_socket(gtm_tls_ctx_t *tls_ctx, gtm_tls_socket_t *prev_
 		if (CONFIG_TRUE == config_lookup_int(cfg, cfg_path, &verify_depth))
 			SSL_set_verify_depth(ssl, verify_depth);
 	}
+	if (0 < use_plaintext_fallback)
+		flags |= GTMTLS_OP_PLAINTEXT_FALLBACK;	/* Enable Plaintext fallback */
+	else
+		flags &= ~GTMTLS_OP_PLAINTEXT_FALLBACK;	/* Disable Plaintext fallback */
+	if (0 < use_pha_fallback)
+		flags |= GTMTLS_OP_PHA_EXT_FALLBACK;	/* Enable PHA fallback */
+	else
+		flags &= ~GTMTLS_OP_PHA_EXT_FALLBACK;	/* Disable PHA fallback */
 	if (!CLIENT_MODE(flags))
 	{	/* Socket created for server mode operation. Set a session ID context for session resumption at the time of
 		 * reconnection.
@@ -1550,6 +1619,22 @@ int gtm_tls_accept(gtm_tls_socket_t *socket)
 	return ssl_error(socket, rv, verify_result);
 }
 
+/* gtm_tls_did_post_hand_shake returns TRUE if the post handshake complete and the client certificate is available */
+int gtm_tls_did_post_hand_shake(gtm_tls_socket_t *socket)
+{
+	X509			*peer;
+
+#if OPENSSL_VERSION_NUMBER >= 0x30000000L
+	return (NULL != SSL_get0_peer_certificate(socket->ssl));
+#elif OPENSSL_VERSION_NUMBER >= 0x10101000L
+	peer = SSL_get_peer_certificate(socket->ssl);
+	X509_free(peer);
+	return (NULL != peer);
+#else
+	return FALSE;
+#endif
+}
+
 /* Call SSL_verify_client_post_handshake() when the connection uses TLSv1.3 and PHA was requested in the server's configuration.
  * This function embeds a call to perform a handshake which might need a retry if the socket is non-blocking.
  * NOTE: When TLSv1.3 and PHA do not apply, the function returns a success status as the embedded handshake returns with an
@@ -1565,12 +1650,28 @@ int gtm_tls_do_post_hand_shake(gtm_tls_socket_t *socket)
 	if ((TLS1_3_VERSION != SSL_version(socket->ssl))
 			|| (PHA_MACROS_ENABLED != (PHA_MACROS_ENABLED & SSL_get_verify_mode(socket->ssl))))
 		return 0;
+	SSL_DPRINT(stderr, "gtm_tls_do_post_hand_shake: implemented\n");
 	/* Post Handshake Auth (PHA) requested for TLSv1.3 */
 	if (1 != SSL_verify_client_post_handshake(socket->ssl))
+	{
+		SSL_DPRINT(stderr, "gtm_tls_do_post_hand_shake: return ssl_error\n");
 		return ssl_error(socket, 0, 0);
+	}
+	SSL_DPRINT(stderr, "gtm_tls_do_post_hand_shake: return gtm_tls_repeat_hand_shake\n");
 	return gtm_tls_repeat_hand_shake(socket);
 #else
+	SSL_DPRINT(stderr, "gtm_tls_do_post_hand_shake: not implemented\n");
 	return 0;
+#endif
+}
+
+/* gtm_tls_has_post_hand_shake returns TRUE if post handshake authentication is enabled */
+int gtm_tls_has_post_hand_shake(gtm_tls_socket_t *socket)
+{
+#if OPENSSL_VERSION_NUMBER >= 0x10101000L
+	return (PHA_MACROS_ENABLED == (PHA_MACROS_ENABLED & SSL_get_verify_mode(socket->ssl)));
+#else
+	return FALSE;
 #endif
 }
 
@@ -1582,15 +1683,25 @@ int gtm_tls_repeat_hand_shake(gtm_tls_socket_t *socket)
 	X509		*cert;
 
 	/* WARNING: one-shot attempt at handshake, caller needs to loop */
+	SSL_DPRINT(stderr, "gtm_tls_repeat_hand_shake: enter\n");
 	rv = SSL_do_handshake(socket->ssl);
+	SSL_DPRINT(stderr, "gtm_tls_repeat_hand_shake: SSL_do_handshake: %d\n", rv);
 	verify_result = SSL_get_verify_result(socket->ssl);
+	SSL_DPRINT(stderr, "gtm_tls_repeat_hand_shake: verify_result: %d\n", verify_result);
 	if ((0 < rv) && (X509_V_OK == verify_result))
 		return 0;	/* Success */
 	/* else error occurred */
 	rv = ssl_error(socket, rv, verify_result);
-	gtm_tls_set_error(socket, "post handshake auth error: %s",
-		X509_verify_cert_error_string(verify_result));
+	SSL_DPRINT(stderr, "gtm_tls_repeat_hand_shake: ssl_error: %d\n", rv);
 	return rv;
+}
+
+int gtm_tls_does_renegotiate(gtm_tls_socket_t *socket)
+{
+#if OPENSSL_VERSION_NUMBER >= 0x10101000L
+	return (TLS1_3_VERSION > SSL_version(socket->ssl));
+#endif
+	return 1;
 }
 
 int gtm_tls_renegotiate(gtm_tls_socket_t *socket)
@@ -1603,7 +1714,7 @@ int gtm_tls_renegotiate(gtm_tls_socket_t *socket)
 	{
 		if (0 >= (rv = SSL_key_update(socket->ssl, SSL_KEY_UPDATE_REQUESTED)))
 			return ssl_error(socket, rv, SSL_get_verify_result(socket->ssl));
-	} else /* TLS1_2_VERSION */
+	} else /* TLS1_2_VERSION and before */
 #endif
 	{
 		if (0 >= (rv = SSL_renegotiate(socket->ssl)))
@@ -1843,7 +1954,11 @@ int gtm_tls_get_conn_info(gtm_tls_socket_t *socket, gtm_tls_conn_info *conn_info
 
 	ssl = socket->ssl;
 	tls_ctx = socket->gtm_ctx;
+#if OPENSSL_VERSION_NUMBER >= 0x30000000L
+	peer = SSL_get0_peer_certificate(ssl);
+#else
 	peer = SSL_get_peer_certificate(ssl);
+#endif
 	if ((NULL != peer) || (GTMTLS_OP_SOCKET_DEV & socket->flags))
 	{	/* if socket device and no certificate from peer still provide info */
 		verify_result = SSL_get_verify_result(ssl);
@@ -1948,7 +2063,9 @@ int gtm_tls_get_conn_info(gtm_tls_socket_t *socket, gtm_tls_conn_info *conn_info
 					SNPRINTF(conn_info->not_before, MAX_TIME_STRLEN, "Bad certificate date");
 				if (-1 == format_ASN1_TIME(X509_get_notAfter(peer), conn_info->not_after, MAX_TIME_STRLEN))
 					SNPRINTF(conn_info->not_after, MAX_TIME_STRLEN, "Bad certificate date");
+#if OPENSSL_VERSION_NUMBER < 0x30000000L
 				X509_free(peer);
+#endif
 			} else
 			{
 				conn_info->cert_nbits = 0;
@@ -1967,7 +2084,9 @@ int gtm_tls_get_conn_info(gtm_tls_socket_t *socket, gtm_tls_conn_info *conn_info
 		{
 			gtm_tls_set_error(socket, "Peer certificate invalid: %s",
 					X509_verify_cert_error_string(verify_result));
+#if OPENSSL_VERSION_NUMBER < 0x30000000L
 			X509_free(peer);
+#endif
 			return -1;
 		}
 	} else
@@ -2090,6 +2209,11 @@ void gtm_tls_fini(gtm_tls_ctx_t **tls_ctx)
 }
 
 /***** EXTERNAL CALLs Section *****/
+#define FREE_TLS_SOCKET_OBJECT(LCL_GTM_TLS_SOCK)		\
+{								\
+	SSL_free(LCL_GTM_TLS_SOCK->ssl);			\
+	gtm_free(LCL_GTM_TLS_SOCK);				\
+}
 
 /* Report the version of the gtmtls plugin library. The TLS plugin is not portable across GT.M versions. GT.M uses this
  * version number to determine if the TLS version supports functionality that GT.M expects.
@@ -2238,7 +2362,6 @@ long gtm_tls_get_ciphers(int count, char *tlsciphers, char *tlsver, char *mode, 
 	int			i, flags = GTMTLS_OP_SOCKET_DEV		/* Treat like a SOCKET device and not replication */
 					| GTMTLS_OP_INTERACTIVE_MODE;	/* Allows for no config file but will prompt for password */
 	long			status;
-	SSL			*lcl_ssl;
 	const SSL_CIPHER	*c;
 	STACK_OF(SSL_CIPHER)	*sk = NULL;
 
@@ -2265,18 +2388,7 @@ long gtm_tls_get_ciphers(int count, char *tlsciphers, char *tlsver, char *mode, 
 				(NULL == tlsver)? "": tlsver);
 		return -1;
 	}
-	/* By default, gtm_tls_init() limits the lowest TLS version to TLSv1.2 */
-	if (0 == strncasecmp(tlsver, LIT_AND_LEN(TLS1_3_STR)))
-	{
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
-		SSL_CTX_set_min_proto_version(lcl_tls_ctx->ctx, TLS1_3_VERSION);
-		SSL_CTX_set_max_proto_version(lcl_tls_ctx->ctx, TLS1_3_VERSION);
-#else
-		(void)snprintf(errstr, ERR_STR_SIZE, "tls1_3 ciphers are no supported with %s", SSLeay_version(SSLEAY_VERSION));
-		tlsciphers[0] = '\0';
-		return -1;
-#endif
-	}
+
 	/* Use SOCKET device or Replication server defaults? */
 	if ((NULL == mode) || (strncasecmp(mode, LIT_AND_LEN(REPLICATION_STR)) && strncasecmp(mode, LIT_AND_LEN(SOCKET_STR))))
 	{
@@ -2284,6 +2396,7 @@ long gtm_tls_get_ciphers(int count, char *tlsciphers, char *tlsver, char *mode, 
 				"'REPLICATION' for replication servers", (NULL == mode)? "": mode);
 		return -1;
 	}
+
 	if (0 == strncasecmp(mode, LIT_AND_LEN(REPLICATION_STR)))
 		flags ^= GTMTLS_OP_INTERACTIVE_MODE;	/* Replication uses a different default ciphersuite */
 
@@ -2295,6 +2408,23 @@ long gtm_tls_get_ciphers(int count, char *tlsciphers, char *tlsver, char *mode, 
 		return -1;
 	}
 
+	/* Apply the protocol restrictions to SSL object. Note: gtm_tls_init() limits the lowest TLS version to TLSv1.2 */
+	if (0 == strncasecmp(tlsver, LIT_AND_LEN(TLS1_3_STR)))
+	{
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+		SSL_set_min_proto_version(lcl_gtm_tls_sock->ssl, TLS1_3_VERSION);
+		SSL_set_max_proto_version(lcl_gtm_tls_sock->ssl, TLS1_3_VERSION);
+	} else
+	{
+		SSL_set_min_proto_version(lcl_gtm_tls_sock->ssl, TLS1_2_VERSION);
+		SSL_set_max_proto_version(lcl_gtm_tls_sock->ssl, TLS1_2_VERSION);
+#else
+		(void)snprintf(errstr, ERR_STR_SIZE, "tls1_3 ciphers are not supported with %s", SSLeay_version(SSLEAY_VERSION));
+		tlsciphers[0] = '\0';
+		return -1;
+#endif
+	}
+
 	/* Update cipher suites using the SAME string for TLSv1.3 and pre-TLSv1.3 */
 	if ((NULL != ciphersuites) && (0 < strlen(ciphersuites))
 			&& (0 >= SSL_set_cipher_list(lcl_gtm_tls_sock->ssl, ciphersuites))	/* TLSv1.2 and before */
@@ -2304,6 +2434,7 @@ long gtm_tls_get_ciphers(int count, char *tlsciphers, char *tlsver, char *mode, 
 	   )
 	{
 		(void)snprintf(errstr, ERR_STR_SIZE, "Cipher Suite error: %s", gtm_tls_get_error(NULL));
+		FREE_TLS_SOCKET_OBJECT(lcl_gtm_tls_sock);
 		return -1;
 	}
 
@@ -2331,8 +2462,7 @@ long gtm_tls_get_ciphers(int count, char *tlsciphers, char *tlsver, char *mode, 
 #if OPENSSL_VERSION_NUMBER >= 0x10100000L
 	sk_SSL_CIPHER_free(sk);
 #endif
-	SSL_free(lcl_gtm_tls_sock->ssl);
-	gtm_free(lcl_gtm_tls_sock);
+	FREE_TLS_SOCKET_OBJECT(lcl_gtm_tls_sock);
 
 	return status;
 }

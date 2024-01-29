@@ -141,6 +141,7 @@ int gtmsource_checkhealth(void)
 			status |= SRV_ERR;
 		}
 	}
+	rel_sem(SOURCE, JNL_POOL_ACCESS_SEM);
 	/* Check that there are no regions with replication state = WAS_ON (i.e. repl_was_open). If so report that.
 	 * But to determine that, we need to attach to all the database regions.
 	 */

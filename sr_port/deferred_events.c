@@ -11,7 +11,6 @@
  ****************************************************************/
 
 #include "mdef.h"
-
 #include "gtm_stdio.h"
 #include "io.h"
 #include <rtnhdr.h>
@@ -50,6 +49,7 @@ GBLREF xfer_entry_t		xfer_table[];				/* transfer table */
 error_def(ERR_CTRAP);
 error_def(ERR_CTRLC);
 error_def(ERR_MALLOCCRIT);
+error_def(ERR_SOCKHANGUP);
 error_def(ERR_TERMHANGUP);
 error_def(ERR_TERMWRITE);
 error_def(ERR_JOBINTRRQST);
@@ -125,7 +125,7 @@ boolean_t xfer_set_handlers(int4  event_type, int4 param_val, boolean_t popped_e
 			}
 		}
 	}
-	if (!already_ev_handling)
+	if ((!already_ev_handling) && (no_event == outofband))
 	{
 		assert(!dollar_zininterrupt || (jobinterrupt != event_type));
 		if (entry != (TREF(save_xfer_root_ptr))->ev_que.fl)
@@ -149,50 +149,8 @@ boolean_t xfer_set_handlers(int4  event_type, int4 param_val, boolean_t popped_e
 			ENABLE_EVENT_INTERRUPTS(prev_intrpt_state);
 		return TRUE;
 	}
-	if (!already_ev_handling && (no_event == outofband) && !have_crit(CRIT_IN_COMMIT))
-	{	/* no competion or blocking interrupt: collect $200 and go straight to pending */
-		/* -------------------------------------------------------
-		 * If table changed, it was not synchronized.
-		 * (Assumes these entries are all that would be changed)
-		 * --------------------------------------------------------
-		 */
-		assert((xfer_table[xf_linefetch] == op_linefetch) ||
-		       (xfer_table[xf_linefetch] == op_zstepfetch) ||
-		       (xfer_table[xf_linefetch] == op_zst_fet_over) ||
-		       (xfer_table[xf_linefetch] == op_mproflinefetch));
-		assert((xfer_table[xf_linestart] == op_linestart) ||
-		       (xfer_table[xf_linestart] == op_zstepstart) ||
-		       (xfer_table[xf_linestart] == op_zst_st_over) ||
-		       (xfer_table[xf_linestart] == op_mproflinestart));
-		assert((xfer_table[xf_zbfetch] == op_zbfetch) ||
-		       (xfer_table[xf_zbfetch] == op_zstzb_fet_over) ||
-		       (xfer_table[xf_zbfetch] == op_zstzbfetch));
-		assert((xfer_table[xf_zbstart] == op_zbstart) ||
-		       (xfer_table[xf_zbstart] == op_zstzb_st_over) ||
-		       (xfer_table[xf_zbstart] == op_zstzbstart));
-		assert((xfer_table[xf_forchk1] == op_forchk1) ||
-		       (xfer_table[xf_forchk1] == op_mprofforchk1));
-		assert((xfer_table[xf_forloop] == op_forloop));
-		assert(xfer_table[xf_ret] == opp_ret ||
-		       xfer_table[xf_ret] == opp_zst_over_ret ||
-		       xfer_table[xf_ret] == opp_zstepret);
-		assert(xfer_table[xf_retarg] == op_retarg ||
-		       xfer_table[xf_retarg] == opp_zst_over_retarg ||
-		       xfer_table[xf_retarg] == opp_zstepretarg);
-		/* -----------------------------------------------
-		 * Now call the specified set function to swap in
-		 * the desired handlers (and set flags or whatever).
-		 * -----------------------------------------------
-		 */
-		assert(entry != (TREF(save_xfer_root_ptr))->ev_que.fl);
-		assert(!dollar_zininterrupt || (jobinterrupt != event_type));
-		entry->event_state = pending;				/* jiggering the transfer table for this event */
-		outofband = event_type;
-		entry->set_fn(param_val);
-		DBGDFRDEVNT((stderr, "%d %s: xfer_set_handlers - set xfer_table for event type %d\n" ,__LINE__, __FILE__,
-			     event_type));
-	} else if (queued != entry->event_state)
-	{	/* queue it */
+	if (queued != entry->event_state)
+	{	/* If event is not in play, queue it. */
 		entry->event_state = queued;
 		SAVE_XFER_QUEUE_ENTRY(event_type, param_val);
 		if (outofband == event_type)
@@ -388,7 +346,10 @@ void async_action(bool lnfetch_or_start)
 			break;
 		case sighup:
 			TAREF1(save_xfer_root, sighup).event_state = pending;
-			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_TERMHANGUP);
+			if (tt == io_std_device.in->type)
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_TERMHANGUP);
+			else if (gtmsocket == io_std_device.in->type)
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_SOCKHANGUP);
 			break;
 		case (defer_error):
 			TAREF1(save_xfer_root, outofband).event_state = active;

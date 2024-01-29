@@ -199,7 +199,7 @@ int	op_job(int4 argcnt, ...)
 		cancel_timer((TID)&tid);
 	if (argcnt)
 		free(job_params.parms);
-	if (job_params.passcurlvn)
+	if (job_params.xfercurlvn)
 		system_free(job_params.curlvn_buffer_ptr);		/* Space allocated by open_memstream in ojparams */
 	if (!non_exit_return)
 	{

@@ -29,13 +29,13 @@ void wbox_test_init(void)
 	if (SS_NORMAL == TRANS_LOG_NAME(&envvar_logical, &trans_name, trans_bufr, SIZEOF(trans_bufr), do_sendmsg_on_log2long))
 	{
 		gtm_white_box_test_case_enabled = TRUE;
-		envvar_logical.addr = GTM_WHITE_BOX_TEST_CASE_NUMBER ;
+		envvar_logical.addr = GTM_WHITE_BOX_TEST_CASE_NUMBER;
 		envvar_logical.len = SIZEOF(GTM_WHITE_BOX_TEST_CASE_NUMBER) - 1;
 		if (SS_NORMAL == TRANS_LOG_NAME(&envvar_logical, &trans_name, trans_bufr, SIZEOF(trans_bufr),
 							do_sendmsg_on_log2long))
 		{
 			gtm_white_box_test_case_number = ATOI(trans_name.addr);
-			envvar_logical.addr = GTM_WHITE_BOX_TEST_CASE_COUNT ;
+			envvar_logical.addr = GTM_WHITE_BOX_TEST_CASE_COUNT;
 			envvar_logical.len = SIZEOF(GTM_WHITE_BOX_TEST_CASE_COUNT) - 1;
 			if (SS_NORMAL == TRANS_LOG_NAME(&envvar_logical, &trans_name, trans_bufr, SIZEOF(trans_bufr),
 								do_sendmsg_on_log2long))

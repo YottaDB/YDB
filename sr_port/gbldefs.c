@@ -1188,6 +1188,11 @@ GBLDEF	boolean_t	in_mu_cre_file;			/* TRUE only if inside "mu_cre_file" function
 GBLDEF	enum dbg_wtfini_lcnt_t	dbg_wtfini_lcnt;	/* "lcnt" value for WCS_OPS_TRACE tracking purposes. This is dbg-only
 							 * and hence it is okay to be a gbldef instead of a threadgbldef.
 							 */
+GBLDEF	bool		only_usr_jnlpool_flush;		/* Debug-only marker used by instance-oriented processes like rollback
+							 * and the source server to indicate to a repl_instance_flush that the
+							 * process has obtained exclusive access to the instance and therefore
+							 * does not need the ordinarily-required locks.
+							 */
 #endif
 GBLDEF	sgm_info	*sgm_info_ptr;
 GBLDEF	tp_region	*tp_reg_free_list;	/* Ptr to list of tp_regions that are unused */

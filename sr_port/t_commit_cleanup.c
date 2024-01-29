@@ -61,25 +61,27 @@ GBLREF	boolean_t		dse_running;
 
 error_def(ERR_DBCOMMITCLNUP);
 
-#define	RESET_EARLY_TN_IF_NEEDED(csa)						\
-{										\
-	assert(!csa->t_commit_crit);						\
-	csa->t_commit_crit = FALSE;						\
-	if (csa->now_crit && (csa->ti->curr_tn == csa->ti->early_tn - 1))	\
-		csa->ti->early_tn = csa->ti->curr_tn;           		\
-	assert(!csa->now_crit || csa->ti->curr_tn == csa->ti->early_tn);	\
+#define	RESET_EARLY_TN_IF_NEEDED(csa)										\
+{														\
+	assert(!csa->t_commit_crit || ((csa->t_commit_crit == T_COMMIT_CRIT_PHASE0)				\
+				&& ((CMT02 < csa->nl->cur_cmt_step) && (CMT05 > csa->nl->cur_cmt_step))));	\
+	csa->t_commit_crit = FALSE;										\
+	if (csa->now_crit && (csa->ti->curr_tn == csa->ti->early_tn - 1))					\
+		csa->ti->early_tn = csa->ti->curr_tn;           						\
+	assert(!csa->now_crit || csa->ti->curr_tn == csa->ti->early_tn);					\
 }
 
-#define	RELEASE_JNLPOOL_LOCK_IF_NEEDED(jpl_reg)				\
-{									\
-        sgmnt_addrs		*repl_csa;				\
-									\
-	if (NULL != jpl_reg)						\
-	{								\
-		repl_csa = &FILE_INFO(jpl_reg)->s_addrs;		\
-		if (!repl_csa->hold_onto_crit)				\
-			rel_lock(jpl_reg);				\
-	}								\
+#define	RELEASE_JNLPOOL_LOCK_IF_NEEDED(jpl_reg)					\
+{										\
+        sgmnt_addrs		*repl_csa;					\
+										\
+	if (NULL != jpl_reg)							\
+	{									\
+		repl_csa = &FILE_INFO(jpl_reg)->s_addrs;			\
+		SET_CUR_CMT_STEP_IF(TRUE, repl_csa->nl->cur_cmt_step, CMT00);	\
+		if (!repl_csa->hold_onto_crit)					\
+			rel_lock(jpl_reg);					\
+	}									\
 }
 
 #define	T_COMMIT_CLEANUP_DB(CR_ARRAY, CR_ARRAY_INDEX, CS_ADDRS, UPDATE_TRANS, JNLPOOL, JGBL, RELEASE_CRIT, GV_CUR_REGION)	\
@@ -95,41 +97,66 @@ MBSTART {															\
 	UNPIN_CR_ARRAY_ON_RETRY(crArray, CR_ARRAY_INDEX);									\
 	assert(!CR_ARRAY_INDEX);												\
 	csa = CS_ADDRS;														\
-	assert(!csa->t_commit_crit);												\
+	assert(!csa->t_commit_crit || ((csa->t_commit_crit == T_COMMIT_CRIT_PHASE0)						\
+				&& (DECL_CMT03 <= csa->nl->cur_cmt_step)));							\
 	assert(!csa->now_crit || (csa->ti->curr_tn == csa->ti->early_tn));							\
 	ASSERT_JNL_SEQNO_FILEHDR_JNLPOOL(csa, JNLPOOL); /* debug-only sanity check between seqno of filehdr and jnlpool */	\
 	csd = csa->hdr;														\
 	/* Note: Below code is slightly similar to that in "mutex_salvage" */							\
-	if (csa->now_crit && JNL_ENABLED(csd) && (csd->trans_hist.early_tn != csd->trans_hist.curr_tn))				\
-	{	/* CMT04 finished but error happened before CMT08. Check if CMT06 needs to be undone */				\
+	if (csa->now_crit && JNL_ENABLED(csd) && (csa->ti->early_tn != csa->ti->curr_tn))					\
+	{	/* CMT02 finished but error happened before CMT09. Check if CMT06 needs to be undone */				\
+		assert(csa->nl->cur_cmt_step < CMT09 && csa->nl->cur_cmt_step > CMT01);						\
 		assert(csa->nl->update_underway_tn < csd->trans_hist.early_tn);							\
 		assert(NULL != csa->jnl);											\
 		assert(NULL != csa->jnl->jnl_buff);										\
 		jbp = csa->jnl->jnl_buff;											\
 		index1 = jbp->phase2_commit_index1;										\
 		index2 = jbp->phase2_commit_index2;										\
-		if (index1 != index2)												\
+		/* WARNING - index1 != index2 can be a very common condition, even when there is only an update			\
+		 * process performing database updates (and therefore all *_in_prog_t updates have its process_id).		\
+		 * The reason for this is that when for example there is only a passive source server and an update		\
+		 * process, jnl_phase2_cleanup is only performed when the array becomes halfway full, and possibly		\
+		 * at some other infrequent points. Therefore when index1 != index2 we do NOT know for certain that		\
+		 * there is any kind of update in progress. A correlary of this: when index1 != index2 and the last		\
+		 * in_progress commit has our process_id, we do NOT know that this update is 'in progress' - wrongly		\
+		 * assuming so on this basis could force a process to roll back a completed commit that is processed		\
+		 * in the transaction before the current one.									\
+		 */														\
+		if (index1 != index2)	/* We MAY have reserved space in the journal buffer */					\
 		{														\
 			assert(jbp->freeaddr <= jbp->rsrv_freeaddr);								\
 			DECR_PHASE2_COMMIT_INDEX(index2, JNL_PHASE2_COMMIT_ARRAY_SIZE);						\
 			lastJbufCmt = &jbp->phase2_commit_array[index2];							\
-			if (lastJbufCmt->process_id == process_id)								\
+			if ((lastJbufCmt->process_id == process_id)								\
+					&& (lastJbufCmt->curr_tn == csa->ti->curr_tn)						\
+					&& (!lastJbufCmt->write_complete))							\
 			{	/* CMT06 finished. So undo it as a whole */							\
-				assert(lastJbufCmt->curr_tn == csd->trans_hist.curr_tn);					\
 			/* 	NARSTODO : Invoke same cleanup code as in mutex.c to reset jb->freeaddr back */			\
 				SET_JBP_RSRV_FREEADDR(jbp, lastJbufCmt->start_freeaddr);					\
 				SHM_WRITE_MEMORY_BARRIER;/* see corresponding SHM_READ_MEMORY_BARRIER in "jnl_phase2_cleanup" */\
 				jbp->phase2_commit_index2 = index2;	/* remove last commit entry */				\
 				/* Undo Step (CMT06) complete */								\
 			}													\
+			/* Else could be another process, living or dead, or garbage data. It would be nice to			\
+			 * assert against garbage data since this will cause a jnl_phase2_salvage and additional		\
+			 * null/inctn records written unnecessarily. Unfortunately, we cannot easily distinguish		\
+			 * between garbage data and a dead pid, which can happen if the process dies after releasing		\
+			 * crit but before marking its jbuf_phase2_in_prog_t jnlpool commit as write_complete, and before	\
+			 * any jnl_salvage operation can handle this situation.							\
+			 */													\
 		}														\
 	}															\
 	if (UPDATE_TRANS)													\
-		RESET_EARLY_TN_IF_NEEDED(csa);		/* Undo Step (CMT04) */							\
+	{															\
+		RESET_EARLY_TN_IF_NEEDED(csa);		/* Undo Step (CMT02) */							\
+	}															\
 	assert(!csa->hold_onto_crit || dse_running || mu_upgrade_in_prog || JGBL.onlnrlbk 					\
 			|| TREF(in_gvcst_redo_root_search) || TREF(in_trigger_upgrade));					\
 	if (!csa->hold_onto_crit && RELEASE_CRIT)										\
+	{															\
+		SET_CUR_CMT_STEP_IF(csa->now_crit, csa->nl->cur_cmt_step, CMT00);						\
 		rel_crit(GV_CUR_REGION); 		/* Undo Step (CMT01) */							\
+	}															\
 } MBEND
 
 boolean_t t_commit_cleanup(enum cdb_sc status, int signal)
@@ -171,16 +198,6 @@ boolean_t t_commit_cleanup(enum cdb_sc status, int signal)
 		 */
 		for (si = first_tp_si_by_ftok;  (NULL != si);  si = si->next_tp_si_by_ftok)
 		{
-			if (UPDTRNS_TCOMMIT_STARTED_MASK & si->update_trans)
-			{	/* Two possibilities.
-				 *	(a) case of duplicate set not creating any cw-sets but updating db curr_tn++.
-				 *	(b) Have completed commit for this region and have released crit on this region.
-				 *		(in a potentially multi-region TP transaction).
-				 * In either case, update is underway and the transaction cannot be rolled back.
-				 */
-				update_underway = TRUE;
-				break;
-			}
 			if (NULL != si->first_cw_set)
 			{
 				csa = si->tp_csa;
@@ -198,6 +215,16 @@ boolean_t t_commit_cleanup(enum cdb_sc status, int signal)
 				}
 				if (!update_jnlpool && REPL_ALLOWED(csa))
 					update_jnlpool = jnlpool;
+			}
+			if (UPDTRNS_TCOMMIT_STARTED_MASK & si->update_trans)
+			{	/* Two possibilities.
+				 *	(a) case of duplicate set not creating any cw-sets but updating db curr_tn++.
+				 *	(b) Have completed commit for this region and may or may not have released crit on
+				 *	this region.
+				 * In either case, update is underway and the transaction cannot be rolled back.
+				 */
+				update_underway = TRUE;
+				break;
 			}
 		}
 	} else
@@ -227,7 +254,7 @@ boolean_t t_commit_cleanup(enum cdb_sc status, int signal)
 	}
 	if (!update_underway)
 	{	/* Rollback (undo) the transaction. the comments below refer to CMTxx step numbers described in secshr_db_clnup.
-		 * At this point we know an update is not underway. That means we got an error BEFORE Step CMT08.
+		 * At this point we know an update is not underway. That means we got an error BEFORE Step CMT09.
 		 * If we are here due to a restart (in t_end or tp_tend), we release crit as long as it is not the transition
 		 * from 2nd to 3rd retry or 3rd to 3rd retry. However, if we are here because of a runtime error in t_end or tp_tend
 		 * at a point where the transaction can be rolled backwards (update_underway = FALSE), we release crit before going
@@ -235,32 +262,65 @@ boolean_t t_commit_cleanup(enum cdb_sc status, int signal)
 		 */
 		release_crit = (0 == signal) ? NEED_TO_RELEASE_CRIT(t_tries, status) : TRUE;
 		assert(!dollar_tlevel || !update_jnlpool || !jnlpool_si || (!jnlpool || (update_jnlpool == jnlpool)));
+		/* CMT06a/6b/7/8 - if we've done phase 2 in the journal buffer & pool, incremented the sequence number, or
+		 * rel_locked the journalpool without hitting the commit state anywhere, we're in trouble. We should not call
+		 * t_commit_cleanup in that condition, at least until there is logic to recover from it. Assert that here.
+		 */
+		assert((CMT06 >= TREF(cur_cmt_step)) || (TREF(statsdb_memerr) && !dollar_tlevel));
+		/* Roll back the journalpool steps if applicable - CMT05 and CMT04 - before CMT06. This is because they are
+		 * relatively independent and the logic for the rest is different in TP and non-TP.
+		 */
 		if (update_jnlpool && update_jnlpool->jnlpool_dummy_reg && update_jnlpool->jnlpool_dummy_reg->open)
 		{
 			csa = &FILE_INFO(update_jnlpool->jnlpool_dummy_reg)->s_addrs;
 			if (csa->now_crit)
-			{	/* Undo Step CMT03. Note: The below code is similar to that in "mutex_salvage" for the jnlpool */
+			{	/* Undo Step CMT05. Note: The below code is similar to that in "mutex_salvage" for the jnlpool */
+				assert(DECL_CMT04 <= TREF(cur_cmt_step));
+				assert(CMT06 >= csa->nl->cur_cmt_step);
 				assert(update_jnlpool->jnlpool_ctl);
 				jpl = update_jnlpool->jnlpool_ctl;
 				index1 = jpl->phase2_commit_index1;
 				index2 = jpl->phase2_commit_index2;
-				if (index1 != index2)
+				/* WARNING - index1 != index2 can be a very common condition, even when there is only an update
+				 * process performing database updates (and therefore all *_in_prog_t updates have its process_id).
+				 * The reason for this is that when for example there is only a passive source server and an update
+				 * process, repl_phase2_cleanup is only performed when the array becomes halfway full, and possibly
+				 * at some other infrequent points. Therefore when index1 != index2 we do NOT know for certain that
+				 * there is any kind of update in progress. A correlary of this: when index1 != index2 and the last
+				 * in_progress commit has our process_id, we do NOT know that this update is 'in progress' - wrongly
+				 * assuming so on this basis could force a process to roll back a completed commit that is processed
+				 * in the transaction before the current one.
+				 */
+				if (index1 != index2) /* We MAY have reserved space in the journalpool */
 				{
+					assert(DECL_CMT05 <= csa->nl->cur_cmt_step);
+					assert(DECL_CMT05 <= TREF(cur_cmt_step));
 					assert(jpl->write_addr <= jpl->rsrv_write_addr);
 					DECR_PHASE2_COMMIT_INDEX(index2, JPL_PHASE2_COMMIT_ARRAY_SIZE);
 					lastJplCmt = &jpl->phase2_commit_array[index2];
-					if (lastJplCmt->process_id == process_id)
-					{	/* An error occurred after CMT03 but before CMT07. Undo CMT03 */
+					if ((lastJplCmt->process_id == process_id)
+							&& (!lastJplCmt->write_complete))
+					{	/* An error occurred after CMT05, so undo it */
+						assert((CMT10 > TREF(cur_cmt_step)) && (CMT03 < TREF(cur_cmt_step)));
 						assert(lastJplCmt->jnl_seqno == jpl->jnl_seqno);
 						jpl->rsrv_write_addr = lastJplCmt->start_write_addr;
+						assert(jpl->rsrv_write_addr >= jpl->contig_addr);
 						jpl->lastwrite_len = lastJplCmt->prev_jrec_len;
 						SHM_WRITE_MEMORY_BARRIER; /* similar layout as UPDATE_JPL_RSRV_WRITE_ADDR */
 						jpl->phase2_commit_index2 = index2;	/* remove last commit entry */
 					}
+					/* Else could be another process, living or dead, or garbage data. It would be nice to
+					 * assert against garbage data since this will cause a repl_phase2_salvage and additional
+					 * null/inctn records sent unnecessarily. Unfortunately, we cannot easily distinguish
+					 * between garbage data and a dead pid, which can happen if the process dies after releasing
+					 * crit but before marking its jpl_phase2_in_prog_t jnlpool commit as write_complete, and
+					 * before any repl_salvage operation can handle this situation.
+					 */
 				}
 				if (!csa->hold_onto_crit)
 					jpl_reg = update_jnlpool->jnlpool_dummy_reg;	/* note down to release crit later */
-			}
+			} else
+				assert(DECL_CMT04 >= TREF(cur_cmt_step));
 		}
 		if (dollar_tlevel)
 		{	/* At this point we know a TP update is NOT underway. In this case, use "first_sgm_info" and not
@@ -273,7 +333,7 @@ boolean_t t_commit_cleanup(enum cdb_sc status, int signal)
 			for (si = first_sgm_info; NULL != si; si = si->next_sgm_info)
 			{
 				TP_CHANGE_REG(si->gv_cur_region);		/* sets jnlpool */
-				/* Undo CMT06, CMT04 and CMT01 */
+				/* Undo CMT06, CMT02 and CMT01 */
 				T_COMMIT_CLEANUP_DB(&si->cr_array[0], si->cr_array_index, cs_addrs, si->update_trans,	\
 									jnlpool, jgbl, release_crit, gv_cur_region);
 			}
@@ -298,19 +358,20 @@ boolean_t t_commit_cleanup(enum cdb_sc status, int signal)
 					assert(tr->reg->open);
 					csa = (sgmnt_addrs *)&FILE_INFO(tr->reg)->s_addrs;
 					assert(!csa->hold_onto_crit || jgbl.onlnrlbk);
+					SET_CUR_CMT_STEP_IF(csa->now_crit, csa->nl->cur_cmt_step, CMT00);
 					if (!csa->hold_onto_crit && csa->now_crit)
 						rel_crit(tr->reg);	/* Undo Step (CMT01) */
 				}
 			}
 			assert(!jgbl.onlnrlbk || (lcl_t_tries == t_tries));
 			assert((lcl_t_tries == t_tries) || (t_tries == (CDB_STAGNATE - 1)));
-			RELEASE_JNLPOOL_LOCK_IF_NEEDED(jpl_reg);	/* Undo Step (CMT02) */
+			RELEASE_JNLPOOL_LOCK_IF_NEEDED(jpl_reg);	/* Undo Step (CMT04) */
 		} else
 		{
 			/* Undo CMT06, CMT04 and CMT01 */
 			T_COMMIT_CLEANUP_DB(cr_array, cr_array_index, cs_addrs, update_trans,			\
 							jnlpool, jgbl, release_crit, gv_cur_region);
-			RELEASE_JNLPOOL_LOCK_IF_NEEDED(jpl_reg);	/* Undo Step (CMT02) */
+			RELEASE_JNLPOOL_LOCK_IF_NEEDED(jpl_reg);	/* Undo Step (CMT04) */
 		}
 #		ifdef DEBUG
 		csa = (NULL == jpl_reg) ? NULL : &FILE_INFO(jnlpool->jnlpool_dummy_reg)->s_addrs;
@@ -345,5 +406,6 @@ boolean_t t_commit_cleanup(enum cdb_sc status, int signal)
 	}
 	if (jnlpool != save_jnlpool)
 		jnlpool = save_jnlpool;
+	jgbl.skip_jplwrites = FALSE;
 	return update_underway;
 }

@@ -349,10 +349,10 @@ boolean_t mu_truncate(int4 truncate_percent, mval *keep_mval)
 		grab_crit(gv_cur_region, WS_88);
 		if (FROZEN_CHILLED(cs_addrs))
 			DO_CHILLED_AUTORELEASE(csa, cs_data);
-		if (!FROZEN(cs_data) && !IS_REPL_INST_FROZEN)
+		if (!FROZEN(cs_data) && !IS_REPL_INST_FROZEN(RECOGNIZE_FREEZES))
 			break;
 		rel_crit(gv_cur_region);
-		while (FROZEN(cs_data) || IS_REPL_INST_FROZEN)
+		while (FROZEN(cs_data) || IS_REPL_INST_FROZEN(RECOGNIZE_FREEZES))
 		{
 			hiber_start(1000);
 			if (FROZEN_CHILLED(cs_addrs) && CHILLED_AUTORELEASE(cs_addrs))

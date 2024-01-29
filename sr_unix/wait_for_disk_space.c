@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2018 Fidelity National Information	*
+ * Copyright (c) 2012-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -50,7 +50,7 @@ void wait_for_disk_space(sgmnt_addrs *csa, char *fn, int fd, off_t offset, char 
 	boolean_t	was_crit;
 	gd_region	*reg;
 	int		fn_len, tmp_errno;
-	boolean_t	freeze_cleared;
+	boolean_t	freeze_cleared = FALSE;
 	char		wait_comment[MAX_FREEZE_COMMENT_LEN];
 	sgmnt_addrs	*repl_csa;
 	jnlpool_addrs_ptr_t	save_jnlpool;
@@ -118,6 +118,7 @@ void wait_for_disk_space(sgmnt_addrs *csa, char *fn, int fd, off_t offset, char 
 	 */
 	DEFER_INTERRUPTS(INTRPT_IN_WAIT_FOR_DISK_SPACE, prev_intrpt_state);
 	send_msg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_DSKNOSPCAVAIL, 2, fn_len, fn); /* this should set the instance freeze */
+	assert((TREF(defer_instance_freeze) == RECOGNIZE_FREEZES) || (TREF(defer_instance_freeze) == RECOGNIZE_ONE_FREEZE));
 	/* Make a copy of the freeze comment which would be set by the previous message. */
 	GENERATE_INST_FROZEN_COMMENT(wait_comment, MAX_FREEZE_COMMENT_LEN, ERR_DSKNOSPCAVAIL);
 	tmp_errno = *save_errno;
@@ -125,7 +126,7 @@ void wait_for_disk_space(sgmnt_addrs *csa, char *fn, int fd, off_t offset, char 
 	/* Hang/retry waiting for the disk space situation to be cleared. */
 	for ( ; ENOSPC == tmp_errno; )
 	{
-		if (!IS_REPL_INST_FROZEN)
+		if (!IS_REPL_INST_FROZEN(TREF(defer_instance_freeze)))
 		{	/* Some other process cleared the instance freeze. But we still dont have our disk
 			 * space issue resolved so set the freeze flag again until space is available for us.
 			 */
@@ -143,7 +144,8 @@ void wait_for_disk_space(sgmnt_addrs *csa, char *fn, int fd, off_t offset, char 
 		/* If some other process froze the instance and changed the comment, a retry of the
 		 * LSEEKWRITE may not be appropriate, so just loop waiting for the freeze to be lifted.
 		 */
-		if (IS_REPL_INST_FROZEN && (STRCMP(wait_comment, jnlpool->jnlpool_ctl->freeze_comment) != 0))
+		if (IS_REPL_INST_FROZEN(TREF(defer_instance_freeze))
+				&& (STRCMP(wait_comment, jnlpool->jnlpool_ctl->freeze_comment) != 0))
 		{
 			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_DSKNOSPCBLOCKED, 2, fn_len, fn);
 			WAIT_FOR_REPL_INST_UNFREEZE(csa);
@@ -151,9 +153,9 @@ void wait_for_disk_space(sgmnt_addrs *csa, char *fn, int fd, off_t offset, char 
 		LSEEKWRITE(fd, offset, buf, count, tmp_errno);
 #		ifdef DEBUG
 		if (LSEEKWRITE_IS_TO_DB == lcl_lseekwrite_target)
-			FAKE_ENOSPC(csa, fake_db_enospc, lcl_lseekwrite_target, tmp_errno);
+			FAKE_ENOSPC(csa, fake_db_enospc, lseekwrite_target, tmp_errno);
 		else if (LSEEKWRITE_IS_TO_JNL == lcl_lseekwrite_target)
-			FAKE_ENOSPC(csa, fake_jnl_enospc, lcl_lseekwrite_target, tmp_errno);
+			FAKE_ENOSPC(csa, fake_jnl_enospc, lseekwrite_target, tmp_errno);
 #		endif
 	}
 	/* Report that we were able to continue whether we are still frozen or not. */
@@ -166,6 +168,7 @@ void wait_for_disk_space(sgmnt_addrs *csa, char *fn, int fd, off_t offset, char 
 	}
 	*save_errno = tmp_errno;
 	local_jnlpool = jnlpool;
+	SET_FREEZE_INVISIBLE_IF_DEFERRING(TREF(defer_instance_freeze));
 	if (save_jnlpool != jnlpool)
 		jnlpool = save_jnlpool;
 	ENABLE_INTERRUPTS(INTRPT_IN_WAIT_FOR_DISK_SPACE, prev_intrpt_state);

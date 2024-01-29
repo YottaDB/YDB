@@ -339,7 +339,8 @@ void zshow_svn(zshow_out *output, int one_sv)
 		/* CAUTION: fall through */
 		case SV_STORAGE:
 			/* double2mval(&var, getstorage()); Causes issues with unaligned stack on x86_64 - remove until fixed */
-			i2mval(&var, getstorage());
+			count = (0 < zmalloclim) ? ((int)zmalloclim) : ((int)getstorage());
+			MV_FORCE_MVAL(&var, (count - (int)totalRmalloc));
 			ZS_VAR_EQU(&x, storage_text);
 			mval_write(output, &var, TRUE);
 			if (SV_ALL != one_sv)

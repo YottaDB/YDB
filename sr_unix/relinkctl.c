@@ -55,7 +55,6 @@
 /* Constants defining how many times to retry the loop in relinkctl_open() based on the specific error conditions encountered. */
 #define MAX_RCTL_INIT_WAIT_RETRIES	1000	/* # of sleeps to allow while waiting for the shared memory to be initialized. */
 #define MAX_RCTL_DELETED_RETRIES	16	/* # of times to allow an existing relinkctl file to be deleted before open(). */
-#define MAX_RCTL_RUNDOWN_RETRIES	16	/* # of times to allow a mapped relinkctl file to get run down before shmat(). */
 
 DEBUG_ONLY(GBLDEF int	saved_errno;)
 GBLREF	uint4		process_id;
@@ -73,11 +72,11 @@ STATICFNDCL void relinkctl_delete(open_relinkctl_sgm *linkctl);
 #define SLASH_GTM_RELINKCTL_LEN	STRLEN(SLASH_GTM_RELINKCTL)
 #define MAX_RCTL_OPEN_RETRIES	16
 
-error_def(ERR_EXCEEDRCTLRNDWN);
 error_def(ERR_FILEPARSE);
 error_def(ERR_RELINKCTLERR);
 error_def(ERR_RELINKCTLFULL);
 error_def(ERR_REQRLNKCTLRNDWN);
+error_def(ERR_RLNKCTLOPENDEL);
 error_def(ERR_RLNKCTLRNDWNFL);
 error_def(ERR_RLNKCTLRNDWNSUC);
 error_def(ERR_SYSCALL);
@@ -146,9 +145,9 @@ open_relinkctl_sgm *relinkctl_attach(mstr *obj_container_name, mstr *objpath, in
 		 */
 		if (!obj_dir_found)
 			obj_container_name->len = 0;
-		else if (objdir.len <= objpath_alloc_len)
-		{
-			memcpy(obj_container_name->addr, objdir.addr, objdir.len);
+		else if (objdir.len < objpath_alloc_len)
+		{	/* len+1 because of an assert null check in mu_rndwn_rlnkctl() */
+			memcpy(obj_container_name->addr, objdir.addr, (objdir.len + 1));
 			obj_container_name->len = objdir.len;
 		}
 	}
@@ -356,8 +355,8 @@ int relinkctl_open(open_relinkctl_sgm *linkctl, boolean_t object_dir_missing)
 			relinkctl_unlock_exclu(linkctl);
 			relinkctl_unmap(linkctl);
 			assert(NULL == linkctl->hdr);
-			if (MAX_RCTL_RUNDOWN_RETRIES <= rctl_rundown_count++)
-				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_EXCEEDRCTLRNDWN, 1, MAX_RCTL_RUNDOWN_RETRIES);
+			send_msg_csa(NULL, VARLSTCNT(6) ERR_RLNKCTLOPENDEL, 4,linkctl->relinkctl_path,
+					RTS_ERROR_MSTR(&linkctl->zro_entry_name), ++rctl_rundown_count);
 			continue;
 		}
 		if (0 == hdr->relinkctl_max_rtn_entries)

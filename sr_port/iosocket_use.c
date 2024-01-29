@@ -36,7 +36,7 @@
 #include "op.h"
 #include "indir_enum.h"
 
-GBLREF	boolean_t		gtm_utf8_mode;
+GBLREF	boolean_t		gtm_utf8_mode, hup_on;
 GBLREF	d_socket_struct		*newdsocket, *socket_pool;
 GBLREF	int4			gtm_max_sockets;
 GBLREF	io_desc			*active_device;
@@ -44,6 +44,7 @@ GBLREF	io_pair			io_curr_device, io_std_device;
 GBLREF	spdesc			stringpool;
 GBLREF	UConverter  		*chset_desc[];
 GBLREF	volatile boolean_t	dollar_zininterrupt;
+GBLREF	void			(*ctrlc_handler_ptr)();
 
 LITREF	nametabent		filter_names[];
 LITREF	unsigned char		filter_index[27];
@@ -79,6 +80,7 @@ void	iosocket_use(io_desc *iod, mval *pp)
 	int4		length, width, new_len;
 	d_socket_struct *dsocketptr;
 	socket_struct	*socketptr = NULL, *curr_socketptr = NULL, *localsocketptr;
+	struct sigaction	act;
 	mstr_len_t	delim_len;
 	char		handlea[MAX_HANDLE_LEN], handles[MAX_HANDLE_LEN], handled[MAX_HANDLE_LEN];
 	char		addr[SA_MAXLITLEN], *errptr, sockaddr[SA_MAXLITLEN],
@@ -374,6 +376,32 @@ void	iosocket_use(io_desc *iod, mval *pp)
 				{
 					memcpy(options_buffer, (unsigned char *)(pp->str.addr + p_offset + 1), options_len);
 					options_buffer[options_len] = '\0';
+				}
+				break;
+			case iop_hupenable:
+				if (!hup_on)
+				{
+					if (dsocketptr == (d_socket_struct *)io_std_device.in->dev_sp)
+					{	/* socket is principal device */
+						sigemptyset(&act.sa_mask);
+						act.sa_flags = 0;
+						act.sa_handler = ctrlc_handler_ptr;
+						sigaction(SIGHUP, &act, 0);
+						hup_on = TRUE;
+					}
+				}
+				break;
+			case iop_nohupenable:
+				if (hup_on)
+				{
+					if (dsocketptr == (d_socket_struct *)io_std_device.in->dev_sp)
+					{	/* socket is principal device */
+						sigemptyset(&act.sa_mask);
+						act.sa_flags = 0;
+						act.sa_handler = SIG_IGN;
+						sigaction(SIGHUP, &act, 0);
+						hup_on = FALSE;
+					}
 				}
 				break;
 			default:

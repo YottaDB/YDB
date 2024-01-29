@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2019 Fidelity National Information	*
+ * Copyright (c) 2003-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -87,7 +87,9 @@ uint4 jnl_file_open_common(gd_region *reg, off_jnl_t os_file_size, char *buff, s
 	uint4			end_of_data, jnl_fs_block_size, read_write_size, read_size;
 	int4			status;
 	gtm_uint64_t		header_virtual_size;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	csa = &FILE_INFO(reg)->s_addrs;
 	csd = csa->hdr;
 	jpc = csa->jnl;

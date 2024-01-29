@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -81,7 +81,7 @@ void op_gvextnam_fast(UNIX_ONLY_COMMA(int count_arg) int hash_code, mval *val1, 
 
 STATICFNDEF void op_gvextnam_common(int count, int hash_code, mval *val1, va_list var)
 {
-	boolean_t	was_null, is_null;
+	boolean_t	is_null, was_null;
 	mstr		*tmp_mstr_ptr;
 	mval		*val, *val2, val_xlated;
 	mname_entry	gvname;
@@ -90,6 +90,7 @@ STATICFNDEF void op_gvextnam_common(int count, int hash_code, mval *val1, va_lis
 	gvnh_reg_t	*gvnh_reg;
 	gd_region	*reg;
 	size_t		st_len;
+	int		tmp_len;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -144,8 +145,8 @@ STATICFNDEF void op_gvextnam_common(int count, int hash_code, mval *val1, va_lis
 	GV_BIND_SUBSNAME_IF_GVSPAN(gvnh_reg, tmpgd, gv_currkey, reg);
 	/* Now that "gv_cur_region" is setup correctly for both spanning and non-spanning globals, do GVSUBOFLOW check */
 	max_key = gv_cur_region->max_key_size;
-	if (gv_currkey->end >= max_key)
-		ISSUE_GVSUBOFLOW_ERROR(gv_currkey, KEY_COMPLETE_TRUE);
+	if ((tmp_len = gv_currkey->end) >= max_key)
+		ISSUE_GVSUBOFLOW_ERROR(gv_currkey, KEY_COMPLETE_TRUE, (tmp_len+1), max_key, gv_cur_region);
 	TREF(gv_some_subsc_null) = was_null; /* if true, it indicates there is a null subscript (other than the last subscript)
 						in current key */
 	TREF(gv_last_subsc_null) = is_null; /* if true, it indicates that last subscript in current key is null */

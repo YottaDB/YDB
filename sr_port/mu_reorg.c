@@ -207,7 +207,7 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 				int index_fill_factor, int data_fill_factor, int reorg_op, const int min_level)
 {
 	boolean_t		end_of_tree = FALSE, detailed_log;
-	int			rec_size, pending_levels;
+	int			rec_size, lcl_rec_size = 0, pending_levels, exp_level;
 	/*
 	 *
 	 * "level" is the level of the working block.
@@ -471,9 +471,8 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 				if (cur_blk_size < max_fill - toler && 0 == (reorg_op & NOCOALESCE))
 				{
 					/* histories are sent in &gv_target->hist and gv_target->alt_hist */
-
 					status = mu_clsce(merge_split_level, i_max_fill, d_max_fill, &kill_set_list,
-							&pending_levels);
+							&pending_levels, min_level);
 					if (cdb_sc_normal == status)
 					{
 						if (merge_split_level) /* delete lower elements of array, t_end might confuse */
@@ -552,20 +551,27 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 					cw_set_depth = cw_map_depth = 0;
 					if (merge_split_level)
 					{
-						GET_RSIZ(rec_size, (rtsib_hist->h[merge_split_level].buffaddr + SIZEOF(blk_hdr)));
+						GET_RSIZ(lcl_rec_size,
+								(rtsib_hist->h[merge_split_level].buffaddr + SIZEOF(blk_hdr)));
 						rtsib_long_blk_id = IS_64_BLK_ID(rtsib_hist->h[merge_split_level].buffaddr);
 						rtsib_bstar_rec_sz = bstar_rec_size(rtsib_long_blk_id);
+						/* Safety of the following relies on guarantee inside of gvcst_expand_any_key
+						 * and READ_RECORD that it won't write past MAX_KEY_SZ in the buffer the caller
+						 * passes it (gv_currkey_next_reorg->base in this case)
+						 */
+						exp_level = merge_split_level;
 						status = gvcst_expand_any_key(&rtsib_hist->h[merge_split_level],
 								rtsib_hist->h[merge_split_level].buffaddr + SIZEOF(blk_hdr)
-								+ rec_size, gv_currkey_next_reorg->base, &rec_size, &tkeylen,
-								&tkeycmpc, rtsib_hist);
+								+ lcl_rec_size, gv_currkey_next_reorg->base, &rec_size, &tkeylen,
+								&tkeycmpc, rtsib_hist, &exp_level);
 						if (cdb_sc_normal != status)
 						{
 							t_retry(status);
 							continue;
 						}
+						assert((merge_split_level == exp_level) || !exp_level);
 						tkeysize = tkeycmpc + tkeylen;
-						if (rtsib_bstar_rec_sz != rec_size)
+						if (exp_level)
 						{
 							/* If gvcst_expand_any_key found a star-key and therefore needed
 							 * to process all righthand children, do t_qreads on those blocks,
@@ -584,7 +590,7 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 						tkeysize = get_key_len(rtsib_hist->h[merge_split_level].buffaddr,
 							rtsib_hist->h[merge_split_level].buffaddr + SIZEOF(blk_hdr)
 							+ SIZEOF(rec_hdr));
-					if (2 < tkeysize && MAX_KEY_SZ >= tkeysize)
+					if ((2 < tkeysize) && (MAX_KEY_SZ >= tkeysize))
 					{
 						if (!merge_split_level)
 							memcpy(&(gv_currkey_next_reorg->base[0]), rtsib_hist->h[0].buffaddr
@@ -599,7 +605,7 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 							need_kip_incr = FALSE;
 							assert(NULL == kip_csa);
 							UNIX_ONLY(ABORT_TRANS_IF_GBL_EXIST_NOMORE_AND_RETURN(lcl_t_tries, gn));
-							if (merge_split_level && (rtsib_bstar_rec_sz != rec_size))
+							if (merge_split_level && exp_level)
 							{	/* reinitialize level member in rtsib_hist srch_blk_status' */
 								for (count = 0; count < MAX_BT_DEPTH; count++)
 									rtsib_hist->h[count].level = count;
@@ -612,7 +618,7 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 						 * This is because before the next call to "t_end" we should have a call to
 						 * "t_begin" which will reset update_trans anyways.
 						 */
-						if (merge_split_level && (rtsib_bstar_rec_sz != rec_size))
+						if (merge_split_level && exp_level)
 						{	/* reinitialize level member in rtsib_hist srch_blk_status' */
 							for (count = 0; count < MAX_BT_DEPTH; count++)
 								rtsib_hist->h[count].level = count;
@@ -622,7 +628,7 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 							log_detailed_log("NOU", rtsib_hist, NULL, merge_split_level, NULL, ret_tn);
 					} else
 					{
-						if (merge_split_level && (rtsib_bstar_rec_sz != rec_size))
+						if (merge_split_level && exp_level)
 						{	/* reinitialize level member in rtsib_hist srch_blk_status' */
 							for (count = 0; count < MAX_BT_DEPTH; count++)
 								rtsib_hist->h[count].level = count;

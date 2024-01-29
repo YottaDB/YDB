@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -31,6 +31,7 @@
 #include "filestruct.h"
 #include "repl_msg.h"
 #include "gtmsource.h"
+#include "gtmsource_srv_latch.h"
 #include "repl_dbg.h"
 #include "repl_log.h"
 #include "iosp.h"
@@ -117,7 +118,8 @@ int gtmsource_poll_actions(boolean_t poll_secondary)
 		gtmsource_state = GTMSOURCE_CHANGING_MODE;
 		gtmsource_local->mode = GTMSOURCE_MODE_PASSIVE;
 		UNIX_ONLY(gtmsource_local->gtmsource_state = gtmsource_state;)
-		gtmsource_flush_fh(gtmsource_local->read_jnl_seqno); /* Force the update on a transition */
+		/* Force the update on a transition */
+		gtmsource_flush_fh(gtmsource_local->read_jnl_seqno, !gtmsource_srv_latch_held_by_us());
 		return (SS_NORMAL);
 	}
 	if (poll_secondary && GTMSOURCE_CHANGING_MODE != gtmsource_state && GTMSOURCE_WAITING_FOR_CONNECTION != gtmsource_state)
@@ -155,7 +157,7 @@ int gtmsource_poll_actions(boolean_t poll_secondary)
 	if ((GTMSOURCE_SENDING_JNLRECS == gtmsource_state) /* Flush the file header only with an active connection */
 			&& (GTMSOURCE_FH_FLUSH_INTERVAL <= difftime(gtmsource_now, gtmsource_last_flush_time)))
 	{
-		gtmsource_flush_fh(gtmsource_local->read_jnl_seqno);
+		gtmsource_flush_fh(gtmsource_local->read_jnl_seqno, !gtmsource_srv_latch_held_by_us());
 		if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
 				return (SS_NORMAL);
 	}

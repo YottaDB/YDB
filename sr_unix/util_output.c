@@ -68,6 +68,7 @@ GBLREF	uint4			is_updhelper, process_id;
 GBLREF	VSIG_ATOMIC_T		forced_exit;
 
 error_def(ERR_REPLINSTACC);
+error_def(ERR_SOCKHANGUP);
 error_def(ERR_TERMHANGUP);
 error_def(ERR_TEXT);
 
@@ -973,7 +974,8 @@ void util_cond_flush(void)
 	SETUP_THREADGBL_ACCESS;
 	ASSERT_SAFE_TO_UPDATE_THREAD_GBLS;
 	assert(((int)ERR_TERMHANGUP != SIGNAL) || ((tt == io_std_device.in->type) && prin_in_dev_failure));
-	if ((TREF(util_outptr) != TREF(util_outbuff_ptr)) && ((int)ERR_TERMHANGUP != SIGNAL))	/* if a PRINCIPAL device terminal */
+	if ((TREF(util_outptr) != TREF(util_outbuff_ptr)) && (((int)ERR_TERMHANGUP != SIGNAL) && ((int)ERR_SOCKHANGUP != SIGNAL)))
+						/* if a PRINCIPAL device terminal */
 		util_out_print(NULL, FLUSH);	/* disappeared, sending stuff to it with a PRN_ERROR just complicates things */
 }
 

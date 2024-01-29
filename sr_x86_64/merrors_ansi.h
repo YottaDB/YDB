@@ -727,7 +727,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* GTMSECSHRSSIDF */
 	   0,	/* GTMSECSHRFORKF */
 	   0,	/* DBFSYNCERR */
-	   0,	/* EXCEEDRCTLRNDWN */
+	   0,	/* UNUSEDMSG898 */
 	   0,	/* SCNDDBNOUPD */
 	   0,	/* MUINFOUINT4 */
 	   0,	/* NLMISMATCHCALC */
@@ -944,7 +944,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* JNLALIGNSZCHG */
 	   0,	/* SEFCTNEEDSFULLB */
 	   0,	/* GVFAILCORE */
-	   0,	/* UNUSEDMSG1115 */
+	   0,	/* RLNKCTLOPENDEL */
 	   0,	/* DBFRZRESETSUC */
 	   0,	/* JNLFILEXTERR */
 	   0,	/* JOBEXAMDONE */
@@ -1041,7 +1041,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* DBBTUWRNG */
 	   0,	/* DBBTUFIXED */
 	   0,	/* DBMAXREC2BIG */
-	   0,	/* UNUSEDMSG1212 */
+	   0,	/* SOCKHANGUP */
 	   0,	/* UNUSEDMSG1213 */
 	   0,	/* UNUSEDMSG1214 */
 	   0,	/* UNUSEDMSG1215 */
@@ -1073,7 +1073,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* BKUPTMPFILWRITE */
 	   0,	/* SHMHUGETLB */
 	   0,	/* SHMLOCK */
-	   0,	/* UNUSEDMSG1244 */
+	   0,	/* SPCFCBUFDELAY */
 	   0,	/* REPLINSTMISMTCH */
 	   0,	/* REPLINSTREAD */
 	   0,	/* REPLINSTDBMATCH */

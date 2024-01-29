@@ -58,7 +58,9 @@ uint4 dbfilop(file_control *fc)
 	gd_segment		*seg;
 	sgmnt_addrs		*csa;
 	ZOS_ONLY(int		realfiletag;)
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	udi = FC2UDI(fc);
 	csa = &udi->s_addrs;
 	switch(fc->op)

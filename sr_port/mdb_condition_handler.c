@@ -137,6 +137,7 @@ error_def(ERR_MEMORY);
 error_def(ERR_NOEXCNOZTRAP);
 error_def(ERR_NOTPRINCIO);
 error_def(ERR_REPEATERROR);
+error_def(ERR_SOCKHANGUP);
 error_def(ERR_STACKCRIT);
 error_def(ERR_STACKOFLOW);
 error_def(ERR_TERMHANGUP);
@@ -251,6 +252,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 	boolean_t		error_in_zyerror;
 	boolean_t		compile_time;
 	boolean_t		repeat_error, etrap_handling, reset_mpc;
+	boolean_t		hangup;
 	int			level, rc;
 	boolean_t		reserve_sock_dev = FALSE;
 	unix_db_info		*udi;
@@ -642,12 +644,12 @@ CONDITION_HANDLER(mdb_condition_handler)
 			dec_err(VARLSTCNT(4) ERR_NOTPRINCIO, 2, io_curr_device.out->trans_name->len,
 				io_curr_device.out->trans_name->dollar_io);
 		MUM_TSTART;
-	} else if (((int)ERR_CTRAP == SIGNAL) || ((int)ERR_TERMHANGUP == SIGNAL))
+	} else if ((hangup = ((int)ERR_TERMHANGUP == SIGNAL) || ((int)ERR_SOCKHANGUP == SIGNAL)) || ((int)ERR_CTRAP == SIGNAL))
 	{
 		if (outofband && !repeat_error)
 		{	/* don't need to do this again if re-throwing the error */
-			assert((((int)ERR_TERMHANGUP == SIGNAL) ? sighup : ctrap) == outofband);
-			if ((int)ERR_TERMHANGUP == SIGNAL)
+			assert((hangup ? sighup : ctrap) == outofband);
+			if (hangup)
 			{
 				assert(hup_on || prin_in_dev_failure);
 				SAVE_ZSTATUS_INTO_RTS_STRINGPOOL(dollar_ecode.error_last_b_line, NULL);

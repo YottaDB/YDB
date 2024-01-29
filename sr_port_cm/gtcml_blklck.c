@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -45,7 +45,7 @@ void gtcml_blklck(cm_region_list *region, mlk_pvtblk *lock, gtm_uint64_t wake)
 		b = (cm_lckblkreg *)malloc(SIZEOF(cm_lckblkreg));
 		b->next = 0;
 		b->region = region->reghead;
-		b->pass = CM_BLKPASS;
+		b->tries_left = CM_BLKPASS;
 		b->lock	 = (cm_lckblklck *)malloc(SIZEOF(cm_lckblklck));
 		l = (cm_lckblklck *)malloc(SIZEOF(cm_lckblklck));
 		l->node = lock->nodptr;

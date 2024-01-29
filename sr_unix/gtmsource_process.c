@@ -1,6 +1,6 @@
  /***************************************************************
  *								*
- * Copyright (c) 2006-2022 Fidelity National Information	*
+ * Copyright (c) 2006-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -157,15 +157,16 @@
 		save_errno = gtm_tls_errno();											\
 		if (REPL_CONN_RESET(save_errno))										\
 		{														\
-			repl_log(gtmsource_log_fp, TRUE, TRUE, "Connection reset while attempting to renegotiate"		\
-					" TLS/SSL connection.\n");								\
+			repl_log(gtmsource_log_fp, TRUE, TRUE, "Connection reset while attempting to TLS/SSL connection.\n",	\
+					(gtm_tls_does_renegotiate(SOCK)) ? "renegotiate" : "update TLS session keys");		\
 			gtmsource_state = gtmsource_local->gtmsource_state = GTMSOURCE_WAITING_FOR_CONNECTION;			\
 			repl_close(&gtmsource_sock_fd);										\
 		} else														\
 		{														\
 			errp = (-1 == save_errno) ? (char *)gtm_tls_get_error(NULL) : STRERROR(save_errno);			\
-			assert(FALSE);												\
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TLSRENEGOTIATE, 0, ERR_TEXT, 2, LEN_AND_STR(errp));	\
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_TLSRENEGOTIATE, 1, 					\
+					(gtm_tls_does_renegotiate(SOCK)) ? "renegotiate" : "update TLS session keys",		\
+					ERR_TEXT, 2, LEN_AND_STR(errp));							\
 		}														\
 	} else															\
 		gtmsource_local->num_renegotiations++;										\
@@ -429,7 +430,8 @@ void gtmsource_recv_ctl(void)
 		 * message will defer sending any more messages to us until the renegotiation is completed.
 		 */
 		repl_tls.renegotiate_state = REPLTLS_WAITING_FOR_RENEG_ACK;
-		repl_log(gtmsource_log_fp, TRUE, TRUE, "Waiting for REPL_RENEG_ACK\n");
+		repl_log(gtmsource_log_fp, TRUE, TRUE, "Waiting for SSL/TLS connection %s acknowledgement message.\n",
+					(gtm_tls_does_renegotiate(repl_tls.sock)) ?  "renegotiate" : "session keys update");
 		poll_time = REPL_POLL_WAIT; /* because we are waiting for a REPL_RENEG_ACK */
 	}
 #	endif
@@ -592,7 +594,9 @@ void gtmsource_recv_ctl(void)
 				break;
 #			ifdef GTM_TLS
 			case REPL_RENEG_ACK:
-				repl_log(gtmsource_log_fp, TRUE, TRUE, "REPL_RENEG_ACK received\n");
+				repl_log(gtmsource_log_fp, TRUE, TRUE, "Received SSL/TLS connection %s acknowledgement message.\n",
+						((gtm_tls_does_renegotiate(repl_tls.sock)) ?
+						 	"renegotiated" : "session keys updated"));
 				REPLTLS_RENEGOTIATE(repl_tls.sock, status);
 				poll_time = REPL_POLL_NOWAIT; /* because we are back to sending data */
 				if (0 != status)
@@ -601,7 +605,9 @@ void gtmsource_recv_ctl(void)
 					break;
 				}
 				/* Send the REPL_RENEG_COMPLETE message. */
-				repl_log(gtmsource_log_fp, TRUE, TRUE, "Sending REPL_RENEG_COMPLETE\n");
+				repl_log(gtmsource_log_fp, TRUE, TRUE, "Sending SSL/TLS connection %s message.\n",
+							((gtm_tls_does_renegotiate(repl_tls.sock)) ?
+							 	"renegotiated" : "session keys updated"));
 				renegotiate_msg.type = REPL_RENEG_COMPLETE;
 				renegotiate_msg.len = MIN_REPL_MSGLEN;
 				gtmsource_repl_send((repl_msg_ptr_t)&renegotiate_msg, "REPL_RENEG_COMPLETE",
@@ -610,8 +616,9 @@ void gtmsource_recv_ctl(void)
 					return;
 				if (GTMSOURCE_WAITING_FOR_CONNECTION == gtmsource_state)
 					break;
-				repl_log(gtmsource_log_fp, TRUE, TRUE, "Sent REPL_RENEG_COMPLETE message."
-						" TLS/SSL connection successfully renegotiated.\n");
+				repl_log(gtmsource_log_fp, TRUE, TRUE, "Sent SSL/TLS connection %s message.\n",
+							((gtm_tls_does_renegotiate(repl_tls.sock)) ?
+							 	"renegotiated" : "session keys updated"));
 				assert(heartbeat_stalled);
 				if (GTMSOURCE_WAITING_FOR_XON != gtmsource_state)
 					heartbeat_stalled = FALSE;
@@ -620,7 +627,8 @@ void gtmsource_recv_ctl(void)
 				repl_tls.renegotiate_state = REPLTLS_RENEG_STATE_NONE;
 				next_renegotiate_hrtbt = FALSE;
 				hrtbt_cnt = 0;
-				repl_log_tls_info(gtmsource_log_fp, repl_tls.sock);
+				if (gtm_tls_does_renegotiate(repl_tls.sock))	/* Announce results only if renegotiated */
+					repl_log_tls_info(gtmsource_log_fp, repl_tls.sock);
 				break;
 #			endif
 			default:
@@ -1270,8 +1278,10 @@ int gtmsource_process(void)
 					{
 						if (!remote_side->tls_requested)
 						{
-							ISSUE_REPLNOTLS(ERR_REPLNOTLS, "Source side", "Receiver side");
+							ISSUE_REPLNOTLS(ERR_REPLNOTLS, SRC_SIDE_STR, RCVR_SIDE_STR);
 							CLEAR_REPL_TLS_REQUESTED; /* As if -tlsid qualifier was never specified. */
+							repl_log(gtmsource_log_fp, TRUE, TRUE, "Plaintext fallback enabled. "
+									"Continuing without TLS/SSL.\n");
 						} else
 							temp_ulong |= START_FLAG_ENABLE_TLS;
 					}
@@ -1342,9 +1352,16 @@ int gtmsource_process(void)
 		}
 		gtmsource_local->connect_jnl_seqno = jctl->jnl_seqno;
 		gtmsource_local->send_losttn_complete = jctl->send_losttn_complete;
-		/* Now that "connect_jnl_seqno" has been updated, flush it to corresponding gtmsrc_lcl on disk */
-		repl_inst_flush_gtmsrc_lcl();	/* this requires the jnlpool lock to be held */
 		rel_lock(jnlpool->jnlpool_dummy_reg);
+		/* Now that "connect_jnl_seqno" has been updated, flush it to corresponding gtmsrc_lcl on disk */
+		grab_gtmsource_srv_latch(gtmsource_srv_latch, UINT32_MAX, HANDLE_CONCUR_ONLINE_ROLLBACK);
+		if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
+		{
+			poll_time = REPL_POLL_NOWAIT;
+			continue;
+		}
+		repl_inst_flush_gtmsrc_lcl();
+		rel_gtmsource_srv_latch(gtmsource_srv_latch);
 		if (REPL_WILL_RESTART_WITH_INFO != reply_msgp->type)
 		{
 			assert(reply_msgp->type == REPL_RESYNC_SEQNO || reply_msgp->type == REPL_ROLLBACK_FIRST);
@@ -1521,7 +1538,7 @@ int gtmsource_process(void)
 		/* Flush "gtmsource_local->read_jnl_seqno" to disk right now. This will serve as a reference point for next timed
 		 * flush to occur.
 		 */
-		gtmsource_flush_fh(gtmsource_local->read_jnl_seqno);
+		gtmsource_flush_fh(gtmsource_local->read_jnl_seqno, true);
 		if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
 		{
 			poll_time = REPL_POLL_NOWAIT;
@@ -1820,7 +1837,7 @@ int gtmsource_process(void)
 					}
 					if (SS_NORMAL != status)
 					{
-						gtmsource_flush_fh(post_read_seqno);
+						gtmsource_flush_fh(post_read_seqno, true);
 						if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
 						{
 							poll_time = REPL_POLL_NOWAIT;
@@ -1958,7 +1975,7 @@ int gtmsource_process(void)
 					poll_time = REPL_POLL_NOWAIT;
 				} else /* data_len == 0 */
 				{	/* nothing to send */
-					gtmsource_flush_fh(post_read_seqno);
+					gtmsource_flush_fh(post_read_seqno, true);
 					if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
 					{
 						poll_time = REPL_POLL_NOWAIT;

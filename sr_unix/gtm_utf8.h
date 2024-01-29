@@ -822,7 +822,7 @@ int	trim_U16_line_term(UChar *buffer, int len);
 		? FALSE													\
 		: u_isprint(code))
 
-static void inline copy_character(uint4 copy_length, sm_uc_ptr_t dstptr, char *rcur)
+static inline void copy_character(uint4 copy_length, sm_uc_ptr_t dstptr, char *rcur)
 {
         switch (copy_length)
         {       /* Rather than calling memcpy, do this dance so we can save some instructions */

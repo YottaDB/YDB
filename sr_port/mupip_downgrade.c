@@ -86,7 +86,9 @@ void mupip_downgrade(void)
 	struct stat	stat_buf;
 	ZOS_ONLY(int	realfiletag;)
 	int		ftrunc_status;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	sem_inf = (sem_info *)malloc(SIZEOF(sem_info) * FTOK_ID_CNT);
 	memset(sem_inf, 0, SIZEOF(sem_info) * FTOK_ID_CNT);
 	atexit(mupip_downgrade_cleanup);

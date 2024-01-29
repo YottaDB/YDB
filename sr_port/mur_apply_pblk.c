@@ -83,7 +83,9 @@ uint4 mur_apply_pblk(reg_ctl_list *rctl)
 	int			save_errno;
 	jnl_record		*jnlrec;
 	unix_db_info		*udi;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	reg = rctl->gd;
 	status = gtm_pthread_init_key(reg);
         if (WBTEST_ENABLED(WBTEST_MU_STOP_THREAD))

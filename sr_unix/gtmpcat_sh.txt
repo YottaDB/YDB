@@ -10,5 +10,5 @@
 #	the license, please stop and do not read further.	#
 #								#
 #################################################################
-gtm_chset=M gtm_boolean=0 gtm_side_effects=0 gtm_max_indrcache_count=2048 gtm_max_indrcache_memory=8192 \
+gtm_boolean=0 gtm_side_effects=0 gtm_max_indrcache_count=2048 gtm_max_indrcache_memory=8192 \
 	gtmroutines="$gtm_dist/tools/gtmpcat $gtmroutines" $gtm_dist/mumps -r gtmpcat "$@"

@@ -48,8 +48,9 @@
 #endif
 
 GBLREF	bool			out_of_time;
-GBLREF	boolean_t		gtm_utf8_mode, prin_dm_io, prin_in_dev_failure, prin_out_dev_failure;
+GBLREF	boolean_t		gtm_utf8_mode, hup_on, prin_dm_io, prin_in_dev_failure, prin_out_dev_failure;
 GBLREF	int			socketus_interruptus;
+GBLREF	int4			exi_condition;
 GBLREF	io_pair 		io_curr_device, io_std_device;
 GBLREF	mstr			chset_names[];
 GBLREF	mv_stent		*mv_chain;
@@ -69,6 +70,7 @@ error_def(ERR_MAXSTRLEN);
 error_def(ERR_NOPRINCIO);
 error_def(ERR_NOSOCKETINDEV);
 error_def(ERR_SETSOCKOPTERR);
+error_def(ERR_SOCKHANGUP);
 error_def(ERR_SOCKPASSDATAMIX);
 error_def(ERR_TEXT);
 error_def(ERR_ZINTRECURSEIO);
@@ -147,6 +149,11 @@ int	iosocket_readfl(mval *v, int4 width, int4 msec_timeout)
 	assert(stringpool.free >= stringpool.base);
 	assert(stringpool.free <= stringpool.top);
 	iod = io_curr_device.in;
+	if (ERR_SOCKHANGUP == error_condition)
+	{
+		SOCKHUP_NOPRINCIO_CHECK(FALSE);
+		return 0;
+	}
 	ESTABLISH_RET_GTMIO_CH(&iod->pair, -1, ch_set);
 	TRCTBL_ENTRY(SOCKRFL_ENTRY, width, iod, (INTPTR_T)socketus_interruptus, NULL);
 	ichset = iod->ichset;

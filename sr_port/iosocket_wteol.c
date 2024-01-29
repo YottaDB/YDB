@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -18,21 +18,31 @@
 #include "gtm_socket.h"
 #include "gtm_inet.h"
 #include "gtm_stdlib.h"
-
+#include "have_crit.h"
+#include "deferred_events_queue.h"
 #include "gt_timer.h"
 #include "io.h"
 #include "iottdef.h"
 #include "iosocketdef.h"
+#include "send_msg.h"
 #include "error.h"
+#include "svnames.h"
+#include "op.h"
+#include "gtmio.h"
 #include "util.h"
 
+GBLREF	boolean_t	hup_on, prin_in_dev_failure, prin_out_dev_failure;
 GBLREF	io_pair		io_std_device;
+GBLREF	mval		dollar_zstatus;
+GBLREF	int4		exi_condition;
 
 error_def(ERR_CURRSOCKOFR);
+error_def(ERR_NOPRINCIO);
 error_def(ERR_NOSOCKETINDEV);
+error_def(ERR_SOCKHANGUP);
 error_def(ERR_SOCKPASSDATAMIX);
 
-void	iosocket_wteol(int4 val, io_desc *io_ptr)
+void	iosocket_wteol(int4 val, io_desc *iod)
 {
 	d_socket_struct	*dsocketptr;
 	socket_struct	*socketptr;
@@ -40,18 +50,23 @@ void	iosocket_wteol(int4 val, io_desc *io_ptr)
 	int		eol_cnt;
 	boolean_t	ch_set;
 
-	assert(gtmsocket == io_ptr->type);
-	dsocketptr = (d_socket_struct *)io_ptr->dev_sp;
-	ESTABLISH_GTMIO_CH(&io_ptr->pair, ch_set);
+	assert(gtmsocket == iod->type);
+	if (ERR_SOCKHANGUP == error_condition)
+	{
+		SOCKHUP_NOPRINCIO_CHECK(TRUE);
+		return;
+	}
+	dsocketptr = (d_socket_struct *)iod->dev_sp;
+	ESTABLISH_GTMIO_CH(&iod->pair, ch_set);
 	if (0 >= dsocketptr->n_socket)
 	{
 #		ifndef VMS
-		if (io_ptr == io_std_device.out)
-			ionl_wteol(val, io_ptr);
+		if (iod == io_std_device.out)
+			ionl_wteol(val, iod);
 		else
 #		endif
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_NOSOCKETINDEV);
-		REVERT_GTMIO_CH(&io_ptr->pair, ch_set);
+		REVERT_GTMIO_CH(&iod->pair, ch_set);
 		return;
 	}
 	if (dsocketptr->current_socket >= dsocketptr->n_socket)
@@ -62,12 +77,12 @@ void	iosocket_wteol(int4 val, io_desc *io_ptr)
 	socketptr = dsocketptr->socket[dsocketptr->current_socket];
 	ENSURE_DATA_SOCKET(socketptr);
 	assert(val);
-	io_ptr->esc_state = START;
+	iod->esc_state = START;
 	if (socketptr->n_delimiter > 0)
 	{
 		for (eol_cnt = val; eol_cnt--; )
 		{
-			io_ptr->dollar.x = 0; /* so that iosocket_write doesn't try to wrap (based on escape state and width) */
+			iod->dollar.x = 0; /* so that iosocket_write doesn't try to wrap (based on escape state and width) */
 			iosocket_write_real(&socketptr->odelimiter0, FALSE);
 		}
 	} else if (socketptr->nonblocked_output)
@@ -81,14 +96,14 @@ void	iosocket_wteol(int4 val, io_desc *io_ptr)
 	 * FILTER=CHARACTER effectively turns off all $X maintenance (except for WRAP logic).
 	 * In VMS the below assignment is not necessary, but harmless; it is always logically correct.
 	 */
-	io_ptr->dollar.x = 0;
-	if (!(io_ptr->write_filter & CHAR_FILTER) || !socketptr->delim0containsLF)
+	iod->dollar.x = 0;
+	if (!(iod->write_filter & CHAR_FILTER) || !socketptr->delim0containsLF)
 	{	/* If FILTER won't do it, also maintain $Y */
-		io_ptr->dollar.y += val;
-		if (io_ptr->length)
-			io_ptr->dollar.y %= io_ptr->length;
+		iod->dollar.y += val;
+		if (iod->length)
+			iod->dollar.y %= iod->length;
 	}
-	iosocket_flush(io_ptr);
-	REVERT_GTMIO_CH(&io_ptr->pair, ch_set);
+	iosocket_flush(iod);
+	REVERT_GTMIO_CH(&iod->pair, ch_set);
 	return;
 }

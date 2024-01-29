@@ -129,7 +129,7 @@ ifneq (,$(findstring AIX,$(UNAMESTR)))
 	# -qro places string literals in read-only storage.
 	# -qroconst places constants in read-only storage.
 	# -q64 forces 64-bit object generation
-	CFLAGS += -qro -qroconst -q64 -qlanglvl=stdc99
+	CFLAGS += -qro -qroconst -q64 -qlanglvl=extc99
 	# -q64 for 64-bit object generation
 	# -brtl for allowing both '.a' and '.so' to be searched at runtime.
 	# -bhalt:5 is to disable warnings about duplicate symbols that come from
@@ -188,7 +188,8 @@ all: libgtmcryptutil.so maskpass gcrypt openssl libgtmtls.so
 # - (possibly problematic) With full path to "ssl.h", use AWK's system func to copy the file into PWD
 # - exit the script so that this action is done only once
 whichsslh: Makefile
-	printf '#include <openssl/ssl.h>\n#include <stdio.h>\nint main(int argc, char *argv[]){\nprintf("/* %%s */\\n",OPENSSL_VERSION_TEXT);return 0;}' > whichsslh.c
+	printf '#include <openssl/ssl.h>\n#include <stdio.h>\nint main(int argc, char *argv[])' > whichsslh.c
+	printf '{\nprintf("/* %%s */\\n", OPENSSL_VERSION_TEXT);return 0;}' >> whichsslh.c
 	$(CC) $(IFLAGS) $(default_thirdparty_CFLAGS) -E whichsslh.c > whichsslh.i
 	awk '/ssl\.h/{sub(/^[^"]*"/,"");sub(/".*/,"");print;system("cp -f "$$0" whichsslh.h");exit}' whichsslh.i
 	$(CC) $(IFLAGS) whichsslh.c -o whichsslhver

@@ -95,6 +95,17 @@ int			intrsafe_gtm_tls_accept(gtm_tls_socket_t *socket)
 	return rv;
 }
 
+int			intrsafe_gtm_tls_did_post_hand_shake(gtm_tls_socket_t *socket)
+{
+	int		rv;
+	intrpt_state_t	prev_intrpt_state;
+
+	DEFER_INTERRUPTS(INTRPT_IN_TLS_FUNCTION, prev_intrpt_state);
+	rv = (*gtm_tls_did_post_hand_shake_fptr)(socket);
+	ENABLE_INTERRUPTS(INTRPT_IN_TLS_FUNCTION, prev_intrpt_state);
+	return rv;
+}
+
 int			intrsafe_gtm_tls_do_post_hand_shake(gtm_tls_socket_t *socket)
 {
 	int		rv;
@@ -106,6 +117,17 @@ int			intrsafe_gtm_tls_do_post_hand_shake(gtm_tls_socket_t *socket)
 	return rv;
 }
 
+int			intrsafe_gtm_tls_has_post_hand_shake(gtm_tls_socket_t *socket)
+{
+	int		rv;
+	intrpt_state_t	prev_intrpt_state;
+
+	DEFER_INTERRUPTS(INTRPT_IN_TLS_FUNCTION, prev_intrpt_state);
+	rv = (*gtm_tls_has_post_hand_shake_fptr)(socket);
+	ENABLE_INTERRUPTS(INTRPT_IN_TLS_FUNCTION, prev_intrpt_state);
+	return rv;
+}
+
 int			intrsafe_gtm_tls_repeat_hand_shake(gtm_tls_socket_t *socket)
 {
 	int		rv;
@@ -113,6 +135,17 @@ int			intrsafe_gtm_tls_repeat_hand_shake(gtm_tls_socket_t *socket)
 
 	DEFER_INTERRUPTS(INTRPT_IN_TLS_FUNCTION, prev_intrpt_state);
 	rv = (*gtm_tls_repeat_hand_shake_fptr)(socket);
+	ENABLE_INTERRUPTS(INTRPT_IN_TLS_FUNCTION, prev_intrpt_state);
+	return rv;
+}
+
+int			intrsafe_gtm_tls_does_renegotiate(gtm_tls_socket_t *socket)
+{
+	int		rv;
+	intrpt_state_t	prev_intrpt_state;
+
+	DEFER_INTERRUPTS(INTRPT_IN_TLS_FUNCTION, prev_intrpt_state);
+	rv = (*gtm_tls_does_renegotiate_fptr)(socket);
 	ENABLE_INTERRUPTS(INTRPT_IN_TLS_FUNCTION, prev_intrpt_state);
 	return rv;
 }

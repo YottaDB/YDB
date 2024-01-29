@@ -539,7 +539,7 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 	int4			tcom_num; /* the number of tcom records encountered */
 	seq_num			jnl_seqno, tmpseqno; /* the current jnl_seq no of the Update process */
 	seq_num			last_errored_seqno = 0;
-	int			key_len, rec_len, backptr = 0;
+	int			backptr = 0, key_len, rec_len, tmp_len;
 	char			fn[MAX_FN_LEN];
 	sm_uc_ptr_t		readaddrs;	/* start of current rec in pool */
 	boolean_t		incr_seqno;
@@ -558,9 +558,9 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 	sgmnt_addrs		*csa, *repl_csa, *tmpcsa = NULL;
 	sgmnt_data_ptr_t	csd;
 	char	           	gv_mname[MAX_KEY_SZ];
-	unsigned char		buff[MAX_ZWR_KEY_SZ], *end, scan_char, next_char;
+	unsigned char		buff[MAX_ZWR_KEY_SZ], *end, next_char, scan_char;
 	boolean_t		log_switched = FALSE;
-	boolean_t		suppl_root_primary, suppl_propagate_primary;
+	boolean_t		suppl_propagate_primary, suppl_root_primary;
 	repl_histinfo		histinfo;
 	repl_old_triple_jnl_t	*input_old_triple;
 	repl_histrec_jnl_ptr_t	input_histjrec;
@@ -569,13 +569,13 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 	struct timespec		waketime;
 	jnl_private_control	*jpc;
 	gld_dbname_list		*curr;
-	gd_region		*save_reg, *dummy_reg;
-	uint4			cntr, last_nullsubs, last_subs, keyend;
+	gd_region		*dummy_reg, *save_reg;
+	uint4			cntr, keyend, last_nullsubs, last_subs;
 	gtm_uint64_t		write_wrap;
 #	ifdef GTM_TRIGGER
 	uint4			nodeflags = 0xffffffff;
 	boolean_t		primary_has_trigdef, secondary_has_trigdef;
-	const char		*trigdef_inst = NULL, *no_trigdef_inst = NULL;
+	const char		*no_trigdef_inst = NULL, *trigdef_inst = NULL;
 #	endif
 	gvnh_reg_t		*gvnh_reg;
 	gd_addr			*starting_gd_header;
@@ -1346,6 +1346,7 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 				{
 					case upd_bad_key_size: /* Not using ISSUE_GVSUBOFLOW_ERROR in order to free gv_failed_key */
 						gv_failed_key_ptr = ((NULL == gv_failed_key) ? gv_currkey : gv_failed_key);
+						tmp_len = gv_failed_key_ptr->end;
 						/* Assert that input key to format_targ_key is double null terminated */
 						assert(KEY_DELIMITER == gv_failed_key_ptr->base[gv_failed_key_ptr->end]);
 						/* Note: might update "endBuff" */
@@ -1354,8 +1355,10 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 						if (NULL != gv_failed_key)	/* Free memory if it has been used */
 							free(gv_failed_key);
 						assert(NULL != tmpcsa);
-						RTS_ERROR_CSA_ABT(tmpcsa, VARLSTCNT(6) ERR_GVSUBOFLOW, 0,
-							ERR_GVIS, 2, endBuff - fmtBuff, fmtBuff);
+						assert(NULL != tmpcsa->region);
+						RTS_ERROR_CSA_ABT(tmpcsa, VARLSTCNT(10) ERR_GVSUBOFLOW, 4, (tmp_len+1),
+								tmpcsa->region->max_key_size, REG_LEN_STR(tmpcsa->region),
+									ERR_GVIS, 2, endBuff - fmtBuff, fmtBuff);
 						break;
 					case upd_bad_val_size:
 						if (0 == (end = format_targ_key(buff, MAX_ZWR_KEY_SZ,
@@ -1364,6 +1367,7 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 						if (NULL != gv_failed_key)	/* Free memory if it has been used */
 							free(gv_failed_key);
 						assert(NULL != tmpcsa);
+						assert(NULL != tmpcsa->region);
 						RTS_ERROR_CSA_ABT(tmpcsa, VARLSTCNT(10) ERR_REC2BIG, 4, val_mv.str.len,
 							(int4)(tmpcsa->region)->max_rec_size, REG_LEN_STR(tmpcsa->region),
 							ERR_GVIS, 2, end - buff, buff);

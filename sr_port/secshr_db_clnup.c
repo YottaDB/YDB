@@ -15,6 +15,7 @@
 #include "gtm_inet.h"
 #include "gtm_string.h"
 
+#include "anticipatory_freeze.h"
 #include "gdsroot.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
@@ -73,6 +74,7 @@ GBLREF	sgm_info		*first_tp_si_by_ftok;	/* List of READ or UPDATED regions sorted
 GBLREF	sgmnt_addrs 		*kip_csa;
 GBLREF	uint4			process_id;
 GBLREF	sgmnt_addrs		*cs_addrs;
+GBLREF	jnl_gbls_t		jgbl;
 
 #ifdef DEBUG
 GBLREF	volatile boolean_t	in_wcs_recover; /* TRUE if in "wcs_recover" */
@@ -115,13 +117,13 @@ error_def(ERR_WCBLOCKED);
  *	c) For MM, the jnl and db commits happen inside crit i.e. no phase2 outside crit like BG.
  *
  * (CMT01)  Get crit on all regions (UPDATED || NON-UPDATED)
- * (CMT02)  Get crit on jnlpool
- * (CMT03)  Reserve space in JNLPOOL for journal records (UPDATE_JPL_RSRV_WRITE_ADDR macro)
  *          For each UPDATED region
  *          {
- * (CMT04)      csd->trans_hist.early_tn = csd->trans_hist.curr_tn + 1;
- * (CMT05)      csa->t_commit_crit = T_COMMIT_CRIT_PHASE0;
+ * (CMT02)      csd->trans_hist.early_tn = csd->trans_hist.curr_tn + 1;
+ * (CMT03)      csa->t_commit_crit = T_COMMIT_CRIT_PHASE0;
  *          }
+ * (CMT04)  Get crit on jnlpool
+ * (CMT05)  Reserve space in JNLPOOL for journal records (UPDATE_JPL_RSRV_WRITE_ADDR macro)
  *          For each UPDATED & JOURNALED region
  *          {
  * (CMT06)      Reserve space in JNLBUFF for journal records PHASE1 (UPDATE_JRS_RSRV_FREEADDR macro)
@@ -129,27 +131,31 @@ error_def(ERR_WCBLOCKED);
  * (CMT06a) If (MM or (BG && jnlbuff-overflow)) Do Step CMT16 here instead of later
  * (CMT06b) If (Non-TP && MM) Do Step CMT17 here instead of later
  * (CMT07)  jnlpool_ctl->jnl_seqno++; jnlpool_ctl->strm_seqno[]++ if supplementary; (SET_JNL_SEQNO macro)
+ * (CMT08)  Defer recognition of extrinsic instance freezes and release crit on jnlpool
  *          For each (UPDATED || NON-UPDATED) region
  *          {
  *              If this is an UPDATED region
  *              {
- * (CMT08)          csa->t_commit_crit = T_COMMIT_CRIT_PHASE1; cnl->update_underway_tn = csd->trans_hist.curr_tn;
- * (CMT09)          If replication is ON, csd->reg_seqno = jnlpool_ctl->jnl_seqno + 1; csd->strm_reg_seqno[] = xxx
+ * (CMT09)          csa->t_commit_crit = T_COMMIT_CRIT_PHASE1; cnl->update_underway_tn = csd->trans_hist.curr_tn;
+ * (CMT10)          If replication is ON, csd->reg_seqno = jnlpool_ctl->jnl_seqno + 1; csd->strm_reg_seqno[] = xxx
  *                  if (cw_set is non-NULL for this region)	// i.e. not duplicate set(s)
  *                  {
  *                      For each cw-se-element
  *                      {
- * (CMT10)                  Commit PHASE1 // bg_update_phase1 or mm_update
- * (CMT10a)                 If (BG && IS_BG_PHASE2_COMMIT_IN_CRIT(cse, mode)) Do Step CMT16 and CMT18 here instead of later
+ * (CMT11)                  Commit PHASE1 // bg_update_phase1 or mm_update
+ *                 	    If (BG && IS_BG_PHASE2_COMMIT_IN_CRIT(cse, mode))
+ * 			    {
+ * (CMT11a)			If NEED_TO_FINISH_JNL_PHASE2(jrs) Do Step CMT17 & CMT18 here instead of later
+ * (CMT11b)                 	Do Step CMT19 here instead of later
+ * 			    }
  *                      }
  *                  }
- * (CMT11)          si->update_trans |= UPDTRNS_TCOMMIT_STARTED_MASK;
- * (CMT12)          csd->trans_hist.curr_tn++;
- * (CMT13)          csa->t_commit_crit = T_COMMIT_CRIT_PHASE2;
+ * (CMT12)          si->update_trans |= UPDTRNS_TCOMMIT_STARTED_MASK;
+ * (CMT13)          csd->trans_hist.curr_tn++;
+ * (CMT14)          csa->t_commit_crit = T_COMMIT_CRIT_PHASE2;
  *              }
- * (CMT14)      Release crit on region
+ * (CMT15)      Release crit on region
  *          }
- * (CMT15)  Release crit on jnlpool
  *          For each (UPDATED && JOURNALED) region
  *          {
  * (CMT16)      If (BG) Write journal records in JNLBUFF & JNLPOOL. PHASE2 (outside crit). Mark write complete in JNLBUFF.
@@ -164,7 +170,7 @@ error_def(ERR_WCBLOCKED);
  * (CMT19)      csa->t_commit_crit = FALSE;
  *          }
  *
- * If a transaction has proceeded to Step (CMT08) for at least one region, then "tp_update_underway" is set to TRUE
+ * If a transaction has proceeded to Step (CMT09) for at least one region, then "tp_update_underway" is set to TRUE
  * and the transaction cannot be rolled back but has to be committed. Otherwise the transaction is rolled back.
  * This is for the case where the process encounters an error in the midst of commit. In this case, we are guaranteed
  * a clean recovery by secshr_db_clnup() & wcs_recover(). Database integrity is guaranteed.
@@ -239,8 +245,9 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 				}
 				if (!update_jnlpool && REPL_ALLOWED(csa))
 					update_jnlpool = jnlpool;
-				if ( T_UPDATE_UNDERWAY(csa))
+				if (T_UPDATE_UNDERWAY(csa))
 				{
+					assert(DECL_CMT09 <= TREF(cur_cmt_step));
 					update_underway = TRUE;
 					break;
 				}
@@ -276,16 +283,15 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 		repl_csa = ((NULL != repl_reg) && repl_reg->open) ? REG2CSA(repl_reg) : NULL;
 		if (dollar_tlevel)
 			for (si = first_tp_si_by_ftok; NULL != si; si = si->next_tp_si_by_ftok)
-				secshr_finish_CMT08_to_CMT14(si->tp_csa, update_jnlpool); /* Roll forward steps CMT08 thru CMT14 */
+				secshr_finish_CMT09_to_CMT15(si->tp_csa, update_jnlpool); /* Roll forward steps CMT09 thru CMT15 */
 		else
 		{
 			csa = cs_addrs;
-			secshr_finish_CMT08_to_CMT14(csa, update_jnlpool);	/* Roll forward steps CMT08 thru CMT14 */
+			secshr_finish_CMT09_to_CMT15(csa, update_jnlpool);	/* Roll forward steps CMT09 thru CMT15 */
 		}
-		if ((NULL != repl_csa) && repl_csa->now_crit)
-			secshr_rel_crit(repl_reg, IS_EXITING_FALSE, IS_REPL_REG_TRUE);	/* Step CMT15 */
-		/* In case of DSE, csa->hold_onto_crit is TRUE and so it is possible the above "secshr_rel_crit"
-		 * call did not release crit. Assert accordingly below.
+		END_IGNORE_EXTFREEZES(TREF(defer_instance_freeze));
+		/* In case of DSE, csa->hold_onto_crit is TRUE and so it is possible the "secshr_rel_crit" inside
+		 * the secshr_finish_* call did not release crit. Assert accordingly below.
 		 */
 		assert((0 == have_crit(CRIT_HAVE_ANY_REG)) || dse_running);
 		if (dollar_tlevel)
@@ -311,6 +317,7 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 				secshr_finish_CMT18_to_CMT19(si->tp_csa);	/* Roll forward Step CMT18 */
 		else
 			secshr_finish_CMT18_to_CMT19(csa);		/* Roll forward Step CMT18 */
+		jgbl.skip_jplwrites = FALSE;
 	}
 	if (save_jnlpool != jnlpool)
 		jnlpool = save_jnlpool;

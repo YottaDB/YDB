@@ -82,11 +82,11 @@ void op_gvname_fast(UNIX_ONLY_COMMA(int count_arg) int hash_code, mval *val_arg,
 
 STATICFNDEF void op_gvname_common(int count, int hash_code, mval *val_arg, va_list var)
 {
-	boolean_t	was_null, is_null;
+	boolean_t	is_null, was_null;
 	boolean_t	bgormm;
 	mval		*val;
 	mname_entry	gvname;
-	int		max_key;
+	int		max_key, tmp_len;
 	gvnh_reg_t	*gvnh_reg;
 	char		varstr[MAX_MIDENT_LEN + 1];
 	gd_region	*reg;
@@ -135,8 +135,8 @@ STATICFNDEF void op_gvname_common(int count, int hash_code, mval *val_arg, va_li
 	GV_BIND_SUBSNAME_IF_GVSPAN(gvnh_reg, gd_header, gv_currkey, reg);
 	/* Now that "gv_cur_region" is setup correctly for both spanning and non-spanning globals, do GVSUBOFLOW check */
 	max_key = gv_cur_region->max_key_size;
-	if (gv_currkey->end >= max_key)
-		ISSUE_GVSUBOFLOW_ERROR(gv_currkey, KEY_COMPLETE_TRUE);
+	if ((tmp_len = gv_currkey->end) >= max_key)
+		ISSUE_GVSUBOFLOW_ERROR(gv_currkey, KEY_COMPLETE_TRUE, (tmp_len+1), max_key, gv_cur_region);
 	assert(!dollar_tlevel || (sgm_info_ptr && (sgm_info_ptr->tp_csa == cs_addrs)));
 	TREF(gv_some_subsc_null) = was_null; /* if true, it indicates there is a null subscript (other than the last subscript)
 						in current key */

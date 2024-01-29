@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -116,7 +116,7 @@ typedef	struct
 	job_parm			*parms;
 	size_t				input_prebuffer_size;
 	char				*input_prebuffer;
-	boolean_t			passcurlvn;
+	boolean_t			xfercurlvn;
 	char				*curlvn_buffer_ptr;
 	size_t				curlvn_buffer_size;
 } job_params_type;

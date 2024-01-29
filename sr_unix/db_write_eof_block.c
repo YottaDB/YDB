@@ -32,7 +32,9 @@ int	db_write_eof_block(unix_db_info *udi, int fd, int blk_size, off_t offset, di
 	char		*buff;
 	sgmnt_addrs	*csa;
 	boolean_t	free_needed;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	if ((NULL != udi) && udi->fd_opened_with_o_direct)
 	{
 		assert(diobuff);

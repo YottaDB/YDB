@@ -605,8 +605,7 @@ void wcs_recover(gd_region *reg)
 		{	/* Whichever cache record (previous or current one) has cr->epid non-zero is the WIP one.
 			 * The other is the more recent one.
 			 */
-			assert(asyncio);
-			assert(twinning_on);
+			assert(WBTEST_ENABLED(WBTEST_EXPECT_IO_HANG) || (asyncio && twinning_on));
 			cr_alt = (cache_rec_ptr_t)GDS_ANY_REL2ABS(csa, bt->cache_index);
 			/* These two crs should be twins so one of them should have epid set. Only exception is a kill -9
 			 * in a small window in wcs_wtstart after LOCK_BUFF_FOR_WRITE but before csr->epid = process_id.

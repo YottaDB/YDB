@@ -162,7 +162,9 @@ void fileheader_sync(gd_region *reg)
 	size_t			flush_len, sync_size, rounded_flush_len;
 	int4			save_errno;
 	unix_db_info		*udi;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	udi = FILE_INFO(reg);
 	csa = &udi->s_addrs;
 	csd = csa->hdr;
@@ -1325,7 +1327,7 @@ void wcs_timer_start(gd_region *reg, boolean_t io_ok)
 	{
 		EPOCH_TAPER_IF_NEEDED(csa, csd, cnl, reg, TRUE, buffs_per_flush, flush_target);
 	}
-	if ((flush_target  <= cnl->wcs_active_lvl) && !FROZEN_CHILLED(csa))
+	if ((flush_target <= cnl->wcs_active_lvl) && !FROZEN_CHILLED(csa))
 	{	/* Already in need of a good flush */
 		BG_TRACE_PRO_ANY(csa, active_lvl_trigger);
 		wtstart_errno = wcs_wtstart(reg, buffs_per_flush, NULL, NULL);

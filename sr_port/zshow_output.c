@@ -78,7 +78,7 @@ void zshow_output(zshow_out *out, const mstr *str)
 	char		buff, *leadptr, *piecestr, *strbase, *strnext, *strptr, *strtokptr, *strtop, *tempstr;
 	gd_addr		*gbl_gd_addr;
 	gvnh_reg_t	*gvnh_reg;
-	int		dbg_sbs_depth, sbs_depth, str_processed;
+	int		dbg_sbs_depth, sbs_depth, str_processed, tmp_len;
 	lv_val		*lv, *lv_child;
 	mval		lmv, *mv_child, *mv;
 	ssize_t		buff_len, cumul_width, device_width, inchar_width, len, outlen, chcnt, char_len, disp_len;
@@ -357,8 +357,9 @@ void zshow_output(zshow_out *out, const mstr *str)
 			if (out->code && out->code != out->curr_code)
 			{
 				GV_BIND_SUBSNAME_FROM_GVNH_REG_IF_GVSPAN(gvnh_reg, gbl_gd_addr, gv_currkey);
-				if (gv_currkey->end >= gv_cur_region->max_key_size)
-					ISSUE_GVSUBOFLOW_ERROR(gv_currkey, KEY_COMPLETE_TRUE);
+				if ((tmp_len = gv_currkey->end) >= gv_cur_region->max_key_size)
+					ISSUE_GVSUBOFLOW_ERROR(gv_currkey, KEY_COMPLETE_TRUE, (tmp_len+1),
+							gv_cur_region->max_key_size, gv_cur_region);
 				op_gvkill();
 			}
 			tempstr=str->addr;
@@ -375,8 +376,9 @@ void zshow_output(zshow_out *out, const mstr *str)
 				mv_child->str.len = len;
 				mval2subsc(mv_child, gv_currkey, gv_cur_region->std_null_coll);
 				GV_BIND_SUBSNAME_FROM_GVNH_REG_IF_GVSPAN(gvnh_reg, gbl_gd_addr, gv_currkey);
-				if (gv_currkey->end >= gv_cur_region->max_key_size)
-					ISSUE_GVSUBOFLOW_ERROR(gv_currkey, KEY_COMPLETE_TRUE);
+				if ((tmp_len = gv_currkey->end) >= gv_cur_region->max_key_size)
+					ISSUE_GVSUBOFLOW_ERROR(gv_currkey, KEY_COMPLETE_TRUE, (tmp_len+1),
+										gv_cur_region->max_key_size, gv_cur_region);
 			}
 			op_gvput((mval *)&literal_null); /* create the global */
 			POP_MV_STENT(); /* we are done with our mval */
@@ -400,8 +402,9 @@ void zshow_output(zshow_out *out, const mstr *str)
 			 * gv_cur_region/gv_target/gd_targ_* variables based on updated gv_currkey.
 			 */
 			GV_BIND_SUBSNAME_FROM_GVNH_REG_IF_GVSPAN(gvnh_reg, gbl_gd_addr, gv_currkey);
-			if (gv_currkey->end >= gv_cur_region->max_key_size)
-				ISSUE_GVSUBOFLOW_ERROR(gv_currkey, KEY_COMPLETE_TRUE);
+			if ((tmp_len = gv_currkey->end) >= gv_cur_region->max_key_size)
+				ISSUE_GVSUBOFLOW_ERROR(gv_currkey, KEY_COMPLETE_TRUE, (tmp_len+1), gv_cur_region->max_key_size,
+													gv_cur_region);
 			assert(gv_currkey->end - 3 == out->out_var.gv.end);	/* true for current 1 character string codes */
 			op_gvkill();
 		}
@@ -450,8 +453,9 @@ void zshow_output(zshow_out *out, const mstr *str)
 							 * gv_cur_region/gv_target/gd_targ_* variables based on updated gv_currkey.
 							 */
 							GV_BIND_SUBSNAME_FROM_GVNH_REG_IF_GVSPAN(gvnh_reg, gbl_gd_addr, gv_currkey);
-							if (gv_currkey->end >= gv_cur_region->max_key_size)
-								ISSUE_GVSUBOFLOW_ERROR(gv_currkey, KEY_COMPLETE_TRUE);
+							if ((tmp_len = gv_currkey->end) >= gv_cur_region->max_key_size)
+								ISSUE_GVSUBOFLOW_ERROR(gv_currkey, KEY_COMPLETE_TRUE, (tmp_len+1),
+											gv_cur_region->max_key_size, gv_cur_region);
 						}
 					}
 					ENSURE_STP_FREE_SPACE((int)(out->ptr - out->buff));
@@ -468,8 +472,9 @@ void zshow_output(zshow_out *out, const mstr *str)
 						MV_FORCE_MVAL(mv, out->line_cont);	/* but the rest go down a level */
 						mval2subsc(mv, gv_currkey, gv_cur_region->std_null_coll);
 						GV_BIND_SUBSNAME_FROM_GVNH_REG_IF_GVSPAN(gvnh_reg, gbl_gd_addr, gv_currkey);
-						if (gv_currkey->end >= gv_cur_region->max_key_size)
-							ISSUE_GVSUBOFLOW_ERROR(gv_currkey, KEY_COMPLETE_TRUE);
+						if ((tmp_len = gv_currkey->end) >= gv_cur_region->max_key_size)
+							ISSUE_GVSUBOFLOW_ERROR(gv_currkey, KEY_COMPLETE_TRUE, (tmp_len+1),
+											gv_cur_region->max_key_size, gv_cur_region);
 					}
 				}
 			}
@@ -494,8 +499,9 @@ void zshow_output(zshow_out *out, const mstr *str)
 					 * gv_cur_region/gv_target/gd_targ_* variables based on updated gv_currkey.
 					 */
 					GV_BIND_SUBSNAME_FROM_GVNH_REG_IF_GVSPAN(gvnh_reg, gbl_gd_addr, gv_currkey);
-					if (gv_currkey->end >= gv_cur_region->max_key_size)
-						ISSUE_GVSUBOFLOW_ERROR(gv_currkey, KEY_COMPLETE_TRUE);
+					if ((tmp_len = gv_currkey->end) >= gv_cur_region->max_key_size)
+						ISSUE_GVSUBOFLOW_ERROR(gv_currkey, KEY_COMPLETE_TRUE, (tmp_len+1),
+											gv_cur_region->max_key_size, gv_cur_region);
 				}
 			}
 			ENSURE_STP_FREE_SPACE((int)(out->ptr - out->buff));

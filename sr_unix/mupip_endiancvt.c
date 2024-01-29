@@ -185,7 +185,9 @@ void mupip_endiancvt(void)
 	uint4			cli_status;
 	unsigned short		n_len, outdb_len, t_len;
 	ZOS_ONLY(int		realfiletag;)
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	if (CLI_PRESENT == (cli_status = cli_present("OUTDB")))
 	{
 		outdb_specified = TRUE;

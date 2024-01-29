@@ -491,7 +491,9 @@ void	iosocket_tls(mval *optionmval, int4 msec_timeout, mval *tlsid, mval *passwo
 			errp = UNREAD_INPUT;
 			SET_DOLLARDEVICE_ONECOMMA_ERRSTR(iod, errp, errlen);
 			if (socketptr->ioerror)
-				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_TLSRENEGOTIATE, 0,
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_TLSRENEGOTIATE, 1,
+					((gtm_tls_does_renegotiate((gtm_tls_socket_t *)socketptr->tlssocket)) ?
+						 "renegotiate" : "update TLS session keys"),
 					ERR_TEXT, 2, errlen, errp);
 			if (NO_M_TIMEOUT != msec_timeout)
 				dollar_truth = FALSE;
@@ -510,7 +512,9 @@ void	iosocket_tls(mval *optionmval, int4 msec_timeout, mval *tlsid, mval *passwo
 					errp2 = (char *)STRERROR(socketptr->obuffer_errno);
 				SET_DOLLARDEVICE_ONECOMMA_ERRSTR1_ERRSTR2(iod, errp, errlen, errp2, errlen2);
 				if (socketptr->ioerror)
-					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(10) ERR_TLSRENEGOTIATE, 0,
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(11) ERR_TLSRENEGOTIATE, 1,
+						((gtm_tls_does_renegotiate((gtm_tls_socket_t *)socketptr->tlssocket)) ?
+						 	"renegotiate" : "update TLS session keys"),
 						ERR_TEXT, 2, errlen, errp, ERR_TEXT, 2, errlen2, errp2);
 				if (NO_M_TIMEOUT != msec_timeout)
 					dollar_truth = FALSE;
@@ -554,7 +558,9 @@ void	iosocket_tls(mval *optionmval, int4 msec_timeout, mval *tlsid, mval *passwo
 				errp = STRERROR(tls_errno);
 			SET_DOLLARDEVICE_ONECOMMA_ERRSTR(iod, errp, errlen);
 			if (socketptr->ioerror)
-				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_TLSRENEGOTIATE, 0,
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_TLSRENEGOTIATE, 1,
+					((gtm_tls_does_renegotiate((gtm_tls_socket_t *)socketptr->tlssocket)) ?
+					 	"renegotiate" : "update TLS session keys"),
 					ERR_TEXT, 2, errlen, errp);
 			if (NO_M_TIMEOUT != msec_timeout)
 				dollar_truth = FALSE;

@@ -874,7 +874,7 @@ int gtmsource_srch_restart(seq_num recvd_jnl_seqno, int recvd_start_flags)
 	else
 		repl_log(gtmsource_log_fp, TRUE, TRUE, "Source server now reading from journal files\n");
 	/* Finally set "gtmsource_local->read_jnl_seqno" to be "recvd_jnl_seqno" and flush changes to instance file on disk */
-	gtmsource_flush_fh(recvd_jnl_seqno);
+	gtmsource_flush_fh(recvd_jnl_seqno, false);
 	assert(GTMSOURCE_HANDLE_ONLN_RLBK != gtmsource_state);
 	return (SS_NORMAL);
 }
@@ -952,7 +952,6 @@ int gtmsource_get_jnlrecs(uchar_ptr_t buff, int *data_len, int maxbufflen, boole
 					"overflow detected at seqno %llu [0x%llx]\n",
 					gtmsource_save_read_jnl_seqno, gtmsource_save_read_jnl_seqno);
 			/* CAUTION : FALL THROUGH */
-
 		case READ_FILE:
 			/* Note that while reading from journal files, it is possible the source server sees the journal records
 			 * for a transaction in the journal files BEFORE the transaction is marked as complete in the journal
@@ -1007,6 +1006,10 @@ int gtmsource_get_jnlrecs(uchar_ptr_t buff, int *data_len, int maxbufflen, boole
 				return (total_tr_len);
 			assertpro(0 < *data_len);
 			return (-1);
+		case READ_BUFF:
+			assert(false);
+		default:
+			assert(false);
 	}
 	return (-1); /* This should never get executed, added to make compiler happy */
 }
@@ -1344,7 +1347,7 @@ void 	repl_cmp_solve_src_timeout(void)
 #ifdef GTM_TLS
 boolean_t gtmsource_exchange_tls_info(void)
 {
-	int			poll_dir, status, flags;
+	int			errlen, poll_dir, status, flags;
 	char			*errp;
 	repl_tlsinfo_msg_t	reply, response;
 
@@ -1365,7 +1368,7 @@ boolean_t gtmsource_exchange_tls_info(void)
 		return FALSE; /* recv did not succeed */
 	repl_log(gtmsource_log_fp, TRUE, TRUE, "  Remote side API version: 0x%08x\n", response.API_version);
 	repl_log(gtmsource_log_fp, TRUE, TRUE, "  Remote side Library version: 0x%08x\n", response.library_version);
-	flags = GTMTLS_OP_VERIFY_PEER | GTMTLS_OP_CLIENT_MODE;
+	flags = GTMTLS_OP_FORCE_VERIFY_PEER | GTMTLS_OP_CLIENT_MODE;
 	/* At this point, both sides are ready for a TLS/SSL handshake. Create a TLS/SSL aware socket. */
 	if (NULL == (repl_tls.sock = gtm_tls_socket(tls_ctx, repl_tls.sock, gtmsource_sock_fd, repl_tls.id, flags)))
 	{
@@ -1385,8 +1388,10 @@ boolean_t gtmsource_exchange_tls_info(void)
 				return FALSE;
 		} while ((GTMTLS_WANT_READ == status) || (GTMTLS_WANT_WRITE == status));
 		if (SS_NORMAL == status)
+		{
+			repl_log(gtmsource_log_fp, TRUE, TRUE, "Secure communication enabled using TLS/SSL protocol\n");
 			return TRUE;
-		else if (REPL_CONN_RESET(status))
+		} else if (REPL_CONN_RESET(status))
 		{
 			repl_log(gtmsource_log_fp, TRUE, TRUE, "Attempt to connect() with TLS/SSL protocol failed. "
 					"Status = %d; %s\n", status, STRERROR(status));
@@ -1396,6 +1401,9 @@ boolean_t gtmsource_exchange_tls_info(void)
 			return FALSE;
 		}
 		errp = (-1 == status) ? (char *)gtm_tls_get_error(NULL) : STRERROR(status);
+		if (2048 > (errlen = strlen(errp))) /* Append version information in one message */
+			snprintf(errp + errlen, 2048 - errlen, "; Local API:0x%08x, LIB:0x%08x; Remote API:0x%08x, LIB:0x%08x",
+					reply.API_version, reply.library_version, response.API_version, response.library_version);
 		if (!PLAINTEXT_FALLBACK)
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_TLSHANDSHAKE, 0, ERR_TEXT, 2, LEN_AND_STR(errp));
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) MAKE_MSG_WARNING(ERR_TLSHANDSHAKE), 0, ERR_TEXT, 2, LEN_AND_STR(errp));

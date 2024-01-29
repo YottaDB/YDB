@@ -44,13 +44,14 @@
 #include "gtm_tls.h"
 #endif
 
-GBLREF boolean_t		prin_dm_io, prin_in_dev_failure, prin_out_dev_failure;
+GBLREF boolean_t		hup_on, prin_dm_io, prin_in_dev_failure, prin_out_dev_failure;
 GBLREF io_pair			io_curr_device, io_std_device;
 GBLREF mstr			chset_names[];
 GBLREF mval			dollar_zstatus;
 GBLREF spdesc			stringpool;
 GBLREF UConverter		*chset_desc[];
 GBLREF volatile int4		outofband;
+GBLREF int4			exi_condition;
 #ifdef GTM_TLS
 GBLREF	gtm_tls_ctx_t		*tls_ctx;
 #endif
@@ -58,6 +59,7 @@ GBLREF	gtm_tls_ctx_t		*tls_ctx;
 error_def(ERR_CURRSOCKOFR);
 error_def(ERR_NOPRINCIO);
 error_def(ERR_NOSOCKETINDEV);
+error_def(ERR_SOCKHANGUP);
 error_def(ERR_SOCKPASSDATAMIX);
 error_def(ERR_SOCKWRITE);
 error_def(ERR_TEXT);
@@ -481,6 +483,11 @@ void	iosocket_write_real(mstr *v, boolean_t convert_output)
 
 	DBGSOCK2((stdout, "socwrite: ************************** Top of iosocket_write\n"));
 	iod = io_curr_device.out;
+	if (ERR_SOCKHANGUP == error_condition)
+	{
+		SOCKHUP_NOPRINCIO_CHECK(TRUE);
+		return;
+	}
 	ESTABLISH_GTMIO_CH(&iod->pair, ch_set);
 	assert(gtmsocket == iod->type);
 	dsocketptr = (d_socket_struct *)iod->dev_sp;

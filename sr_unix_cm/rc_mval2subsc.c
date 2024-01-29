@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -22,8 +22,8 @@
 #include "do_xform.h"
 #include "format_targ_key.h"
 
-GBLREF gv_namehead	*gv_target;
-GBLREF gd_region       *gv_cur_region;
+GBLREF	gv_namehead	*gv_target;
+GBLREF	gd_region	*gv_cur_region;
 
 error_def(ERR_GVSUBOFLOW);
 error_def(ERR_NUMOFLOW);
@@ -62,19 +62,21 @@ unsigned char *mval2subsc(mval *v, gv_key *g, boolean_t std_null_coll)
         char            buf1[MAX_KEY_SZ + 1];
 	mstr		mstr_buf1;
 	mstr		mstr_ch;
-	int	exp_val;
-	bool	is_negative;
+	int		exp_val, max_len, tmp_len;
+	bool		is_negative;
 	unsigned char	buff[MAX_ZWR_KEY_SZ], *end;
-	int4 	n, m, mx, digs;
-	unsigned char *cvt_table;
-	uint4 mvt;	/* Local copy of mvtype, bit ands use a int4, so do conversion once */
-	unsigned char *out_ptr;
-	unsigned char *in_ptr, ch;
-	unsigned char temp_mantissa[NUM_DEC_DG_2L / 2 + 3];	/* Need 1 byte for each two digits.  Add 3 bytes slop */
-	unsigned char *tm;
+	int4 		n, m, mx, digs;
+	unsigned char	*cvt_table;
+	uint4		mvt;	/* Local copy of mvtype, bit ands use a int4, so do conversion once */
+	unsigned	char *out_ptr;
+	unsigned	char *in_ptr, ch;
+	unsigned	char temp_mantissa[NUM_DEC_DG_2L / 2 + 3];	/* Need 1 byte for each two digits.  Add 3 bytes slop */
+	unsigned	char *tm;
+	gd_region	*save_gv_cur_region, tmpreg;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	memset(&tmpreg, 0, SIZEOF(gd_region));
 	out_ptr = g->base + g->end;
 	MV_FORCE_STR(v);
 	if (TREF(transform) && gv_target->nct)
@@ -113,11 +115,13 @@ unsigned char *mval2subsc(mval *v, gv_key *g, boolean_t std_null_coll)
 			in_ptr = (unsigned char *)mstr_buf1.addr; /* mstr_buf1.addr is used just in case it is
 								     reallocated by the XFORM routine */
                 }
-		if ((g->end + n + 3) > (g->top - MAX_GVKEY_PADDING_LEN))
+		if ((tmp_len = (g->end + n + 3)) > (max_len = (g->top - MAX_GVKEY_PADDING_LEN)))
 		{
 			if (0 == (end = format_targ_key(buff, MAX_ZWR_KEY_SZ, g, TRUE)))
 				end = &buff[MAX_ZWR_KEY_SZ - 1];
-			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_GVSUBOFLOW, 0, ERR_GVIS, 2, end - buff, buff);
+			save_gv_cur_region = (NULL == gv_cur_region) ? &tmpreg : gv_cur_region;
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(10) ERR_GVSUBOFLOW, 4, tmp_len, max_len, REG_LEN_STR(save_gv_cur_region),
+				       								ERR_GVIS, 2, end - buff, buff);
 		}
 		if (n > 0)
 		{
@@ -128,14 +132,13 @@ unsigned char *mval2subsc(mval *v, gv_key *g, boolean_t std_null_coll)
 				if (ch <= 1)
 				{
 					*out_ptr++ = STR_SUB_ESCAPE;
-					if ( out_ptr - g->base + n + 3 > g->top - MAX_GVKEY_PADDING_LEN)
+					if ((tmp_len = (out_ptr - g->base + n + 3)) > (max_len = (g->top - MAX_GVKEY_PADDING_LEN)))
 					{
 						if ((end = format_targ_key(buff, MAX_ZWR_KEY_SZ, g, TRUE)) == 0)
-						{
 							end = &buff[MAX_ZWR_KEY_SZ - 1];
-						}
-						RTS_ERROR_CSA_ABT(NULL,
-							VARLSTCNT(6) ERR_GVSUBOFLOW, 0, ERR_GVIS, 2, end - buff, buff);
+						save_gv_cur_region = (NULL == gv_cur_region) ? &tmpreg : gv_cur_region;
+						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(10) ERR_GVSUBOFLOW, 4, tmp_len, max_len,
+								REG_LEN_STR(save_gv_cur_region), ERR_GVIS, 2, end - buff, buff);
 					}
 					ch++;	/* promote character */
 				}
@@ -288,11 +291,13 @@ ALLDONE:
 	*out_ptr++ = 0 ; *out_ptr = 0 ;
 	g->prev = g->end ;
 	g->end  = out_ptr - g->base ;
-	if (g->end > g->top - MAX_GVKEY_PADDING_LEN - 1)
+	if ((tmp_len = g->end) > (max_len = (g->top - MAX_GVKEY_PADDING_LEN - 1)))
 	{	/* take of extra space and one for last zero */
 		if ((end = format_targ_key(buff, MAX_ZWR_KEY_SZ, g, TRUE)) == 0)
 			end = &buff[MAX_ZWR_KEY_SZ - 1];
-		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_GVSUBOFLOW, 0, ERR_GVIS, 2, end - buff, buff);
+		save_gv_cur_region = (NULL == gv_cur_region) ? &tmpreg : gv_cur_region;
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(10) ERR_GVSUBOFLOW, 4, tmp_len, max_len, REG_LEN_STR(save_gv_cur_region),
+											ERR_GVIS, 2, end - buff, buff);
 	}
 	return out_ptr;
 }

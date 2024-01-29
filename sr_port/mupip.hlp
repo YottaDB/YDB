@@ -3623,8 +3623,16 @@
    INST_freeze_on_error
 
    Enables or disables custom errors in a region to automatically cause an
-   Instance Freeze. This flag modifies the "Inst Freeze on Error" file header
-   flag. The format of the INST_FREEZE_ON_ERROR qualifier is:
+   Instance Freeze.
+
+   **Note**
+
+   GT.M creates a STATSDB region with INST_FREEZE_ON_ERROR disabled,
+   preventing errors associated with such a region from causing an instance
+   freeze even when INST_FREEZE_ON_ERROR for the base region is enabled.
+
+   This flag modifies the "Inst Freeze on Error" file header flag. The format
+   of the INST_FREEZE_ON_ERROR qualifier is:
 
    -[NO]INST[_FREEZE_ON_ERROR]
 
@@ -8136,8 +8144,9 @@
    |-----------------------------+----------------------------------------------------------|
    |autorollback_qualifier       |  o -autorollback[=verbose]                               |
    |-----------------------------+----------------------------------------------------------|
-   |connection_qualifiers        |  o [-cmplvl=<compression_level>]                         |
-   |                             |  o -listenport=<port number>                             |
+   |                             |  o [-cmplvl=<compression_level>]                         |
+   |connection_qualifiers        |  o -listenport=<port number>                             |
+   |                             |  o [-[NO]{SEND|RECV}BUFFSIZE[=<buffer_size>]]            |
    |-----------------------------+----------------------------------------------------------|
    |logfile_management_qualifiers|  o -log=<log file name>                                  |
    |                             |  o [-log_interval="[integer1],[integer2]"]               |
@@ -8207,6 +8216,34 @@
    incoming connections from a Source Server. Note that the current
    implementation of the Receiver Server does not support machines with
    multiple IP addresses.
+
+   -[NO]{SEND|RECV}BUFFSIZE[=n]
+
+   Specifies the desired minimum TCP send and/or receive buffer sizes. This
+   affects the SO_SNDBUF and SO_RCVBUF socket options of the socket GT.M uses
+   for replication, not the journalpool or any other application-level
+   buffer. n is a positive integer value indicating the desired minimum
+   buffer size. If GT.M finds that the specified buffer already has a
+   sufficient size when it is created, GT.M will avoid setting the buffer
+   explicitly. The -NO{SEND|RECV}BUFFSIZE version of this qualifier instructs
+   GT.M to avoid setting the buffer sizes under any circumstance. In some
+   environments, when the size of these buffers are dynamically adjusted
+   except in cases where an application sets their size explicitly,
+   -NO{SEND|RECV}BUFFSIZE can lead to good performance in a wide variety of
+   network conditions. By default and without passing this qualifier, GT.M
+   enforces a minimum size of approximately 1MiB for each buffer. This
+   qualifier may only be passed to a -START command.
+
+   **Note**
+
+   The actual size of a tcp buffer depends on a variety of environmental
+   conditions, including system configuration, operating system, and
+   available memory. Users of GT.M on Linux may observe that GT.M will report
+   in the source and/or receiver logs buffers that are approximately twice
+   what is requested, if the request has been honored by the OS. This is due
+   to a quirk in the way that the Linux kernel reports TCP buffer sizes: the
+   user-available size is approximately equal to what is requested, and the
+   additional space is used internally by the kernel.
 
    Logfile Management Qualifiers:
 

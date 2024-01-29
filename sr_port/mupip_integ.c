@@ -192,7 +192,7 @@ void mupip_integ(void)
 	file_control		*fc;
 	gtm_uint64_t		blocks_free = MAXUINT8;
 	gtm_uint64_t		mu_int_tot[TOT_TYPE_MAX][CUM_TYPE_MAX], tot_blks, tot_recs;
-	tp_region		*rptr;
+	tp_region		*rptr = NULL;
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
 	span_node_integ		span_node_data;
@@ -316,6 +316,8 @@ void mupip_integ(void)
 		keylen = SIZEOF(key_buff);
 		if (0 == cli_get_str("SUBSCRIPT", (char *)key_buff, &keylen))
 			mupip_exit(ERR_MUPCLIERR);
+		if (rptr)
+			gv_cur_region = rptr->reg;
 		if (FALSE == mu_getkey(key_buff, keylen))
 			mupip_exit(ERR_MUPCLIERR);
 		assert(mu_key);	/* or else "mu_getkey" call above would have returned FALSE */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2022 Fidelity National Information	*
+ * Copyright (c) 2006-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -451,6 +451,8 @@ int gtmrecv(void)
 	upd_proc_local->log_interval = gtmrecv_options.upd_log_interval;
 	upd_helper_ctl->start_helpers = FALSE;
 	upd_helper_ctl->start_n_readers = upd_helper_ctl->start_n_writers = 0;
+	/* Detached from the initiating process, now detach from the starting IO */
+	io_rundown(RUNDOWN_EXCEPT_STD);
 	log_init_status = repl_log_init(REPL_GENERAL_LOG, &gtmrecv_log_fd, gtmrecv_options.log_file);
 	assert(SS_NORMAL == log_init_status);
 	repl_log_fd2fp(&gtmrecv_log_fp, gtmrecv_log_fd);
@@ -462,10 +464,8 @@ int gtmrecv(void)
 	if (0 > null_fd)
 		rts_error_csa(CSA_ARG(NULL) ERR_REPLERR, RTS_ERROR_LITERAL("Failed to open /dev/null for read"), errno, 0);
 	assert(null_fd > 2);
-	/* Detached from the initiating process, now detach from the starting IO */
-	io_rundown(NORMAL_RUNDOWN);
 	FSTAT_FILE(gtmrecv_log_fd, &stat_buf, log_init_status);
-	assertpro(!log_init_status);	/* io_rundown should not affect the log file */
+	assertpro(!log_init_status);	/* Log file was just created by repl_log_init()! */
 	DUP2(null_fd, 0, rc);
 	if (0 > rc)
 		RTS_ERROR_CSA_ABT(NULL, ERR_REPLERR, RTS_ERROR_LITERAL("Failed to set stdin to /dev/null"), errno, 0);

@@ -60,12 +60,12 @@ void  iott_write_buffered_text(io_desc *io_ptr, char *text, int textlen)
 
 	tt_ptr = io_ptr->dev_sp;
 	assert(tt_ptr->write_active == FALSE);
-	ESTABLISH_GTMIO_CH(&io_ptr->pair, ch_set);
 	if (sighup == outofband)
 	{
 		TERMHUP_NOPRINCIO_CHECK(TRUE);					/* TRUE for WRITE */
 		return;
 	}
+	ESTABLISH_GTMIO_CH(&io_ptr->pair, ch_set);
 	tt_ptr->write_active = TRUE;
  	buff_left = IOTT_BUFF_LEN - (int)((tt_ptr->tbuffp - tt_ptr->ttybuff));
 	assert(buff_left > IOTT_BUFF_MIN || prin_out_dev_failure);

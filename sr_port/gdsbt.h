@@ -292,6 +292,59 @@ typedef struct
 #define	LOCKHIST_ARRAY_SIZE		 512
 #define FTOK_OPS_ARRAY_SIZE		 512
 
+/* Debug-only granular marker of commit step, intended to validate that we are correctly inferring the current step from data that
+ * we need to write anyway in pro. See secshr_db_clnup.c for descriptions of each step*/
+enum cmt_step
+{
+	CMT00,
+	DECL_CMT01,
+	CMT01,
+	DECL_CMT02,
+	CMT02,
+	DECL_CMT03,
+	CMT03,
+	DECL_CMT04,
+	CMT04,
+	DECL_CMT05,
+	CMT05,
+	DECL_CMT06,
+	CMT06,
+	DECL_CMT06a,
+	CMT06a,
+	DECL_CMT06b,
+	CMT06b,
+	DECL_CMT07,
+	CMT07,
+	DECL_CMT08,
+	CMT08,
+	DECL_CMT09,
+	CMT09,
+	DECL_CMT10,
+	CMT10,
+	DECL_CMT11,
+	CMT11,
+	DECL_CMT11a,
+	CMT11a,
+	DECL_CMT11b,
+	CMT11b,
+	DECL_CMT12,
+	CMT12,
+	DECL_CMT13,
+	CMT13,
+	DECL_CMT14,
+	CMT14,
+	DECL_CMT15,
+	CMT15,
+	DECL_CMT16,
+	CMT16,
+	DECL_CMT17,
+	CMT17,
+	DECL_CMT18,
+	CMT18,
+	DECL_CMT19,
+	CMT19,
+};
+
 /*
  * Enable the GTM_CRYPT_UPDATES_REPORT define below to activate logging of encryption-related operations in shared memory. Those
  * operations currently include a write and read of an encrypted block (wcs_wtstart and dsk_read, respectively), update retry or
@@ -547,14 +600,8 @@ typedef struct node_local_struct
 	sm_off_t	lock_addrs;
 	sm_off_t	hdr;					/* Offset to file-header (BG mode ONLY!) */
 	volatile int4	in_crit;
-	int4		in_reinit;
-	unsigned short	ccp_cycle;
-	unsigned short	filler;					/* Align for ccp_cycle. Not changing to int
-								 * as that would perturb to many things at this point
-								 */
-	boolean_t	ccp_crit_blocked;
+	enum cmt_step	cur_cmt_step;				/* Debug-only, used to validate assumptions of recovery functions */
 	int4		ccp_state;
-	boolean_t	ccp_jnl_closed;
 	boolean_t	glob_sec_init;
 	uint4		wtstart_pid[MAX_WTSTART_PID_SLOTS];	/* Maintain pids of wcs_wtstart processes */
 	volatile int4 wc_blocked;				/* WC_UNBLOCK = do not block write cache
@@ -570,6 +617,7 @@ typedef struct node_local_struct
 								 * Setting to WC_BLOCK_ONLY or WC_BLOCK_RECOVER stops all
 								 * concurrent writers from working on the cache.
 								 */
+	boolean_t	freezer_waited_for_kip;			/* currently used only in dbg code */
 	global_latch_t	wc_var_lock;				/* latch used for access to various wc_* ref counters */
 	CACHELINE_PAD(SIZEOF(global_latch_t), 1)		/* Keep these two latches in separate cache lines */
 	global_latch_t	db_latch;				/* latch for interlocking on hppa and tandem */
@@ -584,7 +632,7 @@ typedef struct node_local_struct
 	CACHELINE_PAD(4, 3)
 	volatile CNTR4DCL(wcs_active_lvl, 2);			/* number of entries in active queue */
 	CACHELINE_PAD(4, 4)
-	volatile CNTR4DCL(wcs_staleness, 3);
+	volatile CNTR4DCL(wcs_staleness, 3);			/* currently unused */
 	CACHELINE_PAD(4, 5)
 	volatile CNTR4DCL(ref_cnt, 4);				/* reference count. How many people are using the database */
 	CACHELINE_PAD(4, 6)
@@ -597,31 +645,34 @@ typedef struct node_local_struct
 	volatile CNTR4DCL(wcs_wip_lvl, 8);			/* number of entries in wip queue */
 	CACHELINE_PAD(4, 10)
 	volatile int4	wtfini_in_prog;				/* whether wcs_wtfini() is in progress at this time */
-	boolean_t	freezer_waited_for_kip;			/* currently used only in dbg code */
 	int4		mm_extender_pid;			/* pid of the process executing gdsfilext in MM mode */
-	block_id	highest_lbm_blk_changed;		/* Records highest local bit map block that
-								 * changed so we know how much of master bit
-								 * map to write out. Modified only under crit
-								 */
-	block_id	nbb;					/* Next backup block -- for online backup */
 	int4		lockhist_idx;				/* (DW alignment) "circular" index into lockhists array */
 	int4		crit_ops_index;				/* "circular" index into crit_ops_array */
 	int4		dskread_ops_index;			/* "circular" index into dskread_ops_array */
 	int4		ftok_ops_index;				/* "circular" index into ftok_ops_array */
 	int4		wcs_ops_index;				/* "circular" index into wcs_ops_array */
+	uint4		recov_pid;
+	block_id	highest_lbm_blk_changed;		/* Records highest local bit map block that
+								 * changed so we know how much of master bit
+								 * map to write out. Modified only under crit
+								 */
+	block_id	nbb;					/* Next backup block -- for online backup */
 	lockhist	lockhists[LOCKHIST_ARRAY_SIZE];		/* Keep lock histories here */
 	crit_trace	crit_ops_array[CRIT_OPS_ARRAY_SIZE];	/* space for CRIT_TRACE macro to record info */
 	dskread_trace	dskread_ops_array[DSKREAD_OPS_ARRAY_SIZE];	/* space for DSKREAD_TRACE macro to record info */
 	wcs_ops_trace_t	wcs_ops_array[WCS_OPS_ARRAY_SIZE];	/* space for WCS_OPS_TRACE macro to record info */
 	unique_file_id	unique_id;
-	uint4		owner_node;
 	volatile int4	wcsflu_pid;				/* pid of the process executing wcs_flu in BG mode */
 	int4		creation_date_time4;			/* Lower order 4-bytes of database's creation time to be
-								 * compared at sm attach time */
+								 * compared at sm attach time. Currently only assigned to;
+								 * otherwise unused.
+								 */
 	int4		inhibit_kills;				/* inhibit new KILLs while MUPIP BACKUP, INTEG or FREEZE are
 								 * waiting for kill-in-progress to become zero
 								 */
 	boolean_t	remove_shm;				/* can this shm be removed by the last process to rundown */
+	boolean_t	donotflush_dbjnl;	/* whether db/jnl can be flushed to disk or not (TRUE for mupip recover) */
+	int4		n_pre_read;
 	union
 	{
 		gds_file_id	jnl_file_id;	/* needed on UNIX to hold space */
@@ -629,12 +680,12 @@ typedef struct node_local_struct
 	} jnl_file;	/* Note that in versions before V4.3-001B, "jnl_file" used to be a member of sgmnt_data.
 			 * Now it is a filler there and rightly used here since it is non-zero only when shared memory is active.
 			 */
-	boolean_t	donotflush_dbjnl; /* whether database and journal can be flushed to disk or not (TRUE for mupip recover) */
-	int4		n_pre_read;
 	char		replinstfilename[MAX_FN_LEN + 1];/* 256 : Name of the replication instance file corresponding to this db */
 	char		statsdb_fname[MAX_FN_LEN + 1];	/* Is empty-string if IS_RDBF_STATSDB(csd) is FALSE.
 							 * Is name of the statsdb corresponding to this basedb otherwise.
 							 */
+	uint4		ss_shmcycle;	 	/* incremented everytime a new snapshot creates a new shared memory identifier */
+	uint4		wbox_test_seq_num;	/* used to coordinate with sequential testing steps */
 	gvstats_rec_t	gvstats_rec;
 	trans_num	last_wcsflu_tn;			/* curr_tn when last wcs_flu was done on this database */
 	trans_num	last_wcs_recover_tn;		/* csa->ti->curr_tn of most recent "wcs_recover" */
@@ -645,20 +696,19 @@ typedef struct node_local_struct
 	long		ss_shmid;		/* Identifier of the shared memory for the snapshot that started
 						 * recently.
 						 */
-	uint4		ss_shmcycle;	 	/* incremented everytime a new snapshot creates a new shared memory identifier */
 	boolean_t	snapshot_in_prog;	/* Tells GT.M if any snapshots are in progress */
 	uint4		num_snapshots_in_effect;	/* how many snapshots are currently in place for this region */
-	uint4		wbox_test_seq_num;	/* used to coordinate with sequential testing steps */
 	uint4		freeze_online;		/* for online db freezing, a.k.a. chill.  */
 	uint4		kip_pid_array[MAX_KIP_PID_SLOTS];	/* Processes actively doing kill (0 denotes empty slots) */
-	gtm_uint64_t	sec_size;	/* Upon going to larger shared memory sizes, we realized that this does not	*/
-					/* need	to be in the file header but the node local since it can be calculated	*/
-					/* from info in the file header.
-					 */
 	int4		jnlpool_shmid;	/* copy of jnlpool->repl_inst_filehdr->jnlpool_shmid to prevent mixing of multiple
 					 * journal pools within the same database.
 					 */
 	uint4		trunc_pid;			/* Operating truncate. */
+	boolean_t	fastinteg_in_prog;	/* Tells GT.M if fast integrity is in progress */
+	gtm_uint64_t	sec_size;	/* Upon going to larger shared memory sizes, we realized that this does not	*/
+					/* need	to be in the file header but the node local since it can be calculated	*/
+					/* from info in the file header.
+					 */
 	block_id	highest_lbm_with_busy_blk;	/* Furthest lmap block known to have had a busy block during truncate. */
 	ftokhist	ftok_ops_array[FTOK_OPS_ARRAY_SIZE];
 	volatile uint4	root_search_cycle;	/* incremented online rollback ends and mu_swap_root */
@@ -671,7 +721,6 @@ typedef struct node_local_struct
 	uint4		dbrndwn_access_skip;	/* # of processes that skipped access control semaphore in gds_rundown due to a
 						 * concurrent online rollback or too many MUMPS processes
 						 */
-	boolean_t	fastinteg_in_prog;	/* Tells GT.M if fast integrity is in progress */
 	uint4		wtstart_errcnt;
 	/* Note that although the below fields are dbg-only, they are defined for pro since we want to keep the shared
 	 * memory layout the same for both pro and dbg. There is some code that relies on this assumption.

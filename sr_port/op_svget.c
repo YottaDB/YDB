@@ -226,7 +226,8 @@ void op_svget(int varnum, mval *v)
 			break;
 		case SV_STORAGE:
 			/* double2mval(v, getstorage()); Causes issues with unaligned stack on x86_64 - remove until fixed */
-			i2mval(v, getstorage());
+			ucount = (0 < zmalloclim) ? ((gtm_uint64_t)zmalloclim) : ((gtm_uint64_t)getstorage());
+			ui82mval(v, (ucount - ((gtm_uint64_t)totalRmalloc + (gtm_uint64_t)totalRallocGta)));
 			break;
 		case SV_TLEVEL:
 			count = (int)dollar_tlevel;

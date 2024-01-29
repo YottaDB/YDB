@@ -127,7 +127,10 @@ void mucregini(block_id blk_init_size, enum db_ver desired_db_ver)
 	csd->max_key_size = gv_cur_region->max_key_size;
 	csd->null_subs = gv_cur_region->null_subs;
 	csd->std_null_coll = gv_cur_region->std_null_coll;
-	csd->freeze_on_fail = gv_cur_region->freeze_on_fail;
+	if (IS_STATSDB_REGNAME(gv_cur_region))
+		csd->freeze_on_fail = FALSE;
+	else
+		csd->freeze_on_fail = gv_cur_region->freeze_on_fail;
 	csd->mumps_can_bypass = gv_cur_region->mumps_can_bypass;
 	csd->epoch_taper = gv_cur_region->epoch_taper;
 	csd->epoch_taper_time_pct = EPOCH_TAPER_TIME_PCT_DEFAULT;

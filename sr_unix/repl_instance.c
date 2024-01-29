@@ -76,6 +76,10 @@ GBLREF	boolean_t		holds_sem[NUM_SEM_SETS][NUM_SRC_SEMS];
 GBLREF	boolean_t		is_rcvr_server;
 GBLREF	char			repl_instfilename[];
 GBLREF	gd_addr			*repl_inst_from_gld;
+GBLREF	uint4			process_id;
+#ifdef DEBUG
+GBLREF	bool			only_usr_jnlpool_flush;
+#endif
 
 ZOS_ONLY(error_def(ERR_BADTAG);)
 error_def(ERR_LOGTOOLONG);
@@ -292,10 +296,16 @@ void	repl_inst_read(char *fn, off_t offset, sm_uc_ptr_t buff, size_t buflen)
  */
 void	repl_inst_write(char *fn, off_t offset, sm_uc_ptr_t buff, size_t buflen)
 {
-	int		status, fd, oflag;
-	unix_db_info	*udi;
-	gd_region	*reg;
-	ZOS_ONLY(int	realfiletag;)
+	int			status, fd, oflag;
+	unix_db_info		*udi;
+	gd_region		*reg;
+	ZOS_ONLY(int		realfiletag;)
+#	ifdef DEBUG
+	int			i;
+	int4			latch_pid;
+	size_t			gtmsrc_lcl_start, gtmsrc_lcl_top;
+	gtmsource_local_ptr_t	gtmsourcelocal_ptr;
+#	endif
 
 	assert(!jgbl.mur_rollback || !jgbl.mur_options_forward); /* ROLLBACK -FORWARD should not call this function */
 	/* Assert that except for MUPIP REPLIC -INSTANCE_CREATE or -EDITINSTANCE, all callers hold the FTOK semaphore on the
@@ -319,14 +329,53 @@ void	repl_inst_write(char *fn, off_t offset, sm_uc_ptr_t buff, size_t buflen)
 	assert(((NULL == reg) && (in_repl_inst_create || in_repl_inst_edit))
 		|| ((NULL != reg) && !in_repl_inst_create && !in_repl_inst_edit)
 		|| ((NULL != reg) && (NULL != jnlpool) && in_repl_inst_edit));
-	DEBUG_ONLY(
-		if (NULL != reg)
+#	ifdef DEBUG
+	if (NULL != reg)
+	{
+		udi = FILE_INFO(reg);
+		assert(udi->grabbed_ftok_sem
+				|| (jnlpool && (NULL != jnlpool->jnlpool_ctl) && udi->s_addrs.now_crit)
+				|| jgbl.mur_rollback
+				|| ((NULL != jnlpool) && in_repl_inst_edit)
+				|| ((jnlpool && jnlpool->gtmsource_local)
+					&& (process_id == jnlpool->gtmsource_local->gtmsource_srv_latch.u.parts.latch_pid)));
+		for (i = 0; i < NUM_GTMSRC_LCL; i++)
 		{
-			udi = FILE_INFO(reg);
-			assert(udi->grabbed_ftok_sem || (jnlpool && (NULL != jnlpool->jnlpool_ctl) && udi->s_addrs.now_crit)
-				|| jgbl.mur_rollback || ((NULL != jnlpool) && in_repl_inst_edit));
+			gtmsrc_lcl_start = ((REPL_INST_HDR_SIZE + (SIZEOF(gtmsrc_lcl) * i)));
+			gtmsrc_lcl_top = gtmsrc_lcl_start + SIZEOF(gtmsrc_lcl);
+			if ((offset < gtmsrc_lcl_top) && ((offset + buflen) > gtmsrc_lcl_start))
+			{
+				gtmsourcelocal_ptr = NULL;
+				latch_pid = 0;
+				if (jnlpool && jnlpool->gtmsource_local_array)
+				{
+					gtmsourcelocal_ptr = &jnlpool->gtmsource_local_array[i];
+					latch_pid = gtmsourcelocal_ptr->gtmsource_srv_latch.u.parts.latch_pid;
+				}
+				if (jgbl.mur_rollback)
+				{	/* Assert that we properly exclude everyone we need to. */
+					assert(only_usr_jnlpool_flush || (gtmsourcelocal_ptr && (process_id == latch_pid)));
+				} else if (!jnlpool)
+				{
+					/* If there's no journalpool, assert that we have the ftok on the file */
+					assert(udi->grabbed_ftok_sem);
+				} else if (in_repl_inst_edit)
+				{
+					if (!gtmsourcelocal_ptr || (process_id != latch_pid))
+					{
+						assert(udi->grabbed_ftok_sem);
+						assert((NULL == jnlpool->repl_inst_filehdr)
+								|| (INVALID_SEMID == jnlpool->repl_inst_filehdr->jnlpool_semid)
+								|| (INVALID_SHMID == jnlpool->repl_inst_filehdr->jnlpool_shmid));
+					}
+				} else if (!only_usr_jnlpool_flush)
+				{	/* Otherwise, if there are jnlpool users, assert that we've got the appropriate lock */
+					assert(gtmsourcelocal_ptr && (process_id == latch_pid));
+				}
+			}
 		}
-	)
+	}
+#	endif
 	oflag = O_RDWR;
 	if (in_repl_inst_create)
 		oflag |= (O_CREAT | O_EXCL);
@@ -1151,11 +1200,16 @@ void	repl_inst_flush_gtmsrc_lcl()
 	int4			index;
 	off_t			offset;
 	gtmsrc_lcl_ptr_t	gtmsrclcl_ptr;
+#	ifdef DEBUG
+	seq_num			tmp_rseqno, tmp_cseqno;
+	tmp_rseqno = jnlpool->gtmsource_local->read_jnl_seqno;
+	tmp_cseqno = jnlpool->gtmsource_local->connect_jnl_seqno;
+#	endif
 
 	assert(NULL != jnlpool);
 	udi = FILE_INFO(jnlpool->jnlpool_dummy_reg);
 	assert(!jgbl.mur_rollback); /* Rollback should never reach here */
-	assert(udi->s_addrs.now_crit);
+	assert(process_id == jnlpool->gtmsource_local->gtmsource_srv_latch.u.parts.latch_pid);
 	assert(NULL != jnlpool->gtmsource_local);
 	index = jnlpool->gtmsource_local->gtmsrc_lcl_array_index;
 	assert(0 <= index);
@@ -1168,7 +1222,17 @@ void	repl_inst_flush_gtmsrc_lcl()
 	 */
 	COPY_GTMSOURCELOCAL_TO_GTMSRCLCL(jnlpool->gtmsource_local, gtmsrclcl_ptr);
 	offset = REPL_INST_HDR_SIZE + (SIZEOF(gtmsrc_lcl) * (off_t)index);
+#	ifdef DEBUG
+	if (WBTEST_ENABLED(WBTEST_FLUSH_FH))
+	{	/* Sleep for a long enough time to provide substantial opportunity for any competitors for these fields to try
+		 * to access/modify them and to test the concurrency control system that protects them.
+		 */
+		LONG_SLEEP(5);
+	}
+#	endif
 	repl_inst_write(udi->fn, offset, (sm_uc_ptr_t)gtmsrclcl_ptr, SIZEOF(gtmsrc_lcl));
+	assert((tmp_rseqno == gtmsrclcl_ptr->resync_seqno) && (tmp_rseqno == jnlpool->gtmsource_local->read_jnl_seqno));
+	assert((tmp_cseqno == gtmsrclcl_ptr->connect_jnl_seqno) && (tmp_cseqno == jnlpool->gtmsource_local->connect_jnl_seqno));
 	jnlpool->gtmsource_local->last_flush_resync_seqno = jnlpool->gtmsource_local->read_jnl_seqno;
 }
 

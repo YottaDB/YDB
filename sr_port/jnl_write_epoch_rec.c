@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -52,7 +52,9 @@ void	jnl_write_epoch_rec(sgmnt_addrs *csa)
 	sgmnt_data_ptr_t	csd;
 	uint4			jnl_fs_block_size, read_write_size;
 	int			idx;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	assert(!IN_PHASE2_JNL_COMMIT(csa));
 	jpc = csa->jnl;
 	save_jnlpool = jnlpool;

@@ -579,10 +579,10 @@ void repl_log_tls_info(FILE *logfp, gtm_tls_socket_t *socket)
 	struct tm		*localtm;
 	gtm_tls_conn_info	conn_info;
 
-	if (0 != gtm_tls_get_conn_info(repl_tls.sock, &conn_info))
+	if (0 != gtm_tls_get_conn_info(socket, &conn_info))
 	{
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TLSCONNINFO, 0,
-				ERR_TEXT, 2, LEN_AND_STR(gtm_tls_get_error(repl_tls.sock)));
+				ERR_TEXT, 2, LEN_AND_STR(gtm_tls_get_error(socket)));
 		return;
 	}
 	repl_log(logfp, FALSE, TRUE, "TLS/SSL Session:\n");
@@ -600,7 +600,9 @@ void repl_log_tls_info(FILE *logfp, gtm_tls_socket_t *socket)
 		expiry = asctime(localtm);	/* BYPASSOK to prevent workcheck wanting to convert *time(..) to GTM_*TIME(..)*/
 	}
 	repl_log(logfp, FALSE, TRUE, "  Session Expiry: %s", expiry);
-	repl_log(logfp, FALSE, TRUE, "  Secure Renegotiation %s supported\n", conn_info.secure_renegotiation ? "IS" : "IS NOT");
+	if (gtm_tls_does_renegotiate(socket))	/* Announce only if renegotiation is supported */
+		repl_log(logfp, FALSE, TRUE, "  Secure Renegotiation %s supported\n",
+				(conn_info.secure_renegotiation) ? "IS" : "IS NOT");
 	repl_log(logfp, FALSE, TRUE, "Peer Certificate Information:\n");
 	repl_log(logfp, FALSE, TRUE, "  Asymmetric Algorithm: %s (%d bit)\n", conn_info.cert_algo, conn_info.cert_nbits);
 	repl_log(logfp, FALSE, TRUE, "  Subject: %s\n", conn_info.subject);
@@ -681,8 +683,8 @@ int repl_do_tls_handshake(FILE *logfp, int sock_fd, boolean_t do_accept, int *po
 		return status;
 	} else
 	{	/* TLS/SSL handshake succeeded. Log information about the peer's certificate and the TLS/SSL connection. */
-		repl_log(logfp, TRUE, TRUE, "Secure communication enabled using TLS/SSL protocol\n");
-		repl_log_tls_info(logfp, repl_tls.sock);
+		if (!gtm_tls_has_post_hand_shake(repl_tls.sock))
+			repl_log_tls_info(logfp, repl_tls.sock);
 		return SS_NORMAL;
 	}
 	assert(SS_NORMAL != save_errno);
@@ -704,7 +706,7 @@ int repl_do_tls_post_handshake(FILE *logfp, int sock_fd)
 	if (0 != (status = gtm_tls_do_post_hand_shake(repl_tls.sock)))
 	{
 		while ((GTMTLS_WANT_READ == status) || (GTMTLS_WANT_WRITE == status))
-		{	/* Need to retry the handshake */
+		{	/* Repeat the handshake in order to send the CertificateRequest */
 			if (0 >= (io_ready = fd_ioready(sock_fd, (GTMTLS_WANT_READ == status) ? POLLIN : POLLOUT, REPL_POLL_WAIT)))
 			{
 				if (!io_ready)
@@ -720,9 +722,11 @@ int repl_do_tls_post_handshake(FILE *logfp, int sock_fd)
 	{	/* Post handshake auth failure */
 		errp = gtm_tls_get_error(repl_tls.sock);
 		repl_log(logfp, TRUE, TRUE, "Post-handshake authentication failure: %s\n", errp);
-		repl_log_tls_info(logfp, repl_tls.sock);
 		repl_errno = EREPL_RECV;
-		return ECONNRESET;
+		if (GTMTLS_OP_PHA_EXT_NOT_RECEIVED & repl_tls.sock->flags)
+			return -2;	/* Source Server did not send the PHA extension */
+		else
+			return -1;
 	}
 	return SS_NORMAL;
 }

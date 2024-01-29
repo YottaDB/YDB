@@ -50,8 +50,7 @@ int dse_getki(char *dst, int *len, char *qual, int qual_len)
 	char 		buf[MAX_ZWR_KEY_SZ], *src, *temp_dst, *bot, *top, *tmp, slit[MAX_KEY_SZ + 1], key_buf[MAX_KEY_SZ + 1];
 	short int	max_key;
 	unsigned short 	buf_len;
-	int  		dlr_num, dlr_len;
-	int		num;
+	int  		dlr_num, dlr_len, num, tmp_len;
 	unsigned char	*ptr;
 	mval 		key_subsc;
 	span_subs	subs;
@@ -175,8 +174,8 @@ int dse_getki(char *dst, int *len, char *qual, int qual_len)
 				return FALSE;
 		        }
 			mval2subsc(&key_subsc, gv_currkey, gv_cur_region->std_null_coll);
-			if (gv_currkey->end >= max_key)
-				ISSUE_GVSUBOFLOW_ERROR(gv_currkey, KEY_COMPLETE_TRUE);
+			if ((tmp_len = gv_currkey->end) >= max_key)
+				ISSUE_GVSUBOFLOW_ERROR(gv_currkey, KEY_COMPLETE_TRUE, (tmp_len+1), max_key, gv_cur_region);
 			if (',' != *src)
 				break;
 			src++;

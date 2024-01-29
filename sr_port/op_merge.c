@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -97,7 +97,7 @@ error_def(ERR_NCTCOLLDIFF);
 
 void op_merge(void)
 {
-	boolean_t		found, check_for_null_subs, is_base_var, nontp_and_bgormm, nospan, act_mismatch;
+	boolean_t		act_mismatch, check_for_null_subs, found, is_base_var, nontp_and_bgormm, nospan;
 	gd_addr			*gbl1_gd_addr, *gbl2_gd_addr;
 	gd_binding		*map;
 	gv_key           	*key, *mergekey2;
@@ -106,12 +106,12 @@ void op_merge(void)
 	gvname_info		*gblp1, *gblp2;
 	gvnh_reg_t		*gvnh_reg1, *gvnh_reg2;
 	int			delta2, dollardata_dst, dollardata_src, gvn1subs, gvn2subs, keylen, nsubs;
-	int			org_glvn1_keysz, org_glvn2_keysz, sbs_depth;
+	int			org_glvn1_keysz, org_glvn2_keysz, sbs_depth, tmp_len;
 	lv_val			*dst_lv;
 	mstr			opstr;
-	mval 			*mkey, *value, *subsc, tmp_mval;
+	mval 			*mkey, *subsc, tmp_mval, *value;
 	mv_stent		*mv_zintcmd;
-	unsigned char		buff[MAX_ZWR_KEY_SZ], nullcoll_src, nullcoll_dst, *ptr, *ptr2, *ptr_top;
+	unsigned char		buff[MAX_ZWR_KEY_SZ], nullcoll_dst, nullcoll_src, *ptr, *ptr2, *ptr_top;
 	zshow_out		output;
 #	ifdef DEBUG
 	lv_val			*orig_active_lv;
@@ -330,8 +330,9 @@ void op_merge(void)
 				assert((NULL == gvnh_reg1) || (TREF(gd_targ_gvnh_reg) == gvnh_reg1));
 				GV_BIND_SUBSNAME_FROM_GVNH_REG_IF_GVSPAN(gvnh_reg1, gbl1_gd_addr, gv_currkey);
 				/* For spanning globals, "gv_cur_region" points to the target region for ^gvn1 only now */
-				if (gv_currkey->end >= gv_cur_region->max_key_size)
-					ISSUE_GVSUBOFLOW_ERROR(gv_currkey, KEY_COMPLETE_TRUE);
+				if ((tmp_len = gv_currkey->end) >= gv_cur_region->max_key_size)
+					ISSUE_GVSUBOFLOW_ERROR(gv_currkey, KEY_COMPLETE_TRUE, (tmp_len+1),
+										gv_cur_region->max_key_size, gv_cur_region);
 				if (!nospan)
 				{	/* At least one of ^gvn1 or ^gvn2 spans multiple regions. Recompute check_for_null_subs
 					 * in that case by looking at the specific region that the subscripted reference of

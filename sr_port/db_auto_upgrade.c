@@ -145,6 +145,11 @@ void db_auto_upgrade(gd_region *reg)
 				csd->i_reserved_bytes = 0;
 				break; /* so a new "case" needs to be added BEFORE the assert. */
 			case GDSMV71002:
+				/* GT.M V7.1-003 changed freeze on fail default for statsDBs to FALSE */
+				if (IS_STATSDB_REGNAME(reg))
+					csd->freeze_on_fail = FALSE;
+				break;
+			case GDSMV71003:
 				assert(FALSE);
 				break;
 			default:
@@ -368,6 +373,8 @@ void v6_db_auto_upgrade(gd_region *reg)
 					csd->problksplit = DEFAULT_PROBLKSPLIT;
 				if (csd->last_mdb_ver < GDSMV71002)
 					csd->i_reserved_bytes = 0;
+				if ((csd->last_mdb_ver < GDSMV71003) && IS_STATSDB_REGNAME(reg))
+					csd->freeze_on_fail = FALSE;
 				break;
 			case GDSMV63015:
 				assert(FALSE);	/* if this should come to pass, add appropriate code above the assert */

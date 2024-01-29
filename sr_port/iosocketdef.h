@@ -50,6 +50,14 @@
 #define SOCKOPTIONS_PENDING	4	/* setsockopt needed */
 #define	SOCKOPTIONS_FROM_STRUCT	-1	/* flag for iosocket_tcp_keepalive.c */
 
+#define SOCKHUP_NOPRINCIO_CHECK(WRITE)								\
+MBSTART {											\
+	assert(hup_on || prin_in_dev_failure || prin_out_dev_failure);				\
+	exi_condition = -ERR_SOCKHANGUP;							\
+	ISSUE_NOPRINCIO_IF_NEEDED(iod, WRITE, FALSE);					\
+	async_action(FALSE);									\
+} MBEND
+
 typedef struct
 {
 	uid_t   mem;
@@ -291,20 +299,20 @@ MBSTART {													\
 	iosocket_delimiter_copy(SOCKPTR, NEWSOCKPTR);								\
 }
 
-enum socket_pass_type
+enum socket_xfer_type
 {
-	sockpass_new,
-	sockpass_data,
-	sockpass_sock
+	sockxfer_new,
+	sockxfer_data,
+	sockxfer_sock
 };
 
 #define		ENSURE_DATA_SOCKET(SOCKPTR)					\
 {										\
 	if (socket_local == (SOCKPTR)->protocol)				\
 	{									\
-		if (sockpass_new == (SOCKPTR)->passtype)			\
-			(SOCKPTR)->passtype = sockpass_data;			\
-		else if (sockpass_sock == (SOCKPTR)->passtype)			\
+		if (sockxfer_new == (SOCKPTR)->xfertype)			\
+			(SOCKPTR)->xfertype = sockxfer_data;			\
+		else if (sockxfer_sock == (SOCKPTR)->xfertype)			\
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(2) ERR_SOCKPASSDATAMIX, 0);	\
 	}									\
 }
@@ -313,9 +321,9 @@ enum socket_pass_type
 {										\
 	if (socket_local == (SOCKPTR)->protocol)				\
 	{									\
-		if (sockpass_new == (SOCKPTR)->passtype)			\
-			(SOCKPTR)->passtype = sockpass_sock;			\
-		else if (sockpass_data == (SOCKPTR)->passtype)			\
+		if (sockxfer_new == (SOCKPTR)->xfertype)			\
+			(SOCKPTR)->xfertype = sockxfer_sock;			\
+		else if (sockxfer_data == (SOCKPTR)->xfertype)			\
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(2) ERR_SOCKPASSDATAMIX, 0);	\
 	}                                                                      \
 }
@@ -395,7 +403,7 @@ typedef struct socket_struct_type
 	boolean_t			first_read;
 	boolean_t			first_write;
 	boolean_t			def_moreread_timeout;	/* true if deviceparameter morereadtime defined in open or use */
-	enum socket_pass_type		passtype;		/* prevent mix of data and socket passing on LOCAL sockets */
+	enum socket_xfer_type		xfertype;		/* prevent mix of data and socket passing on LOCAL sockets */
 	uint				filemode;		/* for LOCAL */
 	uint				filemode_mask;		/* to tell which modes specified */
 	uic_struct_int			uic;

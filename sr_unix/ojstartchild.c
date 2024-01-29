@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -642,7 +642,7 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 			if (rc < 0)
 				SETUP_OP_FAIL();
 			/* Send the local variables */
-			if (jparms->passcurlvn)
+			if (jparms->xfercurlvn)
 			{
 				SEND(setup_fds[0], jparms->curlvn_buffer_ptr, jparms->curlvn_buffer_size, 0, rc);
 				system_free(jparms->curlvn_buffer_ptr);		/* Space allocated by open_memstream in ojparams */

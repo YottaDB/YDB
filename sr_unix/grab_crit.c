@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -73,6 +73,7 @@ void	grab_crit(gd_region *reg, wait_state state)
 	csa = &udi->s_addrs;
 	csd = csa->hdr;
 	cnl = csa->nl;
+	assert(!TREF(defer_instance_freeze));
 #	ifdef DEBUG
 	save_jnlpool = jnlpool;
 	if (csa->jnlpool && (csa->jnlpool != jnlpool))
@@ -87,13 +88,6 @@ void	grab_crit(gd_region *reg, wait_state state)
 			LONG_SLEEP(1);
 		FPRINTF(stderr, "MUPIP BACKUP resumed in grab_crit\n");
 		cnl->wbox_test_seq_num = 3;
-	}
-#	endif
-#	ifdef underconstruction
-	if (TREF(in_mupip_integ) && IS_REPL_INST_FROZEN && !TREF(integ_cannotskip_crit))
-	{
-		TREF(instance_frozen_crit_skipped) = TRUE;
-		return;
 	}
 #	endif
 	assert(!csa->hold_onto_crit);

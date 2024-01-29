@@ -260,10 +260,10 @@ int4 gdsfilext(block_id blocks, block_id filesize, boolean_t trans_in_prog)
 			if (FROZEN_CHILLED(cs_addrs))
 				DO_CHILLED_AUTORELEASE(cs_addrs, cs_data);
 			assert(FROZEN(cs_data) || !cs_addrs->jnlpool || (cs_addrs->jnlpool == jnlpool));
-			if (!FROZEN(cs_data) && !IS_REPL_INST_FROZEN)
+			if (!FROZEN(cs_data) && !IS_REPL_INST_FROZEN(TREF(defer_instance_freeze)))
 				break;
 			rel_crit(gv_cur_region);
-			while (FROZEN(cs_data) || IS_REPL_INST_FROZEN)
+			while (FROZEN(cs_data) || IS_REPL_INST_FROZEN(TREF(defer_instance_freeze)))
 			{
 				hiber_start(1000);
 				if (FROZEN_CHILLED(cs_addrs) && CHILLED_AUTORELEASE(cs_addrs))
@@ -280,7 +280,7 @@ int4 gdsfilext(block_id blocks, block_id filesize, boolean_t trans_in_prog)
 	} else
 		WAIT_FOR_REGION_TO_UNCHILL(cs_addrs, cs_data);
 	assert(!cs_addrs->jnlpool || (cs_addrs->jnlpool == jnlpool));
-	if (IS_REPL_INST_FROZEN && trans_in_prog)
+	if (IS_REPL_INST_FROZEN(TREF(defer_instance_freeze)) && trans_in_prog)
 	{
 		assert((CDB_STAGNATE <= t_tries) || TREF(in_bm_getfree_gdsfilext));
 		GDSFILEXT_CLNUP;

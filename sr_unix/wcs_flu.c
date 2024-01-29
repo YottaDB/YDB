@@ -93,7 +93,8 @@ MBSTART {										\
 MBSTART {														\
 	unsigned int		lcnt;											\
         struct shmid_ds         shm_buf;										\
-	int			save_errno;										\
+	int			i, msgcnt, save_errno;									\
+	pid_t			pid;											\
 															\
 	GTM_WHITE_BOX_TEST(WBTEST_BUFOWNERSTUCK_STACK, (CNL->in_wtstart), 1);						\
 	if (WRITERS_ACTIVE(CNL))											\
@@ -133,8 +134,14 @@ MBSTART {														\
 				and at that time we do not want the WBTEST_BUFOWNERSTUCK_STACK white box		\
 				mechanism to kick in.*/									\
 				GTM_WHITE_BOX_TEST(WBTEST_BUFOWNERSTUCK_STACK, gtm_white_box_test_case_enabled, FALSE);	\
-				send_msg_csa(CSA_ARG(CSA) VARLSTCNT(5) ERR_WRITERSTUCK, 3, CNL->in_wtstart,		\
-						DB_LEN_STR(REG));							\
+				for (msgcnt = i = 0; (MAX_WTSTART_PID_SLOTS > i) && (CNL->in_wtstart >= msgcnt); i++)	\
+				{											\
+					if (0 == (pid = CNL->wtstart_pid[i]))						\
+						continue;								\
+					send_msg_csa(CSA_ARG(CSA) VARLSTCNT(7) ERR_WRITERSTUCK, 5, pid,	msgcnt + 1,	\
+							CNL->in_wtstart, DB_LEN_STR(REG));				\
+					msgcnt++;									\
+				}											\
 				return FALSE;										\
 			}												\
 			if (-1 == shmctl(udi->shmid, IPC_STAT, &shm_buf))						\
@@ -226,7 +233,9 @@ boolean_t wcs_flu(uint4 options)
 #	ifdef DEBUG
 	int			wcs_wip_lvl, wcs_active_lvl, wc_in_free; /* copy of cnl noted down for debugging purposes */
 #	endif
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	jnl_status = 0;
 	flush_hdr = options & WCSFLU_FLUSH_HDR;
 	write_epoch = options & WCSFLU_WRITE_EPOCH;
@@ -591,6 +600,7 @@ boolean_t wcs_flu(uint4 options)
 						case WBTEST_BG_UPDATE_DBCSHGETN_INVALID2:
 						case WBTEST_BG_UPDATE_PHASE2FAIL:
 						case WBTEST_CRASH_SHUTDOWN_EXPECTED:
+						case WBTEST_EXPECT_IO_HANG:
 						case WBTEST_FORCE_WCS_GET_SPACE_CACHEVRFY:
 						case WBTEST_MURUNDOWN_KILLCMT06:
 						case WBTEST_WCS_FLU_IOERR:

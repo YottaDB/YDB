@@ -79,6 +79,7 @@
 #ifdef GTM_TLS
 #include "gtm_repl.h"
 #endif
+#include "util.h"			/* for OUT_BUFF_SIZE */
 
 #define	GTM_ZLIB_UNCMP_ERR_STR		"error from zlib uncompress function "
 #define	GTM_ZLIB_Z_MEM_ERROR_STR	"Out-of-memory " GTM_ZLIB_UNCMP_ERR_STR
@@ -167,7 +168,7 @@ STATICFNDCL	void	do_main_loop(boolean_t crash_restart);
 STATICFNDCL	void	gtmrecv_heartbeat_timer(TID tid, int4 interval_len, int *interval_ptr);
 STATICFNDCL	void	gtmrecv_main_loop(boolean_t crash_restart);
 #ifdef GTM_TLS
-STATICFNDCL	boolean_t gtmrecv_exchange_tls_info(void);
+STATICFNDCL	boolean_t gtmrecv_exchange_tls_info(uint4 remote_API_ver, uint4 remote_lib_ver);
 #endif
 
 GBLREF	gtmrecv_options_t	gtmrecv_options;
@@ -2636,11 +2637,19 @@ STATICFNDEF void	gtmrecv_process_need_histinfo_msg(repl_needhistinfo_msg_ptr_t n
  * (a) `gtmrecv_poll_actions' needs to be invoked as opposed to `gtmsource_poll_actions'.
  * (b) The arguments passed to `gtmrecv_poll_actions' are defined as static.
  * (c) The action taken after `gtmsource_poll_actions' and `gtmrecv_poll_actions' are different.
+ *
+ * The Receiver and Source servers exchanged TLS plugin library and 3rd party TLS library version information as part of
+ * negotiating the startup of TLS. In the event of a handshake error, print that information as it may contribute to the
+ * reason for the TLS handshake error. NOTE: Since gtmsource_exchange_tls_info() initiates the TLS negotiation, it has
+ * the client TLS information. The Receiver side calls this function after it receives the same details and so those bits
+ * of information must be passed to this function.
  */
-STATICFNDEF boolean_t gtmrecv_exchange_tls_info(void)
+STATICFNDEF boolean_t gtmrecv_exchange_tls_info(uint4 remote_API_ver, uint4 remote_lib_ver)
 {
-	int			poll_dir, status;
+	int			errlen, poll_dir, status;
+	static int		flags = GTMTLS_OP_FORCE_VERIFY_PEER | GTMTLS_OP_RENEGOTIATE_REQUESTED;
 	char			*errp;
+	boolean_t		pha_fallback;
 	repl_tlsinfo_msg_t	reply;
 
 	reply.type = REPL_TLS_INFO;
@@ -2656,8 +2665,7 @@ STATICFNDEF boolean_t gtmrecv_exchange_tls_info(void)
 	if (repl_connection_reset || gtmrecv_wait_for_jnl_seqno)
 		return FALSE;
 	/* At this point, the both sides are ready for a TLS/SSL handshake. Create a TLS/SSL aware socket. */
-	if (NULL == (repl_tls.sock = gtm_tls_socket(tls_ctx, repl_tls.sock, gtmrecv_sock_fd, repl_tls.id,
-					GTMTLS_OP_VERIFY_PEER | GTMTLS_OP_RENEGOTIATE_REQUESTED)))
+	if (NULL == (repl_tls.sock = gtm_tls_socket(tls_ctx, repl_tls.sock, gtmrecv_sock_fd, repl_tls.id, flags)))
 	{
 		if (PLAINTEXT_FALLBACK)
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) MAKE_MSG_WARNING(ERR_TLSCONVSOCK), 0,
@@ -2685,8 +2693,12 @@ STATICFNDEF boolean_t gtmrecv_exchange_tls_info(void)
 		if (SS_NORMAL == status) /* Where enabled, do post handshake auth */
 			status = repl_do_tls_post_handshake(gtmrecv_log_fp, gtmrecv_sock_fd);
 		if (SS_NORMAL == status)
+		{
+			repl_log(gtmrecv_log_fp, TRUE, TRUE, "Secure communication enabled using TLS/SSL protocol\n");
+			if (GTMTLS_OP_PHA_EXT_NOT_RECEIVED & flags)	/* Re-enable PHA for subsequent connections */
+				flags &= ~GTMTLS_OP_PHA_EXT_NOT_RECEIVED;
 			return TRUE;
-		else if (REPL_CONN_RESET(status))
+		} else if (REPL_CONN_RESET(status))
 		{
 			repl_log(gtmrecv_log_fp, TRUE, TRUE, "Attempt to connect() with TLS/SSL protocol failed. "
 					"Status = %d; %s\n", status, STRERROR(status));
@@ -2694,10 +2706,29 @@ STATICFNDEF boolean_t gtmrecv_exchange_tls_info(void)
 			repl_connection_reset = TRUE;
 			return FALSE;
 		}
-		errp = (-1 == status) ? (char *)gtm_tls_get_error(NULL) : STRERROR(status);
-		if (!PLAINTEXT_FALLBACK)
-			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_TLSHANDSHAKE, 0, ERR_TEXT, 2, LEN_AND_STR(errp));
-		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) MAKE_MSG_WARNING(ERR_TLSHANDSHAKE), 0, ERR_TEXT, 2, LEN_AND_STR(errp));
+		errp = (0 > status) ? (char *)gtm_tls_get_error(repl_tls.sock) : STRERROR(status);
+		if (OUT_BUFF_SIZE > (errlen = strlen(errp))) /* Append version information in one message */
+			snprintf(errp + errlen, OUT_BUFF_SIZE - errlen, "; Local API:0x%08x, LIB:0x%08x; Remote API:0x%08x, LIB:0x%08x",
+					GTM_TLS_API_VERSION, (uint4)tls_ctx->runtime_version, remote_API_ver, remote_lib_ver);
+		pha_fallback = ((GTMTLS_OP_PHA_EXT_FALLBACK & repl_tls.sock->flags) && (-2 == status)
+					&& !(GTMTLS_OP_PHA_EXT_NOT_RECEIVED & flags));
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) /* Plaintext/PHA fallback issue a WARNING */
+				((PLAINTEXT_FALLBACK || pha_fallback) ? MAKE_MSG_WARNING(ERR_TLSHANDSHAKE) : ERR_TLSHANDSHAKE),
+				0, ERR_TEXT, 2, LEN_AND_STR(errp));
+		/* Handshake error. If PHA related, disable PHA and issue an error. Otherwise, follow plaintext fallback behavior */
+		if ((!PLAINTEXT_FALLBACK) || ((GTMTLS_OP_PHA_EXT_FALLBACK & repl_tls.sock->flags) && (-2 == status)))
+		{	/* Close the connection and issue an error message */
+			if (pha_fallback)	/* PHA fallback enabled and extension not received; disable PHA */
+			{
+				repl_log(gtmrecv_log_fp, TRUE, TRUE, "Post-handshake fallback enabled. Disconnecting. "
+						"Post Handshake Authentication temporarily disabled for the next TLS connection "
+						"attempt.\n");
+				flags |= GTMTLS_OP_PHA_EXT_NOT_RECEIVED;
+			}
+			repl_close(&gtmrecv_sock_fd);
+			repl_connection_reset = TRUE;
+			return FALSE;
+		}
 	}
 	repl_log(gtmrecv_log_fp, TRUE, TRUE, "Plaintext fallback enabled. Closing and reconnecting without TLS/SSL.\n");
 	repl_close(&gtmrecv_sock_fd);
@@ -2710,7 +2741,7 @@ STATICFNDEF boolean_t gtmrecv_exchange_tls_info(void)
 STATICFNDEF void do_main_loop(boolean_t crash_restart)
 {
 	/* The work-horse of the Receiver Server */
-	boolean_t			dont_reply_to_heartbeat = FALSE, is_repl_cmpc;
+	boolean_t			dont_reply_to_heartbeat = FALSE, is_repl_cmpc, pha_peer_cert_check = FALSE;
 	boolean_t			uncmpfail, send_cross_endian, recvpool_prepared = FALSE, copied_to_recvpool = FALSE;
 	gtmrecv_local_ptr_t		gtmrecv_local;
 	gtm_time4_t			ack_time;
@@ -2930,6 +2961,12 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 		}
 		if (repl_connection_reset)
 			return;
+		if (pha_peer_cert_check && gtm_tls_did_post_hand_shake(repl_tls.sock))
+		{
+			repl_log(gtmrecv_log_fp, TRUE, TRUE, "Post-handshake authentication completed successfully\n");
+			repl_log_tls_info(gtmrecv_log_fp, repl_tls.sock);
+			pha_peer_cert_check = FALSE;
+		}
 #		ifdef REPL_CMP_SOLVE_TESTING
 		/* Received communication from the source server, so we can cancel the timer */
 		if (TREF(gtm_environment_init) && repl_cmp_solve_timer_set)
@@ -3520,7 +3557,17 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 					remote_side->tls_requested = (recvd_start_flags & START_FLAG_ENABLE_TLS) ? TRUE : FALSE;
 					if (REPL_TLS_REQUESTED && !remote_side->tls_requested)
 					{
-						ISSUE_REPLNOTLS(ERR_REPLNOTLS, "Receiver side", "Source side");
+						gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ((PLAINTEXT_FALLBACK) ?
+									 MAKE_MSG_WARNING(ERR_REPLNOTLS) : ERR_REPLNOTLS),
+								4, LEN_AND_LIT(RCVR_SIDE_STR), LEN_AND_LIT(SRC_SIDE_STR));
+						if (!PLAINTEXT_FALLBACK)
+						{	/* Close the connection and return to waiting for a new one */
+							repl_close(&gtmrecv_sock_fd);
+							repl_connection_reset = TRUE;
+							break;
+						}
+						repl_log(gtmrecv_log_fp, TRUE, TRUE, "Plaintext fallback enabled. "
+								"Continuing without TLS/SSL.\n");
 						CLEAR_REPL_TLS_REQUESTED; /* As if -tlsid qualifier was never specified. */
 					}
 					/* If we have not requested TLS/SSL and the originating side requested TLS/SSL, the latter
@@ -3660,21 +3707,26 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 					repl_log(gtmrecv_log_fp, TRUE, TRUE, "  Remote side API version: 0x%08x\n", remote_API_ver);
 					repl_log(gtmrecv_log_fp, TRUE, TRUE, "  Remote side Library version: 0x%08x\n",
 														remote_lib_ver);
-					if (!gtmrecv_exchange_tls_info())
+					if (!gtmrecv_exchange_tls_info(remote_API_ver, remote_lib_ver))
 					{
+						pha_peer_cert_check = FALSE;
 						if (repl_connection_reset || gtmrecv_wait_for_jnl_seqno)
 							return;
 						assert(PLAINTEXT_FALLBACK);
 						assert(!repl_tls.enabled);
 					} else
-						repl_tls.enabled = TRUE; /* From here on, all communications are secured with SSL */
+					{	/* From here on, all communications are secured with SSL */
+						repl_tls.enabled = TRUE;
+						pha_peer_cert_check = gtm_tls_has_post_hand_shake(repl_tls.sock);
+					}
 					break;
 
 				case REPL_RENEG_ACK_ME:
 					if (0 != data_len)
 						break;
 					assert(!reneg_ack_sent);
-					repl_log(gtmrecv_log_fp, TRUE, TRUE, "Received REPL_RENEG_ACK_ME message\n");
+					repl_log(gtmrecv_log_fp, TRUE, TRUE, "Received %s acknowledgement request message\n",
+							(gtm_tls_does_renegotiate(repl_tls.sock)) ? "renegotiation" : "key-update");
 					gtmrecv_repl_send(&renegotiate_msg, REPL_RENEG_ACK, MIN_REPL_MSGLEN, "REPL_RENEG_ACK",
 								MAX_SEQNO);
 					DEBUG_ONLY(reneg_ack_sent = TRUE);
@@ -3685,10 +3737,11 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 					if (0 != data_len)
 						break;
 					assert(reneg_ack_sent);
-					repl_log(gtmrecv_log_fp, TRUE, TRUE, "Received REPL_RENEG_COMPLETE message."
-								" TLS/SSL connection successfully renegotiated.\n");
+					repl_log(gtmrecv_log_fp, TRUE, TRUE, "Received SSL/TLS connection %s complete message.\n",
+							(gtm_tls_does_renegotiate(repl_tls.sock)) ? "renegotiation" : "key-update");
 					DEBUG_ONLY(reneg_ack_sent = FALSE);
-					repl_log_tls_info(gtmrecv_log_fp, repl_tls.sock);
+					if (gtm_tls_does_renegotiate(repl_tls.sock))	/* Announce results only if renegotiated */
+						repl_log_tls_info(gtmrecv_log_fp, repl_tls.sock);
 					repl_tls.renegotiate_state = REPLTLS_RENEG_STATE_NONE;
 					break;
 #				endif

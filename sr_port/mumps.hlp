@@ -4154,6 +4154,11 @@
 
    The string literal specifies the $ZCMDLINE of the JOB'd process.
 
+   Note that the contents of CMD[LINE] appear in process listings. This can
+   be useful for application administrators to identify process purpose. Be
+   aware of the risks of exposing protected information by including that in
+   CMD[LINE].
+
 4 DEF[AULT]=strlit
    DEF[AULT]=strlit
 
@@ -11559,9 +11564,10 @@
 2 $Storage
    $Storage
 
-   $S[TORAGE] contains an integer value specifying the number of free bytes
-   of address space remaining between the memory currently under management
-   by the process and the theoretical maximum available to the process.
+   $S[TORAGE] contains an integer value specifying difference between the
+   current $ZREALSTOR as a subtrahend and, in order of precedence,
+   $ZMALLOCLIM if it has a non-zero value, the process R_LIMIT if it is not
+   unlimited, and otherwise the maximum of a 64-bit address space.
 
    GT.M uses memory for code (instructions) and data. If the amount of
    virtual memory available to the process exceeds 2,147,483,647 bytes, it is

@@ -30,6 +30,7 @@
 #include "gdscc.h"
 #include "filestruct.h"
 #include "jnl.h"
+#include "jnlbufs.h"
 #include "buddy_list.h"
 #include "tp.h"
 #include "repl_msg.h"
@@ -397,6 +398,8 @@ int gtmsource()
 	assert(mutex_per_process_init_pid && (mutex_per_process_init_pid != process_id));
 	mutex_per_process_init();
 	ppid = getppid();
+	/* Detached from the initiating process, now detach from the starting IO */
+	io_rundown(RUNDOWN_EXCEPT_STD);
 	log_init_status = repl_log_init(REPL_GENERAL_LOG, &gtmsource_log_fd, gtmsource_options.log_file);
 	assert(SS_NORMAL == log_init_status);
 	repl_log_fd2fp(&gtmsource_log_fp, gtmsource_log_fd);
@@ -408,10 +411,8 @@ int gtmsource()
 	if (0 > null_fd)
 		rts_error_csa(CSA_ARG(NULL) ERR_REPLERR, RTS_ERROR_LITERAL("Failed to open /dev/null for read"), errno, 0);
 	assert(null_fd > 2);
-	/* Detached from the initiating process, now detach from the starting IO */
-	io_rundown(NORMAL_RUNDOWN);
 	FSTAT_FILE(gtmsource_log_fd, &stat_buf, log_init_status);
-	assertpro(!log_init_status);	/* io_rundown should not affect the log file */
+	assertpro(!log_init_status);	/* Log file was just created by repl_log_init()! */
 	DUP2(null_fd, 0, rc);
 	if (0 > rc)
 		RTS_ERROR_CSA_ABT(NULL, ERR_REPLERR, RTS_ERROR_LITERAL("Failed to set stdin to /dev/null"), errno, 0);
@@ -551,9 +552,10 @@ int gtmsource()
 		}
 	}
 #	endif
-	gtmsource_local->jnlfileonly = gtmsource_options.jnlfileonly;
+	gtmsource_local->read_algo = gtmsource_options.jnlfileonly ? JNLFILE_DATA : JNLPOOL_DATA;
 	do
 	{ 	/* If mode is passive, go to sleep. Wakeup every now and then and check to see if I have to become active. */
+		assert(!SRC_NEEDS_JPLWRITES(jnlpool,gtmsource_local));
 		gtmsource_state = gtmsource_local->gtmsource_state = GTMSOURCE_START;
 		if ((gtmsource_local->mode == GTMSOURCE_MODE_PASSIVE) && (gtmsource_local->shutdown == NO_SHUTDOWN))
 		{
@@ -574,6 +576,8 @@ int gtmsource()
 			continue;
 		if (GTMSOURCE_MODE_ACTIVE_REQUESTED == gtmsource_local->mode)
 			gtmsource_local->mode = GTMSOURCE_MODE_ACTIVE;
+		assert(GTMSOURCE_MODE_ACTIVE == gtmsource_local->mode);
+		assert(!SRC_NEEDS_JPLWRITES(jnlpool,gtmsource_local));
 		SNPRINTF(tmpmsg, REPL_MSG_SIZE, "GTM Replication Source Server now in ACTIVE mode using port %d",
 			gtmsource_local->secondary_port);
 		sgtm_putmsg(print_msg, OUT_BUFF_SIZE - 1, VARLSTCNT(4) ERR_REPLINFO, 2, LEN_AND_STR(tmpmsg));
@@ -589,7 +593,39 @@ int gtmsource()
 			continue;
 		}
 		GTMSOURCE_SET_READ_ADDR(gtmsource_local, jnlpool);
-		gtmsource_local->read_state = gtmsource_local->jnlfileonly ? READ_FILE : READ_POOL;
+		switch (gtmsource_local->read_algo)
+		{
+		case JNLPOOL_DATA:
+			gtmsource_local->read_state = READ_POOL;
+			if (!SET_SRC_NEEDS_JPLWRITES(jnlpool, gtmsource_local))
+			{
+				jnlpool->jnlpool_ctl->contig_addr = gtmsource_local->read_addr;
+				if (!gtmsource_local->read_addr)
+					jnlpool->jnlpool_ctl->start_jnl_seqno = jnlpool->jnlpool_ctl->jnl_seqno;
+			}
+			assert(gtmsource_local->read_addr == jnlpool->jnlpool_ctl->rsrv_write_addr);
+			break;
+		case JNLFILE_DATA:
+			gtmsource_local->read_state = READ_FILE;
+			break;
+		case JNLBUFF_DATA:
+			assert(FALSE);
+			gtmsource_local->read_algo = JNLFILE_DATA;
+			gtmsource_local->read_state = READ_FILE;
+			break;
+		default:
+			assert(FALSE);
+			gtmsource_local->read_algo = JNLPOOL_DATA;
+			gtmsource_local->read_state = READ_POOL;
+			if (!SET_SRC_NEEDS_JPLWRITES(jnlpool, gtmsource_local))
+			{
+				jnlpool->jnlpool_ctl->contig_addr = gtmsource_local->read_addr;
+				if (!gtmsource_local->read_addr)
+					jnlpool->jnlpool_ctl->start_jnl_seqno = jnlpool->jnlpool_ctl->jnl_seqno;
+			}
+			assert(gtmsource_local->read_addr == jnlpool->jnlpool_ctl->rsrv_write_addr);
+			break;
+		}
 		read_jnl_seqno = gtmsource_local->read_jnl_seqno;
 		assert(read_jnl_seqno <= jnlpool->jnlpool_ctl->jnl_seqno);
 		if (read_jnl_seqno < jnlpool->jnlpool_ctl->jnl_seqno)
@@ -613,6 +649,11 @@ int gtmsource()
 		gtmsource_process();
 		/* gtmsource_process returns only when mode needs to be changed to PASSIVE */
 		assert(gtmsource_state == GTMSOURCE_CHANGING_MODE);
+		if (gtmsource_local->read_algo == JNLPOOL_DATA)
+		{
+			assert(SRC_NEEDS_JPLWRITES(jnlpool,gtmsource_local));
+			UNSET_SRC_NEEDS_JPLWRITES(jnlpool,gtmsource_local);
+		}
 		gtmsource_ctl_close();
 		gtmsource_free_msgbuff();
 		gtmsource_free_tcombuff();

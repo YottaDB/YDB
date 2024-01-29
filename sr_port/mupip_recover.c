@@ -290,7 +290,7 @@ void	mupip_recover(void)
 	}
 	if (TREF(skip_DB_exists_check))
 		db_absent = FALSE;
-	if (!mur_options.update && jgbl.mur_extract && (db_absent || IS_REPL_INST_FROZEN))
+	if (!mur_options.update && jgbl.mur_extract && (db_absent || IS_REPL_INST_FROZEN(RECOGNIZE_FREEZES)))
 	{
 		if (TREF(jnl_extract_nocol))
 		{

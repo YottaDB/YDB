@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2014-2021 Fidelity National Information	*
+ * Copyright (c) 2014-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -68,7 +68,8 @@ void mu_rndwn_rlnkctl(void)
 		dir.addr = objdir;
 		dir.len = param_len;
 		linkctl = relinkctl_attach(&dir, NULL, SIZEOF(objdir));
-		assert((dir.len <= SIZEOF(objdir) - 1) && (('\0' == dir.addr[dir.len]) || (0 == dir.len)));
+		assert(dir.len <= SIZEOF(objdir) - 1);
+		assert(('\0' == dir.addr[dir.len]) || (0 == dir.len));
 		assert(linkctl == TREF(open_relinkctl_list));
 		assert((NULL == linkctl) || (NULL == linkctl->next));
 		if (NULL == linkctl)

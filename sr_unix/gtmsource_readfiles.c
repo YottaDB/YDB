@@ -77,13 +77,13 @@
 MBSTART {													\
 	assert(MAX_SEQNO_ADDR <= MAX_SEQNO_EOF_ADDR);								\
 	assert(SKIP_EOF_ADDR_CHECK || (MAX_SEQNO_EOF_ADDR <= CTL->repl_buff->fc->eof_addr));			\
-	assert(ctl->max_seqno <= MAX_SEQNO);									\
-	ctl->max_seqno = MAX_SEQNO;										\
-	assert(ctl->max_seqno_dskaddr <= MAX_SEQNO_ADDR);							\
-	ctl->max_seqno_dskaddr = MAX_SEQNO_ADDR;								\
+	assert(MAX_SEQNO >= CTL->max_seqno);									\
+	CTL->max_seqno = MAX_SEQNO;										\
+	assert(MAX_SEQNO_ADDR >= CTL->max_seqno_dskaddr);							\
+	CTL->max_seqno_dskaddr = MAX_SEQNO_ADDR;								\
 	assert(MAX_SEQNO_EOF_ADDR >= MAX_SEQNO_ADDR);								\
-	assert(ctl->max_seqno_eof_addr <= MAX_SEQNO_EOF_ADDR);							\
-	ctl->max_seqno_eof_addr = MAX_SEQNO_EOF_ADDR;								\
+	assert(MAX_SEQNO_EOF_ADDR >= CTL->max_seqno_eof_addr);							\
+	CTL->max_seqno_eof_addr = MAX_SEQNO_EOF_ADDR;								\
 } MBEND
 
 #define BUNCHING_TIME	(8 * MILLISECS_IN_SEC)
@@ -524,7 +524,7 @@ static	int update_eof_addr(repl_ctl_element *ctl, int *eof_change)
 	if (is_gdid_gdid_identical(&fc->id, JNL_GDID_PTR(csa)))
 	{
 		new_eof_addr = csa->jnl->jnl_buff->dskaddr;
-		REPL_DPRINT3("Update EOF : New EOF addr from SHM for %s is %u\n", ctl->jnl_fn, new_eof_addr);
+		REPL_DPRINT4("Update EOF : New EOF addr from SHM for %s is %u, was %u\n", ctl->jnl_fn, new_eof_addr, prev_eof_addr);
 	} else
 	{
 		REPL_DPRINT2("Update EOF : New EOF addr will be found from jnl file hdr for %s\n", ctl->jnl_fn);
@@ -1690,7 +1690,7 @@ static	int read_regions(unsigned char **buff, int *buff_avail,
 					{
 						csa = &FILE_INFO(ctl->reg)->s_addrs;
 						freeaddr = csa->jnl->jnl_buff->rsrv_freeaddr;
-						if ((ctl->repl_buff->fc->eof_addr == freeaddr) || (!JNL_ENABLED(csa->hdr)))
+						if ((ctl->max_seqno_eof_addr == freeaddr) || (!JNL_ENABLED(csa->hdr)))
 						{	/* No more pending updates in the journal file. Next update to the
 							 * journal file will take the seqno jctl->jnl_seqno which will be
 							 * greater than read_jnl_seqno
@@ -1923,7 +1923,7 @@ static	int read_regions(unsigned char **buff, int *buff_avail,
 
 int gtmsource_readfiles(unsigned char *buff, int *data_len, int maxbufflen, boolean_t read_multiple)
 {
-	size_t			read_size, read_state, first_tr_len, tot_tr_len, loopcnt;
+	size_t			read_size, first_tr_len, tot_tr_len, loopcnt;
 	unsigned char		*orig_msgp, seq_num_str[32], *seq_num_ptr;  /* INT8_PRINT */
 	jnlpool_ctl_ptr_t	jctl;
 	gtmsource_local_ptr_t	gtmsource_local;
@@ -1931,6 +1931,7 @@ int gtmsource_readfiles(unsigned char *buff, int *data_len, int maxbufflen, bool
 	qw_num			read_addr;
 	gtm_uint64_t		jnlpool_size;
 	boolean_t		file2pool;
+	enum src_read_state	read_state;
 	unsigned int		start_heartbeat;
 	boolean_t		stop_bunching;
 	gtmsource_state_t	gtmsource_state_sav;
@@ -1979,10 +1980,10 @@ int gtmsource_readfiles(unsigned char *buff, int *data_len, int maxbufflen, bool
 			tot_tr_len += read_size;
 			REPL_DPRINT5("File read seqno : %llu Tr len : %d Total tr len : %d Maxbufflen : %d\n", read_jnl_seqno - 1,
 					read_size - REPL_MSG_HDRLEN, tot_tr_len, maxbufflen);
-			if (gtmsource_save_read_jnl_seqno < read_jnl_seqno)
+			if ((gtmsource_save_read_jnl_seqno < read_jnl_seqno) && (JNLPOOL_DATA == gtmsource_local->read_algo))
 			{
 				read_addr += read_size;
-				if (jnlpool_size >= (jctl->rsrv_write_addr - read_addr))
+				if ((read_addr >= jctl->contig_addr) && (jnlpool_size >= (jctl->rsrv_write_addr - read_addr)))
 				{	/* No more overflow, switch to READ_POOL.  To avoid the expense of memory barrier
 					 * in jnlpool_hasnt_overflowed(), we use a possibly stale value of rsrv_write_addr
 					 * to check if we can switch back to pool. The consequence is that we may switch
@@ -2065,7 +2066,7 @@ int gtmsource_readfiles(unsigned char *buff, int *data_len, int maxbufflen, bool
 			maxbufflen = gtmsource_msgbufsiz - REPL_MSG_HDRLEN;
 		}
 	} while (TRUE);
-	if (file2pool && !gtmsource_local->jnlfileonly)
+	if (file2pool && (JNLPOOL_DATA == gtmsource_local->read_algo))
 	{
 		/* Ahead of the transition to pool, force repl_phase2_cleanup() when write_addr is behind read_addr. This
 		 * condition happens frequently with replicating instances and instances with infrequent updates.

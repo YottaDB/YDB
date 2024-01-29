@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-; Copyright (c) 2010-2017 Fidelity National Information		;
+; Copyright (c) 2010-2023 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -433,22 +433,22 @@ pointins:(s,reg)
 gvn2gds(gvn,coll)
 	; return subscript (gds) representation for input "gvn".
 	; checks for GVSUBOFLOW error and if so issues GDE-specific GVSUBOFLOW error
-	n key
-	n savetrap
-	s savetrap=$etrap
-	n $etrap
-	s $etrap="goto gvsuboflowerr"
-	s key=$zcollate(gvn,coll)
+	new key
+	new savetrap
+	set savetrap=$etrap
+	new $etrap
+	set $etrap="goto gvsuboflowerr"
+	set key=$zcollate(gvn,coll)
 	q key
 gvsuboflowerr
-	n len
-	i $zstatus'["GVSUBOFLOW" q  ; dont know how a non-GVSUBOFLOW error occured. let parent frame handle it like any other error
-	s $ecode="",len=$zl(gvn)
-	s $etrap=savetrap
+	new len
+	if ($zstatus'["GVSUBOFLOW")&($zstatus'["DBBADNSUB")&($zstatus'["SUB2LONG") quit
+	set $ecode="",len=$zlength(gvn)
+	set $etrap=savetrap
 	; Do not attempt to print the full "gvn" value as it might exceed the buffer allocated by zmessage.
 	; So print first 100 bytes and last 100 bytes with a "..." in between
 	zm gdeerr("NAMGVSUBOFLOW"):$ze(gvn,2,100):$ze(gvn,len-100,len):coll	; 2 (instead of 1) to skip ^ at start of gvn
-	q
+	quit
 gvn2gdsnotrailingnulls:(gvn,coll)
 	; return subscript (gds) representation for input "gvn". Removes trailing double null-byte
 	n key

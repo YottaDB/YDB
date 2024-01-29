@@ -16,8 +16,10 @@
 #include "gtm_inet.h"
 #include "min_max.h"
 #include "mdef.h"
+#include "mutex.h"
 #include "gt_timer.h"
 #include "gtm_ipv6.h" /* for union gtm_sockaddr_in46 */
+#include "jnlbufs.h"
 #include "sleep.h"
 
 /* Needs mdef.h, gdsfhead.h and its dependencies */
@@ -34,10 +36,18 @@
  */
 #define MERRORS_ARRAY_SZ		(2 * 1024)	/* 2k should be enough for a while */
 
-enum
+enum src_read_state
 {
 	READ_POOL,
-	READ_FILE
+	READ_FILE,
+	READ_BUFF
+};
+
+enum src_read_algo
+{
+	JNLPOOL_DATA,
+	JNLFILE_DATA,
+	JNLBUFF_DATA
 };
 
 enum
@@ -155,6 +165,13 @@ typedef struct jnlpool_ctl_struct_struct
 	 * compiler optimization, forcing fresh load on every access.
 	 */
 	replpool_identifier	jnlpool_id;
+	gtm_uint64_t		contig_addr;		/* Virtual address after which all subsequent records are known to be
+							 * contiguous; after this address each and every sequence number is
+							 * present as a record in the journalpool, without gaps, bracketing
+							 * overflow. Records prior to this adderess may not be present in the
+							 * journalpool and only in the journalfiles, or there can be arbitrary
+							 * skips.
+							 */
 	sm_off_t		critical_off;		/* Offset from the start of this structure to "csa->critical" in jnlpool */
 	sm_off_t		filehdr_off;		/* Offset to "repl_inst_filehdr" section in jnlpool */
 	sm_off_t		srclcl_array_off;	/* Offset to "gtmsrc_lcl_array" section in jnlpool */
@@ -191,6 +208,9 @@ typedef struct jnlpool_ctl_struct_struct
 							 * If no commits are active, "rsrv_write_addr == write_addr". Else
 							 * "rsrv_write_addr > write_addr".
 							 */
+	volatile uint4		write_jnldata;		/* Bitmask: tracks whether source server is active
+							 * and requires jnlrecs-in-jnlpool. False if none do.
+							 */
 	boolean_t		upd_disabled;		/* Identify whether updates are disabled or not  on the secondary */
 	volatile uint4		lastwrite_len;		/* The length of the last transaction written into the journal pool.
 							 * Copied to jnldata_hdr.prev_jnldata_len before writing into the pool.
@@ -226,13 +246,19 @@ typedef struct jnlpool_ctl_struct_struct
 	boolean_t		ftok_counter_halted;
 	uint4			phase2_commit_index1;
 	uint4			phase2_commit_index2;
-	char			filler_16bytealign1[16];
+	uint4 			last_skip_jplwrites;	/* boolean: tracks inverse of what the last process in instance crit saw as
+							 * the write_jnldata; used in mutex salvage recovery functions. This will
+							 * be frequently updated but rarely read; write_jnldata is rarely updated
+							 * but frequently read. For this reason they should be in separate
+							 * cachelines. Only ever read/written in instance crit.
+							 */
 	/************* JPL_TRC_REC RELATED FIELDS -- begin -- ***********/
 #	define TAB_JPL_TRC_REC(A,B)	jpl_trc_rec_t	B;
 #	include "tab_jpl_trc_rec.h"
 #	undef TAB_JPL_TRC_REC
 	/************* JPL_TRC_REC RELATED FIELDS -- end -- ***********/
 	jpl_phase2_in_prog_t	phase2_commit_array[JPL_PHASE2_COMMIT_ARRAY_SIZE];
+	mutex_cln_ctl_struct	mutex_cln_ctl;
 	CACHELINE_PAD(SIZEOF(global_latch_t), 0)	/* start next latch at a different cacheline than previous fields */
 	global_latch_t		phase2_commit_latch;	/* Used by "repl_phase2_complete" to update "phase2_commit_index1" */
 } jnlpool_ctl_struct;
@@ -401,6 +427,7 @@ MBSTART {												\
 	GBLREF	jnl_gbls_t	jgbl;									\
 													\
 	assert(!jgbl.forw_phase_recovery);								\
+	assert(TEMP_JNL_SEQNO == JPL->jnl_seqno);							\
 	TEMP_JNL_SEQNO++;										\
 	JPL->jnl_seqno = TEMP_JNL_SEQNO;								\
 	if (SUPPLEMENTARY)										\
@@ -423,8 +450,7 @@ typedef struct
 						 * sync with the source server specific private global variable "gtmsource_state" */
 	int4			gtmsrc_lcl_array_index;	/* Index of THIS struct in the array of gtmsource_local_struct in jnlpool */
 	int4			repl_zlib_cmp_level;	/* zlib compression level currently used across the replication pipe */
-	unsigned char		filler1_align_8[3];
-	int4			read_state;  	/* From where to read - pool or the file(s)? */
+	enum src_read_state	read_state;  	/* From where to read - pool or the file(s)? */
 	qw_off_t		read; 		/* Offset relative to jnldata_base_off of the next journal record from the pool */
 	repl_conn_info_t	remote_side;	/* Details of the remote side connection */
 	qw_off_t		read_addr; 	/* Virtual address of the next journal record in the merged journal file to read */
@@ -445,6 +471,7 @@ typedef struct
 							 */
 	int4			next_histinfo_num;	/* Index of the histinfo record whose "start_seqno" is "next_histinfo_seqno"
 							 * Initialized when the source server connects to the receiver.*/
+	unsigned char		filler1_align_8[4];
 	seq_num			next_histinfo_seqno;	/* "start_seqno" of the histinfo record that follows the one corresponding
 							 * to the the current "gtmsource_local->read_jnl_seqno". Initialized when
 							 * the source server connects to the receiver.
@@ -478,7 +505,7 @@ typedef struct
 	int4			shutdown_time;		/* Time allowed for shutdown in seconds */
 	char			filter_cmd[MAX_FILTER_CMD_LEN];	/* command to run to invoke the external filter (if needed) */
 	global_latch_t		gtmsource_srv_latch;
-	boolean_t		jnlfileonly;		/* Current source server is only reading from journal files */
+	enum src_read_algo	read_algo;		/* The method of reading records */
 #	ifdef GTM_TLS
 	uint4			next_renegotiate_time;	/* Time (in future) at which the next SSL/TLS renegotiation happens. */
 	int4			num_renegotiations;	/* Number of SSL/TLS renegotiations that happened so far. */
@@ -603,7 +630,7 @@ MBSTART {													\
 	phs2cmt->tot_jrec_len = TN_JRECLEN;									\
 	phs2cmt->prev_jrec_len = JPL->lastwrite_len;								\
 	phs2cmt->write_complete = FALSE;									\
-	JNLPOOL->jrs.start_write_addr = rsrv_write_addr;								\
+	JNLPOOL->jrs.start_write_addr = rsrv_write_addr;							\
 	JNLPOOL->jrs.cur_write_addr = rsrv_write_addr + SIZEOF(jnldata_hdr_struct);				\
 	JNLPOOL->jrs.tot_jrec_len = TN_JRECLEN;									\
 	JNLPOOL->jrs.write_total = SIZEOF(jnldata_hdr_struct);	/* will be incremented as we copy		\
@@ -740,7 +767,7 @@ int		gtmsource_init_heartbeat(void);
 int		gtmsource_process_heartbeat(repl_heartbeat_msg_ptr_t heartbeat_msg);
 int		gtmsource_send_heartbeat(time_t *now);
 int		gtmsource_stop_heartbeat(void);
-void		gtmsource_flush_fh(seq_num resync_seqno);
+void		gtmsource_flush_fh(seq_num resync_seqno, bool get_latch);
 void		gtmsource_reinit_logseqno(void);
 void		gtmsource_rootprimary_init(seq_num start_seqno);
 int		gtmsource_needrestart(void);

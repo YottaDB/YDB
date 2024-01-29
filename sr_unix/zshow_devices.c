@@ -84,7 +84,7 @@ void zshow_devices(zshow_out *output)
 	mval		m;
 	io_desc 	*tiod;
 	d_rm_struct	*rm_ptr;
-	d_tt_struct	*tt_ptr;
+	d_tt_struct	*temp_ptr, *tt_ptr;
 	d_socket_struct *dsocketptr;
 	socket_struct	*socketptr;
 	io_termmask	*mask_out;
@@ -384,7 +384,8 @@ void zshow_devices(zshow_out *output)
 					}
 					if (tt_ptr->mupintr)
 						ZS_STR_OUT(&v, interrupt_text);
-					if (hup_on)
+					temp_ptr = (d_tt_struct *)io_std_device->in->dev_sp;
+					if (hup_on && (tt_ptr->fildes == temp_ptr->fildes))
 						ZS_STR_OUT(&v, hup_text);
 					break;
 				case rm:
@@ -628,6 +629,8 @@ void zshow_devices(zshow_out *output)
 					ZS_ONE_OUT(&v, space_text);
 					if (dsocketptr->mupintr)
 						ZS_STR_OUT(&v, interrupt_text);
+					if (hup_on && (dsocketptr == (d_socket_struct *)io_std_device->in->dev_sp))
+						ZS_STR_OUT(&v, hup_text);
 					output->flush = TRUE;
 					zshow_output(output, 0);
 					for(ii = 0; ii < dsocketptr->n_socket; ii++)

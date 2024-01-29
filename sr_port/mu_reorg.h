@@ -23,8 +23,8 @@
 #endif
 
 /* Following definitions give some default values for reorg */
-#define DATA_FILL_TOLERANCE 5
-#define INDEX_FILL_TOLERANCE 5
+#define DATA_FILL_TOLERANCE 10
+#define INDEX_FILL_TOLERANCE 10
 
 /*********************************************************************
 	block_number is used for swap

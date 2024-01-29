@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2021 Fidelity National Information	*
+ * Copyright (c) 2003-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -70,7 +70,9 @@ void	jnl_file_close(gd_region *reg, boolean_t clean, boolean_t in_jnl_switch)
 	int			rc, save_errno, idx;
 	uint4			jnl_fs_block_size;
 	boolean_t		was_in_jnl_file_autoswitch, write_eof, in_tail;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	csa = &FILE_INFO(reg)->s_addrs;
 	csd = csa->hdr;
 	assert(!clean || csa->now_crit || (csd->clustered && (CCST_CLOSED == csa->nl->ccp_state)));

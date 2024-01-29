@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2020 Fidelity National Information	*
+ * Copyright (c) 2012-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -52,6 +52,30 @@ error_def(ERR_REPLINSTFROZEN);
 error_def(ERR_REPLINSTUNFROZEN);
 error_def(ERR_TEXT);
 
+#define DEFER_FREEZES	0x02
+#define NO_FREEZE_SEEN	0x01
+#define	IGNORE_EXTRINSIC_FREEZES (DEFER_FREEZES | NO_FREEZE_SEEN)
+#define RECOGNIZE_ONE_FREEZE DEFER_FREEZES
+#define RECOGNIZE_FREEZES 0x0
+
+#define START_IGNORE_EXTFREEZES(DFR_FRZ) (DFR_FRZ = IGNORE_EXTRINSIC_FREEZES)
+#define DEFER_FREEZE_OBSERVATION(DFR_FRZ) (DFR_FRZ == IGNORE_EXTRINSIC_FREEZES)
+#define SET_FREEZE_VISIBLE(DFR_FRZ) (DFR_FRZ &= DEFER_FREEZES)
+#define SET_FREEZE_INVISIBLE_IF_DEFERRING(DFR_FRZ) (DFR_FRZ |= ((DFR_FRZ & DEFER_FREEZES) >> 1))
+#define END_IGNORE_EXTFREEZES(DFR_FRZ) (DFR_FRZ = RECOGNIZE_FREEZES)
+
+/* Guarding assignments to TREF(defer_instance_freeze) with these macros allows us to establish the following behavior:
+ * The variable starts as RECOGNIZE_FREEZES (0). At the beginning of the section where we wish to defer freezes, it is
+ * set to IGNORE_EXTRINSIC_FREEZES (3). From that state, it can transition to the state of RECOGNIZE_ONE_FREEZE (2) whenever
+ * it encounters an issue which would cause a freeze. This transition always and only happens in CHECK_IF_FREEZE_ON_ERROR_NEEDED,
+ * and only through SET_FREEZE_VISIBLE. SET_FREEZE_VISIBLE only has an effect if we are in the IGNORE_EXTRINSIC_FREEZES state. Once
+ * the process waits for an unfreeze, it resumes deferring instance freezes (through SET_FREEZE_INVISIBLE_IF_DEFERRING), which
+ * also can only transition the variable from RECOGNIZE_ONE_FREEZE (2) to IGNORE_EXTRINSIC_FREEZES (3), and otherwise has no
+ * effect. This behavior is to ensure that when a process encounters a condition that would cause a freeze it preferentially
+ * recognizes the freeze that is already on and does not attempt to set a second freeze over and above the existing freeze,
+ * but does wait until the first freeze has completed and then resumes its work in the same state as before the condition
+ * which caused the freeze.
+ */
 #define ENABLE_FREEZE_ON_ERROR											\
 {														\
 	if (!IS_GTMSECSHR_IMAGE)					\
@@ -64,15 +88,23 @@ error_def(ERR_TEXT);
 #define CHECK_IF_FREEZE_ON_ERROR_NEEDED(CSA, MSG_ID, FREEZE_NEEDED, FREEZE_MSG_ID, LCL_JNLPOOL)				\
 {															\
 	GBLREF	jnlpool_addrs_ptr_t	jnlpool;									\
+	boolean_t 			inst_not_frozen;								\
 															\
 	if (!FREEZE_NEEDED && CSA && CUSTOM_ERRORS_LOADED_CSA(CSA, LCL_JNLPOOL)						\
 		&& (NULL != is_anticipatory_freeze_needed_fnptr))							\
 	{	/* NOT gtmsecshr */											\
-		if (IS_REPL_INST_UNFROZEN_JPL(LCL_JNLPOOL)								\
+		if (((inst_not_frozen = IS_REPL_INST_UNFROZEN_JPL(LCL_JNLPOOL, RECOGNIZE_FREEZES))			\
+					|| TREF(defer_instance_freeze))							\
 			&& (*is_anticipatory_freeze_needed_fnptr)((sgmnt_addrs *)CSA, MSG_ID))				\
 		{													\
-			FREEZE_NEEDED = TRUE;										\
-			FREEZE_MSG_ID = MSG_ID;										\
+			SET_FREEZE_VISIBLE(TREF(defer_instance_freeze));						\
+			assert((TREF(defer_instance_freeze) == RECOGNIZE_ONE_FREEZE)					\
+					|| (TREF(defer_instance_freeze) == RECOGNIZE_FREEZES));				\
+			if (inst_not_frozen)										\
+			{												\
+				FREEZE_NEEDED = TRUE;									\
+				FREEZE_MSG_ID = MSG_ID;									\
+			}												\
 		}													\
 	}														\
 }
@@ -94,7 +126,7 @@ error_def(ERR_TEXT);
 {															\
 	GBLREF	jnlpool_addrs_ptr_t	jnlpool;									\
 															\
-	if (IS_REPL_INST_FROZEN)											\
+	if (IS_REPL_INST_FROZEN(RECOGNIZE_FREEZES))									\
 	{														\
 		jnlpool->jnlpool_ctl->freeze = 0;									\
 		FREEZE_CLEARED = TRUE;											\
@@ -155,12 +187,12 @@ error_def(ERR_TEXT);
 /* IS_REPL_INST_FROZEN is TRUE if we know that the instance is frozen.
  * IS_REPL_INST_UNFROZEN is TRUE if we know that the instance is not frozen.
  */
-#define IS_REPL_INST_FROZEN			IS_REPL_INST_FROZEN_JPL(jnlpool)
-#define IS_REPL_INST_UNFROZEN			IS_REPL_INST_UNFROZEN_JPL(jnlpool)
-#define IS_REPL_INST_FROZEN_JPL(JNLPOOL)	((NULL != JNLPOOL) && (NULL != JNLPOOL->jnlpool_ctl)				\
-							&& JNLPOOL->jnlpool_ctl->freeze)
-#define IS_REPL_INST_UNFROZEN_JPL(JNLPOOL)	((NULL != JNLPOOL) && (NULL != JNLPOOL->jnlpool_ctl)				\
-							&& !JNLPOOL->jnlpool_ctl->freeze)
+#define IS_REPL_INST_FROZEN(DEFERRING)			IS_REPL_INST_FROZEN_JPL(jnlpool, DEFERRING)
+#define IS_REPL_INST_UNFROZEN(DEFERRING)		IS_REPL_INST_UNFROZEN_JPL(jnlpool, DEFERRING)
+#define IS_REPL_INST_FROZEN_JPL(JNLPOOL, DEFERRING)	(!DEFER_FREEZE_OBSERVATION(DEFERRING) && (NULL != JNLPOOL)		\
+							&& (NULL != JNLPOOL->jnlpool_ctl) && JNLPOOL->jnlpool_ctl->freeze)
+#define IS_REPL_INST_UNFROZEN_JPL(JNLPOOL, DEFERRING)	((NULL != JNLPOOL) && (NULL != JNLPOOL->jnlpool_ctl)			\
+							&& (!JNLPOOL->jnlpool_ctl->freeze || (DEFER_FREEZE_OBSERVATION(DEFERRING))))
 
 #define INST_FROZEN_COMMENT			"PID %d encountered %s; Instance frozen"
 
@@ -204,15 +236,15 @@ void clear_fake_enospc_if_master_dead(void);
  * If it does not, then it assumes the instance is not frozen.
  */
 /* #GTM_THREAD_SAFE : The below macro (WAIT_FOR_REPL_INST_UNFREEZE_SAFE) is thread-safe */
-#define WAIT_FOR_REPL_INST_UNFREEZE_SAFE(CSA)		\
-{							\
-	GBLREF	jnlpool_addrs_ptr_t	jnlpool;	\
-	jnlpool_addrs_ptr_t	local_jnlpool;		\
-							\
-	assert(NULL != CSA);				\
-	local_jnlpool = JNLPOOL_FROM(CSA);		\
-	if (IS_REPL_INST_FROZEN_JPL(local_jnlpool))	\
-		WAIT_FOR_REPL_INST_UNFREEZE(CSA);	\
+#define WAIT_FOR_REPL_INST_UNFREEZE_SAFE(CSA)						\
+{											\
+	GBLREF	jnlpool_addrs_ptr_t	jnlpool;					\
+	jnlpool_addrs_ptr_t	local_jnlpool;						\
+											\
+	assert(NULL != CSA);								\
+	local_jnlpool = JNLPOOL_FROM(CSA);						\
+	if (IS_REPL_INST_FROZEN_JPL(local_jnlpool, TREF(defer_instance_freeze)))	\
+		WAIT_FOR_REPL_INST_UNFREEZE(CSA);					\
 }
 
 /* Below are similar macros like the above but with no CSA to specifically check for */
@@ -225,12 +257,12 @@ void clear_fake_enospc_if_master_dead(void);
 #define	WAIT_FOR_REPL_INST_UNFREEZE_NOCSA_JPL(JPL)					\
 		wait_for_repl_inst_unfreeze_nocsa_jpl(JPL)
 
-#define WAIT_FOR_REPL_INST_UNFREEZE_NOCSA_SAFE		\
-{							\
-	GBLREF	jnlpool_addrs_ptr_t	jnlpool;	\
-							\
-	if (IS_REPL_INST_FROZEN)			\
-		WAIT_FOR_REPL_INST_UNFREEZE_NOCSA;	\
+#define WAIT_FOR_REPL_INST_UNFREEZE_NOCSA_SAFE				\
+{									\
+	GBLREF	jnlpool_addrs_ptr_t	jnlpool;			\
+									\
+	if (IS_REPL_INST_FROZEN(TREF(defer_instance_freeze)))		\
+		WAIT_FOR_REPL_INST_UNFREEZE_NOCSA;			\
 }
 
 /* GTM_DB_FSYNC/GTM_JNL_FSYNC are similar to GTM_FSYNC except that we don't do the fsync
@@ -306,11 +338,21 @@ MBSTART {															\
 			}													\
 		} else if (!IS_DSE_IMAGE /*DSE does not freeze so let it work as normal */					\
 			   && (!CSA->jnlpool || (CSA->jnlpool == jnlpool))							\
-			   && (jnlpool && jnlpool->jnlpool_ctl) && (NULL != ((sgmnt_addrs *)CSA)->nl)				\
-			   && ((sgmnt_addrs *)CSA)->nl->FAKE_WHICH_ENOSPC)							\
+			   && (jnlpool && jnlpool->jnlpool_ctl) && (NULL != ((sgmnt_addrs *)CSA)->nl))				\
 		{														\
-			LCL_STATUS = ENOSPC;											\
-			lseekwrite_target = LSEEKWRITE_TARGET;									\
+			if (((sgmnt_addrs *)CSA)->nl->FAKE_WHICH_ENOSPC)							\
+			{													\
+				LCL_STATUS = ENOSPC;										\
+				lseekwrite_target = LSEEKWRITE_TARGET;								\
+			} else if (gtm_white_box_test_case_enabled && (WBTEST_PHS1_NOSPACE == gtm_white_box_test_case_number))	\
+			{													\
+				if (gtm_wbox_input_test_case_count < gtm_white_box_test_case_count)				\
+				{												\
+					gtm_wbox_input_test_case_count++;							\
+					LCL_STATUS = ENOSPC;									\
+					lseekwrite_target = LSEEKWRITE_TARGET;							\
+				}												\
+			}													\
 		}														\
 	}															\
 } MBEND
@@ -469,8 +511,12 @@ static inline void wait_for_repl_inst_unfreeze_nocsa_jpl(jnlpool_addrs_ptr_t jpl
 {
 	GBLREF	int4			exit_state;
 	GBLREF	int4			exi_condition;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	assert((NULL != jpl) && (NULL != jpl->jnlpool_ctl));
+	assert((TREF(defer_instance_freeze) == RECOGNIZE_FREEZES)
+			|| (TREF(defer_instance_freeze) == RECOGNIZE_ONE_FREEZE));
 	/* If this region is not replicated, do not care for instance freezes */
 	while (jpl->jnlpool_ctl->freeze)
 	{
@@ -482,6 +528,7 @@ static inline void wait_for_repl_inst_unfreeze_nocsa_jpl(jnlpool_addrs_ptr_t jpl
 		SHORT_SLEEP(SLEEP_INSTFREEZEWAIT);
 		DEBUG_ONLY(CLEAR_FAKE_ENOSPC_IF_MASTER_DEAD);
 	}
+	SET_FREEZE_INVISIBLE_IF_DEFERRING(TREF(defer_instance_freeze));
 }
 
 static inline void wait_for_repl_inst_unfreeze(sgmnt_addrs *csa)
@@ -489,19 +536,10 @@ static inline void wait_for_repl_inst_unfreeze(sgmnt_addrs *csa)
 	gd_region		*reg;
 	jnlpool_addrs_ptr_t	local_jnlpool;	/* needed by INSTANCE_FREEZE_HONORED */
 	char			time_str[CTIME_BEFORE_NL + 2]; /* for GET_CUR_TIME macro */
-	DCL_THREADGBL_ACCESS;
 
-	SETUP_THREADGBL_ACCESS;
 	assert(NULL != csa);
 	if (INSTANCE_FREEZE_HONORED(csa, local_jnlpool))
 	{
-#ifdef underconstruction
-		if (TREF(in_mupip_integ) && !TREF(integ_cannotskip_crit))
-		{
-			TREF(instance_frozen_crit_skipped) = TRUE;
-			return;		/* MUPIP INTEG. Don't wait any further for the freeze to be lifted. */
-		}
-#endif
 		reg = csa->region;
 		if (!IS_GTM_IMAGE)
 		{

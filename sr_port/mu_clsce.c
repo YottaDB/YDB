@@ -88,7 +88,7 @@ Returns:
 	cdb_sc_normal on success
 	Other wise error status
  *************************************************************************************************/
-enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_set_ptr, int *pending_levels)
+enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_set_ptr, int *pending_levels, const int min_level)
 {
 	boolean_t	old_ref_star_only = FALSE,
 			new_rtsib_star_only = FALSE,
@@ -123,7 +123,7 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 			newblk1_last_keylen,
 			newblk2_first_keylen;
 	int		rec_size, piece_len = -1, tkeylen, old_levelp_rec_offset;
-	int		blk_seg_cnt, blk_size;
+	int		blk_seg_cnt, blk_size, exp_level = level;
 	enum cdb_sc	status;
 	sm_uc_ptr_t	oldblk1_last_key, old_levelp_cur_next_key = NULL,
 			newblk1_last_key, newblk2_first_key = NULL, new_blk2_ances_first_key = NULL; /* shared memory keys */
@@ -190,12 +190,13 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 	else
 	{
 		if (cdb_sc_normal != (status = gvcst_expand_any_key(old_levelp_blk_stat, rec_base,
-			&old_levelp_cur_prev_key[0], &rec_size, &tkeylen, &tkeycmpc, NULL)))
+			&old_levelp_cur_prev_key[0], &rec_size, &tkeylen, &tkeycmpc, NULL, &exp_level)))
 		{
 			assert(t_tries < CDB_STAGNATE);
 			NONTP_TRACE_HIST_MOD(old_levelp_blk_stat, t_blkmod_mu_clsce);
 			return cdb_sc_blkmod;
 		}
+		assert((levelp == exp_level) || (t_tries < CDB_STAGNATE));
 		old_levelp_cur_prev_keysz = tkeylen + tkeycmpc;
 	}
 
@@ -252,12 +253,13 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 	if (0 == level) /* data block */
 	{
 		if (cdb_sc_normal != (status = gvcst_expand_any_key(old_blk1_stat, old_blk1_base + old_blk1_sz,
-			oldblk1_last_key, &rec_size, &oldblk1_last_keylen, &oldblk1_last_cmpc, NULL)))
+			oldblk1_last_key, &rec_size, &oldblk1_last_keylen, &oldblk1_last_cmpc, NULL, &exp_level)))
 		{
 			assert(t_tries < CDB_STAGNATE);
 			NONTP_TRACE_HIST_MOD(old_blk1_stat, t_blkmod_mu_clsce);
 			return cdb_sc_blkmod;
 		}
+		assert((0 == exp_level) || (t_tries < CDB_STAGNATE));
 		rec_base = old_blk1_base + old_blk1_sz;
 		old_last_rec_hdr1 = NULL;
 	} else  /* Index blocks */
@@ -271,12 +273,13 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 		{
 			if (cdb_sc_normal != (status = gvcst_expand_any_key(old_blk1_stat,
 				old_blk1_base + old_blk1_sz - bstar_rec_sz, &oldblk1_prev_key[0],
-				&rec_size, &tkeylen, &tkeycmpc, NULL)))
+				&rec_size, &tkeylen, &tkeycmpc, NULL, &exp_level)))
 			{
 				assert(t_tries < CDB_STAGNATE);
 				NONTP_TRACE_HIST_MOD(old_blk1_stat, t_blkmod_mu_clsce);
 				return cdb_sc_blkmod;
 			}
+			assert((level == exp_level) || (t_tries < CDB_STAGNATE));
 			GET_CMPC(oldblk1_last_cmpc, oldblk1_prev_key, old_levelp_cur_key);
 			oldblk1_last_keylen = old_levelp_cur_keysz - oldblk1_last_cmpc;
 		}
@@ -836,12 +839,23 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 	if (*pending_levels < lcl_pending_levels)
 		*pending_levels = lcl_pending_levels;
 	/* prepare next gv_currkey for reorg */
-	if (0 == level && !lcl_pending_levels)
+	if ((min_level == level) && !lcl_pending_levels)
 	{
-		assert(newblk2_first_key);
-		assert(newblk2_first_keysz);
-		memcpy(&gv_currkey_next_reorg->base[0], newblk2_first_key, newblk2_first_keysz);
-		gv_currkey_next_reorg->end = newblk2_first_keysz - 1;
+		if (new_rtsib_star_only)
+		{	/* Need to maintain variant that any successful coalesce sets up gv_currkey_next_reorg. Can't do that
+			 * if we've only got a star key, so instead force a go-around after t_end so we get into gvcst_rtsib and
+			 * populate the buffer explicitly.
+			 */
+			assert((t_tries < CDB_STAGNATE) || level);
+			if (!(*pending_levels))
+				*pending_levels = 1;
+		} else
+		{
+			assert(newblk2_first_key);
+			assert((newblk2_first_keysz) && (newblk2_first_keysz <= MAX_KEY_SZ));
+			memcpy(&gv_currkey_next_reorg->base[0], newblk2_first_key, newblk2_first_keysz);
+			gv_currkey_next_reorg->end = newblk2_first_keysz - 1;
+		}
 	}
 	return cdb_sc_normal;
 } /* end of the program */

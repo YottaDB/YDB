@@ -43,7 +43,9 @@ GBLREF gv_namehead	*gv_target;
 GBLREF gv_namehead	*reset_gv_target;
 
 error_def(ERR_COLLATIONUNDEF);
+error_def(ERR_DBBADNSUB);
 error_def(ERR_NOCANONICNAME);
+error_def(ERR_SUB2LONG);
 
 STATICDEF boolean_t	save_transform;
 STATICDEF gd_region	*save_gv_cur_region;
@@ -66,7 +68,7 @@ CONDITION_HANDLER(gvn2gds_ch)
 
 #define MAX_LEN_FOR_CHAR_FUNC 6
 
-boolean_t convert_key_to_db(mval *gvn, int start, int stop, gv_key *gvkey, unsigned char **key);
+void convert_key_to_db(mval *gvn, int start, int stop, gv_key *gvkey, unsigned char **key);
 
 /*
  * -----------------------------------------------
@@ -83,13 +85,12 @@ boolean_t convert_key_to_db(mval *gvn, int start, int stop, gv_key *gvkey, unsig
  */
 unsigned char *gvn2gds(mval *gvn, gv_key *gvkey, int act)
 {
-	boolean_t	est_first_pass, retn;
-	collseq 	*csp;
-	gd_region	tmpreg;
-	gv_namehead	temp_gv_target;
-	unsigned char 	*key, *key_top, *key_start;
-	int		subscript, i, contains_env;
-	int		*start, *stop;
+	boolean_t		est_first_pass;
+	collseq 		*csp;
+	gd_region		tmpreg;
+	gv_namehead		temp_gv_target;
+	unsigned char 		*key, *key_start, *key_top;
+	int			contains_env, i, max_len, *start, *stop, subscript, tmp_len;
 	gv_name_and_subscripts 	start_buff, stop_buff;
 	DCL_THREADGBL_ACCESS;
 
@@ -103,7 +104,6 @@ unsigned char *gvn2gds(mval *gvn, gv_key *gvkey, int act)
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_COLLATIONUNDEF, 1, act);
 	} else
 		csp = NULL;	/* Do not issue COLLATIONUNDEF for 0 collation */
-	retn = TRUE;
 	assert(MV_IS_STRING(gvn));
 	key_start = &gvkey->base[0];
 	key = key_start;
@@ -113,9 +113,14 @@ unsigned char *gvn2gds(mval *gvn, gv_key *gvkey, int act)
 	/* We will parse all of the components up front. */
 	if (!parse_gv_name_and_subscripts(gvn, &subscript, start, stop, &contains_env))
 		NOCANONICNAME_ERROR(gvn);
-	if (stop[contains_env] - start[contains_env] > gvkey->top)
-		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_GVSUBOFLOW);
- 	memcpy(key, gvn->str.addr + start[contains_env], stop[contains_env] - start[contains_env]);
+	if ((tmp_len = (stop[contains_env] - start[contains_env])) > (max_len = gvkey->top))
+	{
+		if (NULL != gv_cur_region)
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_GVSUBOFLOW, 4, tmp_len, max_len, REG_LEN_STR(gv_cur_region));
+		else
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_GVSUBOFLOW, 2, tmp_len, max_len, ERR_DBNOREGION, 0);
+	}
+	memcpy(key, gvn->str.addr + start[contains_env], stop[contains_env] - start[contains_env]);
 	key += stop[contains_env] - start[contains_env];
 	*key++ = KEY_DELIMITER;
 	gvkey->end = key - key_start;
@@ -142,14 +147,12 @@ unsigned char *gvn2gds(mval *gvn, gv_key *gvkey, int act)
 	ESTABLISH_NORET(gvn2gds_ch, est_first_pass);
 	/* we know the number of subscripts, so we convert them all */
 	for (i = 1 + contains_env; i <= contains_env + subscript; ++i)
-	{
-		if (!(retn = convert_key_to_db(gvn, start[i], stop[i], gvkey, &key)))
-			break;
-	}
+		convert_key_to_db(gvn, start[i], stop[i], gvkey, &key);
 	REVERT;
 	RESTORE_GBL_VARS_BEFORE_FUN_RETURN;
-	if (!retn || !CAN_APPEND_HIDDEN_SUBS(gvkey))
-		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_GVSUBOFLOW);
+	if (!CAN_APPEND_HIDDEN_SUBS(gvkey))
+		/* (KEY)->end + 5 <= MAX_KEY_SZ && (KEY)->end + 5 <= (KEY)->top */
+		ISSUE_GVSUBOFLOW_ERROR(gvkey, KEY_COMPLETE_TRUE, (gvkey->end + 5 + 1), MIN(MAX_KEY_SZ, gvkey->top), gv_cur_region);
 	*key++ = KEY_DELIMITER;	/* add double terminating null byte */
 	assert(key <= key_top);
 	return key;
@@ -158,7 +161,7 @@ unsigned char *gvn2gds(mval *gvn, gv_key *gvkey, int act)
 /* given the bounds of a particular subscript (assumed correct), we convert the subscript into
  * a form that mimics the GDS representation of that subscript
  */
-boolean_t convert_key_to_db(mval *gvn, int start, int stop, gv_key *gvkey, unsigned char **key)
+void convert_key_to_db(mval *gvn, int start, int stop, gv_key *gvkey, unsigned char **key)
 {
 	mval 		tmpval, *mvptr, dollarcharmval;
 	int 		isrc;
@@ -178,7 +181,7 @@ boolean_t convert_key_to_db(mval *gvn, int start, int stop, gv_key *gvkey, unsig
 		mvptr = &tmpval;
 		MV_FORCE_NUM(mvptr);
 		if (MVTYPE_IS_NUM_APPROX(tmpval.mvtype))
-			return FALSE;
+			RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(4) ERR_DBBADNSUB, 2, gvn->str.len, gvn->str.addr);
 		mval2subsc(&tmpval, gvkey, gv_cur_region->std_null_coll);
 	} else
 	{	/* It's a string. We need to accept strings, $CHAR args, and $ZCHAR args. */
@@ -227,7 +230,7 @@ boolean_t convert_key_to_db(mval *gvn, int start, int stop, gv_key *gvkey, unsig
 					{
 						if (str + dollarcharmval.str.len > str_top)
 							/* String overflows capacity. */
-							return FALSE;
+							RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(1) ERR_SUB2LONG);
 						memcpy(str, dollarcharmval.str.addr, dollarcharmval.str.len);
 						str += dollarcharmval.str.len;
 					}
@@ -250,7 +253,7 @@ boolean_t convert_key_to_db(mval *gvn, int start, int stop, gv_key *gvkey, unsig
 				{
 					if (str == str_top)
 						/* String overflows capacity. */
-						return FALSE;
+						RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(1) ERR_SUB2LONG);
 					if ('"' == gvn->str.addr[isrc] && '"' == gvn->str.addr[isrc+1])
 					{
 						*str++ = '"';
@@ -270,7 +273,6 @@ boolean_t convert_key_to_db(mval *gvn, int start, int stop, gv_key *gvkey, unsig
 	}
 	assert(gvkey->end < gvkey->top); /* else GVSUBOFLOW error would have been issued */
 	*key = &gvkey->base[gvkey->end];
-	return TRUE;
 }
 
 /*
@@ -292,7 +294,6 @@ unsigned char *gds2gvn(mval *gds, unsigned char *buff, int col)
 	unsigned char 	*key;
 	gv_key_buf	save_currkey;
 	gv_key 		*gvkey;
-	gd_region	tmpreg, *save_gv_cur_region;
 	gv_namehead	temp_gv_target;
 	boolean_t	est_first_pass;
 	DCL_THREADGBL_ACCESS;

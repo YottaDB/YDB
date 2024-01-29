@@ -720,8 +720,8 @@ enum cdb_sc upgrade_idx_block(block_id *curr_blk, gd_region *reg, mname_entry *g
 	cache_rec_ptr_t	child_cr;
 	enum db_ver	blk_ver;
 	gvnh_reg_t	*gvnh_reg = NULL;
-	int		blk_seg_cnt, i, key_cmpc, key_len, level, max_fill, new_blk_sz, num_recs, rec_sz, space_need,
-			split_blks_added, split_levels_added, v7_rec_sz, max_rightblk_lvl;
+	int		blk_seg_cnt, i, key_cmpc, key_len, level, max_fill, max_key, max_rightblk_lvl, new_blk_sz, num_recs, rec_sz,
+			space_need, split_blks_added, split_levels_added, tmp_len, v7_rec_sz;
 	int4		blk_size, child_data_blks, status;
 	mname_entry	gvt_name;
 	sgmnt_addrs	*csa;
@@ -837,7 +837,9 @@ enum cdb_sc upgrade_idx_block(block_id *curr_blk, gd_region *reg, mname_entry *g
 				* the upgrade because it cannot handle this situation.
 				*/
 				t_abort(gv_cur_region, csa);					/* do crit and other cleanup */
-				ISSUE_GVSUBOFLOW_ERROR(gv_currkey, KEY_COMPLETE_TRUE);
+				tmp_len = gv_currkey->end;
+				max_key = (NULL != gv_cur_region) ? gv_cur_region->max_key_size : 0 ;
+				ISSUE_GVSUBOFLOW_ERROR(gv_currkey, KEY_COMPLETE_TRUE, tmp_len, max_key, gv_cur_region);
 			}
 			max_fill = (new_blk_sz >> 1);
 			if (debug_mupip)

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -44,7 +45,7 @@ typedef struct cm_lckblkreg_struct
 	struct cm_region_head_struct	*region;
 	struct cm_lckblkreg_struct	*next;
 	cm_lckblklck_ptr_t		lock;
-	uint4				pass;
+	uint4				tries_left;
 } cm_lckblkreg;
 
 typedef cm_lckblkreg *cm_lckblkreg_ptr_t;

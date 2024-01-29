@@ -181,7 +181,9 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 	uint4			temp_offset, temp_checksum, pfin_offset, eof_offset;
 	uint4			jnl_fs_block_size;
 	sgmnt_addrs		*csa;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	jrecbuf = NULL;
 	csa = info->csa;
 	if (info->no_rename)

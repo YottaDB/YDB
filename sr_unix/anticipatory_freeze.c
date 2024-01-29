@@ -174,7 +174,7 @@ boolean_t	is_anticipatory_freeze_needed(sgmnt_addrs *csa, int msg_id)
 	 *					(due to possible deadlock)
 	 * 2. DSKSPCAVAILABLE : To ensure we don't set anticipatory freeze if the disk space becomes available after an initial
 	 *			lack of space.
-	 * These messages have csa == NULL so they are guarranteed to not trigger a freeze.
+	 * These messages have csa == NULL so they are guaranteed to not trigger a freeze.
 	 * However, ENOSPCQIODEFER is returned and later passed to rts_error with a non-NULL csa, so return FALSE in that case.
 	 */
 

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -51,7 +51,9 @@ boolean_t file_head_write(char *fn, sgmnt_data_ptr_t header, int4 len)
 {
 	int		save_errno, fd;
 	ZOS_ONLY(int	realfiletag;)
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	assert(SGMNT_HDR_LEN == len || SIZEOF_FILE_HDR(header) == len);
 	OPENFILE(fn, O_RDWR, fd); /* udi not available so OPENFILE_DB not used */
 	if (FD_INVALID == fd)

@@ -16,12 +16,13 @@
 #ifndef GTM_TLS_INTERFACE_DEFINITIONS_INCLUDED
 #define GTM_TLS_INTERFACE_DEFINITIONS_INCLUDED
 
-#define GTM_TLS_API_VERSION		0x00000007
+#define GTM_TLS_API_VERSION		0x00000008
 #define GTM_TLS_API_VERSION_SOCK	0x00000002	/* when TLS sockets added */
 #define GTM_TLS_API_VERSION_RENEGOPT	0x00000004	/* WRITE /TLS renegotiate with options */
 #define GTM_TLS_API_VERSION_NONBLOCK	0x00000005	/* WRITE /BLOCK("OFF") */
 #define GTM_TLS_API_VERSION_GET_ERROR	0x00000006	/* gtm_tls_get_error() socket ptr for errbuf */
 #define GTM_TLS_API_VERSION_EXTCALLS	0x00000007	/* External call functions for ciphers and versions */
+#define GTM_TLS_API_VERSION_PHAREPL	0x00000008	/* Force peer verify; Adds PHA functions for replication */
 
 #define MAX_X509_LEN			256
 #define MAX_ALGORITHM_LEN		64
@@ -60,8 +61,8 @@
 #define GTMTLS_OP_ENABLE_COMPRESSION	0x00000002
 /* Socket created for a client-mode operation. */
 #define GTMTLS_OP_CLIENT_MODE		0x00000004
-/* Peer verification is needed. */
-#define GTMTLS_OP_VERIFY_PEER		0x00000008
+/* Enforce peer verification, including ceritifcates */
+#define GTMTLS_OP_FORCE_VERIFY_PEER		0x00000008
 /* Socket device */
 #define GTMTLS_OP_SOCKET_DEV		0x00000010
 /* Socket (client) created for direct mode auditing (APD). Temporarily defined with GTMTLS_OP_SOCKET_DEV's value */
@@ -94,6 +95,12 @@
 #define GTMTLS_OP_NOSHUTDOWN		0x00040000
 /* NON BLOCKing WRITE so set SSL_MODE_ENABLE_PARTIAL_WRITE	*/
 #define GTMTLS_OP_NONBLOCK_WRITE	0x00080000
+/* Using PHA if client does not send the extension, fallback once to not require PHA */
+#define GTMTLS_OP_PHA_EXT_FALLBACK	0x00100000
+/* Using PHA but client does not send the extension */
+#define GTMTLS_OP_PHA_EXT_NOT_RECEIVED	0x00200000
+/* Plaintext fallback */
+#define GTMTLS_OP_PLAINTEXT_FALLBACK	0x00400000
 
 #define GTMTLS_IS_FIPS_MODE(CTX)	(TRUE == CTX->fips_mode)
 #define GTMTLS_RUNTIME_LIB_VERSION(CTX)	(CTX->runtime_version)
@@ -272,6 +279,16 @@ extern int		gtm_tls_connect(gtm_tls_socket_t *socket);
  */
 extern int		gtm_tls_accept(gtm_tls_socket_t *socket);
 
+/* Tells the caller if post handshake authentication is complete to check the peer certificate
+ *
+ * Arguments:
+ *    `socket' : The SSL/TLS socket (initialized using `gtm_tls_socket').
+ *
+ * Returns FALSE if PHA is not enabled and TRUE if it is
+ *
+ */
+extern int		gtm_tls_did_post_hand_shake(gtm_tls_socket_t *socket);
+
 /* Attempts to perform peer verification after the handshake completes with Post Handshake Authentication.
  *
  * Arguments:
@@ -283,6 +300,16 @@ extern int		gtm_tls_accept(gtm_tls_socket_t *socket);
  */
 extern int		gtm_tls_do_post_hand_shake(gtm_tls_socket_t *socket);
 
+/* Tells the caller if post handshake authentication is enabled
+ *
+ * Arguments:
+ *    `socket' : The SSL/TLS socket (initialized using `gtm_tls_socket').
+ *
+ * Returns FALSE if PHA is not enabled and TRUE if it is
+ *
+ */
+extern int		gtm_tls_has_post_hand_shake(gtm_tls_socket_t *socket);
+
 /* Repeat the handshake for PHA
  *
  * Arguments:
@@ -293,6 +320,15 @@ extern int		gtm_tls_do_post_hand_shake(gtm_tls_socket_t *socket);
  *
  */
 extern int		gtm_tls_repeat_hand_shake(gtm_tls_socket_t *socket);
+
+/* Denotes whether or not renegotiation is supported
+ *
+ * Arguments:
+ *    `socket'   : The SSL/TLS socket (initialized using `gtm_tls_socket').
+ *
+ * Return value: 0 unsupported, 1 supported
+ */
+extern int		gtm_tls_does_renegotiate(gtm_tls_socket_t *socket);
 
 /* Renegotiates an active SSL/TLS connection. Note: This function does the renegotiation in a blocking fashion and more importantly
  * handles EINTR internally by retrying the renegotiation.

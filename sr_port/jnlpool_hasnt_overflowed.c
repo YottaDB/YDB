@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2020 Fidelity National Information	*
+ * Copyright (c) 2003-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -38,5 +38,6 @@ boolean_t jnlpool_hasnt_overflowed(jnlpool_ctl_ptr_t jctl, gtm_uint64_t jnlpool_
 	 *
 	 */
 	SHM_READ_MEMORY_BARRIER; /* to fetch the latest rsrv_write_addr */
-	return (jnlpool_size >= (jctl->rsrv_write_addr - read_addr));
+	assert(jctl->rsrv_write_addr >= read_addr);
+	return ((read_addr >= jctl->contig_addr) && (jnlpool_size >= (jctl->rsrv_write_addr - read_addr)));
 }

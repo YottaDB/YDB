@@ -11,17 +11,33 @@
 #								#
 #################################################################
 
-# Check installing as root
-
+# This tool should be run (as root)
+#  * In M mode to install gtmpcat related files in regular GT.M installation location and
+#  * In UTF-8 mode to install gtmpcat related files in utf8 installation location
+#
+# Prerequisite if running with UTF-8 mode :
+#  * gtm_chset=UTF-8
+#  * gtm_icu_version set to a valid value
+#  * LC_CTYPE set to a valid UTF8 locale
+#
+# The values can be obtained from GT.M startup environment script
+# The commands to obtain the values can be obtained from configure (GTM installation) script.
+# e.g
+# gtm_icu_version : pkg-config --modversion icu-io (or) icu-config --version (or) pkg-config --modversion icu
+# LC_CTYPE : locale -a | grep -iE 'en_us\.utf.?8$' | head -n1
+#
+# If $gtm_dist points to */utf8 directory but a proper UTF-8 environment is not set, this script tries to set it up.
+#
 uid=`id -u`
+hostos=`uname -s`
 
+# Check installing as root
 if [ "$uid" -ne 0 ]; then
 	echo "$0 must be run as root"
 	exit 1
 fi
 
 # Check valid package
-
 package_dir=`dirname $0`
 if [ "$package_dir" = "" ]; then
 	package_dir="."
@@ -33,7 +49,6 @@ if [ ! -f "${package_dir}/gtmpcat.m" ]; then
 fi
 
 # Check valid $gtm_dist
-
 if [ ! -d "$gtm_dist" ]; then
 	echo "gtm_dist ($gtm_dist) is not a valid directory"
 	exit 1
@@ -46,12 +61,58 @@ fi
 gtmroutines=". $gtm_dist"
 export gtmroutines
 
-# Note owner and group of mumps executable for later use as the owner and group of the installed files
-
-eval $(/bin/ls -l $gtm_dist/mumps | awk 'NR == 1 { print "owner=" $3, "group=" $4 }')
+isutfdir=$(ls -ld $gtm_dist | awk -F/ '{print $NF}')
+if [ "utf8" == "$isutfdir" ] ; then
+	# If $gtm_dist directory ends with "utf8", let us assume it points to UTF-8 installation path
+	if [ "UTF-8" != "$gtm_chset" ] ; then
+		echo ""
+		echo "gtm_dist ($gtm_dist) points to utf8 directory, but gtm_chset is not UTF-8. Setting gtm_chset=UTF-8"
+		export gtm_chset=UTF-8
+	fi
+	if [ "" == "$gtm_icu_version" ] && [ "Linux" == "$hostos" ] ; then
+		echo ""
+		echo "gtm_icu_version is not defined. Will try to set it to a valid value"
+		if [ -x "$(command -v pkg-config)" -a $(pkg-config --exists icu-io; echo $?) -eq 0 ]; then
+			versioncmd="pkg-config --modversion icu-io"
+			libcmd="pkg-config --variable=libdir icu-io"
+		elif [ -x "$(command -v icu-config)" ] ; then
+			versioncmd="icu-config --version"
+			libcmd="icu-config --libdir"
+		elif [ -x "$(command -v pkg-config)" -a $(pkg-config --exists icu; echo $?) -eq 0 ]; then
+			versioncmd="pkg-config --modversion icu"
+			libcmd="pkg-config --variable=libdir icu"
+		fi
+		if [ -n "$versioncmd" ]; then
+			export gtm_icu_version=`$versioncmd | awk '{ver=+$0;if(ver>5){ver=ver/10}printf("%.1f\n",ver);exit}'`
+			extendlibpath=`$libcmd`
+		fi
+		if [ "" != "$gtm_icu_version" ] ; then
+			echo "gtm_icu_version is set to : $gtm_icu_version"
+		else
+			echo "Unable to automatically figure out ICU version. Will exit installation now"
+			exit 1
+		fi
+	fi
+	isutflocale=`echo $LC_CTYPE | grep -iE 'en_us\.utf.?8$'`
+	if [ "" == "$isutflocale" ] ; then
+		if [ "Linux" == "$hostos" ] ; then
+			binaryopt="-a"
+		else
+			binaryopt=""
+		fi
+		utflocale=`locale -a | grep $binaryopt -iE '\.utf.?8$' | head -n1`
+		export LC_CTYPE=$utflocale
+		unset LC_ALL
+	fi
+	usemumps=$gtm_dist/../mumps
+else
+	usemumps=$gtm_dist/mumps
+fi
+# Note ownership and permissions of mumps executable, to set ownership and permissions of the installed gtmpcat files
+eval $(/bin/ls -l $usemumps | awk 'NR==1 {for (x=2; x<=8; x=x+3 ) {ar[x]=substr($1,x,3); gsub("-","",ar[x]) } \
+					print "userp="ar[2]" groupp="ar[5]" otherp="ar[8]" owner="$3" group="$4 }')
 
 # Check matching version
-
 req_zver="#ZVERSION#"
 cur_zver="$($gtm_dist/mumps -r %XCMD 'write $zversion')"
 
@@ -61,7 +122,6 @@ if [ "$req_zver" != "$cur_zver" -a "$req_zver" != "ANY" ]; then
 fi
 
 # Confirm installation
-
 echo ""
 echo "Installing gtmpcat files to $gtm_dist/tools/gtmpcat"
 echo ""
@@ -73,7 +133,6 @@ if [ "Y" != "$response" -a "YES" != "$response" ] ; then
 fi
 
 # Do the copy
-
 if [ ! -d "$gtm_dist/tools" ]; then
 	mkdir $gtm_dist/tools
 	chown ${owner}:${group} $gtm_dist/tools
@@ -83,6 +142,7 @@ cp ${package_dir}/gtmpcat.m ${package_dir}/#FLDBLD# $gtm_dist/tools/gtmpcat
 cp ${package_dir}/gtmpcat.sh $gtm_dist/gtmpcat
 (cd $gtm_dist/tools/gtmpcat && gtmroutines="." $gtm_dist/mumps *.m)
 chown -R ${owner}:${group} $gtm_dist/gtmpcat $gtm_dist/tools/gtmpcat
+chmod u=${userp},g=${groupp},o=${otherp} $gtm_dist/gtmpcat $gtm_dist/tools $gtm_dist/tools/gtmpcat $gtm_dist/tools/gtmpcat/*.o
 ls -ald $gtm_dist/gtmpcat $gtm_dist/tools $gtm_dist/tools/gtmpcat $gtm_dist/tools/gtmpcat/*
 echo ""
 echo "Done. Please check the permissions on the listed files and directories and change them as appropriate."

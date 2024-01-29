@@ -40,6 +40,7 @@
 #include "repl_sem.h"
 #include "ftok_sems.h"
 #include "gtm_sem.h"
+#include "gtmsource_srv_latch.h"
 
 GBLREF	jnlpool_addrs_ptr_t	jnlpool;		/* Used to access the gtmsource_local structures (slots) */
 GBLREF	boolean_t		in_repl_inst_edit;	/* used by an assert in repl_inst_read/repl_inst_write */
@@ -233,6 +234,10 @@ void	repl_inst_edit(void)
 			 * can release the ftok and then do grab_lock.
 			 */
 			ftok_sem_release(jnlpool->jnlpool_dummy_reg, udi->counter_ftok_incremented, FALSE);
+			gtmsourcelocal_ptr = &jnlpool->gtmsource_local_array[0];
+			for (idx = 0; idx < NUM_GTMSRC_LCL; idx++, gtmsourcelocal_ptr++)
+				grab_gtmsource_srv_latch(&gtmsourcelocal_ptr->gtmsource_srv_latch, UINT32_MAX,
+						ASSERT_NO_ONLINE_ROLLBACK);
 			grab_lock(jnlpool->jnlpool_dummy_reg, TRUE, ASSERT_NO_ONLINE_ROLLBACK);
 		}
 	}
@@ -318,6 +323,7 @@ void	repl_inst_edit(void)
 					gtmsourcelocal_ptr->gtmsource_state = GTMSOURCE_DUMMY_STATE;
 					gtmsourcelocal_ptr->read_jnl_seqno = 0;
 					gtmsourcelocal_ptr->connect_jnl_seqno = 0;
+					UNSET_SRC_NEEDS_JPLWRITES(jnlpool,gtmsourcelocal_ptr);
 					gtmsourcelocal_ptr->gtmsource_pid = 0;
 					/* Clean the corresponding gtmsrc_lcl structure */
 					COPY_GTMSOURCELOCAL_TO_GTMSRCLCL(gtmsourcelocal_ptr, gtmsrclcl_ptr);
@@ -369,6 +375,9 @@ void	repl_inst_edit(void)
 			assert(udi->grabbed_access_sem);
 			/* Release the lock and journal pool access semaphore */
 			rel_lock(jnlpool->jnlpool_dummy_reg);
+			gtmsourcelocal_ptr = &jnlpool->gtmsource_local_array[0];
+			for (idx = 0; idx < NUM_GTMSRC_LCL; idx++, gtmsourcelocal_ptr++)
+				rel_gtmsource_srv_latch(&gtmsourcelocal_ptr->gtmsource_srv_latch);
 			rel_sem_immediate(SOURCE, JNL_POOL_ACCESS_SEM);
 			udi->grabbed_access_sem = FALSE;
 			udi->counter_acc_incremented = FALSE;
