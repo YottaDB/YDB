@@ -164,6 +164,7 @@ void db_auto_upgrade(gd_region *reg)
 				/* GT.M V7.1-002 implemented index reserved bytes and changed default to zero */
 				csd->i_reserved_bytes = 0;
 			case GDSMV71002:
+<<<<<<< HEAD
 				if (GDSMR200_V70000 != csd->minor_dbver)
 				{
 					/* Do YottaDB r2.00 related auto upgrade operations.
@@ -451,6 +452,18 @@ void db_auto_upgrade(gd_region *reg)
 			case GDSMVFILLER253:
 			case GDSMVFILLER254:
 			case GDSMVFILLER255:
+||||||| parent of 19e495f7cb (GT.M V7.1-003)
+				assert(FALSE);
+				break;
+=======
+				/* GT.M V7.1-003 changed freeze on fail default for statsDBs to FALSE */
+				if (IS_STATSDB_REGNAME(reg))
+					csd->freeze_on_fail = FALSE;
+				break;
+			case GDSMV71003:
+				assert(FALSE);
+				break;
+>>>>>>> 19e495f7cb (GT.M V7.1-003)
 			default:
 				/* Unrecognized version in the header */
 				assertpro(FALSE && csd->minor_dbver);
@@ -718,6 +731,7 @@ void v6_db_auto_upgrade(gd_region *reg)
 				csd->max_update_array_size = csd->max_non_bm_update_array_size
 					= (int4)(ROUND_UP2(MAX_NON_BITMAP_UPDATE_ARRAY_SIZE(csd), UPDATE_ARRAY_ALIGN_SIZE));
 				csd->max_update_array_size
+<<<<<<< HEAD
 					+= (int4)(ROUND_UP2(MAX_BITMAP_UPDATE_ARRAY_SIZE(csd), UPDATE_ARRAY_ALIGN_SIZE));
 				/* GT.M V70002 added proactive block split option.
 				 * GT.M V71001 changed proactive block split default.
@@ -730,6 +744,23 @@ void v6_db_auto_upgrade(gd_region *reg)
 								 * but just to be safe handle it below as it is easy to do so.
 								 */
 				csd->mutex_type = IS_STATSDB_REG(reg) ? mutex_type_ydb : mutex_type_adaptive_ydb;
+||||||| parent of 19e495f7cb (GT.M V7.1-003)
+				+= (int4)(ROUND_UP2(MAX_BITMAP_UPDATE_ARRAY_SIZE(csd), UPDATE_ARRAY_ALIGN_SIZE));
+				/* GT.M V70002 added proactive block split option */
+				if (csd->last_mdb_ver < GDSMV71001)
+					csd->problksplit = DEFAULT_PROBLKSPLIT;
+				if (csd->last_mdb_ver < GDSMV71002)
+					csd->i_reserved_bytes = 0;
+=======
+				+= (int4)(ROUND_UP2(MAX_BITMAP_UPDATE_ARRAY_SIZE(csd), UPDATE_ARRAY_ALIGN_SIZE));
+				/* GT.M V70002 added proactive block split option */
+				if (csd->last_mdb_ver < GDSMV71001)
+					csd->problksplit = DEFAULT_PROBLKSPLIT;
+				if (csd->last_mdb_ver < GDSMV71002)
+					csd->i_reserved_bytes = 0;
+				if ((csd->last_mdb_ver < GDSMV71003) && IS_STATSDB_REGNAME(reg))
+					csd->freeze_on_fail = FALSE;
+>>>>>>> 19e495f7cb (GT.M V7.1-003)
 				break;
 			case GDSMV63015:
 				assert(FALSE);	/* if this should come to pass, add appropriate code above the assert */

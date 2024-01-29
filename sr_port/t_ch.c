@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -15,6 +15,7 @@
 
 #include "mdef.h"
 
+#include "anticipatory_freeze.h"
 #include "cdb_sc.h"
 #include "gdsroot.h"
 #include "gtm_facility.h"
@@ -93,6 +94,11 @@ CONDITION_HANDLER(t_ch)
 		retvalue = t_commit_cleanup(cdb_sc_uperr, SIGNAL); /* if return value is TRUE, it means transaction commit has */
 		assert(!retvalue || DUMPABLE); 			   /* started in which case we should not have come to t_ch()  */
 								   /* instead t_end/tp_tend would have called t_commit_cleanup */
+	} else
+	{
+		END_IGNORE_EXTFREEZES(TREF(defer_instance_freeze));
+		jgbl.skip_jplwrites = FALSE;
 	}
+	assert(TREF(defer_instance_freeze) == RECOGNIZE_FREEZES);
 	NEXTCH;
 }

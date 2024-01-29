@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,11 +27,10 @@ JPSDEF ( 5,  "NODET",	jp_nodetached),		JPSDEF ( 8, "NODETACH*",	jp_nodetached),
 JPSDEF ( 5,  "NOSWA",	jp_noswapping),		JPSDEF ( 8, "NOSWAPPI*",	jp_noswapping),
 JPSDEF ( 3,  "OUT",	jp_output),		JPSDEF ( 6,  "OUTPUT",		jp_output),
 #ifdef UNIX
-JPSDEF ( 4,  "PASS",	jp_passcurlvn),		JPSDEF ( 10,  "PASSCURLVN",	jp_passcurlvn),
+JPSDEF ( 4,  "PASS",	jp_xfercurlvn),		JPSDEF ( 10,  "PASSCURLVN",	jp_xfercurlvn),
 #endif
 JPSDEF ( 3,  "PRI",	jp_priority),		JPSDEF ( 8,  "PRIORITY",	jp_priority),
 JPSDEF ( 3,  "PRO",	jp_process_name),	JPSDEF ( 7, "PROCESS*",		jp_process_name),
 JPSDEF ( 3,  "SCH",	jp_schedule),		JPSDEF ( 8,  "SCHEDULE",	jp_schedule),
 JPSDEF ( 3,  "STA",	jp_startup),		JPSDEF ( 7,  "STARTUP",		jp_startup),
 JPSDEF ( 3,  "SWA",	jp_swapping),		JPSDEF ( 8,  "SWAPPING",	jp_swapping)
-

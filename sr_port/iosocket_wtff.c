@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
@@ -18,18 +18,30 @@
 #include "mdef.h"
 #include "gtm_socket.h"
 #include "gtm_inet.h"
+#include "have_crit.h"
+#include "deferred_events_queue.h"
 #include "io.h"
 #include "gt_timer.h"
 #include "iosocketdef.h"
+#include "send_msg.h"
 #include "error.h"
+#include "svnames.h"
+#include "op.h"
+#include "gtmio.h"
+#include "util.h"
 
 GBLREF io_pair		io_curr_device;
+GBLREF boolean_t	hup_on, prin_in_dev_failure, prin_out_dev_failure;
+GBLREF int4		exi_condition;
+GBLREF mval		dollar_zstatus;
 #ifndef VMS
 GBLREF io_pair		io_std_device;
 #endif
 
 error_def(ERR_CURRSOCKOFR);
+error_def(ERR_NOPRINCIO);
 error_def(ERR_NOSOCKETINDEV);
+error_def(ERR_SOCKHANGUP);
 error_def(ERR_SOCKPASSDATAMIX);
 
 void iosocket_wtff(void)
@@ -42,6 +54,11 @@ void iosocket_wtff(void)
 
 	SETUP_THREADGBL_ACCESS;
 	iod = io_curr_device.out;
+	if (ERR_SOCKHANGUP == error_condition)
+	{
+		SOCKHUP_NOPRINCIO_CHECK(TRUE);
+		return;
+	}
 	ESTABLISH_GTMIO_CH(&iod->pair, ch_set);
 	assert(gtmsocket == iod->type);
 	iod->esc_state = START;

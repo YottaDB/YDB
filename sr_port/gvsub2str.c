@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2023-2025 YottaDB LLC and/or its subsidiaries.	*
@@ -42,6 +42,7 @@ GBLREF	boolean_t	tref_transform;
 LITREF	unsigned short	dpos[], dneg[];
 
 error_def(ERR_GVSUBOFLOW);
+error_def(ERR_DBNOREGION);
 /*
  * -----------------------------------------------------
  * Convert a string subscript to MUMPS string
@@ -102,7 +103,7 @@ unsigned char *gvsub2str(unsigned char *sub, mstr *opstr, boolean_t xlat_flg)
 				 * library allocated an external buffer greater than opstr->len
 				 */
 				assert(mstr_targ.addr != (char *)buf1);
-				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_GVSUBOFLOW);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_GVSUBOFLOW, 2, targ_len, opstr->len, ERR_DBNOREGION, 0);
 			}
 			if (!xlat_flg)
 			{

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2018 Fidelity National Information	*
+ * Copyright (c) 2006-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries.	*
@@ -38,6 +38,7 @@
 #include "repl_shutdcode.h"
 #include "eintr_wrappers.h"
 #include "jnl.h"
+#include "jnlbufs.h"
 #include "repl_filter.h"
 #include "repl_sem.h"
 #include "mutex.h"
@@ -87,6 +88,8 @@ int gtmsource_end1(boolean_t auto_shutdown)
 	jnlpool_seqno = jnlpool->jnlpool_ctl->jnl_seqno;
 	for (idx = 0; idx < MAX_SUPPL_STRMS; idx++)
 		jnlpool_strm_seqno[idx] = jnlpool->jnlpool_ctl->strm_seqno[idx];
+	assert(process_id == jnlpool->gtmsource_local->gtmsource_pid);
+	UNSET_SRC_NEEDS_JPLWRITES(jnlpool, jnlpool->gtmsource_local);
 	jnlpool->gtmsource_local->gtmsource_pid = 0;
 	jnlpool->gtmsource_local->gtmsource_state = GTMSOURCE_DUMMY_STATE;
 	/* Detach from journal pool, except if IFOE is configured, in which case we need the journal pool attached

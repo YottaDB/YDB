@@ -148,20 +148,37 @@ SECSHRWRITABLE		<!AD writable. gtmsecshr will not be started>/error/fao=2!/ansi=
 */
 
 void strsanitize(char *src, char *dst);
+/**
+ * @brief Sanitize a file path for display purposes
+ *
+ * In practice, this is used only from this source file and to remove spaces & control characters
+ * from paths involving gtmsecshr.
+ *
+ * SCA complains if we copy the input directly to the output, even if we consider each byte.
+ * Using a translation table gets around that, and gives us some flexibility to add other
+ * mappings later if needed.  Currently the table is built on each call.  This could be
+ * changed, but doesn't seem worthwhile given the infrequent use of this function.
+ *
+ * @param src The input path buffer to be 'sanitized'.  Must be a null terminated C string.
+ * @param dst The output path buffer with the 'sanitized' path.  Must be as large as src
+ * @return None
+ *
+ */
 void strsanitize(char *src, char *dst)
 {
 	int i, srclen;
+	unsigned char trans_tab[256];
+
+	/* Our translation table is largely an identity table except for spaces and control chars */
+	for(i = 0; i < 256; i++)
+	{
+		trans_tab[i] = ((ASCIICTLMAX > i) && (ASCIICTLMIN < i)) ? '*' : i;
+	}
 
 	/* The calling function already validates the string length. */
 	srclen = strlen(src);
 	for (i = 0; (i <= srclen) && (MAX_ENV_VAR_VAL_LEN > i); i++)
-	{
-		/* Convert all control characters to '*'. */
-		if ((ASCIICTLMAX > (int)src[i]) && (ASCIICTLMIN < (int)src[i]))
-			dst[i] = '*';
-		else
-			dst[i] = src[i];
-	}
+                dst[i] = trans_tab[(unsigned char)src[i]];
 }
 
 int main()

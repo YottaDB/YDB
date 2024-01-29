@@ -1,6 +1,6 @@
 /***************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
@@ -79,7 +79,9 @@ uint4 jnl_sub_qio_start(jnl_private_control *jpc, boolean_t aligned_write)
 	uint4			jnl_fs_block_size, new_dsk, new_dskaddr;
 	gd_region		*reg;
 	intrpt_state_t		prev_intrpt_state;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	assert(NULL != jpc);
 	reg = jpc->region;
 	udi = FILE_INFO(reg);
@@ -93,7 +95,7 @@ uint4 jnl_sub_qio_start(jnl_private_control *jpc, boolean_t aligned_write)
 		ENABLE_INTERRUPTS(INTRPT_IN_JNL_QIO, prev_intrpt_state);
 		return ERR_JNLWRTDEFER;
 	}
-	if (IS_REPL_INST_FROZEN)
+	if (IS_REPL_INST_FROZEN(TREF(defer_instance_freeze)))
 	{
 		RELEASE_SWAPLOCK(&jb->io_in_prog_latch);
 		ENABLE_INTERRUPTS(INTRPT_IN_JNL_QIO, prev_intrpt_state);

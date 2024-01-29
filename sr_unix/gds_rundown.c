@@ -172,10 +172,22 @@ int4 gds_rundown(boolean_t cleanup_udi)
 	sgmnt_addrs		*baseDBcsa;
 	node_local_ptr_t	baseDBnl;
 	sgm_info		*si;
+<<<<<<< HEAD
 	DEBUG_ONLY(boolean_t	orig_we_are_last_writer = FALSE;)
+||||||| parent of 19e495f7cb (GT.M V7.1-003)
+	DEBUG_ONLY(boolean_t	orig_we_are_last_writer = FALSE);
+=======
+	DEBUG_ONLY(boolean_t	orig_we_are_last_writer = FALSE);
+>>>>>>> 19e495f7cb (GT.M V7.1-003)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+<<<<<<< HEAD
+||||||| parent of 19e495f7cb (GT.M V7.1-003)
+	jnl_status = 0;
+=======
+	jnl_status = 0;
+>>>>>>> 19e495f7cb (GT.M V7.1-003)
 	reg = gv_cur_region;			/* Local copy */
 	/* Early out for cluster regions
 	 * to avoid tripping the assert below.
@@ -295,8 +307,14 @@ int4 gds_rundown(boolean_t cleanup_udi)
 	canceled_dbsync_timer = FALSE;
 	CANCEL_DB_TIMERS(reg, csa, canceled_dbsync_timer);
 	we_are_last_user = FALSE;
+<<<<<<< HEAD
 	inst_is_frozen = IS_REPL_INST_FROZEN && REPL_ALLOWED(csa->hdr);
 	cnl = csa->nl;
+||||||| parent of 19e495f7cb (GT.M V7.1-003)
+	inst_is_frozen = IS_REPL_INST_FROZEN && REPL_ALLOWED(csa->hdr);
+=======
+	inst_is_frozen = IS_REPL_INST_FROZEN(TREF(defer_instance_freeze)) && REPL_ALLOWED(csa->hdr);
+>>>>>>> 19e495f7cb (GT.M V7.1-003)
 	if (FREEZE_LATCH_HELD(csa))
 		rel_latch(&cnl->freeze_latch);
 	if (!csa->persistent_freeze)

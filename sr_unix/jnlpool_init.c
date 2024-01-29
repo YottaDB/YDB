@@ -39,6 +39,7 @@
 #include "gtmrecv.h"
 #include "mutex.h"
 #include "jnl.h"
+#include "jnlbufs.h"
 #include "repl_sem.h"
 #include "gtmimagename.h"
 #include "io.h"
@@ -236,7 +237,7 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 	gd_segment		*seg;
 	gd_addr			*repl_gld, *local_gdptr;
 	gtmsrc_lcl_ptr_t	gtmsrclcl_ptr;
-	gtmsource_local_ptr_t	gtmsourcelocal_ptr, reuse_slot_ptr;
+	gtmsource_local_ptr_t	gtmsourcelocal_ptr, reuse_slot_ptr, tmp_gtmsourcelocal_ptr;
 	uint4			gtmsource_pid, gtmrecv_pid;
 	seq_num			reuse_slot_seqnum, instfilehdr_seqno;
 	repl_histinfo		last_histinfo;
@@ -244,11 +245,25 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 	jnlpool_addrs_ptr_t	tmp_jnlpool, save_jnlpool;
 	struct sembuf   	sop[3];
 	uint4           	sopcnt;
+<<<<<<< HEAD
 	DEBUG_ONLY(int4		semval);
 	DEBUG_ONLY(boolean_t	sem_created = FALSE);
 	DEBUG_ONLY(int		i);
 	DEBUG_ONLY(char 	*ptr);
 	boolean_t		new_shmid, new_semid;
+||||||| parent of 19e495f7cb (GT.M V7.1-003)
+	DEBUG_ONLY(int4		semval);
+	DEBUG_ONLY(boolean_t	sem_created = FALSE);
+	DEBUG_ONLY(int		i);
+	DEBUG_ONLY(char 	*ptr);
+=======
+#	ifdef DEBUG
+	int4			semval;
+	boolean_t		sem_created = FALSE;
+	int			i;
+	char			*ptr;
+#	endif
+>>>>>>> 19e495f7cb (GT.M V7.1-003)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -741,6 +756,8 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 		jnlpool_mutex_spin_parms->mutex_spin_sleep_mask = MUTEX_SPIN_SLEEP_MASK;
 		jnlpool_mutex_spin_parms->mutex_que_entry_space_size = DEFAULT_NUM_CRIT_ENTRY;
 		assert(!skip_locks);
+		INIT_JPLWRITES_NEEDED(jnlpool);
+		jnlpool->jnlpool_ctl->last_skip_jplwrites = 0;
 		grab_lock(jnlpool->jnlpool_dummy_reg, TRUE, ASSERT_NO_ONLINE_ROLLBACK);
 		/* Flush the file header to disk so future callers of "jnlpool_init" see the jnlpool_semid and jnlpool_shmid */
 		repl_inst_flush_filehdr();
@@ -913,6 +930,14 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 						gtmsource_pid = gtmsourcelocal_ptr->gtmsource_pid;
 						if ((0 == gtmsource_pid) || !is_proc_alive(gtmsource_pid, 0))
 						{	/* Slot can be reused */
+							/* This cleanup should only affect kill -9 situations, so try not to write
+							 * indiscriminately. The test-and-set is not atomic, but it isn't writing to
+							 * a value subject to race conditions: the bit-offset is available only to
+							 * this process, since we know that no living src server owns it and any new
+							 * process will need the jnlpool_init ftok/sem to do anything with it, which
+							 * we now possess. */
+							if (SRC_NEEDS_JPLWRITES(jnlpool, gtmsourcelocal_ptr))
+								UNSET_SRC_NEEDS_JPLWRITES(jnlpool, gtmsourcelocal_ptr);
 							if (gtmsourcelocal_ptr->connect_jnl_seqno < reuse_slot_seqnum)
 							{
 								reuse_slot_seqnum = gtmsourcelocal_ptr->connect_jnl_seqno;
@@ -1102,6 +1127,7 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 		jnlpool->jnlpool_ctl->lastwrite_len = 0;
 		jnlpool->jnlpool_ctl->write_addr = 0;
 		jnlpool->jnlpool_ctl->rsrv_write_addr = 0;
+		jnlpool->jnlpool_ctl->contig_addr = 0;
 		if (0 < jnlpool->repl_inst_filehdr->num_histinfo)
 		{
 			grab_lock(jnlpool->jnlpool_dummy_reg, TRUE, ASSERT_NO_ONLINE_ROLLBACK);
@@ -1111,10 +1137,23 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 			if (0 != status)
 			{
 				assert(ERR_REPLINSTNOHIST == status);	/* the only error returned by repl_inst_histinfo_get() */
+				tmp_gtmsourcelocal_ptr = &jnlpool->gtmsource_local_array[0];
+				for (index = 0; index < NUM_GTMSRC_LCL; index++, tmp_gtmsourcelocal_ptr++)
+					grab_gtmsource_srv_latch(&tmp_gtmsourcelocal_ptr->gtmsource_srv_latch, UINT32_MAX,
+							ASSERT_NO_ONLINE_ROLLBACK);
 				grab_lock(jnlpool->jnlpool_dummy_reg, TRUE, ASSERT_NO_ONLINE_ROLLBACK);
 				repl_inst_flush_jnlpool(TRUE, TRUE); /* to reset "crash" field in instance file header to FALSE */
 				rel_lock(jnlpool->jnlpool_dummy_reg);
+<<<<<<< HEAD
 				DETACH_AND_REMOVE_SHM_AND_SEM(jnlpool, new_semid, new_shmid);/* remove any sem/shm we had created */
+||||||| parent of 19e495f7cb (GT.M V7.1-003)
+				DETACH_AND_REMOVE_SHM_AND_SEM(jnlpool);	/* remove any sem/shm we had created */
+=======
+				tmp_gtmsourcelocal_ptr = &jnlpool->gtmsource_local_array[0];
+				for (index = 0; index < NUM_GTMSRC_LCL; index++, tmp_gtmsourcelocal_ptr++)
+					rel_gtmsource_srv_latch(&tmp_gtmsourcelocal_ptr->gtmsource_srv_latch);
+				DETACH_AND_REMOVE_SHM_AND_SEM(jnlpool);	/* remove any sem/shm we had created */
+>>>>>>> 19e495f7cb (GT.M V7.1-003)
 				udi->grabbed_access_sem = FALSE;
 				udi->counter_acc_incremented = FALSE;
 				ftok_sem_release(jnlpool->jnlpool_dummy_reg, udi->counter_ftok_incremented, TRUE);
@@ -1126,10 +1165,23 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 			assert(instfilehdr_seqno);
 			if (instfilehdr_seqno < last_histinfo.start_seqno)
 			{	/* The jnl seqno in the instance file header is not greater than the last histinfo's start seqno */
+				tmp_gtmsourcelocal_ptr = &jnlpool->gtmsource_local_array[0];
+				for (index = 0; index < NUM_GTMSRC_LCL; index++, tmp_gtmsourcelocal_ptr++)
+					grab_gtmsource_srv_latch(&tmp_gtmsourcelocal_ptr->gtmsource_srv_latch, UINT32_MAX,
+							ASSERT_NO_ONLINE_ROLLBACK);
 				grab_lock(jnlpool->jnlpool_dummy_reg, TRUE, ASSERT_NO_ONLINE_ROLLBACK);
 				repl_inst_flush_jnlpool(TRUE, TRUE); /* to reset "crash" field in instance file header to FALSE */
 				rel_lock(jnlpool->jnlpool_dummy_reg);
+<<<<<<< HEAD
 				DETACH_AND_REMOVE_SHM_AND_SEM(jnlpool, new_semid, new_shmid);/* remove any sem/shm we had created */
+||||||| parent of 19e495f7cb (GT.M V7.1-003)
+				DETACH_AND_REMOVE_SHM_AND_SEM(jnlpool);	/* remove any sem/shm we had created */
+=======
+				tmp_gtmsourcelocal_ptr = &jnlpool->gtmsource_local_array[0];
+				for (index = 0; index < NUM_GTMSRC_LCL; index++, tmp_gtmsourcelocal_ptr++)
+					rel_gtmsource_srv_latch(&tmp_gtmsourcelocal_ptr->gtmsource_srv_latch);
+				DETACH_AND_REMOVE_SHM_AND_SEM(jnlpool);	/* remove any sem/shm we had created */
+>>>>>>> 19e495f7cb (GT.M V7.1-003)
 				udi->grabbed_access_sem = FALSE;
 				udi->counter_acc_incremented = FALSE;
 				ftok_sem_release(jnlpool->jnlpool_dummy_reg, udi->counter_ftok_incremented, TRUE);
@@ -1139,6 +1191,7 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 			jnlpool->jnlpool_ctl->last_histinfo_seqno = last_histinfo.start_seqno;
 		} else
 			jnlpool->jnlpool_ctl->last_histinfo_seqno = 0;
+		assert(!INST_NEEDS_JPLWRITES(jnlpool));
 		assert(ROOTPRIMARY_UNSPECIFIED != gtmsource_options.rootprimary);
 		jnlpool->jnlpool_ctl->upd_disabled = TRUE; /* truly initialized later by a call to "gtmsource_rootprimary_init" */
 		jnlpool->jnlpool_ctl->primary_instname[0] = '\0';
@@ -1202,7 +1255,8 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 			assert(NULL != gtmsourcelocal_ptr);
 			QWASSIGNDW(gtmsourcelocal_ptr->read_addr, 0);
 			gtmsourcelocal_ptr->read = 0;
-			gtmsourcelocal_ptr->read_state = gtmsourcelocal_ptr->jnlfileonly ? READ_FILE : READ_POOL;
+			gtmsourcelocal_ptr->read_algo = gtmsource_options.jnlfileonly ? JNLFILE_DATA : JNLPOOL_DATA;
+			gtmsourcelocal_ptr->read_state = gtmsourcelocal_ptr->read_algo ? READ_FILE : READ_POOL;
 			gtmsourcelocal_ptr->mode = gtmsource_options.mode;
 			gtmsourcelocal_ptr->statslog = FALSE;
 			gtmsourcelocal_ptr->shutdown = NO_SHUTDOWN;
@@ -1217,6 +1271,12 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 			gtmsourcelocal_ptr->next_histinfo_seqno = 0;/* fully initialized when source server connects to receiver */
 			gtmsourcelocal_ptr->next_histinfo_num = 0;  /* fully initialized when source server connects to receiver */
 			gtmsourcelocal_ptr->num_histinfo = 0;  /* fully initialized when source server connects to receiver */
+			/* Always initialize jnlwrites_needed to zero. Will be set to 1 if server is active and not in jnlfileonly
+			 * mode in the gtmsource function. This is atomic but could be subject to conditions of being set-reset if
+			 * the following assumption is false: that this process (and eventually its src-server child) is the only
+			 * one which can set this field in the bitmap, or else this process has died and a new server is reclaiming
+			 * the slot. */
+			UNSET_SRC_NEEDS_JPLWRITES(jnlpool, gtmsourcelocal_ptr);
 			if (GTMSOURCE_MODE_ACTIVE == gtmsource_options.mode)
 			{
 				gtmsourcelocal_ptr->connect_parms[GTMSOURCE_CONN_HARD_TRIES_COUNT] =
@@ -1247,6 +1307,8 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 		}
 		if (reset_gtmsrclcl_info)
 		{	/* Initialize all fields of "gtmsource_local" that are also present in the corresponding "gtmsrc_lcl" */
+			grab_gtmsource_srv_latch(&jnlpool->gtmsource_local->gtmsource_srv_latch, UINT32_MAX,
+					ASSERT_NO_ONLINE_ROLLBACK);
 			gtmsourcelocal_ptr->read_jnl_seqno = 1;	/* fully initialized when source server connects to receiver */
 			assert((MAX_INSTNAME_LEN == sizeof(gtmsource_options.secondary_instname))
 					&& (MAX_INSTNAME_LEN == sizeof(gtmsourcelocal_ptr->secondary_instname)));
@@ -1256,9 +1318,8 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 			/* Now make the corresponding changes from gtmsource_local to the gtmsrc_lcl structure and flush to disk.
 			 * This assumes "jnlpool->gtmsource_local" is set appropriately.
 			 */
-			grab_lock(jnlpool->jnlpool_dummy_reg, TRUE, ASSERT_NO_ONLINE_ROLLBACK);
 			repl_inst_flush_gtmsrc_lcl();
-			rel_lock(jnlpool->jnlpool_dummy_reg);
+			rel_gtmsource_srv_latch(&jnlpool->gtmsource_local->gtmsource_srv_latch);
 		}
 	}
 	/* Assert that gtmsource_local is set to non-NULL value for all those qualifiers that care about it */

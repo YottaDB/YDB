@@ -55,6 +55,7 @@ ENUM_ENTRY(GDSMV70001),		/* 26 - GTM-9131 new statsdb_allocation option & GTM-86
 ENUM_ENTRY(GDSMV70002),		/* 27 - GTM-9426 - Automatically split database blocks based upon restarts... */
 ENUM_ENTRY(GDSMV71001),		/* 28 - Change default proactive block split threshhold */
 ENUM_ENTRY(GDSMV71002),		/* 29 - Make full use of the index reserved bytes field */
+<<<<<<< HEAD
 ENUM_ENTRY(GDSMVFILLER30),	/* 30 - Space reserved for GT.M changes to minor db format */
 ENUM_ENTRY(GDSMVFILLER31),	/* 31 - Space reserved for GT.M changes to minor db format */
 ENUM_ENTRY(GDSMVFILLER32),	/* 32 - Space reserved for GT.M changes to minor db format */
@@ -289,4 +290,8 @@ ENUM_ENTRY(GDSMVFILLER255),	/* 255 - Space reserved for GT.M changes to minor db
 ENUM_ENTRY(GDSMR204_V71001),	/* 256 - YottaDB r2.04 which includes GDSMV71001 */
 ENUM_ENTRY(GDSMR204_V71002),	/* 257 - YottaDB r2.04 which includes GDSMV71002 */
 ENUM_ENTRY(GDSMR204),		/* 258 - New field "mutex_type" records mutex manager type */
+||||||| parent of 19e495f7cb (GT.M V7.1-003)
+=======
+ENUM_ENTRY(GDSMV71003),		/* 30 - Error messages should NOT trigger a freeze if it's a statsDB region */
+>>>>>>> 19e495f7cb (GT.M V7.1-003)
 ENUM_ENTRY(GDSMVLAST)

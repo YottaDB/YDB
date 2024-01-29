@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -56,7 +57,9 @@ int4 mupip_set_jnlfile(char *jnl_fname, int jnl_fn_len)
 	int		save_no;
 	int		rc;
 	ZOS_ONLY(int 	realfiletag;)
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	OPENFILE(jnl_fname, O_RDWR, jnl_fd);
 	if (FD_INVALID == jnl_fd)
 	{

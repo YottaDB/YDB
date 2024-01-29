@@ -731,7 +731,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* GTMSECSHRSSIDF */
 	   0,	/* GTMSECSHRFORKF */
 	   0,	/* DBFSYNCERR */
-	   0,	/* EXCEEDRCTLRNDWN */
+	   0,	/* UNUSEDMSG898 */
 	   0,	/* SCNDDBNOUPD */
 	   0,	/* MUINFOUINT4 */
 	   0,	/* NLMISMATCHCALC */
@@ -948,7 +948,13 @@ const static readonly int error_ansi[] = {
 	   0,	/* JNLALIGNSZCHG */
 	   0,	/* SEFCTNEEDSFULLB */
 	   0,	/* GVFAILCORE */
+<<<<<<< HEAD:sr_port/merrors_ansi.h
 	   0,	/* UNUSEDMSG1117 */
+||||||| parent of 19e495f7cb (GT.M V7.1-003):sr_x86_64/merrors_ansi.h
+	   0,	/* UNUSEDMSG1115 */
+=======
+	   0,	/* RLNKCTLOPENDEL */
+>>>>>>> 19e495f7cb (GT.M V7.1-003):sr_x86_64/merrors_ansi.h
 	   0,	/* DBFRZRESETSUC */
 	   0,	/* JNLFILEXTERR */
 	   0,	/* JOBEXAMDONE */
@@ -1045,6 +1051,14 @@ const static readonly int error_ansi[] = {
 	   0,	/* DBBTUWRNG */
 	   0,	/* DBBTUFIXED */
 	   0,	/* DBMAXREC2BIG */
+<<<<<<< HEAD:sr_port/merrors_ansi.h
+||||||| parent of 19e495f7cb (GT.M V7.1-003):sr_x86_64/merrors_ansi.h
+	   0,	/* UNUSEDMSG1212 */
+	   0,	/* UNUSEDMSG1213 */
+=======
+	   0,	/* SOCKHANGUP */
+	   0,	/* UNUSEDMSG1213 */
+>>>>>>> 19e495f7cb (GT.M V7.1-003):sr_x86_64/merrors_ansi.h
 	   0,	/* UNUSEDMSG1214 */
 	   0,	/* UNUSEDMSG1215 */
 	   0,	/* UNUSEDMSG1216 */
@@ -1077,7 +1091,13 @@ const static readonly int error_ansi[] = {
 	   0,	/* BKUPTMPFILWRITE */
 	   0,	/* SHMHUGETLB */
 	   0,	/* SHMLOCK */
+<<<<<<< HEAD:sr_port/merrors_ansi.h
 	   0,	/* UNUSEDMSG1246 */
+||||||| parent of 19e495f7cb (GT.M V7.1-003):sr_x86_64/merrors_ansi.h
+	   0,	/* UNUSEDMSG1244 */
+=======
+	   0,	/* SPCFCBUFDELAY */
+>>>>>>> 19e495f7cb (GT.M V7.1-003):sr_x86_64/merrors_ansi.h
 	   0,	/* REPLINSTMISMTCH */
 	   0,	/* REPLINSTREAD */
 	   0,	/* REPLINSTDBMATCH */

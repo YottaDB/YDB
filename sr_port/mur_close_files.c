@@ -37,6 +37,7 @@
 #include "hashtab_int8.h"	/* needed for muprec.h */
 #include "hashtab_mname.h"	/* needed for muprec.h */
 #include "muprec.h"
+#include "mutex.h"
 #include "iosp.h"
 #include "tp_change_reg.h"
 #include "gds_rundown.h"
@@ -98,6 +99,7 @@ GBLREF	uint4			process_id;
 GBLREF	void			(*call_on_signal)();
 #ifdef DEBUG
 GBLREF	boolean_t		prin_out_dev_failure;
+GBLREF	bool			only_usr_jnlpool_flush;
 #endif
 
 error_def(ERR_FILERENAME);
@@ -704,6 +706,7 @@ boolean_t mur_close_files(void)
 						 * pool fields to reflect the new state.
 						 */
 						assert(csa->now_crit && csa->hold_onto_crit);
+<<<<<<< HEAD
 						jpl->last_histinfo_seqno = last_histinfo_seqno;
 						jpl->jnl_seqno = murgbl.consist_jnl_seqno;
 						jpl->start_jnl_seqno = murgbl.consist_jnl_seqno;
@@ -722,6 +725,28 @@ boolean_t mur_close_files(void)
 						lastJplCmt->jnl_seqno = 0;
 						lastJplCmt->start_write_addr = 0;
 						lastJplCmt->tot_jrec_len = 0;
+||||||| parent of 19e495f7cb (GT.M V7.1-003)
+						jnlpool->jnlpool_ctl->last_histinfo_seqno = last_histinfo_seqno;
+						jnlpool->jnlpool_ctl->jnl_seqno = murgbl.consist_jnl_seqno;
+						jnlpool->jnlpool_ctl->start_jnl_seqno = murgbl.consist_jnl_seqno;
+						jnlpool->jnlpool_ctl->rsrv_write_addr = jnlpool->jnlpool_ctl->write_addr = 0;
+						jnlpool->jnlpool_ctl->rsrv_write_addr = 0;
+						assert(jnlpool->jnlpool_ctl->phase2_commit_index1
+							== jnlpool->jnlpool_ctl->phase2_commit_index2);
+						jnlpool->jnlpool_ctl->lastwrite_len = 0;
+						jnlpool->jnlpool_ctl->max_zqgblmod_seqno = max_zqgblmod_seqno;
+=======
+						jnlpool->jnlpool_ctl->last_histinfo_seqno = last_histinfo_seqno;
+						jnlpool->jnlpool_ctl->jnl_seqno = murgbl.consist_jnl_seqno;
+						jnlpool->jnlpool_ctl->start_jnl_seqno = murgbl.consist_jnl_seqno;
+						jnlpool->jnlpool_ctl->rsrv_write_addr = jnlpool->jnlpool_ctl->write_addr = 0;
+						jnlpool->jnlpool_ctl->contig_addr = 0;
+						rollback_mutex_cln_ctl(murgbl.consist_jnl_seqno);
+						assert(jnlpool->jnlpool_ctl->phase2_commit_index1
+							== jnlpool->jnlpool_ctl->phase2_commit_index2);
+						jnlpool->jnlpool_ctl->lastwrite_len = 0;
+						jnlpool->jnlpool_ctl->max_zqgblmod_seqno = max_zqgblmod_seqno;
+>>>>>>> 19e495f7cb (GT.M V7.1-003)
 						/* Keep strm_seqno in journal pool in sync with the one in instance file header */
 						assert(SIZEOF(jpl->strm_seqno) == SIZEOF(inst_hdr->strm_seqno));
 						memcpy(jpl->strm_seqno, inst_hdr->strm_seqno,
@@ -762,6 +787,15 @@ boolean_t mur_close_files(void)
 				repl_inst_read(udi->fn, (off_t)REPL_INST_HDR_SIZE, (sm_uc_ptr_t)gtmsrc_lcl_array, GTMSRC_LCL_SIZE);
 				for (idx = 0; idx < NUM_GTMSRC_LCL; idx++)
 				{	/* Check if the slot is being used and only then check the resync_seqno */
+#					ifdef DEBUG
+					if (jnlpool)
+					{
+						gtmsourcelocal_ptr = &jnlpool->gtmsource_local_array[idx];
+						latch = &gtmsourcelocal_ptr->gtmsource_srv_latch;
+					}
+					assert(murgbl.repl_standalone
+							|| (jnlpool && (process_id == latch->u.parts.latch_pid)));
+#					endif
 					if ('\0' != gtmsrc_lcl_array[idx].secondary_instname[0])
 					{
 						if (gtmsrc_lcl_array[idx].resync_seqno > murgbl.consist_jnl_seqno)
@@ -770,7 +804,9 @@ boolean_t mur_close_files(void)
 							gtmsrc_lcl_array[idx].connect_jnl_seqno = murgbl.consist_jnl_seqno;
 					}
 				}
+				DEBUG_ONLY(only_usr_jnlpool_flush = murgbl.repl_standalone;)
 				repl_inst_write(udi->fn, (off_t)REPL_INST_HDR_SIZE, (sm_uc_ptr_t)gtmsrc_lcl_array, GTMSRC_LCL_SIZE);
+				DEBUG_ONLY(only_usr_jnlpool_flush = false;)
 			}
 			if (((NULL != jnlpool) && (NULL != jnlpool->jnlpool_ctl)) && jgbl.onlnrlbk)
 			{	/* Remove any locks that we acquired in mur_open_files.
@@ -886,7 +922,7 @@ boolean_t mur_close_files(void)
 			 */
 			assert(INVALID_SHMID == repl_instance.recvpool_shmid || jgbl.onlnrlbk);
 			/* Check frozen state before detaching the journal pool */
-			inst_frozen = IS_REPL_INST_FROZEN;
+			inst_frozen = IS_REPL_INST_FROZEN(RECOGNIZE_FREEZES);
 			/* Ensure that no new processes have attached to the journal pool */
 			if (-1 == shmctl(repl_instance.jnlpool_shmid, IPC_STAT, &shm_buf))
 			{

@@ -77,7 +77,13 @@ int tcp_open(char *host, unsigned short port, uint8 timeout, boolean_t passive) 
 	int			match, sock = FD_INVALID, sendbufsize, ii, on = 1, temp_1 = -2;
 	GTM_SOCKLEN_TYPE	size;
 	int4			rv, msec_timeout;
+<<<<<<< HEAD
 	struct addrinfo		*ai_ptr = NULL, *remote_ai_ptr, *remote_ai_head, hints;
+||||||| parent of 19e495f7cb (GT.M V7.1-003)
+	struct addrinfo		*ai_ptr = NULL, *remote_ai_ptr = NULL, *remote_ai_head, hints;
+=======
+	struct addrinfo		*ai_ptr = NULL, *remote_ai_ptr = NULL, *remote_ai_head = NULL, hints;
+>>>>>>> 19e495f7cb (GT.M V7.1-003)
 	char			port_buffer[NI_MAXSERV], *brack_pos;
 
 	int			host_len, addr_len, port_len;

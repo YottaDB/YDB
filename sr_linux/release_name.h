@@ -17,8 +17,39 @@
  ****************************************************************/
 
 #ifndef GTM_RELEASE_NAME
+<<<<<<< HEAD
 
+||||||| parent of 19e495f7cb (GT.M V7.1-003)
+#ifdef __CYGWIN__
+#define GTM_RELEASE_NAME 	"GT.M V7.1-002 CYGWIN x86"
+#elif defined(__ia64)
+#define GTM_RELEASE_NAME 	"GT.M V7.1-002 Linux IA64"
+#elif defined(__x86_64__)
+#define GTM_RELEASE_NAME 	"GT.M V7.1-002 Linux x86_64"
+#elif defined(__s390__)
+#define GTM_RELEASE_NAME 	"GT.M V7.1-002 Linux S390X"
+#else
+#define GTM_RELEASE_NAME 	"GT.M V7.1-002 Linux x86"
+#endif
+#endif
+#define GTM_PRODUCT 		"GT.M"
+=======
+#ifdef __CYGWIN__
+#define GTM_RELEASE_NAME 	"GT.M V7.1-003 CYGWIN x86"
+#elif defined(__ia64)
+#define GTM_RELEASE_NAME 	"GT.M V7.1-003 Linux IA64"
+#elif defined(__x86_64__)
+#define GTM_RELEASE_NAME 	"GT.M V7.1-003 Linux x86_64"
+#elif defined(__s390__)
+#define GTM_RELEASE_NAME 	"GT.M V7.1-003 Linux S390X"
+#else
+#define GTM_RELEASE_NAME 	"GT.M V7.1-003 Linux x86"
+#endif
+#endif
+#define GTM_PRODUCT 		"GT.M"
+>>>>>>> 19e495f7cb (GT.M V7.1-003)
 #define GTM_VERSION		"V7.1"
+<<<<<<< HEAD
 #define	GTM_ZVERSION		"V7.1-002"
 #define	YDB_ZYRELEASE		"r2.07"		/* changes here should be reflected in YDB_RELEASE in sr_unix/libyottadb.h */
 
@@ -70,3 +101,8 @@
 #endif
 
 #endif
+||||||| parent of 19e495f7cb (GT.M V7.1-003)
+#define GTM_RELEASE_STAMP	"20230913 21:50"
+=======
+#define GTM_RELEASE_STAMP	"20231117 16:25"
+>>>>>>> 19e495f7cb (GT.M V7.1-003)

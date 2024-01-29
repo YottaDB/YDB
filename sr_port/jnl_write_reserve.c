@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2016-2017 Fidelity National Information	*
+ * Copyright (c) 2016-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -63,12 +63,11 @@
 		JPC->phase2_freeaddr += RECLEN;								\
 }
 
-/* This function reserves space in the journal buffer and the journal pool for the input journal record.
- * This is called when we hold crit from t_end/tp_tend. Once the callers release crit, they will invoke
- * the appropriate jnl_write_* function to copy the journal records from private buffers onto the reserved
- * space in shared memory. This way we minimize holding crit while doing the journal record copy.
- * If the database is in the WAS_ON state (REPL_WAS_ENABLED is TRUE), then the reservation happens only
- * in the journal pool, not in the journal buffers.
+/* This function reserves space in the journal buffer for the input journal record. This is called when we
+ * hold crit from t_end/tp_tend. Once the callers release crit, they invoke the appropriate jnl_write_*
+ * function to copy the journal records from private buffers onto the reserved space in shared memory. This
+ * way we minimize holding crit while doing the journal record copy. If the database is in the WAS_ON state
+ * (REPL_WAS_ENABLED is TRUE), then the write happens only in the journal pool, not in the journal buffers.
  */
 void	jnl_write_reserve(sgmnt_addrs *csa, jbuf_rsrv_struct_t *jbuf_rsrv_ptr,
 					enum jnl_record_type rectype, uint4 reclen, void *param1)
@@ -94,14 +93,19 @@ void	jnl_write_reserve(sgmnt_addrs *csa, jbuf_rsrv_struct_t *jbuf_rsrv_ptr,
 	assert(write_to_jnlbuff || write_to_jnlpool);
 	if (write_to_jnlbuff)
 	{
+		/* If the following assert fails because of integer overflow, we have a serious problem which the assert will
+		 * be incidentally picking up; this would implicate lots of the jnl_* and align-related logic. Assert is intended
+		 * to detect more mundane failure to maintain jpc->next_align_addr correctly.
+		 */
+		assert((jpc->next_align_addr >= jbp->next_align_addr) && (jpc->next_align_addr >= jpc->phase2_freeaddr));
 		lcl_freeaddr = jpc->phase2_freeaddr;
-		if (lcl_freeaddr + reclen > jbp->next_align_addr)
+		if (lcl_freeaddr + reclen > jpc->next_align_addr)
 		{
-			assert(jbp->next_align_addr >= lcl_freeaddr);
-			align_reclen = (jbp->next_align_addr - lcl_freeaddr) + MIN_ALIGN_RECLEN;
+			assert(jpc->next_align_addr >= lcl_freeaddr);
+			align_reclen = (jpc->next_align_addr - lcl_freeaddr) + MIN_ALIGN_RECLEN;
 			assert(align_reclen < jbp->alignsize);
 			ADD_JREC_RSRV_ELEM(jpc, write_to_jnlbuff, jbuf_rsrv_ptr, JRT_ALIGN, align_reclen, param1);
-			jbp->next_align_addr += jbp->alignsize;
+			jpc->next_align_addr += jbp->alignsize;
 		}
 	}
 	ADD_JREC_RSRV_ELEM(jpc, write_to_jnlbuff, jbuf_rsrv_ptr, rectype, reclen, param1);

@@ -1,9 +1,16 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
+||||||| parent of 19e495f7cb (GT.M V7.1-003)
+ *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+=======
+ * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> 19e495f7cb (GT.M V7.1-003)
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -185,8 +192,16 @@ int omi_prc_conn(omi_conn *cptr, char *xend, char *buff, char *bend)
 #	ifdef SHADOWPW
 	struct spwd *spass, *getspnam();
 	struct stat buf;
+<<<<<<< HEAD
 #	endif
 	struct passwd *pass;
+||||||| parent of 19e495f7cb (GT.M V7.1-003)
+#		endif
+	struct passwd *pass;
+=======
+#		endif
+	struct passwd *uinfo;
+>>>>>>> 19e495f7cb (GT.M V7.1-003)
 	char *pw, *syspw;
 
 	/* lowercase agent name */
@@ -212,23 +227,23 @@ int omi_prc_conn(omi_conn *cptr, char *xend, char *buff, char *bend)
 		    return -OMI_ER_DB_USERNOAUTH;
 		}
 		syspw = spass->sp_pwdp;
-	} else if ((pass = getpwnam(ag_name)) == NULL)
+	} else if ((uinfo = getpwnam(ag_name)) == NULL)
 	{
 		OMI_DBG((omi_debug, "%s:  user %s not found in /etc/passwd\n",
 			SRVR_NAME, ag_name));
 		OMI_FREE;
 		return -OMI_ER_DB_USERNOAUTH;
 	} else
-		syspw = pass->pw_passwd;
+		syspw = uinfo->pw_passwd;
 #	else    /* ndef SHADOWPW */
-	if ((pass = getpwnam(ag_name)) == NULL)
+	if ((uinfo = getpwnam(ag_name)) == NULL)
 	{
 		    OMI_DBG((omi_debug, "%s:  user %s not found in /etc/passwd\n",
 			     SRVR_NAME, ag_name));
 		    OMI_FREE;
 		    return -OMI_ER_DB_USERNOAUTH;
 	    } else
-		syspw = pass->pw_passwd;
+		syspw = uinfo->pw_passwd;
 #	endif   /* SHADOWPW */
 	pw = (char *)crypt(ag_pass, syspw);
 	if (strcmp(pw, syspw) != 0)

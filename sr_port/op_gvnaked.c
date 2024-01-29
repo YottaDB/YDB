@@ -78,9 +78,21 @@ void op_gvnaked_fast(UNIX_ONLY_COMMA(int count_arg) int hash_code_dummy, mval *v
 
 void op_gvnaked_common(int count, int hash_code_dummy, mval *val_arg, va_list var)
 {
+<<<<<<< HEAD
 	boolean_t	was_null, is_null;
+||||||| parent of 19e495f7cb (GT.M V7.1-003)
+	boolean_t	was_null, is_null, sbs_cnt;
+=======
+	boolean_t	is_null, sbs_cnt, was_null;
+>>>>>>> 19e495f7cb (GT.M V7.1-003)
 	mval		*val;
+<<<<<<< HEAD
 	int		max_key, sbs_cnt;
+||||||| parent of 19e495f7cb (GT.M V7.1-003)
+	int		max_key;
+=======
+	int		max_key, tmp_len;
+>>>>>>> 19e495f7cb (GT.M V7.1-003)
 	unsigned char	*ptr, *end_ptr;
 	gd_region	*reg, *reg_start, *reg_top;
 	gd_addr		*addr_ptr;
@@ -166,8 +178,8 @@ void op_gvnaked_common(int count, int hash_code_dummy, mval *val_arg, va_list va
 		TREF(gd_targ_gvnh_reg) = NULL;
 	/* Now that "gv_cur_region" is setup correctly for both spanning and non-spanning globals, do GVSUBOFLOW check */
 	max_key = gv_cur_region->max_key_size;
-	if (gv_currkey->end >= max_key)
-		ISSUE_GVSUBOFLOW_ERROR(gv_currkey, KEY_COMPLETE_TRUE);
+	if ((tmp_len = gv_currkey->end) >= max_key)
+		ISSUE_GVSUBOFLOW_ERROR(gv_currkey, KEY_COMPLETE_TRUE, (tmp_len+1), max_key, gv_cur_region);
 	DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC(CHECK_CSA_TRUE);
 	if (IS_REG_BG_OR_MM(reg))
 	{

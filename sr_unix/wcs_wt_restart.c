@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2016 Fidelity National Information		*
+ * Copyright (c) 2016-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
@@ -43,7 +43,9 @@ int	wcs_wt_restart(unix_db_info *udi, cache_state_rec_ptr_t csr)
 	blk_hdr_ptr_t		bp, save_bp;
 	cache_que_head_ptr_t	ahead;
 	sgmnt_addrs		*csa;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	assert(0 > SYNCIO_MORPH_SUCCESS); /* save_errno should be positive in all cases except when == SYNCIO_MORPH_SUCCESS */
 	csa = &udi->s_addrs;
 	BG_TRACE_PRO_ANY(csa, wcs_wt_restart_invoked);

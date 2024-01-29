@@ -188,8 +188,16 @@ void mupip_endiancvt(void)
 	uint4			cli_status;
 	unsigned short		n_len, outdb_len, t_len;
 	ZOS_ONLY(int		realfiletag;)
+	DCL_THREADGBL_ACCESS;
 
+<<<<<<< HEAD
 	if (CLI_PRESENT == cli_present("OUTDB"))
+||||||| parent of 19e495f7cb (GT.M V7.1-003)
+	if (CLI_PRESENT == (cli_status = cli_present("OUTDB")))
+=======
+	SETUP_THREADGBL_ACCESS;
+	if (CLI_PRESENT == (cli_status = cli_present("OUTDB")))
+>>>>>>> 19e495f7cb (GT.M V7.1-003)
 	{
 		outdb_specified = TRUE;
 		outdb_len = SIZEOF(outdb) - 1;

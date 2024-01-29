@@ -67,7 +67,7 @@ void ojparams (char *p, job_params_type *job_params)
 	/* job_params->params.routine.len initialized by caller */
 	/* job_params->params.label.len initialized by caller */
 	job_params->cmdline.len = 0;
-	job_params->passcurlvn = FALSE;
+	job_params->xfercurlvn = FALSE;
 
 		/* Process parameter list */
 	while (*p != jp_eol)
@@ -134,8 +134,8 @@ void ojparams (char *p, job_params_type *job_params)
 			}
 			break;
 
-		case jp_passcurlvn:
-			job_params->passcurlvn = TRUE;
+		case jp_xfercurlvn:
+			job_params->xfercurlvn = TRUE;
 			break;
 		case jp_account:
 		case jp_detached:
@@ -275,7 +275,7 @@ void ojparams (char *p, job_params_type *job_params)
 					job_params->params.directory.len, job_params->params.directory.buffer);
 
 	/* Gather local variables to pass */
-	if (job_params->passcurlvn)
+	if (job_params->xfercurlvn)
 	{	/* Create a "memory file" to store the job_set_locals messages for later transmission by the middle child. */
 		int4	status;
 

@@ -73,7 +73,7 @@ void secshr_finish_CMT18_to_CMT19(sgmnt_addrs *csa)
 	csd = csa->hdr;
 	is_bg = (dba_bg == csd->acc_meth);
 	if (!is_bg)
-	{	/* Step CMT18 already done as part of CMT10a for MM in "secshr_finish_CMT08_to_CMT14" */
+	{	/* Step CMT18 already done as part of CMT10a for MM in "secshr_finish_CMT09_to_CMT15" */
 		csa->t_commit_crit = FALSE;	/* Step CMT19 */
 		return;	/* If MM, phase2 commit is already done */
 	}
@@ -112,9 +112,9 @@ void secshr_finish_CMT18_to_CMT19(sgmnt_addrs *csa)
 			if (gds_t_committed == cs->mode)
 				continue;
 			/* At this point, a positive value of "cs->old_mode" implies phase1 did not complete on "cs".
-			 * This is possible for example if "secshr_finish_CMT08_to_CMT14" could not find a cr in the
+			 * This is possible for example if "secshr_finish_CMT09_to_CMT15" could not find a cr in the
 			 * global buffers for this cs. In that case, skip this cr. Error messages corresponding to this
-			 * missed block commit would have been recorded in "secshr_finish_CMT08_to_CMT14".
+			 * missed block commit would have been recorded in "secshr_finish_CMT09_to_CMT15".
 			 * There is one more possibility and that is if it there was a cse with mode > gds_t_committed
 			 * (for example gds_t_write_root etc.) and phase1 was finished in t_end/tp_tend but an error occurred
 			 * in phase2 when "secshr_db_clnup" took control. In that case, t_end/tp_tend would have set cs->old_mode
@@ -134,7 +134,7 @@ void secshr_finish_CMT18_to_CMT19(sgmnt_addrs *csa)
 		}
 #		ifdef DEBUG
 		if (!cr_stopped_seen)
-		{	/* We did not pick any crs in "secshr_finish_CMT08_to_CMT14" (those with cr->stopped non-zero).
+		{	/* We did not pick any crs in "secshr_finish_CMT09_to_CMT15" (those with cr->stopped non-zero).
 			 * This means we can be sure when phase2 of commit is done, all crs have been unpinned. Assert accordingly.
 			 */
 			if (dollar_tlevel)

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
@@ -27,8 +27,15 @@
 #include "do_xform.h"
 #include "format_targ_key.h"
 
+<<<<<<< HEAD
 GBLREF gv_namehead	*gv_target;
 GBLREF boolean_t	tref_transform;
+||||||| parent of 19e495f7cb (GT.M V7.1-003)
+GBLREF	gv_namehead	*gv_target;
+=======
+GBLREF	gv_namehead	*gv_target;
+GBLREF	gd_region	*gv_cur_region;
+>>>>>>> 19e495f7cb (GT.M V7.1-003)
 
 static readonly unsigned int pos_code[100] =
 {
@@ -68,10 +75,16 @@ unsigned char *mval2subsc(mval *in_val, gv_key *out_key, boolean_t std_null_coll
 	int4		mt, mw, mx;
 	uint4		mvt;	/* Local copy of mvtype, bit ands use a int4, so do conversion once */
 	unsigned int	digs, exp_val;
+<<<<<<< HEAD
 	int		tmp_len, avail_bytes;
 #	ifdef DEBUG
 	unsigned char	*tm_end;
 #	endif
+||||||| parent of 19e495f7cb (GT.M V7.1-003)
+	int		tmp_len, avail_bytes;
+=======
+	int		avail_bytes, length_exceed, max_len, tmp_len;
+>>>>>>> 19e495f7cb (GT.M V7.1-003)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -132,14 +145,17 @@ unsigned char *mval2subsc(mval *in_val, gv_key *out_key, boolean_t std_null_coll
 		 * 	store the STR_SUB_ESCAPE byte. Decrement the available space until it becomes zero
 		 *	at which point issue a GVSUBOFLOW error as well.
 		 */
-		avail_bytes = out_key->top - (out_key->end + tmp_len + 3);
+		length_exceed = out_key->end + tmp_len + 3;
+		max_len = out_key->top;
+		avail_bytes = max_len - length_exceed;
 		if (0 > avail_bytes)
-			ISSUE_GVSUBOFLOW_ERROR(out_key, KEY_COMPLETE_FALSE);
+			ISSUE_GVSUBOFLOW_ERROR(out_key, KEY_COMPLETE_FALSE, length_exceed, max_len, gv_cur_region);
 		if (0 < tmp_len)
 		{
 			*out_ptr++ = STR_SUB_PREFIX;
 			do
 			{
+				length_exceed++;
 				ch = *in_ptr++;
 				if (ch <= 1)
 				{
@@ -149,7 +165,8 @@ unsigned char *mval2subsc(mval *in_val, gv_key *out_key, boolean_t std_null_coll
 						/* Ensure input key to format_targ_key is double null terminated */
 						assert(STR_SUB_PREFIX == out_key->base[out_key->end]);
 						out_key->base[out_key->end] = KEY_DELIMITER;
-						ISSUE_GVSUBOFLOW_ERROR(out_key, KEY_COMPLETE_FALSE);
+						ISSUE_GVSUBOFLOW_ERROR(out_key, KEY_COMPLETE_FALSE, length_exceed,
+												max_len, gv_cur_region);
 					}
 					ch++;	/* promote character */
 				}
@@ -327,7 +344,8 @@ ALLDONE:
 	 * MAX_GVKEY_PADDING_LEN bytes (allocated additionally as part of the DBKEYSIZE macro) left at the end.
 	 * If not, we have overflown the original max-key-size length. Issue error.
 	 */
-	if ((MAX_GVKEY_PADDING_LEN + 1) > (int)(out_key->top - out_key->end))
-		ISSUE_GVSUBOFLOW_ERROR(out_key, KEY_COMPLETE_FALSE);
+	length_exceed = out_key->end + MAX_GVKEY_PADDING_LEN + 1;
+	if (length_exceed > (max_len = out_key->top))
+		ISSUE_GVSUBOFLOW_ERROR(out_key, KEY_COMPLETE_FALSE, length_exceed, MIN((MAX_KEY_SZ - 4), max_len), gv_cur_region);
 	return out_ptr;
 }

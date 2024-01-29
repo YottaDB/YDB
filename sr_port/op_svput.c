@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
@@ -25,6 +25,8 @@
 #include "fileinfo.h"
 #include "gdsbt.h"
 #include "gdsfhead.h"
+#include "repl_msg.h"           /* for gtmsource.h */
+#include "gtmsource.h"          /* for jnlpool_addrs_ptr_t */
 #include "indir_enum.h"
 #include "error.h"
 #include "stringpool.h"
@@ -65,6 +67,7 @@
 GBLREF boolean_t		dollar_zquit_anyway, dollar_ztexit_bool, malloccrit_issued, ztrap_new;
 GBLREF boolean_t		ztrap_explicit_null;		/* whether $ZTRAP was explicitly set to NULL in this frame */
 GBLREF gd_addr			*gd_header;
+GBLREF jnlpool_addrs_ptr_t	jnlpool, jnlpool_head;
 GBLREF gv_key			*gv_currkey;
 GBLREF gv_namehead		*gv_target;
 GBLREF io_pair			io_curr_device;
@@ -106,11 +109,27 @@ error_def(ERR_ZTWORMHOLE2BIG);
 
 void op_svput(int varnum, mval *v)
 {
+<<<<<<< HEAD
 	char	*vptr, lcl_str[256], *tmpPtr;
 	int	i, ok, state, tmp;
 	mval	lcl_mval;
 	int4	previous_gtm_strpllim;
 	size_t	rtmp;
+||||||| parent of 19e495f7cb (GT.M V7.1-003)
+	char	*vptr;
+	int	i, ok, state, tmp;
+	int4	previous_gtm_strpllim;
+	size_t	rtmp;
+	mstr	trap_v;
+=======
+	char		*vptr;
+	int		i, ok, state, tmp;
+	int4		previous_gtm_strpllim;
+	size_t		rtmp;
+	sgmnt_addrs	*csa;			/* for ZGBLDIR */
+	gd_region	*reg, *reg_top;
+	mstr		trap_v;
+>>>>>>> 19e495f7cb (GT.M V7.1-003)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -158,6 +177,19 @@ void op_svput(int varnum, mval *v)
 					dollar_zgbldir.str.len = v->str.len;
 					dollar_zgbldir.str.addr = v->str.addr;
 					s2pool(&dollar_zgbldir.str);
+					if (jnlpool_head && jnlpool_head->next)
+					{	/* only makes sense to change jnlpool if more than one attached */
+						for (reg = gd_header->regions, reg_top = reg + gd_header->n_regions;
+								reg < reg_top; reg++)
+						{	/* is there a jnlpool - only one per gbldir */
+							csa = REG2CSA(reg);
+							if (csa && csa->jnlpool && csa->jnlpool->pool_init)
+							{	/* jnlpool should be setup */
+								jnlpool = csa->jnlpool;		/* make current for $ZPEEK */
+								break;
+							}
+						}
+					}
 				}
 				/* Set "ydb_cur_gbldir" env var to current $zgbldir. Utilities like %YDBPROCSTUCKEXEC look at this
 				 * env var to know the current $zgbldir instead of what $ydb_gbldir env var points to (YDB#941).
