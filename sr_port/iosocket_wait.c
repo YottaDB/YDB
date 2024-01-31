@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -370,6 +370,9 @@ boolean_t iosocket_wait(io_desc *iod, uint8 nsec_timeout, mval *whatop, mval *ha
 		/* find out which sockets are ready */
 		oldestlistencycle = oldestconnectedcycle = oldestwritecycle = 0;
 		oldestlistenindex = oldestconnectedindex = oldestwriteindex = -1;
+#		ifdef DEBUG
+		boolean_t	poll_error = FALSE;	/* set to TRUE if AT LEAST one socket poll() returned POLLERR or POLLHUP */
+#		endif
 		for (ii = 0; ii < dsocketptr->n_socket; ii++)
 		{
 			if (which_socketptr && (which_socketptr != dsocketptr->socket[ii]))
@@ -385,6 +388,10 @@ boolean_t iosocket_wait(io_desc *iod, uint8 nsec_timeout, mval *whatop, mval *ha
 			assertpro((0 == jj) || (jj <= poll_nfds));	/* equal poll_nfds if not polled */
 			if (nselect && (jj != poll_nfds) && (socketptr->sd == poll_fds[jj].fd) && poll_fds[jj].revents)
 			{	/* set flag in socketptr and keep going */
+#				ifdef DEBUG
+				if ((POLLERR | POLLHUP) & poll_fds[jj].revents)
+					poll_error = TRUE;
+#				endif
 				if (POLLIN & poll_fds[jj].revents)
 				{
 					socketptr->current_events |= SOCKPEND_READ;
@@ -505,8 +512,11 @@ boolean_t iosocket_wait(io_desc *iod, uint8 nsec_timeout, mval *whatop, mval *ha
 			oldesteventindex = oldestwriteindex;
 			DBGSOCKWAIT((stdout,"selected write socket[%d], cycle = %d\n", oldestwriteindex, oldestwritecycle));
 		} else
-		{	/* unexpected nothing to do */
-			assert((0 < oldestlistencycle) || (0 < oldestconnectedcycle));
+		{	/* This is possible if "poll()" returned due to a POLLERR or POLLHUP condition in "poll_fds[jj].revents"
+			 * but no POLLIN or POLLOUT condition. That is, the peer side hung up unexpectedly. In that case, there
+			 * is nothing we can do.
+			 */
+			assert(poll_error);
 			iod->dollar.key[0] = '\0';
 			if (NO_M_TIMEOUT != nsec_timeout)
 			{
