@@ -738,6 +738,7 @@ void	repl_inst_dump_gtmsourcelocal(gtmsource_local_ptr_t gtmsourcelocal_ptr)
 	repl_conn_info_t	*remote_side;
 	int			errcode;
 	char			secondary_addr[SA_MAXLEN + 1];
+	int4			renegotiate_factor = 0;
 
 	for (idx = 0; idx < NUM_GTMSRC_LCL; idx++, gtmsourcelocal_ptr++)
 	{
@@ -1026,8 +1027,18 @@ void	repl_inst_dump_gtmsourcelocal(gtmsource_local_ptr_t gtmsourcelocal_ptr)
 		}
 		PRINT_OFFSET_PREFIX(offsetof(gtmsource_local_struct, renegotiate_interval),
 					SIZEOF(gtmsourcelocal_ptr->renegotiate_interval));
-		util_out_print(PREFIX_SOURCELOCAL "Renegotiate Interval (in seconds)     !10UL [0x!XL]", TRUE, idx,
+		util_out_print(PREFIX_SOURCELOCAL "Input Renegotiate Interval in seconds !10UL [0x!XL]", TRUE, idx,
 					gtmsourcelocal_ptr->renegotiate_interval, gtmsourcelocal_ptr->renegotiate_interval);
+		SET_RENEGOTIATE_FACTOR(renegotiate_factor, gtmsourcelocal_ptr);
+		PRINT_OFFSET_PREFIX(offsetof(gtmsource_local_struct, renegotiate_interval),
+					SIZEOF(gtmsourcelocal_ptr->renegotiate_interval));
+		util_out_print(PREFIX_SOURCELOCAL "Actual Renegotiate Interval in seconds!10UL [0x!XL]", TRUE, idx,
+					renegotiate_factor * gtmsourcelocal_ptr->connect_parms[GTMSOURCE_CONN_HEARTBEAT_PERIOD],
+					renegotiate_factor * gtmsourcelocal_ptr->connect_parms[GTMSOURCE_CONN_HEARTBEAT_PERIOD]);
+		PRINT_OFFSET_PREFIX(offsetof(gtmsource_local_struct, prev_renegotiate_time),
+					SIZEOF(gtmsourcelocal_ptr->prev_renegotiate_time));
+		util_out_print(PREFIX_SOURCELOCAL, FALSE, idx);
+		PRINT_TIME("Prev Renegotiate Time       ", gtmsourcelocal_ptr->prev_renegotiate_time);
 		PRINT_OFFSET_PREFIX(offsetof(gtmsource_local_struct, next_renegotiate_time),
 					SIZEOF(gtmsourcelocal_ptr->next_renegotiate_time));
 		util_out_print(PREFIX_SOURCELOCAL, FALSE, idx);

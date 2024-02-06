@@ -3,7 +3,7 @@
  * Copyright (c) 2006-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -147,6 +147,7 @@ int gtmsource_est_conn()
 	assert((NULL == repl_tls.sock) || (NULL == repl_tls.sock->ssl));
 	/* Since this is a new connection, reset next renegotiation time. */
 	gtmsource_local->next_renegotiate_time = 0;	/* Set to correct value after TLS/SSL handshake is established. */
+	gtmsource_local->prev_renegotiate_time = 0;	/* Set to correct value after first renegotiation happens */
 #	endif
 	assert(remote_side == &gtmsource_local->remote_side);
 	remote_side->proto_ver = REPL_PROTO_VER_UNINITIALIZED;

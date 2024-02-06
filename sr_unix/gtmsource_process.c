@@ -175,12 +175,14 @@
 }
 #endif
 
-#define REPLTLS_SET_NEXT_RENEGOTIATE_HRTBT(REPL_TLS, NEXT_RENEGOTIATE_HRTBT, HRTBT_CNT, GTMSOURCE_LOCAL)		\
-{															\
-	REPL_TLS.renegotiate_state = REPLTLS_RENEG_STATE_NONE;								\
-	NEXT_RENEGOTIATE_HRTBT = FALSE;											\
-	HRTBT_CNT = 0;													\
-	GTMSOURCE_LOCAL->next_renegotiate_time = (uint4)time(NULL) + GTMSOURCE_LOCAL->renegotiate_interval;		\
+#define REPLTLS_SET_NEXT_RENEGOTIATE_HRTBT(REPL_TLS, NEXT_RENEGOTIATE_HRTBT, RENEGOTIATE_FACTOR, HRTBT_CNT, GTMSOURCE_LOCAL)	\
+{																\
+	REPL_TLS.renegotiate_state = REPLTLS_RENEG_STATE_NONE;									\
+	NEXT_RENEGOTIATE_HRTBT = FALSE;												\
+	HRTBT_CNT = 0;														\
+	GTMSOURCE_LOCAL->prev_renegotiate_time = GTMSOURCE_LOCAL->next_renegotiate_time;					\
+	GTMSOURCE_LOCAL->next_renegotiate_time											\
+		= (uint4)time(NULL) + (RENEGOTIATE_FACTOR * GTMSOURCE_LOCAL->connect_parms[GTMSOURCE_CONN_HEARTBEAT_PERIOD]);	\
 }
 
 #define	PHASE2_COMMIT_WAIT_CNT	8	/* 8 iterations of each 1 msec sleep before we decide to invoke "repl_phase2_cleanup" */
@@ -622,7 +624,8 @@ void gtmsource_recv_ctl(void)
 					heartbeat_stalled = FALSE;
 				/* else, heartbeat_stalled will be set back to FALSE when REPL_XON is received. */
 				DEBUG_ONLY(renegotiation_pending = FALSE);
-				REPLTLS_SET_NEXT_RENEGOTIATE_HRTBT(repl_tls, next_renegotiate_hrtbt, hrtbt_cnt, gtmsource_local);
+				REPLTLS_SET_NEXT_RENEGOTIATE_HRTBT(repl_tls, next_renegotiate_hrtbt,	\
+								renegotiate_factor, hrtbt_cnt, gtmsource_local);
 				repl_log_tls_info(gtmsource_log_fp, repl_tls.sock);
 				break;
 #			endif
@@ -759,18 +762,8 @@ int gtmsource_process(void)
 	assert(REPL_POLL_WAIT < MILLISECS_IN_SEC);
 	assert(GTMSOURCE_IDLE_POLL_WAIT < REPL_POLL_WAIT);
 
-	if (0 < gtmsource_options.renegotiate_interval)
-	{
-		/* When heartbeat period is a multiple of renegotiate_interval, perform
-	           renegotiation every renegotiate_interval/heartbeat_period. */
-		renegotiate_factor = (int) DIVIDE_ROUND_DOWN(gtmsource_options.renegotiate_interval,
-				gtmsource_local->connect_parms[GTMSOURCE_CONN_HEARTBEAT_PERIOD]);
-		/* When heartbeat period is about as high as the renegotiate interval i.e. (1 == renegotiate_factor),
-		 * perform renegotiation every other heartbeat.
-		 */
-		if (1 == renegotiate_factor)
-			renegotiate_factor++;
-	}
+	assert(gtmsource_options.renegotiate_interval == gtmsource_local->renegotiate_interval);
+	SET_RENEGOTIATE_FACTOR(renegotiate_factor, gtmsource_local);
 
 	gtmsource_state = gtmsource_local->gtmsource_state = GTMSOURCE_WAITING_FOR_CONNECTION;
 	gtmsource_srv_latch = &gtmsource_local->gtmsource_srv_latch;
@@ -1506,7 +1499,8 @@ int gtmsource_process(void)
 			} else
 			{
 				repl_tls.enabled = TRUE; /* From here on, all communications are secured with TLS/SSL. */
-				REPLTLS_SET_NEXT_RENEGOTIATE_HRTBT(repl_tls, next_renegotiate_hrtbt, hrtbt_cnt, gtmsource_local);
+				REPLTLS_SET_NEXT_RENEGOTIATE_HRTBT(repl_tls, next_renegotiate_hrtbt,	\
+								renegotiate_factor, hrtbt_cnt, gtmsource_local);
 			}
 		}
 #		endif
@@ -1560,7 +1554,7 @@ int gtmsource_process(void)
 		heartbeat_stalled = FALSE;
 #		ifdef GTM_TLS
 		DEBUG_ONLY(renegotiation_pending = FALSE);
-		if (repl_tls.enabled && (0 < gtmsource_options.renegotiate_interval))
+		if (repl_tls.enabled && (0 < gtmsource_local->renegotiate_interval))
 			repl_tls.renegotiate_state = REPLTLS_WAITING_FOR_RENEG_TIMEOUT;
 #		endif
 		/* Flush "gtmsource_local->read_jnl_seqno" to disk right now. This will serve as a reference point for next timed

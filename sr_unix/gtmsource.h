@@ -485,6 +485,7 @@ typedef struct
 	boolean_t		jnlfileonly;		/* Current source server is only reading from journal files */
 #	ifdef GTM_TLS
 	int4			renegotiate_interval;	/* renegotiate interval specified at source server startup */
+	uint4			prev_renegotiate_time;	/* Time (in past) at which the most recent SSL/TLS renegotiation happened */
 	uint4			next_renegotiate_time;	/* Time (in future) at which the next SSL/TLS renegotiation happens. */
 	int4			num_renegotiations;	/* Number of SSL/TLS renegotiations that happened so far. */
 #	endif
@@ -641,6 +642,27 @@ typedef jnlpool_addrs	*jnlpool_addrs_ptr_t;
 #if defined(__osf__) && defined(__alpha)
 # pragma pointer_size(restore)
 #endif
+
+#define	SET_RENEGOTIATE_FACTOR(RENEGOTIATE_FACTOR, GTMSOURCE_LOCAL)							\
+{															\
+	int	heartbeatPeriod, renegotiateInterval;									\
+															\
+	heartbeatPeriod = GTMSOURCE_LOCAL->connect_parms[GTMSOURCE_CONN_HEARTBEAT_PERIOD];				\
+	if (heartbeatPeriod)												\
+	{														\
+		renegotiateInterval = GTMSOURCE_LOCAL->renegotiate_interval;						\
+		/* When heartbeat period is a multiple of renegotiateInterval, perform renegotiation every		\
+		 * renegotiateInterval/heartbeatPeriod.									\
+		 */													\
+		RENEGOTIATE_FACTOR = DIVIDE_ROUND_DOWN(renegotiateInterval, heartbeatPeriod);				\
+		/* When heartbeat period is about as high as the renegotiate interval i.e. (1 == RENEGOTIATE_FACTOR),	\
+		 * perform renegotiation every other heartbeat.								\
+		 */													\
+		if (1 == RENEGOTIATE_FACTOR)										\
+			RENEGOTIATE_FACTOR++;										\
+	} else														\
+		RENEGOTIATE_FACTOR = 0;											\
+}
 
 /* Types of processes that can do jnlpool_init */
 typedef enum
