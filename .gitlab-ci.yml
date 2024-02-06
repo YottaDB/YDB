@@ -77,6 +77,8 @@ clang-tidy-amd64:
 
 # We run this job only on master since it's slow (30 minutes)
 clang-tidy-aarch64:
+  # Override default runner timeout of 1 hour since this job has sometimes timed out
+  timeout: 3h
   extends: .clang-tidy
   tags:
     - aarch64
