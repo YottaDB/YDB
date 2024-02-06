@@ -3,7 +3,7 @@
  * Copyright (c) 2006-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -436,6 +436,9 @@ int gtmsource_get_opt(void)
 				return -1;
 			}
 			assert(0 < tlsid_len);
+			/* Note that "renegotiate_interval" variable units is in "minutes" below whereas
+			 * "gtmsource_options.renegotiate_interval" units is in "seconds".
+			 */
 			if (CLI_PRESENT == cli_present("RENEGOTIATE_INTERVAL"))
 			{
 				if (!cli_get_int("RENEGOTIATE_INTERVAL", &renegotiate_interval))
@@ -458,8 +461,8 @@ int gtmsource_get_opt(void)
 				}
 
 			} else
-				renegotiate_interval = DEFAULT_RENEGOTIATE_TIMEOUT * 60; /* Convert to seconds. */
-			gtmsource_options.renegotiate_interval = renegotiate_interval * 60;
+				renegotiate_interval = DEFAULT_RENEGOTIATE_TIMEOUT; /* Still in minutes */
+			gtmsource_options.renegotiate_interval = renegotiate_interval * 60;	/* Convert to seconds */
 			/* Check if plaintext-fallback mode is specified. Default option is NOPLAINTEXTFALLBACK. */
 			if (CLI_PRESENT == (plaintext_fallback = cli_present("PLAINTEXTFALLBACK")))
 				repl_tls.plaintext_fallback = (plaintext_fallback != CLI_NEGATED);
