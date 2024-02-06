@@ -3,7 +3,7 @@
  * Copyright (c) 2006-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -1024,6 +1024,10 @@ void	repl_inst_dump_gtmsourcelocal(gtmsource_local_ptr_t gtmsourcelocal_ptr)
 			util_out_print( PREFIX_SOURCELOCAL "Filter Command              !AZ",
 				TRUE, idx, gtmsourcelocal_ptr->filter_cmd);
 		}
+		PRINT_OFFSET_PREFIX(offsetof(gtmsource_local_struct, renegotiate_interval),
+					SIZEOF(gtmsourcelocal_ptr->renegotiate_interval));
+		util_out_print(PREFIX_SOURCELOCAL "Renegotiate Interval (in seconds)     !10UL [0x!XL]", TRUE, idx,
+					gtmsourcelocal_ptr->renegotiate_interval, gtmsourcelocal_ptr->renegotiate_interval);
 		PRINT_OFFSET_PREFIX(offsetof(gtmsource_local_struct, next_renegotiate_time),
 					SIZEOF(gtmsourcelocal_ptr->next_renegotiate_time));
 		util_out_print(PREFIX_SOURCELOCAL, FALSE, idx);

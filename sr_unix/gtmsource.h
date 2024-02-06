@@ -3,7 +3,7 @@
  * Copyright (c) 2006-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -484,6 +484,7 @@ typedef struct
 	global_latch_t		gtmsource_srv_latch;
 	boolean_t		jnlfileonly;		/* Current source server is only reading from journal files */
 #	ifdef GTM_TLS
+	int4			renegotiate_interval;	/* renegotiate interval specified at source server startup */
 	uint4			next_renegotiate_time;	/* Time (in future) at which the next SSL/TLS renegotiation happens. */
 	int4			num_renegotiations;	/* Number of SSL/TLS renegotiations that happened so far. */
 #	endif

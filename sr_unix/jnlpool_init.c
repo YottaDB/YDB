@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -1228,6 +1228,7 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 			 */
 			SET_LATCH_GLOBAL(&gtmsourcelocal_ptr->gtmsource_srv_latch, LOCK_AVAILABLE);
 #			ifdef GTM_TLS
+			gtmsourcelocal_ptr->renegotiate_interval = gtmsource_options.renegotiate_interval;
 			/* Since the slot is reused for (possibly) a different secondary instance, reset the # of renegotiations
 			 * counter.
 			 */
