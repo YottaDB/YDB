@@ -81,6 +81,8 @@ GPG_KEYS=(
     "67D89209E54981F1023D915DBDFD816F09C10D01"
     # Comsan Chanma
     "D2590D2F68BC2620370D52EBDEEEA9DC8B9A55D8"
+    # Jirapat Distaprom
+    "146843872A57D45E8CB06841295AC8BD2134D07E"
 )
 gpg --keyserver hkps://keyserver.ubuntu.com --recv-keys "${GPG_KEYS[@]}"
 
