@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #################################################################
 #								#
-# Copyright (c) 2020-2023 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2020-2024 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
@@ -79,6 +79,8 @@ GPG_KEYS=(
     "A8C4D3290201B5647F557BC8135280C2690FCF0F"
     # Erno Zalka
     "67D89209E54981F1023D915DBDFD816F09C10D01"
+    # Comsan Chanma
+    "D2590D2F68BC2620370D52EBDEEEA9DC8B9A55D8"
 )
 gpg --keyserver hkps://keyserver.ubuntu.com --recv-keys "${GPG_KEYS[@]}"
 
