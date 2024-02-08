@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -233,6 +233,9 @@ void	op_oldvar(void);
 int	op_open(mval *device, mval *devparms, mval *timeout, mval *mspace);
 int	op_open_dummy(mval *v, mval *p, mval *timeout, mval *mspace);
 int	op_rdone(mval *v, mval *timeout);
+
+#define	OP_READ_MORE_READ_TIME	100	/* msec */
+
 int	op_read(mval *v, mval *timeout);
 int	op_readfl(mval *v, int4 length, mval *timeout);
 int	op_ret();

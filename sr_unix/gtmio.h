@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -80,8 +80,6 @@ error_def(ERR_PREMATEOF);
 #define	DOWRITERL_A	DOWRITERL
 #endif
 
-#define MAX_FILE_OPEN_TRIES	20  /* polling count */
-#define WAIT_FOR_FILE_TIME	100 /* msec */
 #define WAIT_FOR_BLOCK_TIME	100 /* msec */
 
 #define IOCTL(FDESC, REQUEST, ARG, RC)			\

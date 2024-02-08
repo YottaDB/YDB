@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -462,7 +462,15 @@ int go_get(char **in_ptr, int max_len, uint4 max_rec_size)
 	/* one-time only reads if in TP to avoid TPNOTACID, otherwise use untimed reads */
 	for (ret_len = 0; ; )
 	{
-		op_read(&val, (mval *)(dollar_tlevel ? &literal_zero : &literal_notimeout));
+		int	ret;
+
+		/* Use one-time only reads (i.e. zero timeout) if in TP to avoid TPNOTACID. Otherwise use untimed reads */
+		ret = op_read(&val, (mval *)(dollar_tlevel ? &literal_zero: &literal_notimeout));
+		if (dollar_tlevel && !ret)
+		{
+			SHORT_SLEEP(OP_READ_MORE_READ_TIME);	/* see comment in file_input.c for why this is needed */
+			continue;
+		}
 		rd_len = val.str.len;
 		if ((0 == rd_len) && io_curr_device.in->dollar.zeof)
 		{

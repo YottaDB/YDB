@@ -3,7 +3,7 @@
  * Copyright (c) 2010-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -280,8 +280,20 @@ int file_input_get(char **in_ptr, unsigned int max_len)
 	ESTABLISH_RET(mupip_load_ch, 0);
 	ret_len = 0;
 	for (;;)
-	{	/* one-time only reads if in TP to avoid TPNOTACID, otherwise use untimed reads */
-		op_read(&val, (mval *)(dollar_tlevel ? &literal_zero: &literal_notimeout));
+	{
+		int	ret;
+
+		/* Use one-time only reads (i.e. zero timeout) if in TP to avoid TPNOTACID. Otherwise use untimed reads */
+		ret = op_read(&val, (mval *)(dollar_tlevel ? &literal_zero: &literal_notimeout));
+		if (dollar_tlevel && !ret)
+		{	/* If zero timeout read was used (which would be the case if "dollar_tlevel" is non-zero) and
+			 * "op_read()" returned FALSE, then we know there was no data to be read. Therefore, keep retrying
+			 * the "op_read()" until data is available. But we don't want a spin-loop and so sleep a bit in
+			 * between multiple "op_read()" calls. Hence the use of SHORT_SLEEP below.
+			 */
+			SHORT_SLEEP(OP_READ_MORE_READ_TIME);
+			continue;
+		}
 		assert(0 <= val.str.len);
 		rd_len = (unsigned int)val.str.len;
 		if ((0 == rd_len) && io_curr_device.in->dollar.zeof)
