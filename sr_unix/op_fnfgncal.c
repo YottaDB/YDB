@@ -796,7 +796,7 @@ STATICFNDEF void op_fgnjavacal(mval *dst, mval *package, mval *extref, uint4 mas
 	/* Note that this is the nominal buffer size; or, explicitly, the size of buffer without the protection tags */
 	call_buff_size = n;
 	OP_FNFGNCAL_ALLOCATE(param_list_buff, call_buff_size + 2 * buff_boarder_len);
-	param_list = set_up_buffer(param_list_buff, n);
+	param_list = set_up_buffer(param_list_buff, call_buff_size);
 	param_list->arg[0] = (void *)types_descr_ptr;
 	/* Adding 3 to account for type descriptions, class name, and method name arguments. */
 	free_space_pointer = (ydb_long_t *)((char *)param_list + SIZEOF(intszofptr_t) + (SIZEOF(void *) * (argcnt + 3)));
@@ -909,8 +909,8 @@ STATICFNDEF void op_fgnjavacal(mval *dst, mval *package, mval *extref, uint4 mas
 				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_UNIMPLOP);
 				break;
 		}
-		assert(((char *)free_string_pointer <= ((char *)param_list + n * 2))
-			&& ((char *)free_space_pointer <= ((char *)param_list + n * 2)));
+		assert(((char *)free_string_pointer <= ((char *)param_list + call_buff_size))
+			&& ((char *)free_space_pointer <= free_string_pointer_start));
 		i++;
 		m1 = m1 >> 1;
 		m2 = m2 >> 1;
@@ -925,7 +925,7 @@ STATICFNDEF void op_fgnjavacal(mval *dst, mval *package, mval *extref, uint4 mas
 	TREF(in_ext_call) = TRUE;
 	status = callg((callgfnptr)entry_ptr->fcn, param_list);
 	TREF(in_ext_call) = save_in_ext_call;
-	verify_buffer((char *)param_list, n, entry_ptr->entry_name.addr);
+	verify_buffer((char *)param_list, call_buff_size, entry_ptr->entry_name.addr);
 	if (!save_in_ext_call)
 		check_for_timer_pops(!entry_ptr->ext_call_behaviors[SIGSAFE]);
 	mumps_status = save_mumps_status;
@@ -1145,9 +1145,9 @@ void op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 ma
 	 * the string buffer is stored.
 	 */
 	/* Note that this is the nominal buffer size; or, explicitly, the size of buffer without the protection tags */
-	call_buff_size = 2 * n;
+	call_buff_size = n;
 	OP_FNFGNCAL_ALLOCATE(param_list_buff, call_buff_size + 2 * buff_boarder_len);
-	param_list = set_up_buffer(param_list_buff, 2 * n);
+	param_list = set_up_buffer(param_list_buff, call_buff_size);
 	free_space_pointer = (ydb_long_t *)((char *)param_list + SIZEOF(intszofptr_t) + (SIZEOF(void *) * argcnt));
 	free_string_pointer_start = free_string_pointer = (char *)param_list + entry_ptr->parmblk_size;
 	/* Load-up the parameter list */
@@ -1372,6 +1372,8 @@ void op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 ma
 				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_UNIMPLOP);
 				break;
 		}
+		assert(((char *)free_string_pointer <= ((char *)param_list + call_buff_size))
+			&& ((char *)free_space_pointer <= free_string_pointer_start));
 	}
 	assert((char *)free_space_pointer <= free_string_pointer_start);
 	va_end(var);
@@ -1385,7 +1387,7 @@ void op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 ma
 	TREF(in_ext_call) = save_in_ext_call;
 	is_tpretry = (ERR_TPRETRY == mumps_status);	/* note down whether the callg invocation had a TPRETRY error code */
 	mumps_status = save_mumps_status;
-	verify_buffer((char *)param_list, (2*n), entry_ptr->entry_name.addr);
+	verify_buffer((char *)param_list, call_buff_size, entry_ptr->entry_name.addr);
 	check_for_timer_pops(!entry_ptr->ext_call_behaviors[SIGSAFE]);
 	/* Exit from the residual call-in environment(SFT_CI base frame) which might
 	 * still exist on M stack when the externally called function in turn called
