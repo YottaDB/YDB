@@ -1219,8 +1219,8 @@ void op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 ma
 				{
 					memcpy(free_string_pointer, v->str.addr, v->str.len);
 					free_string_pointer += v->str.len;
+					*free_string_pointer++ = '\0';
 				}
-				*free_string_pointer++ = '\0';
 				free_space_pointer++;
 				break;
 			case ydb_int_star:
