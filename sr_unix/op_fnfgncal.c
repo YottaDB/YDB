@@ -187,12 +187,12 @@ STATICFNDCL gparam_list	*set_up_buffer(char *p_list, int len);
 STATICFNDCL void	verify_buffer(char *p_list, int len, char *m_label);
 STATICFNDCL void	free_return_type(INTPTR_T ret_val, enum ydb_types typ);
 
-static const int buff_boarder_len = 8;	/* Needs to be 8-byte aligned or else "free_space_pointer" would not be 4-byte or
+static const int buff_border_len = 8;	/* Needs to be 8-byte aligned or else "free_space_pointer" would not be 4-byte or
 					 * 8-byte aligned for different input parameter types which could later show up
 					 * as a SIGBUS error due to unaligned access on platforms that care about it (e.g. ARM).
 					 */
-static const char *buff_front_boarder = "STMARKER";
-static const char *buff_end_boarder = "ENMARKER";
+#define	BUFF_FRONT_BORDER 	"STMARKER"
+#define	BUFF_END_BORDER		"ENMARKER"
 
 /* If the assigned pointer value is NULL, pass back a literal_null */
 #define	VALIDATE_AND_CONVERT_PTR_TO_TYPE(LMVTYPE, TYPE, CONTAINER, DST, SRC)	\
@@ -216,18 +216,21 @@ MBSTART {									\
 	}					\
 }
 
-/* Routine to set up boarders around the external call buffer */
+/* Routine to set up borders around the external call buffer */
 STATICFNDCL gparam_list *set_up_buffer(char *p_list, int len)
 {
-	memcpy(p_list, buff_front_boarder, buff_boarder_len);
-	memcpy((p_list + len + buff_boarder_len), buff_end_boarder, buff_boarder_len);
-	return (gparam_list *)(p_list + buff_boarder_len);
+	assert(0 == (buff_border_len % 8));	/* See comment in "buff_border_len = 8;" line above for why this assert */
+	assert(buff_border_len == STR_LIT_LEN(BUFF_FRONT_BORDER));
+	memcpy(p_list, BUFF_FRONT_BORDER, buff_border_len);
+	assert(buff_border_len == STR_LIT_LEN(BUFF_END_BORDER));
+	memcpy((p_list + len + buff_border_len), BUFF_END_BORDER, buff_border_len);
+	return (gparam_list *)(p_list + buff_border_len);
 }
 
 STATICFNDCL void verify_buffer(char *p_list, int len, char *m_label)
 {
-	if ((0 != memcmp((p_list + len), buff_end_boarder, buff_boarder_len))
-		|| (0 != memcmp((p_list - buff_boarder_len), buff_front_boarder, buff_boarder_len)))
+	if ((0 != memcmp((p_list + len), BUFF_END_BORDER, buff_border_len))
+		|| (0 != memcmp((p_list - buff_border_len), BUFF_FRONT_BORDER, buff_border_len)))
 	{
 		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_EXTCALLBOUNDS, 1, m_label);
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_EXTCALLBOUNDS, 1, m_label);
@@ -795,7 +798,7 @@ STATICFNDEF void op_fgnjavacal(mval *dst, mval *package, mval *extref, uint4 mas
 	 */
 	/* Note that this is the nominal buffer size; or, explicitly, the size of buffer without the protection tags */
 	call_buff_size = n;
-	OP_FNFGNCAL_ALLOCATE(param_list_buff, call_buff_size + 2 * buff_boarder_len);
+	OP_FNFGNCAL_ALLOCATE(param_list_buff, call_buff_size + 2 * buff_border_len);
 	param_list = set_up_buffer(param_list_buff, call_buff_size);
 	param_list->arg[0] = (void *)types_descr_ptr;
 	/* Adding 3 to account for type descriptions, class name, and method name arguments. */
@@ -1146,7 +1149,7 @@ void op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 ma
 	 */
 	/* Note that this is the nominal buffer size; or, explicitly, the size of buffer without the protection tags */
 	call_buff_size = n;
-	OP_FNFGNCAL_ALLOCATE(param_list_buff, call_buff_size + 2 * buff_boarder_len);
+	OP_FNFGNCAL_ALLOCATE(param_list_buff, call_buff_size + 2 * buff_border_len);
 	param_list = set_up_buffer(param_list_buff, call_buff_size);
 	free_space_pointer = (ydb_long_t *)((char *)param_list + SIZEOF(intszofptr_t) + (SIZEOF(void *) * argcnt));
 	free_string_pointer_start = free_string_pointer = (char *)param_list + entry_ptr->parmblk_size;
