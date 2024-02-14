@@ -697,6 +697,7 @@ STATICFNDEF void op_fgnjavacal(mval *dst, mval *package, mval *extref, uint4 mas
 #	endif
 	/* This is how many parameters we will use for callg, including the implicit ones described below. So, better make
 	 * sure we are not trying to pass more than callg can handle.
+	 * Adding 3 to account for type descriptions, class name, and method name arguments.
 	 */
 	if (MAX_ACTUALS < argcnt + 3)
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_ZCMAXPARAM);
@@ -745,6 +746,12 @@ STATICFNDEF void op_fgnjavacal(mval *dst, mval *package, mval *extref, uint4 mas
 		*types_descr_dptr = 'v';
 	types_descr_dptr++;
 	assert(2 * ydb_jtype_count == SIZEOF(ydb_jtype_chars));
+	/* Iterate args to allocate space for pointer values in space_buffer, and for strings in string_buffer (see description
+	 * in comments below).
+	 * 3 Additional args (type_description, class_name, and method_name) will be sent to `callg()`, prefixed onto callers args.
+	 * Space for type_description is already malloc'ed above, so iterator starts from j=-2 to allocate string space for
+	 * 2 extra parameters (class_name, and method_name)
+	 */
 	for (i = argcnt + 2, j = -2, m1 = entry_ptr->input_mask, m2 = entry_ptr->output_mask, space_n = 0; 0 < i; i--, j++)
 	{	/* Enforce mval values and record expected argument types. */
 		v = va_arg(var, mval *);
@@ -771,8 +778,17 @@ STATICFNDEF void op_fgnjavacal(mval *dst, mval *package, mval *extref, uint4 mas
 #		ifndef GTM64
 		else if ((ydb_jdouble == entry_ptr->parms[j]) || (ydb_jlong == entry_ptr->parms[j]))
 		{	/* Account for potential 8-byte alignment on 32-bit boxes */
-			n += SIZEOF(gtm_int64_t);
-			space_n += SIZEOF(gtm_int64_t);
+			n += SIZEOF(gtm_int64_t) - SIZEOF(*free_space_pointer);
+			space_n += SIZEOF(gtm_int64_t) - SIZEOF(*free_space_pointer);
+			/* ---------------------------------------------
+			 * `ydb_jdouble_t*` and `ydb_jlong_t*` types are always pointer types since they cannot fit in
+			 * sizeof(intptr_t). So this code allocates additional space for the pointed-to value, in case
+			 * that value requires alignment (the actual alignment is done by "ROUND_UP2()" usage below).
+			 * Since the space allocated here is 'just in case', it will be superfluous when no alignment
+			 * is needed. This is not a user-visible bug but will give the user occasional allowance for
+			 * overrun without producing the EXTCALLBOUNDS error.
+			 * ---------------------------------------------
+			 */
 		}
 #		endif
 		jtype_char = entry_ptr->parms[j] - ydb_jtype_start_idx;
@@ -815,6 +831,10 @@ STATICFNDEF void op_fgnjavacal(mval *dst, mval *package, mval *extref, uint4 mas
 	{
 		v = va_arg(var_copy, mval *);
 		if (j < 3)
+		/* Populate arg[1] and arg[2], and their strings, for our prefixed gcall() args,
+		 * specifically: class_name (j=1), and method_name (j=2)
+		 * (the first parameter arg[0] is already populated with type description above).
+		 */
 		{
 			param_list->arg[j] = free_string_pointer;
 			if (v->str.len)
@@ -850,12 +870,10 @@ STATICFNDEF void op_fgnjavacal(mval *dst, mval *package, mval *extref, uint4 mas
 					param_list->arg[j] = (void *)(ydb_long_t)(MV_ON(m1, v) ? mval2i(v) : 0);
 				break;
 			case ydb_jlong:
-#				ifndef GTM64
-				/* Only need to do this rounding on non-64 it platforms because this one type has a 64-bit
-				 * alignment requirement on those platforms.
+				/* Align the pointed-to value on non-64-bit platforms where
+				 * 64-bit types have alignment requirements
 				 */
-				free_space_pointer = (ydb_long_t *)(ROUND_UP2(((INTPTR_T)free_space_pointer), SIZEOF(gtm_int64_t)));
-#				endif
+				NON_GTM64_ONLY(free_space_pointer = (ydb_long_t *)(ROUND_UP2(((INTPTR_T)free_space_pointer), SIZEOF(gtm_int64_t))));
 #				ifdef GTM64
 				if (MASK_BIT_ON(m2))
 				{	/* Output expected. */
@@ -875,12 +893,10 @@ STATICFNDEF void op_fgnjavacal(mval *dst, mval *package, mval *extref, uint4 mas
 				free_space_pointer++;
 				break;
 			case ydb_jdouble:
-#				ifndef GTM64
-				/* Only need to do this rounding on non-64 it platforms because this one type has a 64 bit
-				 * alignment requirement on those platforms.
+				/* Align the pointed-to value on non-64-bit platforms where
+				 * 64-bit types have alignment requirements
 				 */
-				free_space_pointer = (ydb_long_t *)(ROUND_UP2(((INTPTR_T)free_space_pointer), SIZEOF(double)));
-#				endif
+				NON_GTM64_ONLY(free_space_pointer = (ydb_long_t *)(ROUND_UP2(((INTPTR_T)free_space_pointer), SIZEOF(double))));
 				/* Have to go with additional storage either way due to the limitations of callg. */
 				param_list->arg[j] = free_space_pointer;
 				*((double *)free_space_pointer) = (double)(MV_ON(m1, v) ? mval2double(v) : 0.0);
@@ -1124,8 +1140,25 @@ void op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 ma
 				}
 				break;
 #			ifndef GTM64
+			case ydb_int64_star:
+			case ydb_uint64_star:
 			case ydb_double_star:
-				n += SIZEOF(double);
+				/* Allocate space for potential ROUND_UP2 alignment done later in the code */
+				switch(entry_ptr->parms[i])
+				{
+				case ydb_int64_star:
+					n += SIZEOF(ydb_int64_t) - SIZEOF(*free_space_pointer);
+					break;
+				case ydb_uint64_star:
+					n += SIZEOF(ydb_uint64_t) - SIZEOF(*free_space_pointer);
+					break;
+				case ydb_double_star:
+					n += SIZEOF(double) - SIZEOF(*free_space_pointer);
+					break;
+				default:
+					assert(FALSE);
+					break;
+				}
 				/* CAUTION: Fall-through. */
 #			endif
 			default:
@@ -1249,11 +1282,21 @@ void op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 ma
 				free_space_pointer++;
 				break;
 			case ydb_int64_star:
+				// Align the pointed-to value on non-64-bit platforms where 64-bit types have alignment requirements
+				NON_GTM64_ONLY(
+					free_space_pointer =
+						(ydb_long_t *)(ROUND_UP2(((INTPTR_T)free_space_pointer), SIZEOF(ydb_int64_t)))
+				);
 				param_list->arg[i] = free_space_pointer;
 				*((ydb_int64_t *)free_space_pointer) = MV_ON(m1, v) ? (ydb_int64_t)mval2i8(v) : 0;
 				free_space_pointer += (SIZEOF(ydb_int64_t) / SIZEOF(ydb_long_t)); // increment properly for 32 or 64-bit build
 				break;
 			case ydb_uint64_star:
+				// Align the pointed-to value on non-64-bit platforms where 64-bit types have alignment requirements
+				NON_GTM64_ONLY(
+					free_space_pointer =
+						(ydb_long_t *)(ROUND_UP2(((INTPTR_T)free_space_pointer), SIZEOF(ydb_uint64_t)))
+				);
 				param_list->arg[i] = free_space_pointer;
 				*((ydb_uint64_t *)free_space_pointer) = MV_ON(m1, v) ? (ydb_uint64_t)mval2ui8(v) : 0;
 				free_space_pointer += (SIZEOF(ydb_uint64_t) / SIZEOF(ydb_long_t)); // increment properly for 32 or 64-bit build
@@ -1365,7 +1408,9 @@ void op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 ma
 				break;
 			case ydb_pointertofunc_star:
 				/* Cannot pass in a function address to be modified by the user program */
-				free_space_pointer = (ydb_long_t *)ROUND_UP2(((INTPTR_T)free_space_pointer), SIZEOF(INTPTR_T));
+				/* Assert that there is no need to do a ROUND_UP2 in this case both for 32-bit and 64-bit builds */
+				assert(free_space_pointer ==
+					(ydb_long_t *)ROUND_UP2(((INTPTR_T)free_space_pointer), SIZEOF(INTPTR_T)));
 				param_list->arg[i] = free_space_pointer;
 				*((INTPTR_T *)free_space_pointer) = 0;
 				free_space_pointer++;
