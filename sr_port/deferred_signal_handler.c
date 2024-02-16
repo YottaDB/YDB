@@ -37,7 +37,12 @@ void	deferred_signal_handler(void)
 	assert(DEFERRED_SIGNAL_HANDLING_TIMERS < DEFERRED_SIGNAL_HANDLING_CTRLZ);
 	assert(DEFERRED_SIGNAL_HANDLING_CTRLZ < DEFERRED_SIGNAL_HANDLING_EXIT);
 	assert(!INSIDE_THREADED_CODE(dummy_rname));		/* DEFERRED_SIGNAL_HANDLING_CHECK_TRIMMED ensures this */
-	assert(INTRPT_OK_TO_INTERRUPT == intrpt_ok_state);	/* DEFERRED_SIGNAL_HANDLING_CHECK_TRIMMED ensures this */
+	/* ENABLE_INTERRUPTS checks for (INTRPT_OK_TO_INTERRUPT == intrpt_ok_state) and only if TRUE invokes
+	 * the DEFERRED_SIGNAL_HANDLING_CHECK_TRIMMED macro. But it is possible a signal (say SIGTERM) happens after
+	 * that check but before macro call in which case we could come here with "intrpt_ok_state" set to INTRPT_IN_KILL_CLEANUP
+	 * in case this is a MUPIP REORG process (see "generic_signal_handler.c" special logic for reorg). Hence the below assert.
+	 */
+	assert((INTRPT_OK_TO_INTERRUPT == intrpt_ok_state) || (INTRPT_IN_KILL_CLEANUP == intrpt_ok_state));
 	/* Even though "deferred_signal_handling_needed" was TRUE when this function was called in the
 	 * DEFERRED_SIGNAL_HANDLING_CHECK_TRIMMED macro, it is possible a timer pop happens between then
 	 * and here and clears the global in case it only had the DEFERRED_SIGNAL_HANDLING_TIMERS bit set.
