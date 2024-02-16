@@ -353,15 +353,11 @@ STATICFNDEF void extarg2mval(void *src, enum ydb_types typ, mval *dst, boolean_t
 				MV_FORCE_MVAL(dst, s_int_num);
 				break;
 			case ydb_jlong:
-#				ifdef GTM64
 				if (starred)
-					s_long_num = *((ydb_long_t *)src);
+					s_int64_num = *((ydb_int64_t*)src);
 				else
-					s_long_num = (ydb_long_t)src;
-				MV_FORCE_LMVAL(dst, s_long_num);
-#				else
-				i82mval(dst, *(gtm_int64_t *)src);
-#				endif
+					s_int64_num = (ydb_int64_t)(intszofptr_t)src;
+				MV_FORCE_64MVAL(dst, s_int64_num);
 				break;
 			case ydb_jfloat:
 				float2mval(dst, *((float *)src));
@@ -441,18 +437,18 @@ STATICFNDEF void extarg2mval(void *src, enum ydb_types typ, mval *dst, boolean_t
 #		ifdef GTM64
 		case ydb_int64:
 			s_int64_num = (ydb_int64_t)src;
-			MV_FORCE_LMVAL(dst, s_int64_num);
+			MV_FORCE_64MVAL(dst, s_int64_num);
 			break;
 		case ydb_uint64:
 			uns_int64_num = (ydb_uint64_t)src;
-			MV_FORCE_ULMVAL(dst, uns_int64_num);
+			MV_FORCE_U64MVAL(dst, uns_int64_num);
 			break;
 #		endif
 		case ydb_int64_star:
-			VALIDATE_AND_CONVERT_PTR_TO_TYPE(LMVAL, ydb_int64_t, s_int64_num, dst, src);
+			VALIDATE_AND_CONVERT_PTR_TO_TYPE(64MVAL, ydb_int64_t, s_int64_num, dst, src);
 			break;
 		case ydb_uint64_star:
-			VALIDATE_AND_CONVERT_PTR_TO_TYPE(ULMVAL, ydb_uint64_t, uns_int64_num, dst, src);
+			VALIDATE_AND_CONVERT_PTR_TO_TYPE(U64MVAL, ydb_uint64_t, uns_int64_num, dst, src);
 			break;
 		case ydb_string_star:
 			sp = (struct extcall_string *)src;

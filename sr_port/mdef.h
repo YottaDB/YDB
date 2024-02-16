@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  * Copyright (c) 2017-2018 Stephen L Johnson.			*
@@ -593,11 +593,13 @@ mval *underr_strict(mval *start, ...);
 				(void)( (M)->mvtype = MV_NM | MV_INT , (M)->m[1] = (int)(I)*MV_BIAS ))
 #define MV_FORCE_MVAL(M,I)	(((I) >= 1000000 || (I) <= -1000000) ? i2mval((M),(int)(I)) : \
 				(void)( (M)->mvtype = MV_NM | MV_INT , (M)->m[1] = (int)(I)*MV_BIAS ))
+#define MV_FORCE_U64MVAL(M,L)	(((L) >= 1000000) ? ui82mval((M),(gtm_uint64_t)(L)) : \
+				(void)( (M)->mvtype = MV_NM | MV_INT , (M)->m[1] = (int)(L)*MV_BIAS ))
+#define MV_FORCE_64MVAL(M,L)	(((L) >= 1000000 || (L) <= -1000000) ? i82mval((M),(gtm_int64_t)(L)) : \
+				(void)( (M)->mvtype = MV_NM | MV_INT , (M)->m[1] = (int)(L)*MV_BIAS ))
 #ifdef GTM64
-#define MV_FORCE_ULMVAL(M,L)	(((L) >= 1000000) ? ui82mval((M),(gtm_uint64_t)(L)) : \
-				(void)( (M)->mvtype = MV_NM | MV_INT , (M)->m[1] = (int)(L)*MV_BIAS ))
-#define MV_FORCE_LMVAL(M,L)	(((L) >= 1000000 || (L) <= -1000000) ? i82mval((M),(gtm_int64_t)(L)) : \
-				(void)( (M)->mvtype = MV_NM | MV_INT , (M)->m[1] = (int)(L)*MV_BIAS ))
+#define MV_FORCE_ULMVAL(M,L)	MV_FORCE_U64MVAL(M,L)
+#define MV_FORCE_LMVAL(M,L)	MV_FORCE_64MVAL(M,L)
 #else
 #define MV_FORCE_ULMVAL		MV_FORCE_UMVAL
 #define MV_FORCE_LMVAL		MV_FORCE_MVAL
