@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -67,7 +67,7 @@ enum
 	YDB_MAIN_LANG_GO = 1		/* Main routine is written in Go so handle signals differently */
 };
 
-#define	YDB_RELEASE		139	/* Corresponds to YottaDB release r1.39 (i.e. YDB_ZYRELEASE in sr_linux/release_name.h) */
+#define	YDB_RELEASE		200	/* Corresponds to YottaDB release r2.00 (i.e. YDB_ZYRELEASE in sr_linux/release_name.h) */
 
 /* Maximum values */
 #define	YDB_MAX_IDENT		31		/* Maximum size of global/local name (not including '^') */

@@ -3,7 +3,7 @@
 # Copyright (c) 2014-2021 Fidelity National Information         #
 # Services, Inc. and/or its subsidiaries. All rights reserved.  #
 #								#
-# Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 # Copyright (c) 2018 Stephen L Johnson.				#
@@ -223,11 +223,11 @@ help_exit()
 	echo "Version is defaulted from yottadb file if one exists in the same directory as the installer."
 	echo "This version must run as root."
 	echo ""
-	echo "Example usages are (assumes latest YottaDB release is r1.38 and latest GT.M version is V7.0-005)"
-	echo "	$0				# installs latest YottaDB release (r1.38) at /usr/local/lib/yottadb/r138"
-	echo "	$0 --utf8			# installs YottaDB release r1.38 with added support for UTF-8"
-	echo "	$0 --installdir /r138 r1.38	# installs YottaDB r1.38 at /r138"
-	echo "	$0 --gtm			# installs latest GT.M version (V7.0-005) at /usr/local/lib/fis-gtm/V7.0-005_x86_64"
+	echo "Example usages are (assumes latest YottaDB release is r2.00 and latest GT.M version is V7.1-003)"
+	echo "	$0				# installs latest YottaDB release (r2.00) at /usr/local/lib/yottadb/r200"
+	echo "	$0 --utf8			# installs YottaDB release r2.00 with added support for UTF-8"
+	echo "	$0 --installdir /r200 r2.00	# installs YottaDB r2.00 at /r200"
+	echo "	$0 --gtm			# installs latest GT.M version (V7.1-003) at /usr/local/lib/fis-gtm/V7.1-003_x86_64"
 	echo ""
 	echo "As options are processed left to right, later options can override earlier options."
 	echo ""
