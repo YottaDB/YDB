@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -1045,8 +1045,8 @@ void	op_fnview(int numarg, mval *dst, ...)
 
 	if(MV_NM == vtp->restype)
 	{
-		if(n_int8 == TRUE)
-			MV_FORCE_LMVAL(dst, n2);
+		if (n_int8)
+			MV_FORCE_64MVAL(dst, n2); /* need to use this macro as it returns 64-bit numbers even on 32-bit systems */
 		else
 			MV_FORCE_MVAL(dst, n);
 	} else
