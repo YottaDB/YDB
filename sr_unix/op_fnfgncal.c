@@ -353,10 +353,18 @@ STATICFNDEF void extarg2mval(void *src, enum ydb_types typ, mval *dst, boolean_t
 				MV_FORCE_MVAL(dst, s_int_num);
 				break;
 			case ydb_jlong:
+				/* On 64-bit systems, "gtm_jlong_t *" is passed in using a pointer to the actual 8-byte value
+				 * whereas a "gtm_jlong_t" is passed in as is. On 32-bit systems though, both "gtm_jlong_t"
+				 * and "gtm_jlong_t *" are passed in using a pointer to the actual 8-byte value.
+				 */
+#				ifdef GTM64
 				if (starred)
-					s_int64_num = *((ydb_int64_t*)src);
+					s_int64_num = *((ydb_int64_t *)src);
 				else
-					s_int64_num = (ydb_int64_t)(intszofptr_t)src;
+					s_int64_num = (ydb_int64_t)src;
+#				else
+				s_int64_num = *((ydb_int64_t *)src);
+#				endif
 				MV_FORCE_64MVAL(dst, s_int64_num);
 				break;
 			case ydb_jfloat:
