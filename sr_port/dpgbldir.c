@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -50,11 +50,10 @@
 GBLREF	mstr		env_ydb_gbldir_xlate;
 GBLREF	gd_addr		*gd_header;
 GBLREF	gv_namehead	*gv_target_list;
+GBLREF	gdr_name	*gdr_name_head;
+GBLREF	gd_addr		*gd_addr_head;
 
 LITREF	char		gde_labels[GDE_LABEL_NUM][GDE_LABEL_SIZE];
-
-GBLDEF gdr_name	*gdr_name_head;
-GBLDEF gd_addr	*gd_addr_head;
 
 error_def(ERR_GDINVALID);
 
@@ -483,36 +482,6 @@ gd_addr *gd_load(mstr *v, boolean_t force_load)
 	/* Assert that all runtime-only fields are null-initialized by GDE */
 	assert(!table->ygs_map_entry_changed);
 	return table;
-}
-
-/*+
-Function:       GET_NEXT_GDR
-
-		This function returns the next entry in the list of open
-		global directories.  If the input parameter is zero, the
-		first entry is returned, otherwise the next entry in the
-		list is returned.  If the input parameter is not a member
-		of the list, then zero will be returned.
-
-Syntax:         gd_addr *get_next_gdr(gd_addr *prev)
-
-Prototype:      ?
-
-Return:         *gd_addr -- a pointer to the global directory structure
-
-Arguments:      The previous global directory accessed;
-
-Side Effects:   NONE
-
-Notes:          NONE
--*/
-gd_addr *get_next_gdr(gd_addr *prev)
-{
-	gd_addr	*ptr;
-
-	if (NULL == prev)
-		return gd_addr_head;
-	return prev->link;
 }
 
 /* Maintain list of regions for GTCM_SERVER */

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -39,8 +39,7 @@
 #ifdef DEBUG
 GBLREF		jnlpool_addrs_ptr_t	jnlpool;
 GBLREF		volatile int4		gtmMallocDepth;
-
-GBLDEF		boolean_t		in_fake_enospc;	/* used by an assert in "send_msg.c" */
+GBLREF		boolean_t		in_fake_enospc;
 
 STATICDEF	uint4		syslog_deferred = 0;
 

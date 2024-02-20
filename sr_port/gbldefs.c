@@ -1468,3 +1468,11 @@ GBLDEF int			*vrl_catch_signals;
 GBLDEF rl_hook_func_t		**vrl_startup_hook;
 GBLDEF int			*vrl_already_prompted;
 GBLDEF rl_voidfunc_t 		**vrl_redisplay_function;
+
+#ifdef DEBUG
+GBLDEF	boolean_t		in_fake_enospc;	/* used by an assert in "send_msg.c" */
+#endif
+
+GBLDEF gdr_name	*gdr_name_head;
+GBLDEF gd_addr	*gd_addr_head;
+
