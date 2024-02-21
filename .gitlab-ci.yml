@@ -132,10 +132,10 @@ test-r138:
   variables:
     TEST: r138
 
-test-r140:
+test-r200:
   extends: .test-shared
   variables:
-    TEST: r140
+    TEST: r200
 
 test-v70001:
   extends: .test-shared
