@@ -246,7 +246,7 @@ void mupip_integ(void)
 	else
 		muint_fast = FALSE;
 	/* DBG qualifier prints extra debug messages while waiting for KIP in region freeze */
-	debug_mupip = (CLI_PRESENT == cli_present("DBG"));
+	debug_mupip = CLI_PRESENT_DBG_OR_VERBOSE;
 	online_specified = (CLI_PRESENT == cli_present("ONLINE"));
 	if (online_specified)
 	{ 	/* if MUPIP INTEG -ONLINE -ANALYZE=<filename> is given then display details about the snapshot file

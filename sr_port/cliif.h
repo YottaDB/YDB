@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -63,7 +63,10 @@ void		cli_lex_setup(int argc, char *argv[]);
 #pragma pointer_size (restore)
 #endif
 
+#define CLI_PRESENT	1
 #define CLI_2NUM_FIRST_SPECIFIED	0x2
 #define CLI_2NUM_SECOND_SPECIFIED	0x1
+
+#define CLI_PRESENT_DBG_OR_VERBOSE	(CLI_PRESENT == cli_present("DBG") || CLI_PRESENT == cli_present("VERBOSE"))
 
 #endif /* CLIIF_included */

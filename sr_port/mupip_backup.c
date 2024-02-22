@@ -298,7 +298,7 @@ void mupip_backup(void)
 	halt_ptr = grlist = NULL;
 	in_backup = TRUE;
 	inc_since_inc = inc_since_rec = file_backed_up = error_mupip = FALSE;
-	debug_mupip = (CLI_PRESENT == cli_present("DBG"));
+	debug_mupip = CLI_PRESENT_DBG_OR_VERBOSE;
 	call_on_signal = mupip_backup_call_on_signal;
 	mu_outofband_setup();
 	jnl_status = 0;

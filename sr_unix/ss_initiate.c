@@ -3,7 +3,7 @@
  * Copyright (c) 2009-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -234,7 +234,7 @@ boolean_t	ss_initiate(gd_region *reg,			/* Region in which snapshot has to be st
 	csa = &FILE_INFO(reg)->s_addrs;
 	csd = csa->hdr;
 	cnl = csa->nl;
-	debug_mupip = (CLI_PRESENT == cli_present("DBG"));
+	debug_mupip = CLI_PRESENT_DBG_OR_VERBOSE;
 	/* Create a context containing default information pertinent to this initiate invocation */
 	lcl_ss_ctx = malloc(SIZEOF(snapshot_context_t)); /* should be free'd by ss_release */
 	DEFAULT_INIT_SS_CTX(lcl_ss_ctx);
