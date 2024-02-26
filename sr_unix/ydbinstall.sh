@@ -617,10 +617,10 @@ while [ $# -gt 0 ] ; do
 			shift ;;
 		--utf8*)
 			# We previously used to support "--utf8=default" or "--utf8 default" or "--utf8=7.1" or "--utf8 7.1" syntax
-			# where an ICU version of "default" or "7.1" (for example) needed to be specified. But in r1.40 (after merging
-			# GT.M V7.0-000 changes to sr_unix/gtminstall.sh), sr_unix/ydbinstall.sh started supporting "--utf8" with no value.
-			# To maintain backward compatibility, we allow for "--utf8=default" or "--utf8 default" syntax but issue an error
-			# if "--utf8=7.1" or "--utf8 7.1" syntax is specified.
+			# where an ICU version of "default" or "7.1" (for example) needed to be specified. But in r2.00
+			# (after merging GT.M V7.0-000 changes to sr_unix/gtminstall.sh), sr_unix/ydbinstall.sh started supporting
+			# "--utf8" with no value. To maintain backward compatibility, we allow for "--utf8=default" or
+			# "--utf8 default" syntax but issue an error if "--utf8=7.1" or "--utf8 7.1" syntax is specified.
 			tmp=`echo $1 | cut -s -d = -f 2- | tr DEFAULT default`
 			if [ -n "$tmp" ] ; then
 				if [ "default" != "$tmp" ] ; then
