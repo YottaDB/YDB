@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -498,8 +498,12 @@ void  iosocket_block_iocontrol(io_desc *iod, mval *option, mval *returnarg)
 	socketptr = dsocketptr->socket[dsocketptr->current_socket];
 	if (NULL != option)
 	{
-		lower_to_upper((uchar_ptr_t)option_buf, (uchar_ptr_t)(option->str.addr), MIN(SIZEOF(option_buf), option->str.len));
-		if (0 == memcmp(option_buf, BLOCKOFF, option->str.len))
+		int	len;
+
+		len = MIN(SIZEOF(option_buf) - 1, option->str.len);
+		lower_to_upper((uchar_ptr_t)option_buf, (uchar_ptr_t)(option->str.addr), len);
+		option_buf[len] = '\0';	/* null terminate so we can later use STRCMP */
+		if (0 == STRCMP(option_buf, BLOCKOFF))
 		{	/* check if not already set or TLS already enabled */
 			if (socketptr->nonblocked_output)
 			{
@@ -542,7 +546,7 @@ void  iosocket_block_iocontrol(io_desc *iod, mval *option, mval *returnarg)
 				}
 			}
 #endif
-		} else if (0 == memcmp(option_buf, BLOCKCLEAR, option->str.len))
+		} else if (0 == STRCMP(option_buf, BLOCKCLEAR))
 		{
 			if (socketptr->nonblocked_output)
 			{
@@ -554,7 +558,7 @@ void  iosocket_block_iocontrol(io_desc *iod, mval *option, mval *returnarg)
 				}
 				socketptr->args_written = socketptr->lastarg_size = socketptr->lastarg_sent = 0;
 			}
-		} else if (0 == memcmp(option_buf, BLOCKCOUNT, option->str.len))
+		} else if (0 == STRCMP(option_buf, BLOCKCOUNT))
 		{
 			if (socketptr->nonblocked_output)
 			{
@@ -567,7 +571,7 @@ void  iosocket_block_iocontrol(io_desc *iod, mval *option, mval *returnarg)
 				tmpint = (int)socketptr->args_written;
 				MV_FORCE_UMVAL(returnarg, (unsigned int)tmpint);
 			}
-		} else if (0 == memcmp(option_buf, BLOCKSENT, option->str.len))
+		} else if (0 == STRCMP(option_buf, BLOCKSENT))
 		{
 			if (socketptr->nonblocked_output)
 			{
