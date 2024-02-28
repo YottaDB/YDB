@@ -487,6 +487,7 @@ void  iosocket_block_iocontrol(io_desc *iod, mval *option, mval *returnarg)
 	}
 	if (dsocketptr->n_socket <= dsocketptr->current_socket)
 	{
+		assert(FALSE);
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CURRSOCKOFR, 2, dsocketptr->current_socket, dsocketptr->n_socket);
 		return;
 	}

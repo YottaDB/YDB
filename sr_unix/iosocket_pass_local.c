@@ -3,7 +3,7 @@
  * Copyright (c) 2014-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -160,6 +160,7 @@ void iosocket_pass_local(io_desc *iod, pid_t pid, uint8 nsec_timeout, int argcnt
 	}
 	if (dsocketptr->n_socket <= dsocketptr->current_socket)
 	{
+		assert(FALSE);
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CURRSOCKOFR, 2, dsocketptr->current_socket, dsocketptr->n_socket);
 		return;
 	}
@@ -368,6 +369,7 @@ void iosocket_accept_local(io_desc *iod, mval *handlesvar, pid_t pid, uint8 nsec
 	}
 	if (dsocketptr->n_socket <= dsocketptr->current_socket)
 	{
+		assert(FALSE);
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CURRSOCKOFR, 2, dsocketptr->current_socket, dsocketptr->n_socket);
 		return;
 	}

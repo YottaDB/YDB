@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -172,6 +172,7 @@ int	iosocket_readfl(mval *v, int4 width, uint8 nsec_timeout)
 	}
 	if (dsocketptr->n_socket <= dsocketptr->current_socket)
 	{
+		assert(FALSE);
 		iod->dollar.za = ZA_IO_ERR;
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CURRSOCKOFR, 2, dsocketptr->current_socket, dsocketptr->n_socket);
 		return 0;
