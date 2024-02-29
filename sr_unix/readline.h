@@ -48,6 +48,7 @@ GBLREF char 			*readline_file;
 GBLREF volatile boolean_t	readline_catch_signal; /* to go to sigsetjmp location */
 #include <setjmp.h>
 GBLREF sigjmp_buf		readline_signal_jmp; /* for signal handling */
+GBLREF unsigned int		readline_signal_count; /* keeps track of multiple signals to do siglongjmp */
 GBLREF struct readline_state    *ydb_readline_state; /* for saving state after an interrupt */
 /* Counter for entries in this session for use in saving history */
 GBLREF int			ydb_rl_entries_count;

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -40,6 +40,10 @@ void ctrlc_handler(int sig, siginfo_t *info, void *context)
 	int4    ob_char;
 	int	save_errno;
 
+	/* See Signal Handling comment in sr_unix/readline.c */
+	if (readline_catch_signal)
+		readline_signal_count++;
+
 	/* Note we don't need to bypass this like in other handlers because this handler is not in use when using
 	 * simple[Threaded]API.
 	 */
@@ -52,8 +56,11 @@ void ctrlc_handler(int sig, siginfo_t *info, void *context)
 	std_dev_outbndset(ob_char);
 	errno = save_errno;
 	/* See Signal Handling comment in sr_unix/readline.c for an explanation of the following lines */
-	if (readline_catch_signal) {
+	if (readline_catch_signal)
+		readline_signal_count--;
+	if (readline_catch_signal && (0 == readline_signal_count)) {
 		readline_catch_signal = FALSE;
+		assert(!in_os_signal_handler);
 		siglongjmp(readline_signal_jmp, 1);
 	}
 }

@@ -1429,6 +1429,7 @@ GBLDEF char 			*readline_file;
 GBLDEF volatile boolean_t	readline_catch_signal; /* to go to sigsetjmp location */
 #include <setjmp.h>
 GBLDEF sigjmp_buf		readline_signal_jmp;
+GBLDEF unsigned int		readline_signal_count; /* keeps track of multiple signals to do siglongjmp */
 GBLDEF struct readline_state    *ydb_readline_state;
 /* Counter for entries in this session for use in saving history */
 GBLDEF int			ydb_rl_entries_count;

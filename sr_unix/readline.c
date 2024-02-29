@@ -133,6 +133,14 @@ LITREF gtmImageName		gtmImageNames[];
  * processing is done. The "volatile" boolean variable readline_catch_signal is set
  * to activate the longjmp ONLY IF we are inside the readline code.
  *
+ * Note the use of readline_signal_count. The problem is that we only have a single
+ * sigsetjmp, which records the current stack for siglongjmp. If multiple signals are
+ * received, each adds stack levels. The last received signal will execute siglongjmp,
+ * but this will result in us losing the processing for the previous signal, which
+ * didn't finish processing yet--siglongjmp goes to the stack originally by sigsetjmp.
+ * Counting signals in readline_signal_count ensures that we only run siglongjmp if
+ * we are the last signal on the stack. See https://gitlab.com/YottaDB/DB/YDB/-/issues/1065.
+ *
  * The use of sigsetjmp/siglongjmp is commonly used with readline; e.g. with Postgres
  * psql interpreter, and I modeled this implementation on it.
  *
@@ -365,6 +373,15 @@ void readline_read_mval(mval *v) {
 		 * the setjmp/longjmp code out, as we can use a select() call like
 		 * dm_read.c. */
 		if ((sigsetjmp(readline_signal_jmp, 1) != 0) || outofband) {
+			/* Assert that the current number of active signals is
+			 * now zero. We only want to run siglongjmp (which
+			 * destroys the stack) if we are processing the last
+			 * signal on the stack, otherwise, we end up destroying
+			 * the stack of the other signals if multiple signals
+			 * are being processed.
+			 * See https://gitlab.com/YottaDB/DB/YDB/-/issues/1065
+			 */
+			assert(0 == readline_signal_count);
 			/* Handle signals */
 			if (outofband) {
 				if ((jobinterrupt == outofband)) {

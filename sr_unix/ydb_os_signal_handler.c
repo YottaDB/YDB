@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2020-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2020-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -53,6 +53,10 @@ GBLREF volatile int4		outofband;
 
 void ydb_os_signal_handler(int sig, siginfo_t *info, void *context)
 {
+	/* See Signal Handling comment in sr_unix/readline.c */
+	if (readline_catch_signal)
+		readline_signal_count++;
+
 	assert(0 <= in_os_signal_handler);
 	assert(4 > in_os_signal_handler);	/* Ensure this value goes not go beyond a reasonably small number */
 	/* Since at this point, in a multi-threaded program, we are not guaranteed to hold the YDB engine lock, we cannot
@@ -94,9 +98,11 @@ void ydb_os_signal_handler(int sig, siginfo_t *info, void *context)
 	 * to readline if there is no outofband event; otherwise, we end up with readline prompt
 	 * restarting and the user losing their current input everytime there is an unreleated SIGALRM.
 	 */
-	if (readline_catch_signal && outofband) {
+	if (readline_catch_signal)
+		readline_signal_count--;
+	if (readline_catch_signal && (0 == readline_signal_count) && outofband) {
 		readline_catch_signal = FALSE;
+		assert(!in_os_signal_handler);
 		siglongjmp(readline_signal_jmp, 1);
 	}
 }
-

@@ -3,7 +3,7 @@
  * Copyright (c) 2005-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -239,6 +239,7 @@ typedef enum {
 	WBTEST_YDB_STATICPID,			/* 203 : Set pid to a static number for predictable test output */
 	WBTEST_YDB_SETSTATSOFF,			/* 204 : Reset all the gvstats to be the same as their offset in gvstats_rec_t */
 	WBTEST_YDB_MAXSECSHRRETRY,		/* 205 : Cause loop gated by MAX_COMM_ATTEMPTs in secshr_client.c to fail */
+	WBTEST_YDB_RLSIGLONGJMP,                /* 206 : Slow down processing of SIGALRM timers to illustrate multiple signal processing issues with readline */
 } wbtest_code_t;
 
 #if defined (DEBUG) && !defined (STATIC_ANALYSIS)

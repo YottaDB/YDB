@@ -874,6 +874,21 @@ void timer_handler(int why, siginfo_t *info, void *context, boolean_t is_os_sign
 		DECREMENT_IN_OS_SIGNAL_HANDLER_IF_NEEDED;
 		return;
 	}
+#	ifdef DEBUG
+	/* White box WBTEST_YDB_RLSIGLONGJMP slows down processing of timers to allow the conditions for the error in YDB#1065 to
+	 * occur: multiple signals on top of each other in the stack cause loss of stack when siglongjmp is run.
+	 */
+	if (WBTEST_ENABLED(WBTEST_YDB_RLSIGLONGJMP))
+	{
+		if (is_os_signal_handler)
+		{
+			int	i;
+
+			for (i = 0; i < 5; i++)
+				SHORT_SLEEP(999);
+		}
+	}
+#	endif
 	CLEAR_DEFERRED_TIMERS_CHECK_NEEDED;
 	save_errno = errno;
 	save_error_condition = error_condition;		/* aka SIGNAL */

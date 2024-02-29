@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -53,6 +53,10 @@ GBLREF	int			jobinterrupt_sig_num;
  */
 void jobinterrupt_event(int sig, siginfo_t *info, void *context)
 {
+	/* See Signal Handling comment in sr_unix/readline.c */
+	if (readline_catch_signal)
+		readline_signal_count++;
+
 	if (!USING_ALTERNATE_SIGHANDLING)
 	{
 		FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED(sig_hndlr_jobinterrupt_event, sig, NULL, info, context);
@@ -66,15 +70,18 @@ void jobinterrupt_event(int sig, siginfo_t *info, void *context)
 	{
 		drive_non_ydb_signal_handler_if_any("jobinterrupt_event", sig, info, context, FALSE);
 	}
+	if (readline_catch_signal)
+		readline_signal_count--;
 	/* dollar_zininterrupt is reponsible for processing the job interrupt and clearing it (see a few
 	 * lines above); and if that isn't set back to zero, we shouldn't go back to the readline code.
 	 * This mirrors what happens in dm_mode.c, as once we reach a state where dollar_zininterrupt is
 	 * always set (e.g. when we are out of YDB stack space), the job interrupt event stops doing
 	 * anything as the call to `xfer_set_handlers` doesn't happen anymore.
 	 */
-	if (!dollar_zininterrupt && readline_catch_signal) {
+	if (!dollar_zininterrupt && readline_catch_signal && (0 == readline_signal_count)) {
 		/* See Signal Handling comment in sr_unix/readline.c for an explanation of the following lines */
 		readline_catch_signal = FALSE;
+		assert(!in_os_signal_handler);
 		siglongjmp(readline_signal_jmp, 1);
 	}
 }
