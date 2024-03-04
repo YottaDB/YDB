@@ -3,7 +3,7 @@
 ; Copyright (c) 2001-2021 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
-; Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries.	;
+; Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries.	;
 ; All rights reserved.						;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -23,8 +23,9 @@
  Set ival("T")=5
  Set up="ABCDEFGHIJKLMNOPQRSTUVWXYZ"
  Set lo="abcdefghijklmnopqrstuvwxyz"
- ; On the slowest server, this routine took less than half a second. So, there is no need to wait for more than 30 seconds.
- Set $ztimeout="30:use $principal write ""# msg.m took longer than expected"",! zshow ""*"" zhalt 1"
+ ; We have seen the below fail once in a while on a slow 32-bit ARMV6L system when $ztimeout was set to 30 seconds causing
+ ; a build failure. So the timeout is set to 15 minutes (900 seconds) to handle really slow systems too.
+ Set $ztimeout="900:use $principal write ""# msg.m took longer than expected"",! zshow ""*"" zhalt 1"
  ;
  ; Run this program as $gtm_exe/mumps -run msg filename
  ; If used in a non-build environment, pass "nohdr" as second argument to not depend on the presence of $gtm_tools/copyright.txt
