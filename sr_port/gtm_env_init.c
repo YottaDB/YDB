@@ -3,7 +3,7 @@
  * Copyright (c) 2004-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -389,7 +389,7 @@ void	gtm_env_init(void)
 		/* See if $ydb_ztrap_new has been specified */
 		ztrap_new = ydb_logical_truth_value(YDBENVINDX_ZTRAP_NEW, FALSE, NULL);
 		/* See if $ydb_max_storalloc is set */
-		ydb_max_storalloc = ydb_trans_numeric(YDBENVINDX_MAX_STORALLOC, &is_defined, IGNORE_ERRORS_TRUE, NULL);
+		ydb_max_storalloc = ydb_trans_numeric(YDBENVINDX_MALLOC_LIMIT, &is_defined, IGNORE_ERRORS_TRUE, NULL);
 		/* See if $ydb_mupjnl_parallel is set */
 		ydb_mupjnl_parallel = ydb_trans_numeric(YDBENVINDX_MUPJNL_PARALLEL, &is_defined, IGNORE_ERRORS_TRUE, NULL);
 =======

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -91,7 +91,7 @@ YDBENVINDX_TABLE_ENTRY (YDBENVINDX_MAXTPTIME,                  "$ydb_maxtptime",
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_MAX_INDRCACHE_COUNT,        "$ydb_max_indrcache_count",        "$gtm_max_indrcache_count")
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_MAX_INDRCACHE_MEMORY,       "$ydb_max_indrcache_memory",       "$gtm_max_indrcache_memory")
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_MAX_SOCKETS,                "$ydb_max_sockets",                "$gtm_max_sockets")
-YDBENVINDX_TABLE_ENTRY (YDBENVINDX_MAX_STORALLOC,              "$ydb_max_storalloc",              "$gtm_max_storalloc")
+YDBENVINDX_TABLE_ENTRY (YDBENVINDX_MALLOC_LIMIT,               "$ydb_malloc_limit",               "$gtm_malloc_limit")
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_MEMORY_RESERVE,             "$ydb_memory_reserve",             "$gtm_memory_reserve")
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_MSGPREFIX,                  "$ydb_msgprefix",                  "")
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_MSTACK_CRIT_THRESHOLD,      "$ydb_mstack_crit_threshold",      "$gtm_mstack_crit_threshold")
