@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -366,12 +366,8 @@ caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, ssize_t size, in
 						break;
 					default:
 						assert(FALSE);
-<<<<<<< HEAD
-						length = MAXINT4;	/* For static scan */
-=======
 						c = NULL;
 						length = 0;
->>>>>>> eb3ea98c (GT.M V7.0-002)
 				}
 				/* Check the parameter and count. The pointer can't be NULL with a non-zero length */
 				assert((NULL != c) || (0 == length));
@@ -382,15 +378,11 @@ caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, ssize_t size, in
 				 * This is a safe limitation since no message from gtmsecshr specifies width yet.
 				 */
 				assert(!gtm_utf8_mode || IS_GTMSECSHR_IMAGE || (NULL != gtm_wcswidth_fnptr));
-				if (MAXINT4 != length)
-				{	/* Block protected from static scan in case length is not valid */
-					cwidth = (!gtm_utf8_mode || IS_GTMSECSHR_IMAGE)
-						? length : (*gtm_wcswidth_fnptr)((unsigned char *)c, length, FALSE, 1);
-					if ((0 < field_width) && (cwidth > field_width))
-						cwidth = field_width;
-					assert(0 <= cwidth); /* since all unprintable and illegal characters are ignored */
-				} else
-					cwidth = 0;	/* this is an unknown character so set its width to 0 */
+				cwidth = (!gtm_utf8_mode || IS_GTMSECSHR_IMAGE)
+					? length : (*gtm_wcswidth_fnptr)((unsigned char *)c, length, FALSE, 1);
+				if ((0 < field_width) && (cwidth > field_width))
+					cwidth = field_width;
+				assert(0 <= cwidth); /* since all unprintable and illegal characters are ignored */
 				assert(0 <= field_width);
 				outtop1 = outtop - 1;
 				if (right_justify)

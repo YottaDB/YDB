@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -53,15 +53,12 @@
 #include "have_crit.h"
 #include "deferred_events.h"
 #include "deferred_events_queue.h"
-<<<<<<< HEAD
 #include "util.h"
 #include "ydb_logicals.h"
 #include "ydb_setenv.h"
-=======
 #include "gtm_malloc.h"
 #include "getstorage.h"
 #include "try_event_pop.h"
->>>>>>> eb3ea98c (GT.M V7.0-002)
 
 
 GBLREF boolean_t		dollar_zquit_anyway, dollar_ztexit_bool, malloccrit_issued, ztrap_new;
@@ -107,14 +104,9 @@ error_def(ERR_ZTWORMHOLE2BIG);
 
 void op_svput(int varnum, mval *v)
 {
-<<<<<<< HEAD
-	char	*vptr, lcl_str[256], *tmp;
-	int	i, ok, state;
-	mval	lcl_mval;
-=======
-	char	*vptr;
+	char	*vptr, lcl_str[256], *tmpPtr;
 	int	i, ok, state, tmp;
->>>>>>> eb3ea98c (GT.M V7.0-002)
+	mval	lcl_mval;
 	int4	previous_gtm_strpllim;
 	size_t	rtmp;
 	DCL_THREADGBL_ACCESS;
@@ -186,7 +178,6 @@ void op_svput(int varnum, mval *v)
 				TREF(zpeek_regname_len) = 0;
 			}
 			break;
-<<<<<<< HEAD
 		case SV_ZMAXTPTIME:;
 			int	num;
 
@@ -197,10 +188,6 @@ void op_svput(int varnum, mval *v)
 			if (0 > num)
 				num = 0;
 			TREF(dollar_zmaxtptime) = num;
-=======
-		case SV_ZMAXTPTIME:
-			TREF(dollar_zmaxtptime) = mval2i(v);	/* Negative values == no timeout */
->>>>>>> eb3ea98c (GT.M V7.0-002)
 			break;
 		case SV_ZROUTINES:
 			MV_FORCE_STR(v);
@@ -225,9 +212,9 @@ void op_svput(int varnum, mval *v)
 			lcl_mval = *v;
 			if (SIZEOF(lcl_str) < lcl_mval.str.len)
 			{
-				tmp = (char *)malloc(lcl_mval.str.len);
-				memcpy(tmp, v->str.addr, lcl_mval.str.len);
-				lcl_mval.str.addr = tmp;
+				tmpPtr = (char *)malloc(lcl_mval.str.len);
+				memcpy(tmpPtr, v->str.addr, lcl_mval.str.len);
+				lcl_mval.str.addr = tmpPtr;
 			} else
 			{
 				memcpy(lcl_str, v->str.addr, lcl_mval.str.len);
@@ -250,14 +237,11 @@ void op_svput(int varnum, mval *v)
 					op_commarg(v, indir_linetail);
 					op_unwind();
 				}
-				(TREF(dollar_ztrap)).mvtype = MV_STR;
-				(TREF(dollar_ztrap)).str = v->str;
 				if ((TREF(dollar_etrap)).str.len > 0)
 				{
 					gtm_newintrinsic(&(TREF(dollar_etrap)));
 					NULLIFY_TRAP(TREF(dollar_etrap));
 				}
-<<<<<<< HEAD
 				(TREF(dollar_ztrap)).mvtype = MV_STR;
 				/* Copy the saved string (pointing to C-stack or malloc storage) back to the stringpool
 				 * before copying it to TREF(dollar_ztrap).str
@@ -265,9 +249,7 @@ void op_svput(int varnum, mval *v)
 				s2pool(&lcl_mval.str);
 				(TREF(dollar_ztrap)).str = lcl_mval.str;
 				if (SIZEOF(lcl_str) < lcl_mval.str.len)
-					free(tmp);
-=======
->>>>>>> eb3ea98c (GT.M V7.0-002)
+					free(tmpPtr);
 			}
 			if (ZTRAP_POP & TREF(ztrap_form))
 				ztrap_save_ctxt();
@@ -284,17 +266,17 @@ void op_svput(int varnum, mval *v)
 			 */
 			if ((1 == dollar_ecode.index) && (ERR_SETECODE == dollar_ecode.error_last_ecode))
 			{
-				char	*tmp, *entryref, *errortext;
+				char	*entryref, *errortext;
 				int	len;
 
 				/* $ZSTATUS is usually in the form ERRNUM,ENTRYREF,ERRORTEXT.
 				 * This will mirror the format of the error displayed when not in direct mode.
 				 */
 				len = dollar_zstatus.str.len;
-				tmp = (char *)malloc(len + 1);
-				memcpy(tmp, dollar_zstatus.str.addr, len);
-				tmp[len] = '\0';
-				entryref = strchr(tmp, ',');
+				tmpPtr = (char *)malloc(len + 1);
+				memcpy(tmpPtr, dollar_zstatus.str.addr, len);
+				tmpPtr[len] = '\0';
+				entryref = strchr(tmpPtr, ',');
 				errortext = (NULL != entryref) ? strchr(entryref + 1, ',') : NULL;
 				util_out_print(NULL, RESET);	/* Clear whatever message was in buffer previously */
 				if (NULL != errortext)
@@ -320,9 +302,9 @@ void op_svput(int varnum, mval *v)
 					 * when setting $ZSTATUS to a value. Copy over the entire $ZSTATUS text into
 					 * the util_output buffer in this case.
 					 */
-					util_out_print(tmp, NOFLUSH_OUT);
+					util_out_print(tmpPtr, NOFLUSH_OUT);
 				}
-				free(tmp);
+				free(tmpPtr);
 			}
 			break;
 		case SV_PROMPT:

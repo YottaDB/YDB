@@ -180,13 +180,8 @@ void iosocket_pass_local(io_desc *iod, pid_t pid, uint8 nsec_timeout, int argcnt
 	ESTABLISH_GTMIO_CH(&iod->pair, ch_set);
 	ENSURE_PASS_SOCKET(socketptr);
 	out_of_time = FALSE;
-<<<<<<< HEAD
 #	ifdef PID_CHECKING_SUPPORTED
-	if (-1 != pid)
-=======
-#	if PID_CHECKING_SUPPORTED
 	if (-1 < pid)
->>>>>>> eb3ea98c (GT.M V7.0-002)
 	{
 		peerpid = get_peer_pid(socketptr->sd);
 		if (-1 == peerpid)
@@ -394,13 +389,8 @@ void iosocket_accept_local(io_desc *iod, mval *handlesvar, pid_t pid, uint8 nsec
 	ESTABLISH_GTMIO_CH(&iod->pair, ch_set);
 	ENSURE_PASS_SOCKET(socketptr);
 	out_of_time = FALSE;
-<<<<<<< HEAD
 #	ifdef PID_CHECKING_SUPPORTED
-	if (-1 != pid)
-=======
-#	if PID_CHECKING_SUPPORTED
 	if (-1 < pid)
->>>>>>> eb3ea98c (GT.M V7.0-002)
 	{
 		peerpid = get_peer_pid(socketptr->sd);
 		if (-1 == peerpid)

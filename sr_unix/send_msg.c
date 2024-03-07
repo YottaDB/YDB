@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -93,13 +93,8 @@ void send_msg_csa(void *csa, int arg_count, ...)
 /* #GTM_THREAD_SAFE : The below function (send_msg_va) is thread-safe */
 void send_msg_va(void *csa, int arg_count, va_list var)
 {
-<<<<<<< HEAD
         int		dummy, fao_count, i, msg_id, freeze_msg_id;
-        char    	msg_buffer[1024];
-=======
-        int		dummy, fao_actual, fao_count, i, msg_id, freeze_msg_id;
         char    	msg_buffer[PUT_BUFF_SIZE];
->>>>>>> eb3ea98c (GT.M V7.0-002)
         mstr    	msg_string;
 	char		*save_util_outptr;
 	va_list		save_last_va_list_ptr;

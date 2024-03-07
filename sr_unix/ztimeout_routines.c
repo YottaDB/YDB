@@ -3,7 +3,7 @@
  * Copyright (c) 2018-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2023-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -60,15 +60,12 @@
 #include "compiler.h"
 #include "gtm_common_defs.h"
 #include "gtm_time.h"
-<<<<<<< HEAD
-#include "is_equ.h"		/* for MV_FORCE_NSTIMEOUT macro */
-=======
 #ifdef DEBUG_DEFERRED_EVENT
 #include "funsvn.h"
 #include "nametabtyp.h"
 #include "namelook.h"
 #endif
->>>>>>> eb3ea98c (GT.M V7.0-002)
+#include "is_equ.h"		/* for MV_FORCE_NSTIMEOUT macro */
 
 GBLREF	boolean_t		ydb_white_box_test_case_enabled, ztrap_explicit_null;
 GBLREF	dollar_ecode_type	dollar_ecode;
@@ -203,17 +200,10 @@ void ztimeout_expired(void)
 	SETUP_THREADGBL_ACCESS;
 	DBGDFRDEVNT((stderr, "%d %s: ztimeout expired - setting xfer handlers\n", __LINE__, __FILE__));
 #	ifdef DEBUG
-<<<<<<< HEAD
 	if (ydb_white_box_test_case_enabled && ((WBTEST_ZTIMEOUT_TRACE == ydb_white_box_test_case_number)
 			|| (WBTEST_ZTIME_DEFER_CRIT == ydb_white_box_test_case_number)
 			|| (WBTEST_ZTIM_EDGE == ydb_white_box_test_case_number)))
-		DBGFPF((stderr, "# ztimeout expired, white box case setting xfer handlers\n", __LINE__, __FILE__));
-=======
-	if (gtm_white_box_test_case_enabled && ((WBTEST_ZTIMEOUT_TRACE == gtm_white_box_test_case_number)
-			|| (WBTEST_ZTIME_DEFER_CRIT == gtm_white_box_test_case_number)
-			|| (WBTEST_ZTIM_EDGE == gtm_white_box_test_case_number)))
-		DBGFPF((stderr, "# ztimeout expired, white box case %d setting xfer handlers\n", gtm_white_box_test_case_number));
->>>>>>> eb3ea98c (GT.M V7.0-002)
+		DBGFPF((stderr, "# ztimeout expired, white box case %d setting xfer handlers\n", ydb_white_box_test_case_number));
 #	endif
 	xfer_set_handlers(ztimeout, 0, FALSE);
 }
@@ -229,26 +219,14 @@ void ztimeout_set(int4 dummy_param)
 	SETUP_THREADGBL_ACCESS;
 	assert(INTRPT_IN_EVENT_HANDLING == intrpt_ok_state);
 	assert(ztimeout == outofband);
-<<<<<<< HEAD
-	if (dollar_zininterrupt || ((0 < dollar_ecode.index) && (ETRAP_IN_EFFECT))
-=======
-	if (dollar_zininterrupt || ((0 < dollar_ecode.index) && ETRAP_IN_EFFECT) || have_crit(CRIT_HAVE_ANY_REG | CRIT_IN_COMMIT)
->>>>>>> eb3ea98c (GT.M V7.0-002)
+	if (dollar_zininterrupt || ((0 < dollar_ecode.index) && ETRAP_IN_EFFECT)
 		|| (jobinterrupt == (TREF(save_xfer_root_ptr))->ev_que.fl->outofband))
 	{	/* not a good time, so save it */
 		outofband = no_event;
 		TAREF1(save_xfer_root, ztimeout).event_state = queued;
 		SAVE_XFER_QUEUE_ENTRY(ztimeout, 0);
-<<<<<<< HEAD
-		DBGDFRDEVNT((stderr, "%d %s: ztimeout_set - ZTIMEOUT queued: trap: %d, intrpt: %d\n",
-			     __LINE__, __FILE__, ((0 < dollar_ecode.index) && (ETRAP_IN_EFFECT)), dollar_zininterrupt));
-#		ifdef DEBUG
-		if (ydb_white_box_test_case_enabled && ((WBTEST_ZTIMEOUT_TRACE == ydb_white_box_test_case_number)
-				|| (WBTEST_ZTIME_DEFER_CRIT == ydb_white_box_test_case_number)))
-			DBGFPF((stderr, "# ztimeout_set : white box case ZTIMEOUT Deferred\n"));
-=======
-		DBGDFRDEVNT((stderr, "%d %s: ztimeout_set - ZTIMEOUT queued; dec_indx %d, et: %d intrpt: %d, crit: %d\n",
-			__LINE__, __FILE__, ETRAP_IN_EFFECT, dollar_zininterrupt, have_crit(CRIT_HAVE_ANY_REG | CRIT_IN_COMMIT)));
+		DBGDFRDEVNT((stderr, "%d %s: ztimeout_set - ZTIMEOUT queued; dec_indx %d, et: %d intrpt: %d\n",
+			__LINE__, __FILE__, dollar_ecode.index, ETRAP_IN_EFFECT, dollar_zininterrupt));
 #		ifdef DEBUG
 #		ifdef DEBUG_DEFERRED_EVENT
 		if (ETRAP_IN_EFFECT)
@@ -257,10 +235,9 @@ void ztimeout_set(int4 dummy_param)
 			op_zwritesvn(svn_data[index].opcode);
 		}
 #		endif
-		if (gtm_white_box_test_case_enabled && ((WBTEST_ZTIMEOUT_TRACE == gtm_white_box_test_case_number)
-				|| (WBTEST_ZTIME_DEFER_CRIT == gtm_white_box_test_case_number)))
-			DBGFPF((stderr, "# ztimeout_set : white box case %d ZTIMEOUT Deferred\n", gtm_white_box_test_case_number));
->>>>>>> eb3ea98c (GT.M V7.0-002)
+		if (ydb_white_box_test_case_enabled && ((WBTEST_ZTIMEOUT_TRACE == ydb_white_box_test_case_number)
+				|| (WBTEST_ZTIME_DEFER_CRIT == ydb_white_box_test_case_number)))
+			DBGFPF((stderr, "# ztimeout_set : white box case %d ZTIMEOUT Deferred\n", ydb_white_box_test_case_number));
 #		endif
 		return;
 	}
@@ -270,14 +247,9 @@ void ztimeout_set(int4 dummy_param)
 	DEFER_INTO_XFER_TAB;
 	DBGDFRDEVNT((stderr, "%d %s: ztimeout_set - pending xfer entries for ztimeout\n", __LINE__, __FILE__));
 #	ifdef DEBUG
-<<<<<<< HEAD
 	if (ydb_white_box_test_case_enabled && (WBTEST_ZTIM_EDGE == ydb_white_box_test_case_number))
-		DBGFPF((stderr, "# ztimeout_set: set the xfer entries for ztimeout\n"));
-=======
-	if (gtm_white_box_test_case_enabled && (WBTEST_ZTIM_EDGE == gtm_white_box_test_case_number))
 		DBGFPF((stderr, "# ztimeout_set: white box case %d set the xfer entries for ztimeout\n",
-			gtm_white_box_test_case_number));
->>>>>>> eb3ea98c (GT.M V7.0-002)
+			ydb_white_box_test_case_number));
 #	endif
 }
 
@@ -323,14 +295,9 @@ void ztimeout_clear_timer(void)
 	if (pending == entry->event_state)
 	{
 #		ifdef DEBUG
-<<<<<<< HEAD
 		if (ydb_white_box_test_case_enabled && (WBTEST_ZTIM_EDGE == ydb_white_box_test_case_number))
-			DBGFPF((stderr, "# ztimeout_clear_timer - resetting the xfer entries for ztimeout\n"));
-=======
-		if (gtm_white_box_test_case_enabled && (WBTEST_ZTIM_EDGE == gtm_white_box_test_case_number))
 			DBGFPF((stderr, "# ztimeout_clear_timer - white box case %d resetting the xfer entries for ztimeout\n",
-				gtm_white_box_test_case_number));
->>>>>>> eb3ea98c (GT.M V7.0-002)
+				ydb_white_box_test_case_number));
 		assert(ztimeout == outofband);
 #		endif
 	}

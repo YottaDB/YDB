@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2023-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -127,15 +127,9 @@ boolean_t xfer_set_handlers(int4  event_type, int4 param_val, boolean_t popped_e
 					event_type));
 			}
 		}
-<<<<<<< HEAD
-		DBGDFRDEVNT((stderr, "%d %s: xfer_set_handlers - %sevent_type = %d\n", __LINE__, __FILE__,
-			     popped_entry ? "popped " : "", event_type));
-=======
 	}
 	if (!already_ev_handling)
 	{
-		assert(no_event == outofband || (event_type == outofband));
->>>>>>> eb3ea98c (GT.M V7.0-002)
 		assert(!dollar_zininterrupt || (jobinterrupt != event_type));
 		if (entry != (TREF(save_xfer_root_ptr))->ev_que.fl)
 		{	/* no event in play so pend this one by jiggeriing the xfer_table */
@@ -256,7 +250,10 @@ boolean_t xfer_reset_if_setter(int4 event_type)
 		{	/* give tptimeout some priority */
 			REMOVE_XFER_QUEUE_ENTRY(tptimeout);				/* don't leave it in the queue */
 			if (pending != TAREF1(save_xfer_root, tptimeout).event_state)
+			{
+				dummy = 0;
 				xfer_set_handlers(tptimeout, dummy, TRUE);		/* param_val not used, hence dummy */
+			}
 		}
 	} else
 		DBGDFRDEVNT((stderr, "%d %s: xfer_reset_if_setter: event_type %d is but waiting event is %d\n", __LINE__, __FILE__,
@@ -349,7 +346,6 @@ boolean_t real_xfer_reset(int4 event_type)
  */
 void async_action(bool lnfetch_or_start)
 {
-	boolean_t	ours;
 	intrpt_state_t	prev_intrpt_state;
 	DCL_THREADGBL_ACCESS;
 
@@ -384,52 +380,23 @@ void async_action(bool lnfetch_or_start)
 	switch (outofband)
 	{
 		case jobinterrupt:
-<<<<<<< HEAD
 			dollar_zininterrupt = TRUE;	/* do this at every point to minimize nesting; WARNING: fallthrough*/
 		case ctrlc:							/* these go from pending to active here */
 		case ctrap:
-		case sighup:
-		case (ttwriterr):
+		case defer_error:
 			TAREF1(save_xfer_root, outofband).event_state = active;			/*WARNING: fallthrough */
 		case tptimeout:					/* these have their own action routines that do pending -> active */
 		case ztimeout:
 		case deferred_signal:
 			outofband_action(lnfetch_or_start);	/* which effectively does assertpro(no_event == outofband) */
-=======
-			dollar_zininterrupt = TRUE;	/* do this at every point to minimize nesting */
-			TAREF1(save_xfer_root, outofband).event_state = active;
-			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_JOBINTRRQST);
->>>>>>> eb3ea98c (GT.M V7.0-002)
-			break;
-		case ctrlc:							/* these go from pending to active here */
-			TAREF1(save_xfer_root, outofband).event_state = active;
-			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_CTRLC);
-			break;
-		case ctrap:
-			TAREF1(save_xfer_root, outofband).event_state = active;
-			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_CTRAP, 1, TAREF1(save_xfer_root, ctrap).param_val);
 			break;
 		case sighup:
-			TAREF1(save_xfer_root, sighup).event_state = pending;
-			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_TERMHANGUP);
+			TAREF1(save_xfer_root, outofband).event_state = pending;
+			outofband_action(lnfetch_or_start);	/* which effectively does assertpro(no_event == outofband) */
 			break;
-		case (defer_error):
-			TAREF1(save_xfer_root, outofband).event_state = active;
-			ours = xfer_reset_if_setter(defer_error);
-			assert(ours);
-			if ((ERR_MALLOCCRIT == TAREF1(save_xfer_root, defer_error).param_val))
-				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_MALLOCCRIT, 2, gtmMallocErrorSize, gtmMallocErrorCallerid);
-			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_TERMWRITE, 0, TAREF1(save_xfer_root, defer_error).param_val);
-			break;
-		case tptimeout:					/* these have their own action routines that do pending -> active */
-			(*tp_timeout_action_ptr)();
-			break;
-		case ztimeout:
-			ztimeout_action();
-			break;
-		case (neterr_action):	/* netrror_action currently set in assembly routines placed by mdb_condition_handler */
-		case (zstep_pending):
-		case (zbreak_pending):
+		case neterr_action:	/* netrror_action currently set in assembly routines placed by mdb_condition_handler */
+		case zstep_pending:
+		case zbreak_pending:
 			assert(FALSE);	/* ZStep/Zbreak events not not really asynchronous, so they don't come here */
 		case no_event:
 			/* if table changed, it was not synchronized (assumes these entries are all that are be changed) */

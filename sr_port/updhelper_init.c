@@ -3,6 +3,9 @@
  * Copyright (c) 2005-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2024 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -117,10 +120,8 @@ void updhelper_init(recvpool_user who)
 	reg_top = gd_header->regions + gd_header->n_regions;
 	for (reg = gd_header->regions; reg < reg_top; reg++)
 	{	/* Use gvcst_init to set statsdb up, and enable statistics to reader and writer helpers */
-		if (!(reg->open))
-		{
-			gvcst_init(reg, NULL);
-		}
+		if (!reg->open)
+			gvcst_init(reg);
 	}
 	return;
 }

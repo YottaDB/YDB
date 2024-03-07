@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -75,13 +75,9 @@
 #include "have_crit.h"
 #include "gtm_env_init.h"
 #include "gtmio.h"
-<<<<<<< HEAD
 #include "deferred_exit_handler.h"
-=======
-#include "deferred_signal_handler.h"
 #include "deferred_events_queue.h"
 #include "deferred_events.h"
->>>>>>> eb3ea98c (GT.M V7.0-002)
 
 /* This routine is compiled twice, once as debug and once as pro and put into the same pro build. The alternative
  * memory manager is selected with the debug flags (any non-zero ydb_dbglvl setting invokes debug memory manager in
@@ -124,40 +120,6 @@
 #endif
 
 /* #GTM_THREAD_SAFE : The below macro (MALLOC) is thread-safe because caller ensures serialization with locks */
-<<<<<<< HEAD
-#  define MALLOC(size, addr)											\
-{														\
-	intrpt_state_t  prev_intrpt_state;									\
-														\
-	assert(IS_PTHREAD_LOCKED_AND_HOLDER);									\
-	if (!ydbSystemMalloc											\
-		&& (0 < ydb_max_storalloc) && ((size + totalRmalloc + totalRallocGta) > ydb_max_storalloc))	\
-	{	/* Boundary check for $ydb_max_storalloc (if set) */						\
-		gtmMallocErrorSize = size;									\
-		gtmMallocErrorCallerid = CALLERID;								\
-		gtmMallocErrorErrno = ERR_MALLOCMAXUNIX;							\
-		raise_gtmmemory_error();									\
-	}													\
-	DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);					\
-	addr = (void *)malloc(size);										\
-	ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);					\
-	if (NULL == (void *)addr)										\
-	{													\
-		gtmMallocErrorSize = size;									\
-		gtmMallocErrorCallerid = CALLERID;								\
-		gtmMallocErrorErrno = errno;									\
-		raise_gtmmemory_error();									\
-	}													\
-	/* 0-initialize the allocated memory in debug builds to avoid false use-of-uninitialized-value alarms	\
-	 * from Go MemorySanitizer (and likely tools like Valgrind) when this memory gets used later. This lets	\
-	 * us use debug builds with a clean report from those tools which will help us detect real issues if	\
-	 * introduced at a later point in time. That said, YottaDB knows the memory is uninitialized and	\
-	 * initializes it when needed. So there is no need to initialize it in pro builds as it is an		\
-	 * unnecessary cost where performance matters. Hence the below use of DEBUG_ONLY.			\
-	 */													\
-	DEBUG_ONLY(memset(addr, 0, size));									\
-}
-=======
 #  define MALLOC(SIZE, ADDR) 										\
 MBSTART{												\
 	intrpt_state_t  PREV_INTRPT_STATE;								\
@@ -174,7 +136,7 @@ MBSTART{												\
 		gtmMallocErrorErrno = errno;								\
 		raise_gtmmemory_error();								\
 	}												\
-	if (!gtmSystemMalloc && !malloccrit_issued /* totalRmalloc* not available for system malloc */	\
+	if (!ydbSystemMalloc && !malloccrit_issued /* totalRmalloc* not available for system malloc */	\
 		&& (0 < zmalloclim) && ((SIZE + totalRmalloc + totalRallocGta) > zmalloclim))		\
 	{	/* Boundary check on zmalloclim */							\
 		gtmMallocErrorSize = SIZE;								\
@@ -189,7 +151,6 @@ MBSTART{												\
 		(*xfer_set_handlers_fnptr)(defer_error, ERR_MALLOCCRIT, FALSE);				\
 	}												\
 } MBEND
->>>>>>> eb3ea98c (GT.M V7.0-002)
 #  define FREE(size, addr) free(addr);
 #define MAXBACKFILL (16 * 1024)			/* Maximum backfill of large structures */
 #define MAXTWO 2048				/* Maximum size we allocate from queues */
@@ -359,12 +320,8 @@ GBLDEF unsigned int outOfMemorySmTn;			/* smTN when ran out of memory */
 GBLREF	uint4		ydbDebugLevel;			/* Debug level (0 = using default sm module so with
 							 * a DEBUG build, even level 0 implies basic debugging)
 							 */
-<<<<<<< HEAD
 GBLREF	boolean_t	ydbSystemMalloc;		/* Use the system's malloc() instead of our own */
-=======
-GBLREF	boolean_t	gtmSystemMalloc;		/* Use the system's malloc() instead of our own */
 GBLREF	boolean_t	retry_if_expansion_fails;
->>>>>>> eb3ea98c (GT.M V7.0-002)
 GBLREF  int		process_exiting;		/* Process is on it's way out */
 GBLREF	volatile int4	gtmMallocDepth;			/* Recursion indicator. Volatile so it gets stored immediately */
 GBLREF	volatile void	*outOfMemoryMitigation;		/* Reserve that we will freed to help cleanup if run out of memory */
@@ -372,10 +329,6 @@ GBLREF	uint4		outOfMemoryMitigateSize;	/* Size of above reserve in Kbytes */
 GBLREF	int		mcavail;
 GBLREF	mcalloc_hdr	*mcavailptr, *mcavailbase;
 GBLREF	size_t		totalRallocGta;			/* Size allocated by gtm_text_alloc if at all */
-<<<<<<< HEAD
-GBLREF	size_t		ydb_max_storalloc;		/* Max value for $ZREALSTOR or else memory error is raised */
-=======
->>>>>>> eb3ea98c (GT.M V7.0-002)
 GBLREF	void		(*cache_table_relobjs)(void);	/* Function pointer to call cache_table_rebuild() */
 GBLREF	ch_ret_type	(*ht_rhash_ch)();		/* Function pointer to hashtab_rehash_ch */
 GBLREF	ch_ret_type	(*jbxm_dump_ch)();		/* Function pointer to jobexam_dump_ch */

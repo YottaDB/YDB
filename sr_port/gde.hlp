@@ -1607,10 +1607,10 @@
    Determines whether an access method BG database file uses asynchronous I/O
    rather than using synchronous I/O through the file system cache.
 
-   With ASYNCIO, GT.M assumes responsibility for writing database updates
+   With ASYNCIO, YottaDB assumes responsibility for writing database updates
    directly to secondary storage, essentially bypassing the file system and
    its cache. This can yield improved behavior if the file system has trouble
-   handling GT.M database I/O, particularly file synchronization (fsync).
+   handling YottaDB database I/O, particularly file synchronization (fsync).
    ASYNCIO eliminates some memory activities and may improve performance in
    some configurations.
 
@@ -1810,7 +1810,7 @@
 
    -FU[LLBLKWRT]={0|1|2}
 
-   Determines whether GT.M writes only valid database blocks contents, or a
+   Determines whether YottaDB writes only valid database blocks contents, or a
    full block including meaningless trailing content. Full block writes are
    more efficient with some secondary storage because they avoid
    read-before-write.

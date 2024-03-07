@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2024 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -23,5 +26,5 @@ typedef struct usr_reg_que_struct
 	char *usr_reg;
 	unsigned short usr_reg_len;
 } usr_reg_que;
-static bool usr_reg_que_checkdup(unsigned char *usr_reg, unsigned short usr_reg_len);
+
 #endif /* MU_GETLST_INCLUDED */

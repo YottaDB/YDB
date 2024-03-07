@@ -3,7 +3,7 @@
  * Copyright (c) 2010-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -192,15 +192,11 @@ static	boolean_t		promptanswer = TRUE;
 	memcpy(lcl_cmds, COMMANDS, STRLEN(COMMANDS) + 1);							\
 	BITMAP = 0;												\
 	lcl_ptr = STRTOK_R(lcl_cmds, ",", &strtok_ptr);								\
-<<<<<<< HEAD
 	/* STRLEN(COMMANDS) is guaranteed to be greater than 0 (asserted above)					\
 	 * and hence we are guaranteed that "lcl_ptr" is not NULL. Hence the below assert.			\
 	 */													\
 	assert(NULL != lcl_ptr);										\
 	do													\
-=======
-	while (NULL != lcl_ptr)											\
->>>>>>> eb3ea98c (GT.M V7.0-002)
 	{													\
 		switch (*lcl_ptr)										\
 		{												\
@@ -242,12 +238,7 @@ static	boolean_t		promptanswer = TRUE;
 				assertpro(FALSE && lcl_ptr[0]);							\
 				break;										\
 		}												\
-<<<<<<< HEAD
 	} while (NULL != (lcl_ptr = STRTOK_R(NULL, ",", &strtok_ptr)));						\
-=======
-		lcl_ptr = STRTOK_R(NULL, ",", &strtok_ptr);							\
-	}													\
->>>>>>> eb3ea98c (GT.M V7.0-002)
 }
 
 #define	COMMAND_BITMAP_TO_STR(COMMANDS, BITMAP, LEN)										\
@@ -279,7 +270,6 @@ static	boolean_t		promptanswer = TRUE;
 	memcpy(lcl_options, OPTIONS, STRLEN(OPTIONS) + 1);							\
 	BITMAP = 0;												\
 	lcl_ptr = STRTOK_R(lcl_options, ",", &strtok_ptr);							\
-<<<<<<< HEAD
 	/* STRLEN(OPTIONS) can be 0 and hence it is possible "lcl_ptr" is NULL */				\
 	if (NULL != lcl_ptr)											\
 	{													\
@@ -315,40 +305,6 @@ static	boolean_t		promptanswer = TRUE;
 					break;									\
 			}											\
 		} while (NULL != (lcl_ptr = STRTOK_R(NULL, ",", &strtok_ptr)));					\
-=======
-	while (NULL != lcl_ptr)											\
-	{													\
-		switch (*lcl_ptr)										\
-		{												\
-			case 'C':										\
-				BITMAP |= OPTIONS_C;								\
-				break;										\
-			case 'I':										\
-				BITMAP |= OPTIONS_I;								\
-				break;										\
-			case 'N':										\
-				assert('O' == *(lcl_ptr + 1));							\
-				switch (*(lcl_ptr + 2))								\
-				{										\
-					case 'C':								\
-						BITMAP |= OPTIONS_NOC;						\
-						break;								\
-					case 'I':								\
-						BITMAP |= OPTIONS_NOI;						\
-						break;								\
-					default:								\
-						/* Parsing should have found invalid command */			\
-						assertpro(FALSE && lcl_ptr[2]);					\
-						break;								\
-				}										\
-				break;										\
-			default:										\
-				/* Parsing should have found invalid command */					\
-				assertpro(FALSE && lcl_ptr[0]);							\
-				break;										\
-		}												\
-		lcl_ptr = STRTOK_R(NULL, ",", &strtok_ptr);							\
->>>>>>> eb3ea98c (GT.M V7.0-002)
 	}													\
 }
 

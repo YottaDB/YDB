@@ -50,13 +50,10 @@
 #include "jnl.h"
 #include "tp.h"
 #include "cli.h"
-<<<<<<< HEAD
 #include "repl_filter.h"
 #include "gds_blk_upgrade.h"
 #include "mlkdef.h"
-=======
 #include "getstorage.h"
->>>>>>> eb3ea98c (GT.M V7.0-002)
 
 #ifdef DEBUG
 #  define INITIAL_DEBUG_LEVEL GDL_Simple
@@ -104,12 +101,8 @@ void	gtm_env_init(void)
 	double			time;
 	int			status2, i, j;
 	int4			status;
-<<<<<<< HEAD
 	mstr			trans;
-=======
-	mstr			val, trans;
 	size_t			tmp_malloc_limit;
->>>>>>> eb3ea98c (GT.M V7.0-002)
 	uint4			tdbglvl, tmsock, reservesize, memsize, cachent, trctblsize, trctblbytes;
 	uint4			max_threads, max_procs;
 	DCL_THREADGBL_ACCESS;
@@ -382,31 +375,14 @@ void	gtm_env_init(void)
 		/* Initialize jnl_extract_nocol */
 		TREF(jnl_extract_nocol) = ydb_trans_numeric(YDBENVINDX_EXTRACT_NOCOL, &is_defined, IGNORE_ERRORS_TRUE, NULL);
 		/* Initialize dollar_zmaxtptime */
-<<<<<<< HEAD
 		status = ydb_trans_numeric(YDBENVINDX_MAXTPTIME, &is_defined, IGNORE_ERRORS_TRUE, NULL);
 		if (is_defined && (0 <= status) && (TPTIMEOUT_MAX_TIME >= status))
 			TREF(dollar_zmaxtptime) = status;
 		/* See if $ydb_ztrap_new has been specified */
 		ztrap_new = ydb_logical_truth_value(YDBENVINDX_ZTRAP_NEW, FALSE, NULL);
-		/* See if $ydb_max_storalloc is set */
-		ydb_max_storalloc = ydb_trans_numeric(YDBENVINDX_MALLOC_LIMIT, &is_defined, IGNORE_ERRORS_TRUE, NULL);
-		/* See if $ydb_mupjnl_parallel is set */
-		ydb_mupjnl_parallel = ydb_trans_numeric(YDBENVINDX_MUPJNL_PARALLEL, &is_defined, IGNORE_ERRORS_TRUE, NULL);
-=======
-		val.addr = GTM_ZMAXTPTIME;
-		val.len = SIZEOF(GTM_ZMAXTPTIME) - 1;
-		if ((status = trans_numeric(&val, &is_defined, TRUE)) && (0 <= status) && (TPTIMEOUT_MAX_TIME >= status))
-			TREF(dollar_zmaxtptime) = status;	 /* NOTE assignment above */
-		/* See if $gtm_ztrap_new/GTM_ZTRAP_NEW has been specified */
-		val.addr = ZTRAP_NEW;
-		val.len = SIZEOF(ZTRAP_NEW) - 1;
-		ztrap_new = logical_truth_value(&val, FALSE, NULL);
-		/* Initialize dollar_zmalloclim and malloccrit_issued */
+		/* See if $ydb_malloc_limit is set. Initialize dollar_zmalloclim and malloccrit_issued */
+		zmalloclim = ydb_trans_numeric_64(YDBENVINDX_MALLOC_LIMIT, &is_defined, IGNORE_ERRORS_TRUE, NULL);
 		tmp_malloc_limit = (size_t)getstorage();
-		val.addr = GTM_MALLOC_LIMIT;
-		val.len = SIZEOF(GTM_MALLOC_LIMIT) - 1;
-		assert(0 == malloccrit_issued);
-		zmalloclim = (size_t)trans_numeric_64(&val, &is_defined, TRUE);
 		if (!is_defined || IS_GTMSECSHR_IMAGE)
 		{
 			zmalloclim = 0;					/* default is 0; exclude gtmsecshr */
@@ -418,10 +394,8 @@ void	gtm_env_init(void)
 			zmalloclim = tmp_malloc_limit;
 		else if (zmalloclim < MIN_MALLOC_LIM)
 			zmalloclim = MIN_MALLOC_LIM;
-		val.addr = GTM_MUPJNL_PARALLEL;				/* See if $gtm_mupjnl_parallel is set */
-		val.len = SIZEOF(GTM_MUPJNL_PARALLEL) - 1;
-		gtm_mupjnl_parallel = trans_numeric(&val, &is_defined, TRUE);
->>>>>>> eb3ea98c (GT.M V7.0-002)
+		/* See if $ydb_mupjnl_parallel is set */
+		ydb_mupjnl_parallel = ydb_trans_numeric(YDBENVINDX_MUPJNL_PARALLEL, &is_defined, IGNORE_ERRORS_TRUE, NULL);
 		if (!is_defined)
 			ydb_mupjnl_parallel = 1;
 		/* See if ydb_repl_filter_timeout is specified */
@@ -437,16 +411,7 @@ void	gtm_env_init(void)
 		ret = ydb_logical_truth_value(YDBENVINDX_DOLLAR_TEST, FALSE, &is_defined);
 		dollar_test_default = (is_defined ? ret : TRUE);
 		/* gtm_nofflf for GTM-9136.  Default is FALSE */
-<<<<<<< HEAD
 		gtm_nofflf = ydb_logical_truth_value(YDBENVINDX_NOFFLF, FALSE, &is_defined);
-
-=======
-		val.addr = GTM_NOFFLF;
-		val.len = SIZEOF(GTM_NOFFLF) - 1;
-		ret = logical_truth_value(&val, FALSE, &is_defined);
-		if (is_defined)
-		        gtm_nofflf = ret;
->>>>>>> eb3ea98c (GT.M V7.0-002)
 		/* Platform specific initializations */
 		gtm_env_init_sp();
 	}

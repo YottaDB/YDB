@@ -1,13 +1,9 @@
 /****************************************************************
  *								*
-<<<<<<< HEAD
- * Copyright (c) 2001-2018 Fidelity National Information	*
-=======
  * Copyright (c) 2001-2022 Fidelity National Information	*
->>>>>>> eb3ea98c (GT.M V7.0-002)
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -31,11 +27,8 @@
 #include "patcode.h"
 #include "sorts_after.h"
 #include "stringpool.h"
-<<<<<<< HEAD
 #include "is_equ.h"
-=======
 #include "toktyp.h"
->>>>>>> eb3ea98c (GT.M V7.0-002)
 
 LITREF octabstruct	oc_tab[];
 
@@ -165,17 +158,6 @@ void bx_boollit(triple *t, int depth)
 		for (j = 0;  j < ARRAYSIZE(v); j++)
 		{	/* both arguments are literals, so try the operation at compile time */
 			v[j] = &optrip[j]->operand[0].oprval.mlit->v;
-<<<<<<< HEAD
-=======
-			MV_FORCE_NUMD(v[j]);
-			if (!(MV_NM & v[j]->mvtype))
-			{	/* if we don't have a useful number the Boolean conversion won't be valid */
-				TREF(last_source_column) += (TK_EOL == TREF(director_token)) ? -2 : 2;	/* improve hints */
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NUMOFLOW);
-				assert(TREF(rts_error_in_parse));
-				return;
-			}
->>>>>>> eb3ea98c (GT.M V7.0-002)
 			tv[j] = MV_FORCE_BOOL(v[j]);
 		}
 		switch (t->opcode)

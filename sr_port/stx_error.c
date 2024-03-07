@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -91,13 +91,9 @@ void stx_error_va(int in_error, va_list args)
 	if (TREF(xecute_literal_parse))
 	{
 		ins_errtriple(in_error);
-<<<<<<< HEAD
-		TREF(source_error_found) = TRUE;
+		TREF(source_error_found) = (int4)in_error;
 		va_end(dup_args);
 		va_end(args);
-=======
-		TREF(source_error_found) = (int4)in_error;
->>>>>>> eb3ea98c (GT.M V7.0-002)
 		return;
 	}
 	TREF(dollar_zcstatus) = !TREF(dollar_zcstatus) ? in_error : ERR_ERRORSUMMARY;

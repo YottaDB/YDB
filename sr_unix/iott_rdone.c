@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -84,25 +84,8 @@ int	iott_rdone (mint *v, uint8 nsec_timeout)	/* timeout in nanoseconds */
 #ifdef __MVS__
 	wint_t		asc_inchar;
 #endif
-<<<<<<< HEAD
-	char		dc1, dc3;
-	short int	i;
-	io_desc		*io_ptr;
-	d_tt_struct	*tt_ptr;
-	tt_interrupt	*tt_state;
-	int		rdlen, selstat, status, utf8_more, utf8_seen, inchar_width;
-	uint4		mask;
-	int		msk_in, msk_num;
-	unsigned char	*zb_ptr, *zb_top;
-	unsigned char	more_buf[GTM_MB_LEN_MAX + 1], *more_ptr;	/* to build up multi byte for character */
-	fd_set		input_fd;
-	struct timeval	input_timeval;
-	ABS_TIME	cur_time, end_time;
-	mv_stent	*mv_zintdev;
-	boolean_t	ch_set;
+	int		utf8_seen;
 	DCL_THREADGBL_ACCESS;
-=======
->>>>>>> eb3ea98c (GT.M V7.0-002)
 
 	SETUP_THREADGBL_ACCESS;
 	io_ptr = io_curr_device.in;

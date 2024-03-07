@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -143,14 +143,7 @@ static boolean_t mu_open_try(io_log_name *naml, io_log_name *tl, mval *pp, mval 
 				ch = *(pp->str.addr + p_offset++);
 				if (iop_sequential == ch)
 					iod->type = rm;
-<<<<<<< HEAD
 				UPDATE_P_OFFSET(p_offset, ch, pp);	/* updates "p_offset" using "ch" and "pp" */
-=======
-				if (IOP_VAR_SIZE == io_params_size[ch])
-					p_offset += (int)(unsigned char)*(pp->str.addr + p_offset) + 1;
-				else
-					p_offset += io_params_size[ch];
->>>>>>> eb3ea98c (GT.M V7.0-002)
 			}
 			tl->iod = iod;
 		} else

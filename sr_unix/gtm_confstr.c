@@ -3,7 +3,7 @@
  * Copyright (c) 2017-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -30,14 +30,8 @@ int gtm_confstr(char *command, unsigned int maxsize)
 {
 	char 		pathbuf[MAX_FN_LEN];
 	char 		*cmd_path, *path_tok, *path_tokptr, *cmd_ptr;
-<<<<<<< HEAD
-	size_t 		n;
-	int 		status;
-	unsigned int 	tok_len, cmdlen;
-=======
 	size_t 		n, tok_len, cmdlen;
-	int 		status, i;
->>>>>>> eb3ea98c (GT.M V7.0-002)
+	int 		status;
 	struct stat 	sb;
 
 	n = confstr(_CS_PATH, NULL, (size_t) 0);
@@ -49,18 +43,10 @@ int gtm_confstr(char *command, unsigned int maxsize)
 		return -1;
 	}
 	confstr(_CS_PATH, pathbuf, n);
-<<<<<<< HEAD
-	cmdlen = strlen(command);
-	path_tok = STRTOK_R(pathbuf, ":", &path_tokptr);
-	assert(cmdlen && (NULL != path_tok));
-	do
-=======
-	i = 0;
 	cmdlen = strnlen(command, MAX_FN_LEN);
 	assert(0 < cmdlen); /* Internal commands should never be null */
 	path_tok = STRTOK_R(pathbuf, ":", &path_tokptr);
 	while (path_tok != NULL)
->>>>>>> eb3ea98c (GT.M V7.0-002)
 	{
 		tok_len = strlen(path_tok);
 		n = (tok_len + cmdlen + 2);

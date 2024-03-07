@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -30,9 +30,10 @@ void	op_mul(mval *u, mval *v, mval *p)
 	boolean_t	promo;
 	int4		c, exp;
 	mval		w, z;
-<<<<<<< HEAD
 	int		u_mvtype, v_mvtype;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	/* If u or v is $ZYSQLNULL, the result is $ZYSQLNULL */
 	if (MV_IS_SQLNULL(u) || MV_IS_SQLNULL(v))
 	{
@@ -41,11 +42,6 @@ void	op_mul(mval *u, mval *v, mval *p)
 		*p = literal_sqlnull;
 		return;
 	}
-=======
-	DCL_THREADGBL_ACCESS;
-
-	SETUP_THREADGBL_ACCESS;
->>>>>>> eb3ea98c (GT.M V7.0-002)
 	MV_FORCE_NUM(u);
 	MV_FORCE_NUM(v);
 	u_mvtype = u->mvtype;

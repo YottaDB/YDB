@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -190,46 +190,41 @@ typedef struct gtmsrc_lcl_struct
 #define INST_NOT_GLD			(struct gd_addr_struct *)1
 #define IS_INST_FROM_GLD(REPL_GLD)	(INST_NOT_GLD != REPL_GLD)	/* where repl_inst_get_name found instance file name */
 
-#define GET_INSTFILE_NAME(sendmsg, err_act)										\
-{															\
-	boolean_t	is_ydb_env_match;										\
-															\
-	LITREF	char	*ydbenvname[YDBENVINDX_MAX_INDEX];								\
-	LITREF	char	*gtmenvname[YDBENVINDX_MAX_INDEX];								\
-															\
-	is_ydb_env_match = FALSE;											\
-	if (NULL == log_nam.addr)											\
-	{	/* Special signal from SETUP_INST_INFO macro to use ydb_repl_instance env var */			\
-		assert((dont_sendmsg_on_log2long == sendmsg) || (do_sendmsg_on_log2long == sendmsg));			\
-		status = ydb_trans_log_name(YDBENVINDX_REPL_INSTANCE, &trans_name,					\
-				temp_inst_fn, SIZEOF(temp_inst_fn),							\
-				(dont_sendmsg_on_log2long == sendmsg) ? IGNORE_ERRORS_NOSENDMSG : IGNORE_ERRORS_TRUE,	\
-				&is_ydb_env_match);									\
-		/* Set log_nam.addr to point to matched env var name (caller relies on this) */				\
-		log_nam.addr = (char *) (is_ydb_env_match								\
-						? ydbenvname[YDBENVINDX_REPL_INSTANCE]					\
-						: gtmenvname[YDBENVINDX_REPL_INSTANCE]);				\
-		log_nam.len = STRLEN(log_nam.addr);									\
-	} else														\
-		status = trans_log_name(&log_nam, &trans_name, temp_inst_fn, SIZEOF(temp_inst_fn), sendmsg);		\
-	if ((SS_NORMAL == status) || (inst_from_gld && (SS_NOLOGNAM == status)) && (0 != trans_name.len))		\
-	{														\
-		boolean_t path_found;											\
-															\
-		temp_inst_fn[trans_name.len] = '\0';									\
-<<<<<<< HEAD
-		path_found = get_full_path(trans_name.addr, trans_name.len, fn, fn_len, bufsize, &ustatus);		\
+#define GET_INSTFILE_NAME(sendmsg, err_act)											\
+{																\
+	boolean_t	is_ydb_env_match;											\
+																\
+	LITREF	char	*ydbenvname[YDBENVINDX_MAX_INDEX];									\
+	LITREF	char	*gtmenvname[YDBENVINDX_MAX_INDEX];									\
+																\
+	is_ydb_env_match = FALSE;												\
+	if (NULL == log_nam.addr)												\
+	{	/* Special signal from SETUP_INST_INFO macro to use ydb_repl_instance env var */				\
+		assert((dont_sendmsg_on_log2long == sendmsg) || (do_sendmsg_on_log2long == sendmsg));				\
+		status = ydb_trans_log_name(YDBENVINDX_REPL_INSTANCE, &trans_name,						\
+				temp_inst_fn, SIZEOF(temp_inst_fn),								\
+				(dont_sendmsg_on_log2long == sendmsg) ? IGNORE_ERRORS_NOSENDMSG : IGNORE_ERRORS_TRUE,		\
+				&is_ydb_env_match);										\
+		/* Set log_nam.addr to point to matched env var name (caller relies on this) */					\
+		log_nam.addr = (char *) (is_ydb_env_match									\
+						? ydbenvname[YDBENVINDX_REPL_INSTANCE]						\
+						: gtmenvname[YDBENVINDX_REPL_INSTANCE]);					\
+		log_nam.len = STRLEN(log_nam.addr);										\
+	} else															\
+		status = trans_log_name(&log_nam, &trans_name, temp_inst_fn, SIZEOF(temp_inst_fn), sendmsg);			\
+	if ((SS_NORMAL == status) || (inst_from_gld && (SS_NOLOGNAM == status)) && (0 != trans_name.len))			\
+	{															\
+		boolean_t path_found;												\
+																\
+		temp_inst_fn[trans_name.len] = '\0';										\
+		path_found = get_full_path(trans_name.addr, (unsigned int)trans_name.len, fn, fn_len, bufsize, &ustatus);	\
 		if (!path_found && (return_on_error != err_act))								\
-=======
-		if (!get_full_path(trans_name.addr, (unsigned int)trans_name.len, fn, fn_len, bufsize, &ustatus)	\
-				&& err_act)										\
->>>>>>> eb3ea98c (GT.M V7.0-002)
-		{													\
-			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_REPLINSTACC, 2, trans_name.len, trans_name.addr,	\
-				ERR_TEXT, 2, RTS_ERROR_LITERAL("full path could not be found"), ustatus);		\
-		} else													\
-			ret = TRUE;											\
-	}														\
+		{														\
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_REPLINSTACC, 2, trans_name.len, trans_name.addr,		\
+				ERR_TEXT, 2, RTS_ERROR_LITERAL("full path could not be found"), ustatus);			\
+		} else														\
+			ret = TRUE;												\
+	}															\
 }
 
 #define SETUP_INST_INFO(GDPTR, LOGNAM, INSTFROMGLD)			\

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -34,8 +34,10 @@ void	op_idiv(mval *u, mval *v, mval *q)
 	boolean_t	promo;
 	int4		z, c, exp;
 	mval		w, y;
-<<<<<<< HEAD
 	int		u_mvtype, v_mvtype;
+	DCL_THREADGBL_ACCESS;
+
+	SETUP_THREADGBL_ACCESS;
 
 	/* If u or v is $ZYSQLNULL, the result is $ZYSQLNULL */
 	if (MV_IS_SQLNULL(u) || MV_IS_SQLNULL(v))
@@ -50,20 +52,10 @@ void	op_idiv(mval *u, mval *v, mval *q)
 	u_mvtype = u->mvtype;
 	v_mvtype = v->mvtype;
 	assert((v_mvtype & MV_INT) || (0 != v->m[0]) || (0 != v->m[1]));
-	if ((v_mvtype & MV_INT) && (0 == v->m[1]))
-		RTS_ERROR_ABT(VARLSTCNT(1) ERR_DIVZERO);
-	if (u_mvtype & MV_INT & v_mvtype)
-=======
-	DCL_THREADGBL_ACCESS;
-
-	SETUP_THREADGBL_ACCESS;
-	MV_FORCE_NUM(u);
-	MV_FORCE_NUM(v);
 	assert((MV_NM | MV_NUM_APPROX) & v->mvtype);
 	if ((0 == v->m[1]) && ((0 == v->m[0]) || (MV_INT & v->mvtype)))
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_DIVZERO);
-	if (u->mvtype & MV_INT & v->mvtype)
->>>>>>> eb3ea98c (GT.M V7.0-002)
+	if (u_mvtype & MV_INT & v_mvtype)
 	{
 		promo = eb_int_div(u->m[1], v->m[1], q->m);
 		if (!promo)

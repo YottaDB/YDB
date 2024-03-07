@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -230,7 +230,6 @@ bool	lke_showlock(
 						len1 = STR_LIT_LEN(gnam);
 						memcpy(format, msg, len1);
 
-<<<<<<< HEAD
 						if (owned && !lock)
 						{
 							msg = ownedby;
@@ -243,30 +242,7 @@ bool	lke_showlock(
 						memcpy(format + len1, msg, len2);
 						format[len1 + len2] = '\0';
 						assert((len1 + len2) < SIZEOF(format));
-						util_cm_print(lnk, CMMS_V_LKESHOW, format, FLUSH,
-=======
-					if (owned && !lock)
-					{
-						msg = ownedby;
-						len2 = STR_LIT_LEN(ownedby);
-					} else
-					{
-						msg = request;
-						len2 = STR_LIT_LEN(request);
-					}
-					memcpy(format + len1, msg, len2);
-					format[len1 + len2] = '\0';
-					assert((len1 + len2) < SIZEOF(format));
-					if (NULL == lnk)
-					{
-						if ((NULL == one_lock.addr) ||
-							(!memcmp(name->addr, one_lock.addr, one_lock.len)
-							&& (!exact || (one_lock.len == f[0]))))
-							util_out_print_args(format, 7, FLUSH,
-									f[0], f[1], f[2], f[3], f[4], f[5], f[6]);
-					} else
 						util_cm_print(lnk, CMMS_V_LKESHOW, format, 7, FLUSH,
->>>>>>> eb3ea98c (GT.M V7.0-002)
 							      f[0], f[1], f[2], f[3], f[4], f[5], f[6]);
 					}
 				}

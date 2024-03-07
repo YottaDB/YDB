@@ -488,7 +488,7 @@
    RETry
 
    Makes the specified number of attempts to retry performing BACKUP if the
-   backup fails. If -RETRY is not specified, GT.M defaults -RETRY to zero
+   backup fails. If -RETRY is not specified, YottaDB defaults -RETRY to zero
    (0). In case of an error, retry attempts are always based on cp or pax
    even when another copy mechanism is available.
 
@@ -1070,7 +1070,7 @@
        value. MUPIP EXTRACT -FORMAT=GO has two header records - the first is
        a text label (refer to the LABEL qualifier) and the second is the date
        and time of extract in $ZDATE() format DD-MON-YEAR 24:60:SS. If -LABEL
-       is not specified, the default first header is "GT.M MUPIP EXTRACT".
+       is not specified, the default first header is "YottaDB MUPIP EXTRACT".
     3. ZWR - ZWRITE format, used for files to transport or archive that may
        contain non-graphical information. Each global node produces one
        record with both key and value. MUPIP EXTRACT -FORMAT=ZWR has two
@@ -1523,7 +1523,7 @@
    ID
 
    Specifies the signature use for the ftok; if unspecified, it defaults to
-   the signature for a GT.M database file.
+   the signature for a YottaDB database file.
 
 3 ONLY
    ONLY
@@ -3439,7 +3439,7 @@
 3 FUllblkwrt
    FUllblkwrt
 
-   Determines whether GT.M writes only valid database blocks contents, or a
+   Determines whether YottaDB writes only valid database blocks contents, or a
    full block including meaningless trailing content. Full block writes are
    more efficient with some secondary storage because they avoid
    read-before-write. The format of the FULLBLKWRT qualifier is:
@@ -3604,14 +3604,14 @@
    PROblksplit
 
    Specifies the approximate number of records a block in the region must
-   exceed before GT.M considers a proactive block split. If the specified
-   value is 0, GT.M does not engage in proactive block splitting. The format
+   exceed before YottaDB considers a proactive block split. If the specified
+   value is 0, YottaDB does not engage in proactive block splitting. The format
    of the -PROBLKSPLIT qualifier is:
 
    -PRO[BLKSPLIT]=integer
 
-     o GT.M makes proactive block splits when a block has a history of
-       causing repeated restarts; GT.M never proactively splits blocks that
+     o YottaDB makes proactive block splits when a block has a history of
+       causing repeated restarts; YottaDB never proactively splits blocks that
        don't encounter restarts.
      o Proactive block splits tend to make globals require more blocks and
        potentially deeper trees.
@@ -3789,7 +3789,7 @@
 
    -STATSD[B_ALLOCATION]=integer
 
-     o GT.M doubles the block count with each statsdb size increase.
+     o YottaDB doubles the block count with each statsdb size increase.
      o The minimum STATSDB_ALLOCATION is 128 blocks.
      o The maximum STATSDB_ALLOCATION is 8,388,607 blocks.
      o By default, GDE uses an STATSDB_ALLOCATION of 2050 blocks.
@@ -3797,7 +3797,7 @@
 3 STDnullcoll
    STDnullcoll
 
-   Specifies whether YottaDB uses standard MUMPS collation or GT.M collation for
+   Specifies whether YottaDB uses standard MUMPS collation or YottaDB collation for
    null-subscripted keys. YottaDB strongly recommends that you use STDNULL and
    against using this non-standard null collation, which is the default for
    historical reasons. The format of the STDNULLCOLL qualifier is:
@@ -6869,7 +6869,7 @@
    environment variable ydb_repl_instname. If either ydb_repl_instname is not set
    or -name is not specified, YottaDB produces an error.
    environment variable gtm_repl_instname. If either gtm_repl_instname is not
-   set or -name is not specified, GT.M produces an error.
+   set or -name is not specified, YottaDB produces an error.
 
    -noreplace
 
@@ -7123,7 +7123,7 @@
    Whenever the source and receiver server connect with each other, if the
    source server was started with a valid non-zero compression level, they
    first determine whether the receiver server is running a version of YottaDB
-   or GT.M which handles compressed records and has been started with a non-zero
+   or YottaDB which handles compressed records and has been started with a non-zero
    compression level. Only if this is true, do they agree to use compressed
    journal records. They also verify with a test message that
    compression/decompression works correctly before sending any compressed
@@ -7207,9 +7207,9 @@
    connection attempts may also occur when the Receiver Server is not started
    or is not accessible on the network.
 
-   GT.M automatically adjusts the values for <soft tries period> and <hard
-   tries period> to about half of the GT.M determined shutdown wait time.
-   GT.M logs these adjustments in the Source Server log file. This helps
+   YottaDB automatically adjusts the values for <soft tries period> and <hard
+   tries period> to about half of the YottaDB determined shutdown wait time.
+   YottaDB logs these adjustments in the Source Server log file. This helps
    prevent inadvertent timeouts of a Source Server shutdown due to high <soft
    tries period> and/or <hard tries period> and prevents out-of-design
    conditions.
@@ -7574,7 +7574,7 @@
    maximum timeout is 3600 seconds. Any value higher than 3600 produces the
    INVSHUTDOWN error.
 
-   After initiating shutdown of the Source Server, GT.M waits up to 90 *
+   After initiating shutdown of the Source Server, YottaDB waits up to 90 *
    number_of_regions seconds (with a minimum of 120 seconds) for the Source
    Server process to exit normally.
 

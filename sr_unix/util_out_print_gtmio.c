@@ -3,7 +3,7 @@
  * Copyright (c) 2014-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2020-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2020-2024 YottaDB LLC and/or its subsidiaries.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -57,12 +57,8 @@ void	util_out_print_gtmio(caddr_t message, int flush, ...)
 	 */
 	if (STRCMP(message, "!AD") || (FLUSH != flush))
 	{
-<<<<<<< HEAD
-		util_out_print_vaparm(message, NOFLUSH_OUT, var, MAXPOSINT4);
-		va_end(TREF(last_va_list_ptr));
-=======
 		util_out_print_vaparm(message, NOFLUSH_OUT, var, MAXPOSINT4);	/* WARNING: UNCHECKED faocnt - internal use only */
->>>>>>> eb3ea98c (GT.M V7.0-002)
+		va_end(TREF(last_va_list_ptr));
 		src = TREF(util_outbuff_ptr);
 		assert(NULL != TREF(util_outptr));
 		srclen = INTCAST(TREF(util_outptr) - src) + 1;	/* 1 is for '\n' */

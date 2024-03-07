@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -150,15 +150,9 @@ void unary_tail(oprtype *opr, int depth)
 						s2n(mv);
 						if (!(MV_NM & mv->mvtype))
 						{
-<<<<<<< HEAD
+							TREF(last_source_column) += (TK_EOL == TREF(director_token)) ? -2 : 2;
 							stx_error(ERR_NUMOFLOW);
 							break;
-=======
-							TREF(last_source_column) += (TK_EOL == TREF(director_token)) ? -2 : 2;
-							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NUMOFLOW);
-							assert(TREF(rts_error_in_parse));
-							return;
->>>>>>> eb3ea98c (GT.M V7.0-002)
 						}
 					}
 					n2s(mv);

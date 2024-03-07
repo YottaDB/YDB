@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -231,14 +231,9 @@ void zshow_output(zshow_out *out, const mstr *str)
 				/* add the subscript for the "code" */
 				lv_child = op_putindx(VARLSTCNT(2) lv, mv_child);
 				lv_child->v.mvtype = 0; /* don't want a node so make it undef'd */
-<<<<<<< HEAD
 				for (tempstr = str->addr;
 					NULL != (piecestr = STRTOK_R(tempstr, ".", &strtokptr)); /* WARNING assignment in test */
 					tempstr = NULL)
-=======
-				for (tempstr = str->addr; NULL != (piecestr = STRTOK_R(tempstr,".", &strtokptr));
-						tempstr = NULL) /* WARNING inline assignment in test */
->>>>>>> eb3ea98c (GT.M V7.0-002)
 				{
 					len = (ssize_t)strnlen(piecestr, MAX_MIDENT_LEN);
 					assert((0 < len) && (MAX_MIDENT_LEN >= len));
@@ -387,14 +382,9 @@ void zshow_output(zshow_out *out, const mstr *str)
 			}
 			tempstr=str->addr;
 			/* build the key by adding the rest of the subscripts */
-<<<<<<< HEAD
 			for (tempstr = str->addr;
 				NULL != (piecestr = STRTOK_R(tempstr, ".", &strtokptr)); /* WARNING assignment in test */
 				tempstr = NULL)
-=======
-			for (tempstr = str->addr; NULL != (piecestr = STRTOK_R(tempstr,".", &strtokptr)); /* inline assignment */
-					tempstr = NULL)
->>>>>>> eb3ea98c (GT.M V7.0-002)
 			{
 				len = (ssize_t)strnlen(piecestr, MAX_MIDENT_LEN);
 				assert((0 < len) && (MAX_MIDENT_LEN >= len));

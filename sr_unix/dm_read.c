@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -566,23 +566,6 @@ void	dm_read (mval *v)
 						outptr = UTF8_WCTOMB(inchar, outptr);
 					}
 					*outptr = '\0';
-<<<<<<< HEAD
-=======
-				} else
-				{
-#				endif
-					match_length = (uint4)strcspn((const char *)buffer_start, delimiter_string);
-					/* only "rec" and "recall" should be accepted */
-					if (((strlen(REC) == match_length) || (strlen(RECALL) == match_length))
-						&& (0 == strncmp((const char *)buffer_start, RECALL, match_length)))
-					{
-						for (argv1 = buffer_start + match_length; !(IS_AT_END_OF_STRINGPOOL(argv1, 0))
-								&& (' ' != argv1[0]) && ('\t' != argv1[1]); argv1++);
-						argv[1] = (char *)((IS_AT_END_OF_STRINGPOOL(argv1, 0)) ? NULL : argv1);
-					} else
-						break;		/* not RECALL so end of line */
-#				ifdef UTF8_SUPPORTED
->>>>>>> eb3ea98c (GT.M V7.0-002)
 				}
 #				endif
 

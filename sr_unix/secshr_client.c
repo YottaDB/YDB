@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -145,11 +145,6 @@ const static char readonly *secshrstart_error_code[] = {
 	recv_len = SIZEOF(mesg);								\
 	recv_complete = FALSE;									\
 	save_errno = 0;										\
-<<<<<<< HEAD
-=======
-	assert((0 <= CLIENT_ACK_TIMER) && (MAXPOSINT4 >= CLIENT_ACK_TIMER));			\
-	start_timer(timer_id, CLIENT_ACK_TIMER, client_timer_handler, 0, NULL);			\
->>>>>>> eb3ea98c (GT.M V7.0-002)
 }
 
 error_def(ERR_YDBDISTUNVERIF);

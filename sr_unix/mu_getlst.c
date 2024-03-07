@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -14,6 +14,7 @@
  ****************************************************************/
 
 #include "mdef.h"
+
 #include "sys/types.h"
 #include "gtm_stat.h"
 #include "gtm_unistd.h"
@@ -41,6 +42,7 @@
 #include "gtm_malloc.h"
 #include "mdq.h"
 #include "compiler.h"
+
 GBLDEF	boolean_t		is_directory;
 GBLDEF	mstr			directory;
 GBLREF	backup_reg_list		*mu_repl_inst_reg_list;
@@ -52,6 +54,7 @@ GBLREF	gd_addr			*gd_header;
 GBLREF	tp_region		*grlist;
 GBLDEF	usr_reg_que		*usr_spec_regions = NULL; /* Queue of region(s) in user-specified order */
 
+static bool usr_reg_que_checkdup(unsigned char *usr_reg, unsigned short usr_reg_len);
 
 error_def(ERR_MUBCKNODIR);
 error_def(ERR_MUNOACTION);
@@ -73,11 +76,7 @@ error_def(ERR_NOREGION);
 void mu_getlst(char *name, int4 size)
 {
 	boolean_t	matched, is_statsDB, is_autoDB;
-<<<<<<< HEAD
-	char		*c1, *c2, *c3, *c4, fbuff[YDB_PATH_MAX], rbuff[RBUFF_ARRAY_SIZE], fnbuff[YDB_PATH_MAX + 1];
-=======
-	char		*c1, *c2, *c3, *c4, rbuff[GTM_PATH_MAX], fbuff[GTM_PATH_MAX], fnbuff[GTM_PATH_MAX + 1];
->>>>>>> eb3ea98c (GT.M V7.0-002)
+	char		*c1, *c2, *c3, *c4, rbuff[RBUFF_ARRAY_SIZE], fbuff[YDB_PATH_MAX], fnbuff[YDB_PATH_MAX + 1];
 	gd_region	*reg;
 	tp_region	*list;
 	unsigned short	flen, i, rlen;
@@ -100,14 +99,8 @@ void mu_getlst(char *name, int4 size)
 		if (!cli_get_str(name, rbuff, &rlen))
 			mupip_exit(ERR_MUNODBNAME);
 		for (i = 0; i < rlen; i++)
-<<<<<<< HEAD
 			rbuff[i] = TOUPPER(rbuff[i]); /* Region names are always upper-case ASCII and thoroughly NUL terminated */
 		for ( ; i < RBUFF_ARRAY_SIZE; i++)
-=======
-			/* Region names are always upper-case ASCII and thoroughly NUL terminated */
-			rbuff[i] = TOUPPER(rbuff[i]);
-		for ( ; i < ARRAYSIZE(rbuff); i++)
->>>>>>> eb3ea98c (GT.M V7.0-002)
 			rbuff[i] = 0;
 	} else
 	{
@@ -151,14 +144,8 @@ void mu_getlst(char *name, int4 size)
 		if (!cli_get_str(name, rbuff, &rlen))
 			mupip_exit(ERR_MUNODBNAME);
 		for (i = 0; i < rlen; i++)
-<<<<<<< HEAD
 			rbuff[i] = TOUPPER(rbuff[i]); /* Region names are always upper-case ASCII and thoroughly NUL terminated */
 		for ( ; i < RBUFF_ARRAY_SIZE; i++)
-=======
-			/* Region names are always upper-case ASCII and thoroughly NUL terminated */
-			rbuff[i] = TOUPPER(rbuff[i]);
-		for ( ; i < ARRAYSIZE(rbuff); i++)
->>>>>>> eb3ea98c (GT.M V7.0-002)
 			rbuff[i] = 0;
 		flen = SIZEOF(fbuff);	/* reset max_buflen to original before call to "cli_get_str" */
 		if ((!cli_get_str("SAVE_DIR", fbuff, &flen)) || (0 == flen))

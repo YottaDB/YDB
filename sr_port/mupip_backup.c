@@ -82,11 +82,8 @@
 #include "repl_sem.h"
 #include "gtm_sem.h"
 #include "anticipatory_freeze.h"
-<<<<<<< HEAD
-
-=======
 #include "mdq.h"
->>>>>>> eb3ea98c (GT.M V7.0-002)
+
 #define PATH_DELIM		'/'
 #define TMPDIR_ACCESS_MODE	(R_OK | W_OK | X_OK)
 #define	SCRATCH_DIR		"/tmp/"
@@ -290,11 +287,8 @@ void mupip_backup(void)
 	struct perm_diag_data	pdd;
 	int			nbytes, nbytes2;
 	ZOS_ONLY(int		realfiletag;)
-<<<<<<< HEAD
-	DCL_THREADGBL_ACCESS;
-=======
 	usr_reg_que		*region_que_entry;
->>>>>>> eb3ea98c (GT.M V7.0-002)
+	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	/* ==================================== STEP 1. Initialization ======================================= */

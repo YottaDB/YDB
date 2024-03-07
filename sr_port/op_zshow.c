@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -44,14 +44,10 @@ void op_zshow(mval *func, int type, lv_val *lvn)
 {
 	const char	*ptr, *ptr_top;
   	zshow_out	output;
-<<<<<<< HEAD
-=======
 	char		zshow_code;
 	char		reqorder[sizeof(ZSHOW_ALL_ITEMS)];	/* codes in requested order, just once */
 	int		reqcnt;
 	int		done_chars = 0;	/* Bit field of upper case characters found */
-
->>>>>>> eb3ea98c (GT.M V7.0-002)
 	MAXSTR_BUFF_DECL(buff);
 	DCL_THREADGBL_ACCESS;
 

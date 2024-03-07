@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -95,15 +95,12 @@ typedef enum
 	INTRPT_IN_JNL_FSYNC,		/* Deferring interrupts in jnl_fsync() while holding the latch */
 	INTRPT_IN_EVENT_HANDLING,	/* Deferring interrupts while managing a deferred or outofband event */
 	INTRPT_IN_KILL_CLEANUP,		/* Deferring interrupts while performing KILL cleanup - used by REORG */
-<<<<<<< HEAD
+	INTRPT_IN_RTN_CLEANUP,          /* Deferring interrupts while cleaning up routines */
 
 	/****************** Below interrupt states are YottaDB-ONLY **************/
 	INTRPT_IN_SS_DESTROY_CONTEXT,	/* Deferring interrupts in ss_destroy_context() */
 
 	/****************** Below interrupt states are common to both GT.M and YottaDB **************/
-=======
-	INTRPT_IN_RTN_CLEANUP,          /* Deferring interrupts while cleaning up routines */
->>>>>>> eb3ea98c (GT.M V7.0-002)
 	INTRPT_NUM_STATES		/* Should be the *last* one in the enum. */
 } intrpt_state_t;
 
@@ -179,8 +176,6 @@ void	deferred_signal_handler(void);
 																\
 	GBLREF VSIG_ATOMIC_T	forced_exit;											\
 	GBLREF int		forced_exit_sig;										\
-	GBLREF boolean_t	(*xfer_set_handlers_fnptr)(int4, void (*callback)(int4), int4 param, boolean_t popped_entry);	\
-	GBLREF void		(*deferred_signal_set_fnptr)(int4 dummy_val);							\
 																\
 	/* Below code is not thread safe as it modifies global variables "forced_exit"						\
 	 * and "forced_exit_sig".												\
@@ -204,7 +199,7 @@ void	deferred_signal_handler(void);
 		 * that gets handled at the earliest safe point.								\
 		 */														\
 		if (NULL != xfer_set_handlers_fnptr)										\
-			(*xfer_set_handlers_fnptr)(deferred_signal, deferred_signal_set_fnptr, 0, FALSE);			\
+			(*xfer_set_handlers_fnptr)(deferred_signal, 0, FALSE);							\
 		/* else: it is "gtmsecshr" in which case outofband does not apply */						\
 	}															\
 }

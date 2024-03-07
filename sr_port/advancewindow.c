@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -214,17 +214,7 @@ void advancewindow(void)
 		(TREF(director_mval)).mvtype = MV_STR;
 		CLEAR_MVAL_BITS(TADR(director_mval));
 		TREF(lexical_ptr) = (char *)s2n(&(TREF(director_mval)));
-<<<<<<< HEAD
 		assert(((TREF(director_mval)).mvtype & MV_NUM_MASK) || !TREF(s2n_intlit));
-=======
-		if (!((TREF(director_mval)).mvtype &= MV_NUM_MASK))
-		{
-			TREF(last_source_column) += (TK_EOL == TREF(director_token)) ? -2 : 2;	/* improve hints */
-			stx_error(ERR_NUMOFLOW);
-			TREF(director_token) = TK_ERROR;
-			return;
-		}
->>>>>>> eb3ea98c (GT.M V7.0-002)
 		if (TREF(s2n_intlit))
 		{
 			TREF(director_token) = TK_NUMLIT ;

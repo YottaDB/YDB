@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -136,7 +136,6 @@ GBLREF	int			init_xfer_table(void);
 GBLREF	void			(*ydb_stm_thread_exit_fnptr)(void);
 GBLREF	void			(*ydb_stm_invoke_deferred_signal_handler_fnptr)(void);
 GBLREF	boolean_t		(*xfer_set_handlers_fnptr)(int4, int4 param, boolean_t popped_entry);
-GBLREF	void			(*deferred_signal_set_fnptr)(int4 dummy_val);
 GBLREF	pthread_mutex_t		ydb_engine_threadsafe_mutex[STMWORKQUEUEDIM];
 GBLREF	pthread_t		ydb_engine_threadsafe_mutex_holder[STMWORKQUEUEDIM];
 GBLREF	boolean_t		ydb_treat_sigusr2_like_sigusr1;
@@ -316,7 +315,6 @@ void gtm_startup(struct startup_vector *svec)
 	TREF(in_zwrite) = FALSE;
 	curr_symval->alias_activity = FALSE;
 	xfer_set_handlers_fnptr = &xfer_set_handlers;
-	deferred_signal_set_fnptr = &deferred_signal_set;
 	/* The below 2 function pointers will be set to non-NULL values in case of Simple Thread API in "ydb_stm_thread()" */
 	ydb_stm_thread_exit_fnptr = NULL;
 	ydb_stm_invoke_deferred_signal_handler_fnptr = NULL;

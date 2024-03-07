@@ -1119,15 +1119,10 @@ GBLDEF	boolean_t	gtm_main_thread_id_set;		/* Indicates whether the thread ID is 
 							 */
 GBLDEF	boolean_t	gtm_jvm_process;		/* Indicates whether we are running with JVM or stand-alone. */
 #endif
-<<<<<<< HEAD
-GBLDEF	size_t		ydb_max_storalloc;		/* Maximum that YottaDB allows to be allocated - used for testing */
-GBLDEF	boolean_t	ipv4_only;			/* If TRUE, only use AF_INET. Reflects the value of the ydb_ipv4_only
-=======
 GBLDEF	size_t		zmalloclim;			/* ISV memory warning of MALLOCCRIT in bytes */
 GBLDEF	boolean_t	malloccrit_issued;		/* MEMORY error limit set at time of MALLOCCRIT */
 GBLDEF	xfer_set_handlers_fnptr_t	xfer_set_handlers_fnptr;	/* see comment in deferred_events.h about this typedef */
-GBLDEF	boolean_t	ipv4_only;			/* If TRUE, only use AF_INET. Reflects the value of the gtm_ipv4_only
->>>>>>> eb3ea98c (GT.M V7.0-002)
+GBLDEF	boolean_t	ipv4_only;			/* If TRUE, only use AF_INET. Reflects the value of the ydb_ipv4_only
 							 * environment variable, so is process wide.
 							 */
 GBLDEF void (*stx_error_fptr)(int in_error, ...);	/* Function pointer for stx_error() so gtm_utf8.c can avoid pulling
@@ -1409,14 +1404,11 @@ GBLDEF	volatile int		in_os_signal_handler;	/* Non-zero if we are in an OS invoke
 							 * we get a SIGTERM signal while handling a SIGALRM signal (both
 							 * signals go through "ydb_os_signal_handler").
 							 */
-GBLDEF	boolean_t (*xfer_set_handlers_fnptr)(int4, void (*callback)(int4), int4 param, boolean_t popped_entry);
+GBLDEF	boolean_t (*xfer_set_handlers_fnptr)(int4, int4 param, boolean_t popped_entry);
 							/* Function pointer to "xfer_set_handlers". Stored this way since
 							 * "gtmsecshr" should not pull in "xfer_set_handlers()" and the world
 							 * when pulling in "generic_signal_handler()".
 							 */
-GBLDEF	void (*deferred_signal_set_fnptr)(int4 dummy_val);	/* Function pointer to "deferred_signal_set()". Like the above,
-								 * this exists only to keep "gtmsecshr" executable size small.
-								 */
 GBLDEF	boolean_t		ydb_ztrigger_output = TRUE;	/* If TRUE, $ZTRIGGER() function calls output whether the trigger
 								 * got added or not. If FALSE, the printing is skipped. Default
 								 * value is TRUE. VIEW "ZTRIGGER_OUTPUT":0 resets it to FALSE.

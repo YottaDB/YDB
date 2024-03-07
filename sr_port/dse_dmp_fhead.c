@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -257,12 +257,9 @@ void dse_dmp_fhead (void)
 		util_out_print("  Full Block Write                         !UL", TRUE, csd->write_fullblk);
 		if (db_shares_gvstats)
 			util_out_print("  StatsDB Allocation            !19UL", TRUE, csd->statsdb_allocation);
-<<<<<<< HEAD
 		util_out_print("  Max conc proc time         !22UL", FALSE, csd->max_procs.time);
 		util_out_print("  Max Concurrent processes         !9UL", TRUE, csd->max_procs.cnt);
 		util_out_print("  Reorg Sleep Nanoseconds         !17UL", TRUE, csd->reorg_sleep_nsec);
-=======
->>>>>>> eb3ea98c (GT.M V7.0-002)
 	}
 	if (CLI_PRESENT == cli_present("ALL"))
 	{	/* Only dump these if -/ALL as if part of above display */

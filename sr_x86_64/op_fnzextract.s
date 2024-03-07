@@ -3,7 +3,7 @@
 # Copyright (c) 2007-2022 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
-# Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
@@ -60,13 +60,7 @@ l10:
 	movl	mval_l_strlen(%rsi), %ecx
 	cmpl	%eax, %ecx				# If left index > str. len, then null result
 	jl	l25
-<<<<<<< HEAD
 	cmpl	%edx, %ecx				# Right index may be at most the len.
-=======
-	cmpl	$0, REG32_ARG2				# If right index < 0, then null result
-	jl	l25
-	cmpl	REG32_ARG2, REG32_ARG3			# Right index may be at most the len.
->>>>>>> eb3ea98c (GT.M V7.0-002)
 	jge	l20					# .. of the source string
 	movl	%ecx, %edx
 l20:

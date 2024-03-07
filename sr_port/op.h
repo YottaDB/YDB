@@ -117,11 +117,7 @@ int4	op_fnzfind(mval *src, mval *del, mint first, mval *dst);
 void	op_fnzyhash(mval *string, int salt, mval *ret);
 void	op_fnzysuffix(mval *string, mval *ret);
 void	op_fnzj2(mval *src, int len, mval *dst);
-<<<<<<< HEAD
-void	op_fnzjobexam(mval *prelimSpec, mval *zshowcodes, mval *finalSpec);
-=======
 void	op_fnzjobexam(mval *prelimSpec,  mval *fmt, mval *finalSpec);
->>>>>>> eb3ea98c (GT.M V7.0-002)
 void	op_fnzlength(mval *a1, mval *a0);
 void	op_fnzlkid(mint boolex, mval *retval);
 void	op_fnzm(mint x, mval *v);

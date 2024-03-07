@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -1311,7 +1311,7 @@ MBSTART {							\
 {															\
 	jbuf_phase2_in_prog_t	*phs2CMT;										\
 															\
-	/* The following condition implies that a previous update process was killed in CMT06, right before updating	\
+	/* The following condition implies that a process updating the db was killed in CMT06, right before updating	\
 	 * JBP->phase2_commit_index2. Increment index2 & call jnl_phase2_cleanup() to process it as a dead commit.	\
 	 */														\
 	phs2CMT = &JBP->phase2_commit_array[JBP->phase2_commit_index2];							\
@@ -1333,22 +1333,9 @@ MBSTART {														\
 	GBLREF	uint4		dollar_tlevel;										\
 															\
 	assert(CSA->now_crit);												\
-<<<<<<< HEAD
+	SHM_READ_MEMORY_BARRIER;	/* Ensure the indices read from memory are correct */				\
 	if (JBP->phase2_commit_index2 == JBP->phase2_commit_index1)							\
 		HANDLE_KILL9_IN_CMT06_STEP_IF_NEEDED(CSA, JBP);								\
-=======
-	/* The following condition implies that a update/MUMPS process was killed in CMT06, right before updating	\
-	 * JBP->phase2_commit_index2. Increment index2 & call jnl_phase2_cleanup() to process it as a dead commit.	\
-	 */														\
-	SHM_READ_MEMORY_BARRIER;	/* Ensure the indices read from memory are correct */				\
-	if ((JBP->phase2_commit_index2 == JBP->phase2_commit_index1) && (JBP->freeaddr < JBP->rsrv_freeaddr)		\
-		&& ((JBP->phase2_commit_array[JBP->phase2_commit_index1].start_freeaddr +				\
-			JBP->phase2_commit_array[JBP->phase2_commit_index1].tot_jrec_len) == JBP->rsrv_freeaddr))	\
-	{														\
-		INCR_PHASE2_COMMIT_INDEX(JBP->phase2_commit_index2, JNL_PHASE2_COMMIT_ARRAY_SIZE);			\
-		jnl_phase2_cleanup(CSA, JBP);										\
-	}														\
->>>>>>> eb3ea98c (GT.M V7.0-002)
 	/* Allocate a slot. But before that, check if the slot array is full.						\
 	 * endIndex + 1 == first_index implies full.	Note: INCR_PHASE2_COMMIT_INDEX macro does the + 1		\
 	 * endIndex     == first_index implies empty.									\

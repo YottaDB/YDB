@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -139,49 +139,6 @@ typedef struct
 
 int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 {
-<<<<<<< HEAD
-	pat_strlit		strlit;
-	boolean_t		dfa, done, infinite;
-	boolean_t		dfa_fixed_len, fixed_len, prev_fixed_len, split_atom, start_dfa;
-	int4			lower_bound, upper_bound, alloclen;
-	gtm_int64_t		bound;
-	unsigned char		curchar, symbol, *inchar, *in_top, *buffptr;
-	uint4			pattern_mask, last_leaf_mask, y_max, mbit;
-	uint4			*patmaskptr;
-	int			atom_map, count, total_min, total_max;
-	int			min[MAX_PATTERN_ATOMS], max[MAX_PATTERN_ATOMS], size[MAX_PATTERN_ATOMS];
-	struct leaf		leaves, *lv_ptr;
-	struct e_table		expand, *exp_ptr;
-	int			exp_temp[CHAR_CLASSES];
-	int			leaf_num, curr_leaf_num, min_dfa, curr_min_dfa, sym_num;
-	int 			seqcnt, charpos, leafcnt, cursize;
-	int4			bitpos;
-	alternation		init_alt;
-	alternation		*cur_alt;
-	mstr			alttail;
-	int4			status;
-	int4			altactive;
-	int4			altend;
-	char			*saveinstr;
-	int			chidx;
-	int			bit;
-	int			seq;
-	int			altmin, altmax;
-	int			saw_delimiter = 0;
-	int4			altlen, bytelen;
-	int4			allmask;
-	boolean_t		last_infinite;
-	boolean_t		done_free;
-	unsigned char		*let_go;
-	uint4			*fstchar, *lastpatptr, *outchar, *topchar;
-	int			any_alt = FALSE;
-	int			altcount, altsimplify;
-	int			low_in, high_in, size_in, jump;
-	boolean_t		topseen = FALSE;/* If TRUE it means we found inchar to be == in_top and so did NOT scan the NEXT
-						 * byte in inchar (to be stored in curchar). Therefore from this point onwards,
-						 * "curchar" should never be used in this function. This is also asserted below.
-						 */
-=======
 	alternation	*cur_alt, init_alt;
 	boolean_t	dfa, dfa_fixed_len, done, done_free, fixed_len, infinite, last_infinite,
 			prev_fixed_len, split_atom, start_dfa;
@@ -204,7 +161,6 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 	struct leaf	leaves, *lv_ptr;
 	uint4		*fstchar, last_leaf_mask, *lastpatptr, mbit, *outchar, *patmaskptr, pattern_mask, *topchar, y_max;
 	unsigned char	*buffptr, curchar, *inchar, *in_top, *let_go, symbol;
->>>>>>> eb3ea98c (GT.M V7.0-002)
 
 	if (0 == instr->len)		/* empty pattern string. Cant do much */
 	{

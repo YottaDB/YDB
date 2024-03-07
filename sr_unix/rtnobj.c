@@ -3,7 +3,7 @@
  * Copyright (c) 2014-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  * Copyright (c) 2017-2018 Stephen L Johnson.			*
@@ -314,14 +314,14 @@ void	rtnobj_integ(relinkrec_t *relinkrec, open_relinkctl_sgm *linkctl)
 		rtnobj = rtnobj_retpos(linkctl, shm_index_off_slow); /* Move the slow runner one step forward */
 		shm_index_off_slow = rtnobj->next_rtnobj_shm_offset;
 		relinkrec->numvers++;
-		if (TREF(gtm_autorelink_ctlmax) == relinkrec->numvers)
+		if (TREF(ydb_autorelink_ctlmax) == relinkrec->numvers)
 		{	/* verify we don't traverse more than the maximum number of routines that the
 			 * shared memory segment is capable of holding.
 			 */
 			rtnobj = rtnobj_retpos(linkctl, shm_index_off_fast);
 			rtnobj->next_rtnobj_shm_offset = (rtnobj_sm_off_t)NULL_RTNOBJ_SM_OFF_T;
 			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_RLNKINTEGINFO, 5,
-					LEN_AND_LIT("number of elements in shm segment exceeded gtm_autorelink_ctlmax - fixed"),
+					LEN_AND_LIT("number of elements in shm segment exceeded ydb_autorelink_ctlmax - fixed"),
 					CALLFROM, 1, 1);
 			return;
 		}
@@ -334,14 +334,14 @@ void	rtnobj_integ(relinkrec_t *relinkrec, open_relinkctl_sgm *linkctl)
 			break;
 		}
 		relinkrec->numvers++;
-		if (TREF(gtm_autorelink_ctlmax) == relinkrec->numvers)
+		if (TREF(ydb_autorelink_ctlmax) == relinkrec->numvers)
 		{	/* verify we don't traverse more than the maximum number of routines that the
 			 * shared memory segment is capable of holding.
 			 */
 			rtnobj = rtnobj_retpos(linkctl, shm_index_off_fast);
 			rtnobj->next_rtnobj_shm_offset = (rtnobj_sm_off_t)NULL_RTNOBJ_SM_OFF_T;
 			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_RLNKINTEGINFO, 5,
-					LEN_AND_LIT("number of elements in shm segment exceeded gtm_autorelink_ctlmax - fixed"),
+					LEN_AND_LIT("number of elements in shm segment exceeded ydb_autorelink_ctlmax - fixed"),
 					CALLFROM, 1, 1);
 			return;
 		}

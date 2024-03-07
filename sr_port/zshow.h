@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2020-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -22,18 +22,11 @@
 #define ZSHOW_BUFF_ONLY 	4
 #define ZSHOW_NOPARM		-1
 
-<<<<<<< HEAD
-#ifdef UNIX
-# define ZSHOW_ALL		"VIBDLGRC"
-#else
-# define ZSHOW_ALL		"VIBDLGSC"
-#endif
-=======
 /* Default set of zshow "*" codes */
-#define ZSHOW_ALL		"IVBDLGRC"
+#define ZSHOW_ALL		"VIBDLGRC"
+
 /* All zshow codes */
 #define ZSHOW_ALL_ITEMS		"ABCDGILRSTV"
->>>>>>> eb3ea98c (GT.M V7.0-002)
 
 #define CLEANUP_ZSHOW_BUFF				\
 {							\

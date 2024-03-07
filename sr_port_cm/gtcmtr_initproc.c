@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -47,11 +47,7 @@ GBLREF jnl_process_vector *originator_prc_vec;
 error_def(CMERR_INVPROT);
 error_def(ERR_TOOMANYCLIENTS);
 
-<<<<<<< HEAD
 cm_op_t gtcmtr_initproc(void)
-=======
-char gtcmtr_initproc(void)
->>>>>>> eb3ea98c (GT.M V7.0-002)
 {
 	unsigned char *reply;
         unsigned short beginprocnum;

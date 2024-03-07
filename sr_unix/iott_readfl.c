@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -62,6 +62,7 @@ GBLREF	stack_frame		*frame_pointer;
 GBLREF	unsigned char		*msp, *stackbase, *stacktop, *stackwarn;
 GBLREF	volatile boolean_t	dollar_zininterrupt;
 GBLREF	volatile int4		outofband;
+GBLREF	char			*KEY_HOME, *KEY_END;
 
 LITREF	unsigned char		lower_to_upper_table[];
 
@@ -69,15 +70,6 @@ LITREF	unsigned char		lower_to_upper_table[];
 LITREF	UChar32		u32_line_term[];
 #endif
 
-<<<<<<< HEAD
-GBLREF	int		AUTO_RIGHT_MARGIN, EAT_NEWLINE_GLITCH;
-GBLREF	char		*KEY_BACKSPACE, *KEY_DC;
-GBLREF	char		*KEY_DOWN, *KEY_LEFT, *KEY_RIGHT, *KEY_UP;
-GBLREF	char		*KEY_INSERT, *KEY_HOME, *KEY_END;
-GBLREF	char		*KEYPAD_LOCAL, *KEYPAD_XMIT;
-
-=======
->>>>>>> eb3ea98c (GT.M V7.0-002)
 #ifdef __MVS__
 #	define SEND_KEYPAD_LOCAL
 #else
@@ -196,20 +188,6 @@ void iott_readfl_badchar(mval *vmvalptr, wint_t *dataptr32, int datalen,
 
 int	iott_readfl(mval *v, int4 length, uint8 nsec_timeout)	/* timeout in milliseconds */
 {
-<<<<<<< HEAD
-	boolean_t	ret, nonzerotimeout, timed, insert_mode, edit_mode, utf8_active, zint_restart, buffer_moved;
-	uint4		mask;
-	wint_t		inchar, *buffer_32_start, switch_char;
-	unsigned char	inbyte, *outptr, *outtop;
-#ifdef __MVS__
-	wint_t		asc_inchar;
-#endif
-	unsigned char	more_buf[GTM_MB_LEN_MAX + 1], *more_ptr;	/* to build up multi byte for character */
-	unsigned char	*buffer_start;		/* beginning of non UTF8 buffer */
-	int		msk_in, msk_num, rdlen, save_errno, selstat, status, ioptr_width, i, utf8_more, utf8_seen;
-	int		exp_length;
-	int		inchar_width;		/* display width of inchar */
-=======
 	ABS_TIME	cur_time, end_time;
 	boolean_t	buffer_moved, ch_set, edit_mode, empterm, escape_edit, insert_mode, nonzerotimeout, ret, timed, utf8_active,
 				zint_restart;
@@ -217,7 +195,7 @@ int	iott_readfl(mval *v, int4 length, uint8 nsec_timeout)	/* timeout in millisec
 	fd_set		input_fd;
 	int		backspace, delete, down, i, insert_key, ioptr_width, exp_length, keypad_len, left, msk_in, msk_num,
 				rdlen, right, save_errno, selstat, status, up, utf8_more;
->>>>>>> eb3ea98c (GT.M V7.0-002)
+	int		utf8_seen;
 	int		delchar_width;		/* display width of deleted char */
 	int		dx, dx_start;		/* local dollar X, starting value */
 	int		dx_instr, dx_outlen;	/* wcwidth of string to insert point, whole string */
@@ -225,13 +203,9 @@ int	iott_readfl(mval *v, int4 length, uint8 nsec_timeout)	/* timeout in millisec
 	int		inchar_width;		/* display width of inchar */
 	int		instr;			/* insert point in input string */
 	int		outlen;			/* total characters in line so far */
-<<<<<<< HEAD
-	int		keypad_len, backspace, delete;
-	int		up, down, right, left, insert_key, home, end;
+	int		home, end;
 	int		recall_index;
-	boolean_t	escape_edit, empterm, no_up_or_down_cursor_yet;
-=======
->>>>>>> eb3ea98c (GT.M V7.0-002)
+	boolean_t	no_up_or_down_cursor_yet;
 	io_desc		*io_ptr;
 	io_terminator	outofbands;
 	io_termmask	mask_term;
@@ -240,20 +214,15 @@ int	iott_readfl(mval *v, int4 length, uint8 nsec_timeout)	/* timeout in millisec
 	uint4		mask;
 	unsigned char	inbyte, *outptr, *outtop, *zb_ptr, *zb_top;
 	unsigned char	more_buf[GTM_MB_LEN_MAX + 1], *more_ptr;	/* to build up multi byte for character */
-	unsigned char	*current_ptr;		/* insert next character into buffer here */
 	unsigned char	*buffer_start;		/* beginning of non UTF8 buffer */
 	struct timeval	input_timeval;
 	struct timeval	save_input_timeval;
-<<<<<<< HEAD
-	boolean_t	ch_set;
-	recall_ctxt_t	*recall;
-	DCL_THREADGBL_ACCESS;
-=======
-	wint_t		inchar, *current_32_ptr, *buffer_32_start, switch_char;
+	wint_t		inchar, *buffer_32_start, switch_char;
 #ifdef __MVS__
 	wint_t		asc_inchar;
 #endif
->>>>>>> eb3ea98c (GT.M V7.0-002)
+	recall_ctxt_t	*recall;
+	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	assert(stringpool.free >= stringpool.base);

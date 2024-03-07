@@ -3,7 +3,7 @@
  * Copyright (c) 2012-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -300,11 +300,7 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, uint
 					break;
 				case iop_zlisten:
 					listen_specified = TRUE;
-<<<<<<< HEAD
 					len = (int)(unsigned char)(*(pp->str.addr + p_offset));
-=======
-					len = (int)(unsigned char)*(pp->str.addr + p_offset);
->>>>>>> eb3ea98c (GT.M V7.0-002)
 					if (len < SA_MAXLITLEN)
 					{
 						memset(sockaddr, 0, SIZEOF(sockaddr));
@@ -316,11 +312,7 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, uint
 					break;
 				case iop_connect:
 					connect_specified = TRUE;
-<<<<<<< HEAD
 					len = (int)(unsigned char)(*(pp->str.addr + p_offset));
-=======
-					len = (int)(unsigned char)*(pp->str.addr + p_offset);
->>>>>>> eb3ea98c (GT.M V7.0-002)
 					if (len < SA_MAXLITLEN)
 					{
 						memset(sockaddr, 0, SIZEOF(sockaddr));
@@ -339,11 +331,7 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, uint
 					break;
 				case iop_attach:
 					attach_specified = TRUE;
-<<<<<<< HEAD
 					handle_len = (int)(unsigned char)(*(pp->str.addr + p_offset));
-=======
-					handle_len = (int)(unsigned char)*(pp->str.addr + p_offset);
->>>>>>> eb3ea98c (GT.M V7.0-002)
 					if (handle_len > MAX_HANDLE_LEN)
 						handle_len = MAX_HANDLE_LEN;
 					assert((0 < handle_len) && (SIZEOF(sock_handle) >= handle_len));

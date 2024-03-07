@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2020-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2020-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -26,25 +26,15 @@ error_def(ERR_NUMOFLOW);
 
 void add_mvals(mval *u, mval *v, int subtraction, mval *result)
 {
-<<<<<<< HEAD
         int	delta, uexp, vexp, exp;
         int4	m0, m1, n0, n1, x, factor;
 	char	usign, vsign, rsign;
-
-        m1 = u->m[1];
-        if (0 == (u->mvtype & MV_INT))
-        {
-=======
-	int delta, uexp, vexp, exp;
-	int4 m0, m1, n0, n1, x, factor;
-	char usign, vsign, rsign;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	m1 = u->m[1];
-	if ((u->mvtype & MV_INT) == 0)
-	{
->>>>>>> eb3ea98c (GT.M V7.0-002)
+        m1 = u->m[1];
+        if (0 == (u->mvtype & MV_INT))
+        {
 		usign = u->sgn;
 		m0 = u->m[0];
 		uexp = u->e;
@@ -61,7 +51,6 @@ void add_mvals(mval *u, mval *v, int subtraction, mval *result)
 			m1 = -m1;
 		}
 		for (uexp = EXP_INT_OVERF - 1 ; m1 < MANT_LO ; m1 *= 10 , uexp--)
-<<<<<<< HEAD
                         ;
         }
         n1 = v->m[1];
@@ -69,15 +58,6 @@ void add_mvals(mval *u, mval *v, int subtraction, mval *result)
         {
                 n0 = v->m[0];
                 vexp = v->e;
-=======
-			;
-	}
-	n1 = v->m[1];
-	if ((v->mvtype & MV_INT) == 0)
-	{
-		n0 = v->m[0];
-		vexp = v->e;
->>>>>>> eb3ea98c (GT.M V7.0-002)
 		vsign = v->sgn ^ subtraction;
 	} else
 	{

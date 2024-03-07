@@ -3,6 +3,9 @@
  * Copyright (c) 2018-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2024 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -30,6 +33,8 @@ GBLREF  sigset_t			block_sigsent;
 #define MAXOUTOFBAND 31
 
 #define OUTOFBAND_RESTARTABLE(event)	(jobinterrupt == (event))
+
+void	outofband_action(boolean_t line_fetch_or_start);
 
 /* ------------------------------------------------------------------
  * Perform action corresponding to the first async event that

@@ -710,20 +710,9 @@ void	op_fnview(int numarg, mval *dst, ...)
 				n &= 0x000000FF;	/* make an unsigned char, essentially */
 			} else
 			{	/* $VIEW("YCOLLATE",coll,ver) : Check if collsequence "coll" version is compatible with "ver" */
-<<<<<<< HEAD
-				if (0 == n)
-					break;	/* collation sequence # is 0, any version is compatible with it */
-				if (NULL != csp)
-				{
-					collver = mval2i(arg2);
-					n = do_verify(csp, n, collver);
-				} else
-					n = -1;
-=======
 				collver = mval2i(arg2);	/* Negative value downcasted to unsigned char */
 				assert(0 <= collver);
 				n = do_verify(csp, n, collver);
->>>>>>> eb3ea98c (GT.M V7.0-002)
 			}
 			break;
 		case VTK_YGLDCOLL:

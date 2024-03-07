@@ -234,7 +234,6 @@ int gtmsource_get_opt(void)
 				return -1;
 			}
 			connect_parms_str = &tmp_connect_parms_str[0];
-<<<<<<< HEAD
 			for (connect_parms_index = GTMSOURCE_CONN_HARD_TRIES_COUNT,
 				connect_parms_badval = FALSE,
 				connect_parm_token_str = connect_parms_str;
@@ -243,17 +242,6 @@ int gtmsource_get_opt(void)
 				&& (NULL != (connect_parm =	/* Warning: Assignment inside boolean expression */
 						STRTOK_R(connect_parm_token_str, GTMSOURCE_CONN_PARMS_DELIM, &strtokptr)));
 			     connect_parms_index++, connect_parm_token_str = NULL)
-=======
-			for (connect_parms_index = 0,
-			     connect_parms_badval = FALSE,
-			     connect_parm_token_str = connect_parms_str;
-			     !connect_parms_badval &&
-			     connect_parms_index <= GTMSOURCE_CONN_PARMS_COUNT &&
-			     /* inline assignment */
-			     (NULL != (connect_parm = STRTOK_R(connect_parm_token_str, GTMSOURCE_CONN_PARMS_DELIM, &strtokptr)));
-			     connect_parms_index++,
-			     connect_parm_token_str = NULL)
->>>>>>> eb3ea98c (GT.M V7.0-002)
 			{
 				size_t	counter;
 

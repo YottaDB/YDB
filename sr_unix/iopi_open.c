@@ -3,7 +3,7 @@
  * Copyright (c) 2008-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -345,7 +345,6 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, uint8 tim
 		assert((params) *(pp->str.addr + p_offset) < (params)n_iops);
 		switch ((ch = *(pp->str.addr + p_offset++)))
 		{
-<<<<<<< HEAD
 			case iop_exception:
 				DEF_EXCEPTION(pp, p_offset, iod);
 				break;
@@ -372,37 +371,6 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, uint8 tim
 				break;
 			default:
 				break;
-=======
-		case iop_exception:
-			DEF_EXCEPTION(pp, p_offset, iod);
-			break;
-		case iop_shell:
-			slen[PSHELL] = (unsigned int)(unsigned char)*(pp->str.addr + p_offset);
-			sparams[PSHELL] = (char *)(pp->str.addr + p_offset + 1);
-			param_cnt++;
-			break;
-		case iop_command:
-			slen[PCOMMAND] = (unsigned int)(unsigned char)*(pp->str.addr + p_offset);
-			sparams[PCOMMAND] = (char *)(pp->str.addr + p_offset + 1);
-			param_cnt++;
-			break;
-		case iop_stderr:
-			slen[PSTDERR] = (unsigned int)(unsigned char)*(pp->str.addr + p_offset);
-			sparams[PSTDERR] = (char *)(pp->str.addr + p_offset + 1);
-			param_cnt++;
-			break;
-		case iop_independent:
-			independent = TRUE;
-			break;
-		case iop_parse:
-			parse = TRUE;
-			break;
-		case iop_writeonly:
-			return_stdout = FALSE;
-			break;
-		default:
-			break;
->>>>>>> eb3ea98c (GT.M V7.0-002)
 		}
 		UPDATE_P_OFFSET(p_offset, ch, pp);	/* updates "p_offset" using "ch" and "pp" */
 	}

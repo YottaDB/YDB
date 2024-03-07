@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -90,12 +90,8 @@ void tptimeout_set(int4 dummy_param)
 	SETUP_THREADGBL_ACCESS;
 	assert(INTRPT_IN_EVENT_HANDLING == intrpt_ok_state);
 	assert(tptimeout == outofband);
-<<<<<<< HEAD
-	if (dollar_zininterrupt || ((0 < dollar_ecode.index) && (ETRAP_IN_EFFECT))
+	if (dollar_zininterrupt || ((0 < dollar_ecode.index) && ETRAP_IN_EFFECT)
 		|| (jobinterrupt == (TREF(save_xfer_root_ptr))->ev_que.fl->outofband))
-=======
-	if (dollar_zininterrupt || ((0 < dollar_ecode.index) && ETRAP_IN_EFFECT) || have_crit(CRIT_HAVE_ANY_REG | CRIT_IN_COMMIT))
->>>>>>> eb3ea98c (GT.M V7.0-002)
 	{	/* Error handling or job interrupt is in effect - defer tp timeout until $ECODE is cleared and/or we have unrolled
 		* the job interrupt frame.
 		*/

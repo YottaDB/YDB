@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -156,7 +156,7 @@ void db_auto_upgrade(gd_region *reg)
 				csd->max_update_array_size
 					+= (int4)(ROUND_UP2(MAX_BITMAP_UPDATE_ARRAY_SIZE(csd), UPDATE_ARRAY_ALIGN_SIZE));
 			case GDSMV70001:
-<<<<<<< HEAD
+			case GDSMV70002:
 				if (GDSMR200_V70000 != csd->minor_dbver)
 				{
 					/* Do YottaDB r2.00 related auto upgrade operations.
@@ -165,10 +165,10 @@ void db_auto_upgrade(gd_region *reg)
 					 */
 					/* Handle GDSMR122 (aka GDSMV63007) case */
 					/* ----------------------------------- */
-					/* YottaDB r122 introduced "reorg_sleep_nsec" to slow down reorg update rate by user */
+					/* YottaDB r1.22 introduced "reorg_sleep_nsec" to slow down reorg update rate by user */
 					csd->reorg_sleep_nsec = 0;
 					/* ----------------------------------- */
-					/* YottaDB r130 changed "flush_time" from milliseconds to nanoseconds to support
+					/* YottaDB r1.30 changed "flush_time" from milliseconds to nanoseconds to support
 					 * nanosecond timers. In GT.M, "flush_time" is an array of 2 4-byte quantities but only
 					 * the first 4-byte is used. Whereas in YottaDB, "flush_time" is an 8-byte quantity.
 					 * Therefore, nullify the second 4-byte before doing the below multiplication to
@@ -180,18 +180,23 @@ void db_auto_upgrade(gd_region *reg)
 					 */
 					if (0 == csd->flush_trigger_top)
 						csd->flush_trigger_top = FLUSH_FACTOR(csd->n_bts);
-					/* Note: This ensures that the csd->flush_trigger_top field added in GT.M v63007 is set if
-					 * the old db_minorver is GDSMR122.
+					/* Note: This ensures that the csd->flush_trigger_top field added in GT.M V6.3-007 is
+					 * set if the old db_minorver is GDSMR122.
 					 */
 					/* ----------------------------------- */
-					/* YottaDB r134 introduced "max_procs" which records the maximum number of
+					/* YottaDB r1.34 introduced "max_procs" which records the maximum number of
 					 * processes accessing the database to measure system load.
 					 */
 					csd->max_procs.cnt = 0;
 					csd->max_procs.time = 0;
 				}
-				break;
 			case GDSMR200_V70001:
+				if (GDSMV70002 != csd->minor_dbver)
+				{	/* GT.M V70002 added proactive block split option */
+					csd->problksplit = DEFAULT_PROBLKSPLIT;
+				}
+				break;		/* so a new "case" needs to be added BEFORE the assert. */
+			case GDSMR202_V70002:
 				/* When adding a new minor version, the following template should be maintained
 				 * 1) Remove the penultimate 'break' (i.e. "break" in the PREVIOUS "case" block.
 				 * 2) If there are any file header fields added in the new minor version, initialize the fields
@@ -209,7 +214,6 @@ void db_auto_upgrade(gd_region *reg)
 				assert(FALSE);		/* When this assert fails, it means a new GDSMV* was created, */
 				break;			/* 	so a new "case" needs to be added BEFORE the assert. */
 			/* Remove the below cases one by one as later GT.M versions use up these minor db version enum values. */
-			case GDSMVFILLER27:
 			case GDSMVFILLER28:
 			case GDSMVFILLER29:
 			case GDSMVFILLER30:
@@ -220,15 +224,6 @@ void db_auto_upgrade(gd_region *reg)
 			case GDSMVFILLER35:
 			case GDSMVFILLER36:
 			case GDSMVFILLER37:
-=======
-				/* GT.M V70002 added proactive block split option */
-				csd->problksplit = DEFAULT_PROBLKSPLIT;
-				break;		/* so a new "case" needs to be added BEFORE the assert. */
-			case GDSMV70002:
-				/* Nothing to do for this version since it is GDSMVCURR for now. */
-				assert(FALSE);
-				break;
->>>>>>> eb3ea98c (GT.M V7.0-002)
 			default:
 				/* Unrecognized version in the header */
 				assertpro(FALSE && csd->minor_dbver);
@@ -499,13 +494,9 @@ void v6_db_auto_upgrade(gd_region *reg)
 				csd->max_update_array_size = csd->max_non_bm_update_array_size
 					= (int4)(ROUND_UP2(MAX_NON_BITMAP_UPDATE_ARRAY_SIZE(csd), UPDATE_ARRAY_ALIGN_SIZE));
 				csd->max_update_array_size
-<<<<<<< HEAD
 					+= (int4)(ROUND_UP2(MAX_BITMAP_UPDATE_ARRAY_SIZE(csd), UPDATE_ARRAY_ALIGN_SIZE));
-=======
-				+= (int4)(ROUND_UP2(MAX_BITMAP_UPDATE_ARRAY_SIZE(csd), UPDATE_ARRAY_ALIGN_SIZE));
 				/* GT.M V70002 added proactive block split option */
 				csd->problksplit = DEFAULT_PROBLKSPLIT;
->>>>>>> eb3ea98c (GT.M V7.0-002)
 				break;
 			case GDSMV63015:
 				assert(FALSE);	/* if this should come to pass, add appropriate code above the assert */

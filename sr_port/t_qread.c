@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -498,12 +498,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 				buffaddr = (sm_uc_ptr_t)GDS_REL2ABS(cr->buffaddr);
 #				ifdef DEBUG
 				/* stop self to test sechshr_db_clnup clears the read state */
-<<<<<<< HEAD
-				if (ydb_white_box_test_case_enabled
-					&& (WBTEST_SIGTSTP_IN_T_QREAD == ydb_white_box_test_case_number))
-=======
 				if (WBTEST_ENABLED(WBTEST_SIGTSTP_IN_T_QREAD))
->>>>>>> eb3ea98c (GT.M V7.0-002)
 				{	/* this should never fail, but because of the way we developed the test we got paranoid */
 					dummy = kill(process_id, SIGTERM);
 					assert(0 == dummy);

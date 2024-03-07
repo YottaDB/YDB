@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -45,11 +45,8 @@
 #include "deferred_events.h"
 #include "deferred_events_queue.h"
 #include "ztimeout_routines.h"
-<<<<<<< HEAD
-#include "bool_zysqlnull.h"
-=======
 #include "try_event_pop.h"
->>>>>>> eb3ea98c (GT.M V7.0-002)
+#include "bool_zysqlnull.h"
 
 GBLREF	boolean_t		dollar_truth, dollar_zquit_anyway, is_tracing_on;
 GBLREF	mval			*alias_retarg;

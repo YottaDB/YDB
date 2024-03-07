@@ -3,7 +3,7 @@
  * Copyright (c) 2011-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -68,7 +68,7 @@ void op_zg1(int4 level)
 			/* Couldn't get to the level we were trying to unwind to */
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_ZGOTOTOOBIG);
 	}
-<<<<<<< HEAD
+	unwlevels = curlvl - level;
 	if ((0 == level) && (0 == TREF(gtmci_nested_level)))
 	{	/* For ZGOTO 0, if this is MUPIP, exit after sending an oplog message recording the uncommon exit method.
 		 * Otherwise, if $ZTRAP is active or ""=$ECODE return a status of 0, else return the last error in $ECODE
@@ -77,15 +77,6 @@ void op_zg1(int4 level)
 		 */
 		exi_cond = (((TREF(dollar_ztrap)).str.len) || !(dollar_ecode.index)) ? 0 : dollar_ecode.error_last_ecode;
 		if (IS_MUPIP_IMAGE)
-=======
-	unwlevels = curlvl - level;
-	/* For ZGOTO 0, if this is MUPIP, exit after sending an oplog message recording the uncommon exit method.
-	 * Otherwise, if $ZTRAP is active or ""=$ECODE return a status of 0, else return the last error in $ECODE
-	 */
-	if (0 == level)
-	{
-		for (fp = frame_pointer; NULL != fp; fp = fpprev)
->>>>>>> eb3ea98c (GT.M V7.0-002)
 		{
 			zposition.mvtype = 0;	/* It's not an mval yet till getzposition fills it in */
 			getzposition(&zposition);

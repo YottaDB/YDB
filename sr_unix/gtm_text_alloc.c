@@ -3,7 +3,7 @@
  * Copyright (c) 2007-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -49,14 +49,9 @@
 #include "deferred_events.h"
 
 GBLREF  int		process_exiting;		/* Process is on it's way out */
-<<<<<<< HEAD
 GBLREF	volatile int4	fast_lock_count;		/* Stop stale/epoch processing while we have our parts exposed */
 GBLREF	uint4		ydbDebugLevel;
-GBLREF	size_t		ydb_max_storalloc;		/* Max value for $ZREALSTOR or else memory error is raised */
-=======
-GBLREF	uint4		gtmDebugLevel;
 GBLREF	volatile int4	fast_lock_count;		/* Stop stale/epoch processing while we have our parts exposed */
->>>>>>> eb3ea98c (GT.M V7.0-002)
 
 OS_PAGE_SIZE_DECLARE
 
@@ -75,7 +70,7 @@ OS_PAGE_SIZE_DECLARE
 #define MAXINDEX 5
 
 /* Fields to help instrument our algorithm */
-GBLREF	boolean_t	gtmSystemMalloc;		/* Use the system's malloc() instead of our own */
+GBLREF	boolean_t	ydbSystemMalloc;		/* Use the system's malloc() instead of our own */
 GBLREF	boolean_t	malloccrit_issued;		/* set at time of MALLOCCRIT */
 GBLREF	int		gtmMallocErrorErrno;		/* Errno at point of last failure */
 GBLREF	size_t		gtmMallocErrorSize;		/* Size of last failed malloc */
@@ -209,26 +204,12 @@ void gtm_text_free(void *addr)
 /* ******* Normal mmap() expansion ******* */
 
 /* These routines for Unix are NOT thread or interrupt safe */
-<<<<<<< HEAD
-#  define TEXT_ALLOC(rsize, addr)										\
-{														\
-	int	save_errno;											\
-	if ((0 < ydb_max_storalloc) && ((rsize + totalRmalloc + totalRallocGta) > ydb_max_storalloc))		\
-	{	/* Boundary check for $ydb_max_storalloc (if set) */						\
-		--gtaSmDepth;											\
-		--fast_lock_count;										\
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_MEMORY, 2, rsize, CALLERID, ERR_MALLOCMAXUNIX);	\
-	}													\
- 	addr = mmap(NULL, rsize, (PROT_READ + PROT_WRITE + PROT_EXEC), (MAP_PRIVATE + MAP_ANONYMOUS), -1, 0);	\
-	if (MAP_FAILED == addr)											\
-=======
 #  define TEXT_ALLOC(SIZE, ADDR)										\
 MBSTART {													\
 	int	SAVE_ERRNO;											\
 														\
 	ADDR = mmap(NULL, SIZE, (PROT_READ + PROT_WRITE + PROT_EXEC), (MAP_PRIVATE + MAP_ANONYMOUS), -1, 0);	\
 	if (MAP_FAILED == ADDR)											\
->>>>>>> eb3ea98c (GT.M V7.0-002)
 	{													\
 		--gtaSmDepth;											\
                 --fast_lock_count;										\
@@ -243,7 +224,7 @@ MBSTART {													\
 			       SAVE_ERRNO, 0, ERR_CALLERID, 3, LEN_AND_LIT("TEXT_ALLOC"), CALLERID);		\
 		assertpro(FALSE);										\
 	}													\
-	if (!gtmSystemMalloc && !malloccrit_issued /* totalRmalloc* not available for system malloc */		\
+	if (!ydbSystemMalloc && !malloccrit_issued /* totalRmalloc* not available for system malloc */		\
 		&& (0 < zmalloclim) && ((SIZE + totalRmalloc + totalRallocGta) > zmalloclim))			\
 	{	/* Boundary check on zmalloclim */								\
 		gtmMallocErrorSize = SIZE;									\

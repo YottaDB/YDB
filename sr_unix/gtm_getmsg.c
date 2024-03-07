@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -32,12 +32,8 @@ GBLREF bool	dec_nofac;
  */
 int gtm_getmsg(int4 msgnum, mstr *msgbuf)
 {
-<<<<<<< HEAD
-	short int	m_len, faclen, taglen, j, sever;
-	int		retval;
-=======
 	short int	severity;
->>>>>>> eb3ea98c (GT.M V7.0-002)
+	int		retval;
 	char		*cp;
 	const char 	*top, *msgp, *fac, *base;
 	char		outbuf[32];
@@ -156,14 +152,9 @@ int gtm_getmsg(int4 msgnum, mstr *msgbuf)
 	cp_len = (size_t)(top - cp);
 	memcpy(cp, msgp, cp_len);
 	cp += cp_len;
-<<<<<<< HEAD
-	msgbuf->len = m_len;
-	*cp++ = 0;
-	return retval;
-=======
 	/* The buffer size calculation always leaves space for a null character */
 	assert((int)(cp - base) < msgbuf->len);
 	*cp = 0;
 	msgbuf->len = (int)m_len;
->>>>>>> eb3ea98c (GT.M V7.0-002)
+	return retval;
 }

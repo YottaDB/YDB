@@ -1,13 +1,9 @@
 /****************************************************************
  *								*
-<<<<<<< HEAD
- * Copyright (c) 2001-2017 Fidelity National Information	*
-=======
  * Copyright (c) 2001-2022 Fidelity National Information	*
->>>>>>> eb3ea98c (GT.M V7.0-002)
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2022-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2022-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -52,7 +48,9 @@ void op_exp(mval *u, mval* v, mval *p)
 	int4		n, n1;
 	int4		z1_rnd, z2_rnd, pten;
 	int		idx;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	u1_p = &u1;
 	memcpy(u1_p, u, SIZEOF(mval));
 	MV_FORCE_NUM(u1_p);

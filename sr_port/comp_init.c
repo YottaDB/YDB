@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -31,11 +31,6 @@
  *	rts_stringpool when the compilation is finished.
  */
 GBLREF char		cg_phase;
-<<<<<<< HEAD
-GBLREF int4		curr_fetch_count;
-=======
-GBLREF int4		aligned_source_buffer;
->>>>>>> eb3ea98c (GT.M V7.0-002)
 GBLREF spdesc		stringpool,rts_stringpool;
 GBLREF spdesc		indr_stringpool;
 
