@@ -380,13 +380,13 @@ fi
 # Remove deprecated files first if applicable
 if [ -n "$remove_deprecated" ]; then
 	$echo ""
-	$echo "Checking for deprecated files in $gtmdist"
+	$echo "Checking for deprecated files in $ydbdist"
 	$echo ""
 	for file in $deprecatedfiles
 	do
-		if [ -f "$gtmdist/$file" -o -f "$gtmdist/utf8/$file" ]; then
+		if [ -f "$ydbdist/$file" -o -f "$ydbdist/utf8/$file" ]; then
 			echo "	Removing $file"
-			rm -f $gtmdist/$file $gtmdist/utf8/$file
+			rm -f $ydbdist/$file $ydbdist/utf8/$file
 		fi
 	done
 fi
