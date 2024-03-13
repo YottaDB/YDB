@@ -236,9 +236,12 @@ boolean_t xfer_reset_if_setter(int4 event_type)
 			break;
 		default:
 			res = FALSE;
+			break;
 		}
+		break;
 	default:
 		res = (event_type == outofband);
+		break;
 	}
 	if (res)
 	{	/* it's worth a try */

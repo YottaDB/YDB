@@ -254,6 +254,7 @@ updproc.c:warning: Value stored to 'temp_write' is never read [clang-analyzer-de
 utfcgr.c:warning: Value stored to 'scanptr' is never read [clang-analyzer-deadcode.DeadStores]
 util_out_print_gtmio.c:warning: va_end() is called on an uninitialized va_list [clang-analyzer-valist.Uninitialized]
 util_output.c:warning: va_end() is called on an uninitialized va_list [clang-analyzer-valist.Uninitialized]
+util_output.c:warning: va_end() is called on an uninitialized va_list [clang-analyzer-valist.Uninitialized]
 util_output_cm.c:warning: va_end() is called on an uninitialized va_list [clang-analyzer-valist.Uninitialized]
 wcs_flu.c:warning: Value stored to 'fix_in_wtstart' is never read [clang-analyzer-deadcode.DeadStores]
 wcs_flu.c:warning: Value stored to 'wc_in_free' is never read [clang-analyzer-deadcode.DeadStores]

@@ -198,7 +198,6 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 	in_top = (unsigned char *)&inchar[instr->len];
 	assert(inchar < in_top);
 	curchar = *inchar++;
-	altactive = 0;
 	for (;;)
 	{
 		assert(inchar <= in_top);

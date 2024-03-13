@@ -119,6 +119,7 @@ void outofband_action(boolean_t lnfetch_or_start)
 			case defer_error:
 				ours = xfer_reset_if_setter(defer_error);
 				assert(ours);
+				PRO_ONLY(UNUSED(ours));
 				if ((ERR_MALLOCCRIT == TAREF1(save_xfer_root, defer_error).param_val))
 					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4)
 						ERR_MALLOCCRIT, 2, gtmMallocErrorSize, gtmMallocErrorCallerid);
