@@ -636,7 +636,8 @@ int expritem(oprtype *a)
 					}
 				}
 				advancewindow();
-				if (((OC_FNZCHAR == fun_data[index].opcode) || (OC_FNCHAR == fun_data[index].opcode))
+				if ((0 <= index)
+					&& ((OC_FNZCHAR == fun_data[index].opcode) || (OC_FNCHAR == fun_data[index].opcode))
 					&& (MV_NUM_APPROX == ((MV_NM | MV_NUM_APPROX) & (TREF(director_mval)).mvtype)))
 				{	/* [z]f_char need an error based s2n failing to create a valid numeric argument */
 					assert((0 == (TREF(director_mval)).e) && !val_iscan(&(TREF(director_mval))));
