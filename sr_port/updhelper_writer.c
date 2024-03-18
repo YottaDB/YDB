@@ -3,7 +3,7 @@
  * Copyright (c) 2005-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -122,11 +122,19 @@ int updhelper_writer(void)
 		flushed = FALSE;
 		for (reg = gd_header->regions, r_top = reg + gd_header->n_regions; reg < r_top; reg++)
 		{
-			assert(reg->open); /* we called region_init() in the initialization code */
+			if (!reg->open)
+			{
+				/* We called region_init() in the initialization code so we expect the region to be open.
+				 * An exception is if this is a statsdb region. In that case, it might not be open if
+				 * the baseDB has NOSTATS set in it. Assert accordingly.
+				 */
+				assert(IS_STATSDB_REGNAME(reg));
+				continue;
+			}
 			csa = &FILE_INFO(reg)->s_addrs;
 			cnl = csa->nl;
 			csd = csa->hdr;
-			if (reg->open && !reg->read_only)
+			if (!reg->read_only)
 			{
 				TP_CHANGE_REG(reg); /* for jnl_ensure_open() */
 				if (dba_mm == REG_ACC_METH(reg))
