@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -100,7 +100,7 @@ int	gtm_compile(void)
 	/* Save the original MUMPS command line qualifers, which starts with "MUMPS ". These are processed after,
 	 * and take precedence over, $ZCOMPILE. */
 	origlen = strlen(cli_lex_in_ptr->in_str);
-	assert(STR_LIT_LEN("MUMPS ") < origlen);
+	assert(STR_LIT_LEN("MUMPS ") <= origlen);
 	origlen -= STR_LIT_LEN("MUMPS ");
 	assert(MAXPOSINT4 >= origlen);
 	orig_cmdstr.addr = (char *)malloc(origlen);
