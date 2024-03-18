@@ -142,6 +142,11 @@ test-v70001:
   variables:
     TEST: v70001
 
+test-r202:
+  extends: .test-shared
+  variables:
+    TEST: r202
+
 # Main and ONLY docker creation mechanism.
 .docker-create:
   stage: docker-create
