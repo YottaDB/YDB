@@ -324,9 +324,6 @@ int cmd(void)
 	}
 	if (NULL != oldchain)
 	{	/* for a literal 0 postconditional, we just throw the command & args away and return happiness */
-		(TREF(fetch_control)).curr_fetch_trip = fetch0;
-		(TREF(fetch_control)).curr_fetch_opr = fetch1;
-		(TREF(fetch_control)).curr_fetch_count = fetch_cnt;
 		setcurtchain(oldchain);
 		if (fetch0 != (TREF(fetch_control)).curr_fetch_trip)
 		{
