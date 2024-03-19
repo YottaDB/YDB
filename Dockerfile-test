@@ -1,6 +1,6 @@
 #################################################################
 #                                                               #
-# Copyright (c) 2023 YottaDB LLC and/or its subsidiaries.       #
+# Copyright (c) 2023-2024 YottaDB LLC and/or its subsidiaries.       #
 # All rights reserved.                                          #
 #                                                               #
 # This source code contains the intellectual property           #
@@ -26,6 +26,5 @@ COPY sr_unix_nsb ./sr_unix_nsb/
 COPY sr_x86_64 ./sr_x86_64/
 COPY sr_x86_regs ./sr_x86_regs/
 COPY .git ./.git/
-ENV GIT_DIR=/Distrib/YottaDB/V999_R999/.git
 RUN /usr/library/gtm_test/T999/docker/build_and_install_yottadb.csh
 WORKDIR /home/gtmtest
