@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2020-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2020-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -27,8 +27,13 @@ GBLREF	volatile int4	outofband;
 /* The below is modeled on "jobinterrupt_set()" */
 void deferred_signal_set(int4 dummy_val)
 {
+	DCL_THREADGBL_ACCESS;
+
+	SETUP_THREADGBL_ACCESS;
 	assert(in_os_signal_handler);
 	assert(deferred_signal == outofband);
+	assert(pending == TAREF1(save_xfer_root, deferred_signal).event_state);
 	/* We need deferred signal outofband processing at our earliest convenience */
 	DEFER_INTO_XFER_TAB;
+	TAREF1(save_xfer_root, deferred_signal).event_state = active;
 }

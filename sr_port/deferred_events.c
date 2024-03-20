@@ -365,7 +365,7 @@ void async_action(bool lnfetch_or_start)
 			MUM_TSTART;
 		}
 		TAREF1(save_xfer_root, jobinterrupt).event_state = pending;	/* jobinterrupt gets a pass from the assert below */
-	} else if (!lnfetch_or_start)
+	} else if ((deferred_signal != outofband) && !lnfetch_or_start)
 	{	/* something other than a new line caugth this, so  */
 		assert(pending >= TAREF1(save_xfer_root, outofband).event_state);
 		TAREF1(save_xfer_root, outofband).event_state = pending;	/* make it pending in case it was not there yet */
