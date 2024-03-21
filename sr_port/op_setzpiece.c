@@ -2,6 +2,9 @@
  *								*
  *	Copyright 2006, 2013 Fidelity Information Services, Inc	*
  *								*
+ * Copyright (c) 2024 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -51,8 +54,10 @@ void op_setzpiece(mval *src, mval *del, mval *expr, int4 first, int4 last, mval 
 	unsigned char 	*match_ptr, *src_str, *str_addr, *tmp_str;
 	delimfmt	unichar;
 
-	if (0 > --first)
+	if (0 >= first)
 		first = 0;
+	else
+		first--;
 	assert(last >= first);
 	second_src_ind = last - first;
 	MV_FORCE_STR(del);
