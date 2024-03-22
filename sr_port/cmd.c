@@ -329,6 +329,11 @@ int cmd(void)
 		{
 			assert(OC_FETCH == (TREF(fetch_control)).curr_fetch_trip->opcode);
 			ins_triple((TREF(fetch_control)).curr_fetch_trip);
+		} else
+		{
+			(TREF(fetch_control)).curr_fetch_trip = fetch0;
+			(TREF(fetch_control)).curr_fetch_opr = fetch1;
+			(TREF(fetch_control)).curr_fetch_count = fetch_cnt;
 		}
 		return TRUE;
 	}
