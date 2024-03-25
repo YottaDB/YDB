@@ -46,7 +46,7 @@ void ctrap_set(int4 ob_char)
 		|| dollar_zininterrupt || (jobinterrupt == (TREF(save_xfer_root_ptr))->ev_que.fl->outofband))
 	{	/* not a good time, so save it */
 		TAREF1(save_xfer_root, ctrap).event_state = queued;
-		SAVE_XFER_QUEUE_ENTRY(ctrap, 0);
+		SAVE_XFER_QUEUE_ENTRY(ctrap, ob_char);
 		DBGDFRDEVNT((stderr, "%d %s: ctrap_set - ctrap queued - outofband: %d, trap: %d, intrpt: %d\n",
 			     __LINE__, __FILE__, outofband, ((0 < dollar_ecode.index) && (ETRAP_IN_EFFECT)), dollar_zininterrupt));
 		return;
