@@ -3,7 +3,7 @@
  * Copyright (c) 2013-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -204,7 +204,7 @@ void	iosocket_use(io_desc *iod, mval *pp)
 					sockaddr[int_len] = '\0';
 				} else
 					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_ADDRTOOLONG,
-						4, int_len, pp->str.addr + p_offset + 1, int_len, USR_SA_MAXLITLEN);
+						4, int_len, pp->str.addr + p_offset + 1, int_len, USR_SA_MAXLITLEN - 1);
 				break;
 			case iop_delimiter:
 				n_specified++;
@@ -255,7 +255,7 @@ void	iosocket_use(io_desc *iod, mval *pp)
 					sockaddr[int_len] = '\0';
 				} else
 					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_ADDRTOOLONG,
-						4, int_len, pp->str.addr + p_offset + 1, int_len, USR_SA_MAXLITLEN);
+						4, int_len, pp->str.addr + p_offset + 1, int_len, USR_SA_MAXLITLEN - 1);
 				break;
 			case iop_socket:
 				n_specified++;

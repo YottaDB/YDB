@@ -308,7 +308,7 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, uint
 						memcpy(sockaddr, pp->str.addr + p_offset + 1, len);
 					} else
 						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_ADDRTOOLONG, 4, len,
-							pp->str.addr + p_offset + 1, len, SA_MAXLITLEN);
+							pp->str.addr + p_offset + 1, len, SA_MAXLITLEN - 1);
 					break;
 				case iop_connect:
 					connect_specified = TRUE;
@@ -320,7 +320,7 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, uint
 						memcpy(sockaddr, pp->str.addr + p_offset + 1, len);
 					} else
 						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_ADDRTOOLONG, 4,
-							len, pp->str.addr + p_offset + 1, len, SA_MAXLITLEN);
+							len, pp->str.addr + p_offset + 1, len, SA_MAXLITLEN - 1);
 					break;
 				case iop_ioerror:
 					ioerror_specified = TRUE;
