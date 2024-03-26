@@ -3,7 +3,7 @@
  * Copyright (c) 2013-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -67,12 +67,12 @@ MBSTART {													\
 	assert(repl_tls.enabled);										\
 	if (!PLAINTEXT_FALLBACK)										\
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_TLSIOERROR, 2, LEN_AND_LIT(SEND_OR_RECV),		\
-							ERR_TEXT, 2, LEN_AND_STR(gtm_tls_get_error()));		\
+						ERR_TEXT, 2, LEN_AND_STR(gtm_tls_get_error(repl_tls.sock)));	\
 	else													\
 	{	/* Fall back from TLS to Plaintext */								\
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8)							\
 			MAKE_MSG_WARNING(ERR_TLSIOERROR), 2, LEN_AND_LIT(SEND_OR_RECV),				\
-						ERR_TEXT, 2, LEN_AND_STR(gtm_tls_get_error()));			\
+						ERR_TEXT, 2, LEN_AND_STR(gtm_tls_get_error(repl_tls.sock)));	\
 		repl_log(gtmsource_log_fp, TRUE, TRUE,								\
 				"Plaintext fallback enabled. Closing and reconnecting without TLS/SSL.\n");	\
 		repl_close(&gtmsource_sock_fd);									\
@@ -87,12 +87,12 @@ MBSTART {													\
 	assert(repl_tls.enabled);										\
 	if (!PLAINTEXT_FALLBACK)										\
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_TLSIOERROR, 2, LEN_AND_LIT(SEND_OR_RECV),		\
-							ERR_TEXT, 2, LEN_AND_STR(gtm_tls_get_error()));		\
+						ERR_TEXT, 2, LEN_AND_STR(gtm_tls_get_error(repl_tls.sock)));	\
 	else													\
 	{	/* Fall back from TLS to Plaintext */								\
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8)							\
 			MAKE_MSG_WARNING(ERR_TLSIOERROR), 2, LEN_AND_LIT(SEND_OR_RECV),				\
-						ERR_TEXT, 2, LEN_AND_STR(gtm_tls_get_error()));			\
+						ERR_TEXT, 2, LEN_AND_STR(gtm_tls_get_error(repl_tls.sock)));	\
 		repl_log(gtmrecv_log_fp, TRUE, TRUE,								\
 				"Plaintext fallback enabled. Closing and reconnecting without TLS/SSL.\n");	\
 		repl_close(&gtmrecv_sock_fd);									\

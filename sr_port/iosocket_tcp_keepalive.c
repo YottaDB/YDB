@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2021-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -25,9 +25,6 @@
 #include "iosocketdef.h"
 #include "gtmio.h"
 
-<<<<<<< HEAD
-boolean_t iosocket_tcp_keepalive(socket_struct *socketptr, int keepalive_opt, char *act)
-=======
 error_def(ERR_SETSOCKOPTERR);
 
 /* iosocket_tcp_keepalive.c */
@@ -39,7 +36,6 @@ error_def(ERR_SETSOCKOPTERR);
  * TCP_KEEPCNT and TCP_KEEPINTVL can only be set via OPTIONS except as part of a white box case that sets a short time
  */
 boolean_t iosocket_tcp_keepalive(socket_struct *socketptr, int keepalive_opt, char *act, boolean_t freesocket)
->>>>>>> 35326517 (GT.M V7.0-003)
 {
 	boolean_t		trap;
 	char			*errptr, *sockopt_errptr;
@@ -91,14 +87,10 @@ boolean_t iosocket_tcp_keepalive(socket_struct *socketptr, int keepalive_opt, ch
 	{	/* skip if nothing to do with keepalive */
 #	endif
 		flush_pio();
-<<<<<<< HEAD
-		printf("%s ydb_socket_keepalive_idle: %d\n", act, keepalive_opt);
-=======
 		if (0 < keepalive_opt)
 			printf("%s gtm_socket_keepalive_idle: %d\n", act, keepalive_opt);
 		else	/* if only KEEPALIVE in OPTIONS, idle may be -1 */
 			printf("%s USE :options=keepalive: %d, idle: %d\n", act, keepalive_value, keepidle_value);
->>>>>>> 35326517 (GT.M V7.0-003)
 		FFLUSH(stdout);
 		printf("%s %ssetting SO_KEEPALIVE\n", act, (0 < keepalive_value ? "" : "un"));
 		FFLUSH(stdout);
@@ -187,11 +179,7 @@ boolean_t iosocket_tcp_keepalive(socket_struct *socketptr, int keepalive_opt, ch
 		keepcnt_value = keepintvl_value = 2;	/* for now force it in white box test */
 		flush_pio();
 		printf("%s setting TCP_KEEP options\n wb enabled: %d, wb #: %d. opt: %d\n",
-<<<<<<< HEAD
-		       act, ydb_white_box_test_case_enabled, ydb_white_box_test_case_number, keepalive_opt);
-=======
-		       act, gtm_white_box_test_case_enabled, gtm_white_box_test_case_number, keepcnt_value);
->>>>>>> 35326517 (GT.M V7.0-003)
+		       act, ydb_white_box_test_case_enabled, ydb_white_box_test_case_number, keepcnt_value);
 		FFLUSH(stdout);
 		keepcnt_got_len = SIZEOF(keepcnt_got);
 		if (-1 == setsockopt(socketptr->sd, IPPROTO_TCP, TCP_KEEPCNT, &keepcnt_value, SIZEOF(keepcnt_value)))

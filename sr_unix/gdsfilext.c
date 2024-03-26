@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -618,14 +618,7 @@ int4 gdsfilext(block_id blocks, block_id filesize, boolean_t trans_in_prog)
 	{
 		send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(7) ERR_DBFILEXT, 5, DB_LEN_STR(gv_cur_region), &blocks, &new_total,
 			&curr_tn);
-<<<<<<< HEAD
 		db_file_name = (char *)gv_cur_region->dyn.addr->fname;
-=======
-		if ((NULL != gv_cur_region) && (NULL != gv_cur_region->dyn.addr) && (0 != gv_cur_region->dyn.addr->fname_len))
-			db_file_name = (char *)gv_cur_region->dyn.addr->fname;
-		else
-			db_file_name = "";
->>>>>>> 35326517 (GT.M V7.0-003)
 		warn_db_sz(db_file_name, blocks, new_total, MAXTOTALBLKS(cs_data));
 	}
 	return SS_NORMAL;

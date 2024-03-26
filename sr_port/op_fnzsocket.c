@@ -3,7 +3,7 @@
  * Copyright (c) 2014-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -285,17 +285,11 @@ void	op_fnzsocket(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 	if ((zsocket_item = namelook(zsocket_indextab, zsocket_names, keyword->str.addr, keyword->str.len)) < 0)
 	{
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_ZSOCKETATTR, 2, keyword->str.len, keyword->str.addr);
-<<<<<<< HEAD
 		/* This line is unreachable but gcc 12.2 on AARCH64 does not realize it and issues a [-Warray-bounds]
 		 * warning in the following "zsocket_types[zsocket_item]" line assuming "zsocket_item" is -1.
 		 * To avoid that, just set "zsocket_item" to 0 here even though we don't expect to ever reach here.
 		 */
 		zsocket_item = 0;	/* avoid false [-Warray-bounds] warning in gcc 12.2 on AARCH64 */
-=======
-		return;		/* The compiler doesn't like the zsocket_item == -1 case, and in pro it doesn't
-				 * see the assert(FALSE) from RTS_ERROR_CSA_ABT(), so let it know we are bailing out.
-				 */
->>>>>>> 35326517 (GT.M V7.0-003)
 	}
 	zsocket_type = zsocket_types[zsocket_item];
 	if ((level_socket == zsocket_level[zsocket_item]) && (zsocket_index != zsocket_item))

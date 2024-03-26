@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -58,15 +58,11 @@ static readonly char	space_text[] = {' '};
 
 GBLREF boolean_t	ctrlc_on, gtm_utf8_mode, hup_on;
 GBLREF io_log_name	*io_root_log_name;
-<<<<<<< HEAD
 GBLREF io_pair		io_std_device;
-=======
-GBLREF io_pair		*io_std_device;
 GBLREF io_log_name	*dollar_principal;
 GBLREF mstr		dollar_prin_log;
 GBLREF mstr		dollar_zpin;			/* contains "< /" */
 GBLREF mstr		dollar_zpout;			/* contains "> /" */
->>>>>>> 35326517 (GT.M V7.0-003)
 GBLREF int		process_exiting;
 
 LITREF mstr		chset_names[];
@@ -891,7 +887,7 @@ int view_device(mstr *device_name, unsigned char *device, int device_len)
 	int		nldone;				/* 0 if not $ZPIN or $ZPOUT, 1 if $ZPIN and 2 if $ZPOUT */
 
 	nldone = len = 0;
-	if ((io_std_device->in != io_std_device->out))
+	if ((io_std_device.in != io_std_device.out))
 	{
 		tlp = dollar_principal ? dollar_principal : io_root_log_name->iod->trans_name;
 		nlen = tlp->len;
@@ -928,8 +924,8 @@ int view_device(mstr *device_name, unsigned char *device, int device_len)
 	{
 		iod = nlog->iod;
 		/* if iod is standard in device and it is a split device and it is $ZPOUT set iod to output device */
-		if ((2 == nldone) && (io_std_device->in == iod))
-			iod = io_std_device->out;
+		if ((2 == nldone) && (io_std_device.in == iod))
+			iod = io_std_device.out;
 		switch (iod->type)
 		{
 			case tt:

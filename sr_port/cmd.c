@@ -332,7 +332,6 @@ int cmd(void)
 	if (NULL != oldchain)
 	{	/* for a literal 0 postconditional, we just throw the command & args away and return happiness */
 		setcurtchain(oldchain);
-<<<<<<< HEAD
 		if (fetch0 != (TREF(fetch_control)).curr_fetch_trip)
 		{
 			assert(OC_FETCH == (TREF(fetch_control)).curr_fetch_trip->opcode);
@@ -343,9 +342,7 @@ int cmd(void)
 			(TREF(fetch_control)).curr_fetch_opr = fetch1;
 			(TREF(fetch_control)).curr_fetch_count = fetch_cnt;
 		}
-=======
 		TREF(discard) = FALSE;
->>>>>>> 35326517 (GT.M V7.0-003)
 		return TRUE;
 	}
 	if ((EXPR_FAIL != rval) && (NULL != cr))

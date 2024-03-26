@@ -1,9 +1,9 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2021 Fidelity National Information	*
+ * Copyright (c) 2012-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  * Copyright (c) 2018 Stephen L Johnson. All rights reserved.	*
@@ -129,11 +129,15 @@ MBSTART {					\
 /* Macro to define the exit handler and optionally set an atexit() for it */
 #define DEFINE_EXIT_HANDLER(EXITHNDLR, ATEXIT)		\
 MBSTART {						\
-	GBLREF void (*exit_handler_fptr)();		\
+	GBLREF void	(*exit_handler_fptr)();		\
+	GBLREF void	(*primary_exit_handler)(void);	\
 							\
 	exit_handler_fptr = &EXITHNDLR;			\
 	if (ATEXIT)					\
+	{						\
 		atexit(EXITHNDLR);			\
+		primary_exit_handler = EXITHNDLR;	\
+	}						\
 } MBEND
 
 /* Macro to drive the exit handler if it exists  */

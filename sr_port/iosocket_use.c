@@ -690,13 +690,7 @@ void	iosocket_use(io_desc *iod, mval *pp)
 				return;
 			}
 		}
-<<<<<<< HEAD
-		if ((socketptr->bufsiz != newsocket.bufsiz)
-			&& (-1 == setsockopt(newsocket.sd, SOL_SOCKET, SO_RCVBUF, &newsocket.bufsiz, SIZEOF(newsocket.bufsiz))))
-=======
-#		endif
 		if (socketptr->bufsiz != newsocket.bufsiz)
->>>>>>> 35326517 (GT.M V7.0-003)
 		{
 			if (-1 == setsockopt(newsocket.sd, SOL_SOCKET, SO_RCVBUF, &newsocket.bufsiz, SIZEOF(newsocket.bufsiz)))
 			{

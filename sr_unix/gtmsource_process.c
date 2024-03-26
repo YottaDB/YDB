@@ -245,23 +245,8 @@ STATICDEF	boolean_t	renegotiation_pending = FALSE;
 
 #define	OUT_LINE			(256 + 1)
 #define PROC_SRCOPS_PRINT_MSG_LEN	2048
-<<<<<<< HEAD
 
 STATICFNDCL void repl_tr_endian_convert_src(repl_msg_ptr_t send_msgp, int send_tr_len, seq_num pre_read_seqno);
-=======
-error_def(ERR_JNLNEWREC);
-error_def(ERR_JNLSETDATA2LONG);
-error_def(ERR_REPLCOMM);
-error_def(ERR_REPLFTOKSEM);
-error_def(ERR_REPLINSTNOHIST);
-error_def(ERR_REPLNOTLS);
-error_def(ERR_REPLXENDIANFAIL);
-error_def(ERR_REPLAHEAD);
-error_def(ERR_TRIG2NOTRIG);
-error_def(ERR_TLSIOERROR);
-error_def(ERR_TLSRENEGOTIATE);
-error_def(ERR_TEXT);
->>>>>>> 35326517 (GT.M V7.0-003)
 
 /* Endian converts the given set of journal records (possibly multiple sequence numbers) so that the secondary can consume them
  * as-is. This is done only in the case when the primary is running on a GT.M version less than the GT.M version on secondary

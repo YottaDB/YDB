@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -460,14 +460,9 @@ unsigned char mu_cre_file(boolean_t caller_is_mupip_create)
 	}
 	if (!cs_data->defer_allocate)
 	{
-<<<<<<< HEAD
 		assert(0 == ydb_skip_bml_num);
-		status = posix_fallocate(udi->fd, 0, BLK_ZERO_OFF(cs_data->start_vbn) +
-					 ((off_t)(cs_data->trans_hist.total_blks + 1) * cs_data->blk_size));
-=======
 		POSIX_FALLOCATE(udi->fd, 0, BLK_ZERO_OFF(cs_data->start_vbn) +
 					 ((off_t)(cs_data->trans_hist.total_blks + 1) * cs_data->blk_size), status);
->>>>>>> 35326517 (GT.M V7.0-003)
 		if (0 != status)
 		{
 			assert(ENOSPC == status);

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -255,18 +255,13 @@ boolean_t iosocket_bind(socket_struct *socketptr, uint8 nsec_timeout, boolean_t 
 		if (0 == socketptr->local.port)
 			socketptr->local.port = actual_port;
 		assert(socketptr->local.port == actual_port);
-<<<<<<< HEAD
-		keepalive_opt = TREF(ydb_socket_keepalive_idle);	/* deviceparameter would give more granular control */
-		if (keepalive_opt && !iosocket_tcp_keepalive(socketptr, keepalive_opt, action))
-=======
 		if ((SOCKOPTIONS_PENDING & socketptr->options_state.alive)
 			|| (SOCKOPTIONS_PENDING & socketptr->options_state.cnt)
 			|| (SOCKOPTIONS_PENDING & socketptr->options_state.intvl))
 			keepalive_opt = SOCKOPTIONS_FROM_STRUCT;
 		else
-			keepalive_opt = TREF(gtm_socket_keepalive_idle);	/* deviceparameter takes precedence */
+			keepalive_opt = TREF(ydb_socket_keepalive_idle);	/* deviceparameter takes precedence */
 		if (keepalive_opt && !iosocket_tcp_keepalive(socketptr, keepalive_opt, action, TRUE))
->>>>>>> 35326517 (GT.M V7.0-003)
 			return FALSE;				/* iosocket_tcp_keepalive issues rts_error rather than return */
 	} else
 	{

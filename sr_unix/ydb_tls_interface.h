@@ -3,7 +3,7 @@
  * Copyright (c) 2013-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -157,11 +157,7 @@ typedef struct gtm_tls_session_struct
  */
 
 /* Returns the most recent error (null-terminated) related to the workings of the SSL/TLS reference implementation. */
-<<<<<<< HEAD:sr_unix/ydb_tls_interface.h
-GBLREF	const char		*gtm_tls_get_error(void);
-=======
-extern const char		*gtm_tls_get_error(gtm_tls_socket_t *);
->>>>>>> 35326517 (GT.M V7.0-003):sr_unix/gtm_tls_interface.h
+GBLREF	const char		*gtm_tls_get_error(gtm_tls_socket_t *);
 
 /* If the most recent invocation of the SSL/TLS reference implementation resulted in a system call error, `gtm_tls_errno' returns
  * the value of `errno'. Otherwise, -1 is returned in which case `gtm_tls_get_error' provides more information.

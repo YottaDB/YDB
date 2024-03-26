@@ -1558,15 +1558,9 @@
 
    This command displays an output like the following:
 
-<<<<<<< HEAD
    File    /home/jdoe/.yottadb/r2.00_x86_64/g/yottadb.dat
    Region  DEFAULT
    File            /home/jdoe/.yottadb/r2.00_x86_64/g/yottadb.dat
-=======
-   File    /home/jdoe/.fis-gtm/V7.0-002_x86_64/g/gtm.dat
-   Region  DEFAULT
-   File            /home/jdoe/.fis-gtm/V7.0-002_x86_64/g/gtm.dat
->>>>>>> 35326517 (GT.M V7.0-003)
    Region          DEFAULT
    Date/Time       23-MAR-2022 03:54:59 [$H = 66191,14099]
      Access method                           BG  Global Buffers                  1024

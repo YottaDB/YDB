@@ -889,7 +889,12 @@ void	op_fnview(int numarg, mval *dst, ...)
 			assert(NULL != csa->hdr);
 			n = !(RDBF_NOSTATS & csa->reservedDBFlags);
 			break;
-<<<<<<< HEAD
+		case VTK_DEVICE:
+			n = view_device(&parmblk.value->str, device_status, sizeof(device_status));
+			dst->str.addr =(char *) device_status;
+			dst->str.len = n;
+			s2pool(&dst->str);
+			break;
 		case VTK_ENVIRONMENT:
 			trigdepth = gtm_trigger_depth;
 			cidepth = TREF(gtmci_nested_level);
@@ -1037,17 +1042,10 @@ void	op_fnview(int numarg, mval *dst, ...)
 		}
 		case VTK_ZTRIGGER_OUTPUT:
 			*dst = (ydb_ztrigger_output ? literal_one : literal_zero);
-=======
-		case VTK_DEVICE:
-			n = view_device(&parmblk.value->str, device_status, sizeof(device_status));
-			dst->str.addr =(char *) device_status;
-			dst->str.len = n;
-			s2pool(&dst->str);
-
->>>>>>> 35326517 (GT.M V7.0-003)
 			break;
 		default:
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_VIEWFN, 2, strlen((const char *)vtp->keyword), vtp->keyword);
+			break;
 	}
 
 	if(MV_NM == vtp->restype)

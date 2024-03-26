@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -63,14 +63,9 @@ void mupip_dump_fhead(void)
 {
 	int4		status;
 	tp_region	*rptr;
-<<<<<<< HEAD
 	unsigned char	file[YDB_PATH_MAX];
 	unsigned short	file_len = YDB_PATH_MAX - 1;
-=======
-	unsigned char	file[GTM_PATH_MAX];
-	unsigned short	file_len = GTM_PATH_MAX - 1;
 	usr_reg_que	*region_que_entry;
->>>>>>> 35326517 (GT.M V7.0-003)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;

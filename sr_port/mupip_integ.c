@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -148,35 +148,11 @@ GBLREF gv_key			*gv_currkey;
 GBLREF gv_key			*mu_end_key;
 GBLREF boolean_t		mu_key;
 GBLREF gv_key			*mu_start_key;
-<<<<<<< HEAD
 GBLREF gv_namehead		*gv_target;
 GBLREF sgmnt_addrs		*cs_addrs;
 GBLREF short			crash_count;
 GBLREF tp_region		*grlist;
-=======
 GBLREF usr_reg_que		*usr_spec_regions;
-
-error_def(ERR_CTRLC);
-error_def(ERR_CTRLY);
-error_def(ERR_DBBTUFIXED);
-error_def(ERR_DBBTUWRNG);
-error_def(ERR_DBNOREGION);
-error_def(ERR_DBRBNLBMN);
-error_def(ERR_DBRBNNEG);
-error_def(ERR_DBRBNTOOLRG);
-error_def(ERR_DBRDONLY);
-error_def(ERR_DBSPANCHUNKORD);
-error_def(ERR_DBSPANGLOINCMP);
-error_def(ERR_DBTNLTCTN);
-error_def(ERR_DBTNRESET);
-error_def(ERR_DBTNRESETINC);
-error_def(ERR_INTEGERRS);
-error_def(ERR_MUNOACTION);
-error_def(ERR_MUNOFINISH);
-error_def(ERR_MUNOTALLINTEG);
-error_def(ERR_MUPCLIERR);
-error_def(ERR_REGFILENOTFOUND);
->>>>>>> 35326517 (GT.M V7.0-003)
 
 void mupip_integ(void)
 {
@@ -971,14 +947,7 @@ void mupip_integ(void)
 	if ((NULL != tcsa) && (NULL != tcsa->ti) && (0 != tcsa->ti->total_blks) && (NULL != tcsa->hdr)
 		&& (0 != MAXTOTALBLKS(tcsa->hdr)))
 	{
-<<<<<<< HEAD
 		db_file_name = (char *)gv_cur_region->dyn.addr->fname;
-=======
-		if ((NULL != gv_cur_region->dyn.addr) && (0 != gv_cur_region->dyn.addr->fname_len))
-			db_file_name = (char *)gv_cur_region->dyn.addr->fname;
-		else
-			db_file_name = "";
->>>>>>> 35326517 (GT.M V7.0-003)
 		warn_db_sz(db_file_name, 0, tcsa->ti->total_blks, MAXTOTALBLKS(tcsa->hdr));
 	}
 	mupip_exit(SS_NORMAL);
