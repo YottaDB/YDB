@@ -974,7 +974,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* JNLSWITCHSZCHG */
 	   0,	/* NOTRNDMACC */
 	   0,	/* TMPFILENOCRE */
-	   0,	/* UNUSEDMSG1141 */
+	   0,	/* DEVICEOPTION */
 	   0,	/* JNLSENDOPER */
 	   0,	/* DDPSUBSNUL */
 	   0,	/* DDPNOCONNECT */

@@ -2,7 +2,7 @@
 #								#
 # Copyright 2001, 2012 Fidelity Information Services, Inc	#
 #								#
-# Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 # Copyright (c) 2018 Stephen L Johnson. All rights reserved.	#
@@ -108,7 +108,7 @@ top			=	16
 	tst	w14, w15
 	b.ne	1f
 	mov	x0, \reg
-	bl	underr_strict
+	bl	underr_overwrite
 1:
 
 .endm

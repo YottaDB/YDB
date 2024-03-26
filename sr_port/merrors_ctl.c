@@ -976,7 +976,7 @@ LITDEF	err_msg merrors[] = {
 	{ "JNLSWITCHSZCHG", "Journal AUTOSWITCHLIMIT [!UL blocks] is rounded down to [!UL blocks] to equal the sum of Journal ALLOCATION [!UL blocks] and a multiple of Journal EXTENSION [!UL blocks] for database file !AD", 6, 0 },
 	{ "NOTRNDMACC", "Only random access files are supported as backup files for non-incremental backup", 0, 0 },
 	{ "TMPFILENOCRE", "Error in MUPIP BACKUP while trying to create temporary file !AD", 2, 0 },
-	{ "UNUSEDMSG1141", "SHRMEMEXHAUSTED last used in OpenVMS", 0, 0 },
+	{ "DEVICEOPTION", "Option !AD on !AZ command: !AZ", 4, 0 },
 	{ "JNLSENDOPER", "pid = 0x!XL : status = 0x!XL : jpc_status = 0x!XL : jpc_status2 = 0x!XL : iosb.cond = 0x!XW", 5, 0 },
 	{ "DDPSUBSNUL", "NUL characters in subscripts are not supported by DDP", 0, 0 },
 	{ "DDPNOCONNECT", "Named volume set, !AD, is not connected", 2, 0 },
