@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -67,6 +67,7 @@ error_def(ERR_MEMORY);
 
 CONDITION_HANDLER(gtmsource_ch)
 {
+	boolean_t	skip_repl_close;
 	gd_addr		*addr_ptr;
 	gd_region	*reg_local, *reg_top;
 	sgmnt_addrs	*csa;
@@ -96,11 +97,15 @@ CONDITION_HANDLER(gtmsource_ch)
 		if (is_src_server)
 			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_REPLSRCEXITERR, 2, gtmsource_options.secondary_instname,
 					gtmsource_options.log_file);
-		/* When WBTEST_INDUCE_TLSIOERR, intentionally skip the gracefull close of the socket descriptor to
+		/* When WBTEST_INDUCE_TLSIOERR, intentionally skip the graceful close of the socket descriptor to
 		 * induce a TLSIOERR in the Receiver Server */
-		DEBUG_ONLY(if (!WBTEST_ENABLED(WBTEST_INDUCE_TLSIOERR)))
-			if (FD_INVALID != gtmsource_sock_fd) /* Close the socket if open */
-				repl_close(&gtmsource_sock_fd);
+#		ifdef DEBUG
+		skip_repl_close = WBTEST_ENABLED(WBTEST_INDUCE_TLSIOERR);
+#		else
+		skip_repl_close = FALSE;
+#		endif
+		if (!skip_repl_close && (FD_INVALID != gtmsource_sock_fd)) /* Close the socket if open */
+			repl_close(&gtmsource_sock_fd);
        		NEXTCH;
 	}
 	VMS_ONLY (
