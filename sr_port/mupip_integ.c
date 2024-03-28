@@ -284,7 +284,6 @@ void mupip_integ(void)
 		}
 		if (!mu_region_found)
 			error_mupip = FALSE;
-		rptr = grlist;
 	} else
 	{
 		GVKEY_INIT(gv_altkey, DBKEYSIZE(MAX_KEY_SZ));	/* used by code below */

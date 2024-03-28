@@ -3,6 +3,9 @@
  * Copyright (c) 2022 Fidelity National Information		*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2024 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -91,14 +94,15 @@ static const int devoption_argtype[] =	/* IOP_SRC_ */
 #define VALUEREQUIRED	"value required"
 
 
-#define GET_OPTION_VALUE(OPTION, OPTIONLEN, RET, STATUS)		\
-MBSTART { /* OPTIONLEN not used since strtol stops on non digit */	\
-	STATUS = errno = 0;						\
-	RET = STRTOL(OPTION, NULL, 0);					\
-	if (0 != errno)							\
-	{								\
-		STATUS = errno;						\
-	}								\
+#define GET_OPTION_VALUE(OPTION, OPTIONLEN, RET, STATUS)				\
+MBSTART {										\
+	UNUSED(OPTIONLEN); /* OPTIONLEN not used since strtol stops on non digit */	\
+	STATUS = errno = 0;								\
+	RET = STRTOL(OPTION, NULL, 0);							\
+	if (0 != errno)									\
+	{										\
+		STATUS = errno;								\
+	}										\
 } MBEND
 
 /*	Parse OPTIONS device parameter arguments 		*
@@ -119,8 +123,6 @@ void	devoptions(io_desc *iod, void *socketptrarg, mstr *optionstr, char *caller,
 	boolean_t		valuepresent;
 	int			optionvalue, valuelen, valuestart, local_errno;
 	char			*errortext;
-	io_desc			*socket_iod;
-	d_socket_struct		*dsocketptr;
 	socket_struct		*socketptr;
 	DCL_THREADGBL_ACCESS;
 
@@ -129,8 +131,6 @@ void	devoptions(io_desc *iod, void *socketptrarg, mstr *optionstr, char *caller,
 	if (socketptrarg)
 	{
 		socketptr = (socket_struct *)socketptrarg;
-		dsocketptr = socketptr->dev;
-		socket_iod = dsocketptr->iod;
 	} else
 	{
 		if (NULL == iod)
@@ -139,11 +139,9 @@ void	devoptions(io_desc *iod, void *socketptrarg, mstr *optionstr, char *caller,
 			return;
 		}
 		socketptr = NULL;
-		dsocketptr = NULL;
-		socket_iod = NULL;
 	}
 	options = *optionstr;	/* option[=value],... */
-	for (index = 0; 0 < options.len ; options.len -= (index + 1), options.addr += (index + 1))
+	for ( ; 0 < options.len ; options.len -= (index + 1), options.addr += (index + 1))
 	{	/* comma separated options - need quotes if ever allow string values */
 		valuepresent = FALSE;
 		keyword = options;

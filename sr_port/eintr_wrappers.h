@@ -341,6 +341,7 @@ static inline size_t gtm_fwrite(void *buff, size_t elemsize, size_t nelems, FILE
 		 */
 		assert(!feof(fp));
 		status = ferror(fp);
+		PRO_ONLY(UNUSED(status));
 		assert(status);
 		clearerr(fp);	/* reset error set by the "fwrite" */
 		/* In case of EINTR, retry "fwrite" */

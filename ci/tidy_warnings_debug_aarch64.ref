@@ -45,8 +45,8 @@ gtm_env_init.c:warning: Although the value stored to 'status' is used in the enc
 gtm_env_init.c:warning: Value stored to 'ret' is never read [clang-analyzer-deadcode.DeadStores]
 gtm_newintrinsic.c:warning: Value stored to 'shift_size' is never read [clang-analyzer-deadcode.DeadStores]
 gtm_putmsg_list.c:warning: va_end() is called on an uninitialized va_list [clang-analyzer-valist.Uninitialized]
-gtm_threadgbl_deftypes.c:warning: Excessive padding in 'gtm_threadgbl_def_t' (182 padding bytes, where 6 is optimal).
-gtm_threadgbl_init.c:warning: Excessive padding in 'gtm_threadgbl_true_t' (182 padding bytes, where 6 is optimal).
+gtm_threadgbl_deftypes.c:warning: Excessive padding in 'gtm_threadgbl_def_t' (186 padding bytes, where 2 is optimal).
+gtm_threadgbl_init.c:warning: Excessive padding in 'gtm_threadgbl_true_t' (186 padding bytes, where 2 is optimal).
 gtmci.c:warning: Initialized va_list 'var' is leaked [clang-analyzer-valist.Unterminated]
 gtmci.c:warning: Initialized va_list 'var' is leaked [clang-analyzer-valist.Unterminated]
 gtmrecv_get_opt.c:warning: Although the value stored to 'cmplvl_status' is used in the enclosing expression, the value is never actually read from 'cmplvl_status' [clang-analyzer-deadcode.DeadStores]
@@ -79,10 +79,7 @@ incr_link.c:warning: comparing object representation of type 'rhdtyp' (aka 'stru
 ionl_use.c:warning: Value stored to 'd_in' is never read [clang-analyzer-deadcode.DeadStores]
 iosocket_connect.c:warning: Value stored to 'save_errno' is never read [clang-analyzer-deadcode.DeadStores]
 iosocket_open.c:warning: Value stored to 'zint_conn_restart' is never read [clang-analyzer-deadcode.DeadStores]
-iosocket_readfl.c:warning: Value stored to 'dsocketptr' is never read [clang-analyzer-deadcode.DeadStores]
 iosocket_snr.c:warning: Value stored to 'real_errno' is never read [clang-analyzer-deadcode.DeadStores]
-iosocket_tcp_keepalive.c:warning: Value stored to 'errlen' is never read [clang-analyzer-deadcode.DeadStores]
-iosocket_tcp_keepalive.c:warning: Value stored to 'errptr' is never read [clang-analyzer-deadcode.DeadStores]
 iosocket_use.c:warning: Value stored to 'save_errno' is never read [clang-analyzer-deadcode.DeadStores]
 iott_edit.c:warning: Value stored to 'cur_width' is never read [clang-analyzer-deadcode.DeadStores]
 iott_edit.c:warning: redundant condition 'utf8_active' [bugprone-redundant-branch-condition]

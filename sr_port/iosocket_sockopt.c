@@ -3,6 +3,9 @@
  * Copyright (c) 2022 Fidelity National Information		*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2024 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -32,16 +35,12 @@ int iosocket_getsockopt(socket_struct *socketptr, char *optname, int option, int
 	char			*errptr, *sockopt_errptr;
 	d_socket_struct		*dsocketptr;
 	int4			errlen, real_errno;
-	ssize_t			status;
 
-	real_errno = 0;
-	if (-1 == (status = getsockopt(socketptr->sd, level, option, optvalue,
-					optvaluelen)))
+	if (-1 == getsockopt(socketptr->sd, level, option, optvalue, optvaluelen))
 	{
 		real_errno = errno;
 		dsocketptr = socketptr->dev;
 		errptr = (char *)STRERROR(real_errno);
-		errlen = STRLEN(errptr);
 		trap = socketptr->ioerror;
 		SET_DOLLARDEVICE_ONECOMMA_ERRSTR(dsocketptr->iod, errptr, errlen);
 		if (freesocket || trap)
@@ -67,16 +66,12 @@ int iosocket_setsockopt(socket_struct *socketptr, char *optname, int option, int
 	char			*errptr, *sockopt_errptr;
 	d_socket_struct		*dsocketptr;
 	int4			errlen, real_errno;
-	ssize_t			status;
 
-	real_errno = 0;
-	if (-1 == (status = setsockopt(socketptr->sd, level, option, optvalue,
-					optvaluelen)))
+	if (-1 == setsockopt(socketptr->sd, level, option, optvalue, optvaluelen))
 	{
 		real_errno = errno;
 		dsocketptr = socketptr->dev;
 		errptr = (char *)STRERROR(real_errno);
-		errlen = STRLEN(errptr);
 		trap = socketptr->ioerror;
 		SET_DOLLARDEVICE_ONECOMMA_ERRSTR(dsocketptr->iod, errptr, errlen);
 		if (freesocket || trap)

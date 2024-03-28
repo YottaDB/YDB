@@ -78,8 +78,8 @@ gtm_env_xlate_init.c:warning: Although the value stored to 'status' is used in t
 gtm_newintrinsic.c:warning: Value stored to 'shift_size' is never read [clang-analyzer-deadcode.DeadStores]
 gtm_putmsg_list.c:warning: Value stored to 'i' is never read [clang-analyzer-deadcode.DeadStores]
 gtm_putmsg_list.c:warning: va_end() is called on an uninitialized va_list [clang-analyzer-valist.Uninitialized]
-gtm_threadgbl_deftypes.c:warning: Excessive padding in 'gtm_threadgbl_def_t' (178 padding bytes, where 2 is optimal).
-gtm_threadgbl_init.c:warning: Excessive padding in 'gtm_threadgbl_true_t' (178 padding bytes, where 2 is optimal).
+gtm_threadgbl_deftypes.c:warning: Excessive padding in 'gtm_threadgbl_def_t' (182 padding bytes, where 6 is optimal).
+gtm_threadgbl_init.c:warning: Excessive padding in 'gtm_threadgbl_true_t' (182 padding bytes, where 6 is optimal).
 gtmci.c:warning: Initialized va_list 'var' is leaked [clang-analyzer-valist.Unterminated]
 gtmci.c:warning: Initialized va_list 'var' is leaked [clang-analyzer-valist.Unterminated]
 gtmrecv.c:warning: Value stored to 'log_init_status' is never read [clang-analyzer-deadcode.DeadStores]
@@ -147,14 +147,7 @@ iorm_readfl.c:warning: Value stored to 'rm_ptr' is never read [clang-analyzer-de
 iorm_wteol.c:warning: Value stored to 'res_size' is never read [clang-analyzer-deadcode.DeadStores]
 iosocket_connect.c:warning: Value stored to 'save_errno' is never read [clang-analyzer-deadcode.DeadStores]
 iosocket_open.c:warning: Value stored to 'zint_conn_restart' is never read [clang-analyzer-deadcode.DeadStores]
-iosocket_readfl.c:warning: Value stored to 'buffer_start' is never read [clang-analyzer-deadcode.DeadStores]
-iosocket_readfl.c:warning: Value stored to 'dsocketptr' is never read [clang-analyzer-deadcode.DeadStores]
-iosocket_readfl.c:warning: Value stored to 'old_stringpool_free' is never read [clang-analyzer-deadcode.DeadStores]
-iosocket_readfl.c:warning: Value stored to 'old_stringpool_free' is never read [clang-analyzer-deadcode.DeadStores]
 iosocket_snr.c:warning: Value stored to 'real_errno' is never read [clang-analyzer-deadcode.DeadStores]
-iosocket_tcp_keepalive.c:warning: Although the value stored to 'status' is used in the enclosing expression, the value is never actually read from 'status' [clang-analyzer-deadcode.DeadStores]
-iosocket_tcp_keepalive.c:warning: Although the value stored to 'status' is used in the enclosing expression, the value is never actually read from 'status' [clang-analyzer-deadcode.DeadStores]
-iosocket_tcp_keepalive.c:warning: Value stored to 'errlen' is never read [clang-analyzer-deadcode.DeadStores]
 iosocket_tls.c:warning: Value stored to 'len' is never read [clang-analyzer-deadcode.DeadStores]
 iosocket_use.c:warning: Value stored to 'save_errno' is never read [clang-analyzer-deadcode.DeadStores]
 iott_edit.c:warning: Value stored to 'cur_width' is never read [clang-analyzer-deadcode.DeadStores]

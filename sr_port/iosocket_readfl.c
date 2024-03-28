@@ -83,10 +83,8 @@ void iosocket_readfl_badchar(mval *vmvalptr, int datalen, int delimlen, unsigned
 	int		tmplen, errlen;
 	unsigned char	*delimend;
 	io_desc		*iod;
-	d_socket_struct	*dsocketptr;
 
 	iod = io_curr_device.in;
-	dsocketptr = (d_socket_struct *)(iod->dev_sp);
 	vmvalptr->str.len = datalen;
 	vmvalptr->str.addr = (char *)stringpool.free;
 	if (0 < datalen)
@@ -301,7 +299,7 @@ int	iosocket_readfl(mval *v, int4 width, uint8 nsec_timeout)
 		{	/* Now need to move it to the top */
 			assert(stp_need == max_bufflen);
 			memcpy(stringpool.free, buffer_start, bytes_read);	/* BYPASSOK */
-			buffer_start = stringpool.free;				/* BYPASSOK */
+			DEBUG_ONLY(buffer_start = stringpool.free);		/* BYPASSOK */
 		} else
 		{	/* It should still be just under the used space */
 			stringpool.free = buffer_start;		/* backup the free pointer */
@@ -433,7 +431,7 @@ int	iosocket_readfl(mval *v, int4 width, uint8 nsec_timeout)
 				stringpool.free += v->str.len;							/* BYPASSOK */
 				assert(stringpool.free <= stringpool.top);					/* BYPASSOK */
 				INVOKE_STP_GCOL(max_bufflen);
-				old_stringpool_free = stringpool.free;						/* BYPASSOK */
+				DEBUG_ONLY(old_stringpool_free = stringpool.free);				/* BYPASSOK */
 				assert(IS_AT_END_OF_STRINGPOOL(v->str.addr, v->str.len));
 				stringpool.free = (unsigned char *)v->str.addr;
 				v->str.len = 0; /* If interrupted, don't hold onto old space */
@@ -492,7 +490,7 @@ int	iosocket_readfl(mval *v, int4 width, uint8 nsec_timeout)
 							stringpool.free += bytes_read;
 							assert(stringpool.free <= stringpool.top);
 							INVOKE_STP_GCOL(max_bufflen);
-							old_stringpool_free = stringpool.free;
+							DEBUG_ONLY(old_stringpool_free = stringpool.free);
 							assert(IS_AT_END_OF_STRINGPOOL(v->str.addr, v->str.len));
 							stringpool.free = (unsigned char *)v->str.addr;
 							v->str.len = 0; /* If interrupted, don't hold onto old space */
@@ -934,7 +932,7 @@ int	iosocket_readfl(mval *v, int4 width, uint8 nsec_timeout)
 		if (socketptr->tlsenabled && (0 > real_errno))
 		{
 			errptr = (char *)gtm_tls_get_error((gtm_tls_socket_t *)socketptr->tlssocket);
-			real_errno = gtm_tls_errno();
+			DBGSOCK_ONLY(real_errno = gtm_tls_errno());
 		} else	/* TLS not enabled or system call error */
 #		endif
 			errptr = (char *)STRERROR(real_errno);

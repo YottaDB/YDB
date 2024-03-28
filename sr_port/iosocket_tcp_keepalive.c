@@ -100,7 +100,7 @@ boolean_t iosocket_tcp_keepalive(socket_struct *socketptr, int keepalive_opt, ch
 #	endif
 	if (0 <= keepalive_value)
 	{
-		if (-1 == (status = setsockopt(socketptr->sd, SOL_SOCKET, SO_KEEPALIVE, &keepalive_value, SIZEOF(keepalive_value))))
+		if (-1 == setsockopt(socketptr->sd, SOL_SOCKET, SO_KEEPALIVE, &keepalive_value, SIZEOF(keepalive_value)))
 		{
 			real_errno = errno;
 			sockopt_errptr = "SO_KEEPALIVE";
@@ -118,11 +118,11 @@ boolean_t iosocket_tcp_keepalive(socket_struct *socketptr, int keepalive_opt, ch
 			real_errno = errno;
 		if (0 == status)
 		{
-			errptr = (char *)STRERROR(real_errno);
 			assert(keepidle_got == keepidle_value);
 			real_errno = 0;
 		}
 #		endif
+		PRO_ONLY(UNUSED(status));
 	}
 	if ((0 == real_errno) && (0 <= keepcnt_value))
 	{
@@ -144,7 +144,6 @@ boolean_t iosocket_tcp_keepalive(socket_struct *socketptr, int keepalive_opt, ch
 	{
 		dsocketptr = socketptr->dev;
 		errptr = (char *)STRERROR(real_errno);
-		errlen = STRLEN(errptr);
 		trap = socketptr->ioerror;
 		SET_DOLLARDEVICE_ONECOMMA_ERRSTR(dsocketptr->iod, errptr, errlen);
 #		ifdef DEBUG
@@ -185,11 +184,13 @@ boolean_t iosocket_tcp_keepalive(socket_struct *socketptr, int keepalive_opt, ch
 		if (-1 == setsockopt(socketptr->sd, IPPROTO_TCP, TCP_KEEPCNT, &keepcnt_value, SIZEOF(keepcnt_value)))
 		{
 			real_errno = errno;
+			DEBUG_ONLY(UNUSED(real_errno));
 			assert(FALSE);		/* while a white box case, we can ignore errors */
 		}
 		if (-1 == getsockopt(socketptr->sd, IPPROTO_TCP, TCP_KEEPCNT, &keepcnt_got, &keepcnt_got_len))
 		{
 			real_errno = errno;
+			DEBUG_ONLY(UNUSED(real_errno));
 			assert(FALSE);		/* while a white box case, we can ignore errors */
 		}
 		if (keepcnt_got != keepcnt_value)
@@ -201,12 +202,14 @@ boolean_t iosocket_tcp_keepalive(socket_struct *socketptr, int keepalive_opt, ch
 		if (-1 == setsockopt(socketptr->sd, IPPROTO_TCP, TCP_KEEPINTVL, &keepintvl_value, SIZEOF(keepintvl_value)))
 		{
 			real_errno = errno;
+			DEBUG_ONLY(UNUSED(real_errno));
 			assert(FALSE);		/* while a white box case, we can ignore errors */
 		}
 		keepintvl_got_len = SIZEOF(keepintvl_got);
 		if (-1 == getsockopt(socketptr->sd, IPPROTO_TCP, TCP_KEEPINTVL, &keepintvl_got, &keepintvl_got_len))
 		{
 			real_errno = errno;
+			DEBUG_ONLY(UNUSED(real_errno));
 			assert(FALSE);		/* while a white box case, we can ignore errors */
 		}
 		if (keepintvl_got != keepintvl_value)
