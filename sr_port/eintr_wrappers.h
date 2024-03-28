@@ -415,7 +415,11 @@ static inline size_t gtm_fwrite(void *buff, size_t elemsize, size_t nelems, FILE
 	do							\
 	{							\
 		RC = posix_fallocate(FD, BUF, SIZE);		\
-	} while (EINTR == RC);					\
+		if (EINTR != RC)				\
+			break;					\
+		eintr_handling_check();				\
+	} while (TRUE);						\
+	HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;			\
 }
 
 #define READ_FILE(FD, BUF, SIZE, RC)				\

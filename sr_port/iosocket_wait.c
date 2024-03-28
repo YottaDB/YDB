@@ -610,12 +610,16 @@ int iosocket_accept(d_socket_struct *dsocketptr, socket_struct *socketptr, boole
 	peer_sa_ptr = ((struct sockaddr *)(&peer));
 	if (selectfirst || (dsocketptr->waitcycle > socketptr->readycycle))
 	{	/* if not selected this time do a select first to check if connection still there */
+		poll_fds.fd = socketptr->sd;
+		poll_fds.events = POLLIN;
 		do
 		{
-			poll_fds.fd = socketptr->sd;
-			poll_fds.events = POLLIN;
 			rv = poll(&poll_fds, 1, 0);
-		} while ((0 > rv) && (EINTR == (save_errno = errno))); /* inline assigment */
+			if ((0 <= rv) || (EINTR != (save_errno = errno)))	/* inline assigment */
+				break;
+			eintr_handling_check();
+		} while (TRUE);
+		HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 		if (0 > rv)
 		{
 			errptr = (char *)STRERROR(save_errno);
