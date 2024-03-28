@@ -913,7 +913,7 @@ int view_device(mstr *device_name, unsigned char *device, int device_len)
 		nlog = get_log_name(&dollar_prin_log, NO_INSERT);
 	if (NULL == nlog)
 	{
-		stat = TRANS_LOG_NAME(device_name, &tn, buf1, SIZEOF(buf1), dont_sendmsg_on_log2long);
+		stat = trans_log_name(device_name, &tn, buf1, SIZEOF(buf1), dont_sendmsg_on_log2long);
 		if (SS_NORMAL == stat)
 		{
 			if (0 != (tl = get_log_name(&tn, NO_INSERT)))
