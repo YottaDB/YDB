@@ -6072,8 +6072,8 @@ Init
 	Set gtmtypfldindx("gtm_tls_ctx_t","plugin_version")=7
 	;
 	Set gtmtypes("gtm_tls_socket_t")="struct"
-	Set gtmtypes("gtm_tls_socket_t",0)=5
-	Set gtmtypes("gtm_tls_socket_t","len")=72
+	Set gtmtypes("gtm_tls_socket_t",0)=6
+	Set gtmtypes("gtm_tls_socket_t","len")=80
 	Set gtmtypes("gtm_tls_socket_t",1,"name")="gtm_tls_socket_t.flags"
 	Set gtmtypes("gtm_tls_socket_t",1,"off")=0
 	Set gtmtypes("gtm_tls_socket_t",1,"len")=4
@@ -6099,6 +6099,11 @@ Init
 	Set gtmtypes("gtm_tls_socket_t",5,"len")=8
 	Set gtmtypes("gtm_tls_socket_t",5,"type")="addr"
 	Set gtmtypfldindx("gtm_tls_socket_t","gtm_ctx")=5
+	Set gtmtypes("gtm_tls_socket_t",6,"name")="gtm_tls_socket_t.errstr"
+	Set gtmtypes("gtm_tls_socket_t",6,"off")=72
+	Set gtmtypes("gtm_tls_socket_t",6,"len")=8
+	Set gtmtypes("gtm_tls_socket_t",6,"type")="addr"
+	Set gtmtypfldindx("gtm_tls_socket_t","errstr")=6
 	;
 	Set gtmtypes("gtm_trigger_parms")="struct"
 	Set gtmtypes("gtm_trigger_parms",0)=8
@@ -39049,8 +39054,8 @@ Init
 	Set gtmtypfldindx("socket_interrupt","wait_for_what")=9
 	;
 	Set gtmtypes("socket_struct")="struct"
-	Set gtmtypes("socket_struct",0)=96
-	Set gtmtypes("socket_struct","len")=2816
+	Set gtmtypes("socket_struct",0)=102
+	Set gtmtypes("socket_struct","len")=2840
 	Set gtmtypes("socket_struct",1,"name")="socket_struct.sd"
 	Set gtmtypes("socket_struct",1,"off")=0
 	Set gtmtypes("socket_struct",1,"len")=4
@@ -39533,6 +39538,36 @@ Init
 	Set gtmtypes("socket_struct",96,"len")=4
 	Set gtmtypes("socket_struct",96,"type")="uint32_t"
 	Set gtmtypfldindx("socket_struct","current_events")=96
+	Set gtmtypes("socket_struct",97,"name")="socket_struct.options_state"
+	Set gtmtypes("socket_struct",97,"off")=2816
+	Set gtmtypes("socket_struct",97,"len")=4
+	Set gtmtypes("socket_struct",97,"type")="struct"
+	Set gtmtypfldindx("socket_struct","options_state")=97
+	Set gtmtypes("socket_struct",98,"name")="socket_struct.keepalive"
+	Set gtmtypes("socket_struct",98,"off")=2820
+	Set gtmtypes("socket_struct",98,"len")=4
+	Set gtmtypes("socket_struct",98,"type")="int"
+	Set gtmtypfldindx("socket_struct","keepalive")=98
+	Set gtmtypes("socket_struct",99,"name")="socket_struct.keepidle"
+	Set gtmtypes("socket_struct",99,"off")=2824
+	Set gtmtypes("socket_struct",99,"len")=4
+	Set gtmtypes("socket_struct",99,"type")="int"
+	Set gtmtypfldindx("socket_struct","keepidle")=99
+	Set gtmtypes("socket_struct",100,"name")="socket_struct.keepcnt"
+	Set gtmtypes("socket_struct",100,"off")=2828
+	Set gtmtypes("socket_struct",100,"len")=4
+	Set gtmtypes("socket_struct",100,"type")="int"
+	Set gtmtypfldindx("socket_struct","keepcnt")=100
+	Set gtmtypes("socket_struct",101,"name")="socket_struct.keepintvl"
+	Set gtmtypes("socket_struct",101,"off")=2832
+	Set gtmtypes("socket_struct",101,"len")=4
+	Set gtmtypes("socket_struct",101,"type")="int"
+	Set gtmtypfldindx("socket_struct","keepintvl")=101
+	Set gtmtypes("socket_struct",102,"name")="socket_struct.iobfsize"
+	Set gtmtypes("socket_struct",102,"off")=2836
+	Set gtmtypes("socket_struct",102,"len")=4
+	Set gtmtypes("socket_struct",102,"type")="int"
+	Set gtmtypfldindx("socket_struct","iobfsize")=102
 	;
 	Set gtmtypes("source_address")="struct"
 	Set gtmtypes("source_address",0)=2
