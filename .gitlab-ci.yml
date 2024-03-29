@@ -23,6 +23,7 @@ stages:
  - test
  - docker-create
  - docker-manifest
+ - docker-tag
 
 commit-verify:
   image: ubuntu:22.04
@@ -152,23 +153,20 @@ test-r202:
   variables:
     TEST: r202
 
-# Main and ONLY docker creation mechanism.
+# docker images creation mechanism.
 .docker-create:
   stage: docker-create
   script:
     - docker build --platform=${PLATFORM} ${ARGS} --pull -t yottadb/${REPO}:${DOCKERHUBTAG} -f ${DOCKERFILE} .
     - docker login -u $HUB_USERNAME -p $HUB_PASSWORD
     - docker push yottadb/${REPO}:${DOCKERHUBTAG}
-    - docker tag yottadb/${REPO}:${DOCKERHUBTAG} yottadb/${REPO}:$(grep YDB_ZYRELEASE sr_*/release_name.h | grep -o '\(r[0-9.]*\)' | grep -v '^r$' | sort -u)
-    - docker push yottadb/${REPO}:$(grep YDB_ZYRELEASE sr_*/release_name.h | grep -o '\(r[0-9.]*\)' | grep -v '^r$' | sort -u)
     - 'echo -e "FROM yottadb/${REPO}:${DOCKERHUBTAG}\n ENTRYPOINT []" > BareDockerfile'
     - docker build --platform=${PLATFORM} --pull -t yottadb/${REPO}-base:${DOCKERHUBTAG} -f BareDockerfile .
     - docker push yottadb/${REPO}-base:${DOCKERHUBTAG}
-    - docker tag yottadb/${REPO}-base:${DOCKERHUBTAG} yottadb/${REPO}-base:$(grep YDB_ZYRELEASE sr_*/release_name.h | grep -o '\(r[0-9.]*\)' | grep -v '^r$' | sort -u)
-    - docker push yottadb/${REPO}-base:$(grep YDB_ZYRELEASE sr_*/release_name.h | grep -o '\(r[0-9.]*\)' | grep -v '^r$' | sort -u)
   only:
     - master@YottaDB/DB/YDB
 
+# docker manifests (combines the AMD64 and AARCH64 images into a single manifest)
 .docker-manifest:
   stage: docker-manifest
   script:
@@ -187,6 +185,16 @@ test-r202:
     - amd64
   only:
     - master@YottaDB/DB/YDB
+
+# docker tagging mechanism (only runs on Git tags: tag the :latest manifest to :rn.nn )
+.docker-manifest-tag-with-version:
+  stage: docker-tag
+  script:
+    - docker login -u $HUB_USERNAME -p $HUB_PASSWORD
+    - docker buildx imagetools create -t yottadb/${REPO}:$(grep YDB_ZYRELEASE sr_*/release_name.h | grep -o '\(r[0-9.]*\)' | grep -v '^r$' | sort -u) yottadb/${REPO}:latest
+  only:
+    - tags
+
 
 # Section for creating single commit docker images (:latest-master docker tag)
 # amd64
@@ -397,3 +405,25 @@ docker-manifest-debian-release:
   variables:
     REPO: yottadb-debian
 # END
+#
+# YottaDB version tag on Git Tag on manifests
+docker-manifest-ubuntu-tag:
+  extends: .docker-manifest-tag-with-version
+  variables:
+    REPO: yottadb
+
+docker-manifest-ubuntu-debug-tag:
+  extends: .docker-manifest-tag-with-version
+  variables:
+    REPO: yottadb-debug
+
+docker-manifest-rocky-tag:
+  extends: .docker-manifest-tag-with-version
+  variables:
+    REPO: yottadb-rocky
+
+docker-manifest-debian-tag:
+  extends: .docker-manifest-tag-with-version
+  variables:
+    REPO: yottadb-debian
+#END
