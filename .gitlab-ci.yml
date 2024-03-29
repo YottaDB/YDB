@@ -142,6 +142,11 @@ test-v70001:
   variables:
     TEST: v70001
 
+test-v70002:
+  extends: .test-shared
+  variables:
+    TEST: v70002
+
 test-r202:
   extends: .test-shared
   variables:
