@@ -1587,7 +1587,7 @@
      Journal Buffer Size                   2312  Journal Alignsize               4096
      Journal AutoSwitchLimit            8386560  Journal Epoch Interval           300
      Journal Yield Limit                      8  Journal Sync IO                FALSE
-     Journal File: /home/jdoe/.fis-gtm/V7.0-002_x86_64/g/gtm.mjl
+     Journal File: /home/jdoe/.yottadb/r2.00_x86_64/g/gtm.mjl
      Mutex Hard Spin Count                  128  Mutex Sleep Spin Count           128
      Mutex Queue Slots                     1024  KILLs in progress                  0
      Replication State                      OFF  Region Seqno      0x0000000000000001
