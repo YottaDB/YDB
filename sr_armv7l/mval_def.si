@@ -97,11 +97,11 @@ top			=	8
 1:
 .endm
 
-	.sbttl	mval_def.si    mv_force_defined_strict
+	.sbttl	mval_def.si    mv_force_defined_overwrite
 # ---------------------------------------
-#       mv_force_defined_strict(reg)
+#       mv_force_defined_overwrite(reg)
 # ---------------------------------------
-.macro  mv_force_defined_strict reg
+.macro  mv_force_defined_overwrite reg
 	ldr	r12, [\reg, +#mval_w_mvtype]
 	mov	r4, #mval_m_str
 	add	r4, r4, #mval_m_nm

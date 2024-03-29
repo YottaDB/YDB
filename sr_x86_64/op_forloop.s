@@ -56,9 +56,10 @@ ENTRY	op_forloop
         movq	%rdi, indx(%rbp)
 	movq	%rdi, %rsi
 	mv_force_defined_overwrite %rsi, l0		# copy literal_null into control variable if undefined
+	movq	indx(%rbp), %rsi			# restore %rsi in case "mv_force_defined_overwrite" clobbered it
 	mv_force_num %rsi, l1
-	movq	indx(%rbp), %rsi
-	movq	step(%rbp), %rdi
+	movq	indx(%rbp), %rsi			# restore %rsi in case "mv_force_num" clobbered it
+	movq	step(%rbp), %rdi			# restore %rdi in case "mv_force_num" clobbered it
 	movw	mval_w_mvtype(%rsi), %ax
 	movw	mval_w_mvtype(%rdi), %dx
 	andw	%dx, %ax

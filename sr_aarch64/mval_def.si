@@ -99,9 +99,9 @@ top			=	16
 .endm
 
 # ---------------------------------------
-#       mv_force_defined_strict(reg)
+#       mv_force_defined_overwrite(reg)
 # ---------------------------------------
-.macro  mv_force_defined_strict reg
+.macro  mv_force_defined_overwrite reg
 	ldrh	w14, [\reg, #mval_w_mvtype]
 	mov	w15, #mval_m_str
 	add	w15, w15, #mval_m_nm

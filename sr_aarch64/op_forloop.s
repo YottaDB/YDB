@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 # Copyright (c) 2018 Stephen L Johnson. All rights reserved.	#
@@ -58,10 +58,11 @@ ENTRY op_forloop
 	str	x3, [x29, #loop]
 
 	mov	x1, x0
-	mv_force_defined_strict x1
+	mv_force_defined_overwrite x1		/* copy literal_null into control variable if undefined */
+	ldr	x1, [x29, #indx]		/* restore x1 in case "mv_force_defined_overwrite" clobbered it */
 	mv_force_num x1
-	ldr	x1, [x29, #indx]
-	ldr	x0, [x29, #step]
+	ldr	x1, [x29, #indx]		/* restore x1 in case "mv_force_num" clobbered it */
+	ldr	x0, [x29, #step]		/* restore x0 in case "mv_force_num" clobbered it */
 	ldrh	w13, [x1, #mval_w_mvtype]
 	ldrh	w15, [x0, #mval_w_mvtype]
 	and	w13, w13, w15
