@@ -51,6 +51,7 @@ YDBENVINDX_TABLE_ENTRY (YDBENVINDX_COREDUMP_FILTER,            "$ydb_coredump_fi
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_CRYPT_CONFIG,               "$ydb_crypt_config",               "$gtmcrypt_config")
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_CRYPT_FIPS,                 "$ydb_crypt_fips",                 "$gtmcrypt_FIPS")
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_CRYPT_PLUGIN,               "$ydb_crypt_plugin",               "$gtm_crypt_plugin")
+YDBENVINDX_TABLE_ENTRY (YDBENVINDX_DB_CREATE_VER,              "$ydb_db_create_ver",              "$gtm_db_create_ver")
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_CUSTOM_ERRORS,              "$ydb_custom_errors",              "$gtm_custom_errors")
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_DBFILEXT_SYSLOG_DISABLE,    "$ydb_dbfilext_syslog_disable",    "$gtm_dbfilext_syslog_disable")
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_DBGLVL,                     "$ydb_dbglvl",                     "$gtmdbglvl")
@@ -65,6 +66,7 @@ YDBENVINDX_TABLE_ENTRY (YDBENVINDX_DB_STARTUP_MAX_WAIT,        "$ydb_db_startup_
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_DIST,                       "$ydb_dist",                       "$gtm_dist")
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_DIST_ONLY,                  "$ydb_dist",                       "")
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_DMTERM,                     "$ydb_dmterm",                     "$gtm_dmterm")
+YDBENVINDX_TABLE_ENTRY (YDBENVINDX_DOLLAR_TEST,                "$ydb_dollartest",                 "")
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_DONT_TAG_UTF8_ASCII,        "$ydb_dont_tag_utf8_ascii",        "$gtm_dont_tag_UTF8_ASCII")
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_DTNDBD,                     "$ydb_dtndbd",                     "$gtmdtndbd")
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_ENVIRONMENT_INIT,           "$ydb_environment_init",           "$gtm_environment_init")
@@ -131,7 +133,6 @@ YDBENVINDX_TABLE_ENTRY (YDBENVINDX_STRING_POOL_LIMIT,          "$ydb_string_pool
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_SYSID,                      "$ydb_sysid",                      "$gtm_sysid")
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_TREAT_SIGUSR2_LIKE_SIGUSR1, "$ydb_treat_sigusr2_like_sigusr1", "")
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_TLS_PASSWD_PREFIX,          "$ydb_tls_passwd_",                "$gtmtls_passwd_")
-YDBENVINDX_TABLE_ENTRY (YDBENVINDX_DOLLAR_TEST,                "$ydb_dollartest",                 "")
 /* Like YDBENVINDX_DIST and YDBENVINDX_DIST_ONLY, we have the below two lines.
  * YDBENVINDX_TMP is used by the wrapper gtmsecshr ($ydb_dist/gtmsecshr). But since that sets ydb_tmp in the environment,
  * the gtmsecshr process that is forked off ($ydb_dist/gtmsecshrdir/gtmsecshr) inherits this env var and so does not need

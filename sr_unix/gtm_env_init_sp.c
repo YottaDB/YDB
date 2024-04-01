@@ -3,7 +3,7 @@
  * Copyright (c) 2004-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -295,11 +295,10 @@ void	gtm_env_init_sp(void)
 		TREF(dbinit_max_delta_secs) = hrtbt_cntr_delta;
 	/* Initialize database file creation version */
 	gtm_db_create_ver = GDSVCURR;	/* Default to the current version */
-	val.addr = GTM_DB_CREATE_VER;
-	val.len = SIZEOF(GTM_DB_CREATE_VER) - 1;
-	if (SS_NORMAL == (status = TRANS_LOG_NAME(&val, &trans, buf, GTM_PATH_MAX, do_sendmsg_on_log2long)))
-		if (('6' == buf[0]) || (('V' == toupper(buf[0])) && ('6' == buf[1])))
-			gtm_db_create_ver = GDSV6;	/* Create prior version: GDSV6 */
+	if ((SS_NORMAL == ydb_trans_log_name(YDBENVINDX_DB_CREATE_VER, &trans, buf, YDB_PATH_MAX, IGNORE_ERRORS_TRUE, NULL))
+		&& (((1 == trans.len) && ('6' == buf[0]))
+			|| ((2 == trans.len) && ('V' == toupper(buf[0])) && ('6' == buf[1]))))
+		gtm_db_create_ver = GDSV6;	/* Create prior version: GDSV6 */
 	/* Initialize variable that controls the location of GT.M custom errors file (used for anticipatory freeze) */
 	if ((SS_NORMAL == ydb_trans_log_name(YDBENVINDX_CUSTOM_ERRORS, &trans, buf, YDB_PATH_MAX,
 											IGNORE_ERRORS_TRUE, NULL))
