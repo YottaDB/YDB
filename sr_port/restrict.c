@@ -3,7 +3,7 @@
  * Copyright (c) 2017-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -167,16 +167,9 @@ void restrict_init(void)
 	int		rest_owner_perms, rest_group_perms, rest_other_perms;
 
 	assert(!restrict_initialized);
-<<<<<<< HEAD
 	assert(ydb_dist_ok_to_use);
 	SNPRINTF(restrictpath, YDB_PATH_MAX, "%s/%s", ydb_dist, RESTRICT_FILENAME);
 	SNPRINTF(filtcmdpath, YDB_PATH_MAX, "%s/%s", ydb_dist, COMM_FILTER_FILENAME);
-
-=======
-	assert(gtm_dist_ok_to_use);
-	SNPRINTF(restrictpath, GTM_PATH_MAX, "%s/%s", gtm_dist, RESTRICT_FILENAME);
-	SNPRINTF(filtcmdpath, GTM_PATH_MAX, "%s/%s", gtm_dist, COMM_FILTER_FILENAME);
->>>>>>> b400aa64 (GT.M V7.0-004)
 	Fopen(restrictfp, restrictpath, "r");
 	if (NULL == restrictfp)
 	{	/* No read access or the file does not exist */

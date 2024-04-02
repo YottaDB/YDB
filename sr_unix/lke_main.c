@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -65,6 +65,7 @@
 #include "gt_timers_add_safe_hndlrs.h"
 #include "continue_handler.h"
 #include "readline.h"
+#include "restrict.h"
 
 #ifdef UTF8_SUPPORTED
 # include "gtm_icu_api.h"
@@ -84,6 +85,7 @@ GBLREF ch_ret_type		(*stpgc_ch)();			/* Function pointer to stp_gcol_ch */
 static bool lke_process(int argc);
 
 error_def(ERR_CTRLC);
+error_def(ERR_RESTRICTEDOP);
 
 int lke_main(int argc, char *argv[], char **envp)
 {
@@ -106,6 +108,8 @@ int lke_main(int argc, char *argv[], char **envp)
 	prealloc_gt_timers();
 	gt_timers_add_safe_hndlrs();
 	initialize_pattern_table();
+	if (RESTRICTED(lke))
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_RESTRICTEDOP, 1, "LKE");
 	gvinit();
 	region_init(FALSE);	/* Was TRUE, but that doesn't actually work if there are GTCM regions in the GLD,
 				 * at least in DEBUG, so leave it off for now to allow LKE to work in this situation.

@@ -7163,31 +7163,12 @@
    If you plan to use the optional compression facility for replication, you
    must provide the compression library. The YottaDB interface for compression
    libraries accepts the zlib compression libraries without any need for
-<<<<<<< HEAD
-   adaptation. These libraries are included in many UNIX distributions and
+   adaptation. These libraries are included in many distributions and
    are downloadable from the zlib home page. If you prefer to use other
-   compression libraries, you need to configure or adapt them to provide the
-   same API provided by zlib. Simple instructions for compiling zlib on follow.
-   Although YottaDB uses zlib, zlib is not YottaDB software and YottaDB does not
-   support zlib. These instructions are merely provided as a convenience to you.
-
-   If a package for zlib is available with your operating system, YottaDB
-   suggests that you use it rather than building your own.
-
-   Linux/gcc:
-
-   ./configure --shared
-   make CFLAGS="-m64"
-
-   By default, YottaDB searches for the libz.so shared library in the standard
-=======
-   adaptation. These libraries are included in many distributions and are
-   downloadable from the zlib home page. If you prefer to use other
    compression libraries, you need to configure or adapt them to provide the
    same API provided by zlib.
 
-   By default, GT.M searches for the libz.so shared library in the standard
->>>>>>> b400aa64 (GT.M V7.0-004)
+   By default, YottaDB searches for the libz.so shared library in the standard
    system library directories (for example, /usr/lib, /usr/local/lib,
    /usr/local/lib64). If the shared library is installed in a non-standard
    location, before starting replication, you must ensure that the
@@ -7583,20 +7564,20 @@
 
    TLSv1.3 introduces a number of protocol changes. The concept of
    renegotiation was removed. As a result, when using TLSv1.3, this qualifier
-   takes on a different meaning. GT.M used TLSv1.2 renegotiation to ensure
+   takes on a different meaning. YottaDB used TLSv1.2 renegotiation to ensure
    appropriate refresh of session keys (for rationale, see Luykx, A. and K.
    Paterson, "Limits on Authenticated Encryption Use in TLS", 2016;
-   http://www.isg.rhul.ac.uk/~kp/TLS-AEbounds.pdf). As a result, GT.M uses
+   http://www.isg.rhul.ac.uk/~kp/TLS-AEbounds.pdf). As a result, YottaDB uses
    the term "renegotiation" for SOCKET devices where the mode is "server" and
    "renegotiation_interval" for the frequency of renegotiation during
-   database replication. For TLSv1.3 sessions, the GT.M Reference TLS plugin
+   database replication. For TLSv1.3 sessions, the YottaDB Reference TLS plugin
    treats the "renegotiation" as a request to update the session keys.
 
   Important
 
    OpenSSL 3.0 by default does not allow client-side initiated TLSv1.2
    renegotiation requests due to potential DoS attacks. Because of this, the
-   GT.M Reference TLS plugin built with a pre-OpenSSL 3.0 version does not
+   YottaDB Reference TLS plugin built with a pre-OpenSSL 3.0 version does not
    support client initiated renegotiation when communicating with a plugin
    build with OpenSSL 3.0. This limitation only affects database replication
    and not SOCKET devices. There is currently no work-around for this

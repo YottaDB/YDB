@@ -2189,15 +2189,9 @@
    parameter passing. When M protects a local variable, it saves a copy of
    the variable's value and makes that variable undefined. M restores the
    variable to its saved value during execution of the QUIT that terminates
-<<<<<<< HEAD
    the process stack level associated with the "protecting" NEW or formalist.
    For more information on NEW and QUIT, refer to the "Commands" chapter in
    the YottaDB Programmer's Guide.
-=======
-   the process stack level associated with the "protecting" NEW or
-   formallist. For more information on NEW and QUIT, refer to the "Commands"
-   chapter in the GT.M Programmer's Guide.
->>>>>>> b400aa64 (GT.M V7.0-004)
 
    M restricts the following uses of variables to local variables:
 
@@ -15525,27 +15519,16 @@
        completes or to 0 if it times out. $DEVICE provides status information
        in case of an error. ZSHOW "D" includes "TLS" in the second line of
        the output for an encrypted socket.
-<<<<<<< HEAD
-     o "renegotiate" applies only to a server socket. It allows applications
-       to request a TLS renegotiation. Renegotiation requires the suspension
-       of application communication and the application must read all pending
-       data before initiating a renegotiation. This means that in the
-       communication protocol used, both parties must be at a known state
-       when renegotiating keys. For example, in YottaDB replication, one party
-       sends a renegotiation request and waits for an acknowledgement before
-       initiating the renegotiation.
-=======
      o "renegotiate" applies only to a server socket. Prior to TLSv1.3, this
        option allows applications to request a TLS renegotiation.
        Renegotiation requires the suspension of application communication and
        the application must read all pending data before initiating a
        renegotiation. This means that in the communication protocol used,
        both parties must be at a known state when renegotiating keys. For
-       example, in GT.M replication, one party sends a renegotiation request
+       example, in YottaDB replication, one party sends a renegotiation request
        and waits for an acknowledgement before initiating the renegotiation.
        Due to a change in the TLSv1.3 protocol which removed the concept of
        renegotiation, this option refreshes the TLS connection keys.
->>>>>>> b400aa64 (GT.M V7.0-004)
      o tlsid refers to the name of a section in the configuration file
        specified by the ydb_crypt_config environment variable. If tlsid is not
        specified with the "renegotiate" option and cfg-file-options are

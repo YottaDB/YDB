@@ -300,14 +300,7 @@ void	trigger_upgrade(gd_region *reg)
 	 * 	triggers for this global get re-read if and when we implement an -ONLINE upgrade).
 	 */
 	tmpmv = &tmpmval;	/* At all points maintain this relationship. The two are used interchangeably below */
-<<<<<<< HEAD
 	assert(gv_target->root);	/* caller "mupip_trigger" should have not invoked us otherwise */
-=======
-	if (gv_target->root)
-		do_upgrade = TRUE;
-	else
-		do_upgrade = FALSE;
->>>>>>> b400aa64 (GT.M V7.0-004)
 	/* The below logic assumes ^#t global does not have any integrity errors */
 	/* kill ^#t("#TRHASH"), ^#t("#TNAME") and ^#t("#LABEL") first. Regenerate each again as we process ^#t(<gbl>,...) */
 	csa->incr_db_trigger_cycle = TRUE; /* so that we increment csd->db_trigger_cycle at commit time.

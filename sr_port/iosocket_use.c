@@ -695,14 +695,8 @@ void	iosocket_use(io_desc *iod, mval *pp)
 		if (flush_specified)
 			iosocket_flush(iod);	/* buffered output if any */
 		if (bfsize_specified)
-<<<<<<< HEAD
-			newsocket.buffer_size = bfsize;
-		if (socket_local != newsocket.protocol)
-=======
 			curr_socketptr->buffer_size = bfsize;
-#		ifdef TCP_NODELAY
 		if (socket_local != curr_socketptr->protocol)
->>>>>>> b400aa64 (GT.M V7.0-004)
 		{
 			nodelay = curr_socketptr->nodelay ? 1 : 0;
 			if ((socketptr->nodelay != curr_socketptr->nodelay) &&
@@ -720,12 +714,7 @@ void	iosocket_use(io_desc *iod, mval *pp)
 				return;
 			}
 		}
-<<<<<<< HEAD
-		if (socketptr->bufsiz != newsocket.bufsiz)
-=======
-#		endif
 		if (socketptr->bufsiz != curr_socketptr->bufsiz)
->>>>>>> b400aa64 (GT.M V7.0-004)
 		{
 			if (-1 == setsockopt(curr_socketptr->sd, SOL_SOCKET, SO_RCVBUF, &curr_socketptr->bufsiz,
 					SIZEOF(curr_socketptr->bufsiz)))

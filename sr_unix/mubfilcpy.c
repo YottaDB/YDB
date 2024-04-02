@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -485,18 +485,12 @@ boolean_t	mubfilcpy (backup_reg_list *list, boolean_t showprogress, int attemptc
 			assert(data_off < stat.st_size);
 			assert(hole_off <= stat.st_size);
 			strtm = time(NULL);
-<<<<<<< HEAD
-			copy_file_range_p = p;
+			copy_file_range_p = func_ptr;
 
 			size_t	max_cp_len;
 			max_cp_len = hole_off - in_off;
 			assert(max_cp_len <= remaining);
 			ret = copy_file_range_p(infd, (loff_t *)&in_off, outfd, (loff_t *)&out_off, max_cp_len, 0);
-=======
-			tmpsize = remaining;
-			copy_file_range_p = func_ptr;
-			ret = copy_file_range_p(infd, inoffp, outfd, outoffp, remaining, 0);
->>>>>>> b400aa64 (GT.M V7.0-004)
 			if (WBTEST_ENABLED(WBTEST_BACKUP_FORCE_SLEEP))
 			{
 				util_out_print("BACKUP_STARTED", TRUE);
@@ -505,12 +499,7 @@ boolean_t	mubfilcpy (backup_reg_list *list, boolean_t showprogress, int attemptc
 			}
 			if (-1 == ret)
 			{
-<<<<<<< HEAD
 				if (1 == handle_err("Error occurred during the copy phase of MUPIP BACKUP", errno))
-=======
-				if (1 == (status = handle_err("Error occurred during the copy phase of MUPIP BACKUP",
-						errno))) /* WARNING assignment */
->>>>>>> b400aa64 (GT.M V7.0-004)
 					ABORTBACKUP;
 			}
 			endtm = time(NULL);

@@ -256,12 +256,8 @@ static	CLI_ENTRY	mup_convert_qual[] = {		/* CONVERT */
 };
 
 static	CLI_ENTRY	mup_create_qual[] = {		/* CREATE */
-<<<<<<< HEAD
-{ "REGION", mupip_create, 0, 0, 0, 0, 0, VAL_OR_PARAM, 0, NON_NEG, VAL_STR, 0 },
-=======
-{ "REGION", mupip_create, 0, 0, 0, 0, 0, VAL_REQ,        2, NON_NEG, VAL_STR, 0 },
+{ "REGION", mupip_create, 0, 0, 0, 0, 0, VAL_OR_PARAM,   2, NON_NEG, VAL_STR, 0 },
 { "V6",     mupip_create, 0, 0, 0, 0, 0, VAL_DISALLOWED, 2, NEG,     VAL_N_A, 0 },
->>>>>>> b400aa64 (GT.M V7.0-004)
 { "" }
 };
 

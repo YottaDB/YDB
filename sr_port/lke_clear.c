@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -80,13 +80,9 @@ void	lke_clear(void)
 	node.len = SIZEOF(nodebuf);
 	one_lock.addr = one_lockbuf;
 	one_lock.len = SIZEOF(one_lockbuf);
-<<<<<<< HEAD
-	if (0 == lke_getcli(&all, &wait, &interactive, &pid, &regname, &node, &one_lock, &memory, &nocrit, &exact, 0, 0))
-=======
 	if (RESTRICTED(lkeclear))
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_RESTRICTEDOP, 1, "LKECLEAR");
-	if (lke_getcli(&all, &wait, &interactive, &pid, &regname, &node, &one_lock, &memory, &nocrit, &exact, 0, 0) == 0)
->>>>>>> b400aa64 (GT.M V7.0-004)
+	if (0 == lke_getcli(&all, &wait, &interactive, &pid, &regname, &node, &one_lock, &memory, &nocrit, &exact, 0, 0))
 		return;
 	/* Search all regions specified on the command line */
 	for (reg = gd_header->regions, n = 0; n != gd_header->n_regions; ++reg, ++n)

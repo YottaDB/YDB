@@ -15,22 +15,13 @@
 #								#
 #################################################################
 
-<<<<<<< HEAD
-# CMake 2.8.4 introduced LINK_DEPENDS target property
-# CMake 2.8.4 introduced generator expressions in custom commands
-# CMake 2.8.5 introduced use of C compiler as the assembler
-# CMake 3.0.0 avoids odd dependency issues when generating the git commit hash on CentOS
-cmake_minimum_required(VERSION 3.0.0)
-project(YDB C ASM)
-=======
 # Min version of cmake on RHEL 6
 cmake_minimum_required(VERSION 3.6.0)
 if(POLICY CMP0087)
   # Policy needed since cmake 3.16
   cmake_policy(SET CMP0087 NEW)
 endif()
-project(GTM C ASM)
->>>>>>> b400aa64 (GT.M V7.0-004)
+project(YDB C ASM)
 
 # Max optimization level is -O2
 get_property(languages GLOBAL PROPERTY ENABLED_LANGUAGES)
@@ -43,15 +34,7 @@ foreach(lang ${languages})
 endforeach()
 
 # Defaults
-<<<<<<< HEAD
 set(version r201)
-=======
-set(version ${V7.0-004})
-if("${version}" STREQUAL "")
-        set(version V9.9-0)
-endif()
-
->>>>>>> b400aa64 (GT.M V7.0-004)
 # If CMAKE_BUILD_TYPE is not defined make it a Release build
 if(NOT CMAKE_CONFIGURATION_TYPES AND NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE "RelWithDebInfo" CACHE STRING "Build type" FORCE)
@@ -354,15 +337,11 @@ if(gen_xfer_desc)
   foreach(src ${sources_used})
     set(CMAKE_CONFIGURABLE_FILE_CONTENT "${CMAKE_CONFIGURABLE_FILE_CONTENT}${src}\n")
   endforeach()
-<<<<<<< HEAD
-  configure_file(${CMAKE_ROOT}/Modules/CMakeConfigurableFile.in ${YDB_BINARY_DIR}/sources.list)
-=======
   foreach(inc ${includes})
     get_filename_component(absinc ${inc} REALPATH)
     list(APPEND abs_includes ${absinc})
   endforeach()
-  configure_file(${CMAKE_ROOT}/Modules/CMakeConfigurableFile.in ${GTM_BINARY_DIR}/sources.list)
->>>>>>> b400aa64 (GT.M V7.0-004)
+  configure_file(${CMAKE_ROOT}/Modules/CMakeConfigurableFile.in ${YDB_BINARY_DIR}/sources.list)
   add_custom_command(
     OUTPUT xfer_desc.i
     WORKING_DIRECTORY ${YDB_BINARY_DIR}
@@ -371,14 +350,9 @@ if(gen_xfer_desc)
     COMMAND ${CMAKE_COMMAND}
       -D CMAKE_C_COMPILER=${CMAKE_C_COMPILER}
       -D "arch=${arch}"
-<<<<<<< HEAD
-      -D "includes=${includes}"
-      -P ${YDB_SOURCE_DIR}/sr_unix/gen_xfer_desc.cmake
-=======
       -D "includes=${abs_includes}"
       -D CMAKE_VERBOSE_MAKEFILE=${CMAKE_VERBOSE_MAKEFILE}
-      -P ${GTM_SOURCE_DIR}/sr_unix/gen_xfer_desc.cmake
->>>>>>> b400aa64 (GT.M V7.0-004)
+      -P ${YDB_SOURCE_DIR}/sr_unix/gen_xfer_desc.cmake
     VERBATIM
     )
   add_custom_target(gen_xfer_desc DEPENDS xfer_desc.i)
@@ -440,13 +414,7 @@ foreach(lib
   add_dependencies(lib${lib} gen_gtm_threadgbl_deftypes)
 endforeach()
 
-<<<<<<< HEAD
-# TODO: find_package or find_library for system libs?
-include_directories (/usr/local/include)
 target_link_libraries(libmumps ${libsyslibs})
-=======
-target_link_libraries(libmumps		${libmumpslibs})
->>>>>>> b400aa64 (GT.M V7.0-004)
 if(gen_xfer_desc)
   add_dependencies(libmumps gen_xfer_desc)
 endif()
@@ -488,13 +456,7 @@ list(APPEND with_export mupip)
 add_executable(lke ${lke_SOURCES})
 list(APPEND with_export lke)
 
-<<<<<<< HEAD
-
 add_executable(gtcm_server ${gtcm_server_SOURCES})
-=======
-add_executable(gtcm_server		${gtcm_server_SOURCES})
-target_link_libraries(gtcm_server	libgtcm libmumps libstub)
->>>>>>> b400aa64 (GT.M V7.0-004)
 list(APPEND with_export gtcm_server)
 
 add_executable(gtcm_gnp_server ${gtcm_gnp_server_SOURCES})
@@ -514,28 +476,8 @@ set_target_properties(libyottadb PROPERTIES
   LINK_FLAGS "${libyottadb_link} -Wl,-Map=libyottadb.map"
   LINK_DEPENDS "${libyottadb_dep}"
   )
-<<<<<<< HEAD
 add_dependencies(libyottadb gen_export)
 add_dependencies(yottadb libyottadb)
-=======
-add_dependencies(libgtmshr gen_export)
-add_dependencies(mumps libgtmshr)
-
-# Iterate over the list of GPG related libraries
-foreach(gpglib gpg-error gpgme gcrypt config)
-  # For each library, we need a new CMake variable, hence GPGLIB_${gpglib}
-  find_library(GPGLIB_${gpglib} NAME ${gpglib} PATHS ${CMAKE_LIBRARY_PATH})
-  # Append the found library to the list
-  set(GPG_LIBRARIES ${GPG_LIBRARIES} ${GPGLIB_${gpglib}})
-endforeach()
-
-# Iterate over the list of SSL related libraries
-foreach(tlslib ssl crypto config)
-  # For each library, we need a new CMake variable, hence TLSLIB_${tlslib}
-  find_library(TLSLIB_${tlslib} NAME ${tlslib} PATHS ${CMAKE_LIBRARY_PATH})
-  # Append the found library to the list
-  set(TLS_LIBRARIES ${TLS_LIBRARIES} ${TLSLIB_${tlslib}})
-endforeach()
 
 #-----------------------------------------------------------------------------
 ## Encryption Plugin Library compilation ##
@@ -594,106 +536,6 @@ else()
 		include_directories(${LIBGCRYPT_INCLUDES})
 	endif()
 endif()
-
-# Building the three encryption libraries could by a loop of some sort, but
-# manually creating each target is way easier.
-
-# Library=GCRYPT Algorithm=AES256CFB
-add_library(libgtmcrypt_gcrypt_AES256CFB.so MODULE ${libgtmcrypt_SOURCES})
-set_target_properties(libgtmcrypt_gcrypt_AES256CFB.so PROPERTIES
-  OUTPUT_NAME gtmcrypt_gcrypt_AES256CFB
-  COMPILE_DEFINITIONS "USE_GCRYPT -DUSE_AES256CFB"
-  LIBRARY_OUTPUT_DIRECTORY ${GTM_BINARY_DIR}/plugin
-  )
-add_dependencies(libgtmcrypt_gcrypt_AES256CFB.so gen_gtm_threadgbl_deftypes)
-target_link_libraries(libgtmcrypt_gcrypt_AES256CFB.so ${GPG_LIBRARIES})
-install(TARGETS libgtmcrypt_gcrypt_AES256CFB.so DESTINATION ${GTM_INSTALL_DIR}/plugin)
-
-# Establish the default encryption link
-set(default_encr_link   ${GTM_BINARY_DIR}/plugin/libgtmcrypt.so)
-set(default_encr_target libgtmcrypt_gcrypt_AES256CFB.so)
-add_custom_command(
-	OUTPUT ${default_encr_link}
-	COMMAND ${CMAKE_COMMAND} -E create_symlink "${default_encr_target}" "${default_encr_link}"
-	DEPENDS ${GTM_BINARY_DIR}/plugin/${default_encr_target}
-	COMMENT "Generating default_encr symbolic link"
-	)
-add_custom_target(install_default_encr ALL DEPENDS ${default_encr_link})
-install(FILES ${default_encr_link} DESTINATION ${GTM_INSTALL_DIR}/plugin)
-
-# Library=OPENSSL Algorithm=AES256CFB
-add_library(libgtmcrypt_openssl_AES256CFB MODULE ${libgtmcrypt_SOURCES})
-set_target_properties(libgtmcrypt_openssl_AES256CFB PROPERTIES
-  OUTPUT_NAME gtmcrypt_openssl_AES256CFB
-  COMPILE_DEFINITIONS "USE_OPENSSL -DUSE_AES256CFB"
-  LIBRARY_OUTPUT_DIRECTORY ${GTM_BINARY_DIR}/plugin
-  )
-target_link_libraries(libgtmcrypt_openssl_AES256CFB ${GPG_LIBRARIES} ${TLS_LIBRARIES})
-add_dependencies(libgtmcrypt_openssl_AES256CFB gen_gtm_threadgbl_deftypes)
-install(TARGETS libgtmcrypt_openssl_AES256CFB DESTINATION ${GTM_INSTALL_DIR}/plugin)
-
-add_library(libgtmtls MODULE ${libgtmtls_SOURCES})
-set_target_properties(libgtmtls PROPERTIES
-  OUTPUT_NAME gtmtls
-  COMPILE_DEFINITIONS "USE_OPENSSL"
-  LIBRARY_OUTPUT_DIRECTORY ${GTM_BINARY_DIR}/plugin
-  )
-target_link_libraries(libgtmtls ${TLS_LIBRARIES})
-add_dependencies(libgtmtls gen_gtm_threadgbl_deftypes gen_tls_options)
-install(TARGETS libgtmtls DESTINATION ${GTM_INSTALL_DIR}/plugin)
-
-add_executable(maskpass ${maskpass_SOURCES})
-target_link_libraries(maskpass ${GPG_LIBRARIES} ${TLS_LIBRARIES})
-set_target_properties(maskpass PROPERTIES
-  COMPILE_DEFINITIONS "USE_GCRYPT -DUSE_SYSLIB_FUNCS"
-  RUNTIME_OUTPUT_DIRECTORY ${GTM_BINARY_DIR}/plugin/gtmcrypt
-  )
-install(TARGETS maskpass DESTINATION ${GTM_INSTALL_DIR}/plugin/gtmcrypt)
-
-# Always copy files into the plugin directory
-foreach(f
-      Makefile.mk
-      encrypt_sign_db_key.sh
-      gen_keypair.sh
-      gen_sym_hash.sh
-      gen_sym_key.sh
-      gtm_tls_impl.c
-      gtm_tls_impl.h
-      gtm_tls_interface.h
-      gtmcrypt_dbk_ref.c
-      gtmcrypt_dbk_ref.h
-      gtmcrypt_interface.h
-      gtmcrypt_pk_ref.c
-      gtmcrypt_pk_ref.h
-      gtmcrypt_ref.c
-      gtmcrypt_ref.h
-      gtmcrypt_sym_ref.c
-      gtmcrypt_sym_ref.h
-      gtmcrypt_util.c
-      gtmcrypt_util.h
-      import_and_sign_key.sh
-      maskpass.c
-      pinentry-gtm.sh
-      pinentry.m
-      show_install_config.sh
-    )
-  set(f_in "${GTM_SOURCE_DIR}/sr_unix/${f}")
-  string(REGEX REPLACE ".mk$" "" f_mod "${f}")
-  set(f_out "${GTM_BINARY_DIR}/plugin/gtmcrypt/${f_mod}")
-  add_custom_command(
-    OUTPUT "${f_out}"
-    DEPENDS "${f_in}"
-    COMMAND ${CMAKE_COMMAND} -E copy "${f_in}" "${f_out}"
-    )
-  if("${f}" MATCHES "\\.sh$")
-    set(permissions PERMISSIONS ${install_permissions_script})
-  else()
-    set(permissions "")
-  endif()
-  install(FILES "${f_out}" DESTINATION ${GTM_INSTALL_DIR}/plugin/gtmcrypt ${permissions})
-  list(APPEND files_to_place "${f_out}")
-endforeach()
->>>>>>> b400aa64 (GT.M V7.0-004)
 
 #-----------------------------------------------------------------------------
 install(TARGETS
@@ -784,17 +626,6 @@ foreach(d ${gt_src_list})
         list(APPEND files_to_place "${m_out}")
         list(APPEND m_routines "${m_out}")
       endif()
-<<<<<<< HEAD
-=======
-      add_custom_command(
-        OUTPUT "${m_out}"
-        DEPENDS ${GTM_SOURCE_DIR}/${d}/${m}
-        COMMAND ${CMAKE_COMMAND} -E copy ${GTM_SOURCE_DIR}/${d}/${m} "${m_out}"
-        )
-      install(FILES "${m_out}" DESTINATION ${GTM_INSTALL_DIR})
-      list(APPEND files_to_place "${m_out}")
-      list(APPEND gtm_chset_routines_${gtm_chset} "${m_out}")
->>>>>>> b400aa64 (GT.M V7.0-004)
     endif()
   endforeach()
   foreach(m ${mpt_files_${d}})
@@ -944,12 +775,8 @@ foreach(ydb_chset "M" "UTF-8")
       VERBATIM
       )
     list(APPEND files_to_place ${out})
-<<<<<<< HEAD
-    install(FILES "${out}" DESTINATION ${YDB_INSTALL_DIR}${ydb_chset_dir_${ydb_chset}})
-=======
     list(APPEND mo_files ${out})
-    install(FILES "${out}" DESTINATION ${GTM_INSTALL_DIR}${gtm_chset_dir_${gtm_chset}})
->>>>>>> b400aa64 (GT.M V7.0-004)
+    install(FILES "${out}" DESTINATION ${YDB_INSTALL_DIR}${ydb_chset_dir_${ydb_chset}})
   endforeach()
 endforeach()
 
@@ -979,43 +806,27 @@ Halt")
     -D ydb_chset=M
     )
   add_custom_command(
-<<<<<<< HEAD
-    OUTPUT ${help}help.dat ${help}help.gld
-    DEPENDS ${YDB_SOURCE_DIR}/sr_unix/mumps.cmake yottadb mupip
+    OUTPUT ${YDB_BINARY_DIR}/${help}help.gld
+    DEPENDS ${YDB_SOURCE_DIR}/sr_unix/mumps.cmake $<TARGET_FILE:yottadb>
             ${YDB_BINARY_DIR}/${help}help.in1
-            ${YDB_BINARY_DIR}/${help}help.in2
-            ${m_routines}
-    COMMAND ${CMAKE_COMMAND} -E remove ${help}help.dat ${help}help.gld
+            ${mo_files}
     COMMAND ${CMAKE_COMMAND} ${env}
       -D mumps=$<TARGET_FILE:yottadb> -D "args=-run;GDE"
       -D input_file=${YDB_BINARY_DIR}/${help}help.in1
       -P ${YDB_SOURCE_DIR}/sr_unix/mumps.cmake
-    COMMAND ${CMAKE_COMMAND} ${env}
-      -D mumps=$<TARGET_FILE:mupip> -D "args=create"
-      -P ${YDB_SOURCE_DIR}/sr_unix/mumps.cmake
-=======
-    OUTPUT ${GTM_BINARY_DIR}/${help}help.gld
-    DEPENDS ${GTM_SOURCE_DIR}/sr_unix/mumps.cmake $<TARGET_FILE:mumps>
-            ${GTM_BINARY_DIR}/${help}help.in1
-            ${mo_files}
-    COMMAND ${CMAKE_COMMAND} ${env}
-      -D mumps=$<TARGET_FILE:mumps> -D "args=-run;GDE"
-      -D input_file=${GTM_BINARY_DIR}/${help}help.in1
-      -P ${GTM_SOURCE_DIR}/sr_unix/mumps.cmake
     VERBATIM
     )
   add_custom_command(
-    OUTPUT ${GTM_BINARY_DIR}/${help}help.dat
-    DEPENDS ${GTM_SOURCE_DIR}/sr_unix/mumps.cmake $<TARGET_FILE:mumps> $<TARGET_FILE:mupip>
-            ${GTM_BINARY_DIR}/${help}help.in2
-            ${GTM_BINARY_DIR}/${help}help.gld
-    WORKING_DIRECTORY ${GTM_BINARY_DIR}
+    OUTPUT ${YDB_BINARY_DIR}/${help}help.dat
+    DEPENDS ${YDB_SOURCE_DIR}/sr_unix/mumps.cmake $<TARGET_FILE:yottadb> $<TARGET_FILE:mupip>
+            ${YDB_BINARY_DIR}/${help}help.in2
+            ${YDB_BINARY_DIR}/${help}help.gld
+    WORKING_DIRECTORY ${YDB_BINARY_DIR}
     COMMAND ${CMAKE_COMMAND} -E remove -f ${help}help.dat
     COMMAND ${CMAKE_COMMAND} ${env}
       -D mumps=$<TARGET_FILE:mupip> -D "args=create"
       -D gtmgbldir=${help}help
-      -P ${GTM_SOURCE_DIR}/sr_unix/mumps.cmake
->>>>>>> b400aa64 (GT.M V7.0-004)
+      -P ${YDB_SOURCE_DIR}/sr_unix/mumps.cmake
     COMMAND ${CMAKE_COMMAND} ${env}
       -D mumps=$<TARGET_FILE:yottadb> -D "args=-direct"
       -D input_file=${YDB_BINARY_DIR}/${help}help.in2
@@ -1034,14 +845,8 @@ Halt")
   install(SCRIPT ${YDB_SOURCE_DIR}/cmake/set-help-read-only.cmake)
 endforeach()
 add_custom_command(
-<<<<<<< HEAD
-  OUTPUT GTMDEFINEDTYPESTODB.o
-  DEPENDS gtmhelp.dat gtmhelp.gld GTMDefinedTypesInit.m
-=======
-  OUTPUT ${GTM_BINARY_DIR}/.gtm_deftypes_load
-  DEPENDS GTMDefinedTypesInit${CMAKE_BUILD_TYPE}.m GTMDEFINEDTYPESTODB.o ${GTM_BINARY_DIR}/gtmhelp.dat
-  COMMAND ${CMAKE_COMMAND} -E copy GTMDefinedTypesInit${CMAKE_BUILD_TYPE}.m ${GTM_BINARY_DIR}/GTMDefinedTypesInit.m
->>>>>>> b400aa64 (GT.M V7.0-004)
+  OUTPUT ${YDB_BINARY_DIR}/.gtm_deftypes_load
+  DEPENDS GTMDefinedTypesInit.m GTMDEFINEDTYPESTODB.o ${YDB_BINARY_DIR}/gtmhelp.dat
   COMMAND ${CMAKE_COMMAND}
     -D ydb_dist=${YDB_BINARY_DIR}
     -D ydb_routines=.
@@ -1049,75 +854,12 @@ add_custom_command(
     -D ydb_chset=M
     -D mumps=$<TARGET_FILE:yottadb>
     -D "args=-run;GTMDEFINEDTYPESTODB"
-<<<<<<< HEAD
     -P ${YDB_SOURCE_DIR}/sr_unix/mumps.cmake
+    COMMAND touch ${GTM_BINARY_DIR}/.gtm_deftypes_load
     VERBATIM
   )
 list(APPEND files_to_place GTMDEFINEDTYPESTODB.o)
 
-=======
-    -P ${GTM_SOURCE_DIR}/sr_unix/mumps.cmake
-  COMMAND touch ${GTM_BINARY_DIR}/.gtm_deftypes_load
-  VERBATIM
-  )
-list(APPEND files_to_place GTMDEFINEDTYPESTODB.o)
-else()
-add_custom_command(
-  OUTPUT ${GTM_BINARY_DIR}/.gtm_deftypes_load
-  COMMAND touch ${GTM_BINARY_DIR}/.gtm_deftypes_load
-  )
-endif(GTMDefinedTypesInit${CMAKE_BUILD_TYPE}_found)
-
-foreach(help gtm gde mupip dse lke)
-  set(CMAKE_CONFIGURABLE_FILE_CONTENT
-	  "SET -ACC=MM -READ_ONLY -reg \"*\"
-exit")
-  configure_file(${CMAKE_ROOT}/Modules/CMakeConfigurableFile.in
-                 ${GTM_BINARY_DIR}/${help}help.in3)
-  set(env
-    -D gtm_dist=${GTM_BINARY_DIR}
-    -D gtmroutines=.
-    -D gtmgbldir=${GTM_BINARY_DIR}/${help}help
-    )
-  add_custom_command(
-    OUTPUT ${GTM_BINARY_DIR}/.${help}help.dat_setro
-    DEPENDS ${GTM_SOURCE_DIR}/sr_unix/mumps.cmake $<TARGET_FILE:mupip>
-            ${GTM_BINARY_DIR}/${help}help.in3 ${GTM_BINARY_DIR}/.gtm_deftypes_load
-    COMMAND ${CMAKE_COMMAND} ${env}
-      -D mumps=$<TARGET_FILE:mupip>
-      -D input_file=${GTM_BINARY_DIR}/${help}help.in3
-      -P ${GTM_SOURCE_DIR}/sr_unix/mumps.cmake
-    COMMAND touch ${GTM_BINARY_DIR}/.${help}help.dat_setro
-    VERBATIM
-    )
-    list(APPEND targets_to_run ${GTM_BINARY_DIR}/.${help}help.dat_setro)
-endforeach()
-
-foreach(help gtm gde mupip dse lke)
-  set(CMAKE_CONFIGURABLE_FILE_CONTENT
-	  "SET -ACC=MM -NOREAD_ONLY -reg \"*\"
-exit")
-  configure_file(${CMAKE_ROOT}/Modules/CMakeConfigurableFile.in
-                 ${GTM_BINARY_DIR}/${help}help.in4)
-  set(env
-    -D gtm_dist=${GTM_BINARY_DIR}
-    -D gtmroutines=.
-    -D gtmgbldir=${GTM_BINARY_DIR}/${help}help
-    )
-  add_custom_target(${help}help.dat_setnoro
-    DEPENDS ${GTM_SOURCE_DIR}/sr_unix/mumps.cmake mumps mupip
-            ${GTM_BINARY_DIR}/${help}help.in4 ${help}help.dat
-    COMMAND ${CMAKE_COMMAND} ${env}
-      -D mumps=$<TARGET_FILE:mupip>
-      -D input_file=${GTM_BINARY_DIR}/${help}help.in4
-      -P ${GTM_SOURCE_DIR}/sr_unix/mumps.cmake
-    VERBATIM
-    )
-endforeach()
-#-----------------------------------------------------------------------------
-
-set(GTM_TOP "${GTM_BINARY_DIR}")
->>>>>>> b400aa64 (GT.M V7.0-004)
 configure_file(sr_unix/gpgagent.tab.in plugin/gpgagent.tab @ONLY)
 set(YDB_TOP "$ENV{PWD}/${YDB_INSTALL_DIR}")
 configure_file(sr_unix/gpgagent.tab.in CMakeFiles/plugin/gpgagent.tab @ONLY)

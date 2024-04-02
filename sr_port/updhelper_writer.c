@@ -122,7 +122,6 @@ int updhelper_writer(void)
 		flushed = FALSE;
 		for (reg = gd_header->regions, r_top = reg + gd_header->n_regions; reg < r_top; reg++)
 		{
-<<<<<<< HEAD
 			if (!reg->open)
 			{
 				/* We called region_init() in the initialization code so we expect the region to be open.
@@ -132,11 +131,6 @@ int updhelper_writer(void)
 				assert(IS_STATSDB_REGNAME(reg));
 				continue;
 			}
-=======
-			 /* we only call gvcst_init() in updhelper_init(), skip closed regions */
-			if (!reg->open)
-				continue;
->>>>>>> b400aa64 (GT.M V7.0-004)
 			csa = &FILE_INFO(reg)->s_addrs;
 			cnl = csa->nl;
 			csd = csa->hdr;

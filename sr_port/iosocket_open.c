@@ -491,11 +491,7 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, uint
 				if (FD_INVALID != socketptr->temp_sd)
 					close(socketptr->temp_sd);
 				SOCKET_FREE(socketptr);
-<<<<<<< HEAD
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_SOCKMAX, 1, ydb_max_sockets);
-=======
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_SOCKMAX, 1, gtm_max_sockets);
->>>>>>> b400aa64 (GT.M V7.0-004)
 				return FALSE;
 			}
 			socketptr->dev = newdsocket;

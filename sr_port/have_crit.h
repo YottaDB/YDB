@@ -96,15 +96,12 @@ typedef enum
 	INTRPT_IN_EVENT_HANDLING,	/* Deferring interrupts while managing a deferred or outofband event */
 	INTRPT_IN_KILL_CLEANUP,		/* Deferring interrupts while performing KILL cleanup - used by REORG */
 	INTRPT_IN_RTN_CLEANUP,          /* Deferring interrupts while cleaning up routines */
-<<<<<<< HEAD
+	INTRPT_IN_SOCKET_CLOSE,		/* Deferring interrupts while closing some sockets */
 
 	/****************** Below interrupt states are YottaDB-ONLY **************/
 	INTRPT_IN_SS_DESTROY_CONTEXT,	/* Deferring interrupts in ss_destroy_context() */
 
 	/****************** Below interrupt states are common to both GT.M and YottaDB **************/
-=======
-	INTRPT_IN_SOCKET_CLOSE,		/* Deferring interrupts while closing some sockets */
->>>>>>> b400aa64 (GT.M V7.0-004)
 	INTRPT_NUM_STATES		/* Should be the *last* one in the enum. */
 } intrpt_state_t;
 

@@ -247,13 +247,8 @@ void mupip_backup(void)
 	char			tempfilename[MAX_FN_LEN + 1], *tempfilename2, *getcwd_res;
 	char			tempdir_full_buffer[MAX_FN_LEN + 1];
 	char			*jnl_str_ptr, jnl_str[256], entry[256], prev_jnl_fn[JNL_NAME_SIZE];
-<<<<<<< HEAD
-	int			index, jnl_fstat, attemptcnt, maxretry;
-	mstr			tempdir_trans, *file, *rfile, *replinstfile, tempdir_full, filestr;
-=======
 	int			index, jnl_fstat, attemptcnt, maxtries;
-	mstr			tempdir_log, tempdir_trans, *file, *rfile, *replinstfile, tempdir_full, filestr;
->>>>>>> b400aa64 (GT.M V7.0-004)
+	mstr			tempdir_trans, *file, *rfile, *replinstfile, tempdir_full, filestr;
 	uint4			jnl_status, temp_file_name_len, tempdir_trans_len, trans_log_name_status;
 	boolean_t		jnl_options[jnl_end_of_list] = {FALSE, FALSE, FALSE}, save_no_prev_link;
 	jnl_private_control	*jpc;

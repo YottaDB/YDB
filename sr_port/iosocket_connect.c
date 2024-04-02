@@ -126,12 +126,7 @@ boolean_t iosocket_connect(socket_struct *sockptr, uint8 nsec_timeout, boolean_t
 		add_uint8_to_abs_time(&cur_time, nsec_timeout, &end_time);
 	}
 	real_sockintr->end_time_valid = sockintr->end_time_valid = FALSE;
-<<<<<<< HEAD
-=======
-	oneshot = (0 == msec_timeout);
-	last_errno = 0;
-
->>>>>>> b400aa64 (GT.M V7.0-004)
+	oneshot = (0 == nsec_timeout);
 	remote_ai_ptr = (struct addrinfo*)(&(sockptr->remote.ai));
 	do
 	{
@@ -311,36 +306,35 @@ boolean_t iosocket_connect(socket_struct *sockptr, uint8 nsec_timeout, boolean_t
 		{
 			/* Use plain connect to allow jobinterrupt */
 			assert(FD_INVALID != sockptr->sd);
-<<<<<<< HEAD
 			/* If a timeout is set, set the socket descriptor to non-blocking mode */
-			if ((NO_M_TIMEOUT != nsec_timeout) && (0 != nsec_timeout))
+			if (NO_M_TIMEOUT != nsec_timeout)
 			{
-				sockptr->nonblocking = TRUE;
-				flags_orig = fcntl(sockptr->sd, F_GETFL);
-				flags = flags_orig | O_NONBLOCK;
-				fcntl(sockptr->sd, F_SETFL, flags);
-			}
-=======
-			if (first_time && (NO_M_TIMEOUT != msec_timeout))
-			{	/* start timer if not end_time, if timeout is 0 just a short wait */
-				DBGSOCK((stdout, "socconn: if first_time: msec_timeout = %d\n", msec_timeout));
-				sys_get_curr_time(&cur_time);
-				cur_time = sub_abs_time(&end_time, &cur_time);	/* calculate remaining time */
-				if (0 != msec_timeout)
-					msec_timeout = (int4)((cur_time.at_sec * MILLISECS_IN_SEC) +
-					/* Round up in order to prevent premature timeouts */
-						DIVIDE_ROUND_UP(cur_time.at_usec, MICROSECS_IN_MSEC));
-				if (0 >= msec_timeout)
+				if (0 != nsec_timeout)
 				{
-					no_time_left = TRUE;
-					msec_timeout = 100 /* enough time to connect if no problems */;
-					DBGSOCK((stdout, "socconn: first_time msec_timeout was 0, now = %d\n", msec_timeout));
+					sockptr->nonblocking = TRUE;
+					flags_orig = fcntl(sockptr->sd, F_GETFL);
+					flags = flags_orig | O_NONBLOCK;
+					fcntl(sockptr->sd, F_SETFL, flags);
 				}
-				first_time = FALSE;
-				timer_started = TRUE;
-				TIMEOUT_INIT(timer_done, msec_timeout);
-			 }
->>>>>>> b400aa64 (GT.M V7.0-004)
+				if (first_time)
+				{	/* start timer if not end_time, if timeout is 0 just a short wait */
+					DBGSOCK((stdout, "socconn: if first_time: nsec_timeout = %llu\n", nsec_timeout));
+					sys_get_curr_time(&cur_time);
+					cur_time = sub_abs_time(&end_time, &cur_time);	/* calculate remaining time */
+					if (0 != nsec_timeout)
+						nsec_timeout = (cur_time.tv_sec * (uint8)NANOSECS_IN_SEC) + cur_time.tv_nsec;
+					if (0 >= nsec_timeout)
+					{
+						no_time_left = TRUE;
+						nsec_timeout = (100 * NANOSECS_IN_MSEC); /* enough time to connect if no problems */
+						DBGSOCK((stdout, "socconn: first_time nsec_timeout was 0, now = %llu\n",
+							nsec_timeout));
+					}
+					first_time = FALSE;
+					timer_started = TRUE;
+					TIMEOUT_INIT(timer_done, nsec_timeout);
+				 }
+			}
 			res = connect(sockptr->sd, SOCKET_REMOTE_ADDR(sockptr), remote_ai_ptr->ai_addrlen);	 /* BYPASSOK */
 			if (res < 0)
 			{
@@ -354,14 +348,10 @@ boolean_t iosocket_connect(socket_struct *sockptr, uint8 nsec_timeout, boolean_t
 						need_connect = FALSE;
 						break;
 					case EINTR:
-<<<<<<< HEAD
 						eintr_handling_check();
-						if (outofband && (0 != nsec_timeout))
-=======
 						DBGSOCK((stdout, "socconn: EINTR: outofband = %d, oneshot = %d\n",
 							outofband, oneshot));
 						if (outofband && !oneshot)
->>>>>>> b400aa64 (GT.M V7.0-004)
 						{	/* handle outofband unless zero timeout */
 							save_errno = 0;
 							need_socket = need_connect = FALSE;
@@ -370,24 +360,21 @@ boolean_t iosocket_connect(socket_struct *sockptr, uint8 nsec_timeout, boolean_t
 					case EINPROGRESS:
 					case EALREADY:
 						need_socket = need_connect = FALSE;
-<<<<<<< HEAD
-						if (0 != nsec_timeout)
-=======
 						if (!oneshot)
 						{
 							DBGSOCK((stdout, "socconn: EINPROGESS: errno = %d\n", save_errno));
->>>>>>> b400aa64 (GT.M V7.0-004)
 							need_select = TRUE;
 						}
 					/* fall through */
 					case ETIMEDOUT:	/* the other side bound but not listening */
 					case ECONNREFUSED:
 					case ENOENT:    /* LOCAL socket not there */
-<<<<<<< HEAD
-						if (!no_time_left && (0 != nsec_timeout) && (NO_M_TIMEOUT != nsec_timeout))
+						if (!no_time_left && !oneshot && (NO_M_TIMEOUT != nsec_timeout))
 						{
 							sys_get_curr_time(&cur_time);
 							cur_time = sub_abs_time(&end_time, &cur_time);
+							DBGSOCK((stdout, "socconn: ENOENT: errno = %d, nsec_timeout= %llu\n",
+								save_errno, nsec_timeout));
 							if (0 > cur_time.tv_sec)
 							{
 								cur_time.tv_sec = 0;
@@ -395,22 +382,7 @@ boolean_t iosocket_connect(socket_struct *sockptr, uint8 nsec_timeout, boolean_t
 							}
 							nsec_timeout = (cur_time.tv_sec * (uint8)NANOSECS_IN_SEC) + cur_time.tv_nsec;
 						}
-						if (0 == nsec_timeout)
-=======
-						if (!no_time_left && (!oneshot) && (NO_M_TIMEOUT != msec_timeout))
-						{
-							sys_get_curr_time(&cur_time);
-							cur_time = sub_abs_time(&end_time, &cur_time);
-							DBGSOCK((stdout, "socconn: ENOENT: errno = %d, msec_timeout= %d\n",
-								save_errno, msec_timeout));
-							msec_timeout = (int4)(cur_time.at_sec * MILLISECS_IN_SEC +
-								/* Round up in order to prevent premature timeouts */
-								DIVIDE_ROUND_UP(cur_time.at_usec, MICROSECS_IN_MSEC));
-							if (0 >= msec_timeout)
-								msec_timeout = 0;
-						}
-						if (oneshot || (0 == msec_timeout))
->>>>>>> b400aa64 (GT.M V7.0-004)
+						if (oneshot || (0 == nsec_timeout))
 							no_time_left = TRUE;
 						else if (!no_time_left)
 						{

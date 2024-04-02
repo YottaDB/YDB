@@ -537,15 +537,9 @@ MBSTART {											\
 	{													\
 		STATSDBREG_TO_BASEDBREG(statsDBreg, baseDBreg);							\
 		if (!baseDBreg->open)										\
-<<<<<<< HEAD
 			gv_init_reg(baseDBreg);									\
-		if (!statsDBreg->open)										\
-		{	/* statsDB did not get opened as part of baseDB open above. Possible if ydb_statshare	\
-=======
-			gv_init_reg(baseDBreg, NULL);								\
 		if (!statsDBreg->open && IS_ACC_METH_BG_OR_MM(baseDBreg->dyn.addr->acc_meth))			\
-		{	/* statsDB did not get opened as part of baseDB open above. Possible if gtm_statshare	\
->>>>>>> b400aa64 (GT.M V7.0-004)
+		{	/* statsDB did not get opened as part of baseDB open above. Possible if ydb_statshare	\
 			 * is not set to 1. But user could still do a ZWR ^%YGS which would try to open		\
 			 * statsDB in caller (who is not equipped to handle errors) so do the open of the	\
 			 * statsDB now and silently handle errors like is done in "gvcst_init".	Any errors	\

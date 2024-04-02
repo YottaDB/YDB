@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -62,13 +62,8 @@ void op_zprevious(mval *v)
 	boolean_t		found, ok_to_change_currkey;
 	enum db_acc_method	acc_meth;
 	gd_addr			*gd_targ;
-<<<<<<< HEAD
-	gd_binding		*gd_map_start, *map, *prev_map;
-	gd_region		*save_gv_cur_region, *reg;
-=======
 	gd_binding		*gd_map_start, *map, *prev_map, *rmap;
-	gd_region		*save_gv_cur_region;
->>>>>>> b400aa64 (GT.M V7.0-004)
+	gd_region		*save_gv_cur_region, *reg;
 	gv_key_buf		save_currkey;
 	gv_namehead		*save_gv_target;
 	gvnh_reg_t		*gvnh_reg;
@@ -181,21 +176,15 @@ void op_zprevious(mval *v)
 			 */
 			if (IS_BASEDB_REGNAME(reg))
 			{	/* Non-statsDB region */
-<<<<<<< HEAD
 				if (!reg->open)
 					gv_init_reg(reg);
-				gv_cur_region = reg;	/* Set "gv_cur_region" global only after successful "gv_init_reg" */
-				change_reg();
-=======
-				if (!gv_cur_region->open)
-					gv_init_reg(gv_cur_region, NULL);
->>>>>>> b400aa64 (GT.M V7.0-004)
 				/* Entries in directory tree could have empty GVT in which case move on to previous entry */
+				gv_cur_region = map->reg.addr;
+				change_reg();
 				acc_meth = REG_ACC_METH(gv_cur_region);
 				for ( ; ; )
 				{
-					gv_cur_region = map->reg.addr;
-					change_reg();
+					assert(gv_cur_region == map->reg.addr);
 					assert(0 == gv_currkey->prev);	/* or else gvcst_zprevious could get confused */
 					if (IS_ACC_METH_BG_OR_MM(acc_meth))
 					{

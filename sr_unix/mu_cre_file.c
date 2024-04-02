@@ -126,12 +126,8 @@ GBLREF	gd_region		*gv_cur_region;
 GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
-<<<<<<< HEAD
 GBLREF	uint4			ydbDebugLevel;
-=======
-GBLREF	uint4			gtmDebugLevel;
 GBLREF	enum db_ver		gtm_db_create_ver;              /* database creation version */
->>>>>>> b400aa64 (GT.M V7.0-004)
 #ifdef DEBUG
 GBLREF	boolean_t		in_mu_cre_file;
 GBLREF	block_id		ydb_skip_bml_num;
