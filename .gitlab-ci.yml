@@ -71,6 +71,7 @@ commit-verify:
         shellcheck
         zlib1g-dev
         libreadline-dev
+        gawk
     - ci/build.sh
 
 clang-tidy-amd64:
