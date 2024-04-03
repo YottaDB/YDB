@@ -251,10 +251,8 @@ void op_zprevious(mval *v)
 								gv_altkey->base[++gv_altkey->end] = KEY_DELIMITER;
 								found = TRUE;
 								break;
-							} else
-								found = FALSE;
-						} else
-							found = FALSE;
+							}
+						}
 						gv_currkey->end = gvname.var_name.len + 1;
 						gv_currkey->base[gv_currkey->end] = KEY_DELIMITER;
 					} else

@@ -165,7 +165,6 @@ void iosocket_close_range(d_socket_struct *dsocketptr, int start, int end, boole
 {
 	int4		ii,jj;
 	int		rc, save_fd, save_rc = 0, save_errno;
-	int		local_process_exiting;
 	ssize_t		status;
 	intrpt_state_t	prev_intrpt_state;
 	socket_struct	*socketptr;
@@ -173,8 +172,9 @@ void iosocket_close_range(d_socket_struct *dsocketptr, int start, int end, boole
 	char		*path;
 	int		res;
 	int		null_fd = 0;
+	DEBUG_ONLY(int	local_process_exiting);
 
-	local_process_exiting = process_exiting;	/* record in case changes while here */
+	DEBUG_ONLY(local_process_exiting = process_exiting);	/* record in case changes while here */
 	for (ii = start; ii >= end; ii--)
 	{
 		/* defer interrupts each iteration */

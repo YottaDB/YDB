@@ -292,8 +292,7 @@ void op_gvorder(mval *v)
 								gv_altkey->base[++gv_altkey->end] = KEY_DELIMITER;
 								found = TRUE;
 								break;
-							} else
-								found = FALSE;
+							}
 						}
 						/* The query failed, but we may still find something in the next global, so
 						 * reset gv_currkey to the global name so the increment below can work
