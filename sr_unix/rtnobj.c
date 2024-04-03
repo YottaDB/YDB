@@ -320,9 +320,9 @@ void	rtnobj_integ(relinkrec_t *relinkrec, open_relinkctl_sgm *linkctl)
 			 */
 			rtnobj = rtnobj_retpos(linkctl, shm_index_off_fast);
 			rtnobj->next_rtnobj_shm_offset = (rtnobj_sm_off_t)NULL_RTNOBJ_SM_OFF_T;
-			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_RLNKINTEGINFO, 5,
+			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_RLNKINTEGINFO, 5,
 					LEN_AND_LIT("number of elements in shm segment exceeded ydb_autorelink_ctlmax - fixed"),
-					CALLFROM, 1, 1);
+					CALLFROM);
 			return;
 		}
 		rtnobj = rtnobj_retpos(linkctl, shm_index_off_fast); /* Move the fast runner one step forward */
@@ -340,9 +340,9 @@ void	rtnobj_integ(relinkrec_t *relinkrec, open_relinkctl_sgm *linkctl)
 			 */
 			rtnobj = rtnobj_retpos(linkctl, shm_index_off_fast);
 			rtnobj->next_rtnobj_shm_offset = (rtnobj_sm_off_t)NULL_RTNOBJ_SM_OFF_T;
-			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_RLNKINTEGINFO, 5,
+			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_RLNKINTEGINFO, 5,
 					LEN_AND_LIT("number of elements in shm segment exceeded ydb_autorelink_ctlmax - fixed"),
-					CALLFROM, 1, 1);
+					CALLFROM);
 			return;
 		}
 		rtnobj = rtnobj_retpos(linkctl, shm_index_off_fast); /* Move the fast runner one more step forward */
@@ -373,14 +373,14 @@ void	rtnobj_integ(relinkrec_t *relinkrec, open_relinkctl_sgm *linkctl)
 			/* If complete_loop is TRUE, the last element in the list originaly pointed to the first one */
 			if (complete_loop)
 			{
-				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_RLNKINTEGINFO, 5,
+				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_RLNKINTEGINFO, 5,
 						LEN_AND_LIT("a loop to the start of linkctl was detected and fixed"),
-						CALLFROM, 1, 1);
+						CALLFROM);
 				return;
 			} else
-				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_RLNKINTEGINFO, 5,
+				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_RLNKINTEGINFO, 5,
 						LEN_AND_LIT("a loop to the middle of linkctl was detected and fixed"),
-						CALLFROM, 1, 1);
+						CALLFROM);
 			/* If complete_loop is FALSE we need to complete the counting of relinkrec->numvers */
 			for( ; (rtnobj_sm_off_t)NULL_RTNOBJ_SM_OFF_T != shm_index_off_loop_found; relinkrec->numvers++)
 			{
@@ -390,7 +390,7 @@ void	rtnobj_integ(relinkrec_t *relinkrec, open_relinkctl_sgm *linkctl)
 			return;
 		}
 	}
-	send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_RLNKINTEGINFO, 5, LEN_AND_LIT("relinkrec->numvers verified"), CALLFROM, 1, 1);
+	send_msg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_RLNKINTEGINFO, 5, LEN_AND_LIT("relinkrec->numvers verified"), CALLFROM);
 	return;
 }
 
