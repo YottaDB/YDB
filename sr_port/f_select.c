@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -80,7 +80,7 @@ int f_select(oprtype *a, opctype op)
 	save_state->expr_start = TREF(expr_start);
 	save_state->expr_start_orig = TREF(expr_start_orig);
 	save_state->shift_side_effects = TREF(shift_side_effects);
-	if ((save_state->shift_side_effects) && (GTM_BOOL != TREF(gtm_fullbool)))
+	if ((save_state->shift_side_effects) && (YDB_BOOL != TREF(ydb_fullbool)))
 		TREF(saw_side_effect) = TRUE; /* this will stop shifting of side effects in FULL_BOOL mode */
 	save_state->saw_side_effect = TREF(saw_side_effect);
 	save_state->expr_depth = TREF(expr_depth);

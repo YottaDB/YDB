@@ -499,28 +499,28 @@ endif()
 # NOTE: select between field 2 vs 3 because OpenSSL headers after 1.0.2 do "#<space>define" instead of "#define"
 set(CMAKE_CONFIGURABLE_FILE_CONTENT
 	"/define[ \\t]+SSL_OP_[A-Z_v0-9]+[ \\t]+/{fld=2;if($2 ~ /define/)fld=3;print \"DEFINE_SSL_OP(\" $(fld) \"),\"}")
-configure_file(${CMAKE_ROOT}/Modules/CMakeConfigurableFile.in ${GTM_BINARY_DIR}/gen_tls_options.awk)
+configure_file(${CMAKE_ROOT}/Modules/CMakeConfigurableFile.in ${YDB_BINARY_DIR}/gen_tls_options.awk)
 set(CMAKE_CONFIGURABLE_FILE_CONTENT
 	"/define[ \\t]+SSL_VERIFY_[A-Z_v0-9]+[ \\t]+/{fld=2;if($2 ~ /define/)fld=3;print \"DEFINE_SSL_OP(\" $(fld) \"),\"}")
-configure_file(${CMAKE_ROOT}/Modules/CMakeConfigurableFile.in ${GTM_BINARY_DIR}/gen_tls_verify_options.awk)
+configure_file(${CMAKE_ROOT}/Modules/CMakeConfigurableFile.in ${YDB_BINARY_DIR}/gen_tls_verify_options.awk)
 # 4. Generate the files
 add_custom_command(
-  OUTPUT ${GTM_BINARY_DIR}/gen_tls_verify_options.h
+  OUTPUT ${YDB_BINARY_DIR}/gen_tls_verify_options.h
   DEPENDS gen_gtm_threadgbl_deftypes
   COMMENT "Generating SSL/TLS verification options header file"
-  COMMAND ${AWK} -f ${GTM_BINARY_DIR}/gen_tls_verify_options.awk ${SSLH} > ${GTM_BINARY_DIR}/gen_tls_verify_options.h
+  COMMAND ${AWK} -f ${YDB_BINARY_DIR}/gen_tls_verify_options.awk ${SSLH} > ${YDB_BINARY_DIR}/gen_tls_verify_options.h
   VERBATIM
   )
 add_custom_command(
-  OUTPUT ${GTM_BINARY_DIR}/gen_tls_options.h
+  OUTPUT ${YDB_BINARY_DIR}/gen_tls_options.h
   DEPENDS gen_gtm_threadgbl_deftypes
   COMMENT "Generating SSL/TLS options header file"
-  COMMAND ${AWK} -f ${GTM_BINARY_DIR}/gen_tls_options.awk ${SSLH} > ${GTM_BINARY_DIR}/gen_tls_options.h
+  COMMAND ${AWK} -f ${YDB_BINARY_DIR}/gen_tls_options.awk ${SSLH} > ${YDB_BINARY_DIR}/gen_tls_options.h
   VERBATIM
   )
 # 5. Setup the dependency for downstream consumers
 add_custom_target(gen_tls_options
-  DEPENDS ${GTM_BINARY_DIR}/gen_tls_options.h ${GTM_BINARY_DIR}/gen_tls_verify_options.h)
+  DEPENDS ${YDB_BINARY_DIR}/gen_tls_options.h ${YDB_BINARY_DIR}/gen_tls_verify_options.h)
 
 # Locate libgcrypt's header files (assumption: all others headers are found in the same location)
 find_program(LIBGCRYPT_CONFIG_SCRIPT NAMES libgcrypt-config)
@@ -845,8 +845,8 @@ Halt")
   install(SCRIPT ${YDB_SOURCE_DIR}/cmake/set-help-read-only.cmake)
 endforeach()
 add_custom_command(
-  OUTPUT ${YDB_BINARY_DIR}/.gtm_deftypes_load
-  DEPENDS GTMDefinedTypesInit.m GTMDEFINEDTYPESTODB.o ${YDB_BINARY_DIR}/gtmhelp.dat
+  OUTPUT GTMDEFINEDTYPESTODB.o
+  DEPENDS GTMDefinedTypesInit.m ${YDB_BINARY_DIR}/gtmhelp.dat
   COMMAND ${CMAKE_COMMAND}
     -D ydb_dist=${YDB_BINARY_DIR}
     -D ydb_routines=.
@@ -855,7 +855,6 @@ add_custom_command(
     -D mumps=$<TARGET_FILE:yottadb>
     -D "args=-run;GTMDEFINEDTYPESTODB"
     -P ${YDB_SOURCE_DIR}/sr_unix/mumps.cmake
-    COMMAND touch ${GTM_BINARY_DIR}/.gtm_deftypes_load
     VERBATIM
   )
 list(APPEND files_to_place GTMDEFINEDTYPESTODB.o)
