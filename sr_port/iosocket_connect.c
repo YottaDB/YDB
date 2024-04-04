@@ -411,11 +411,20 @@ boolean_t iosocket_connect(socket_struct *sockptr, uint8 nsec_timeout, boolean_t
 				flags = flags_orig;
 				fcntl(sockptr->sd, F_SETFL, flags);
 			}
-		}
-		if (timer_started)
-		{
-			timer_started = FALSE;
-			TIMEOUT_DONE(timer_done);
+			if (timer_started)
+			{
+				timer_started = FALSE;
+				TIMEOUT_DONE(timer_done);
+			}
+			/* If we had only one chance to try "connect()" (due to a zero timeout) and we succeeded
+			 * (i.e. "res" is 0) then break out of the "do/while" loop as this connect succeeded.
+			 */
+			assert((0 == res) || (-1 == res));
+			if (no_time_left && (0 <= res))
+			{
+				assert(!need_select);
+				break;
+			}
 		}
 		if (need_select)
 		{
