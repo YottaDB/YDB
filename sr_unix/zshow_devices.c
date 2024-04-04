@@ -120,7 +120,7 @@ void zshow_devices(zshow_out *output)
 	static readonly char output_iv[] = "OIV=";
 	static readonly char key[] = "KEY=";
 	static readonly char iv[] = "IV=";
-	static readonly char hup_text[] = "HUPENABLE";
+	static readonly char hup_text[] = "HUPENABLE ";
 
 	/* gtmsocket specific */
 	static readonly char at_text[] = {'@'};
@@ -389,6 +389,17 @@ void zshow_devices(zshow_out *output)
 						ZS_STR_OUT(&v, interrupt_text);
 					if (hup_on)
 						ZS_STR_OUT(&v, hup_text);
+					if (tt_ptr->ttio_struct->c_iflag & IXON)
+						ZS_PARM_SP(&v, zshow_ttsy);
+					else
+						ZS_PARM_SP(&v, zshow_nottsy);
+					if (tt_ptr->ttio_struct->c_iflag & IXOFF)
+						ZS_PARM_SP(&v, zshow_host);
+					else
+						ZS_PARM_SP(&v, zshow_nohost);
+					/* CONVERT is like HUPENABLE which only show up when enable it */
+					if (tt_ptr->term_ctrl & TRM_CONVERT)
+						ZS_PARM_SP(&v, zshow_conv);
 					break;
 				case rm:
 					/* we go to rm_ptr above for the rm type */

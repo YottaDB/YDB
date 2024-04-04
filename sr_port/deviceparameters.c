@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2022-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -107,7 +107,7 @@ LITDEF nametabent dev_param_names[] =
 
 	,{3,"NEW*"}	,{10,"NEWVERSION"}
 	,{4,"NOCA*"}	,{11,"NOCANONICAL"}
-	,{4,"NOCE*"}	,{6,"NOCENA*"}		/*,{9,"NOCENABLE"}*/
+	,{4,"NOCE*"}	,{6,"NOCENA*"}		,{9,"NOCENABLE"}
 	,{6,"NOCONV*"}	,{9,"NOCONVERT"}
 	,{6,"NODELI*"}	,{11,"NODELIMITER"}
 	,{6,"NODEST*"}	,{9,"NODESTROY"}
@@ -121,7 +121,7 @@ LITDEF nametabent dev_param_names[] =
 	,{5,"NOFIX*"}	,{7,"NOFIXED"}
 	,{4,"NOFLA*"}	,{5,"NOFLAG"}
 	,{5,"NOFOL*"}	,{8,"NOFOLLOW"}
-	,{5,"NOHOS*"}	,{6,"NOHOST*"}		/*,{10,"NOHOSTSYNC"}*/
+	,{5,"NOHOS*"}	,{6,"NOHOST*"}		,{10,"NOHOSTSYNC"}
 	,{4,"NOHU*"}	,{11,"NOHUPENABLE"}
 	,{4,"NOIN*"}	,{6,"NOINSE*"}		/*,{8,"NOINSERT"}*/
 	,{4,"NOPAG*"}	,{5,"NOPAGE"}
@@ -246,7 +246,7 @@ LITDEF	uint4 dev_param_index[27] =
 	0,   5,   9,   27,  35,  50,  66,  68,  73,  82,  82,  83,  91,  94,
 
 /*	O    P    Q    R    S    T    U    V    W    X    Y    Z    end	     */
-	162, 171, 190, 191, 206, 226, 236, 242, 243, 258, 259, 260, 283
+	164, 173, 192, 193, 208, 228, 238, 244, 245, 260, 261, 263, 285
 };
 
 /* Offset of string within letter in dev_param_names */
@@ -257,11 +257,11 @@ LITDEF zshow_index zshow_param_index[] =
 /*	ALLO    BLOC     COMMAND CONV     CTRA     DELE    DEST    EBCDIC   EDIT     EMPTERM  EXCE     EXTE */
 	{0,0},  {2,1},   {9,2},  {14,2},  {16,2},  {0,3},  {4,3},  {1,4},   {4,4},   {7,4},   {12,4},  {14,4},
 /*	FIE     FIL     FIXED   FOLLOW   HOST    ICHSET  INDEPENDENT  INSE    LAB      LENG */
-	{4,5},  {7,5},  {9,5},  {15,5},  {1,7},  {0,8},  {3,8},	      {7,8},  {0,11},  {2,11},
+	{4,5},  {7,5},  {9,5},  {15,5},  {2,7},  {0,8},  {3,8},	      {7,8},  {0,11},  {2,11},
 /*	NOCENE   NODEST    NOECHO    NOEDIT    NOEMPTERM NOESCA    NOFOLLOW  NOHOST     NOINSE */
-	{4,13},  {10,13},  {15,13},  {17,13},  {19,13},  {21,13},  {30,13},  {32,13},  {36,13},
+	{6,13},  {11,13},  {16,13},  {18,13},  {20,13},  {22,13},  {31,13},  {34,13},  {38,13},
 /*	NOPAST   NOREADS  NOTTSY    NOTYPE   NOWRAP */
-	{39,13}, {42,13}, {57,13},  {59,13}, {64,13},
+	{41,13}, {44,13}, {60,13},  {61,13}, {66,13},
 /*	OCHSET   PAD      PARSE     PAST      PRMMBX    RCHK     READ     READS    REC */
 	{1,14},  {8,15},  {12,15},  {13,15},  {17,15},  {0,17},  {1,17},  {3,17},  {5,17},
 /*      SHAR     SHELL    STDERR    STREAM    TERM      TTSY     TYPE     UIC */
@@ -358,7 +358,7 @@ int deviceparameters(oprtype *c, char who_calls)
 
 		,iop_newversion ,iop_newversion
 		,iop_nocanonical ,iop_nocanonical
-		,iop_nocenable ,iop_nocenable
+		,iop_nocenable ,iop_nocenable ,iop_nocenable
 		,iop_noconvert ,iop_noconvert
 		,iop_nodelimiter ,iop_nodelimiter
 		,iop_nodestroy ,iop_nodestroy
@@ -372,7 +372,7 @@ int deviceparameters(oprtype *c, char who_calls)
 		,iop_nofixed ,iop_nofixed
 		,iop_noflag ,iop_noflag
 		,iop_nofollow ,iop_nofollow
-		,iop_nohostsync ,iop_nohostsync
+		,iop_nohostsync ,iop_nohostsync ,iop_nohostsync
 		,iop_nohupenable ,iop_nohupenable
 		,iop_noinsert ,iop_noinsert
 		,iop_page ,iop_page

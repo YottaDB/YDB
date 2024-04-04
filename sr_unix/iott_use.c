@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -528,6 +528,12 @@ void iott_use(io_desc *iod, mval *pp)
 			ISSUE_NOPRINCIO_BEFORE_RTS_ERROR_IF_APPROPRIATE(iod);
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_TCSETATTR, 1, tt_ptr->fildes, save_errno);
 		}
+		/* Store both t.c_lflag and t.c_iflag back in tt_ptr after calling Tcsetattr */
+		/* t.c_iflag used for show TTSYNC and NOTTSYNC when using ZSHOW "D" */
+		/* we may not need t.c_lflag because tt_ptr->canonical is currently responsible for CANONICAL output */
+		/* in sr_unix/zshow_devices.c but we might need it later so just store it both just in case */
+		tt_ptr->ttio_struct->c_iflag = t.c_lflag;
+		tt_ptr->ttio_struct->c_iflag = t.c_iflag;
 		if (tt == d_in->type)
 		{
 			temp_ptr->term_ctrl = mask_in;
