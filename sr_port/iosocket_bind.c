@@ -195,12 +195,7 @@ boolean_t iosocket_bind(socket_struct *socketptr, uint8 nsec_timeout, boolean_t 
 					{
 						sys_get_curr_time(&cur_time);
 						cur_time = sub_abs_time(&end_time, &cur_time);
-						if (0 > cur_time.tv_sec)
-						{
-							cur_time.tv_sec = 0;
-							cur_time.tv_nsec = 0;
-						}
-						nsec_timeout = (cur_time.tv_sec * (uint8)NANOSECS_IN_SEC) + cur_time.tv_nsec;
+						SET_NSEC_TIMEOUT_FROM_DELTA_TIME(cur_time, nsec_timeout);
 						if (0 != nsec_timeout)
 							no_time_left = FALSE;
 					} else

@@ -258,12 +258,7 @@ boolean_t iosocket_wait(io_desc *iod, uint8 nsec_timeout, mval *whatop, mval *ha
 					*/
 					DBGSOCK((stdout, "socwait: Taking timeout end time from wait restart data\n"));
 					cur_time = sub_abs_time(&end_time, &cur_time);
-					if (0 > cur_time.tv_sec)
-					{
-						cur_time.tv_sec = 0;
-						cur_time.tv_nsec = 0;
-					}
-					nsec_timeout = (cur_time.tv_sec * (uint8)NANOSECS_IN_SEC) + cur_time.tv_nsec;
+					SET_NSEC_TIMEOUT_FROM_DELTA_TIME(cur_time, nsec_timeout);
 					if (0 == nsec_timeout)
 					{
 						utimeout.tv_sec = 0;
@@ -322,12 +317,7 @@ boolean_t iosocket_wait(io_desc *iod, uint8 nsec_timeout, mval *whatop, mval *ha
 					{
 						sys_get_curr_time(&cur_time);
 						cur_time = sub_abs_time(&end_time, &cur_time);
-						if (0 > cur_time.tv_sec)
-						{
-							cur_time.tv_sec = 0;
-							cur_time.tv_nsec = 0;
-						}
-						nsec_timeout = (cur_time.tv_sec * (uint8)NANOSECS_IN_SEC) + cur_time.tv_nsec;
+						SET_NSEC_TIMEOUT_FROM_DELTA_TIME(cur_time, nsec_timeout);
 						if (0 == nsec_timeout)
 						{
 							rv = 0;		/* time out */

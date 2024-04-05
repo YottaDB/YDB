@@ -321,8 +321,7 @@ boolean_t iosocket_connect(socket_struct *sockptr, uint8 nsec_timeout, boolean_t
 					DBGSOCK((stdout, "socconn: if first_time: nsec_timeout = %llu\n", nsec_timeout));
 					sys_get_curr_time(&cur_time);
 					cur_time = sub_abs_time(&end_time, &cur_time);	/* calculate remaining time */
-					if (0 != nsec_timeout)
-						nsec_timeout = (cur_time.tv_sec * (uint8)NANOSECS_IN_SEC) + cur_time.tv_nsec;
+					SET_NSEC_TIMEOUT_FROM_DELTA_TIME(cur_time, nsec_timeout);
 					if (0 >= nsec_timeout)
 					{
 						no_time_left = TRUE;
@@ -375,12 +374,7 @@ boolean_t iosocket_connect(socket_struct *sockptr, uint8 nsec_timeout, boolean_t
 							cur_time = sub_abs_time(&end_time, &cur_time);
 							DBGSOCK((stdout, "socconn: ENOENT: errno = %d, nsec_timeout= %llu\n",
 								save_errno, nsec_timeout));
-							if (0 > cur_time.tv_sec)
-							{
-								cur_time.tv_sec = 0;
-								cur_time.tv_nsec = 0;
-							}
-							nsec_timeout = (cur_time.tv_sec * (uint8)NANOSECS_IN_SEC) + cur_time.tv_nsec;
+							SET_NSEC_TIMEOUT_FROM_DELTA_TIME(cur_time, nsec_timeout);
 						}
 						if (oneshot || (0 == nsec_timeout))
 							no_time_left = TRUE;
@@ -437,7 +431,7 @@ boolean_t iosocket_connect(socket_struct *sockptr, uint8 nsec_timeout, boolean_t
 				{
 					sys_get_curr_time(&cur_time);
 					cur_time = sub_abs_time(&end_time, &cur_time);
-					nsec_timeout = (cur_time.tv_sec * (uint8)NANOSECS_IN_SEC) + cur_time.tv_nsec;
+					SET_NSEC_TIMEOUT_FROM_DELTA_TIME(cur_time, nsec_timeout);
 					if (0 < nsec_timeout)
 					{
 						cur_timeval.tv_sec = cur_time.tv_sec;

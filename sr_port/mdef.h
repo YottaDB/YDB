@@ -1564,6 +1564,9 @@ qw_num	gtm_byteswap_64(qw_num num64);
 #define E_9			((int)1E9)
 #define E_18			((long long)1E18)
 
+#define	SET_NSEC_TIMEOUT_FROM_DELTA_TIME(CUR_TIME, NSEC_TIMEOUT)				\
+	NSEC_TIMEOUT = (0 > CUR_TIME.tv_sec) ? 0 : (CUR_TIME.tv_sec * (uint8)NANOSECS_IN_SEC) + CUR_TIME.tv_nsec
+
 #define STR_LEN_OF_E_9		10
 #define ASSERT_IN_RANGE(low, x, high)	assert((low <= x) && (x <= high))
 
