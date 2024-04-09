@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.2
 #################################################################
 #								#
-# Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
@@ -34,11 +34,14 @@ RUN apt-get update && \
                     gcc \
                     git \
                     tcsh \
+                    gawk \
                     libconfig-dev \
                     libelf-dev \
                     libicu-dev \
                     libncurses-dev \
                     libreadline-dev \
+                    libssl-dev \
+                    libgcrypt-dev \
                     && \
     apt-get clean
 
