@@ -130,7 +130,16 @@ void	gtm_env_init(void)
 			if (ydbSystemMalloc)
 				ydbDebugLevel &= !GDL_SmAllMallocDebug;
 		}
-<<<<<<< HEAD
+		/* ydb_pinshm environment/logical */
+		assert(FALSE == pin_shared_memory);
+		ret = ydb_logical_truth_value(YDBENVINDX_PINSHM, FALSE, &is_defined);
+		if (is_defined)
+			pin_shared_memory = ret; /* if env var is not defined, pin_shared_memory takes the default value */
+		/* ydb_hugepages environment/logical */
+		assert(FALSE == hugetlb_shm_enabled);
+		ret = ydb_logical_truth_value(YDBENVINDX_HUGETLB_SHM, FALSE, &is_defined);
+		if (is_defined)
+			hugetlb_shm_enabled = ret; /* if env var is not defined, hugetlb_shm_enabled takes the default value */
 		/* See if ydb_msgprefix is specified. If so store it in TREF(ydbmsgprefix).
 		 * Note: Default value is already stored in "gtm_threadgbl_init".
 		 * Do this initialization before most other variables so any error messages later issued in this module
@@ -138,21 +147,6 @@ void	gtm_env_init(void)
 		 */
 		if (SS_NORMAL ==
 			(status = ydb_trans_log_name(YDBENVINDX_MSGPREFIX, &trans, buf, SIZEOF(buf), IGNORE_ERRORS_TRUE, NULL)))
-=======
-		/* gtm_pinshm environment/logical */
-		val.addr = GTM_PINSHM;
-		val.len = SIZEOF(GTM_PINSHM) - 1;
-		pin_shared_memory = logical_truth_value(&val, FALSE, &is_defined);
-		/* gtm_hugepages environment/logical */
-		val.addr = GTM_HUGETLB_SHM;
-		val.len = SIZEOF(GTM_HUGETLB_SHM) - 1;
-		hugetlb_shm_enabled = logical_truth_value(&val, FALSE, &is_defined);
-		/* gtm_boolean environment/logical */
-		val.addr = GTM_BOOLEAN;
-		val.len = SIZEOF(GTM_BOOLEAN) - 1;
-		TREF(gtm_fullbool) = trans_numeric(&val, &is_defined, TRUE);
-		switch (TREF(gtm_fullbool))
->>>>>>> 732d6f04 (GT.M V7.0-005)
 		{
 			assert(SIZEOF(buf) > trans.len);
 			if (SIZEOF_ydbmsgprefixbuf > trans.len)
