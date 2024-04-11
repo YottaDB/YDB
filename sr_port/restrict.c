@@ -166,7 +166,7 @@ void restrict_init(void)
 	char		*grpbuf = NULL;
 	size_t		grpbufsz, audit_prefix_len = 0;
 	boolean_t	created_now = FALSE, tls = FALSE, audit_opread = FALSE;
-	boolean_t	is_ad, is_al, is_am, is_apd, is_aza, valid_option, is_zauditlog_tmp;
+	boolean_t	is_ad, is_al, is_am, is_apd, is_aza, is_zauditlog_tmp;
 	struct stat 	restrictStat;
 	uid_t		euid, fuid;
 	gid_t		egid, fgid;
@@ -212,7 +212,10 @@ void restrict_init(void)
 					&& ((egid == restrictStat.st_gid)
 						|| (gtm_member_group_id(euid, restrictStat.st_gid, NULL)))));
 		} else	/* Treat a stat failure as full restrictions */
+		{
 			restrict_default = TRUE;
+			rest_owner_perms = rest_group_perms = rest_other_perms = 0; /* Treat as NOT have any access */
+		}
 		/* Read the file, line by line. */
 		lineno = 0;
 		do
@@ -270,6 +273,7 @@ void restrict_init(void)
 				{	/* An auditing facility found */
 					fields = SSCANF(linebuf, FACILITY_FMTSTR " : %s",
 										facility, logger_info);
+					UNUSED(fields);	/* to avoid [clang-analyzer-deadcode.DeadStores] warning */
 					logger_info_len = STRLEN(logger_info);
 					if (MAX_LOGGER_INFO_LEN <= logger_info_len)
 					{	/* The line is longer than we can store - treat as parse error */
@@ -319,41 +323,35 @@ void restrict_init(void)
 						if ((apd_opts_strt < apd_opts_end) && (',' == *apd_opts_strt))
 							apd_opts_strt++;           /* forward space past comma */
 						/* See if this is a valid auditing option */
-						valid_option = FALSE;
 						if ((AUDIT_OPT_LGDE_LEN == opt_len)
 								&& (0 == STRNCASECMP(opt_strt,
 										AUDIT_OPT_LGDE,
 										AUDIT_OPT_LGDE_LEN)))
 						{
-							valid_option = TRUE;
 							if (is_aza) restrictions.gde_enable = TRUE;
 						} else if ((AUDIT_OPT_OPREAD_LEN == opt_len)
 								&& (0 == STRNCASECMP(opt_strt,
 										AUDIT_OPT_OPREAD,
 										AUDIT_OPT_OPREAD_LEN)))
 						{
-							valid_option = TRUE;
 							if (is_apd) audit_opread = TRUE;
 						}
 #						ifdef GTM_TLS
 						else if ((AUDIT_OPT_TLS_LEN == opt_len)
 								&& (0 == STRNCASECMP(opt_strt, AUDIT_OPT_TLS,
 										AUDIT_OPT_TLS_LEN)))
-							tls = valid_option = TRUE;
+							tls = TRUE;
 #						endif
 						else
                                                 {       /* Invalid option - parse error and restrict everything */
-							if (!valid_option)
-							{
-								send_msg_csa(CSA_ARG(NULL) VARLSTCNT(9)
-										ERR_RESTRICTSYNTAX, 3,
-										LEN_AND_STR(restrictpath), lineno,
-										ERR_TEXT, 2,
-										LEN_AND_LIT
-										("Invalid auditing option"));
-								restrict_all = TRUE;
-								break;
-							}
+							send_msg_csa(CSA_ARG(NULL) VARLSTCNT(9)
+									ERR_RESTRICTSYNTAX, 3,
+									LEN_AND_STR(restrictpath), lineno,
+									ERR_TEXT, 2,
+									LEN_AND_LIT
+									("Invalid auditing option"));
+							restrict_all = TRUE;
+							break;
                                                 }
 					}
 					if (restrict_all)
@@ -386,7 +384,7 @@ void restrict_init(void)
 						restrictions.lke_audit_enable = TRUE;
 					continue;
 				} else if (1 == fields)
-						restrict_one = restrict_default;
+					restrict_one = restrict_default;
 				else if (2 == fields)
 				{
 					if (NULL == grpbuf)

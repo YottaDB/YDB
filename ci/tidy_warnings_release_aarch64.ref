@@ -342,7 +342,6 @@ repl_instance.c:warning: Value stored to 'udi' is never read [clang-analyzer-dea
 repl_ipc_cleanup.c:warning: Value stored to 'status' is never read [clang-analyzer-deadcode.DeadStores]
 repl_sort_tr_buff.c:warning: Although the value stored to 'cur_rec_idx' is used in the enclosing expression, the value is never actually read from 'cur_rec_idx' [clang-analyzer-deadcode.DeadStores]
 repl_sort_tr_buff.c:warning: Value stored to 'prefix' is never read [clang-analyzer-deadcode.DeadStores]
-restrict.c:warning: Value stored to 'fields' is never read [clang-analyzer-deadcode.DeadStores]
 rtnobj.c:warning: Value stored to 'freeList' is never read [clang-analyzer-deadcode.DeadStores]
 rtnobj.c:warning: Value stored to 'max_free_index' is never read [clang-analyzer-deadcode.DeadStores]
 rts_error.c:warning: Initialized va_list 'var' is leaked [clang-analyzer-valist.Unterminated]
