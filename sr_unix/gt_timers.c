@@ -501,7 +501,7 @@ void start_timer(TID tid, uint8 time_to_expir, void (*handler)(), int4 hdata_len
 	} else if (jnl_file_close_timer_fptr == handler)
 	{	/* Account for known instances of the above function being called from within a deferred zone. */
 		assert((INTRPT_OK_TO_INTERRUPT == intrpt_ok_state) || (INTRPT_IN_DB_CSH_GETN == intrpt_ok_state)
-			|| (INTRPT_IN_GDS_RUNDOWN == intrpt_ok_state));
+			|| (INTRPT_IN_GDS_RUNDOWN == intrpt_ok_state) || (INTRPT_IN_SS_INITIATE == intrpt_ok_state));
 		safe_to_add = TRUE;
 	} else
 	{
