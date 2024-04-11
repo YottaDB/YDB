@@ -2960,17 +2960,10 @@
    each such occasion to the operator log. For $ZTIMEOUT, the value may
    specify a vector that takes precedence over the current error handling
    vector. For <CTRL-C> without CENABLE, it transfers control as if there was
-<<<<<<< HEAD
    an error; with CENABLE, YottaDB enters Direct Mode to give the programmer
    control. Without CENABLE or CTRAP, YottaDB ignores <CTRL-C> on a $PRINCIPAL
    terminal. The YottaDB terminal handler only recognizes other <CTRL>
-   characters if CTRAP enabled when the the OS terminal handling delivers and
-=======
-   an error; with CENABLE, GT.M enters Direct Mode to give the programmer
-   control. Without CENABLE or CTRAP, GT.M ignores <CTRL-C> on a $PRINCIPAL
-   terminal. The GT.M terminal handler only recognizes other <CTRL>
    characters if CTRAP enabled when the OS terminal handling delivers and
->>>>>>> 732d6f04 (GT.M V7.0-005)
    they appear in the terminal input stream.
 
    YottaDB recognizes most of these events when they occur but transfers control

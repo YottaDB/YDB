@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2020-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2020-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -35,18 +35,10 @@ LITREF mval	literal_sqlnull;
  * order of strings inside the stringpool. */
 void op_cat(UNIX_ONLY_COMMA(int srcargs) mval *dst, ...)
 {
-<<<<<<< HEAD
 	va_list		var;
 	mval		*in;
 	int		maxlen, i;
 	unsigned char	*cp, *base;
-=======
-	unsigned char 		*cp, *base;
-	int 			i, maxlen;
-	mval 			*in, *src;
-	va_list			var;
-	VMS_ONLY(int srcargs;)
->>>>>>> 732d6f04 (GT.M V7.0-005)
 
 	VAR_START(var, dst);
 	VMS_ONLY(va_count(srcargs);)
@@ -63,17 +55,13 @@ void op_cat(UNIX_ONLY_COMMA(int srcargs) mval *dst, ...)
 	for (i = 0; i < srcargs ; i++)
 	{
 		in = va_arg(var, mval *);
-<<<<<<< HEAD
 		if (MV_IS_SQLNULL(in))
 		{	/* If at least one operand in a string concatenation is $ZYSQLNULL, then the return value is $ZYSQLNULL */
 			*dst = literal_sqlnull;
 			va_end(var);
 			return;
 		}
-		maxlen += (MV_IS_STRING(in)) ? (in)->str.len : MAX_NUM_LEN;
-=======
-		maxlen += MV_IS_STRING(in) ? in->str.len : MAX_NUM_LEN;
->>>>>>> 732d6f04 (GT.M V7.0-005)
+		maxlen += MV_IS_STRING(in) ? (in)->str.len : MAX_NUM_LEN;
 		if (maxlen > MAX_STRLEN)
 		{
 			va_end(var);

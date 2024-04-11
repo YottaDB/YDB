@@ -151,11 +151,7 @@ void	op_fnview(int numarg, mval *dst, ...)
 	gv_namehead	temp_gv_target;
 	gvnh_reg_t	*gvnh_reg;
 	gvnh_spanreg_t	*gvspan;
-<<<<<<< HEAD
-	int		n, tl, newlevel, res, reg_index, collver, nct, act, ver, trigdepth, cidepth;
-=======
-	int		apdtype, n, tl, newlevel, res, reg_index, collver, nct, act, ver;
->>>>>>> 732d6f04 (GT.M V7.0-005)
+	int		apdtype, n, tl, newlevel, res, reg_index, collver, nct, act, ver, trigdepth, cidepth;
 	block_id	n2 = 0;
 	lv_val		*lv;
 	mstr		tmpstr, commastr, *gblnamestr;

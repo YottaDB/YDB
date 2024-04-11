@@ -3,7 +3,7 @@
 ! Copyright (c) 2001-2022 Fidelity National Information		!
 ! Services, Inc. and/or its subsidiaries. All rights reserved.	!
 !								!
-! Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries.	!
+! Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries.	!
 ! All rights reserved.						!
 !								!
 !	This source code contains the intellectual property	!
@@ -104,10 +104,6 @@ GBLNAMCOLLRANGE	<Collation sequence #!UL is out of range (0 thru 255)>/error/fao
 STDNULLCOLLREQ	<Region !AD needs Standard Null Collation enabled because global !AD spans through it>/info/fao=4
 GBLNAMCOLLVER	<Global directory indicates GBLNAME !AD has collation sequence #!UL with a version #!UL but shared library reports different version #!UL>/error/fao=5
 GDEASYNCIONOMM	<!AD segment has ASYNCIO turned on. Cannot support MM access method.>/error/fao=2
-<<<<<<< HEAD
 NOPERCENTY	<^%Y* is a reserved global name in YottaDB>/error/fao=0
-=======
-NOPERCENTY	<^%Y* is a reserved global name in GT.M>/error/fao=0
 GDELOGFAIL	<GDE failed to log command. Check operator log for more information>/error/fao=0
->>>>>>> 732d6f04 (GT.M V7.0-005)
 	.end

@@ -2,6 +2,9 @@
  *								*
  *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
+ * Copyright (c) 2024 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -117,9 +120,14 @@ GBLREF	boolean_t	ipv4_only;	/* If TRUE, only use AF_INET. */
 }
 #endif
 
+/* Note: The man pages of "freeaddrinfo()" indicate this is a "void" return function.
+ * Therefore, there is no possibility of an EINTR error return and so I don't see any
+ * need for DEFER_INTERRUPTS/ENABLE_INTERRUPTS macros in the YottaDB code (they are present
+ * in the GT.M code in the callers of "freeaddrinfo()").
+ */
 #define FREEADDRINFO(ai_ptr)						\
 {									\
-	if(ai_ptr)							\
+	if (NULL != ai_ptr)						\
 		freeaddrinfo(ai_ptr);					\
 }
 

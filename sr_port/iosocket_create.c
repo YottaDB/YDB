@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -45,10 +45,7 @@
 #include "gtm_caseconv.h"
 #include "util.h"
 #include "trans_log_name.h"
-<<<<<<< HEAD
 #include "dogetaddrinfo.h"
-=======
->>>>>>> 732d6f04 (GT.M V7.0-005)
 
 error_def(ERR_ADDRTOOLONG);
 error_def(ERR_GETSOCKNAMERR);
@@ -164,19 +161,12 @@ socket_struct *iosocket_create(char *sockaddr, uint4 bfsize, int file_des, boole
 				port_buffer_len = 0;
 				I2A(port_buffer, port_buffer_len, port);
 				port_buffer[port_buffer_len]='\0';
-<<<<<<< HEAD
 				if (0 != (errcode = dogetaddrinfo(NULL, port_buffer, &hints, &addr_info_ptr)))
-=======
-				DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
-				if (0 != (errcode = getaddrinfo(NULL, port_buffer, &hints, &addr_info_ptr)))
->>>>>>> 732d6f04 (GT.M V7.0-005)
 				{
 					close(sd);
-					ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 					RTS_ERROR_ADDRINFO(NULL, ERR_GETADDRINFO, errcode);
 					return NULL;
 				}
-				ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 				SOCKET_ALLOC(socketptr);
 				socketptr->local.port = port;
 				socketptr->temp_sd = sd;
@@ -187,9 +177,7 @@ socket_struct *iosocket_create(char *sockaddr, uint4 bfsize, int file_des, boole
 				ai_ptr->ai_addr = SOCKET_LOCAL_ADDR(socketptr);
 				ai_ptr->ai_addrlen = addr_info_ptr->ai_addrlen;
 				ai_ptr->ai_next = NULL;
-				DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
-				freeaddrinfo(addr_info_ptr);
-				ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
+				FREEADDRINFO(addr_info_ptr);
 			} else
 			{	/* connection socket */
 				assert(2 == colon_cnt);
@@ -215,18 +203,11 @@ socket_struct *iosocket_create(char *sockaddr, uint4 bfsize, int file_des, boole
 					memcpy(temp_addr, sockaddr, addrlen);
 				temp_addr[addrlen] = 0;
 				CLIENT_HINTS(hints);
-<<<<<<< HEAD
 				if (0 != (errcode = dogetaddrinfo(temp_addr, port_buffer, &hints, &addr_info_ptr)))
-=======
-				DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
-				if (0 != (errcode = getaddrinfo(temp_addr, port_buffer, &hints, &addr_info_ptr)))
->>>>>>> 732d6f04 (GT.M V7.0-005)
 				{
-					ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 					RTS_ERROR_ADDRINFO(NULL, ERR_GETADDRINFO, errcode);
 					return NULL;
 				}
-				ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 				/*  we will test all address families in iosocket_connect() */
 				SOCKET_ALLOC(socketptr);
 				socketptr->remote.ai_head = addr_info_ptr;
@@ -317,27 +298,14 @@ socket_struct *iosocket_create(char *sockaddr, uint4 bfsize, int file_des, boole
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_GETSOCKNAMERR, 3, save_errno, tmplen, errptr);
 				return NULL;
 			}
-<<<<<<< HEAD
 		} else if (((size_t) (((struct sockaddr *) 0)->sa_data) >= tmp_addrlen)
 						|| (0 == SOCKET_LOCAL_ADDR(socketptr)->sa_family))
-=======
-		}
-		else if (((size_t) (((struct sockaddr *) 0)->sa_data) >= tmp_addrlen)
-			|| (0 == SOCKET_LOCAL_ADDR(socketptr)->sa_family))
->>>>>>> 732d6f04 (GT.M V7.0-005)
 		{
 			SOCKET_LOCAL_ADDR(socketptr)->sa_family = AF_UNIX;
 			((struct sockaddr_un *)SOCKET_LOCAL_ADDR(socketptr))->sun_path[0] = '\0';
 			tmp_addrlen = SIZEOF(struct sockaddr_un);
 		}
-<<<<<<< HEAD
 		protocol = (AF_UNIX == SOCKET_LOCAL_ADDR(socketptr)->sa_family) ? socket_local : socket_tcpip;
-=======
-		if (AF_UNIX == SOCKET_LOCAL_ADDR(socketptr)->sa_family)
-			protocol = socket_local;
-		else
-			protocol = socket_tcpip;
->>>>>>> 732d6f04 (GT.M V7.0-005)
 		ai_ptr->ai_addrlen = tmp_addrlen;
 		ai_ptr->ai_family = SOCKET_LOCAL_ADDR(socketptr)->sa_family;
 		ai_ptr->ai_socktype = SOCK_STREAM;
@@ -373,31 +341,17 @@ socket_struct *iosocket_create(char *sockaddr, uint4 bfsize, int file_des, boole
 				}
 				DEBUG_ONLY(is_enotconn_error = TRUE);
 			}
-<<<<<<< HEAD
 		} else if (socket_local == protocol)
-=======
-		}
-		else if (socket_local == protocol)
->>>>>>> 732d6f04 (GT.M V7.0-005)
 		{
 			SOCKET_REMOTE_ADDR(socketptr)->sa_family = AF_UNIX;
 			((struct sockaddr_un *)SOCKET_REMOTE_ADDR(socketptr))->sun_path[0] = '\0';
 			tmp_addrlen = SIZEOF(struct sockaddr_un);
 		}
-<<<<<<< HEAD
 		/* Even though the socket might be inherited from a JOB command or xinetd, it is possible the socket
 		 * is a LISTENING or a CONNECTED socket. Determine that before assigning the state of this socket.
 		 */
 		socketbuflen = SIZEOF(socketptr->bufsiz);
 		if (-1 == getsockopt(socketptr->sd, SOL_SOCKET, SO_ACCEPTCONN, &socketptr->bufsiz, &socketbuflen))
-=======
-		socketptr->remote.ai.ai_addrlen = tmp_addrlen;
-		assert(0 != SOCKET_REMOTE_ADDR(socketptr)->sa_family);
-		socketptr->remote.ai.ai_family = SOCKET_REMOTE_ADDR(socketptr)->sa_family;
-		socketptr->remote.ai.ai_socktype = SOCK_STREAM;
-		assert((socket_tcpip != protocol) || (0 != SOCKET_REMOTE_ADDR(socketptr)->sa_family));
-		if (socket_tcpip == protocol)
->>>>>>> 732d6f04 (GT.M V7.0-005)
 		{
 			save_errno = errno;
 			errptr = (char *)STRERROR(save_errno);

@@ -29,6 +29,7 @@
 #include "iosp.h"
 #include "error.h"
 #include "cli.h"
+#include "io.h"
 #include "stringpool.h"
 #include "interlock.h"
 #include "gtmimagename.h"
@@ -66,6 +67,7 @@
 #include "continue_handler.h"
 #include "readline.h"
 #include "restrict.h"
+#include "dm_audit_log.h"
 
 #ifdef UTF8_SUPPORTED
 # include "gtm_icu_api.h"
@@ -80,6 +82,7 @@ GBLREF void			(*func)(void);
 GBLREF spdesc			rts_stringpool, stringpool;
 GBLREF char			cli_err_str[];
 GBLREF CLI_ENTRY		lke_cmd_ary[];
+GBLREF IN_PARMS			*cli_lex_in_ptr;
 GBLREF ch_ret_type		(*stpgc_ch)();			/* Function pointer to stp_gcol_ch */
 
 static bool lke_process(int argc);
@@ -90,7 +93,6 @@ error_def(ERR_RESTRICTEDOP);
 int lke_main(int argc, char *argv[], char **envp)
 {
 	DCL_THREADGBL_ACCESS;
-
 	GTM_THREADGBL_INIT;
 	common_startup_init(LKE_IMAGE, &lke_cmd_ary[0]);
 	licensed = TRUE;
@@ -114,6 +116,7 @@ int lke_main(int argc, char *argv[], char **envp)
 	region_init(FALSE);	/* Was TRUE, but that doesn't actually work if there are GTCM regions in the GLD,
 				 * at least in DEBUG, so leave it off for now to allow LKE to work in this situation.
 				 */
+	io_init_name();
 	cli_lex_setup(argc, argv);
 	readline_check_and_loadlib(); /* sets readline_file */
 	/*      this should be after cli_lex_setup() due to S390 A/E conversion    */
@@ -130,7 +133,7 @@ int lke_main(int argc, char *argv[], char **envp)
 static bool lke_process(int argc)
 {
 	bool		flag = FALSE;
-	int		res;
+	int		res, status;
 	static int	save_stderr = SYS_STDERR;
 	DCL_THREADGBL_ACCESS;
 
@@ -144,15 +147,21 @@ static bool lke_process(int argc)
 
 	func = 0;
 	util_interrupt = 0;
-	if ( EOF == (res = parse_cmd()))
+	res = parse_cmd();
+	if (EOF != res)
+	{
+		status = log_cmd_if_needed(cli_lex_in_ptr->in_str);
+		if (status)
+			return FALSE;
+	}
+	if (EOF == res)
 	{
 		if (util_interrupt)
 		{
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CTRLC);
 			REVERT;
 			return TRUE;
-		}
-		else
+		} else
 		{
 			REVERT;
 			return FALSE;

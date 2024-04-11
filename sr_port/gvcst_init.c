@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -170,13 +170,8 @@ GBLREF	boolean_t		jnlpool_init_needed;
 GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	jnlpool_addrs_ptr_t	jnlpool_head;
 GBLREF	uint4			process_id;
-<<<<<<< HEAD
-=======
 GBLREF	int4			pre_drvlongjmp_error_condition;
 
-LITREF char			gtm_release_name[];
-LITREF int4			gtm_release_name_len;
->>>>>>> 732d6f04 (GT.M V7.0-005)
 LITREF mval			literal_statsDB_gblname;
 
 #define MAX_DBINIT_RETRY	3

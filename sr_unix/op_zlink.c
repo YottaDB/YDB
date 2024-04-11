@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -37,12 +37,7 @@
 #endif
 #include "arlinkdbg.h"
 #include "relinkctl.h"
-<<<<<<< HEAD
-=======
-#include "toktyp.h"		/* Needed for "valid_mname.h" */
-#include "valid_mname.h"
 #include "restrict.h"
->>>>>>> 732d6f04 (GT.M V7.0-005)
 
 typedef enum
 {
@@ -116,8 +111,6 @@ GBLREF spdesc			rts_stringpool, stringpool;
 GBLREF unsigned char		object_file_name[];
 GBLREF unsigned short		object_name_len;
 
-<<<<<<< HEAD
-=======
 error_def(ERR_FILENOTFND);
 error_def(ERR_FILEPARSE);
 error_def(ERR_RESTRICTEDOP);
@@ -129,7 +122,6 @@ error_def(ERR_ZLINKFILE);
 error_def(ERR_ZLNOOBJECT);
 ZOS_ONLY(error_def(ERR_BADTAG);)
 
->>>>>>> 732d6f04 (GT.M V7.0-005)
 /* Routine to locate object files, or source and compile to an object file if necessary, and drive the linker to link the file
  * into this process appropriately. Three types of linking are currently supported on UNIX platforms (excepting Linux i386 which
  * has its own less fully-featured linker):

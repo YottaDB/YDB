@@ -1241,15 +1241,9 @@ OMISERVHANG	<GTCM OMI server is hung>/info/fao=0!/ansi=0
 RSVDBYTE2HIGH	<Record size (!UL) is greater than the maximum allowed for region !AD with Block size (!UL) and Reserved bytes (!UL)>/error/fao=5!/ansi=0
 BKUPTMPFILOPEN	<Open of backup temporary file !AD failed>/error/fao=2!/ansi=0//1
 BKUPTMPFILWRITE	<Write to backup temporary file !AD failed>/error/fao=2!/ansi=0//1
-<<<<<<< HEAD
-UNUSEDMSG1244	<VMSMEMORY2 nixed in r1.20 because it is a VMS only error>/error/fao=0!/ansi=0
-UNUSEDMSG1245	<LOADBGSZ2 last used in V6.3-009>/error/fao=0!/ansi=0
-UNUSEDMSG1246	<LOADEDSZ2 last used in V6.3-009>/error/fao=0!/ansi=0
-=======
 SHMHUGETLB	<Could not back shared memory with huge pages, using base pages instead>/warning/fao=0!/ansi=0
 SHMLOCK		<Could not pin shared memory into physical memory>/warning/fao=0!/ansi=0
-UNUSEDMSG1244	<LOADEDSZ2 last used in V6.3-009>/error/fao=0!/ansi=0
->>>>>>> 732d6f04 (GT.M V7.0-005)
+UNUSEDMSG1246	<LOADEDSZ2 last used in V6.3-009>/error/fao=0!/ansi=0
 REPLINSTMISMTCH	<Process has replication instance file !AD (jnlpool shmid = !UL) open but database !AD is bound to instance file !AD (jnlpool shmid = !UL)>/error/fao=8!/ansi=0
 REPLINSTREAD	<Error reading [0x!XL] bytes at offset [0x!16@XQ] from replication instance file !AD>/error/fao=4!/ansi=0//1
 REPLINSTDBMATCH	<Replication instance file !AD has seqno [0x!16@XQ] while database has a different seqno [0x!16@XQ]>/error/fao=4!/ansi=0

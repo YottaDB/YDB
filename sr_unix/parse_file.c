@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -81,14 +81,11 @@ int4 parse_file(mstr *file, parse_blk *pblk)
 	struct sockaddr		localhost_sa, *localhost_sa_ptr;
 	mval			def_trans;
 	int			errcode;
-<<<<<<< HEAD
+	intrpt_state_t		prev_intrpt_state;
+	size_t			move_len;		/* try to give static analysis more assurance on mmemove() params */
 	boolean_t		donot_short_circuit;
 	/* Buffer Variables for symlink */
 	char symlink_buffer[YDB_PATH_MAX];
-=======
-	intrpt_state_t		prev_intrpt_state;
-	size_t			move_len;		/* try to give static analysis more assurance on mmemove() params */
->>>>>>> 732d6f04 (GT.M V7.0-005)
 
 	pblk->fnb = 0;
 	ai_ptr = localhost_ai_ptr = temp_ai_ptr = NULL;
@@ -174,7 +171,6 @@ int4 parse_file(mstr *file, parse_blk *pblk)
 				base = node;				/* Update pointers past node name */
 				/* See if the desired (query) node is the local node */
 				node_name_len = (uint4)(node - trans.addr);	/* Scanned node including ':' */
-<<<<<<< HEAD
 				if (!donot_short_circuit)
 				{
 					query_node_len = node_name_len - 1;		/* Pure name length, no ':' on end */
@@ -187,42 +183,6 @@ int4 parse_file(mstr *file, parse_blk *pblk)
 					CLIENT_HINTS(hints);
 					errcode = dogetaddrinfo(query_node_name, NULL, &hints, &ai_ptr);
 					if (0 == errcode)
-=======
-				query_node_len = MIN((node_name_len - 1), MAX_HOST_NAME_LEN); /* Pure name length, no ':' on end */
-				assert(MAX_HOST_NAME_LEN >= query_node_len);
-				assert(0 < query_node_len);
-				assert(':' == *(trans.addr + query_node_len));
-				memcpy(query_node_name, trans.addr, query_node_len);
-				query_node_name[query_node_len] = 0;
-				localhost_sa_ptr = NULL;	/* Null value needed if not find query node (remote default) */
-				CLIENT_HINTS(hints);
-				DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
-				if (0 != (errcode = getaddrinfo(query_node_name, NULL, &hints, &ai_ptr)))	/* Assignment! */
-					ai_ptr = NULL;		/* Skip additional lookups */
-				else
-					memcpy((sockaddr_ptr)&query_sas, ai_ptr->ai_addr, ai_ptr->ai_addrlen);
-				CLIENT_HINTS(hints);
-				if (0 == (errcode = getaddrinfo(LOCALHOSTNAME, NULL, &hints, &localhost_ai_ptr))
-					&& (0 == memcmp(localhost_ai_ptr->ai_addr, (sockaddr_ptr)&query_sas,
-						localhost_ai_ptr->ai_addrlen)))
-				{
-					localhost_sa_ptr = localhost_ai_ptr->ai_addr;
-				}
-				FREEADDRINFO(localhost_ai_ptr);
-				ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
-				if (ai_ptr && !localhost_sa_ptr)
-				{	/* Have not yet established this is not a local node -- check further */
-					GETHOSTNAME(local_node_name, MAX_HOST_NAME_LEN, status);
-					if (-1 == status)
-						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5,
-							LEN_AND_LIT("gethostname"), CALLFROM, errno);
-					CLIENT_HINTS(hints);
-					DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
-					if (0 != (errcode = getaddrinfo(local_node_name, NULL, &hints, &localhost_ai_ptr)))
-						localhost_ai_ptr = NULL;	/* Empty address list */
-					for (temp_ai_ptr = localhost_ai_ptr; temp_ai_ptr!= NULL;
-					     temp_ai_ptr = temp_ai_ptr->ai_next)
->>>>>>> 732d6f04 (GT.M V7.0-005)
 					{
 						memcpy((sockaddr_ptr)&query_sas, ai_ptr->ai_addr, ai_ptr->ai_addrlen);
 						CLIENT_HINTS(hints);
@@ -232,7 +192,6 @@ int4 parse_file(mstr *file, parse_blk *pblk)
 						{
 							localhost_sa_ptr = localhost_ai_ptr->ai_addr;
 						}
-<<<<<<< HEAD
 						FREEADDRINFO(localhost_ai_ptr);
 						if (!localhost_sa_ptr)
 						{	/* Have not yet established this is not a local node -- check further */
@@ -257,23 +216,6 @@ int4 parse_file(mstr *file, parse_blk *pblk)
 							FREEADDRINFO(localhost_ai_ptr);
 						}
 						if (!localhost_sa_ptr)
-=======
-					}
-					FREEADDRINFO(localhost_ai_ptr);
-					ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
-				}
-				if (ai_ptr && !localhost_sa_ptr)
-				{
-					CLIENT_HINTS(hints);
-					DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
-					if (0 != (errcode = getaddrinfo(LOCALHOSTNAME6, NULL, &hints, &localhost_ai_ptr)))
-						localhost_ai_ptr = NULL;	/* Empty address list */
-					for (temp_ai_ptr = localhost_ai_ptr; temp_ai_ptr!= NULL;
-					     temp_ai_ptr = temp_ai_ptr->ai_next)
-					{
-						if (0 == memcmp((sockaddr_ptr)&query_sas, temp_ai_ptr->ai_addr,
-								 temp_ai_ptr->ai_addrlen))
->>>>>>> 732d6f04 (GT.M V7.0-005)
 						{
 							CLIENT_HINTS(hints);
 							errcode = dogetaddrinfo(LOCALHOSTNAME6, NULL, &hints, &localhost_ai_ptr);
@@ -299,20 +241,9 @@ int4 parse_file(mstr *file, parse_blk *pblk)
 						 */
 						hasnode = (NULL == localhost_sa_ptr);
 					}
-<<<<<<< HEAD
-=======
-					FREEADDRINFO(localhost_ai_ptr);
-					ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
->>>>>>> 732d6f04 (GT.M V7.0-005)
 				}
 				if (hasnode)
 				{	/* Remote node specified -- don't apply any defaults */
-<<<<<<< HEAD
-=======
-					DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
-					FREEADDRINFO(ai_ptr);
-					ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
->>>>>>> 732d6f04 (GT.M V7.0-005)
 					pblk->l_node = trans.addr;
 					pblk->b_node = node_name_len;
 					pblk->l_dir = base;
@@ -323,12 +254,6 @@ int4 parse_file(mstr *file, parse_blk *pblk)
 					pblk->fnb |= (1 << V_HAS_NODE);
 					return ERR_PARNORMAL;
 				}
-<<<<<<< HEAD
-=======
-				DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
-				FREEADDRINFO(ai_ptr);
-				ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
->>>>>>> 732d6f04 (GT.M V7.0-005)
 				/* Remove local node name from filename buffer */
 				assert(trans.len > node_name_len);	/* this is a function of how we determined node_name_len */
 				trans_ptr = (transbuf_t *) trans.addr;

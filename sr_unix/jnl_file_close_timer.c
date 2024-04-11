@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2021-2024 YottaDB LLC and/or its subsidiaries.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -92,19 +92,11 @@ void jnl_file_close_timer(void)
 	/* Only restart the timer if there are still journal files open, or if we didn't check because it wasn't safe.
 	 * Otherwise, it will be restarted on the next successful jnl_file_open(), or never, if we are exiting.
 	 */
-<<<<<<< HEAD
-	if (!exit_handler_active && (any_jnl_open || (INTRPT_OK_TO_INTERRUPT != intrpt_ok_state)))
+	if (!exit_handler_active && (do_timer_restart || (INTRPT_OK_TO_INTERRUPT != intrpt_ok_state)))
 		start_timer((TID)jnl_file_close_timer, OLDERJNL_CHECK_INTERVAL, jnl_file_close_timer, 0, NULL);
 	else
 	{
-		assert(!any_jnl_open || exit_handler_active);
-=======
-	if (do_timer_restart || (INTRPT_OK_TO_INTERRUPT != intrpt_ok_state))
-		start_timer((TID)jnl_file_close_timer, OLDERJNL_CHECK_INTERVAL, jnl_file_close_timer, 0, NULL);
-	else
-	{
-		assert(!do_timer_restart || process_exiting);
->>>>>>> 732d6f04 (GT.M V7.0-005)
+		assert(!do_timer_restart || exit_handler_active);
 		oldjnlclose_started = FALSE;
 	}
 }

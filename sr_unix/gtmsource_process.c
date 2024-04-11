@@ -1867,20 +1867,7 @@ int gtmsource_process(void)
 									". Status = %d ; %s\n", pre_read_seqno,
 									pre_read_seqno, post_read_seqno, post_read_seqno,
 									 status, STRERROR(status));
-<<<<<<< HEAD
-								close_retry = TRUE;
-							} else if (ECOMM == status) /*Communication error in send */
-							{
-								repl_log(gtmsource_log_fp, TRUE, TRUE,
-									"Error sending DATA"
-									" from "INT8_FMT" "INT8_FMTX" to "INT8_FMT" "
-									INT8_FMTX" . Error in send: %s\n",
-									pre_read_seqno, pre_read_seqno, post_read_seqno,
-									post_read_seqno, STRERROR(status));
-=======
->>>>>>> 732d6f04 (GT.M V7.0-005)
-								repl_log_conn_info(gtmsource_sock_fd, gtmsource_log_fp,
-								TRUE);
+								repl_log_conn_info(gtmsource_sock_fd, gtmsource_log_fp, TRUE);
 								close_retry = TRUE;
 							}
 							if (close_retry)

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -310,7 +310,7 @@ XFER(xf_fnzcollate, op_fnzcollate),
 XFER(xf_fnzatransform, op_fnzatransform),
 XFER(xf_fnztranslate_fast, op_fnztranslate_fast),
 XFER(xf_fntranslate_fast, op_fntranslate_fast),
-<<<<<<< HEAD
+XFER(xf_fnzauditlog, op_fnzauditlog),
 XFER(xf_fnreversequery, op_fnreversequery),
 XFER(xf_gvreversequery, op_gvreversequery),
 XFER(xf_fnq2, op_fnq2),
@@ -323,6 +323,3 @@ XFER(xf_bxrelop, op_bxrelop),
 XFER(xf_boolinit, bool_init),
 XFER(xf_boolexprstart, bool_init),
 XFER(xf_boolexprfinish, bool_finish),
-=======
-XFER(xf_fnzauditlog, op_fnzauditlog)
->>>>>>> 732d6f04 (GT.M V7.0-005)

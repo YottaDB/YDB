@@ -94,12 +94,7 @@ GBLDEF	boolean_t			restrict_initialized;
 #ifdef DEBUG
 GBLREF	boolean_t			ydb_dist_ok_to_use;
 #endif
-<<<<<<< HEAD
 GBLREF	char				ydb_dist[YDB_PATH_MAX];
-GBLREF	boolean_t			dollar_zaudit;
-=======
-GBLREF	char				gtm_dist[GTM_PATH_MAX];
->>>>>>> 732d6f04 (GT.M V7.0-005)
 
 error_def(ERR_RESTRICTSYNTAX);
 error_def(ERR_SYSCALL);

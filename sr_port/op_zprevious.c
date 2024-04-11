@@ -254,18 +254,11 @@ void op_zprevious(mval *v)
 								gv_altkey->base[++gv_altkey->end] = KEY_DELIMITER;
 								found = TRUE;
 								break;
-<<<<<<< HEAD
 							}
 						}
-=======
-							} else
-								found = FALSE;
-						} else
-							found = FALSE;
 						/* We may have added subscripts from the previous map above, so restore
 						 * gv_currkey to the name alone by using the gvname we saved above.
 						 */
->>>>>>> 732d6f04 (GT.M V7.0-005)
 						gv_currkey->end = gvname.var_name.len + 1;
 						gv_currkey->base[gv_currkey->end] = KEY_DELIMITER;
 					} else

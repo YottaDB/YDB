@@ -1241,15 +1241,9 @@ GBLDEF	char		io_setup_errstr[IO_SETUP_ERRSTR_ARRAYSIZE];
 GBLDEF	void		(*mupip_exit_fp)(int4 errnum);	/* Function pointer to mupip_exit() in MUPIP but points to a routine
 							 * that assert fails if run from non-MUPIP builds.
 							 */
-<<<<<<< HEAD
-/* Direct mode auditing related global variables */
-GBLDEF	boolean_t	dollar_zaudit;			/* Intrinsic that indicates whether direct mode
-							 * auditing (i.e. APD) is enabled.
-							 * TRUE => Auditing is enabled.
-							 */
-GBLDEF	dm_audit_info	*audit_conn;			/* Stores the APD logger's connection information */
 GBLDEF	boolean_t	gtm_nofflf;			/* GTM-9136 TRUE only to suppress LF after FF in "write #" */
 GBLDEF	void 		(*primary_exit_handler)(void);	/* If non-NULL, may be used to reestablish atexit() handler */
+GBLDEF	dm_audit_info	audit_conn[MAX_AUD_CONN];	/* AUdit logging connection information */
 
 /* YottaDB global variables */
 GBLDEF	CLI_ENTRY	*cmd_ary;	/* Pointer to command table for MUMPS/DSE/LKE etc. */
@@ -1483,8 +1477,3 @@ GBLDEF	boolean_t		in_fake_enospc;	/* used by an assert in "send_msg.c" */
 GBLDEF gdr_name	*gdr_name_head;
 GBLDEF gd_addr	*gd_addr_head;
 
-=======
-GBLDEF	boolean_t	gtm_nofflf;			/* GTM-9136 TRUE only to suppress LF after FF in "write #" */
-GBLDEF	void 		(*primary_exit_handler)(void);	/* If non-NULL, may be used to reestablish atexit() handler */
-GBLDEF	dm_audit_info	audit_conn[MAX_AUD_CONN];	/* AUdit logging connection information */
->>>>>>> 732d6f04 (GT.M V7.0-005)

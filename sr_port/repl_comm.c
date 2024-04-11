@@ -114,8 +114,6 @@ STATICDEF unsigned char * repl_recv_trace_buff = 0;
 STATICDEF int repl_recv_size_trace_pos = 0;
 STATICDEF int repl_recv_size_trace[REPL_RECV_SIZE_TRACE_SIZE];
 
-<<<<<<< HEAD
-=======
 error_def(ERR_GETADDRINFO);
 error_def(ERR_GETNAMEINFO);
 error_def(ERR_GETSOCKNAMERR);
@@ -133,7 +131,6 @@ error_def(ERR_TLSCONNINFO);
 #	define	WBTEST_REPLCOMM_SEND_SRC_ERRNO	ENETUNREACH
 #endif
 
->>>>>>> 732d6f04 (GT.M V7.0-005)
 #define REPL_TRACE_BUFF(TRACE_BUFF, TRACE_BUFF_POS, IO_BUFF, IO_SIZE, MAX_TRACE_SIZE)			\
 {													\
 	if (IO_SIZE > MAX_TRACE_SIZE)									\

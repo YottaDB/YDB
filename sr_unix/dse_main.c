@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -70,12 +70,12 @@
 #include "gt_timers_add_safe_hndlrs.h"
 #include "continue_handler.h"
 #include "restrict.h"
-
+#include "dm_audit_log.h"
 #ifdef UTF8_SUPPORTED
 #include "gtm_icu_api.h"
 #include "gtm_utf8.h"
 #include "gtm_conv.h"
-GBLREF	u_casemap_t 		gtm_strToTitle_ptr;		/* Function pointer for gtm_strToTitle */
+GBLREF	u_casemap_t		gtm_strToTitle_ptr;		/* Function pointer for gtm_strToTitle */
 #endif
 
 GBLREF gd_region		*gv_cur_region;
@@ -91,6 +91,7 @@ GBLREF VSIG_ATOMIC_T		util_interrupt;
 GBLREF char			cli_err_str[];
 GBLREF boolean_t		write_after_image;
 GBLREF CLI_ENTRY		dse_cmd_ary[];
+GBLREF IN_PARMS			*cli_lex_in_ptr;
 GBLREF ch_ret_type		(*stpgc_ch)();			/* Function pointer to stp_gcol_ch */
 
 GBLDEF block_id			patch_curr_blk;
@@ -103,7 +104,6 @@ error_def(ERR_RESTRICTEDOP);
 int dse_main(int argc, char **argv, char **envp)
 {
 	DCL_THREADGBL_ACCESS;
-
 	GTM_THREADGBL_INIT;
 	common_startup_init(DSE_IMAGE, &dse_cmd_ary[0]);
 	licensed = TRUE;
@@ -166,14 +166,21 @@ int dse_main(int argc, char **argv, char **envp)
 
 static bool	dse_process(int argc)
 {
-	int	res;
+	int	res, status;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	ESTABLISH_RET(util_ch, TRUE);
 	func = 0;
 	util_interrupt = 0;
-	if (EOF == (res = parse_cmd()))
+	res = parse_cmd();
+	if (EOF != res)
+	{
+		status = log_cmd_if_needed(cli_lex_in_ptr->in_str);
+		if (status)
+			return FALSE;
+	}
+	if (EOF == res)
 	{
 		if (util_interrupt)
 		{

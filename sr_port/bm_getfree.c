@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -100,15 +100,11 @@ block_id bm_getfree(block_id hint_arg, boolean_t *blk_used, unsigned int cw_work
 
 	SETUP_THREADGBL_ACCESS;
 	total_blks = (dba_mm == cs_data->acc_meth) ? cs_addrs->total_blks : cs_addrs->ti->total_blks;
-<<<<<<< HEAD
-	hint = ((hint_arg >= total_blks) ? 1 : hint_arg);		/* for TP, hint can be > total_blks */
+	hint = (((ublock_id)hint_arg >= total_blks) ? 1 : hint_arg);	/* avoid any chance of treating TP chain.flag as signed */
 #	ifdef DEBUG
 	if ((0 != ydb_skip_bml_num) && (BLKS_PER_LMAP <= hint) && (hint < ydb_skip_bml_num))
 		hint = ydb_skip_bml_num;
 #	endif
-=======
-	hint = (((ublock_id)hint_arg >= total_blks) ? 1 : hint_arg);	/* avoid any chance of treating TP chain.flag as a sign */
->>>>>>> 732d6f04 (GT.M V7.0-005)
 	hint_cycled = DIVIDE_ROUND_UP(total_blks, BLKS_PER_LMAP);
 	hint_limit = DIVIDE_ROUND_DOWN(hint, BLKS_PER_LMAP);
 	local_maps = hint_cycled + 2;	/* for (up to) 2 wraps */

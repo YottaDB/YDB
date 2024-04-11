@@ -150,12 +150,8 @@ static readonly char zclose_text[] = "$ZCLOSE";
 static readonly char zkey_text[] = "$ZKEY";
 static readonly char arrow_text[] = "->";
 
-<<<<<<< HEAD
 GBLREF int			jobinterrupt_sig_num;
-GBLREF boolean_t		dollar_zaudit, dollar_zquit_anyway;
-=======
 GBLREF boolean_t		dollar_zquit_anyway;
->>>>>>> 732d6f04 (GT.M V7.0-005)
 GBLREF int4			dollar_zeditor, dollar_zsystem, zdir_form;
 GBLREF io_log_name		*dollar_principal, *io_root_log_name;
 GBLREF io_pair			io_curr_device, io_std_device;

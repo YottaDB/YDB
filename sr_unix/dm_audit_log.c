@@ -3,7 +3,7 @@
  * Copyright (c) 2018-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved. *
  *								*
- * Copyright (c) 2019-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *                                                              *
  *      This source code contains the intellectual property     *
@@ -108,11 +108,7 @@ void	free_dm_audit_info_ptrs(void)
 	}
 #	endif
 	if (AUDIT_CONN_TCP == audit_conn[save_is_zauditlog].conn_type)
-	{
-		DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
-		freeaddrinfo(audit_conn[save_is_zauditlog].netaddr.tcp_addr);
-		ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
-	}
+		FREEADDRINFO(audit_conn[save_is_zauditlog].netaddr.tcp_addr);
 }
 
 /* Establishes a connection to the logger by using the
@@ -463,15 +459,9 @@ int	dm_audit_init(char *host_info, boolean_t is_tls)
 		port_len = STRLEN(port_buffer);
 		port_buffer[port_len]='\0';
 		CLIENT_HINTS(hints);
-<<<<<<< HEAD
 		if (0  != (errcode = dogetaddrinfo(host, port_buffer, &hints, &remote_ai_head)))
-=======
-		DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
-		if (0  != (errcode = getaddrinfo(host, port_buffer, &hints, &remote_ai_head)))
->>>>>>> 732d6f04 (GT.M V7.0-005)
 		{
 			real_errno = errno;
-			ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 			TEXT_ADDRINFO(errptr, errcode, real_errno);
 			restrict_initialized = TRUE;
 			if ((IS_MUPIP_IMAGE) || (IS_DSE_IMAGE) || (IS_LKE_IMAGE) || (save_is_zauditlog))
@@ -486,7 +476,6 @@ int	dm_audit_init(char *host_info, boolean_t is_tls)
 			}
 			return -1;
 		}
-		ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 		audit_conn[save_is_zauditlog].netaddr.tcp_addr = remote_ai_head;
 		if (!is_tls)
 			audit_conn[save_is_zauditlog].conn_type = AUDIT_CONN_TCP;
