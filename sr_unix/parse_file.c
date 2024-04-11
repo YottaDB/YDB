@@ -85,7 +85,7 @@ int4 parse_file(mstr *file, parse_blk *pblk)
 	size_t			move_len;		/* try to give static analysis more assurance on mmemove() params */
 	boolean_t		donot_short_circuit;
 	/* Buffer Variables for symlink */
-	char symlink_buffer[YDB_PATH_MAX];
+	char 			symlink_buffer[YDB_PATH_MAX];
 
 	pblk->fnb = 0;
 	ai_ptr = localhost_ai_ptr = temp_ai_ptr = NULL;
@@ -100,8 +100,6 @@ int4 parse_file(mstr *file, parse_blk *pblk)
 		return ERR_FILEPATHTOOLONG;
 	assert(trans.addr == pblk->buffer);
 	assert(0 <= trans.len);
-	typedef char transbuf_t[trans.len];	/* let static analysis infer our buffer size */
-	transbuf_t *delptr, *trans_ptr;
 	memset(&def, 0, SIZEOF(def));	/* Initial the defaults to zero */
 	if (pblk->def1_size > 0)
 	{	/* Parse default filespec if supplied */
@@ -256,11 +254,10 @@ int4 parse_file(mstr *file, parse_blk *pblk)
 				}
 				/* Remove local node name from filename buffer */
 				assert(trans.len > node_name_len);	/* this is a function of how we determined node_name_len */
-				trans_ptr = (transbuf_t *) trans.addr;
 				move_len =  MIN(trans.len - node_name_len, MAX_FN_LEN);
-				assert (sizeof(transbuf_t) >= move_len);
-				assert(NULL != trans_ptr);
-				memmove((void *)trans_ptr, node, move_len);
+				assert(trans.len >= move_len);
+				assert(NULL != trans.addr);
+				memmove(trans.addr, node, move_len);
 				ptr = base = node -= node_name_len;
 				top -= node_name_len;
 				trans.len -= node_name_len;
@@ -334,8 +331,7 @@ int4 parse_file(mstr *file, parse_blk *pblk)
 			assert(NULL != ptr);
 			assert(NULL != del);
 			assert((del <= ptr) && (del >= trans.addr));
-			delptr = (transbuf_t *) del;
-			memmove((void *) delptr, ptr, move_len);
+			memmove(del, ptr, move_len);
 			diff = (int)(ptr - del);
 			ptr -= diff;
 			top -= diff;

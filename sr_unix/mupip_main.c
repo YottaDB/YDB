@@ -110,8 +110,6 @@ int mupip_main(int argc, char **argv, char **envp)
 	ydb_chk_dist(argv[0]);
 	init_gtm();
 	cli_lex_setup(argc,argv);
-	/*      this call should be after cli_lex_setup() due to S390 A/E conversion    */
-	init_gtm();
 	mupip_exit_fp = mupip_exit;	/* Initialize function pointer for use during MUPIP */
 	while (TRUE)
 	{	func = 0;

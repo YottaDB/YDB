@@ -96,15 +96,17 @@
 	}					\
 }
 
+#define	MAX_TMP_CMD_LEN	((MAX_FN_LEN) * 2 + SIZEOF(UNALIAS))	/* SIZEOF includes 1 byte for null terminator too */
+
 #define	CLEANUP_AND_RETURN_FALSE								\
 {												\
 	int	rc;										\
 	int4	rv2, tmpcmdlen;									\
-	int	maxtmpcmdlen = (MAX_FN_LEN) * 2 + STR_LIT_LEN(UNALIAS) + 1;			\
-	char	tmpcmd[maxtmpcmdlen];								\
+	char	tmpcmd[MAX_TMP_CMD_LEN];							\
+												\
 	if (FD_INVALID != backup_fd)								\
 		CLOSEFILE_RESET(backup_fd, rc);	/* resets "backup_fd" to FD_INVALID */		\
-	memset(tmpcmd, '\0', maxtmpcmdlen);							\
+	memset(tmpcmd, '\0', SIZEOF(tmpcmd));							\
 	/* An error happened. We are not sure if the temp dir is empty. Can't use rmdir() */	\
 	MEMCPY_LIT(tmpcmd, UNALIAS);								\
 	tmpcmdlen = STR_LIT_LEN(UNALIAS);							\
