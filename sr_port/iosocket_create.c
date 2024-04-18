@@ -188,7 +188,7 @@ socket_struct *iosocket_create(char *sockaddr, uint4 bfsize, int file_des, boole
 				}
 				/* for connection socket */
 				SNPRINTF(port_buffer, NI_MAXSERV, "%hu", port);
-				assert(last_2colon > sockaddr);
+				assert(last_2colon >= sockaddr);
 				addrlen = last_2colon - sockaddr;
 				if ('[' == sockaddr[0])
 				{
