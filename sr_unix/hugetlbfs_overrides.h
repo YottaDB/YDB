@@ -3,6 +3,9 @@
  * Copyright (c) 2014-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2024 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -13,7 +16,7 @@
 #ifndef HUGETLBFS_OVERRIDES_H_
 #define HUGETLBFS_OVERRIDES_H_
 
-#if ( defined(__linux__) && ( defined(__i386__) || defined(__x86_64__) ) )
+#if ( defined(__linux__) && ( defined(__i386__) || defined(__x86_64__) || defined(__aarch64__)) )
 #	define	HUGETLB_SUPPORTED	1
 
 	GBLREF	long gtm_os_hugepage_size;
