@@ -3,7 +3,7 @@
 ; Copyright (c) 2001-2022 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
-; Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	;
+; Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	;
 ; All rights reserved.						;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -20,7 +20,7 @@ DBG:	;transfer point for DEBUG and "runtime" %gde
 	; Most of it is stored in the "gdeEntryState" local variable in subscripted nodes.
 	; Exceptions are local collation related act,ncol,nct values which have to be stored in in unsubscripted variables
 	;	to prevent COLLDATAEXISTS error as part of the $$set^%LCLCOL below.
-	n gdeEntryState,gdeEntryStateAct,gdeEntryStateNcol,gdeEntryStateNct
+	n gdeEditFlag,gdeDev,gdeEntryState,gdeEntryStateAct,gdeEntryStateNcol,gdeEntryStateNct,gdeIOPat,gdeLoopI
 	s gdeEntryStateAct=$$get^%LCLCOL
 	s gdeEntryStateNcol=$$getncol^%LCLCOL
 	s gdeEntryStateNct=$$getnct^%LCLCOL
@@ -39,9 +39,15 @@ DBG:	;transfer point for DEBUG and "runtime" %gde
 	s io=$io,useio="io",comlevel=0,combase=$zl,resume(comlevel)=$zl_":INTERACT"
 	i $$set^%PATCODE("M")
 	d GDEINIT^GDEINIT,GDEMSGIN^GDEMSGIN,GDFIND^GDESETGD,CREATE^GDEGET:create,LOAD^GDEGET:'create
+	; Determine whether GDE is running from a terminal, and if so enable EDITING
+	s gdeIOPat=1_""""_io_""""_1_""" "".E1"" TERMINAL "".E" ; pattern to see if a ZSH "D" line is for the current io device
+	zsh "d":gdeDev
+	s gdeEditFlag=""
+	f gdeLoopI=1:1 q:'$d(gdeDev("D",gdeLoopI))  i gdeDev("D",gdeLoopI)?@gdeIOPat s gdeEditFlag="editing:" q
 	i debug s prompt="DEBUGDE>",uself="logfile"
-	e  s prompt="GDE>",uself="logfile:(ctrap=$c(3,25,26):exception=""d CTRL^GDE"")"
-	e  s useio="io:(ctrap=$c(3,25,26):exception=""d CTRL^GDE"")"
+	e  d
+	. s prompt="GDE>",uself="logfile:(ctrap=$c(3,25,26):exception=""d CTRL^GDE"")"
+	. s useio="io:(ctrap=$c(3,25,26):"_gdeEditFlag_"exception=""d CTRL^GDE"")"
 	u @useio
 	; comline is set to $ZCMDLINE on entry. If the entry zlevel is 0, set the resume point to exit
 	i $l(comline) s:'gdeEntryState("zlevel") resume(comlevel)=$zl_":EXIT^GDEEXIT" d comline,EXIT^GDEEXIT
