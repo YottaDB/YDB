@@ -1733,6 +1733,7 @@ AUDINITFAIL	<Audit !AZ facility failed to initialize audit information>/error/fa
 AUDCONNFAIL	<Audit !AZ facility failed to connect to audit logger>/error/fao=1!/ansi=0
 AUDLOGFAIL	<Audit !AZ facility failed to log command>/error/fao=1!/ansi=0
 SOCKCLOSE	<Error closing socket: (errno == !UL) !AD>/error/fao=3!/ansi=80
+MUTRUNCALREADY	<Region !AD: no further truncation possible>/info/fao=2!/ansi=0
 !
 ! If there are UNUSEDMSG* lines unused for more than one year and at least two non-patch releases, use them before adding new lines.
 !

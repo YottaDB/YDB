@@ -3,7 +3,7 @@
  * Copyright (c) 2012-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -373,10 +373,16 @@ boolean_t mu_truncate(int4 truncate_percent, mval *keep_mval)
 	{
 		rel_crit(gv_cur_region);
 		return TRUE;
-	} else if (csa->ti->total_blks != old_total || new_total == old_total)
+	} else if (csa->ti->total_blks != old_total)
 	{
 		assert(csa->ti->total_blks >= old_total); /* Better have been an extend, not a truncate... */
 		gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_MUTRUNCNOSPACE, 3, REG_LEN_STR(gv_cur_region), truncate_percent);
+		rel_crit(gv_cur_region);
+		return TRUE;
+	} else if (new_total == old_total) /* If trying to truncate when database is already truncated */
+	{
+		assert(csa->ti->total_blks >= old_total); /* Better have been an extend, not a truncate... */
+		gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_MUTRUNCALREADY, 2, REG_LEN_STR(gv_cur_region));
 		rel_crit(gv_cur_region);
 		return TRUE;
 	} else if (((GDSVCURR != csd->desired_db_format) && !(BLK_ID_32_VER > csd->desired_db_format))

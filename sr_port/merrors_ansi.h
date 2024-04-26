@@ -1565,4 +1565,5 @@ const static readonly int error_ansi[] = {
 	   0,	/* AUDCONNFAIL */
 	   0,	/* AUDLOGFAIL */
 	  80,	/* SOCKCLOSE */
+	   0,	/* MUTRUNCALREADY */
 	};
