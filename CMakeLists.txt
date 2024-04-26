@@ -528,7 +528,7 @@ if (LIBGCRYPT_CONFIG_SCRIPT MATCHES ".+-NOTFOUND")
 	message(FATAL_ERROR "FATAL: libgcrypt-config not found (${LIBGCRYPT_CONFIG_SCRIPT})")
 else()
 	# libgcrypt-config --cflags returns "\n" when the includes are located in the default search path
-	exec_program(${LIBGCRYPT_CONFIG_SCRIPT} ARGS --cflags RETURN_VALUE _return_VALUE OUTPUT_VARIABLE LIBGCRYPT_CFLAGS)
+	execute_process(COMMAND ${LIBGCRYPT_CONFIG_SCRIPT} --cflags RESULT_VARIABLE _return_VALUE OUTPUT_VARIABLE LIBGCRYPT_CFLAGS)
 	# If a path is returned, it is preceded by '-I' for use as CFLAG directive
 	string(REGEX REPLACE "^-I" "" LIBGCRYPT_INCLUDES "${LIBGCRYPT_CFLAGS}")
 	if (NOT (${LIBGCRYPT_INCLUDES} MATCHES "\n"))
