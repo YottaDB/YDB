@@ -206,16 +206,6 @@ MBSTART {									\
 	}									\
 } MBEND
 
-/* if FLAG is false, set it to true and syslog it once */
-#define ISSUE_ERR_ONCE(FLAG, ...)		\
-{						\
-	if (!FLAG)				\
-	{					\
-		FLAG = TRUE;			\
-		send_msg_csa(__VA_ARGS__);	\
-	}					\
-}
-
 /* Routine to set up borders around the external call buffer */
 STATICFNDCL gparam_list *set_up_buffer(char *p_list, int len)
 {
@@ -557,8 +547,6 @@ STATICFNDEF int extarg_getsize(void *src, enum ydb_types typ, mval *dst, struct 
 {
 	char			*cp, **cpp;
 	struct extcall_string	*sp;
-	static bool		issued_ERR_XCRETNULLREF = FALSE;
-	static bool		issued_ERR_ZCCONVERT = FALSE;
 
 	if (!src)
 		switch (typ)
@@ -582,8 +570,8 @@ STATICFNDEF int extarg_getsize(void *src, enum ydb_types typ, mval *dst, struct 
 				return 0;
 			default:
 				/* Handle null pointer return types */
-				ISSUE_ERR_ONCE(issued_ERR_XCRETNULLREF, CSA_ARG(NULL) VARLSTCNT(4)
-						ERR_XCRETNULLREF, 2, LEN_AND_STR(entry_ptr->call_name.addr))
+				RTS_ERROR_CSA_ABT(CSA_ARG(NULL) VARLSTCNT(4)
+						ERR_XCRETNULLREF, 2, LEN_AND_STR(entry_ptr->call_name.addr));
 				return 0;
 				break;
 		}
@@ -618,8 +606,8 @@ STATICFNDEF int extarg_getsize(void *src, enum ydb_types typ, mval *dst, struct 
 			cpp = (char **)src;
 			if (NULL == (*cpp))
 			{
-				ISSUE_ERR_ONCE(issued_ERR_XCRETNULLREF, CSA_ARG(NULL) VARLSTCNT(4)
-						ERR_XCRETNULLREF, 2, LEN_AND_STR(entry_ptr->call_name.addr))
+				RTS_ERROR_CSA_ABT(CSA_ARG(NULL) VARLSTCNT(4)
+						ERR_XCRETNULLREF, 2, LEN_AND_STR(entry_ptr->call_name.addr));
 				return 0;
 			}
 			return STRLEN(*cpp);
@@ -632,16 +620,13 @@ STATICFNDEF int extarg_getsize(void *src, enum ydb_types typ, mval *dst, struct 
 			sp = (struct extcall_string *)src;
 			if (NULL == sp->addr)
 			{
-				sp->len = 0;
-				ISSUE_ERR_ONCE(issued_ERR_XCRETNULLREF, CSA_ARG(NULL) VARLSTCNT(4)
-						ERR_XCRETNULLREF, 2, LEN_AND_STR(entry_ptr->call_name.addr))
+				RTS_ERROR_CSA_ABT(CSA_ARG(NULL) VARLSTCNT(4)
+						ERR_XCRETNULLREF, 2, LEN_AND_STR(entry_ptr->call_name.addr));
 			}
-			if (0 > sp->len)
-			{	/* Negative string length. syslog and reset to zero */
-				sp->len = 0;
-				ISSUE_ERR_ONCE(issued_ERR_ZCCONVERT, CSA_ARG(NULL) VARLSTCNT(4)
-						ERR_ZCCONVERT, 2, LEN_AND_STR(entry_ptr->call_name.addr))
-			} else
+			if (0 > sp->len)   /* Negative string length. syslog and reset to zero */
+				RTS_ERROR_CSA_ABT(CSA_ARG(NULL) VARLSTCNT(4)
+						ERR_ZCCONVERT, 2, LEN_AND_STR(entry_ptr->call_name.addr));
+			else
 				assert(!(((INTPTR_T)sp->addr < (INTPTR_T)stringpool.free)
 					&& ((INTPTR_T)sp->addr >= (INTPTR_T)stringpool.base)));
 			return (int)(sp->len);
@@ -652,16 +637,13 @@ STATICFNDEF int extarg_getsize(void *src, enum ydb_types typ, mval *dst, struct 
 			buff_ptr = (ydb_buffer_t *)src;
 			if (NULL == buff_ptr->buf_addr)
 			{
-				buff_ptr->len_used = 0;
-				ISSUE_ERR_ONCE(issued_ERR_XCRETNULLREF, CSA_ARG(NULL) VARLSTCNT(4)
-						ERR_XCRETNULLREF, 2, LEN_AND_STR(entry_ptr->call_name.addr))
+				RTS_ERROR_CSA_ABT(CSA_ARG(NULL) VARLSTCNT(4)
+						ERR_XCRETNULLREF, 2, LEN_AND_STR(entry_ptr->call_name.addr));
 			}
-			if (0 > buff_ptr->len_used)
-			{	/* Negative string length. syslog and reset to zero */
-				buff_ptr->len_used = 0;
-				ISSUE_ERR_ONCE(issued_ERR_ZCCONVERT, CSA_ARG(NULL) VARLSTCNT(4)
-						ERR_ZCCONVERT, 2, LEN_AND_STR(entry_ptr->call_name.addr))
-			} else
+			if (0 > buff_ptr->len_used)   /* Negative string length. syslog and reset to zero */
+				RTS_ERROR_CSA_ABT(CSA_ARG(NULL) VARLSTCNT(4)
+						ERR_ZCCONVERT, 2, LEN_AND_STR(entry_ptr->call_name.addr));
+			else
 				assert(!(((INTPTR_T)buff_ptr->buf_addr < (INTPTR_T)stringpool.free)
 					&& ((INTPTR_T)buff_ptr->buf_addr >= (INTPTR_T)stringpool.base)));
 			return (int)(buff_ptr->len_used);
