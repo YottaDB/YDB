@@ -82,9 +82,20 @@ LITDEF char *zsocket_tls_options[] = {"CIPHER", "OPTIONS", "SESSION", "INTERNAL"
 #define OPTIONVALUE		'='
 #define OPTIONVALUESEP		';'
 
+#define LENGTH_OF_OPTIONEND 	1
+#define LENGTH_OF_OPTIONVALUE 	1
+
 #define KEEPALIVE_STR	"KEEPALIVE"
 #define KEEPIDLE_STR	"KEEPIDLE"
+#define KEEPCNT_STR	"KEEPCNT"
+#define KEEPINTVL_STR	"KEEPINTVL"
 #define SNDBUF_STR	"SNDBUF"
+
+typedef enum
+{
+	ZSIR_1_DETERMINE_LENGTH,
+	ZSIR_2_RENDER_RESULT
+} zsocket_item_round_t;
 
 #define ZSOCKETITEM(A,B,C,D) {(SIZEOF(A) - 1), A}
 const nametabent zsocket_names[] =
@@ -160,6 +171,15 @@ MBSTART {	/* if not even "," for third arg then force invalid index */	\
 	else	/* Index not in bounds; treat like non-existent socket */	\
 		SOCKETPTR = NULL;						\
 } MBEND
+
+static void zsocket_options_item(
+	zsocket_item_round_t round,
+	char** charptr_ptr,
+	int* determined_length_ptr,
+	bool* need_optionend_flag_ptr,
+	const char* caption_string,
+	int value,
+	int state);
 
 void	op_fnzsocket(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 {
@@ -480,54 +500,66 @@ void	op_fnzsocket(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 		case zsocket_number:
 			numret = (int)dsocketptr->n_socket;
 			break;
-		case zsocket_options:
-			/* build string from socket struct - note this may not be exactly what was specified */
-			len = 0;
-			if (SOCKOPTIONS_SYSTEM < socketptr->options_state.alive)
-			{	/* user specified */
-				len += STRLEN(KEEPALIVE_STR);
-				if (0 == socketptr->keepalive)
-					len++;		/* disabled */
-				else if (SOCKOPTIONS_SYSTEM < socketptr->options_state.idle)
-				{	/* if keepalive disabled skip keepidle */
-					len += STRLEN(KEEPIDLE_STR) + 1;	/* count = */
-					len += MAX_DIGITS_IN_INT;
-				}
-			}
-			if (SOCKOPTIONS_SYSTEM < socketptr->options_state.sndbuf)
+		case zsocket_options:;
+			int determined_length = 0;
+			for (zsocket_item_round_t round = ZSIR_1_DETERMINE_LENGTH; round <= ZSIR_2_RENDER_RESULT; round++)
 			{
-				if (len) len++;		/* comma unless only option */
-				len += STRLEN(SNDBUF_STR) + 1;	/* count = */
-				len += MAX_DIGITS_IN_INT;
-			}
-			ENSURE_STP_FREE_SPACE(len);
-			charptr = (char *)stringpool.free;
-			len2 = 0;
-			if (SOCKOPTIONS_SYSTEM < socketptr->options_state.alive)
-			{	/* user specified */
-				len2++;		/* count options */
-				if (0 >= socketptr->keepalive)
+				bool need_optionend_flag = false;
+
+				if (ZSIR_2_RENDER_RESULT == round)
 				{
-					*charptr++ = OPTIONDISABLE;
-				}
-				MEMCPY_LIT(charptr, KEEPALIVE_STR);
-				charptr += STR_LIT_LEN(KEEPALIVE_STR);
-				if (0 < socketptr->keepidle)
-				{
-					*charptr++ = OPTIONVALUE;
-					charptr = (char *)i2asc((uchar_ptr_t)charptr, socketptr->keepidle);
+					ENSURE_STP_FREE_SPACE(determined_length);
+					charptr = (char *)stringpool.free;
 				}
 
-			}
-			if (SOCKOPTIONS_SYSTEM < socketptr->options_state.sndbuf)
-			{
-				if (0 < len2)
-					*charptr++ = OPTIONEND;		/* of previous option */
-				MEMCPY_LIT(charptr, SNDBUF_STR);
-				charptr += STR_LIT_LEN(SNDBUF_STR);
-				*charptr++ = OPTIONVALUE;
-				charptr = (char *)i2asc((uchar_ptr_t)charptr, socketptr->iobfsize);
-			}
+				zsocket_options_item(
+					round,
+					&charptr,
+					&determined_length,
+					&need_optionend_flag,
+					KEEPALIVE_STR,
+					socketptr->keepalive,
+					socketptr->options_state.alive);
+
+				if (socketptr->keepalive > 0)
+				{
+					zsocket_options_item(
+						round,
+						&charptr,
+						&determined_length,
+						&need_optionend_flag,
+						KEEPIDLE_STR,
+						socketptr->keepidle,
+						socketptr->options_state.idle);
+				}
+
+				zsocket_options_item(
+					round,
+					&charptr,
+					&determined_length,
+					&need_optionend_flag,
+					KEEPCNT_STR,
+					socketptr->keepcnt,
+					socketptr->options_state.cnt);
+
+				zsocket_options_item(
+					round,
+					&charptr,
+					&determined_length,
+					&need_optionend_flag,
+					KEEPINTVL_STR,
+					socketptr->keepintvl,
+					socketptr->options_state.intvl);
+
+				zsocket_options_item(
+					round,
+					&charptr,
+					&determined_length,
+					&need_optionend_flag,
+					SNDBUF_STR,
+					socketptr->iobfsize,
+					socketptr->options_state.sndbuf);
+			} // for round
 			len = charptr - (char *)stringpool.free;
 			dst->str.addr = (char *)stringpool.free;
 			dst->str.len = len;
@@ -842,4 +874,43 @@ void	op_fnzsocket(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 	if (MV_NM == dst->mvtype)
 		MV_FORCE_MVAL(dst, numret);
 	return;
+}
+
+static void zsocket_options_item(
+	zsocket_item_round_t round,
+	char** charptr_ptr,
+	int* determined_length_ptr,
+	bool* need_optionend_flag_ptr,
+	const char* caption_string,
+	int value,
+	int state)
+{
+	// if not user defined option, don't render
+	if (SOCKOPTIONS_SYSTEM >= state)
+		return;
+
+	if (ZSIR_1_DETERMINE_LENGTH == round)
+	{
+		if (*need_optionend_flag_ptr)
+			*determined_length_ptr += LENGTH_OF_OPTIONEND;
+		*determined_length_ptr += STRLEN(caption_string);
+		*determined_length_ptr += LENGTH_OF_OPTIONVALUE;
+		*determined_length_ptr += MAX_DIGITS_IN_INT;
+	}
+
+	if (ZSIR_2_RENDER_RESULT == round)
+	{
+		if (*need_optionend_flag_ptr)
+		{
+			**charptr_ptr = OPTIONEND;
+			*charptr_ptr += LENGTH_OF_OPTIONEND;
+		}
+		strcpy(*charptr_ptr, caption_string);
+		*charptr_ptr += strlen(caption_string);
+		**charptr_ptr = OPTIONVALUE;
+		*charptr_ptr += LENGTH_OF_OPTIONVALUE;
+		*charptr_ptr = (char *)i2asc((uchar_ptr_t)*charptr_ptr, value);
+	}
+
+	*need_optionend_flag_ptr = true;
 }
