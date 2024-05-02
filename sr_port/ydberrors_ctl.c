@@ -1,9 +1,9 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries.*
+ * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -65,6 +65,7 @@ LITDEF	err_msg ydberrors[] = {
 	{ "ISVSUBSCRIPTED", "ISV variable name !AD specified with a non-zero subscript count of !UL", 3, 0 },
 	{ "ZBRKCNTNEGATIVE", "Count [!SL], of transits through a ZBREAK breakpoint before activating it, cannot be negative", 1, 0 },
 	{ "SECSHRPATHMAX", "gtmsecshr executable path length is greater than maximum (!UL)", 1, 0 },
+	{ "MUTRUNCALREADY", "Region !AD: no further truncation possible", 2, 0 },
 };
 
 
@@ -77,7 +78,7 @@ GBLDEF	err_ctl ydberrors_ctl = {
 	256,
 	"YDB",
 	&ydberrors[0],
-	48,
+	49,
 	&ydberrors_undocarr[0],
 	0
 };

@@ -3,7 +3,7 @@
 ! Copyright (c) 2001-2017 Fidelity National Information		!
 ! Services, Inc. and/or its subsidiaries. All rights reserved.	!
 !								!
-! Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries.	!
+! Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries.	!
 ! All rights reserved.						!
 !								!
 !	This source code contains the intellectual property	!
@@ -74,6 +74,7 @@ GVNUNSUPPORTED	<Global variable name !AD not supported in !AD call>/error/fao=4
 ISVSUBSCRIPTED	<ISV variable name !AD specified with a non-zero subscript count of !UL>/error/fao=3
 ZBRKCNTNEGATIVE	<Count [!SL], of transits through a ZBREAK breakpoint before activating it, cannot be negative>/error/fao=1
 SECSHRPATHMAX	<gtmsecshr executable path length is greater than maximum (!UL)>/error/fao=1
+MUTRUNCALREADY	<Region !AD: no further truncation possible>/info/fao=2
 !
 ! If there are UNUSEDMSG* lines unused for more than one year and at least two non-patch releases, use them before adding new lines.
 !

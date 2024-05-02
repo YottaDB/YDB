@@ -1,9 +1,9 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries.*
+ * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -61,3 +61,4 @@
 #define ERR_ISVSUBSCRIPTED 151028082
 #define ERR_ZBRKCNTNEGATIVE 151028090
 #define ERR_SECSHRPATHMAX 151028098
+#define ERR_MUTRUNCALREADY 151028107

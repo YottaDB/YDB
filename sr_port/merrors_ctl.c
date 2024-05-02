@@ -1567,7 +1567,6 @@ LITDEF	err_msg merrors[] = {
 	{ "AUDCONNFAIL", "Audit !AZ facility failed to connect to audit logger", 1, 0 },
 	{ "AUDLOGFAIL", "Audit !AZ facility failed to log command", 1, 0 },
 	{ "SOCKCLOSE", "Error closing socket: (errno == !UL) !AD", 3, 0 },
-	{ "MUTRUNCALREADY", "Region !AD: no further truncation possible", 2, 0 },
 };
 
 
@@ -1605,7 +1604,7 @@ GBLDEF	err_ctl merrors_ctl = {
 	246,
 	"GTM",
 	&merrors[0],
-	1551,
+	1550,
 	&merrors_undocarr[0],
 	25
 };

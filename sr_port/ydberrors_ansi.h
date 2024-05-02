@@ -1,9 +1,9 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries.*
+ * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -15,6 +15,5 @@
 
 
 const static readonly int error_ansi[] = {
-	   0,	/* DEVPARPARSE */
-	   0,	/* SETZDIRTOOLONG */
+	   0,	/* MUTRUNCALREADY */
 	};
