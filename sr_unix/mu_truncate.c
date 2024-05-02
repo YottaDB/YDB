@@ -381,7 +381,6 @@ boolean_t mu_truncate(int4 truncate_percent, mval *keep_mval)
 		return TRUE;
 	} else if (new_total == old_total) /* If trying to truncate when database is already truncated */
 	{
-		assert(csa->ti->total_blks >= old_total); /* Better have been an extend, not a truncate... */
 		gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_MUTRUNCALREADY, 2, REG_LEN_STR(gv_cur_region));
 		rel_crit(gv_cur_region);
 		return TRUE;
