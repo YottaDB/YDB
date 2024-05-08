@@ -17,7 +17,7 @@
 #   $ docker build -t yottadb/yottadb-rocky:latest-master -f Dockerfile-rocky .
 #
 # Use with data persistence:
-#   $ docker run --rm  -v `pwd`/ydb-data:/data -ti yottadb/yottadb:latest
+#   $ docker run --rm  -p 9080-9081:9080-9081 -v `pwd`/ydb-data:/data -ti yottadb/yottadb-rocky:latest-master
 
 # Stage 1: YottaDB build image
 FROM rockylinux:8.8 as ydb-release-builder
@@ -76,8 +76,8 @@ RUN mkdir -p /tmp/yottadb-build \
  && make -j `grep -c ^processor /proc/cpuinfo` \
  && make install
 
-# Stage 2: YottaDB release image
-FROM rockylinux:8.8 as ydb-release
+# Stage 2: YottaDB GUI install
+FROM rockylinux:8.8 as ydb-gui
 
 RUN --mount=type=bind,from=ydb-release-builder,source=/tmp/yottadb-release,target=/tmp/staging \
     # This is a strange step: The mount volume is readonly; and we actually write to it in ydbinstall
@@ -94,7 +94,41 @@ RUN --mount=type=bind,from=ydb-release-builder,source=/tmp/yottadb-release,targe
                     procps-ng \
                     nano \
                     gzip \
-                    readline \
+                    cmake \
+                    git \
+                    pkg-config \
+                    make \
+                    gcc \
+                    libcurl-devel \
+                    && \
+    # Add the CMake build_os_release file which is not part of the install
+    # directory Needed to allow us to build Rocky Linux on AARCH64 for Docker
+    # Hub, but it's not officially supported. We do this AFTER yum update, since
+    # it can change the minor version and cause /etc/os-release and
+    # /tmp/build_os_release to be different and result in ydbinstall failing.
+    cp /etc/os-release /tmp/build_os_release && \
+    /tmp/ydb-release/ydbinstall --utf8 --installdir /opt/yottadb/current --gui
+
+# Stage 3: YottaDB release image
+FROM rockylinux:8.8 as ydb-release
+
+RUN --mount=type=bind,from=ydb-release-builder,source=/tmp/yottadb-release,target=/tmp/staging \
+    --mount=type=bind,from=ydb-gui,source=/opt/yottadb/current/plugin/,target=/tmp/plugin \
+    # This is a strange step: The mount volume is readonly; and we actually write to it in ydbinstall
+    # So we need to copy the mount contents to a seaprate folder
+    cp -R /tmp/staging /tmp/ydb-release && \
+    yum update -y && \
+    yum install -y \
+                    file \
+                    binutils \
+                    findutils \
+                    elfutils-libelf \
+                    libicu \
+                    wget \
+                    procps-ng \
+                    nano \
+                    gzip \
+                    nodejs \
                     && \
     # Add the CMake build_os_release file which is not part of the install
     # directory Needed to allow us to build Rocky Linux on AARCH64 for Docker
@@ -103,14 +137,16 @@ RUN --mount=type=bind,from=ydb-release-builder,source=/tmp/yottadb-release,targe
     # /tmp/build_os_release to be different and result in ydbinstall failing.
     cp /etc/os-release /tmp/build_os_release && \
     /tmp/ydb-release/ydbinstall --utf8 --installdir /opt/yottadb/current && \
+    cp -R /tmp/plugin /opt/yottadb/current/ && \
     yum remove -y wget && \
     yum clean all && \
     rm -rf /var/cache/yum && \
     rm -rf /tmp/ydb-release
 
 WORKDIR /data
+EXPOSE 9080 9081
+COPY ci/docker-scripts/docker-main-startup.sh /docker-main-startup.sh
 ENV gtmdir=/data \
     LC_ALL=C.UTF-8 \
     EDITOR=/usr/bin/nano
-
-ENTRYPOINT ["/opt/yottadb/current/ydb"]
+ENTRYPOINT ["/docker-main-startup.sh"]

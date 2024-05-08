@@ -144,7 +144,7 @@ NOTE: You must have at least docker 17.05 as [multi-stage](https://docs.docker.c
 
 ### Image information
 
-The docker image is built using the generic ```ydb``` script that gives the user some sane defaults to begin exploring YottaDB. This isn't meant for production usage.
+The docker image is built using the generic `ydb_env_set` script that gives the user some sane defaults to begin exploring YottaDB. This isn't meant for production usage.
 
 The commands below assume that you want to remove the docker container after running the command, which means that if you don't mount a volume that contains your database and routines they will be lost. If you want the container to persist remove the ```--rm``` parameter from the ```docker``` command.
 
@@ -156,6 +156,8 @@ Volumes are also supported by mounting to the ```/data``` directory. If you want
 
 This creates a ydb-data directory in your current working directory. This can be deleted after the container is shutdown/removed if you want to remove all data created in the YottaDB container (such as your database and routines).
 
+The [YottaDB GUI](https://gitlab.com/YottaDB/UI/YDBGUI) is available on port 9080; statistics for the GUI is running on port 9081.
+
 ### Pre-built images
 
 Pre-built images are available on [docker hub](https://hub.docker.com/r/yottadb/)
@@ -163,18 +165,18 @@ Pre-built images are available on [docker hub](https://hub.docker.com/r/yottadb/
 ### Running a Pre-built image
 
 ```
-docker run --rm -it download.yottadb.com/yottadb/yottadb # you can add a specific version after a ":" if desired
+docker run --rm -it -p 9080-9081:9080-9081 download.yottadb.com/yottadb/yottadb # you can add a specific version after a ":" if desired
 ```
 
 ### Build Steps
 
 1) Build the image
    ```
-   docker build -t yottadb/yottadb:latest .
+   docker build -t yottadb/yottadb:latest-master .
    ```
 2) Run the created image
    ```
-   docker run --rm -it yottadb/yottadb:latest
+   docker run --rm -it -p 9080-9081:9080-9081 yottadb/yottadb:latest-master
    ```
 
 ## FAQ

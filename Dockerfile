@@ -14,10 +14,10 @@
 # Simple build/running directions are below:
 #
 # Build:
-#   $ docker build -t yottadb/yottadb:latest .
+#   $ docker build -t yottadb/yottadb:latest-master .
 #
 # Use with data persistence:
-#   $ docker run --rm -e ydb_chset=utf-8 -v `pwd`/ydb-data:/data -ti yottadb/yottadb:latest
+#   $ docker run -p 9080-9081:9080-9081 --rm -v `pwd`/ydb-data:/data -ti yottadb/yottadb:latest-master
 
 ARG OS_VSN=22.04
 
@@ -36,7 +36,6 @@ RUN apt-get update && \
                     tcsh \
                     gawk \
                     libconfig-dev \
-                    libcurl4-openssl-dev \
                     libelf-dev \
                     libicu-dev \
                     libncurses-dev \
@@ -84,8 +83,8 @@ RUN mkdir -p /tmp/yottadb-build \
  && make -j $(nproc) \
  && make install
 
-# Stage 2: YottaDB release image
-FROM ubuntu:${OS_VSN} as ydb-release
+# Stage 2: YottaDB GUI install
+FROM ubuntu:${OS_VSN} as ydb-gui
 
 ARG DEBIAN_FRONTEND=noninteractive
 RUN --mount=type=bind,from=ydb-release-builder,source=/tmp/yottadb-release,target=/tmp/staging \
@@ -101,12 +100,46 @@ RUN --mount=type=bind,from=ydb-release-builder,source=/tmp/yottadb-release,targe
                     binutils \
                     libelf-dev \
                     libicu70 \
-                    nano \
                     wget \
                     netbase \
                     readline-common \
+                    cmake \
+                    make \
+                    binutils \
+                    git \
+                    pkg-config \
+                    libcurl4-openssl-dev \
+                    ca-certificates \
+                    gcc \
+                    && \
+    /tmp/ydb-release/ydbinstall --utf8 --installdir /opt/yottadb/current --gui
+
+# Stage 3: YottaDB release image
+FROM ubuntu:${OS_VSN} as ydb-release
+
+ARG DEBIAN_FRONTEND=noninteractive
+RUN --mount=type=bind,from=ydb-release-builder,source=/tmp/yottadb-release,target=/tmp/staging \
+    --mount=type=bind,from=ydb-gui,source=/opt/yottadb/current/plugin/,target=/tmp/plugin \
+    # This is a strange step: The mount volume is readonly; and we actually write to it in ydbinstall
+    # So we need to copy the mount contents to a seperate folder
+    cp -R /tmp/staging /tmp/ydb-release && \
+    # Add the CMake build_os_release file which is not part of the install directory
+    # Needed to allow us to build Ubuntu on AARCH64 for Docker Hub, but it's not officially supported
+    cp /etc/os-release /tmp/build_os_release && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends \
+                    file \
+                    binutils \
+                    libelf-dev \
+                    libicu70 \
+                    nano \
+                    wget \
+                    netbase \
+                    libcurl4 \
+		    nodejs \
                     && \
     /tmp/ydb-release/ydbinstall --utf8 --installdir /opt/yottadb/current && \
+    cp -R /tmp/plugin /opt/yottadb/current/ && \
     apt-get remove -y wget && \
     apt-get autoclean -y && \
     apt-get clean && \
@@ -114,7 +147,9 @@ RUN --mount=type=bind,from=ydb-release-builder,source=/tmp/yottadb-release,targe
     rm -rf /tmp/ydb-release
 
 WORKDIR /data
+EXPOSE 9080 9081
+COPY ci/docker-scripts/docker-main-startup.sh /docker-main-startup.sh
 ENV gtmdir=/data \
     LC_ALL=C.UTF-8 \
     EDITOR=/usr/bin/nano
-ENTRYPOINT ["/opt/yottadb/current/ydb"]
+ENTRYPOINT ["/docker-main-startup.sh"]
