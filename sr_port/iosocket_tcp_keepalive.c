@@ -158,7 +158,7 @@ boolean_t iosocket_tcp_keepalive(socket_struct *socketptr, int keepalive_opt, ch
 		}
 #		endif
 #		endif
-		if (freesocket && trap)
+		if (freesocket || trap)
 		{
 			if (FD_INVALID != socketptr->sd)
 			{
