@@ -749,7 +749,7 @@ void	iosocket_use(io_desc *iod, mval *pp)
 			|| (SOCKOPTIONS_PENDING & curr_socketptr->options_state.cnt)
 			|| (SOCKOPTIONS_PENDING & curr_socketptr->options_state.intvl)))
 		{	/* options specified and pending keepalive related value to apply */
-			if (!iosocket_tcp_keepalive(curr_socketptr, SOCKOPTIONS_FROM_STRUCT, "USE", TRUE))
+			if (!iosocket_tcp_keepalive(curr_socketptr, SOCKOPTIONS_FROM_STRUCT, "USE", FALSE))
 			{
 				assert(curr_socketptr != socketptr);	/* since not create new socket */
 				if (0 < delimiter_len)		/* new delimiters */

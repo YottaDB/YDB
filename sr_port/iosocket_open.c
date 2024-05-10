@@ -563,6 +563,7 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, uint
 			|| (!iosocket_listen_sock(socketptr, DEFAULT_LISTEN_DEPTH))))
 		|| (connect_specified && (!iosocket_connect(socketptr, timepar, ibfsize_specified))))
 	{
+		assert(curr_socketptr == socketptr);	/* since create new socket */
 		REVERT_GTMIO_CH(&ioptr->pair, ch_set);
 		return FALSE;
 	} else if (is_principal)

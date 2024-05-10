@@ -158,7 +158,7 @@ boolean_t iosocket_tcp_keepalive(socket_struct *socketptr, int keepalive_opt, ch
 		}
 #		endif
 #		endif
-		if (freesocket || trap)
+		if (freesocket)
 		{
 			if (FD_INVALID != socketptr->sd)
 			{
@@ -166,9 +166,10 @@ boolean_t iosocket_tcp_keepalive(socket_struct *socketptr, int keepalive_opt, ch
 				socketptr->sd = FD_INVALID;
 			}
 			SOCKET_FREE(socketptr);
+		}
+		if (freesocket || trap)
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_SETSOCKOPTERR, 5,
 			      LEN_AND_STR(sockopt_errptr), real_errno, errlen, errptr);
-		}
 		return FALSE;
 	}
 #	ifdef DEBUG
