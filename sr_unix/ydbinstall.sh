@@ -748,7 +748,7 @@ fi
 
 # Suport script
 if [ "Y" = "$ydb_support" ] ; then
-	append_to_str utillist "dmesg env gdb getopt journalctl lsblk lscpu lsmem seq tail xargs"
+	append_to_str utillist "dmesg env gdb getopt lsblk lscpu lsmem seq tail xargs"
 fi
 
 # YDBSyslog plugin
