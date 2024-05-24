@@ -3,7 +3,7 @@
  * Copyright (c) 2008-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -305,7 +305,7 @@ int main()
 #	endif /* _AIX */
 	ret = 0; /* start positive */
 	/* get the ones we need */
-	if (env_var_ptr = ydb_getenv(YDBENVINDX_DIST_ONLY, NULL_SUFFIX, NULL_IS_YDB_ENV_MATCH))	/* Warning - assignment */
+	if (env_var_ptr = ydb_getenv(YDBENVINDX_DIST, NULL_SUFFIX, NULL_IS_YDB_ENV_MATCH))	/* Warning - assignment */
 	{
 		if (MAX_ALLOWABLE_LEN <
 				SECSHR_PARENT_DIR_LEN(strlen(env_var_ptr)) + STR_LIT_LEN(GTMSECSHR_DIR_SUFFIX) + STR_LIT_LEN(GTMSECSHR_BASENAME))
