@@ -296,28 +296,26 @@ isvaluevalid()
 
 install_plugins()
 {
+	mkdir -p ${ydb_installdir}/plugin/version
 	# These plugins don't have any dependencies on any other plugins
 	if [ "Y" = $ydb_aim ] ; then install_std_plugin Util YDBAIM ; fi
 	if [ "Y" = "$ydb_posix" ] ; then install_std_plugin Util YDBPosix ; fi
 	if [ "Y" = "$ydb_sodium" ] ; then install_std_plugin Util YDBSodium ; fi
 	if [ "Y" = "$ydb_support" ] ; then
 		echo "Now installing YDBSupport"
-		if [ -e "${ydb_installdir}/plugin/ydb_support.sh" ] ; then
-			 mv ${ydb_installdir}/plugin/ydb_support.sh ${ydb_installdir}/plugin/ydb_support.sh_sav_$$
-		fi
-		wget ${wget_flags} ${ydb_installdir}/plugin https://gitlab.com/YottaDB/Util/YDBSupport/-/raw/master/ydb_support.sh
-		status_sav=$?
-		if [ 0 -eq ${status_sav} ] ; then
+		cd $tmpdir	# Get back to top level temporary directory as the current directory
+		mkdir ydbsupport_tmp
+		cd ydbsupport_tmp
+		if git clone --depth 1 https://gitlab.com/YottaDB/Util/YDBSupport.git YDBSupport-master 2>YDBSupport.err 1>YDBSupport.out ; then
+			cd YDBSupport-master
+			cp ydb_support.sh ${ydb_installdir}/plugin
 			chmod +x ${ydb_installdir}/plugin/ydb_support.sh
-		else echo wget failed with status $status_sav
-		fi
-		if [ -e "${ydb_installdir}/plugin/ydb_support.sh_sav_$$" ] ; then
-			if  [ $status_sav ]; then
-				rm -f ${ydb_installdir}/plugin/ydb_support.sh_sav_$$
-			else
-				mv ${ydb_installdir}/plugin/ydb_support.sh_sav_$$ ${ydb_installdir}/plugin/ydb_support.sh
-				echo Prior ${ydb_installdir}/plugin/ydb_support.sh restored
-			fi
+			git log --max-count=1 --pretty=oneline >${ydb_installdir}/plugin/version/YDBSupport.log
+			cd ../..
+			\rm -R ydbsupport_tmp
+		else
+			echo "Unable to download YDBSupport.  Your internet connection and/or the gitlab servers may be down. Please try again later."
+			remove_tmpdir=0
 		fi
 	fi
 	if [ "Y" = "$ydb_syslog" ] ; then install_std_plugin Util YDBSyslog ; fi
@@ -327,12 +325,12 @@ install_plugins()
 		mkdir enc_tmp
 		cd enc_tmp
 		export ydb_dist=${ydb_installdir}
-		if wget ${wget_flags} ${PWD} https://gitlab.com/YottaDB/Util/YDBEncrypt/-/archive/master/YDBEncrypt-master.tar.gz 2>enc.err 1>enc.out; then
-			tar xzf YDBEncrypt-master.tar.gz
+		if git clone --depth 1 https://gitlab.com/YottaDB/Util/YDBEncrypt.git YDBEncrypt-master 2>YDBEncrypt.err 1>YDBEncrypt.out ; then
 			cd YDBEncrypt-master
 			if make -j `grep -c ^processor /proc/cpuinfo` 2>>../enc.err 1>>../enc.out && make install 2>>../enc.err 1>>../enc.out; then
 				# Save the build directory if the make install command returns a non-zero exit code. Otherwise, remove it.
 				if [ "Y" = "$gtm_verbose" ] ; then cat ../enc.err ../enc.out ; fi
+				git log --max-count=1 --pretty=oneline >${ydb_installdir}/plugin/version/YDBEncrypt.log
 				cd ../..
 				\rm -R enc_tmp
 				# rename gtmcrypt to ydbcrypt and create a symbolic link for backward compatibility
@@ -354,8 +352,7 @@ install_plugins()
 		cd $tmpdir	# Get back to top level temporary directory as the current directory
 		mkdir zlib_tmp
 		cd zlib_tmp
-		if wget ${wget_flags} ${PWD} https://gitlab.com/YottaDB/Util/YDBZlib/-/archive/master/YDBZlib-master.tar.gz 1>zlib.log 2>&1; then
-			tar xzf YDBZlib-master.tar.gz
+		if git clone --depth 1 https://gitlab.com/YottaDB/Util/YDBZlib.git YDBZlib-master 2>YDBZlib.err 1>YDBZLib.out ; then
 			cd YDBZlib-master
 			if gcc -c -fPIC -I${ydb_installdir} gtmzlib.c && gcc -o libgtmzlib.so -shared gtmzlib.o 1>>../zlib.log 2>&1; then
 				# Save the build directory if either of the gcc commands return a non-zero exit code. Otherwise, remove it.
@@ -373,6 +370,7 @@ install_plugins()
 				fi
 				${ydb_installdir}/mumps ${ydb_installdir}/plugin/r/_ZLIB
 				cp _ZLIB.o ${ydb_installdir}/plugin/o
+				git log --max-count=1 --pretty=oneline >${ydb_installdir}/plugin/version/YDBZlib.log
 				cd ../..
 				\rm -R zlib_tmp
 			else
@@ -408,6 +406,7 @@ install_std_plugin()
 		mkdir ${2}-master/build && cd ${2}-master/build
 		# Build the plugin, saving the directory if the build fails
 		if ( ${cmakecmd} .. && ${cmakecmd} --build . -j $(getconf _NPROCESSORS_ONLN) && ${cmakecmd} --install . ) 2>>${2}.err 1>>${2}.out ; then
+			git log --max-count=1 --pretty=oneline >${ydb_dist}/plugin/version/${2}.log
 			if [ "Y" = "$gtm_verbose" ] ; then cat ${2}.out ; fi
 			cd ../../../.. ; \rm -rf ${2}_tmp
 		else
