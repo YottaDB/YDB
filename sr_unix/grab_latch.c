@@ -3,7 +3,7 @@
  * Copyright (c) 2014-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -42,6 +42,7 @@ GBLREF	volatile int4	fast_lock_count;		/* Stop interrupts while we have our part
 boolean_t grab_latch(sm_global_latch_ptr_t latch, int max_timeout_in_secs, wait_state state, sgmnt_addrs *csa)
 {
 	ABS_TIME	cur_time, end_time, remain_time;
+	time_t		last_cas_latch_check_remain_secs = 0;
 	int		maxspins, retries, spins;
 	int4		max_sleep_mask;
 	boolean_t	skip_time_calc;
@@ -62,6 +63,7 @@ boolean_t grab_latch(sm_global_latch_ptr_t latch, int max_timeout_in_secs, wait_
 		sys_get_curr_time(&cur_time);
 		add_int_to_abs_time(&cur_time, max_timeout_in_secs * 1000, &end_time);
 		remain_time.tv_sec = 0;		/* ensure one try */
+		last_cas_latch_check_remain_secs = 0;
 	}
 	/* Define number of hard-spins the inner loop does */
 	maxspins = num_additional_processors ? MAX_LOCK_SPINS(LOCK_SPINS, num_additional_processors) : 1;
@@ -84,11 +86,24 @@ boolean_t grab_latch(sm_global_latch_ptr_t latch, int max_timeout_in_secs, wait_
 			break;
 		if (!skip_time_calc)
 		{
-			REST_FOR_LATCH(latch, USEC_IN_NSEC_MASK, retries);
+			/* The below code is similar to the REST_FOR_LATCH macro except that the "performCASLatchCheck()" call
+			 * is based on elapsed time (available in this function) instead of iterations (in the generic macro).
+			 */
+			if (0 == (retries & LOCK_SPIN_HARD_MASK))
+				GTM_REL_QUANT(USEC_IN_NSEC_MASK);	/* Release processor to holder of lock (hopefully) */
 			sys_get_curr_time(&cur_time);
 			remain_time = sub_abs_time(&end_time, &cur_time);
 			if (0 > remain_time.tv_sec)
 				break;
+
+			/* Since we are anyways recording remaining time, use this chance to do dead pid check every 1 second */
+			if (last_cas_latch_check_remain_secs && (remain_time.tv_sec != last_cas_latch_check_remain_secs))
+			{	/* It has been at least 1 second since we last did a dead pid check.
+				 * Check if we're due to check for lock abandonment check or holder wakeup.
+				 */
+				performCASLatchCheck(latch, TRUE);
+			}
+			last_cas_latch_check_remain_secs = remain_time.tv_sec;
 		} else
 		{	/* Indefinite wait for lock. Periodically check if latch is held by dead pid. If so get it back. */
 			SLEEP_FOR_LATCH(latch, retries);
