@@ -117,6 +117,7 @@ dump_info()
 	if [ -n "$ydb_aim" ] ; then echo ydb_aim " : " $ydb_aim ; fi
 	if [ -n "$ydb_branch" ] ; then echo ydb_branch " : " $ydb_branch ; fi
 	if [ -n "$ydb_change_removeipc" ] ; then echo ydb_change_removeipc " : " $ydb_change_removeipc ; fi
+	if [ -n "$ydb_curl" ] ; then echo ydb_curl " : " $ydb_curl ; fi
 	if [ -n "$ydb_debug" ] ; then echo ydb_debug " : " $ydb_debug ; fi
 	if [ -n "$ydb_deprecated" ] ; then echo ydb_deprecated " : " $ydb_deprecated ; fi
 	if [ -n "$ydb_distrib" ] ; then echo ydb_distrib " : " $ydb_distrib ; fi
@@ -179,10 +180,12 @@ help_exit()
 	echo "ydbinstall [option] ... [version]"
 	echo "Options are:"
 	echo "--aim				-> installs AIM plugin"
+	echo "--allplugins                      -> installs all plugins"
 	echo "--branch branchname		-> builds YottaDB from a specific git branch; use with --from-source"
 	echo "--build-type buildtype		-> type of YottaDB build, default is pro"
 	echo "--copyenv [dirname]		-> copy ydb_env_set, ydb_env_unset, and gtmprofile files to dirname, default /usr/local/etc; incompatible with linkenv"
 	echo "--copyexec [dirname]		-> copy ydb & gtm scripts to dirname, default /usr/local/bin; incompatible with linkexec"
+	echo "--curl                            -> download and install the libcurl plugin"
 	echo "--debug				-> turn on debugging with set -x"
 	echo "--distrib dirname or URL		-> source directory for YottaDB/GT.M distribution tarball, local or remote"
 	echo "--dry-run				-> do everything short of installing YottaDB, including downloading the distribution"
@@ -299,6 +302,7 @@ install_plugins()
 	mkdir -p ${ydb_installdir}/plugin/version
 	# These plugins don't have any dependencies on any other plugins
 	if [ "Y" = $ydb_aim ] ; then install_std_plugin Util YDBAIM ; fi
+	if [ "Y" = $ydb_curl ] ; then install_std_plugin Util YDBCurl ; fi
 	if [ "Y" = "$ydb_posix" ] ; then install_std_plugin Util YDBPosix ; fi
 	if [ "Y" = "$ydb_sodium" ] ; then install_std_plugin Util YDBSodium ; fi
 	if [ "Y" = "$ydb_support" ] ; then
@@ -363,6 +367,7 @@ install_plugins()
 					mkdir utf8
 					(
 						cd utf8
+						LC_CTYPE=$(locale -a | grep -a -iE '\.utf.?8$' | head -1) ; export LC_CTYPE
 						export ydb_chset="UTF-8"
 						${ydb_installdir}/mumps ${ydb_installdir}/plugin/r/_ZLIB
 						cp _ZLIB.o ${ydb_installdir}/plugin/o/utf8
@@ -386,7 +391,7 @@ install_plugins()
 	# This plugin has a dependency on sodium, and needs to come after it.
 	if [ "Y" = "$ydb_ws" ] ; then install_std_plugin Util YDB-Web-Server ; fi
 
-	# This plugin has a dependency on Posix & WS, and need to come after them.
+	# This plugin has a dependency on Curl, Posix & WS, and need to come after them.
 	if [ "Y" = "$ydb_gui" ] ; then install_std_plugin UI YDBGUI ; fi
 
 	# This plugin has a dependency on AIM, Posix, and Encrypt, and needs to come after they are installed
@@ -462,6 +467,7 @@ if [ -z "$USER" ] ; then USER=`id -un` ; fi
 if [ -z "$ydb_aim" ] ; then ydb_aim="N" ; fi
 if [ -n "$ydb_buildtype" ] ; then gtm_buildtype="$ydb_buildtype" ; fi
 if [ -z "$ydb_change_removeipc" ] ; then ydb_change_removeipc="yes" ; fi
+if [ -z "$ydb_curl" ] ; then ydb_curl="N" ; fi
 if [ -z "$ydb_deprecated" ] ; then ydb_deprecated="Y" ; fi
 if [ -n "$ydb_dryrun" ] ; then gtm_dryrun="$ydb_dryrun" ; fi
 if [ -z "$ydb_encplugin" ] ; then ydb_encplugin="N" ; fi
@@ -504,6 +510,7 @@ while [ $# -gt 0 ] ; do
 	case "$1" in
 		--aim) ydb_aim="Y" ; shift ;;
 		--allplugins)  ydb_aim="Y"
+			ydb_curl="Y"
 			ydb_encplugin="Y"
 			ydb_gui="Y"
 			ydb_octo="Y"
@@ -541,6 +548,7 @@ while [ $# -gt 0 ] ; do
 			fi
 			unset gtm_linkexec
 			shift ;;
+		--curl) ydb_curl="Y" ; shift ;;
 		--debug) ydb_debug="Y" ; set -x ; shift ;;
 		--distrib*) tmp=`echo $1 | cut -s -d = -f 2-`
 			if [ -n "$tmp" ] ; then ydb_distrib=$tmp
@@ -577,8 +585,8 @@ while [ $# -gt 0 ] ; do
 			fi
 			shift ;;
 		--gui)
-			# Force install of YDB Web Server to ensure latest version
-			# Make need --overwrite-existing flag to ensure overwrite of an existing version
+			# May need --overwrite-existing flag to ensure overwrite of an existing version
+			ydb_curl="Y"
 			ydb_gui="Y"
 			ydb_posix="Y"
 			ydb_ws="Y"
@@ -712,6 +720,13 @@ if [ "Y" = $ydb_aim ] ; then
 	append_to_str utillist "git cmake ld.gold make pkg-config"
 fi
 
+# libcurl plugin
+if [ "Y" = "$ydb_curl" ] ; then
+	append_to_str utillist "cmake gcc git make ld.gold"
+	append_to_str shliblist "libcurl.so"
+	append_to_str hdrlist "curl/curl.h"
+fi
+
 # Encryption plugin
 if [ "Y" = "$ydb_encplugin" ] ; then
 	append_to_str utillist "gcc make tcsh"
@@ -742,6 +757,7 @@ fi
 # libsodium plugin
 if [ "Y" = "$ydb_sodium" ] ; then
 	append_to_str utillist "cmake gcc git make ld.gold"
+	append_to_str shliblist "libsodium.so"
 	append_to_str hdrlist "sodium.h"
 fi
 
@@ -762,8 +778,9 @@ fi
 
 # Zlib plugin; note that all required headers are part of the POSIX standard
 if [ "Y" = "$ydb_zlib" ] ; then
-	append_to_str utillist "gcc"
+	append_to_str utillist "locale gcc grep head"
 	append_to_str shliblist "libz.so"
+	append_to_str hdrlist "zlib.h"
 fi
 
 # Check for required header files, shared libraries and utility programs
@@ -872,6 +889,7 @@ if [ -n "$ydb_from_source" ] ; then
 	if [ "Y" = "$ydb_aim" ] ; then install_options="${install_options} --aim" ; fi
 	if [ -n "$gtm_copyenv" ] ; then install_options="${install_options} --copyenv ${gtm_copyenv}" ; fi
 	if [ -n "$gtm_copyexec" ] ; then install_options="${install_options} --copyexec ${gtm_copyexec}" ; fi
+	if [ "Y" = "$ydb_curl" ] ; then install_options="${install_options} --curl" ; fi
 	if [ "Y" = "$ydb_debug" ] ; then install_options="${install_options} --debug" ; fi
 	if [ "Y" = "$gtm_dryrun" ] ; then install_options="${install_options} --dry-run" ; fi
 	if [ "Y" = "$ydb_encplugin" ] ; then install_options="${install_options} --encplugin" ; fi
@@ -981,6 +999,9 @@ if [ "Y" = "$ydb_plugins_only" ]; then
 		msgsuffix="already installed and --overwrite-existing not specified."
 		if [ "Y" = $ydb_aim ] && [ -e $ydb_installdir/plugin/o/_ydbaim.so ] ; then
 			echo YDBAIM $msgsuffix ; unset nooverwrite
+		fi
+		if [ "Y" = $ydb_curl ] && [ -e $ydb_installdir/plugin/libcurl.so ] ; then
+			echo YDBCurl $msgsuffix ; unset nooverwrite
 		fi
 		if [ "Y" = $ydb_encplugin ] && [ -e $ydb_installdir/plugin/libgtmcrypt.so ] ; then
 			echo YDBEncrypt $msgsuffix ; unset nooverwrite
