@@ -36,6 +36,7 @@ RUN apt-get update && \
                     tcsh \
                     gawk \
                     libconfig-dev \
+		    libcurl-dev \
                     libelf-dev \
                     libicu-dev \
                     libncurses-dev \
