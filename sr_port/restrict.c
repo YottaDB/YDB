@@ -160,7 +160,8 @@ void restrict_init(void)
 	char		*host_info, *opt_strt, *apd_opts_strt, *apd_opts_end;
 	int		save_errno, fields, status, lineno, logger_info_len, opt_len;
 	FILE		*restrictfp, *filtcmdfp = NULL;
-	boolean_t	restrict_one, restrict_default = FALSE, restrict_all = FALSE;
+	boolean_t	restrict_one, restrict_all;
+	boolean_t	read_restrict_file;
 	boolean_t	valid_audit_entry, cont;
 	struct group	grp, *grpres;
 	char		*grpbuf = NULL;
@@ -196,6 +197,7 @@ void restrict_init(void)
 			restrict_all = TRUE;
 			assert(FALSE);
 		}
+		read_restrict_file = FALSE;
 	} else
 	{	/* The file exists, check permissions */
 		euid = GETEUID();
@@ -206,16 +208,23 @@ void restrict_init(void)
 			rest_owner_perms = (0200 & restrictStat.st_mode);
 			rest_group_perms = (0020 & restrictStat.st_mode);
 			rest_other_perms = (0002 & restrictStat.st_mode);
-			/* Anyone with write permissions sets the restriction default to FALSE */
-			restrict_default = !(rest_other_perms || (rest_owner_perms && (euid == restrictStat.st_uid))
+			/* Anyone with write permissions sets the restriction default to FALSE.
+			 * So do not need to read the restriction file at all.
+			 */
+			restrict_all = FALSE;
+			read_restrict_file = !(rest_other_perms || (rest_owner_perms && (euid == restrictStat.st_uid))
 					|| (rest_group_perms
 					&& ((egid == restrictStat.st_gid)
 						|| (gtm_member_group_id(euid, restrictStat.st_gid, NULL)))));
 		} else	/* Treat a stat failure as full restrictions */
 		{
-			restrict_default = TRUE;
-			rest_owner_perms = rest_group_perms = rest_other_perms = 0; /* Treat as NOT have any access */
+			restrict_all = TRUE;
+			read_restrict_file = FALSE;
 		}
+	}
+	if (read_restrict_file)
+	{
+		assert(!restrict_all);
 		/* Read the file, line by line. */
 		lineno = 0;
 		do
@@ -343,7 +352,7 @@ void restrict_init(void)
 							tls = TRUE;
 #						endif
 						else
-                                                {       /* Invalid option - parse error and restrict everything */
+						{       /* Invalid option - parse error and restrict everything */
 							send_msg_csa(CSA_ARG(NULL) VARLSTCNT(9)
 									ERR_RESTRICTSYNTAX, 3,
 									LEN_AND_STR(restrictpath), lineno,
@@ -352,7 +361,7 @@ void restrict_init(void)
 									("Invalid auditing option"));
 							restrict_all = TRUE;
 							break;
-                                                }
+						}
 					}
 					if (restrict_all)
 						break;
@@ -384,7 +393,7 @@ void restrict_init(void)
 						restrictions.lke_audit_enable = TRUE;
 					continue;
 				} else if (1 == fields)
-					restrict_one = restrict_default;
+					restrict_one = TRUE;
 				else if (2 == fields)
 				{
 					if (NULL == grpbuf)
@@ -425,7 +434,7 @@ void restrict_init(void)
 						} else if ((GETEGID() == grp.gr_gid) || GID_IN_GID_LIST(grp.gr_gid))
 							restrict_one = FALSE;
 						else
-							restrict_one = restrict_default;
+							restrict_one = TRUE;
 					} else
 					{	/* Treat error in group lookup as parse error. */
 						send_msg_csa(CSA_ARG(NULL) VARLSTCNT(12) ERR_RESTRICTSYNTAX, 3,
@@ -490,12 +499,6 @@ void restrict_init(void)
 		} while (!restrict_all && !feof(restrictfp));
 		if (NULL != grpbuf)
 			free(grpbuf);
-		/* Do we have write perms for unrestricted access? */
-		if ((0x1 & rest_other_perms)	/* Other has write access */
-			|| ((0x1 & rest_owner_perms) && (euid == restrictStat.st_uid)) /* euid is owner with write access */
-			|| ((0x1 & rest_group_perms) &&
-				(gtm_member_group_id(euid, restrictStat.st_gid, NULL)))) /* euid in file group with write access */
-			restrict_all = FALSE;
 	}
 	if (restrict_all)
 	{
