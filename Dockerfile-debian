@@ -118,6 +118,7 @@ RUN apt-get update && \
                     libreadline-dev \
                     libssl-dev \
                     curl \
+                    libcurl4-openssl-dev \
                     libconfig-dev \
                     whois \
                     && \
