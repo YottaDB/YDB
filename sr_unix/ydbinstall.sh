@@ -859,7 +859,7 @@ if [ -n "$ydb_from_source" ] ; then
 		else
 			cmake_command="${cmakecmd} -D CMAKE_BUILD_TYPE=RelWithDebInfo"
 		fi
-		if ! ${cmake_command} -D CMAKE_INSTALL_PREFIX:PATH=$PWD ../ ; then
+		if ! ${cmake_command} .. ; then
 			echo "CMake failed. Exiting. Temporary directory $ydbinstall_tmp will not be deleted."
 			err_exit
 		fi

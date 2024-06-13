@@ -15,8 +15,8 @@
 #								#
 #################################################################
 
-# Min version of cmake on RHEL 6
-cmake_minimum_required(VERSION 3.6.0)
+# Needed for CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT
+cmake_minimum_required(VERSION 3.7.1)
 if(POLICY CMP0087)
   # Policy needed since cmake 3.16
   cmake_policy(SET CMP0087 NEW)
@@ -38,6 +38,11 @@ set(version r201)
 # If CMAKE_BUILD_TYPE is not defined make it a Release build
 if(NOT CMAKE_CONFIGURATION_TYPES AND NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE "RelWithDebInfo" CACHE STRING "Build type" FORCE)
+endif()
+
+# Set the install prefix to the build directory and do not allow the default /usr/local, as that's invalid for YottaDB
+if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
+  set_property(CACHE CMAKE_INSTALL_PREFIX PROPERTY VALUE ${CMAKE_CURRENT_BINARY_DIR})
 endif()
 
 if("${CMAKE_BUILD_TYPE}" MATCHES "Debug")
@@ -68,6 +73,9 @@ option(ENABLE_ASAN "Enable address sanitizer in build?" OFF)
 # The below option enables the -ftrivial-auto-var-init=pattern flag in the compiler.
 # It is recommended to enable this option only for non-production builds of YottaDB.
 option(ENABLE_AUTO_VAR_INIT_PATTERN "Enable -ftrivial-auto-var-init=pattern in build?" OFF)
+
+# The below option enables code profiling
+option(ENABLE_PROFILING "Enable code profiling?" OFF)
 
 set(install_permissions_script
   OWNER_READ OWNER_EXECUTE OWNER_WRITE

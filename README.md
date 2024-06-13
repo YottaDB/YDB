@@ -98,9 +98,9 @@ listed below. For example for Ubuntu Linux:
 
   ### Build with gcc
   ```sh
-  cmake -D CMAKE_INSTALL_PREFIX:PATH=$PWD ../
+  cmake ..
   export ydb_icu_version=65.1.suse # this is needed only on OpenSUSE Leap 15.4 or SLES 15.4 or SLED 15.4
-  make -j `grep -c ^processor /proc/cpuinfo`
+  make -j $(getconf _NPROCESSORS_ONLN)
   make install	# For known errors in this step and how to work around them, consult the FAQ section below
   cd yottadb_r*  # The latest release number will be seen in the directory name
   ```
@@ -108,9 +108,9 @@ listed below. For example for Ubuntu Linux:
   ### Build with Clang/LLVM
   ```sh
   export CC=/usr/bin/clang
-  cmake -D CMAKE_LINKER:PATH=/usr/bin/ld.lld -D CMAKE_INSTALL_PREFIX:PATH=$PWD ../
+  cmake -D CMAKE_LINKER:PATH=/usr/bin/ld.lld ..
   export ydb_icu_version=65.1.suse # this is needed only on OpenSUSE Leap 15.4 or SLES 15.4 or SLED 15.4
-  make -j `grep -c ^processor /proc/cpuinfo`
+  make -j $(getconf _NPROCESSORS_ONLN)
   make install	# For known errors in this step and how to work around them, consult the FAQ section below
   cd yottadb_r*  # The latest release number will be seen in the directory name
   ```
