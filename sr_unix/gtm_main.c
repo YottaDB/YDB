@@ -88,7 +88,7 @@ int gtm_main(int argc, char **argv, char **envp)
 {
 	char		*ptr, *eq, **p;
 	char		gtmlibxc[YDB_PATH_MAX];
-	int             eof, parse_ret;
+	int		eof, parse_ret, cli_ret;
 	int		gtmcrypt_errno;
 	int		status;
 	char		*pathptr;				/* this is similar to code in "dlopen_libyottadb.c" */
@@ -111,7 +111,9 @@ int gtm_main(int argc, char **argv, char **envp)
 	pathptr = realpath(PROCSELF, curr_exe_realpath);	/* this is similar to code in "dlopen_libyottadb.c" */
 	assert(NULL != pathptr);	/* or else "dlopen_libyottadb" would have failed in a similar check */
 	ydb_chk_dist(pathptr);
-	cli_lex_setup(argc, argv);
+	cli_ret = cli_lex_setup(argc, argv);
+	if (cli_ret)
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) cli_ret, 2, LEN_AND_STR(cli_err_str));
 	/* put the arguments into buffer, then clean up the token buffer
 	 * cli_gettoken() copies all arguments except the first one argv[0]
 	 * into the buffer (cli_lex_in_ptr->in_str).

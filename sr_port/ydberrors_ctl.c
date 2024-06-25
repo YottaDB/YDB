@@ -43,7 +43,7 @@ LITDEF	err_msg ydberrors[] = {
 	{ "UNKNOWNSYSERR", "[!UL] does not correspond to a known YottaDB error code", 1, 0 },
 	{ "READLINEFILEPERM", "Readline history file !AZ could not be created", 1, 0 },
 	{ "NODEEND", "End of list of nodes/subscripts", 0, 0 },
-	{ "READLINELONGLINE", "Entered line is greater than 32Kb long and will be truncated", 0, 0 },
+	{ "READLINELONGLINE", "Entered line is greater than 32Kb long, exceeding maximum allowed", 0, 0 },
 	{ "INVTPTRANS", "Invalid TP transaction - either invalid TP token or transaction not in progress", 0, 0 },
 	{ "THREADEDAPINOTALLOWED", "Process cannot switch to using threaded Simple API while already using Simple API", 0, 0 },
 	{ "SIMPLEAPINOTALLOWED", "Process cannot switch to using Simple API while already using threaded Simple API", 0, 0 },
@@ -66,6 +66,7 @@ LITDEF	err_msg ydberrors[] = {
 	{ "ZBRKCNTNEGATIVE", "Count [!SL], of transits through a ZBREAK breakpoint before activating it, cannot be negative", 1, 0 },
 	{ "SECSHRPATHMAX", "gtmsecshr executable path length is greater than maximum (!UL)", 1, 0 },
 	{ "MUTRUNCALREADY", "Region !AD: no further truncation possible", 2, 0 },
+	{ "ARGSLONGLINE", "Entered line is greater than maximum characters allowed (!UL)", 1, 0 },
 };
 
 
@@ -78,7 +79,7 @@ GBLDEF	err_ctl ydberrors_ctl = {
 	256,
 	"YDB",
 	&ydberrors[0],
-	49,
+	50,
 	&ydberrors_undocarr[0],
 	0
 };

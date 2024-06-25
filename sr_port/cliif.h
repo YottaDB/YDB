@@ -58,7 +58,7 @@ boolean_t	cli_get_defertime(char *entry, int4 *dst);
 #pragma pointer_size (save)
 #pragma pointer_size (long)
 #endif
-void		cli_lex_setup(int argc, char *argv[]);
+int		cli_lex_setup(int argc, char *argv[]);
 #ifdef __osf__
 #pragma pointer_size (restore)
 #endif

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -346,7 +346,7 @@ int gtcm_gnp_server_main(int argc, char **argv, char **envp)
 	char			time_str[CTIME_BEFORE_NL + 2];	/* for GET_CUR_TIME macro */
 	cmi_descriptor		log_path_descr, service_descr;
 	cmi_status_t		status;
-	int			arg_index, eof, parse_ret;
+	int			arg_index, eof, parse_ret, cli_ret;
 	pid_t			pid;
 	struct sigaction	act;
 	uint4			timout;
@@ -364,7 +364,9 @@ int gtcm_gnp_server_main(int argc, char **argv, char **envp)
 	assert(4 == offsetof(gv_key, prev)); /* for integrity of CM_GET_GVCURRKEY */
 	ydb_chk_dist(argv[0]);
 	/* read comments in gtm.c for cli magic below */
-	cli_lex_setup(argc, argv);
+	cli_ret = cli_lex_setup(argc, argv);
+	if (cli_ret)
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) cli_ret, 2, LEN_AND_STR(cli_err_str));
 	if (1 < argc)
 		cli_gettoken(&eof);
 	cli_token_buf[0] = '\0';

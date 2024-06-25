@@ -52,7 +52,7 @@ UNSETENVFAIL	<VIEW "UNSETENV":"!AD" failed in unsetenv() system call>/error/fao=
 UNKNOWNSYSERR	<[!UL] does not correspond to a known YottaDB error code>/error/fao=1
 READLINEFILEPERM	<Readline history file !AZ could not be created>/warning/fao=1
 NODEEND		<End of list of nodes/subscripts>/error/fao=0
-READLINELONGLINE	<Entered line is greater than 32Kb long and will be truncated>/warning/fao=0
+READLINELONGLINE	<Entered line is greater than 32Kb long, exceeding maximum allowed>/warning/fao=0
 INVTPTRANS	<Invalid TP transaction - either invalid TP token or transaction not in progress>/error/fao=0
 THREADEDAPINOTALLOWED	<Process cannot switch to using threaded Simple API while already using Simple API>/error/fao=0
 SIMPLEAPINOTALLOWED	<Process cannot switch to using Simple API while already using threaded Simple API>/error/fao=0
@@ -75,6 +75,7 @@ ISVSUBSCRIPTED	<ISV variable name !AD specified with a non-zero subscript count 
 ZBRKCNTNEGATIVE	<Count [!SL], of transits through a ZBREAK breakpoint before activating it, cannot be negative>/error/fao=1
 SECSHRPATHMAX	<gtmsecshr executable path length is greater than maximum (!UL)>/error/fao=1
 MUTRUNCALREADY	<Region !AD: no further truncation possible>/info/fao=2
+ARGSLONGLINE	<Entered line is greater than maximum characters allowed (!UL)>/warning/fao=1
 !
 ! If there are UNUSEDMSG* lines unused for more than one year and at least two non-patch releases, use them before adding new lines.
 !

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -42,6 +42,7 @@ GBLREF	u_casemap_t 		gtm_strToTitle_ptr;		/* Function pointer for gtm_strToTitle
 #include "stringpool.h"
 #include "stp_parms.h"
 
+GBLREF	char			cli_err_str[];
 GBLREF  stack_frame     	*frame_pointer;
 GBLREF  unsigned char		*fgncal_stack;
 GBLREF	int			fork_after_ydb_init;
@@ -65,7 +66,7 @@ int ydb_init()
 	char			path[YDB_PATH_MAX];
 	int			path_len;
 	int			save_errno;
-	int			status;
+	int			status, cli_ret;
 	struct stat		stat_buf;
 	char			file_perm[MAX_PERM_LEN];
 	Dl_info			shlib_info;
@@ -310,7 +311,12 @@ int ydb_init()
 			memcpy(ydb_dist, dist, dist_len);
 			gtm_post_startup_check_init();
 		}
-		cli_lex_setup(0, NULL);
+		cli_ret = cli_lex_setup(0, NULL);
+		if (cli_ret)
+		{
+			assert(FALSE);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) cli_ret, 2, LEN_AND_STR(cli_err_str));
+		}
 		/* Initialize msp to the maximum so if errors occur during YottaDB startup below,
 		 * the unwind logic in "gtmci_ch" will get rid of the whole stack.
 		 */

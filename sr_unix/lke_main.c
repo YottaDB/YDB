@@ -92,7 +92,9 @@ error_def(ERR_RESTRICTEDOP);
 
 int lke_main(int argc, char *argv[], char **envp)
 {
+	int	cli_ret;
 	DCL_THREADGBL_ACCESS;
+
 	GTM_THREADGBL_INIT;
 	common_startup_init(LKE_IMAGE, &lke_cmd_ary[0]);
 	licensed = TRUE;
@@ -117,7 +119,9 @@ int lke_main(int argc, char *argv[], char **envp)
 				 * at least in DEBUG, so leave it off for now to allow LKE to work in this situation.
 				 */
 	io_init_name();
-	cli_lex_setup(argc, argv);
+	cli_ret = cli_lex_setup(argc, argv);
+	if (cli_ret)
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) cli_ret, 2, LEN_AND_STR(cli_err_str));
 	readline_check_and_loadlib(); /* sets readline_file */
 	/*      this should be after cli_lex_setup() due to S390 A/E conversion    */
 	OPERATOR_LOG_MSG;

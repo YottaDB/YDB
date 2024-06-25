@@ -28,6 +28,7 @@
 #include "gtm_stdio.h"
 #include "gtm_string.h"
 #include "gtm_unistd.h"
+#include "gtm_termios.h"
 #ifdef UTF8_SUPPORTED
 #include "gtm_icu_api.h"
 #include "gtm_utf8.h"
@@ -47,6 +48,9 @@ GBLREF int	cmd_cnt;
 GBLREF char	**cmd_arg;
 GBLDEF boolean_t gtm_cli_interpret_string = TRUE;
 GBLDEF IN_PARMS *cli_lex_in_ptr;
+GBLREF char 	cli_err_str[];			/* Parse Error message buffer */
+
+static struct termios   tty_settings;
 
 #ifdef UTF8_SUPPORTED
 GBLREF	boolean_t	gtm_utf8_mode;
@@ -152,7 +156,7 @@ static int tok_string_extract(void)
 #pragma pointer_size (save)
 #pragma pointer_size (long)
 #endif
-void	cli_lex_setup (int argc, char **argv)
+int	cli_lex_setup (int argc, char **argv)
 {
 	int	parmlen, parmindx;
 	char	**parmptr;
@@ -170,9 +174,9 @@ void	cli_lex_setup (int argc, char **argv)
 	for (parmindx = 0, parmptr = argv, parmlen = PARM_OVHD; parmindx < argc; parmptr++, parmindx++)
 	{
 		if (MAX_LINE < (parmlen + STRLEN(*parmptr) + 1))
-		{	/* Copy as much as possible from the command string */
-			parmlen = MAX_LINE;
-			break;
+		{
+			SNPRINTF(cli_err_str, MAX_CLI_ERR_STR, "Command line too long (%u maximum)", MAX_LINE);
+			return (ERR_CLIERR);
 		}
 		parmlen += STRLEN(*parmptr) + 1;
 	}
@@ -188,6 +192,7 @@ void	cli_lex_setup (int argc, char **argv)
 	cli_lex_in_ptr->argv = argv;
 	cli_lex_in_ptr->in_str[0] = '\0';
 	cli_lex_in_ptr->tp = NULL;
+	return 0;
 }
 
 void cli_str_setup(uint4 addrlen, char *addr)
@@ -410,6 +415,7 @@ char *cli_fgets(char *destbuffer, int buffersize, FILE *fp, boolean_t in_tp)
 	char		cli_fgets_buffer[MAX_LINE], *retptr = NULL;
 	char 		*readline_result;
 	char		*image_name;
+	int		fgets_buffer_len = 0;
 #	ifdef UTF8_SUPPORTED
 	int		mbc_len, u16_off;
 	int32_t		mbc_dest_len;
@@ -435,13 +441,12 @@ char *cli_fgets(char *destbuffer, int buffersize, FILE *fp, boolean_t in_tp)
 			in_len = strlen(readline_result) + 1; // + 1 for \0
 			/* NB: This is different from the original code
 			 * FGETS_FILE reads until MAX_LINE; with readline, we just get a pointer to
-			 * an arbirarily large string. Here we just clip the input after issuing
-			 * an error
+			 * an arbirarily large string.
 			 */
 			if (in_len > MAX_LINE) {
 				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(2) ERR_READLINELONGLINE, 0);
-				readline_result[MAX_LINE] = '\0';
-				in_len = MAX_LINE - 1;
+				readline_result[0] = '\0';
+				in_len = 1;
 			}
 			if (cli_lex_in_ptr->buflen < in_len)
 			{
@@ -465,6 +470,37 @@ char *cli_fgets(char *destbuffer, int buffersize, FILE *fp, boolean_t in_tp)
 	PRINTF("%s> ", gtmImageNames[image_type].imageName);
 	FFLUSH(stdout);
 
+	if (gtm_utf8_mode)
+	{
+		fgets_buffer_len = (int32_t)(SIZEOF(cli_fgets_Ubuffer) / SIZEOF(UChar)) - 1;
+	} else
+	{
+		fgets_buffer_len = SIZEOF(cli_fgets_buffer);
+	}
+
+	if (isatty(STDIN_FILENO))
+	{
+		if (-1 == tcgetattr(STDIN_FILENO, &tty_settings))
+		{
+			PERROR("tcgetattr: ");
+			FPRINTF(stderr, "Unable to get terminal characterstics for standard in\n");
+		} else if (tty_settings.c_lflag & ICANON)
+			/*
+			 * NOTE: In canonical mode, the buffer is supplied by the tty driver when using
+			 * fgets/u_fgets (interactively), and is smaller than MAX_LINE, it is 4096.
+			 *
+			 * From the termios man page:
+			 *   In canonical mode:
+			 *     The maximum line length is 4096 chars (including the terminating newline
+			 *     character); lines longer than 4096 chars are truncated. After 4095
+			 *     characters, input processing (e.g., ISIG and ECHO* processing) continues,
+			 *     but any input data after 4095 characters up to (but not including) any
+			 *     terminating newline is discarded. This ensures that the terminal can
+			 *     always receive more input until at least one line can be read.
+			 */
+			fgets_buffer_len = 4096;
+	}
+
 #	ifdef UTF8_SUPPORTED
 	if (gtm_utf8_mode)
 	{
@@ -481,9 +517,8 @@ char *cli_fgets(char *destbuffer, int buffersize, FILE *fp, boolean_t in_tp)
 		if (NULL != u_fp)
 		{
 			do
-			{	/* no f_ferror */
-				uc_fgets_ret = u_fgets(cli_fgets_Ubuffer,
-					(int32_t)(SIZEOF(cli_fgets_Ubuffer) / SIZEOF(UChar)) - 1, u_fp);
+			{	/* no u_ferror so use plain ferror */
+				uc_fgets_ret = u_fgets(cli_fgets_Ubuffer, fgets_buffer_len, u_fp);
 				if ((NULL != uc_fgets_ret) || u_feof(u_fp) || !ferror(fp) || (EINTR != errno))
 					break;
 				eintr_handling_check();
@@ -498,6 +533,23 @@ char *cli_fgets(char *destbuffer, int buffersize, FILE *fp, boolean_t in_tp)
 				return NULL;
 			}
 			in_len = u_strlen(cli_fgets_Ubuffer);
+			if ('\n' != cli_fgets_Ubuffer[in_len - 1])
+			{
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ARGSLONGLINE, 2, in_len);
+				/* There is a buffer overflow, so drain the input buffer with more u_fgets */
+				do
+				{	/* no u_ferror so use plain ferror */
+					uc_fgets_ret = u_fgets(cli_fgets_Ubuffer, fgets_buffer_len, u_fp);
+					in_len = u_strlen(cli_fgets_Ubuffer);
+					if (((NULL == uc_fgets_ret) && (EINTR != errno)) || u_feof(u_fp) ||
+						ferror(fp) || ('\n' == cli_fgets_Ubuffer[in_len - 1]))
+						break;
+					eintr_handling_check();
+				} while (TRUE);
+				HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
+				cli_fgets_Ubuffer[0] = '\n';
+				in_len = 1;
+			}
 			in_len = trim_U16_line_term(cli_fgets_Ubuffer, (int)in_len);
 			for (u16_off = 0, mbc_len = 0; u16_off < in_len; )
 			{
@@ -529,11 +581,30 @@ char *cli_fgets(char *destbuffer, int buffersize, FILE *fp, boolean_t in_tp)
 	{
 #	endif
 		cli_fgets_buffer[0] = '\0';
-		FGETS_FILE(cli_fgets_buffer, SIZEOF(cli_fgets_buffer), fp, retptr);
+		FGETS_FILE(cli_fgets_buffer, fgets_buffer_len, fp, retptr);
 		if (NULL != retptr)
 		{
 			in_len = strlen(cli_fgets_buffer);
 			assert(in_len <= MAX_LINE);
+			if ('\n' != cli_fgets_buffer[in_len - 1]) {
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ARGSLONGLINE, 2, in_len);
+				/* There is a buffer overflow, so drain the input buffer with more fgets */
+				do
+				{
+					/* We don't use the FGETS_FILE macro here, because we want to
+					 * break out of the loop once it flushes an overflow, which is
+					 * a different set of conditions than the macro handles
+					 */
+					retptr = fgets(cli_fgets_buffer, SIZEOF(cli_fgets_buffer), fp);
+					in_len = strlen(cli_fgets_buffer);
+					if (((NULL == retptr) && (EINTR != errno)) || feof(fp) ||
+						ferror(fp) || ('\n' == cli_fgets_buffer[in_len - 1]))
+						break;
+					eintr_handling_check();
+				} while (TRUE);
+				cli_fgets_buffer[0] = '\n';
+				in_len = 1;
+			}
 			if (cli_lex_in_ptr->buflen < in_len)
 			{
 				cli_lex_in_expand((int)in_len);

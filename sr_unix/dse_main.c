@@ -103,7 +103,9 @@ error_def(ERR_RESTRICTEDOP);
 
 int dse_main(int argc, char **argv, char **envp)
 {
+	int	cli_ret;
 	DCL_THREADGBL_ACCESS;
+
 	GTM_THREADGBL_INIT;
 	common_startup_init(DSE_IMAGE, &dse_cmd_ary[0]);
 	licensed = TRUE;
@@ -134,7 +136,9 @@ int dse_main(int argc, char **argv, char **envp)
 	region_init(FALSE);
 	util_out_print("!/File  !_!AD", TRUE, DB_LEN_STR(gv_cur_region));
 	util_out_print("Region!_!AD!/", TRUE, REG_LEN_STR(gv_cur_region));
-	cli_lex_setup(argc, argv);
+	cli_ret = cli_lex_setup(argc, argv);
+	if (cli_ret)
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) cli_ret, 2, LEN_AND_STR(cli_err_str));
 	/* Since DSE operates on a region-by-region basis (for the most part), do not use a global directory at all from now on */
 	original_header = gd_header;
 	gd_header = NULL;

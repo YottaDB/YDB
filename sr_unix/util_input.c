@@ -3,7 +3,7 @@
  * Copyright (c) 2006-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2020-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -72,7 +72,7 @@ char *util_input(char *buffer, int buffersize, FILE *fp, boolean_t remove_leadin
 		if (NULL != u_fp)
 		{
 			do
-			{	/* no u_ferror */
+			{	/* no u_ferror so use plain ferror */
 				uc_fgets_ret = u_fgets(ufgets_Ubuffer, (int32_t)(SIZEOF(ufgets_Ubuffer) / SIZEOF(UChar)) - 1, u_fp);
 				if ((NULL != uc_fgets_ret) || u_feof(u_fp) || !ferror(fp) || (EINTR != errno))
 					break;

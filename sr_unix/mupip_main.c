@@ -80,7 +80,7 @@ GBLREF	IN_PARMS		*cli_lex_in_ptr;
 
 int mupip_main(int argc, char **argv, char **envp)
 {
-	int 		i, lenargv, res, status;
+	int		i, lenargv, res, status, cli_ret;
 	char 		*cmdletter;
 	DCL_THREADGBL_ACCESS;
 
@@ -109,7 +109,9 @@ int mupip_main(int argc, char **argv, char **envp)
 	mu_get_term_characterstics();
 	ydb_chk_dist(argv[0]);
 	init_gtm();
-	cli_lex_setup(argc,argv);
+	cli_ret = cli_lex_setup(argc, argv);
+	if (cli_ret)
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) cli_ret, 2, LEN_AND_STR(cli_err_str));
 	mupip_exit_fp = mupip_exit;	/* Initialize function pointer for use during MUPIP */
 	while (TRUE)
 	{	func = 0;
