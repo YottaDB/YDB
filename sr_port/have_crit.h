@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -88,6 +88,9 @@ typedef enum
 	INTRPT_IN_KILL_CLEANUP,		/* Deferring interrupts while performing KILL cleanup - used by REORG */
 	INTRPT_IN_RTN_CLEANUP,          /* Deferring interrupts while cleaning up routines */
 	INTRPT_IN_SOCKET_CLOSE,		/* Deferring interrupts while closing some sockets */
+	INTRPT_IN_RIP_NOTIFY,		/* Deferring interrupts while notifying read waiters of completion */
+	INTRPT_IN_JNL_CLEANUP,		/* Deferring interrupts while holding the phase2 latch */
+	INTRPT_IN_MLK_SHM_MODIFY,	/* Deferring interrupts while grabbing a LOCK and initializing a node */
 	INTRPT_NUM_STATES		/* Should be the *last* one in the enum. */
 } intrpt_state_t;
 

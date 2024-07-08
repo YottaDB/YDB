@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -321,6 +321,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 	assert((inctn_invalid_op == inctn_opcode) || mu_upgrade_in_prog || mu_reorg_encrypt_in_prog || update_trans);
 	assert(!need_kip_incr || update_trans || TREF(in_gvcst_redo_root_search));
 	assert(!DEFER_FREEZE_OBSERVATION(TREF(defer_instance_freeze)));
+	SET_CUR_CMT_STEP_IF(TRUE, TREF(cur_cmt_step), CMT00);
 	cti = csa->ti;
 	if ((WC_BLOCK_RECOVER == cnl->wc_blocked) || (is_mm && (csa->total_blks != cti->total_blks)))
 	{	/* If blocked, or we have MM and file has been extended, force repair */
@@ -669,7 +670,6 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 	}
 	block_saved = FALSE;
 	ESTABLISH_NOUNWIND(t_ch);	/* avoid hefty setjmp call, which is ok since we never unwind t_ch */
-	SET_CUR_CMT_STEP_IF(TRUE, TREF(cur_cmt_step), CMT00);
 	assert(!csa->hold_onto_crit || csa->now_crit);
 	if (!csa->now_crit)
 	{
@@ -1645,6 +1645,64 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 			SET_CUR_CMT_STEP_IF(TRUE, TREF(cur_cmt_step), CMT06b);
 		}
 	}
+	if (free_seen)
+	{	/* Write to snapshot and backup file for busy2free and recycled2free mode. These modes only appear in
+		 * mupip reorg -truncate, which cannot occur with MM.
+		 */
+		cs = &cw_set[0];
+		if (SAVE_2FREE_IMAGE(cs->mode, free_seen, csd))
+		{
+			blkid = cs->blk;
+			assert(!IS_BITMAP_BLK(blkid) && (blkid == cr_array[0]->blk));
+			csa->backup_in_prog = (BACKUP_NOT_IN_PROGRESS != cnl->nbb);
+			cr = cr_array[0];
+			backup_cr = cr;
+			blk_ptr = (sm_uc_ptr_t)GDS_REL2ABS(cr->buffaddr);
+			backup_blk_ptr = blk_ptr;
+			BG_BACKUP_BLOCK(csa, csd, cnl, cr, cs, blkid, backup_cr, backup_blk_ptr, block_saved,
+					 dummysi->backup_block_saved);
+			if (SNAPSHOTS_IN_PROG(csa))
+			{	/* we write the before-image to snapshot file only for FAST_INTEG and not for
+				 * regular integ because the block is going to be marked free at this point
+				 * and in case of a regular integ a before image will be written to the snapshot
+				 * file eventually when the free block gets reused. So the before-image writing
+				 * effectively gets deferred but does happen.
+				 */
+				lcl_ss_ctx = SS_CTX_CAST(cs_addrs->ss_ctx);
+				if (lcl_ss_ctx && FASTINTEG_IN_PROG(lcl_ss_ctx) && (blkid < lcl_ss_ctx->total_blks))
+					WRITE_SNAPSHOT_BLOCK(cs_addrs, cr, NULL, blkid, lcl_ss_ctx);
+			}
+		}
+		/* Write the journal record before releasing crit as we will UNPIN the associated cache-records before
+		 * releasing crit (sooner than normal).
+		 */
+		if (NEED_TO_FINISH_JNL_PHASE2(jrs))
+		{
+			/* "jnl_write_pblk" will look at "cse->old_mode" (instead of cse->mode) with the assumption that
+			 * it is called in phase2 after crit has been released. But in this case we are calling
+			 * "jnl_write_phase2" (which in turn calls "jnl_write_pblk") before releasing crit.
+			 * So set cse->old_mode = cse->mode before the call.
+			 */
+			first_jre = jrs->jrs_array;
+			jre_top = first_jre + jrs->usedlen;
+			for (jre = first_jre; jre < jre_top; jre++)
+			{
+				if (JRT_PBLK != jre->rectype)
+					continue;
+				cs = (cw_set_element *)jre->param1;
+				cs->old_mode = cs->mode;
+			}
+			assert(!replication);	/* so "JPL_PHASE2_WRITE_COMPLETE" does not need to be called inside
+						 * NONTP_FINISH_JNL_PHASE2_IN_JNLBUFF_AND_JNLPOOL invocation below.
+						 */
+			/* Step CMT06a */
+			SET_CUR_CMT_STEP_IF(TRUE, csa->nl->cur_cmt_step, DECL_CMT06a);
+			SET_CUR_CMT_STEP_IF(TRUE, TREF(cur_cmt_step), DECL_CMT06a);
+			NONTP_FINISH_JNL_PHASE2_IN_JNLBUFF_AND_JNLPOOL(csa, jrs, replication, jnlpool);
+			SET_CUR_CMT_STEP_IF(TRUE, csa->nl->cur_cmt_step, CMT06a);
+			SET_CUR_CMT_STEP_IF(TRUE, TREF(cur_cmt_step), CMT06a);
+		}
+	}
 	/* Ensure jgbl.gbl_jrec_time did not get reset by any of the jnl writing functions */
 	assert(save_gbl_jrec_time == jgbl.gbl_jrec_time);
 	if (replication)
@@ -1720,65 +1778,6 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 		SET_REG_SEQNO(csa, temp_jnl_seqno, supplementary, strm_index, next_strm_seqno, SKIP_ASSERT_FALSE); /* Step CMT10 */
 		SET_CUR_CMT_STEP_IF(TRUE, csa->nl->cur_cmt_step, CMT10);
 		SET_CUR_CMT_STEP_IF(TRUE, TREF(cur_cmt_step), CMT10);
-
-	}
-	if (free_seen)
-	{	/* Write to snapshot and backup file for busy2free and recycled2free mode. These modes only appear in
-		 * mupip reorg -truncate, which cannot occur with MM.
-		 */
-		cs = &cw_set[0];
-		if (SAVE_2FREE_IMAGE(cs->mode, free_seen, csd))
-		{
-			blkid = cs->blk;
-			assert(!IS_BITMAP_BLK(blkid) && (blkid == cr_array[0]->blk));
-			csa->backup_in_prog = (BACKUP_NOT_IN_PROGRESS != cnl->nbb);
-			cr = cr_array[0];
-			backup_cr = cr;
-			blk_ptr = (sm_uc_ptr_t)GDS_REL2ABS(cr->buffaddr);
-			backup_blk_ptr = blk_ptr;
-			BG_BACKUP_BLOCK(csa, csd, cnl, cr, cs, blkid, backup_cr, backup_blk_ptr, block_saved,
-					 dummysi->backup_block_saved);
-			if (SNAPSHOTS_IN_PROG(csa))
-			{	/* we write the before-image to snapshot file only for FAST_INTEG and not for
-				 * regular integ because the block is going to be marked free at this point
-				 * and in case of a regular integ a before image will be written to the snapshot
-				 * file eventually when the free block gets reused. So the before-image writing
-				 * effectively gets deferred but does happen.
-				 */
-				lcl_ss_ctx = SS_CTX_CAST(cs_addrs->ss_ctx);
-				if (lcl_ss_ctx && FASTINTEG_IN_PROG(lcl_ss_ctx) && (blkid < lcl_ss_ctx->total_blks))
-					WRITE_SNAPSHOT_BLOCK(cs_addrs, cr, NULL, blkid, lcl_ss_ctx);
-			}
-		}
-		/* Write the journal record before releasing crit as we will UNPIN the associated cache-records before
-		 * releasing crit (sooner than normal).
-		 */
-		if (NEED_TO_FINISH_JNL_PHASE2(jrs))
-		{
-			/* "jnl_write_pblk" will look at "cse->old_mode" (instead of cse->mode) with the assumption that
-			 * it is called in phase2 after crit has been released. But in this case we are calling
-			 * "jnl_write_phase2" (which in turn calls "jnl_write_pblk") before releasing crit.
-			 * So set cse->old_mode = cse->mode before the call.
-			 */
-			first_jre = jrs->jrs_array;
-			jre_top = first_jre + jrs->usedlen;
-			for (jre = first_jre; jre < jre_top; jre++)
-			{
-				if (JRT_PBLK != jre->rectype)
-					continue;
-				cs = (cw_set_element *)jre->param1;
-				cs->old_mode = cs->mode;
-			}
-			assert(!replication);	/* so "JPL_PHASE2_WRITE_COMPLETE" does not need to be called inside
-						 * NONTP_FINISH_JNL_PHASE2_IN_JNLBUFF_AND_JNLPOOL invocation below.
-						 */
-			/* Step CMT06a */
-			SET_CUR_CMT_STEP_IF(TRUE, csa->nl->cur_cmt_step, DECL_CMT06a);
-			SET_CUR_CMT_STEP_IF(TRUE, TREF(cur_cmt_step), DECL_CMT06a);
-			NONTP_FINISH_JNL_PHASE2_IN_JNLBUFF_AND_JNLPOOL(csa, jrs, replication, jnlpool);
-			SET_CUR_CMT_STEP_IF(TRUE, csa->nl->cur_cmt_step, CMT06a);
-			SET_CUR_CMT_STEP_IF(TRUE, TREF(cur_cmt_step), CMT06a);
-		}
 	}
 	if (cw_set_depth)
 	{

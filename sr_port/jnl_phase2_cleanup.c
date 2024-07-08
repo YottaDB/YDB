@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2016-2023 Fidelity National Information	*
+ * Copyright (c) 2016-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -26,6 +26,7 @@
 #include "gdsbgtr.h"
 
 GBLREF	uint4		process_id;
+GBLREF	intrpt_state_t	intrpt_ok_state;
 
 #define	PHASE2_COMMIT_ARRAY_ITERATE_UNTIL_WRITE_COMPLETE_FALSE(csa, phs2cmt, maxCmt)	\
 MBSTART {										\
@@ -47,12 +48,14 @@ void	jnl_phase2_cleanup(sgmnt_addrs *csa, jnl_buffer_ptr_t jbp)
 	int			index1, index2;
 	jbuf_phase2_in_prog_t	*phs2cmt, *deadCmt, *begCmt, *maxCmt, *topCmt;
 	boolean_t		was_latch_owner;
+	intrpt_state_t		prev_intrpt_state = intrpt_ok_state;
 	DEBUG_ONLY(uint4	jbp_freeaddr1;)
 
 	/* It is possible we already own the latch in case we are in timer-interrupt or process-exit code hence the below check */
 	was_latch_owner = GLOBAL_LATCH_HELD_BY_US(&jbp->phase2_commit_latch);
 	if (!was_latch_owner)
 	{	/* Return value of "grab_latch" does not need to be checked because we pass GRAB_LATCH_INDEFINITE_WAIT as timeout */
+		DEFER_INTERRUPTS(INTRPT_IN_JNL_CLEANUP, prev_intrpt_state);
 		grab_latch(&jbp->phase2_commit_latch, GRAB_LATCH_INDEFINITE_WAIT, WS_28, csa);
 	}
 	index1 = jbp->phase2_commit_index1;
@@ -161,5 +164,8 @@ void	jnl_phase2_cleanup(sgmnt_addrs *csa, jnl_buffer_ptr_t jbp)
 		}
 	}
 	if (!was_latch_owner)
+	{
 		rel_latch(&jbp->phase2_commit_latch);
+		ENABLE_INTERRUPTS(INTRPT_IN_JNL_CLEANUP, prev_intrpt_state);
+	}
 }

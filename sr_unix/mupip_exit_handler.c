@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -135,7 +135,7 @@ void mupip_exit_handler(void)
 		SHMDT(recvpool.recvpool_ctl);
 		recvpool.recvpool_ctl = NULL;
 	}
-	WITH_CH(exi_ch, gv_rundown(), 0); /* also takes care of detaching from the journal pool */
+	WITH_CH(exi_ch, gv_rundown(), if(FALSE)); /* also takes care of detaching from the journal pool */
 	relinkctl_rundown(TRUE, TRUE);	/* decrement relinkctl-attach & rtnobj-reference counts */
 	/* Log the exit of replication servers. In case they are exiting abnormally, their log file pointers
 	 * might not be set up. In that case, use "stderr" for logging.

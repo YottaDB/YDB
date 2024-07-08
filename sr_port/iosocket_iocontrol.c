@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -29,23 +29,8 @@
 #include "stringpool.h"
 #include "min_max.h"
 #include "error.h"
-#include "gdsroot.h"
-#include "gdskill.h"
-#include "gdsbt.h"
-#include "gtm_facility.h"
-#include "fileinfo.h"
-#include "gdsfhead.h"
-#include "gdscc.h"
-#include "filestruct.h"
-#include "buddy_list.h"		/* needed for tp.h */
-#include "jnl.h"
-#include "tp.h"
-#include "send_msg.h"
-#include "gtmmsg.h"		/* for gtm_putmsg() prototype */
-#include "change_reg.h"
-#include "getzposition.h"
+#include "tpnotacid_chk_inline.h"
 #ifdef DEBUG
-#include "have_crit.h"		/* for the TPNOTACID_CHECK macro */
 #include "wbox_test_init.h"
 #endif
 
@@ -115,7 +100,7 @@ void	iosocket_iocontrol(mstr *mn, int4 argcnt, va_list args)
 	{
 		arg = (0 < argcnt) ? va_arg(args, mval *) : (mval *)&literal_notimeout;
 		if ((NULL != arg) && !M_ARG_SKIPPED(arg) && MV_DEFINED(arg))
-			MV_FORCE_MSTIMEOUT(arg, msec_timeout, FORMATTIMESTR);
+			MV_FORCE_MSTIMEOUT(arg, &msec_timeout, FORMATTIMESTR);
 		else
 		{
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_EXPR);
@@ -155,7 +140,7 @@ void	iosocket_iocontrol(mstr *mn, int4 argcnt, va_list args)
 				arg = (mval *)&literal_notimeout;
 		} else
 			arg = (mval *)&literal_notimeout;
-		MV_FORCE_MSTIMEOUT(arg, msec_timeout, FORMATTIMESTR);
+		MV_FORCE_MSTIMEOUT(arg, &msec_timeout, FORMATTIMESTR);
 		iosocket_pass_local(io_curr_device.out, pid, msec_timeout, n, args);
 	} else if (0 == memcmp(action, "ACCEPT", length))
 	{
@@ -185,7 +170,7 @@ void	iosocket_iocontrol(mstr *mn, int4 argcnt, va_list args)
 				arg = (mval *)&literal_notimeout;
 		} else
 			arg = (mval *)&literal_notimeout;
-		MV_FORCE_MSTIMEOUT(arg, msec_timeout, FORMATTIMESTR);
+		MV_FORCE_MSTIMEOUT(arg, &msec_timeout, FORMATTIMESTR);
 		iosocket_accept_local(io_curr_device.in, handlesvar, pid, msec_timeout, n, args);
 #ifdef	GTM_TLS
 	} else if (0 == memcmp(action, "TLS", length))
@@ -212,7 +197,7 @@ void	iosocket_iocontrol(mstr *mn, int4 argcnt, va_list args)
 				arg = (mval *)&literal_notimeout;
 		} else
 			arg = (mval *)&literal_notimeout;
-		MV_FORCE_MSTIMEOUT(arg, msec_timeout, FORMATTIMESTR);
+		MV_FORCE_MSTIMEOUT(arg, &msec_timeout, FORMATTIMESTR);
 		if (3 <= argcnt)
 		{
 			tlsid = va_arg(args, mval *);

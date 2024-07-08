@@ -1,6 +1,6 @@
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !								!
-! Copyright (c) 2001-2023 Fidelity National Information		!
+! Copyright (c) 2001-2024 Fidelity National Information		!
 ! Services, Inc. and/or its subsidiaries. All rights reserved.	!
 !								!
 !	This source code contains the intellectual property	!
@@ -992,7 +992,7 @@ FILERENAME	<File !AD is renamed to !AD>/info/fao=4!/ansi=0
 JNLBUFINFO	<Pid 0x!XL dsk 0x!XL free 0x!XL bytcnt 0x!XL io_in_prog 0x!XL fsync_in_prog 0x!XL dskaddr 0x!XL freeaddr 0x!XL qiocnt 0x!XL now_writer 0x!XL fsync_pid 0x!XL filesize 0x!XL cycle 0x!XL errcnt 0x!XL wrtsize 0x!XL fsync_dskaddr 0x!XL rsrv_free 0x!XL rsrv_freeaddr 0x!XL phase2_commit_index1 0x!XL phase2_commit_index2 0x!XL next_align_addr 0x!XL>/info/fao=21!/ansi=0
 SDSEEKERR	<Sequential device seek error - !AD>/error/fao=2!/ansi=0
 LOCALSOCKREQ	<LOCAL socket required>/error/fao=0!/ansi=0
-TPNOTACID	<!AD at !AD violates ACID properties of a TRANSACTION and could exceed !AD seconds; $TRESTART = !UL and indefinite RESTARTs may occur>/info/fao=7!/ansi=0
+TPNOTACID	<!AD at !AD violates ACID properties of a TRANSACTION and could exceed !UL milliseconds; !UL RESTARTs have occurred>/warning/fao=6!/ansi=0
 JNLSETDATA2LONG	<SET journal record has data of length !UL.  Target system cannot handle data more than !UL bytes.>/error/fao=2!/ansi=0
 JNLNEWREC	<Target system cannot recognize journal record of type !UL, last recognized type is !UL>/error/fao=2!/ansi=0
 REPLFTOKSEM	<Error with replication semaphores for instance file !AD>/error/fao=2!/ansi=0
@@ -1689,8 +1689,8 @@ EXTCALLBOUNDS	<Wrote outside bounds of external call buffer. M label: !AZ>/fatal
 EXCEEDSPREALLOC	<Preallocated size !UL for M external call label !AZ exceeded by string of length !UL>/error/fao=3!/ansi=0
 ZTIMEOUT	<Time expired>/warning/fao=0!/ansi=0
 ERRWZTIMEOUT	<Error while processing $ZTIMEOUT>/error/fao=0!/ansi=0
-MLKHASHRESIZE	<LOCK hash table increased in size from !UL to !UL and placed in shared memory (id = !UL)>/info/fao=3!/ansi=0
-MLKHASHRESIZEFAIL	<Failed to increase LOCK hash table size from !UL to !UL. Will retry with larger size.>/warning/fao=2!/ansi=0
+MLKHASHRESIZE	<LOCK hash table for region !AD (!AD) increased in size from !UL to !UL and placed in shared memory (id = !UL)>/info/fao=7!/ansi=0
+MLKHASHRESIZEFAIL	<Failed to increase LOCK hash table for region !AD (!AD) size from !UL to !UL. Will retry with larger size.>/warning/fao=6!/ansi=0
 MLKCLEANED	<LOCK garbage collection freed !UL lock slots for region !AD>/info/fao=3!/ansi=0
 NOTMNAME	<!AD is not a valid M name>/error/fao=2!/ansi=0
 DEVNAMERESERVED	 <Cannot use !AD as device name. Reserved for GTM internal usage>/error/fao=2!/ansi=0
@@ -1705,7 +1705,7 @@ BUFSPCDELAY	<Request for !UL blocks in region !AD delayed>/warning/fao=3!/ansi=0
 AIOQUEUESTUCK	<Waited !UL minutes for AIO work queue to complete (cr = !XL)>/error/fao=2!/ansi=0
 INVGVPATQUAL	<Invalid Global Value Pattern file qualifier value.  !AD>/error/fao=2!/ansi=0
 NULLPATTERN	<Empty line found in the Pattern file.>/warning/fao=0!/ansi=0
-MLKREHASH	<LOCK hash table rebuilt for region !AD (seed = !UJ)>/info/fao=3!/ansi=0
+MLKREHASH	<LOCK hash table rebuilt for region !AD (!AD) (seed = !UJ)>/info/fao=5!/ansi=0
 MUKEEPPERCENT	<Keep threshold percentage should be from 0 to 99>/error/fao=0!/ansi=0
 MUKEEPNODEC	<Expected decimal integer input for keep>/error/fao=0!/ansi=0
 MUKEEPNOTRUNC	<Keep issued without -truncate>/error/fao=0!/ansi=0

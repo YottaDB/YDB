@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -38,6 +38,7 @@
 #include "gtmdbglvl.h"		/* for gtm_malloc.h */
 #include "gtm_malloc.h"		/* for VERIFY_STORAGE_CHAINS */
 #include "send_msg.h"
+#include "tpnotacid_chk_inline.h"
 
 /******************************************************************************
  *
@@ -135,6 +136,8 @@ error_def(ERR_ZCVECTORINDX);
 error_def(ERR_XCRETNULLREF);
 error_def(ERR_EXTCALLBOUNDS);
 error_def(ERR_EXCEEDSPREALLOC);
+
+#define EXCALLSTR "CALL OUT"
 
 STATICDEF int		call_table_initialized = 0;
 /* The following are one-letter mnemonics for Java argument types (capital letters to denote output direction):
@@ -801,6 +804,7 @@ STATICFNDEF void op_fgnjavacal(mval *dst, mval *package, mval *extref, uint4 mas
 	va_end(var_copy);
 	param_list->n = argcnt + 3;		/* Take care of the three implicit parameters. */
 	VERIFY_STORAGE_CHAINS;
+	TPNOTACID_CHECK(EXCALLSTR);
 	save_mumps_status = mumps_status; 	/* Save mumps_status as a callin from external call may change it. */
 	assert(INTRPT_OK_TO_INTERRUPT == intrpt_ok_state);	/* Expected for DEFERRED_EXIT_HANDLING_CHECK below */
 	TREF(in_ext_call) = TRUE;
@@ -1202,6 +1206,7 @@ void op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 ma
 	va_end(var);
 	param_list->n = argcnt;
 	VERIFY_STORAGE_CHAINS;
+	TPNOTACID_CHECK(EXCALLSTR);
 	save_mumps_status = mumps_status; /* Save mumps_status as a callin from external call may change it */
 	assert(INTRPT_OK_TO_INTERRUPT == intrpt_ok_state);              /* Expected for DEFERRED_EXIT_HANDLING_CHECK below */
 	TREF(in_ext_call) = TRUE;

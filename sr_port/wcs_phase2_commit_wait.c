@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2008-2023 Fidelity National Information	*
+ * Copyright (c) 2008-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -246,8 +246,11 @@ boolean_t	wcs_phase2_commit_wait(sgmnt_addrs *csa, cache_rec_ptr_t cr)
 			if (was_crit)
 			{
 				BG_TRACE_PRO_ANY(csa, phase2_commit_wait_sleep_in_crit);
-			} else
+			}
+			else
+			{
 				BG_TRACE_PRO_ANY(csa, phase2_commit_wait_sleep_no_crit);
+			}
 			if (0 == (lcnt % PHASE2_COMMIT_WAIT))
 			{	/* This is the case where we wait for a particular cache-record.
 				 * Take the c-stack of the PID that is still holding this cr.

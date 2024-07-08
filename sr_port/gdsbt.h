@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -769,7 +769,11 @@ typedef struct node_local_struct
 	gtm_uint64_t	wcs_buffs_freed; /* this is a count of the number of buffers transitioned to the free "queue" */
 	volatile gtm_uint64_t	dskspace_next_fire;
 	global_latch_t	lock_crit;		/* mutex for LOCK processing */
+	CACHELINE_PAD(8, 11)
 	volatile block_id	tp_hint;
+	pthread_mutex_t		read_completed_ctl;	/* Coordinate block read completion in BG */
+	pthread_cond_t		read_completed;
+	uint4			epoch_taper_last_pid;	/* last process to do an epoch taper */
 } node_local;
 
 #define	COPY_STATSDB_FNAME_INTO_STATSREG(statsDBreg, statsDBfname, statsDBfname_len)				\

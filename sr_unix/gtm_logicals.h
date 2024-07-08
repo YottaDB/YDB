@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -28,8 +28,8 @@
 #define	GTM_GBLDIR			"$gtmgbldir"
 #define	GTM_GVUNDEF_FATAL		"$gtm_gvundef_fatal"
 #define	GTM_POOLLIMIT			"$gtm_poollimit"
-#define	GTM_TP_ALLOCATION_CLUE		"$gtm_tp_allocation_clue"
 #define	GTM_TPNOTACIDTIME		"$gtm_tpnotacidtime"
+#define	GTM_TPNOTACIDTRIES		"$gtm_tpnotacidtries"
 #define	GTM_TPRESTART_LOG_DELTA		"$gtm_tprestart_log_delta"
 #define	GTM_TPRESTART_LOG_FIRST		"$gtm_tprestart_log_first"
 #define GTM_NONTPRESTART_LOG_DELTA	"$gtm_nontprestart_log_delta"

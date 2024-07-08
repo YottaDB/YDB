@@ -675,8 +675,7 @@ boolean_t incr_link(int *file_desc, zro_ent *zro_entry, uint4 fname_len, char *f
 	 */
 	alloc_len = hdr->linkage_len * SIZEOF(lnk_tabent);
 	hdr->linkage_adr = (lnk_tabent *)malloc((0 != alloc_len) ? alloc_len : SIZEOF(lnk_tabent));
-	assert(PADLEN(hdr->linkage_adr, SIZEOF(lnk_tabent) == 0));
-	assert(((UINTPTR_T)hdr->linkage_adr % SIZEOF(lnk_tabent)) == 0);
+	assert((0 == (PADLEN(hdr->linkage_adr, SIZEOF(lnk_tabent)))) && (0 == ((UINTPTR_T)hdr->linkage_adr % SIZEOF(lnk_tabent))));
 	memset((char *)hdr->linkage_adr, 0, (hdr->linkage_len * SIZEOF(lnk_tabent)));
 	/* Relocations for read-write releasable section. Perform relocation on literal mval table and
 	 * variable table entries since they both point to the offsets from the beginning of the

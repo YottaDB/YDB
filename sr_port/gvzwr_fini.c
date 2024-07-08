@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -34,60 +34,54 @@
 
 GBLDEF zshow_out	*zwr_output;
 
-GBLREF gv_namehead	*gv_target;
-GBLREF gv_namehead	*reset_gv_target;
-GBLREF gv_key		*gv_currkey;
-GBLREF gd_region	*gv_cur_region;
-GBLREF sgmnt_addrs	*cs_addrs;
-GBLREF gvzwrite_datablk	*gvzwrite_block;
-GBLREF gd_addr		*gd_header;
-GBLREF bool		undef_inhibit;
+GBLREF bool			undef_inhibit;
+GBLREF gd_addr			*gd_header;
+GBLREF gd_region		*gv_cur_region;
+GBLREF gv_key			*gv_currkey;
+GBLREF gv_namehead		*gv_target, *reset_gv_target;
+GBLREF gvzwrite_datablk		*gvzwrite_block;
 
 error_def(ERR_GVNAKED);
 
 void gvzwr_fini(zshow_out *out, int pat)
 {
 	char 		m[SIZEOF(mident_fixed)];
-	mval 		local, data;
-	gv_key		*old;
 	gvnh_reg_t	*gvnh_reg;
+	mval 		local, data;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	if (!gv_currkey)
 		gvinit();
-	ESTABLISH(gvzwrite_ch);
 	zwr_output = out;
+	ESTABLISH(gvzwrite_ch);
 	assert(INVALID_GV_TARGET == reset_gv_target);
+	gvzwrite_block->ref_gbldir = gd_header;				/* see cmments in zwrite.h for more info on this section */
+	DEBUG_ONLY(gvzwrite_block->ref_targ = gv_target);
 	reset_gv_target = gv_target;
 	DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC(CHECK_CSA_TRUE);
-	gvzwrite_block->gd_reg = gv_cur_region;
-	gvzwrite_block->old_targ = (unsigned char *)gv_target;
-	old = (gv_key *)malloc(SIZEOF(gv_key) + gv_currkey->end + 1);
-	gvzwrite_block->old_key = (unsigned char *)old;
-	memcpy(gvzwrite_block->old_key, gv_currkey, SIZEOF(gv_key) + gv_currkey->end + 1);
+	gvzwrite_block->ref_reg = gv_cur_region;
+	GVKEY_INIT(gvzwrite_block->ref_key, DBKEYSIZE(MAX_KEY_SZ));	/* better dynamic than static; freed in gvzwrite_clnup */
+	COPY_KEY(gvzwrite_block->ref_key, gv_currkey);
 	gvzwrite_block->gv_last_subsc_null = TREF(gv_last_subsc_null);
 	gvzwrite_block->gv_some_subsc_null = TREF(gv_some_subsc_null);
 	if (!pat)
-	{
+	{	/* just a reference */
 		local = *gvzwrite_block->pat;
-		if (local.str.len)  /* New reference. Will get new gv_target.. */
-		{
+		if (local.str.len)
+		{	/* new reference. gets new gv_target */
 			gv_target = NULL;
 			gv_currkey->base[0] = '\0';
 			op_gvname(VARLSTCNT(1) &local);
- 			op_gvdata(&data);
+			op_gvdata(&data);
 			if (!(MV_FORCE_INTD(&data)))
 			{
 				if (!undef_inhibit)
 					sgnl_gvundef();
 			} else
-			{
-				gvzwrite_block->fixed = (gvzwrite_block->fixed ? TRUE : FALSE);
 				gvzwr_var(MV_FORCE_INTD(&data), 0);
-			}
-		} else	/* Old (naked) reference. Keep previous gv_target reference */
-		{
+		} else
+		{	/* old (naked) reference. Keep previous gv_target */
 			if (gv_currkey->prev == 0)
 				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_GVNAKED);
 			gv_currkey->end = gv_currkey->prev;
@@ -104,20 +98,16 @@ void gvzwr_fini(zshow_out *out, int pat)
 				if (!undef_inhibit)
 					sgnl_gvundef();
 			} else
-			{
-				gvzwrite_block->fixed = (gvzwrite_block->fixed ? TRUE : FALSE);
 				gvzwr_var((int4)MV_FORCE_INTD(&data), 0);
-			}
 		}
 	} else
-	{
+	{	/* wander through a global using the pattern as a filter */
 		gv_target = NULL;
 		gv_currkey->base[0] = '\0';
 		local.mvtype = MV_STR;
 		local.str.addr = &m[0];
 		local.str.len = 1;
 		m[0] = '%';
-
 		gvzwrite_block->fixed = FALSE;
 		for (; ;)
 		{

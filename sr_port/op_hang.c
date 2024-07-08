@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -36,23 +36,8 @@
 # include "util.h"
 # include "deferred_signal_handler.h"
 #endif
-
-#include "gdsroot.h"
-#include "gdskill.h"
-#include "gdsbt.h"
-#include "gtm_facility.h"
-#include "fileinfo.h"
-#include "gdsfhead.h"
-#include "gdscc.h"
-#include "filestruct.h"
-#include "buddy_list.h"		/* needed for tp.h */
-#include "jnl.h"
-#include "tp.h"
-#include "send_msg.h"
-#include "gtmmsg.h"		/* for gtm_putmsg() prototype */
-#include "change_reg.h"
+#include "tpnotacid_chk_inline.h"
 #include "iott_setterm.h"
-#include "getzposition.h"
 #include "sleep.h"
 #include "time.h"
 
@@ -93,25 +78,9 @@ void op_hang(mval* num)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	ms = 0;
-	MV_FORCE_NUM(num);
-	if (num->mvtype & MV_INT)
-	{
-		if (0 < num->m[1])
-		{
-			assert(MV_BIAS >= 1000);	/* if formats change overflow may need attention */
-			ms = num->m[1] * (1000 / MV_BIAS);
-		}
-	} else if (0 == num->sgn) 		/* if sign is not 0 it means num is negative */
-	{
-		tmp = mval2double(num) * (double)1000;
-		ms = ((double)MAXPOSINT4 >= tmp) ? (int)tmp : (int)MAXPOSINT4;
-		assert(0 <= ms);
-	}
+	MV_FORCE_MSTIMEOUT(num, &ms, HANGSTR);
 	if (ms)
 	{
-		if ((TREF(tpnotacidtime)).m[1] < ms)
-			TPNOTACID_CHECK(HANGSTR);
 #		ifdef _AIX	/* AIX times are a bit wobbly, so nudge any 1sec. hang aiming to landing in the next sec */
 		if (1000 == ms)		/* some apps expect a HANG 1 (1000 MS) to land in the next second */
 			ms +=2;		/* push a bit (in milliseconds) */

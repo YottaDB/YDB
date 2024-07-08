@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2023 Fidelity National Information	*
+ * Copyright (c) 2006-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -55,8 +55,6 @@ GBLREF char			gtm_dist[GTM_PATH_MAX];
 GBLREF	volatile boolean_t	timer_in_handler;
 GBLREF mstr			dollar_zicuver;
 
-typedef void (*icu_func_t)();	/* a generic pointer type to the ICU function */
-
 /* For now the minimum ICU version supported is 3.6 */
 #define	ICU_MINIMUM_SUPPORTED_VER	"3.6"
 #define IS_ICU_VER_GREATER_THAN_MIN_VER(major_ver, minor_ver) ((3 < major_ver) || ((3 == major_ver) && (6 <= minor_ver)))
@@ -85,6 +83,8 @@ typedef void (*icu_func_t)();	/* a generic pointer type to the ICU function */
  * tagged as @stable ICU 2.4 and GT.M will only support ICU versions >= 3.6
  */
 typedef uint8_t UVersionInfo[MAX_ICU_VERSION_LENGTH];
+
+typedef void (*icu_func_t)(UVersionInfo);	/* a generic pointer type to the ICU function */
 
 /* The first parameter to ICUVERLT36 can be either ICU_LIBNAME or $gtm_icu_version. Depending on the choice
  * of the first parameter, different suffix is chosen.
@@ -125,7 +125,6 @@ NULL
 /* duplicated prototypes needed to avoid including header file gtm_icu_api.h */
 void gtm_icu_init(void);
 void gtm_conv_init(void);
-
 
 error_def(ERR_DLLNOOPEN);
 error_def(ERR_ICUSYMNOTFOUND);

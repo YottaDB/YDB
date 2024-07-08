@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -10,8 +10,8 @@
  *								*
  ****************************************************************/
 
+#include <sys/mman.h>
 #include "mdef.h"
-
 #include "gtm_string.h"
 
 #ifdef UNIX
@@ -59,6 +59,9 @@
 #ifdef __MVS__
 #include "gtm_zos_io.h"
 #endif
+#ifdef DEBUG
+#include "util.h"
+#endif
 
 GBLDEF repl_ctl_element		*repl_ctl_list = NULL;
 GBLDEF repl_rctl_elem_t		*repl_rctl_list = NULL;
@@ -81,13 +84,14 @@ GBLREF uint4			process_id;
 
 error_def(ERR_JNLFILRDOPN);
 error_def(ERR_JNLNOREPL);
+error_def(ERR_SYSCALL);
 
 repl_buff_t *repl_buff_create(uint4 buffsize, uint4 jnl_fs_block_size);
 
 repl_buff_t *repl_buff_create(uint4 buffsize, uint4 jnl_fs_block_size)
 {
 	repl_buff_t	*tmp_rb;
-	int		index;
+	int		index, save_errno;
 	unsigned char	*buff_ptr;
 
 	tmp_rb = (repl_buff_t *)malloc(SIZEOF(repl_buff_t));
@@ -98,7 +102,14 @@ repl_buff_t *repl_buff_create(uint4 buffsize, uint4 jnl_fs_block_size)
 		tmp_rb->buff[index].recaddr = JNL_FILE_FIRST_RECORD;
 		tmp_rb->buff[index].readaddr = JNL_FILE_FIRST_RECORD;
 		tmp_rb->buff[index].buffremaining = buffsize;
-		buff_ptr = (unsigned char *)malloc(buffsize + jnl_fs_block_size);
+		/* mmap() allocates memory in whole pages */
+		buff_ptr = (unsigned char *)mmap(NULL, buffsize + jnl_fs_block_size, PROT_READ | PROT_WRITE,
+					MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+		if (MAP_FAILED == buff_ptr)
+		{
+			save_errno = errno;
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("mmap()"), CALLFROM, save_errno);
+		}
 		tmp_rb->buff[index].base_buff = buff_ptr;
 		tmp_rb->buff[index].base = (unsigned char *)ROUND_UP2((uintszofptr_t)buff_ptr, jnl_fs_block_size);
 		tmp_rb->buff[index].recbuff = tmp_rb->buff[index].base;
@@ -440,8 +451,12 @@ int gtmsource_ctl_init(void)
 
 int repl_ctl_close(repl_ctl_element *ctl)
 {
-	int	index;
-	int	status;
+	int	index, save_errno, status;
+	uint	size;
+#	ifdef DEBUG
+	FILE	*pf;
+	char	buff[50], line[20], *fgets_res;
+#	endif
 
 	if (NULL != ctl)
 	{
@@ -450,7 +465,35 @@ int repl_ctl_close(repl_ctl_element *ctl)
 		{
 			for (index = REPL_MAINBUFF; REPL_NUMBUFF > index; index++)
 				if (NULL != ctl->repl_buff->buff[index].base_buff)
-					free(ctl->repl_buff->buff[index].base_buff);
+				{
+#					ifdef DEBUG
+					if (WBTEST_ENABLED(WBTEST_MUNMAP_FREE) && (1 == gtm_white_box_test_case_count))
+					{
+						SNPRINTF(buff, SIZEOF(buff), "ps -p %u -o rssize | grep -v RSS", getpid());
+						if (NULL == (pf = POPEN(buff ,"r")))
+						{
+							save_errno = errno;
+							send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
+										LEN_AND_LIT("popen()"), CALLFROM, save_errno);
+						}
+						FGETS(line, SIZEOF(line), pf, fgets_res);
+						assert(NULL != fgets_res);
+						/* Record the memory "pick", before deallocating memory with munmap() */
+						util_out_print("WBTEST_MUNMAP_FREE : VmRSS !UL kB", TRUE,
+												STRTOUL(line, NULL, 10));
+						/* Only need to signal the test once */
+						gtm_white_box_test_case_enabled = FALSE;
+					}
+#					endif
+					size = ctl->repl_buff->fc->jfh->alignsize + ctl->repl_buff->fc->fs_block_size;
+					/* munmap() deallocates the MMAPed memory and returns it to the operating system */
+					if (-1 == munmap(ctl->repl_buff->buff[index].base_buff, size))
+					{
+						save_errno = errno;
+						send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("munmap()"),
+										CALLFROM, save_errno);
+					}
+				}
 			if (NULL != ctl->repl_buff->fc)
 			{
 				if (NULL != ctl->repl_buff->fc->jfh_base)

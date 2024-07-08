@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -69,7 +69,8 @@ void jobinterrupt_process_cleanup(void)
 	   statement boundary when we were called to run $zinterrupt.
 	*/
 	TREF(transform) = TRUE;
-	dollar_zininterrupt = FALSE;	/* No longer in a $zinterrupt */
+	DBGDFRDEVNT((stderr, "%d %s: jobinterrupt_process_cleanup cleanup\n", __LINE__, __FILE__));
+	dollar_zininterrupt = FALSE; /* Once reset, SIGUSR1s are not ignored and engage event handling */
 	/* Now build message for operator log with the form ERRWZINTR, compiler-error */
 	util_out_print(NULL, RESET);
 	msgbuff.addr = (char *)msgbuf;
@@ -94,6 +95,7 @@ void jobinterrupt_process_cleanup(void)
 	util_out_print((caddr_t)msgbuf, OPER);
 	if (NULL == dollar_ecode.error_last_b_line)
 		dec_err(VARLSTCNT(1) ERR_ERRWZINTR);	/* Was a direct mode frame - this message needs to go out to the console */
+	(void)xfer_reset_if_setter(jobinterrupt);
 	TAREF1(save_xfer_root, jobinterrupt).event_state = not_in_play;
 	event_type = no_event;
 	TRY_EVENT_POP;			/* leaving interrupt and not in error handling, so check for pending timed events */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2019-2023 Fidelity National Information	*
+ * Copyright (c) 2019-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -86,5 +86,6 @@ void mlk_rehash(mlk_pvtctl_ptr_t pctl)
 	pctl->ctl->gc_needed = FALSE;
 	pctl->ctl->resize_needed = FALSE;
 	pctl->ctl->rehash_needed = FALSE;
-	send_msg_csa(CSA_ARG(pctl->csa) VARLSTCNT(5) ERR_MLKREHASH, 3, REG_LEN_STR(pctl->region), pctl->ctl->hash_seed);
+	send_msg_csa(CSA_ARG(pctl->csa) VARLSTCNT(7) ERR_MLKREHASH, 5,
+			REG_LEN_STR(pctl->region), DB_LEN_STR(pctl->region), pctl->ctl->hash_seed);
 }

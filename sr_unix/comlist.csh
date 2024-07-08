@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2001-2023 Fidelity National Information		#
+# Copyright (c) 2001-2024 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -864,7 +864,11 @@ echo "############# OS and other library versions at the time of build #########
 uname -a
 if ("AIX" == "$HOSTOS") then
 	oslevel -s
-	$gt_cc_compiler -qversion
+	if ("$gt_cc_compiler" =~ *clang*) then
+		$gt_cc_compiler --version
+	else
+		$gt_cc_compiler -qversion
+	endif
 else if ("Linux" == $HOSTOS) then
 	if (-X lsb_release) then
 		lsb_release -ds | awk '{gsub(/"/,"") ; print}'

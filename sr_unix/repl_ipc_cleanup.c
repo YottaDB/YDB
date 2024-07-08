@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -42,6 +42,7 @@
 #include "have_crit.h"
 #include "anticipatory_freeze.h"
 #include "jnl.h"
+#include "wcs_sleep.h"
 
 GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	int			pool_init;
@@ -58,6 +59,8 @@ int	gtmsource_ipc_cleanup(boolean_t auto_shutdown, int *exit_status, int4 *num_s
 	int		status, detach_status, remove_status, semval, save_errno;
 	unix_db_info	*udi;
 	struct shmid_ds	shm_buf;
+	int sleep_counter;
+	int n_attached = 0;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -95,14 +98,36 @@ int	gtmsource_ipc_cleanup(boolean_t auto_shutdown, int *exit_status, int4 *num_s
 	assert(INVALID_SHMID != udi->shmid);
 	if (attempt_ipc_cleanup)
 	{
-		i_am_the_last_user = (((status = shmctl(udi->shmid, IPC_STAT, &shm_buf)) == 0) && (1 == shm_buf.shm_nattch));
+		/* From time to time we see processes that don't terminate quickly enough (or don't get waited on
+		 * in the <defunct> state gumming up our cleanup attempt.  If that happens (ie: !i_am_the_last_user)
+		 * we wait a little while (2 sec max) to allow everyone to get out of our way.  If that still doesn't
+		 * clear up, we note the fact and move on */
+		for (sleep_counter = SLEEP_TWO_SEC;; sleep_counter--)
+		{
+			i_am_the_last_user = (((status = shmctl(udi->shmid, IPC_STAT, &shm_buf)) == 0) &&
+				(1 == (n_attached = shm_buf.shm_nattch))); /* WARNING: assignment */
+			if (i_am_the_last_user || (0 == sleep_counter))
+				break;
+			if (SLEEP_TWO_SEC == sleep_counter) /* Just note once */
+				repl_log(stderr, TRUE, TRUE,
+					"Waiting for sole jnlpool access (%d other processes still attached).\n",
+					n_attached - 1);
+
+			wcs_sleep(1);
+		}
 		if (!i_am_the_last_user)
 		{
 			if (status < 0)
 				repl_log(stderr, TRUE, TRUE, "Error in jnlpool shmctl : %s\n", STRERROR(ERRNO));
 			else
-				repl_log(stderr, TRUE, TRUE, "Not deleting jnlpool ipcs. %d processes still attached to jnlpool\n",
-					 shm_buf.shm_nattch - 1);
+			{
+				/* If we still can't delete, say how many others are accessing, the shm create pid &
+				 * and the shm last access pid */
+				repl_log(stderr, TRUE, TRUE,
+					"Not deleting jnlpool ipcs. %d processes still attached to "
+					"jnlpool:  last pid %d\n",
+					 shm_buf.shm_nattch - 1, shm_buf.shm_lpid);
+			}
 			attempt_ipc_cleanup = FALSE;
 			*exit_status = ABNORMAL_SHUTDOWN;
 		} else if (INVALID_SHMID != udi->shmid)

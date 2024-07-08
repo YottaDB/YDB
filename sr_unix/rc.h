@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -93,9 +93,6 @@ typedef union rc_lword {
     char		 octet[SIZEOF(uint4)];
     uint4	 value;
 } rc_lword;
-
-/*  Operation pointers */
-typedef int (*rc_op)(/* char *, short */);
 
 /*  XBLK header */
 typedef struct rc_xblk_hdr {
@@ -224,6 +221,9 @@ typedef struct {
     char	 time[4];
     char	 license_blk[224];
 } rc_rsp_logn;
+
+/*  Operation pointers */
+typedef int (*rc_op)(rc_q_hdr *);
 
 /*  Incomplete structure reference ("rc_oflow" in rc/rc_oflow.h) */
 typedef struct rc_oflow	 rof_struct;

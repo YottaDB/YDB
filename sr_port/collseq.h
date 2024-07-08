@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -14,6 +14,7 @@
 #define COLLSEQ_H_INCLUDED
 
 #include "min_max.h"
+#include "gtm_descript.h"
 
 #define MAX_COLLTYPE	255
 #define MIN_COLLTYPE	0
@@ -87,15 +88,27 @@
 	assert(currptr <= ptrtop);								\
 }
 
+typedef union gtm_descriptor_union
+{
+	gtm_descriptor		d16;
+	gtm32_descriptor	d32;
+} gtm_descriptor_alt;
+
+typedef	int4	(*collseq_xform_fptr_t)(gtm_descriptor_alt *src, int level, gtm_descriptor_alt *dst, int *dstlen);
+typedef	int4	(*collseq_xback_fptr_t)(gtm_descriptor_alt *src, int level, gtm_descriptor_alt *dst, int *dstlen);
+typedef	int4	(*collseq_xutil_fptr_t)(gtm32_descriptor *in, int level, gtm32_descriptor *out, int *outlen,
+					int op, int honor_numeric);
+typedef	int4	(*collseq_version_fptr_t)(void);
+typedef	int4	(*collseq_verify_fptr_t)(unsigned char type, unsigned char ver);
 
 typedef struct collseq_struct {
 	struct collseq_struct	*flink;
 	int			act;
-	int4			(*xform)();
-	int4			(*xback)();
-	int4			(*xutil)();	/* for zatransform -2/2 prev/next functionality */
-	int4			(*version)();
-	int4			(*verify)();
+	collseq_xform_fptr_t	xform;
+	collseq_xback_fptr_t	xback;
+	collseq_xutil_fptr_t	xutil;		/* for zatransform -2/2 prev/next functionality */
+	collseq_version_fptr_t	version;
+	collseq_verify_fptr_t	verify;
 	int			argtype;
 } collseq;
 

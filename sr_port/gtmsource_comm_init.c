@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -43,7 +43,7 @@
 #include "repl_sp.h"
 #include "repl_comm.h"
 #include "repl_log.h"
-#include "util.h"	/* util_out_print in GTM_PUTMSG_CSA_ADDRINFO */
+#include "sgtm_putmsg.h"
 
 #define RESOLUTION_FAILURE_PREFIX	"Failure in resolving "
 GBLDEF	int			gtmsource_sock_fd = FD_INVALID;
@@ -69,6 +69,7 @@ int gtmsource_comm_init(boolean_t print_addresolve_error)
 	int			port_len;
 	int			errcode;
 	intrpt_state_t		prev_intrpt_state;
+	char                    print_msg[REPL_MSG_SIZE];
 
 	if (FD_INVALID != gtmsource_sock_fd) /* Initialization done already */
 		return(0);
@@ -83,7 +84,7 @@ int gtmsource_comm_init(boolean_t print_addresolve_error)
 	if ((0 != errcode) && print_addresolve_error)
 	{
 		SNPRINTF(hostinfo, SIZEOF(hostinfo), "%s%s:%s", RESOLUTION_FAILURE_PREFIX, host, port_buffer);
-		GTM_PUTMSG_CSA_ADDRINFO(NULL, ERR_GETADDRINFO, errcode, hostinfo);
+		REPL_LOG_ADDRINFO(gtmsource_log_fp, repl_log, print_msg, ERR_GETADDRINFO, errcode, hostinfo);
 	}
 	if (ai_head)
 	{

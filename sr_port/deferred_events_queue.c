@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2018-2021 Fidelity National Information	*
+ * Copyright (c) 2018-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -193,7 +193,7 @@ void scan_xfer_queue_entries(boolean_t check4players)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-#ifdef	DEBUG
+#if defined(DEBUG) || defined(DEBUG_DEFERRED_EVENT)
 	DBGDFRDEVNT((stderr, "%d %s: scan_xfer_queue_entries in play:\n", __LINE__, __FILE__));
 	for (event_type=no_event; event_type < DEFERRED_EVENTS; event_type++)
 	{

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -15,6 +15,9 @@
 
 #ifdef DEBUG
 #include <stddef.h>		/* for offsetof macro (see OFFSETOF usage in assert below) */
+#include "wcs_clean_dbsync.h"
+#include "timers.h"
+#include "have_crit.h"
 #include "wbox_test_init.h"
 #endif
 
@@ -96,7 +99,7 @@ error_def(ERR_JNLENDIANLITTLE);
 
 #define JNL_EXTEND_MIN		0
 #define JNL_EXTEND_DEF		2048
-#define JNL_EXTEND_MAX		1073741823
+#define JNL_EXTEND_MAX		8388607		/* should actually be JNL_ALLOC_MAX - jnl_alq but that's complex with no benefit */
 #define JNL_MIN_WRITE		32768
 #define JNL_MAX_WRITE		65536
 /* FE was changed to EB because, the bit pattern there seems to vary more than the one for "FE".
@@ -527,6 +530,59 @@ typedef struct
 	unsigned char		buff[1];		/* Actually buff[size] */
 } jnl_buffer;
 
+#ifdef DEBUG
+#define CHAOS_IN_JNL_CLEANUP()													\
+MBSTART {															\
+	GBLREF uint4 		process_id;											\
+	GBLREF volatile int4	gtmMallocDepth;											\
+	GBLREF intrpt_state_t	intrpt_ok_state;										\
+	GBLREF boolean_t	gtm_white_box_test_case_enabled;								\
+	int			start_jnl_cleanup_wbox = gtm_white_box_test_case_count;						\
+																\
+	assert(!OK_TO_INTERRUPT);												\
+	if (WBTEST_ENABLED(WBTEST_JNL_CLEANUP))											\
+	{															\
+		if (!gtm_wbox_input_test_case_count && (JNL_CLEANUP_MUPIP_STOP <= gtm_white_box_test_case_count))		\
+		{														\
+			gtm_wbox_input_test_case_count = JNL_CLEANUP_MUPIP_STOP;						\
+		} else if (!gtm_wbox_input_test_case_count && (JNL_CLEANUP_KILL9 <= gtm_white_box_test_case_count))		\
+		{														\
+			gtm_wbox_input_test_case_count = JNL_CLEANUP_KILL9;							\
+		}														\
+		if ((JNL_CLEANUP_MUPIP_STOP <= gtm_white_box_test_case_count)							\
+				&& (gtm_wbox_input_test_case_count++ >= (gtm_white_box_test_case_count + 10)) 			\
+				&& !have_crit(CRIT_IN_COMMIT | CRIT_IN_WTSTART)) 						\
+		{														\
+			gtm_white_box_test_case_enabled = FALSE;								\
+			for (int mustp = 0; mustp < 5; mustp++)									\
+			{													\
+				kill(process_id, SIGTERM);									\
+				SHORT_SLEEP(100);										\
+			}													\
+			assert(false);												\
+		} else if ((JNL_CLEANUP_KILL9 <= gtm_white_box_test_case_count)							\
+				&& (gtm_wbox_input_test_case_count++ >= (gtm_white_box_test_case_count + 10)) 			\
+				&& !have_crit(CRIT_IN_COMMIT | CRIT_IN_WTSTART))						\
+		{														\
+			gtm_white_box_test_case_enabled = FALSE;								\
+			kill(process_id, SIGKILL);										\
+			LONG_SLEEP(10);												\
+			assert(false);												\
+		}														\
+	}															\
+} MBEND
+#else
+#define CHAOS_IN_JNL_CLEANUP()
+#endif
+
+#define FIXUP_JBP_FREE_IF_NEEDED(JBP)										\
+{														\
+	assert(JBP->phase2_commit_latch.u.parts.latch_pid == process_id);					\
+	if (JBP->free != (JBP->freeaddr % JBP->size))								\
+	{													\
+		JBP->free = JBP->freeaddr % JBP->size;								\
+	}													\
+}
 /* Sets jbp->freeaddr & jbp->free. They need to be kept in sync at all times */
 #define	SET_JBP_FREEADDR(JBP, FREEADDR)										\
 {														\
@@ -546,6 +602,10 @@ typedef struct
 	 * cache changes. It is up to readers to also specify a read memory barrier if necessary to receive	\
 	 * this broadcast.											\
 	 */													\
+	if (WBTEST_ENABLED(WBTEST_JNL_CLEANUP))									\
+	{													\
+		CHAOS_IN_JNL_CLEANUP();										\
+	}													\
 	SHM_WRITE_MEMORY_BARRIER;										\
 	JBP->free = (FREEADDR) % JBP->size;									\
 	DBG_CHECK_JNL_BUFF_FREEADDR(JBP);									\

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -35,6 +35,7 @@
 #include "trans_log_name.h"
 #include "cli.h"
 #include "gtm_threadgbl_init.h"
+#include "hugetlbfs_overrides.h"
 
 /* This executable does not have any command tables so initialize command array to NULL. The reason why cmd_ary is needed is
  * because trans_log_name (invoked by this module) in turn pulls in gtm_malloc/gtm_free and in turn a lot of the database

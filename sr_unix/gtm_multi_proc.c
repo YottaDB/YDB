@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2015-2023 Fidelity National Information	*
+ * Copyright (c) 2015-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -46,6 +46,7 @@
 #include "repl_msg.h"
 #include "gtmsource.h"
 #include "mutex.h"
+#include "hugetlbfs_overrides.h"
 
 #ifdef DEBUG
 #include "is_proc_alive.h"

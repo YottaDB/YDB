@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -57,10 +57,8 @@ boolean_t find_rtn_tabent(rtn_tabent **res, mstr *name)
 	rtn_name.addr = name->addr;
 	bot = rtn_names + 1;	/* Exclude the first NULL entry */
 	top = rtn_names_end + 1;/* Include the last entry */
-	for ( ; ; )
+	while (bot != top)
 	{
-		if (bot == top)
-			break;
 		assert(bot < top);
 		mid = bot + (top - bot) / 2;
 		assert(mid >= bot);
@@ -70,14 +68,11 @@ boolean_t find_rtn_tabent(rtn_tabent **res, mstr *name)
 			*res = mid;
 			return TRUE;
 		} else if (0 > comp)
-		{
 			bot = mid + 1;
-			continue;
-		} else
+		else
 		{
 			assert(mid < top);
 			top = mid;
-			continue;
 		}
 	}
 	*res = bot;

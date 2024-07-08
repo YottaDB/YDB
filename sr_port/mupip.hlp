@@ -681,7 +681,7 @@
 
    The format of the CREATE command is:
 
-   CR[EATE] [-[no]V6] [-R[EGION]=region-name]
+   CRE[ATE] [-[no]V6] [-R[EGION]=region-name]
 
    The single optional -REGION qualifier specifies a region for which to
    create a database file.
@@ -1283,7 +1283,7 @@
 
    The format of the MUPIP FREEZE command is:
 
-   F[REEZE] {-OF[F] [-OV[ERRIDE]]|-ON [[-ONL[INE] [-[NO]AUTORELEASE]] | [-NOONL[INE]] [-R[ECORD]]]} region-list
+   FR[EEZE] {-OF[F] [-OV[ERRIDE]]|-ON [[-ONL[INE] [-[NO]AUTORELEASE]] | [-NOONL[INE]] [-R[ECORD]]]} region-list
 
      o The region-list identifies the target of the FREEZE. region-list may
        specify more than one region of the current global directory in a
@@ -1626,7 +1626,7 @@
 
    The format of the MUPIP INTEG command is:
 
-   I[NTEG]
+   INTE[G]
    [
     -A[DJACENCY]=integer
     -BL[OCK]=hexa;block-number
@@ -3104,7 +3104,7 @@
 
    The format of the RESTORE command is:
 
-   RE[STORE] [-NET[TIMEOUT]] [-[NO]E[XTEND]] dbfile bytestream-bkup-list|<TCP_socket_address>
+   RES[TORE] [-NET[TIMEOUT]] [-[NO]E[XTEND]] dbfile bytestream-bkup-list|<TCP_socket_address>
 
      o dbfile identifies the name of the database file that RESTORE uses as a
        starting point.
@@ -3321,7 +3321,7 @@
 
    The format of the SET command is:
 
-   SE[T] {-FI[LE] file-name|-JN[LFILE] journal-file-name|-REG[ION] region-list}
+   SET {-FI[LE] file-name|-JN[LFILE] journal-file-name|-REG[ION] region-list}
     -AC[CESS_METHOD]={BG|MM}
     -[NO]AS[YNCIO]
     -DATA[_RESERVED_BYTES]=integer
@@ -3695,9 +3695,9 @@
    Mutex_slots
 
    Sets the size of a structure that GT.M uses to manage contention for the
-   principal critical section for a database. Performance issues may occur
-   when there are many processes contending for database access and if this
-   structure cannot accommodate all waiting processes. Therefore, FIS
+   principal critical section for a database on AIX. Performance issues may
+   occur when there are many processes contending for database access and if
+   this structure cannot accommodate all waiting processes. Therefore, FIS
    recommends setting this value to a minimum of slightly more than the
    maximum number of concurrent processes you expect to access the database.
 
@@ -4915,7 +4915,8 @@
    file.
 
    The default EXTENSION value is 2048 blocks. The minimum EXTENSION is zero
-   (0) blocks and the maximum is 1073741823 (one less than 1 giga) blocks.
+   (0) blocks and the maximum is 8,388,607, which enough to take a journal
+   file to maximum size.
 
    F[ILENAME]=journal_filename
 
@@ -7413,7 +7414,7 @@
      . use $principal
      . read extrRec
      . if $zeof halt
-     . set rectype=$piece(extrRec,"",1)
+     . set rectype=$piece(extrRec,"\",1)
      . if rectype'=EOT do
      .. if rectype'=TSTART set filtrOut=extrRec_EOL
      .. else  do  ; Write Journal Records within TSTART and TCOMMIT boundary in one go (1MiB limit).
@@ -7647,12 +7648,16 @@
   Important
 
    OpenSSL 3.0 by default does not allow client-side initiated TLSv1.2
-   renegotiation requests due to potential DoS attacks. Because of this, the
-   GT.M Reference TLS plugin built with a pre-OpenSSL 3.0 version does not
-   support client initiated renegotiation when communicating with a plugin
-   build with OpenSSL 3.0. This limitation only affects database replication
-   and not SOCKET devices. There is currently no work-around for this
-   limitation.
+   renegotiation requests due to potential DoS attacks. Due to security
+   enhancements in OpenSSL 3.0, the reference TLS implementation in GT.M
+   versions before V7.0-004 do not use the appropriate OpenSSL 3.0 API to
+   enable support for renegotiation. Due to these OpenSSL changes, customers
+   needing to replicate to/from GT.M versions before V7.0-004 with OpenSSL
+   3.0 must use-RENEGOTIATE_INTERVAL=0 in the Source Server startup. Because
+   of this, the GT.M Reference TLS plugin built with a pre-OpenSSL 3.0
+   version does not support client initiated renegotiation when communicating
+   with a plugin build with OpenSSL 3.0. This limitation only affects
+   database replication and not SOCKET devices.
 
 2 Shutdown_Source_Server
    Shutdown Source Server
@@ -8707,8 +8712,7 @@
    |  COMMAND  |    OBJECTS     |                    MAIN QUALIFIER                     |  GT.M   |Standalone|
    |           |                |                                                       |version* | Access#  |
    |-----------+----------------+-------------------------------------------------------+---------+----------|
-   |B[ACKUP]   |region-name     |-BK[UPDBJNL]=DISABLE | OFF                             |         |          |
-   |           |file-name       |                                                       |         |          |
+   |B[ACKUP]   |region-list     |-BK[UPDBJNL]=DISABLE | OFF                             |         |          |
    |-----------+----------------+-------------------------------------------------------+---------+----------|
    |           |                |-BY[TESTREAM] -NET[TIMEOUT]=seconds                    |         |          |
    |-----------+----------------+-------------------------------------------------------+---------+----------|
@@ -8734,7 +8738,7 @@
    |-----------+----------------+-------------------------------------------------------+---------+----------|
    |           |                |-T[RANSACTION=hexa;transaction_number]                 |         |          |
    |-----------+----------------+-------------------------------------------------------+---------+----------|
-   |CR[EATE]   |-               |-R[EGION]=region-name                                  |         |Y         |
+   |CRE[ATE]   |-               |-R[EGION]=region-name                                  |         |Y         |
    |-----------+----------------+-------------------------------------------------------+---------+----------|
    |DO[WNGRADE]|file-name       |-V[ERSION]=V5                                          |-V7.0-000|Y         |
    |-----------+----------------+-------------------------------------------------------+---------+----------|
@@ -8767,7 +8771,7 @@
    |-----------+----------------+-------------------------------------------------------+---------+----------|
    |           |                |-R[EGION=region-list                                   |         |          |
    |-----------+----------------+-------------------------------------------------------+---------+----------|
-   |F[REEZE]   |region-list     |-OF[F] [-OV[ERRIDE]]                                   |         |          |
+   |FR[EEZE]   |region-list     |-OF[F] [-OV[ERRIDE]]                                   |         |          |
    |-----------+----------------+-------------------------------------------------------+---------+----------|
    |           |                |-ON [-[NO]ONL[INE] [-[NO]A[UTORELEASE]] [-R[ECORD]]]   |         |          |
    |-----------+----------------+-------------------------------------------------------+---------+----------|
@@ -8777,9 +8781,9 @@
    |-----------+----------------+-------------------------------------------------------+---------+----------|
    |           |                |-R[ECVPOOL]                                            |         |          |
    |-----------+----------------+-------------------------------------------------------+---------+----------|
-   |H[ELP]     |command-option  |-                                                      |         |          |
+   |HE[LP]     |command-option  |-                                                      |         |          |
    |-----------+----------------+-------------------------------------------------------+---------+----------|
-   |I[NTEG]    |File-name or    |-A[DJACENCY]=integer]                                  |         |          |
+   |INTE[G]    |File-name or    |-A[DJACENCY]=integer]                                  |         |          |
    |           |region-list     |                                                       |         |          |
    |-----------+----------------+-------------------------------------------------------+---------+----------|
    |           |                |-BL[OCK]=hexa;block-number]                            |         |          |
@@ -8812,7 +8816,7 @@
    |-----------+----------------+-------------------------------------------------------+---------+----------|
    |           |                |-[NO]TR[ANSACTION][=integer]                           |         |          |
    |-----------+----------------+-------------------------------------------------------+---------+----------|
-   |IN[TRPT]   |process id      |                                                       |         |N/A       |
+   |INTR[PT]   |process id      |                                                       |         |N/A       |
    |-----------+----------------+-------------------------------------------------------+---------+----------|
    |J[OURNAL]  |file-name       |-EX[TRACT][=file-specification|                        |         |          |
    |-----------+----------------+-------------------------------------------------------+---------+----------|
@@ -8888,7 +8892,7 @@
    |-----------+----------------+-------------------------------------------------------+---------+----------|
    |           |                |-UPDA[TEPROC]                                          |         |          |
    |-----------+----------------+-------------------------------------------------------+---------+----------|
-   |RE[STORE]  |file-name or    |-[NO]E[XTEND]                                          |         |Y         |
+   |RES[TORE]  |file-name or    |-[NO]E[XTEND]                                          |         |Y         |
    |           |file-list       |                                                       |         |          |
    |-----------+----------------+-------------------------------------------------------+---------+----------|
    |RU[NDOWN]  |file-name or    |-F[ILE]                                                |         |Y         |
@@ -8900,8 +8904,10 @@
    |-----------+----------------+-------------------------------------------------------+---------+----------|
    |           |                |-OVERRIDE                                              |         |          |
    |-----------+----------------+-------------------------------------------------------+---------+----------|
-   |           |file-name or    |SE[T] {-FI[LE] file-name|-JN[LFILE]                    |         |          |
-   |SE[T]      |region-name     |journal-file-name|-REG[ION]                            |         |          |
+   |SEM[APHORE]|sem-ids-list    |                                                       |         |          |
+   |-----------+----------------+-------------------------------------------------------+---------+----------|
+   |           |file-name or    |{-FI[LE] file-name|-JN[LFILE]                          |         |          |
+   |SET        |region-name     |journal-file-name|-REG[ION]                            |         |          |
    |           |                |region-list|-REP[LICATION]={ON|OFF}}                   |         |          |
    |-----------+----------------+-------------------------------------------------------+---------+----------|
    |           |                |-AC[CESS_METHOD]={BG|MM}                               |         |Y         |
@@ -8983,7 +8989,7 @@
    |-----------+----------------+-------------------------------------------------------+---------+----------|
    |ST[OP]     |process-id      |process-id                                             |         |N/A       |
    |-----------+----------------+-------------------------------------------------------+---------+----------|
-   |TRIGGER    |-               |-TRIG[GERFILE]=<trigger_definitions_file>              |V5.4-002 |          |
+   |TR[IGGER]  |-               |-TRIG[GERFILE]=<trigger_definitions_file>              |V5.4-002 |          |
    |-----------+----------------+-------------------------------------------------------+---------+----------|
    |           |                |-NOPR[OMPT]                                            |V5.4-002 |          |
    |-----------+----------------+-------------------------------------------------------+---------+----------|
@@ -9380,7 +9386,7 @@
 1 Copyright
    Copyright
 
-   Copyright 2023
+   Copyright 2024
 
    Fidelity National Information Services, Inc. and/or its subsidiaries. All
    rights reserved.

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -216,10 +216,6 @@ void	op_fnview(int numarg, mval *dst, ...)
 			s2pool_concat(dst, &commastr);
 			arg2 = &tmpmval;
 			MV_FORCE_MVAL(arg2, (int)(stringpool.free - stringpool.base));
-			MV_FORCE_STR(arg2);
-			s2pool_concat(dst, &arg2->str);
-			s2pool_concat(dst, &commastr);
-			MV_FORCE_MVAL(arg2, (int)(stringpool.top - stringpool.invokestpgcollevel));
 			MV_FORCE_STR(arg2);
 			s2pool_concat(dst, &arg2->str);
 			break;

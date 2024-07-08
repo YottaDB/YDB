@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -255,7 +255,7 @@ int	iott_rdone (mint *v, int4 msec_timeout)	/* timeout in milliseconds */
 		{
 			if (timed)
 			{
-				wake_alarm();	/* sets out_of_time to be true for zero as well as non-zero timeouts */
+				wake_alarm(0, 0, NULL);	/* sets out_of_time to be true for zero as well as non-zero timeouts */
 				break;
 			}
 			continue;	/* select() timeout; try again */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -854,12 +854,16 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 				BLK_ADDR(bn_ptr2, blk_id_sz, unsigned char);		/* Block pointer for 1st new block rec */
 				memcpy(bn_ptr2, new_blk1_top - blk_id_sz, blk_id_sz);
 				BLK_SEG(bs_ptr2, bn_ptr2, blk_id_sz);
-			} else
+			} else if (old_blk_after_currec == new_blk1_top)
 			{
-				assert(old_blk_after_currec == new_blk1_top);
 				BLK_SEG(bs_ptr2, (sm_uc_ptr_t)star_rec_hdr, SIZEOF(rec_hdr));
 				ins_off = blk_seg_cnt;
 				BLK_SEG(bs_ptr2, zeroes, blk_id_sz);
+			} else
+			{	/* old_blk_after_currec > new_blk1_top */
+				assert(t_tries < CDB_STAGNATE);
+				NONTP_TRACE_HIST_MOD(old_blk1_hist_ptr, t_blkmod_mu_split);
+				CLEAR_BLKFMT_AND_RETURN(cdb_sc_blkmod);
 			}
 			if (new_blk1_sz != blk_seg_cnt)
 			{

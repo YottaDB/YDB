@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2018-2023 Fidelity National Information	*
+ * Copyright (c) 2018-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -28,13 +28,8 @@
 #include "buddy_list.h"	/* for tp.h */
 #include "jnl.h"
 #include "tp.h"
-#include "send_msg.h"
-#include "gtmmsg.h"		/* for gtm_putmsg() prototype */
-#include "change_reg.h"
-#include "getzposition.h"
-#include "min_max.h"
+#include "tpnotacid_chk_inline.h"
 #include "mvalconv.h"
-#include "have_crit.h"
 #include "gtm_stdio.h"
 #include "gtm_string.h"
 #include "time.h"
@@ -168,7 +163,7 @@ void check_and_set_ztimeout(mval *inp_val)
 			ztimeout_seconds.mvtype = MV_STR;
 			(TREF(dollar_ztimeout)).ztimeout_seconds = ztimeout_seconds;
 			zt_sec_ptr = &ztimeout_seconds;				/* compile of below macro requires explicit ptr */
-			MV_FORCE_MSTIMEOUT(zt_sec_ptr, msec_timeout, ZTIMEOUTSTR);
+			MV_FORCE_MSTIMEOUT(zt_sec_ptr, &msec_timeout, NOTPNOTACID);
 			assert(INTRPT_IN_EVENT_HANDLING != intrpt_ok_state);
 			DEFER_INTERRUPTS(INTRPT_IN_EVENT_HANDLING, prev_intrpt_state);
 			ztimeout_clear_timer();

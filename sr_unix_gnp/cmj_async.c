@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,10 +23,7 @@ cmi_status_t cmj_set_async(int fd)
 {
 	cmi_status_t status = SS_NORMAL;
 	int rval;
-#if defined(FIOASYNC)
-	int val = 1;
-	rval = ioctl(fd, FIOASYNC, &val);
-#elif defined(O_ASYNC)
+#if defined(O_ASYNC)
 	rval = fcntl(fd, F_SETFL, O_ASYNC|O_NONBLOCK);
 #elif defined(FASYNC)
 	rval = fcntl(fd, F_SETFL, FASYNC|O_NONBLOCK);
@@ -40,10 +38,7 @@ cmi_status_t cmj_set_async(int fd)
 int cmj_reset_async(int fd)
 {
 	cmi_status_t rval;
-#if defined(FIOASYNC)
-	int val = 0;
-	rval = (cmi_status_t)ioctl(fd, FIOASYNC, &val);
-#elif defined(O_ASYNC) || defined(FASYNC)
+#if defined(O_ASYNC) || defined(FASYNC)
 	rval = (cmi_status_t)fcntl(fd, F_SETFL, O_NONBLOCK);
 #else
 #error Can not set async state on platform

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -11,7 +11,7 @@
  ****************************************************************/
 
 #ifndef GETFREE_INLINE_BLK_INCLUDED
-#define GETFREE_INLINE_BLK_NCLUDED
+#define GETFREE_INLINE_BLK_INCLUDED
 
 #define	RETURN_IF_FREE(VALID, PTR, BASE_ADDR)			\
 MBSTART{							\

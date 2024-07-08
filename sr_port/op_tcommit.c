@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -451,8 +451,6 @@ enum cdb_sc	op_tcommit(void)
 							for (tr = tp_reg_list; NULL != tr; tr = tr->fPtr)
 								assert(csa->now_crit == (FILE_INFO(tr->reg)->s_addrs.now_crit));
 						)
-						if (!csa->now_crit)
-							WAIT_ON_INHIBIT_KILLS(cnl, MAXWAIT2KILL);
 						/* temp_si is to maintain index into sgm_info_ptr list till which DECR_CNTs
 						 * have to be done incase abnormal status or tp_tend fails/succeeds
 						 */

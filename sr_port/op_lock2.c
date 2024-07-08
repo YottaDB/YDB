@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -40,23 +40,10 @@
 #include "op.h"
 #include "mv_stent.h"
 #include "find_mvstent.h"
-#include "gdskill.h"
-#include "gdsbt.h"
-#include "gtm_facility.h"
 #include "gtm_maxstr.h"
-#include "fileinfo.h"
-#include "gdsfhead.h"
-#include "gdscc.h"
-#include "filestruct.h"
-#include "buddy_list.h"		/* needed for tp.h */
 #include "io.h"
 #include "iott_setterm.h"
-#include "jnl.h"
-#include "tp.h"
-#include "send_msg.h"
-#include "gtmmsg.h"		/* for gtm_putmsg() prototype */
-#include "change_reg.h"
-#include "getzposition.h"
+#include "tpnotacid_chk_inline.h"
 #include "lockdefs.h"
 #include "is_proc_alive.h"
 #include "mvalconv.h"
@@ -149,9 +136,9 @@ int	op_lock2(mval *timeout, unsigned char laflag)	/* timeout is in milliseconds 
 	out_of_time = FALSE;
 	timer_on = FALSE;
 	if (CM_ZALLOCATES == cm_action)		/* can't use ? : syntax here because of the way the macros nest */
-		MV_FORCE_MSTIMEOUT(timeout, msec_timeout, ZALLOCTIMESTR);
+		MV_FORCE_MSTIMEOUT(timeout, &msec_timeout, ZALLOCTIMESTR);
 	else
-		MV_FORCE_MSTIMEOUT(timeout, msec_timeout, LOCKTIMESTR);
+		MV_FORCE_MSTIMEOUT(timeout, &msec_timeout, LOCKTIMESTR);
 	if (NO_M_TIMEOUT != msec_timeout)
 	{
 		if (0 == msec_timeout)

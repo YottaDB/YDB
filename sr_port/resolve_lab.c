@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,15 +16,16 @@
 
 error_def(ERR_LABELMISSING);
 
-void resolve_lab(mlabel *label, int *errknt)
+void resolve_lab(mtreenode *node, void *arg)
 {
+	int	*errknt = arg;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	if (!label->ml)
+	if (!node->lab.ml)
 	{
 		(*errknt)++;
-		stx_error(ERR_LABELMISSING, 2, label->mvname.len, label->mvname.addr);
+		stx_error(ERR_LABELMISSING, 2, node->lab.mvname.len, node->lab.mvname.addr);
 		TREF(source_error_found) = 0;
 	}
 	return;

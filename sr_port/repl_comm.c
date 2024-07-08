@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -348,14 +348,17 @@ int repl_recv(int sock_fd, unsigned char *buff, int *recv_len, int timeout GTMTL
 	{
 		while (TRUE)
 		{
+#ifdef DEBUG
 			if ((WBTEST_ENABLED(WBTEST_REPL_TLS_RECONN)) && is_rcvr_server)
 			{
 				GTM_WHITE_BOX_TEST(WBTEST_REPL_TLS_RECONN, bytes_recvd, -1);
 				if (-1 == bytes_recvd)
 					gtm_wbox_input_test_case_count = 11; /* Do not go to white box again*/
 			}
+#endif
 			bytes_recvd = GTMTLS_ONLY(repl_tls.enabled ? gtm_tls_recv(repl_tls.sock, (char *)buff, max_recv_len)
 							 : ) recv(sock_fd, (char *)buff, max_recv_len, 0);	/* BYPASSOK */
+#ifdef DEBUG
 			if (((WBTEST_ENABLED(WBTEST_FETCHCOMM_ERR)) || (WBTEST_ENABLED(WBTEST_FETCHCOMM_HISTINFO)))
 				 && !(is_rcvr_server || is_src_server))
 			{	/* Induce the test only in mupip rollback process*/
@@ -367,6 +370,7 @@ int repl_recv(int sock_fd, unsigned char *buff, int *recv_len, int timeout GTMTL
 				LONG_SLEEP(5);
 				repl_log(stdout, TRUE, TRUE, "bytes_recvd: %d\n",bytes_recvd);
 			}
+#endif
 			if (0 < bytes_recvd)
 			{
 				*recv_len = (int)bytes_recvd;
@@ -436,12 +440,14 @@ int repl_recv(int sock_fd, unsigned char *buff, int *recv_len, int timeout GTMTL
 								&& !(is_rcvr_server || is_src_server))
 		{
 			repl_log(stdout, TRUE, TRUE, "Changing save_errno\n");
+#ifdef DEBUG
 			GTM_WHITE_BOX_TEST(WBTEST_FETCHCOMM_ERR, save_errno, ECONNRESET);
 			if (WBTEST_ENABLED(WBTEST_FETCHCOMM_HISTINFO) && (-1 == bytes_recvd))
 			{
 				save_errno = ECONNRESET;
 				gtm_wbox_input_test_case_count = 9; /* Do not go to white box again*/
 			}
+#endif
 		}
 		return save_errno;
 	} else if (!io_ready)	/* Select call timedout with no errors */

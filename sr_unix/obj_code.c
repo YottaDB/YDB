@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -105,9 +105,11 @@ GBLREF int			object_file_des;
 
 error_def(ERR_OBJFILERR);
 error_def(ERR_SYSCALL);
-error_def(ERR_TEXT);
 
-STATICFNDCL void cg_lab (mlabel *mlbl, char *do_emit);
+STATICFNDCL void cg_lab (mtreenode *node, void *do_emit_arg);
+
+STATICDEF void *EMIT_FALSE = NULL;
+STATICDEF void *EMIT_TRUE = &EMIT_FALSE;	/* An arbitrary non-NULL pointer */
 
 void obj_code (uint4 src_lines, void *checksum_ctx)
 {
@@ -194,7 +196,7 @@ void obj_code (uint4 src_lines, void *checksum_ctx)
 	rhead.labtab_len = mlmax;
 	code_size += mlmax * SIZEOF(lab_tabent);
 	if (mlabtab)
-		walktree((mvar *)mlabtab, cg_lab, NULL);
+		walktree((mtreenode *)mlabtab, cg_lab, EMIT_FALSE);
 	/* Prior to calculating reloc and symbol size, run the linkage chains to fill out
 	 * the reloc table and symbol table so we get the same size we will create later.
 	 */
@@ -267,11 +269,11 @@ void obj_code (uint4 src_lines, void *checksum_ctx)
 	/* Variable table: */
 	vptr = (var_tabent *)mcalloc(mvmax * SIZEOF(var_tabent));
 	if (mvartab)
-		walktree(mvartab, cg_var, (char *)&vptr);
+		walktree((mtreenode *)mvartab, cg_var, &vptr);
 	emit_immed((char *)vptr, mvmax * SIZEOF(var_tabent));
 	/* The label table */
 	if (mlabtab)
-		walktree((mvar *)mlabtab, cg_lab, (char *)TRUE);
+		walktree((mtreenode *)mlabtab, cg_lab, EMIT_TRUE);
 	resolve_sym();		/* Associate relocation entries for the same symbol/linkage-table slot together */
 	output_relocation();	/* Output relocation entries for the linkage section */
 	output_symbol();	/* Output the symbol table text pool */
@@ -302,27 +304,28 @@ void obj_code (uint4 src_lines, void *checksum_ctx)
 /* Routine called to process a given label. Cheezy 2nd parm is due to general purpose
  * mechanism of the walktree routine that calls us.
  */
-STATICFNDEF void cg_lab(mlabel *mlbl, char *do_emit)
+STATICFNDEF void cg_lab(mtreenode *node, void *do_emit_arg)
 {
+	bool		do_emit = !!do_emit_arg;
 	lab_tabent	lent;
 	mstr		glob_name;
 
-	if (mlbl->ml && mlbl->gbl)
+	if (node->lab.ml && node->lab.gbl)
 	{
 		if (do_emit)
 		{	/* Output (2nd) pass, emit the interesting information */
-			lent.lab_name.len = mlbl->mvname.len;
+			lent.lab_name.len = node->lab.mvname.len;
 			lent.lab_name.addr = (0 < lent.lab_name.len)			/* Offset into literal text pool */
-				? (char *)(mlbl->mvname.addr - (char *)stringpool.base) : NULL;
-			lent.LABENT_LNR_OFFSET = (lnr_tabent *)(SIZEOF(lnr_tabent) * mlbl->ml->line_number);
+				? (char *)(node->lab.mvname.addr - (char *)stringpool.base) : NULL;
+			lent.LABENT_LNR_OFFSET = (lnr_tabent *)(SIZEOF(lnr_tabent) * node->lab.ml->line_number);
 											/* Offset into lnr table */
-			lent.has_parms = (NO_FORMALLIST != mlbl->formalcnt);		/* Flag to indicate any formallist */
+			lent.has_parms = (NO_FORMALLIST != node->lab.formalcnt);		/* Flag to indicate any formallist */
 			GTM64_ONLY(lent.filler = 0);					/* Remove garbage due so hashes well */
 			UTF8_ONLY(lent.lab_name.char_len = 0);			/* .. ditto .. */
 			emit_immed((char *)&lent, SIZEOF(lent));
 		} else
 		{	/* 1st pass, do the definition but no emissions */
-			mlabel2xtern(&glob_name, &int_module_name, &mlbl->mvname);
+			mlabel2xtern(&glob_name, &int_module_name, &node->lab.mvname);
 			define_symbol(GTM_CODE, &glob_name);
 		}
 	}

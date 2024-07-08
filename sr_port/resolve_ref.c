@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -64,7 +64,7 @@ int resolve_ref(int errknt)
 	if (errknt && !(cmd_qlf.qlf & CQ_IGNORE))
 	{
 		assert(!run_time);
-		walktree((mvar *)mlabtab, resolve_lab, (char *)&errknt);
+		walktree((mtreenode *)mlabtab, resolve_lab, &errknt);
 	} else
 	{
 #		ifndef i386

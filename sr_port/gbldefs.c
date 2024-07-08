@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -150,6 +150,7 @@ GBLDEF	bool		out_of_time;
 GBLDEF	io_pair		io_curr_device;		/* current device	*/
 GBLDEF	io_pair		io_std_device;		/* standard device	*/
 GBLDEF	io_log_name	*dollar_principal;	/* pointer to log name GTM$PRINCIPAL if defined */
+GBLDEF	boolean_t	async_dm_read;		/* used by dm_read to tell async_action whether to pop m-stack */
 GBLDEF	boolean_t	prin_dm_io;		/* used by op_dmode so mdb_condition_handler and iorm_readfl know it's active */
 GBLDEF	boolean_t	prin_in_dev_failure;	/* used in I/O to perform NOPRINCIO detection on input */
 GBLDEF	boolean_t	prin_out_dev_failure;	/* used in I/O to perform NOPRINCIO detection on output */
@@ -897,7 +898,6 @@ GBLDEF	mval		*alias_retarg;			/* Points to an alias return arg created by a "QUI
 #ifdef DEBUG_ALIAS
 GBLDEF	boolean_t	lvmon_enabled;			/* Enable lv_val monitoring */
 #endif
-GBLDEF	block_id	gtm_tp_allocation_clue;		/* block# hint to start allocation for created blocks in TP */
 GBLDEF	int4		gtm_zlib_cmp_level;		/* zlib compression level specified at process startup */
 GBLDEF	int4		repl_zlib_cmp_level;		/* zlib compression level currently in use in replication pipe.
 							 * This is a source-server specific variable and is non-zero only
@@ -1074,8 +1074,8 @@ GBLDEF	boolean_t	jnlpool_init_needed;		/* TRUE if jnlpool_init should be done at
 							 * anticipatory freeze supported configurations). The variable is set
 							 * explicitly by interested commands (eg., MUPIP REORG).
 							 */
-GBLDEF	char		repl_instfilename[MAX_FN_LEN + 1];	/* save first instance */
-GBLDEF	char		repl_inst_name[MAX_INSTNAME_LEN];	/* for syslog */
+GBLDEF	char		repl_instfilename[MAX_FN_LEN + 1];	/* save $gtm_repl_instance full path for gtmpcat */
+GBLDEF	char		repl_inst_name[MAX_INSTNAME_LEN];	/* used for syslog if first message for gtmpcat */
 GBLDEF	gd_addr		*repl_inst_from_gld;		/* if above obtained from directory */
 GBLDEF	boolean_t	span_nodes_disallowed;		/* Indicates whether spanning nodes are not allowed. For example,
 							 * they are not allowed for GT.CM OMI and GNP.

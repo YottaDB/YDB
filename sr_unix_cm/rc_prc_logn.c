@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,12 +21,9 @@
 #include "copy.h"
 
 int
-rc_prc_logn(qhdr)
-    rc_q_hdr	*qhdr;
+rc_prc_logn(rc_q_hdr *qhdr)
 {
-
     qhdr->a.erc.value = RC_SUCCESS;
 
     return 0;
-
 }

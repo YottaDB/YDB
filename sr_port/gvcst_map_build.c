@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -33,7 +33,7 @@ GBLREF	uint4		mu_upgrade_in_prog;
 void gvcst_map_build(block_id *array, sm_uc_ptr_t base_addr, cw_set_element *cs, trans_num ctn)
 {
 	boolean_t	status;
-	uint4		(*bml_func)();
+	uint4		(*bml_func)(block_id id, sm_uc_ptr_t map);
 	uint4		ret;
 	block_id	bitnum;
 #ifdef DEBUG

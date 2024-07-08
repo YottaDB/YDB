@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2023 Fidelity National Information	*
+ * Copyright (c) 2006-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -208,7 +208,7 @@ typedef struct jnlpool_ctl_struct_struct
 							 * If no commits are active, "rsrv_write_addr == write_addr". Else
 							 * "rsrv_write_addr > write_addr".
 							 */
-	volatile uint4		write_jnldata;		/* Bitmask: tracks whether source server is active
+	gtm_atomic_uint_least32_t	write_jnldata;		/* Bitmask: tracks whether source server is active
 							 * and requires jnlrecs-in-jnlpool. False if none do.
 							 */
 	boolean_t		upd_disabled;		/* Identify whether updates are disabled or not  on the secondary */

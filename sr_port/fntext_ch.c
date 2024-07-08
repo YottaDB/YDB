@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,6 +24,7 @@ error_def(ERR_OUTOFSPACE);
 error_def(ERR_STACKOFLOW);
 error_def(ERR_TPRETRY);
 error_def(ERR_VMSMEMORY);
+error_def(ERR_DBROLLEDBACK);
 
 GBLREF	uint4	dollar_tlevel;
 
@@ -35,7 +37,7 @@ CONDITION_HANDLER(fntext_ch)
 	tlevel = TREF(op_fntext_tlevel);
 	TREF(op_fntext_tlevel) = 0;
 #	endif
-	if (!DUMPABLE && (SIGNAL != ERR_TPRETRY))
+	if (!DUMPABLE && (SIGNAL != ERR_TPRETRY) && (SIGNAL != ERR_DBROLLEDBACK))
 	{
 #		ifdef GTM_TRIGGER
 		if (tlevel)

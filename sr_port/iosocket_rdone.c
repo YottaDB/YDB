@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -53,7 +53,7 @@ int	iosocket_rdone(mint *v, int4 msec_timeout)
 		} else
 			/* Null length string returns 0 */
 			codepoint = 0;
-		*v = (mint)(codepoint);
+		*v = (0 == io_curr_device.in->dollar.za) ? (mint)(codepoint) : -1;
 	} else
 		*v = -1;
 	return ret;

@@ -120,7 +120,7 @@
 2 Copyright
    Copyright
 
-   Copyright 2023
+   Copyright 2024
 
    Fidelity National Information Services, Inc. and/or its subsidiaries. All
    rights reserved.
@@ -3683,10 +3683,9 @@
      * blklvl - Is the level in the GDS structure of the block ("blk: ..."
        field in the TPRESTART message) that caused the TP restart.
      * type - A value of 0,1,2,4 shows the restart occurred in the TP
-       transaction BEFORE executing TCOMMIT; whether it is a 0 or 1 or 2 or 4
-       should not matter to the user. These values would typically be used
-       for debugging by your GT.M support channel. A value of 3 shows the
-       restart occurred at TCOMMIT time.
+       transaction BEFORE executing TCOMMIT; 1 means searching, 2 means
+       reading, 3 means committing, 4 means validating history, and 0 means
+       others.
      * readset - The number of GDS blocks that accessed as part of this TP
        transaction in the region containing the global ("glbl: ..." in the
        TPRESTART message).
@@ -3712,8 +3711,13 @@
        tracking, but for non-TP mini-transacstions. Note that you can use the
        gtm_nontprestart_log_delta and gtm_nontprestart_log_first environment
        variables to set the frequency of the NONTPRESTART messages.
-     o For more information, refer to "Key Words" and the Environment
-       Variables section of GT.M Administration and Operations Guide.
+     o
+
+
+
+
+
+
 
 1 Commands
    Commands
@@ -5353,14 +5357,15 @@
    nearer limit. If the argument specifies "*" for the region, the command
    applies to all regions. $VIEW("POOLLIMIT",<region>) returns the current
    value for the region as an ordinal number - zero (0) when there is no
-   limit in place. Note that this facility is designed for use by a
-   relatively small subset of processes. In addition, MUPIP REORG uses this
-   facility to limit its buffers to a value established by the UNIX
-   environment variable (or OpenVMS logical name) gtm_poollimit using the
-   syntax described for VIEW "POOLLIMIT" with a default of 64 if
-   gtm_poollimit is not specified. Note that this may slightly slow a
-   standalone REORG but can be overridden by defining gtm_poollimit as 0 or
-   "100%".
+   limit in place. This facility is designed for use by a relatively small
+   subset of processes. Note that the poollimit mechanism does not completely
+   restrict a process to a limited protion of the pool, but rather tends to
+   restrict it to that portion. In addition, MUPIP REORG uses this facility
+   to limit its buffers to a value established by the UNIX environment
+   variable gtm_poollimit using the syntax described for VIEW "POOLLIMIT"
+   with a default of 64 if gtm_poollimit is not specified. Note that this may
+   slightly slow a standalone REORG but can be overridden by defining
+   gtm_poollimit as 0 or "100%".
 
 4 RCTLDUMP
    RCTLDUMP
@@ -6842,6 +6847,9 @@
    DWT : # of Disk WriTes to the database file (TP and non-TP, committed and rolled-back). This does not include writes that are satisfied by buffered globals for databases that use the BG (Buffered Global) access method. GT.M always reports 0 for databases that use the MM (memory-mapped) access method as this has no real meaning in that mode.
    GET : # of GET operations (TP and non-TP)
    GLB : # of waits for bg access critical section
+   IDXH: # of index block cache hits
+   IDXM: # of index block cache misses
+   INC : # of $INCREMENT operations. The $INCREMENT function also increases the SET counter.
    JBB : # of Journal Buffer Bytes updated in shared memory
    JEX : # of Journal file EXtentions
    JFB : # of Journal File Bytes written to the journal file on disk. For performance reasons, GT.M always aligns the beginning of these writes to file system block size boundaries. JFB counts all bytes including those needed for alignment in order to reflect the actual IO load on the journal file. Since the bytes required to achieve alignment may have already been counted as part of the previous JFB, processes may write the same bytes more than once, causing the JFB counter to typically be higher than JBB.
@@ -6957,7 +6965,8 @@
    GLD:*,REG:*,SET:205,KIL:0,GET:1,DTA:0,ORD:0,ZPR:0,QRY:0,LKS:0,LKF:0,CTN:0,DRD:9,DWT:15,
    NTW:203,NTR:4,NBW:212,NBR:414,NR0:0,NR1:0,NR2:0,NR3:0,TTW:1,TTR:0,TRB:0,TBW:2,TBR:6,
    TR0:0,TR1:0,TR2:0,TR3:0,TR4:0,TC0:0,TC1:0,TC2:0,TC3:0,TC4:0,ZTR:0,DFL:0,DFS:0,JFL:0,JFS:0,JBB:0,JFB:0,JFW:0,JRL:0,JRP:0,
-   JRE:0,JRI:0,JRO:0,JEX:0,DEX:0,CAT:4,CFE:0,CFS:0,CFT:0,CQS:0,CQT:0,CYS:0,CYT:0,BTD:0,WFR:0,BUS:0,BTS:0
+   JRE:0,JRI:0,JRO:0,JEX:0,DEX:0,CAT:4,CFE:0,CFS:0,CFT:0,CQS:0,CQT:0,CYS:0,CYT:0,BTD:0,WFR:0,BUS:0,BTS:0,STG:0,KTG:0,ZTG:0,
+   DEXA:0,GLB:0,JNL:0,MLK:0,PRC:0,TRX:0,ZAD:0,JOPA:0,AFRA:0,BREA:0,MLBA:0,TRGA:0,WRL:0,PRG:0,WFL:0,WHE:0,INC:0
    GLD:/home/gtmuser1/.fis-gtm/V5.4-002B_x86/g/mumps.gld,REG:DEFAULT,SET:205,KIL:0,GET:1,
    DTA:0,ORD:0,ZPR:0,QRY:0,LKS:0,LKF:0,CTN:411,DRD:9,DWT:15,NTW:2
    03,NTR:4,NBW:212,NBR:414,NR0:0,NR1:0,NR2:0,NR3:0,TTW:1,TTR:0,TRB:0,TBW:2,TBR:6,TR0:0,
@@ -6965,7 +6974,8 @@
    GLD:/tmp/tst/test.gld,REG:DEFAULT,SET:205,KIL:0,GET:1,DTA:0,ORD:0,ZPR:0,QRY:0,LKS:0,LKF:0,
    CTN:411,DRD:9,DWT:15,NTW:203,NTR:4,NBW:212,NBR:414,NR0:0,NR1:0,NR2:0,NR3:0,TTW:1,TTR:0,TRB:0,
    TBW:2,TBR:6,TR0:0,TR1:0,TR2:0,TR3:0,TR4:0,TC0:0,TC1:0,TC2:0,TC3:0,TC4:0,ZTR:0,DFL:0,DFS:0,JFL:0,JFS:0,JBB:0,JFB:0,JFW:0,
-   JRL:0,JRP:0,JRE:0,JRI:0,JRO:0,JEX:0,DEX:0,CAT:4,CFE:0,CFS:0,CFT:0,CQS:0,CQT:0,CYS:0,CYT:0,BTD:0,WFR:0,BUS:0,BTS:0
+   JRL:0,JRP:0,JRE:0,JRI:0,JRO:0,JEX:0,DEX:0,CAT:4,CFE:0,CFS:0,CFT:0,CQS:0,CQT:0,CYS:0,CYT:0,BTD:0,WFR:0,BUS:0,BTS:0,STG:0,
+   KTG:0,ZTG:0,DEXA:0,GLB:0,JNL:0,MLK:0,PRC:0,TRX:0,ZAD:0,JOPA:0,AFRA:0,BREA:0,MLBA:0,TRGA:0,WRL:0,PRG:0,WFL:0,WHE:0,INC:0
 
    Example:
 
@@ -6981,11 +6991,15 @@
    GLD:/tmp/x1.gld,REG:REG1,SET:0,KIL:0,GET:0,DTA:0,ORD:0,ZPR:0,QRY:0,LKS:0,LKF:0,CTN:0,DRD:0,
    DWT:0,NTW:0,NTR:0,NBW:0,NBR:0,NR0:0,NR1:0,NR2:0,NR3:0,TTW:0,
    TTR:0,TRB:0,TBW:0,TBR:0,TR0:0,TR1:0,TR2:0,TR3:0,TR4:0,TC0:0,TC1:0,TC2:0,TC3:0,TC4:0,ZTR:0,DFL:0,DFS:0,JFL:0,JFS:0,JBB:0,
-   JFB:0,JFW:0,JRL:0,JRP:0,JRE:0,JRI:0,JRO:0,JEX:0,DEX:0,CAT:4,CFE:0,CFS:0,CFT:0,CQS:0,CQT:0,CYS:0,CYT:0,BTD:0,WFR:0,BUS:0,BTS:0
+   JFB:0,JFW:0,JRL:0,JRP:0,JRE:0,JRI:0,JRO:0,JEX:0,DEX:0,CAT:4,CFE:0,CFS:0,CFT:0,CQS:0,CQT:0,CYS:0,CYT:0,BTD:0,WFR:0,BUS:0,
+   BTS:0,STG:0,KTG:0,ZTG:0,DEXA:0,GLB:0,JNL:0,MLK:0,PRC:0,TRX:0,ZAD:0,JOPA:0,AFRA:0,BREA:0,MLBA:0,TRGA:0,WRL:0,PRG:0,WFL:0,
+   WHE:0,INC:0
    GLD:/tmp/x1.gld,REG:REG2,SET:0,KIL:0,GET:0,DTA:0,ORD:0,ZPR:0,QRY:0,LKS:0,LKF:0,CTN:0,DRD:0,
    DWT:0,NTW:0,NTR:0,NBW:0,NBR:0,NR0:0,NR1:0,NR2:0,NR3:0,TTW:0,
    TTR:0,TRB:0,TBW:0,TBR:0,TR0:0,TR1:0,TR2:0,TR3:0,TR4:0,TC0:0,TC1:0,TC2:0,TC3:0,TC4:0,ZTR:0,DFL:0,DFS:0,JFL:0,JFS:0,JBB:0,
-   JFB:0,JFW:0,JRL:0,JRP:0,JRE:0,JRI:0,JRO:0,JEX:0,DEX:0,CAT:4,CFE:0,CFS:0,CFT:0,CQS:0,CQT:0,CYS:0,CYT:0,BTD:0,WFR:0,BUS:0,BTS:0
+   JFB:0,JFW:0,JRL:0,JRP:0,JRE:0,JRI:0,JRO:0,JEX:0,DEX:0,CAT:4,CFE:0,CFS:0,CFT:0,CQS:0,CQT:0,CYS:0,CYT:0,BTD:0,WFR:0,BUS:0,
+   BTS:0,STG:0,KTG:0,ZTG:0,DEXA:0,GLB:0,JNL:0,MLK:0,PRC:0,TRX:0,ZAD:0,JOPA:0,AFRA:0,BREA:0,MLBA:0,TRGA:0,WRL:0,PRG:0,WFL:0,
+   WHE:0,INC:0
 
    Example:
 
@@ -6996,15 +7010,21 @@
    zgbl("G",0)="GLD:*,REG:*,SET:0,KIL:0,GET:0,DTA:0,ORD:0,
    ZPR:0,QRY:0,LKS:0,LKF:0,CTN:0,DRD:0,DWT:0,NTW:0,NTR:0,NBW:0,NBR:0,NR0:0,NR1:0,NR2:0,NR3:0,TTW:0,
    TTR:0,TRB:0,TBW:0,TBR:0,TR0:0,TR1:0,TR2:0,TR3:0,TR4:0,TC0:0,TC1:0,TC2:0,TC3:0,TC4:0,ZTR:0,DFL:0,DFS:0,JFL:0,JFS:0,JBB:0,
-   JFB:0,JFW:0,JRL:0,JRP:0,JRE:0,JRI:0,JRO:0,JEX:0,DEX:0,CAT:4,CFE:0,CFS:0,CFT:0,CQS:0,CQT:0,CYS:0,CYT:0,BTD:0,WFR:0,BUS:0,BTS:0"
+   JFB:0,JFW:0,JRL:0,JRP:0,JRE:0,JRI:0,JRO:0,JEX:0,DEX:0,CAT:4,CFE:0,CFS:0,CFT:0,CQS:0,CQT:0,CYS:0,CYT:0,BTD:0,WFR:0,BUS:0,
+   BTS:0,STG:0,KTG:0,ZTG:0,DEXA:0,GLB:0,JNL:0,MLK:0,PRC:0,TRX:0,ZAD:0,JOPA:0,AFRA:0,BREA:0,MLBA:0,TRGA:0,WRL:0,PRG:0,WFL:0,
+   WHE:0,INC:0"
    zgbl("G",1)="GLD:/tmp/x1.gld,REG:REG1,SET:0,KIL:0,GET:0,DTA:0,ORD:0,ZPR:0,QRY:0,
    LKS:0,LKF:0,CTN:0,DRD:0,DWT:0,NTW:0,NTR:0,NBW:0,NBR:0,NR0:0,NR1:0,NR2:0,
    NR3:0,TTW:0,TTR:0,TRB:0,TBW:0,TBR:0,TR0:0,TR1:0,TR2:0,TR3:0,TR4:0,TC0:0,TC1:0,TC2:0,TC3:0,TC4:0,ZTR:0,DFL:0,DFS:0,JFL:0,
-   JFS:0,JBB:0,JFB:0,JFW:0,JRL:0,JRP:0,JRE:0,JRI:0,JRO:0,JEX:0,DEX:0,CAT:4,CFE:0,CFS:0,CFT:0,CQS:0,CQT:0,CYS:0,CYT:0,BTD:0,WFR:0,BUS:0,BTS:0"
+   JFS:0,JBB:0,JFB:0,JFW:0,JRL:0,JRP:0,JRE:0,JRI:0,JRO:0,JEX:0,DEX:0,CAT:4,CFE:0,CFS:0,CFT:0,CQS:0,CQT:0,CYS:0,CYT:0,BTD:0,
+   WFR:0,BUS:0,BTS:0,STG:0,KTG:0,ZTG:0,DEXA:0,GLB:0,JNL:0,MLK:0,PRC:0,TRX:0,ZAD:0,JOPA:0,AFRA:0,BREA:0,MLBA:0,TRGA:0,WRL:0,
+   PRG:0,WFL:0,WHE:0,INC:0"
    zgbl("G",2)="GLD:/tmp/x1.gld,REG:REG2,SET:0,KIL:0,GET:0,DTA:0,ORD:0,ZPR:0,QRY:0,LKS:0,
    LKF:0,CTN:0,DRD:0,DWT:0,NTW:0,NTR:0,NBW:0,NBR:0,NR0:0,NR1:0,NR2:0,
    NR3:0,TTW:0,TTR:0,TRB:0,TBW:0,TBR:0,TR0:0,TR1:0,TR2:0,TR3:0,TR4:0,TC0:0,TC1:0,TC2:0,TC3:0,TC4:0,ZTR:0,DFL:0,DFS:0,JFL:0,
-   JFS:0,JBB:0,JFB:0,JFW:0,JRL:0,JRP:0,JRE:0,JRI:0,JRO:0,JEX:0,DEX:0,CAT:4,CFE:0,CFS:0,CFT:0,CQS:0,CQT:0,CYS:0,CYT:0,BTD:0,WFR:0,BUS:0,BTS:0"
+   JFS:0,JBB:0,JFB:0,JFW:0,JRL:0,JRP:0,JRE:0,JRI:0,JRO:0,JEX:0,DEX:0,CAT:4,CFE:0,CFS:0,CFT:0,CQS:0,CQT:0,CYS:0,CYT:0,BTD:0,
+   WFR:0,BUS:0,BTS:0,STG:0,KTG:0,ZTG:0,DEXA:0,GLB:0,JNL:0,MLK:0,PRC:0,TRX:0,ZAD:0,JOPA:0,AFRA:0,BREA:0,MLBA:0,TRGA:0,WRL:0,
+   PRG:0,WFL:0,WHE:0,INC:0"
 
    Example:
 
@@ -8950,10 +8970,34 @@
    |                   |              | Returns the replication instance    |
    |                   |              | file name for the current Journal   |
    |                   |              | Pool and an empty string when there |
-   | "JNLPOOL"         | none         | is no Journal Pool. Note that the   |
-   |                   |              | current Journal Pool may not be     |
-   |                   |              | associated with the last global     |
-   |                   |              | accessed by an extended reference.  |
+   |                   |              | is no Journal Pool. Specifying a    |
+   |                   |              | second expression for               |
+   |                   |              | $VIEW("JNLPOOL") provides a means   |
+   |                   |              | of iterating through active Journal |
+   |                   |              | Pools. If the second expression is  |
+   |                   |              | an empty string, the function       |
+   |                   |              | returns the replication instance    |
+   |                   |              | file name associated with the       |
+   |                   |              | instance first attached by the      |
+   |                   |              | process or. if the process has not  |
+   |                   |              | previously engaged with any         |
+   |                   | replication  | instance, the string "*". If the    |
+   | "JNLPOOL"         | instance     | file name specified in the second   |
+   |                   | file         | expression does not match the       |
+   |                   |              | replication instance file name for  |
+   |                   |              | any of the active Journal Pools the |
+   |                   |              | function returns the string "*".    |
+   |                   |              | Otherwise, the function returns the |
+   |                   |              | file name of the Journal Pool       |
+   |                   |              | attached after the Journal Pool     |
+   |                   |              | with the specified file name. Note  |
+   |                   |              | the two argument form of            |
+   |                   |              | $VIEW("JNLPOOL") does not change    |
+   |                   |              | the current Replication Instance.   |
+   |                   |              | Note also that the current Journal  |
+   |                   |              | Pool may not be associated with the |
+   |                   |              | last global accessed by an extended |
+   |                   |              | reference.                          |
    |-------------------+--------------+-------------------------------------|
    |                   |              | Index showing how many ZTSTART      |
    | "JNLTRANSACTION"  | none         | transaction fences have been opened |
@@ -9067,26 +9111,20 @@
    |                   |              | return value of the empty string    |
    |                   |              | indicates the end of the list.      |
    |-------------------+--------------+-------------------------------------|
-   |                   |              | Returns a string with three comma   |
+   |                   |              | Returns a string with two comma     |
    |                   |              | separated values: Number of bytes   |
    |                   |              | currently allocated as process      |
    |                   |              | working storage: GT.M manages this  |
    |                   |              | space as what is commonly called a  |
    |                   |              | heap, and uses the term stringpool  |
-   |                   |              | to refer to it. The GT.M garbage    |
+   | "SPSIZE"          | none         | to refer to it. The GT.M garbage    |
    |                   |              | collector reclaims unused space     |
    |                   |              | from the stringpool from time to    |
-   | "SPSIZE"          | none         | time, and GT.M automatically        |
+   |                   |              | time, and GT.M automatically        |
    |                   |              | expands the stringpool as needed by |
    |                   |              | the application program; Number of  |
    |                   |              | bytes currently used by the         |
-   |                   |              | process; Number of bytes reserved:  |
-   |                   |              | The reserved space is used to       |
-   |                   |              | reduce the active memory usage, for |
-   |                   |              | example, when a process uses a      |
-   |                   |              | large amount of memory then         |
-   |                   |              | subsequently uses a significantly   |
-   |                   |              | reduced amount.                     |
+   |                   |              | process.                            |
    |-------------------+--------------+-------------------------------------|
    |                   |              | Returns 0 when the process has      |
    |                   |              | sharing disabled, 1 when it has     |
@@ -9182,7 +9220,9 @@
    NTW:24,NTR:55,NBW:27,NBR:138,NR0:0,NR1:0,NR2:0,NR3:0,TTW:17,TTR:5,TRB:0,TBW:32,
    TBR:80,TR0:0,TR1:0,TR2:0,TR3:0,TR4:0,TC0:0,TC1:0,TC2:0,TC3:0,TC4:0,ZTR:7,DFL:9,
    DFS:0,JFL:0,JFS:0,JBB:0,JFB:0,JFW:0,JRL:0,JRP:0,JRE:0,JRI:0,JRO:0,JEX:0,DEX:0,
-   CAT:35,CFE:0,CFS:0,CFT:0,CQS:0,CQT:0,CYS:0,CYT:0,BTD:13
+   CAT:35,CFE:0,CFS:0,CFT:0,CQS:0,CQT:0,CYS:0,CYT:0,BTD:13,WFR:0,BUS:0,BTS:0,STG:0,
+   KTG:0,ZTG:0,DEXA:0,GLB:0,JNL:0,MLK:0,PRC:0,TRX:0,ZAD:0,JOPA:0,AFRA:0,BREA:0,MLBA:0,
+   TRGA:0,WRL:0,PRG:0,WFL:0,WHE:0,INC:0
    GTM>
 
    Example:
@@ -9440,19 +9480,19 @@
 4 Example_of_$ZBITAND()
    Example of $ZBITAND()
 
-   GTM>
+   GTM>set BITSTRINGA=$zbitset($zbitset($zbitstr(8,0),2,1),8,1)
    ; The binary representation of A is 01000001
-   GTM>Set BITSTRINGB=$zbitset($zbitset($zbitstr(8,0),2,1),7,1)
+   GTM>set BITSTRINGB=$zbitset($zbitset($zbitstr(8,0),2,1),7,1)
    ; The binary representation of B is 01000010
    GTM>set BITSTRINGAB=$zbitand(BITSTRINGA,BITSTRINGB)
-   GTM>for i=1:1:8 write $zbitget(BITSTRINGAB,I)
+   GTM>for i=1:1:8 write $zbitget(BITSTRINGAB,i)
    01000000
 
    This examples uses $ZBITAND to perform a bitwise AND operation on A and B.
 
-   A= 01000001
-   B= 01000010
-   A bitwise AND B=0100000
+   A = 01000001
+   B = 01000010
+   A bitwise AND B = 0100000
 
 3 $ZBITCOUNT()
    $ZBITCOUNT()
@@ -9530,7 +9570,7 @@
 
    GTM>set BITSTRINGA=$zbitset($zbitset($zbitstr(8,0),2,1),8,1)
    ; The binary representation of A is 01000001
-   GTM>for i=1:1:8 write $zbitget(BITSTRINGA,I)
+   GTM>for i=1:1:8 write $zbitget(BITSTRINGA,i)
    01000001
    GTM>
 
@@ -9570,7 +9610,7 @@
 
    GTM>set BITSTRINGA=$zbitset($zbitset($zbitstr(8,0),2,1),8,1)
    ; The binary representation of A is 01000001
-   GTM>for i=1:1:8 write $zbitget($zbitnot(BITSTRINGA),I)
+   GTM>for i=1:1:8 write $zbitget($zbitnot(BITSTRINGA),i)
    10111110
    GTM>
 
@@ -9661,8 +9701,8 @@
 
    GTM>set BITSTRINGA=$zbitset($zbitset($zbitstr(8,0),2,1),8,1) ; The binary representation of A is 01000001
    GTM>set BITSTRINGB=$zbitset($zbitset($zbitstr(8,0),2,1),7,1); The binary representation of B is 01000010
-   GTM>set BITSTRINGC=$zbitor(BITSTRINGA,BITSTRINGB) ; A XOR B=00000011
-   GTM>for I=1:1:8 write $zbitget(BITSTRINGC,I)
+   GTM>set BITSTRINGC=$zbitxor(BITSTRINGA,BITSTRINGB) ; A XOR B=00000011
+   GTM>for i=1:1:8 write $zbitget(BITSTRINGC,i)
    00000011
    GTM>
 
@@ -9728,8 +9768,8 @@
    This example WRITEs the byte sequence represented by * and signals the
    terminal bell.
 
-2 $ZCOllate()
-   $ZCOllate()
+2 $ZCOLlate()
+   $ZCOLlate()
 
    Returns the transformed representation of the first argument glvn in a
    normalized form using the alternative transform specified by the second
@@ -9739,7 +9779,7 @@
 
    The format for the $ZCOLLATE() function is:
 
-   $ZCO[llate](glvn,intexpr[,{0|1}])
+   $ZCOL[late](glvn,intexpr[,{0|1}])
 
    Note that because the forward transform is to the GDS global storage
    format, the reverse transform always shows a global form. This is not
@@ -9748,8 +9788,8 @@
 
    Please see the section on $ZATRANSFORM() for a similar alternative.
 
-3 Example_of_$ZCOllate()
-   Example of $ZCOllate()
+3 Example_of_$ZCOLlate()
+   Example of $ZCOLlate()
 
    Example:
 
@@ -11850,6 +11890,41 @@
    UTF-8
    GTM>
 
+2 $ZCLose
+   $ZCLose
+
+   Provides termination status of the last PIPE CLOSE as follows:
+
+     o -99 when the check times out
+     o -98 for unanticipated problems with the check
+     o the negative of the signal value if a signal terminated the
+       co-process.
+
+   If positive, $ZCLOSE contains the exit status returned by the last
+   co-process.
+
+2 $ZDAteform
+   $ZDAteform
+
+   $ZDA[TEFORM] contains an integer value, specifying the output year format
+   of $ZDATE(). $ZDATEFORM can be modified using the SET command. GT.M
+   initializes $ZDATEFORM to the translation of the environment variable
+   gtm_zdate_form. If gtm_zdate_form is not defined, GT.M initializes
+   $ZDATEFORM to zero (0).
+
+   Refer to "Functions" and "Utility Routines" chapters in the GT.M
+   Programmer's Guide for more details.
+
+   Example:
+
+   GTM>WRITE $ZDATEFROM
+   0
+   GTM>WRITE $ZDATE($H)
+   11/15/02
+   GTM>SET $ZDATEFORM=1
+   GTM>WRITE $ZDATE($H)
+   11/15/2002
+
 2 $ZCMdline
    $ZCMdline
 
@@ -11962,41 +12037,6 @@
    the code for ERRORSUMMARY.
 
    GT.M does not permit the SET command to modify $ZCSTATUS.
-
-2 $ZCLose
-   $ZCLose
-
-   Provides termination status of the last PIPE CLOSE as follows:
-
-     o -99 when the check times out
-     o -98 for unanticipated problems with the check
-     o the negative of the signal value if a signal terminated the
-       co-process.
-
-   If positive, $ZCLOSE contains the exit status returned by the last
-   co-process.
-
-2 $ZDAteform
-   $ZDAteform
-
-   $ZDA[TEFORM] contains an integer value, specifying the output year format
-   of $ZDATE(). $ZDATEFORM can be modified using the SET command. GT.M
-   initializes $ZDATEFORM to the translation of the environment variable
-   gtm_zdate_form. If gtm_zdate_form is not defined, GT.M initializes
-   $ZDATEFORM to zero (0).
-
-   Refer to "Functions" and "Utility Routines" chapters in the GT.M
-   Programmer's Guide for more details.
-
-   Example:
-
-   GTM>WRITE $ZDATEFROM
-   0
-   GTM>WRITE $ZDATE($H)
-   11/15/02
-   GTM>SET $ZDATEFORM=1
-   GTM>WRITE $ZDATE($H)
-   11/15/2002
 
 2 $ZDirectory
    $ZDirectory
@@ -18001,22 +18041,22 @@
 5 HUPENABLE
    HUPENABLE
 
-   [NO]HUPENABLE Applies to: TRM
+   [NO]HUPENABLE Applies to: TRM and SOC
 
-   [NO]HUPENABLE Applies to: Terminal PRINCIPAL devices
+   [NO]HUPENABLE Applies to: SOCKET and Terminal PRINCIPAL devices
 
    Enables or disables the recognition by the process of the loss ("hang up")
-   of the PRINCIPAL device terminal. When enabled the proces receives a
-   TERMHANGUP error if the O/S signals that the terminal assigned to the
-   process as the PRINCIPAL device has disconnected. In addition, a
-   TERMHANGUP error implicitly sets the device to NOHUPENABLE so if a process
-   anticipates multiple disconnects/hangups, it should explicitly issue a USE
-   $PRINCIPAL:HUPENABLE. If GT.M is configured to ignore such a signal, a
-   process may subsequently receive an IOEOF or a TERMWRITE error from an
-   attempt to respectively READ from, or WRITE to the missing device. GT.M
-   terminates a process that ignores more than one of these messages and, if
-   the process is not in Direct Mode, sends a NOPRINCIO message to the
-   operator log.
+   of the PRINCIPAL device terminal. When enabled the process receives a
+   SOCKHANGUP or TERMHANGUP error if the O/S signals that the device assigned
+   to the process as the PRINCIPAL device has disconnected. In addition, a
+   SOCKHANGUP or TERMHANGUP error implicitly sets the device to NOHUPENABLE
+   so if a process anticipates multiple disconnects/hangups, it should
+   explicitly issue a USE $PRINCIPAL:HUPENABLE. If GT.M is configured to
+   ignore such a signal, a process may subsequently receive an IOEOF or a
+   SOCKWRITE/TERMWRITE error from an attempt to respectively READ from, or
+   WRITE to the missing device. GT.M terminates a process that ignores more
+   than one of these messages and, if the process is not in Direct Mode,
+   sends a NOPRINCIO message to the operator log.
 
    If defined, the gtm_hupeable environment variable determines the initial
    process behavior, and if that is undefined GT.M does not immediately
@@ -18649,6 +18689,8 @@
    |---------------------+-----+----+------+------+------+-----|
    | [NO]HOSTSYNC        | X   |    |      |      |      |     |
    |---------------------+-----+----+------+------+------+-----|
+   | [NO]HUPENABLE       | X   |    |      |      |      | X   |
+   |---------------------+-----+----+------+------+------+-----|
    | IKEY                |     | X  | X    | X    |      |     |
    |---------------------+-----+----+------+------+------+-----|
    | INREWIND            |     | X  |      |      |      |     |
@@ -18847,6 +18889,8 @@
    | IOERROR=expr       | X    | X   |       |
    |--------------------+------+-----+-------|
    | [NO]HOSTSYNC       |      | X   |       |
+   |--------------------+------+-----+-------|
+   | [NO]HUPENABLE      |      | X   |       |
    |--------------------+------+-----+-------|
    | [Z]LENGTH=intexpr  |      | X   |       |
    |--------------------+------+-----+-------|

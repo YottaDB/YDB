@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2013-2023 Fidelity National Information	*
+ * Copyright (c) 2013-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -614,8 +614,11 @@ void	op_fnzpeek(mval *structid, int offset, int len, mval *format, mval *ret)
 		case PO_NLREPL:
 		case PO_RIHREPL:
 			/* Make sure jnlpool_addrs are availble */
-			if (!REPL_INST_AVAILABLE(NULL))
+			if (!REPL_INST_AVAILABLE(jnlpool && jnlpool->pool_init ? jnlpool->gd_ptr : NULL))
+			{
+				assert(gd_header);
 				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_ZPEEKNORPLINFO);
+			}
 			if (!pool_init)
 			{
 				attach_success = op_fnzpeek_attach_jnlpool();
@@ -651,7 +654,7 @@ void	op_fnzpeek(mval *structid, int offset, int len, mval *format, mval *ret)
 		case PO_UPLREPL:
 		case PO_UHCREPL:
 			/* Make sure recvpool_addrs are available */
-			if (!REPL_INST_AVAILABLE(NULL))
+			if (!REPL_INST_AVAILABLE(jnlpool && jnlpool->pool_init ? jnlpool->gd_ptr : NULL))
 				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_ZPEEKNORPLINFO);
 			if (NULL == recvpool.recvpool_ctl)
 			{

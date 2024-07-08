@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2016 Fidelity National Information	*
+ * Copyright (c) 2003-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -12,6 +12,7 @@
 
 #ifndef MEMCOHERENCY_H_INCLUDED
 #define MEMCOHERENCY_H_INCLUDED
+#include "gtm_atomic.h"
 
 /* for Uniprocessor systems, no need for "memory barrier" as memory is always coherent.
  * But almost always we expect to be running on a multi-processor system so we want to avoid the cost
@@ -42,6 +43,17 @@
 
 #elif defined(POWER) || defined(PWRPC)	/* GT.M defines POWER and PWRPC if _AIX is defined, see sr_rs6000/mdefsp.h */
 
+#if defined(__xlc__)
+#define do_sync()	__sync()
+#define do_lwsync()	__lwsync()
+#define do_eieio()	__eieio()
+#define do_isync()	__isync()
+#elif defined(__open_xl__ )
+#define do_sync()	__builtin_ppc_sync()
+#define do_lwsync()	__builtin_ppc_lwsync()
+#define do_eieio()	__builtin_ppc_eieio()
+#define do_isync()	__builtin_ppc_isync()
+#else
 /* Refer to article "POWER4 and shared memory synchronization by R. William Hay and Gary R. Hook" available at
  * http://www-106.ibm.com/developerworks/eserver/articles/power4_mem.html
  */
@@ -84,6 +96,7 @@ void do_isync(void);
  */
 #pragma mc_func	do_isync{"4c00012c"}
 #pragma reg_killed_by do_isync
+#endif
 
 #define SHM_WRITE_MEMORY_BARRIER										\
 { /* Ensure that code does not rely on ordering of "loads" following lwsync in programming sequence to occur */ \
@@ -91,12 +104,14 @@ void do_isync(void);
   /* tp_end.c) do not rely on store-load order across memory barrier. Note that grab/rel_lock() perform      */ \
   /* "sync" (via call to _clear_lock()), and so, we are guaranteed strict ordering of loads and stores of    */ \
   /* code that reads/writes to journal pool in transaction logic					     */ \
+	COMPILER_FENCE(memory_order_release);									\
 	do_lwsync();												\
 }
 
-#define SHM_READ_MEMORY_BARRIER		\
-{					\
-	do_isync();			\
+#define SHM_READ_MEMORY_BARRIER			\
+{						\
+	do_isync();				\
+	COMPILER_FENCE(memory_order_acquire);	\
 }
 
 #define  MM_WRITE_MEMORY_BARRIER	\
@@ -188,9 +203,9 @@ void do_isync(void);
 
 /* Memory accesses in Intel x86 and IBM S390 archtectures are strongly ordered */
 
-#define SHM_WRITE_MEMORY_BARRIER
-#define SHM_READ_MEMORY_BARRIER
-#define MM_WRITE_MEMORY_BARRIER
+#define SHM_WRITE_MEMORY_BARRIER COMPILER_FENCE(memory_order_release);
+#define SHM_READ_MEMORY_BARRIER COMPILER_FENCE(memory_order_acquire);
+#define MM_WRITE_MEMORY_BARRIER COMPILER_FENCE(memory_order_release);
 
 #endif
 

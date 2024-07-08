@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -125,7 +125,7 @@ boolean_t is_timer_initialized(ABS_TIME timer) { return (((0 == timer.at_sec) &&
 void generic_signal_handler(int sig, siginfo_t *info, void *context)
 {
 	gtm_sigcontext_t	*context_ptr;
-	void			(*signal_routine)();
+	void			(*signal_routine)(int4);
 	intrpt_state_t		prev_intrpt_state;
 	ABS_TIME		mu_stop_timer;
 #	ifdef DEBUG
@@ -432,7 +432,7 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 		if (NULL != (signal_routine = call_on_signal))	/* Note assignment */
 		{
 			call_on_signal = NULL;		/* So we don't recursively call ourselves */
-			(*signal_routine)();
+			(*signal_routine)(0);
 		}
 	}
 	if (!IS_GTMSECSHR_IMAGE)

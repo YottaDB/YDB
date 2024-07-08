@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -153,11 +153,9 @@ struct gd_addr_struct *repl_inst_get_name(char *fn, unsigned int *fn_len, unsign
 				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_REPLINSTACC, 2, log_nam.len, log_nam.addr,
 					ERR_TEXT, 2, RTS_ERROR_LITERAL("from global directory"));
 		}
-	} else if ('\0' == repl_instfilename[0])
-	{	/* save information from first instance for syslog */
+	} else if (!inst_from_gld && ('\0' == repl_instfilename[0]))
+	{	/* save expanded environment variable gtm_repl_instance for gtmpcat */
 		memcpy(repl_instfilename, fn, *fn_len + 1);	/* include null from get_full_path */
-		if (inst_from_gld)
-			repl_inst_from_gld = gd_local;		/* got from global directory */
 	}
 	if (FALSE == ret)
 		return NULL;

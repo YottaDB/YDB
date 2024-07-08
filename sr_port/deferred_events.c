@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -34,7 +34,7 @@
  */
 
 GBLREF boolean_t		is_tracing_on;				/* M profiling */
-GBLREF boolean_t		tp_timeout_set_xfer;
+GBLREF boolean_t		async_dm_read, tp_timeout_set_xfer;
 GBLREF intrpt_state_t		intrpt_ok_state;
 GBLREF io_pair			io_std_device;
 GBLREF size_t			gtmMallocErrorSize;			/* Size of malloc limit violation */
@@ -91,8 +91,8 @@ boolean_t xfer_set_handlers(int4  event_type, int4 param_val, boolean_t popped_e
 	{	/* events already in flux - stash this "as is" in the record for this event */
 		if (not_in_play == entry->event_state)
 			entry->event_state = signaled;
-		DBGDFRDEVNT((stderr, "%d %s: xfer_set_handlers - stashed: %d with state: %d\n", __LINE__, __FILE__, e_type,
-			TAREF1(save_xfer_root, e_type).event_state));
+		DBGDFRDEVNT((stderr, "%d %s: xfer_set_handlers - stashed: %d with state: %d\n", __LINE__, __FILE__, event_type,
+			TAREF1(save_xfer_root, event_type).event_state));
 		return TRUE;						/* return value currently only used by tp_timeout.c */
 	}
 	/* WARNING! AIO sets multi_thread_in_use which disables DEFER_INTERRUPTS, treat it like an active event */
@@ -297,12 +297,14 @@ boolean_t real_xfer_reset(int4 event_type)
  */
 void async_action(bool lnfetch_or_start)
 {
-	boolean_t	ours;
+	boolean_t	ours, save_async_dm_read;
 	intrpt_state_t	prev_intrpt_state;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	assert(INTRPT_IN_EVENT_HANDLING != intrpt_ok_state);
+	save_async_dm_read = async_dm_read;
+	async_dm_read = FALSE;
 	DEFER_INTERRUPTS(INTRPT_IN_EVENT_HANDLING, prev_intrpt_state);
 	if (jobinterrupt == outofband)
 	{
@@ -338,6 +340,8 @@ void async_action(bool lnfetch_or_start)
 			break;
 		case ctrlc:							/* these go from pending to active here */
 			TAREF1(save_xfer_root, outofband).event_state = active;
+			if (save_async_dm_read && (MVST_MVAL == mv_chain->mv_st_type))
+				POP_MV_STENT();		/* In Direct Mode, so pop mval from top of stack to avoid memory leak */
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_CTRLC);
 			break;
 		case ctrap:

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2011-2022 Fidelity National Information	*
+ * Copyright (c) 2011-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -58,7 +58,7 @@ void op_zgoto(mval *rtn_name, mval *lbl_name, int offset, int level)
 	mval		rtnname, lblname;
 	rhdtyp		*rtnhdr;
 	lnr_tabent 	USHBIN_ONLY(*)*lnrptr;
-	void		(*frame_func)();
+	void		(*frame_func)(rhdtyp *, unsigned char *, unsigned char *);
 	char		rtnname_buff[SIZEOF(mident_fixed)], lblname_buff[SIZEOF(mident_fixed)];
 	DEBUG_ONLY(int4	dlevel;)
 	DCL_THREADGBL_ACCESS;

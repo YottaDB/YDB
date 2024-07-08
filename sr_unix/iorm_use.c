@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -324,7 +324,7 @@ void	iorm_use(io_desc *iod, mval *pp)
 			 * side of $PRINCIPAL is equal to io_std_device.in we break if OUTREWIND is the device parameter.
 			 * A similar check is done on the output side if INREWIND or REWIND is the device parameter.
 			 */
-			if ((io_std_device.in == iod))
+			if (io_std_device.in == iod)
 				break;
 			outdevparam = TRUE;
 		case iop_inrewind:
@@ -681,7 +681,7 @@ void	iorm_use(io_desc *iod, mval *pp)
 			 * side of $PRINCIPAL is equal to io_std_device.in we break if OUTSEEK is the device parameter.
 			 * A similar check is done on the output side if INSEEK or SEEK is the device parameter.
 			 */
-			if ((io_std_device.in == iod))	/* CAUTION: potential fall-through */
+			if (io_std_device.in == iod)	/* CAUTION: potential fall-through */
 				break;
 			outdevparam = TRUE;
 		case iop_inseek:

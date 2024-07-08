@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -14,7 +14,7 @@
 
 #include <errno.h>
 #include "gtm_stdlib.h"
-
+#include "gtm_fcntl.h"	/* Needed for AIX's silly open to open64 translations */
 #include "gdsroot.h"
 #include "gdskill.h"
 #include "gdsbt.h"
@@ -28,22 +28,14 @@
 #include "io.h"
 #include "iottdef.h"
 #include "iotimer.h"
-#include <rtnhdr.h>
 #include "stack_frame.h"
-#include "buddy_list.h"		/* needed for tp.h */
-#include "tp.h"
-#include "send_msg.h"
-#include "gtmmsg.h"		/* for gtm_putmsg() prototype */
+#include "tpnotacid_chk_inline.h"
 #include "op.h"
-#include "change_reg.h"
 #include "dm_read.h"
-#include "tp_change_reg.h"
-#include "getzposition.h"
 #include "restrict.h"
 #include "dm_audit_log.h"
 #include "svnames.h"
 #include "util.h"
-#include "have_crit.h"
 #include "deferred_events_queue.h"
 
 #define	DIRECTMODESTR	"DIRECT MODE (any TP RESTART will fail)"
@@ -114,7 +106,7 @@ void	op_dmode(void)
 	TPNOTACID_CHECK(DIRECTMODESTR);
 	if (io_curr_device.in->type == tt)
 	{
-		dm_read(input_line);
+		input_line = dm_read(input_line);
 		/* If direct mode auditing is enabled, this attempts to send the command to logger */
 		if ((AUDIT_ENABLE_DMODE & RESTRICTED(dm_audit_enable)) && !dm_audit_log(input_line, AUDIT_SRC_DMREAD))
 		{

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -37,20 +38,18 @@
 #include "iob.h"
 #ifdef __MVS__
 #include "gtm_zos_io.h"
+
+/* Need the ERR_BADTAG and ERR_TEXT  error_defs for the TAG_POLICY macro warning */
+error_def(ERR_BADTAG);
+error_def(ERR_TEXT);
 #endif
 
-BFILE *iob_open_rd(path, blksiz, blkfactor)
-    char *path;
-    int blksiz;
-    int blkfactor;
+BFILE *iob_open_rd(char *path, int blksiz, int blkfactor)
 {
     int fd;
     BFILE *file;
 #ifdef __MVS__
     int realfiletag;
-    /* Need the ERR_BADTAG and ERR_TEXT  error_defs for the TAG_POLICY macro warning */
-    error_def(ERR_TEXT);
-    error_def(ERR_BADTAG);
 #endif
 
     if (FD_INVALID == (fd = OPEN3(path,O_RDONLY,0)))
@@ -76,9 +75,3 @@ BFILE *iob_open_rd(path, blksiz, blkfactor)
 
     return file;
 }
-
-
-
-
-
-

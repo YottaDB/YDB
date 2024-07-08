@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -212,7 +212,7 @@ void mucregini(block_id blk_init_size, enum db_ver desired_db_ver)
 	{
 		if ((csp = ready_collseq((int)(csd->def_coll))))
 		{
-			csd->def_coll_ver = (csp->version)(csd->def_coll);
+			csd->def_coll_ver = (csp->version)();
 			if (!do_verify(csp, csd->def_coll, csd->def_coll_ver))
 			{
 				PUTMSG_ERROR_CSA((CSA_ARG(cs_addrs)

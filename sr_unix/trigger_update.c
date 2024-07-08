@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2023 Fidelity National Information	*
+ * Copyright (c) 2010-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -1411,8 +1411,8 @@ boolean_t trigger_update_rec(mval *trigger_rec, boolean_t noprompt, uint4 *trig_
 	{	/* If this is a not a multi-line xecute string, we dont expect newlines. The only exception is if it is
 		 * the last byte in the string.
 		 */
-		 assert(memchr(trigjrec->str.addr, '\n', trigjrec->str.len) == trigjrecptr);
-		 *trigjrecptr++;
+		assert(memchr(trigjrec->str.addr, '\n', trigjrec->str.len) == trigjrecptr);
+		trigjrecptr++;
 		if (trigjrecptr != (trigjrec->str.addr + trigjrec->str.len))
 		{
 			util_out_print_gtmio("Error : Newline allowed only inside multi-line xecute in $ztrigger ITEM", FLUSH);

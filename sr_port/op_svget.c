@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -53,6 +53,7 @@
 #include "mlkdef.h"
 #include "iormdef.h"
 #include "toktyp.h"
+#include "min_max.h"
 #ifdef DEBUG
 #  include "wbox_test_init.h"
 #endif
@@ -88,11 +89,9 @@ error_def(ERR_INVSVN);
 error_def(ERR_UNIMPLOP);
 error_def(ERR_ZDIROUTOFSYNC);
 
-LITREF mval		literal_zero, literal_one, literal_null;
-LITREF char		gtm_release_name[];
-LITREF int4		gtm_release_name_len;
-LITREF char		gtm_release_stamp[];
-LITREF int4		gtm_release_stamp_len;
+LITREF char	gtm_release_name[], gtm_release_stamp[];
+LITREF int4	gtm_release_name_len, gtm_release_stamp_len;
+LITREF mval	literal_null, literal_one, literal_zero;
 
 void op_svget(int varnum, mval *v)
 {
@@ -225,16 +224,18 @@ void op_svget(int varnum, mval *v)
 			*v = dollar_system;
 			break;
 		case SV_STORAGE:
-			/* double2mval(v, getstorage()); Causes issues with unaligned stack on x86_64 - remove until fixed */
-			ucount = (0 < zmalloclim) ? ((gtm_uint64_t)zmalloclim) : ((gtm_uint64_t)getstorage());
-			ui82mval(v, (ucount - ((gtm_uint64_t)totalRmalloc + (gtm_uint64_t)totalRallocGta)));
+			count = (0 < zmalloclim) ? ((int)zmalloclim) : ((int)gtm_getrlimit());
+			count -= ((int)totalRmalloc + (int)totalRallocGta);
+			if (0 > count)
+				count = 0;
+			MV_FORCE_MVAL(v, count);
 			break;
 		case SV_TLEVEL:
 			count = (int)dollar_tlevel;
 			MV_FORCE_MVAL(v, count);
 			break;
 		case SV_TRESTART:
-			MV_FORCE_MVAL(v, (int)((MAX_VISIBLE_TRESTART < dollar_trestart) ? MAX_VISIBLE_TRESTART : dollar_trestart));
+			MV_FORCE_MVAL(v, (int)MIN(MAX_VISIBLE_TRESTART, dollar_trestart));
 			break;
 		case SV_X:
 			count = (int)io_curr_device.out->dollar.x;
@@ -325,7 +326,11 @@ void op_svget(int varnum, mval *v)
 			*v = TREF(dollar_zmode);
 			break;
 		case SV_ZMAXTPTIME:
-			i2mval(v, TREF(dollar_zmaxtptime));
+			v->m[0] = v->sgn = 0;
+			v->mvtype = (MV_NM | MV_INT);
+			assert(MV_BIAS == MILLISECS_IN_SEC);				/* check math if this changes */
+			v->m[1] = TREF(dollar_zmaxtptime);
+			MV_FORCE_STR(v);
 			break;
 		case SV_ZPOS:
 			getzposition(v);

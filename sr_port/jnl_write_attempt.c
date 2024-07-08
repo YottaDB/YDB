@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -42,6 +42,7 @@
 #include "sleep.h"
 
 #define	ITERATIONS_100K	100000
+#define	ITERATIONS_1M	1000000
 
 GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	uint4			process_id;
@@ -69,9 +70,11 @@ static uint4 jnl_sub_write_attempt(jnl_private_control *jpc, unsigned int *lcnt,
 	uint4			dskaddr, freeaddr, free, rsrv_freeaddr;
 	uint4			phase2_commit_index1;
 	static uint4		stuck_cnt = 0;
+	static uint4 		wait_comment_pid = 0;
 	jnlpool_addrs_ptr_t	local_jnlpool;
 	intrpt_state_t		prev_intrpt_state = INTRPT_NUM_STATES;
-	char			wait_comment[MAX_FREEZE_COMMENT_LEN], comparator[MAX_FREEZE_COMMENT_LEN];
+	static char		wait_comment[MAX_FREEZE_COMMENT_LEN];
+	char			comparator[MAX_FREEZE_COMMENT_LEN];
 	int			real_comment_off;
 	DCL_THREADGBL_ACCESS;
 
@@ -87,7 +90,6 @@ static uint4 jnl_sub_write_attempt(jnl_private_control *jpc, unsigned int *lcnt,
 	csa = &FILE_INFO(jpc->region)->s_addrs;
 	was_crit = csa->now_crit;
 	exact_check = was_crit && (threshold == jb->rsrv_freeaddr); /* see comment in jnl_write_attempt() for why this is needed */
-	GENERATE_INST_FROZEN_COMMENT(wait_comment, MAX_FREEZE_COMMENT_LEN, ERR_JNLPROCSTUCK);
 	while (exact_check ? (jb->dskaddr != threshold) : (jb->dskaddr < threshold))
 	{
 		if (jb->io_in_prog_latch.u.parts.latch_pid == process_id)
@@ -125,6 +127,15 @@ static uint4 jnl_sub_write_attempt(jnl_private_control *jpc, unsigned int *lcnt,
 				freeze_waiter = FALSE;
 			} else
 			{
+				if (csa->now_crit && csa->nl)
+				{
+					INCR_GVSTATS_COUNTER(csa, csa->nl, ms_jnl_critsleeps,
+							(MAXSLPTIME < *lcnt ? MAXSLPTIME : *lcnt));
+				} else if (csa->nl)
+				{
+					INCR_GVSTATS_COUNTER(csa, csa->nl, ms_jnl_nocritsleeps,
+							(MAXSLPTIME < *lcnt ? MAXSLPTIME : *lcnt));
+				}
 				wcs_sleep(*lcnt);
 				continue;
 			}
@@ -143,10 +154,17 @@ static uint4 jnl_sub_write_attempt(jnl_private_control *jpc, unsigned int *lcnt,
 		}
 		if ((*lcnt <= JNL_MAX_FLUSH_TRIES) DEBUG_ONLY(&& !(WBTEST_ENABLED(WBTEST_JNLPROCSTUCK_FORCE))))
 		{
+			if (csa->now_crit && csa->nl)
+			{
+				INCR_GVSTATS_COUNTER(csa, csa->nl, ms_jnl_critsleeps, (MAXSLPTIME < *lcnt ? MAXSLPTIME : *lcnt));
+			} else if (csa->nl)
+			{
+				INCR_GVSTATS_COUNTER(csa, csa->nl, ms_jnl_nocritsleeps, (MAXSLPTIME < *lcnt ? MAXSLPTIME : *lcnt));
+			}
 			wcs_sleep(*lcnt);
 			break;
 		}
-		if ((writer == CURRENT_JNL_IO_WRITER(jb)) DEBUG_ONLY(|| (WBTEST_ENABLED(WBTEST_JNLPROCSTUCK_FORCE))))
+		if ((writer == CURRENT_JNL_IO_WRITER(jb)) || WBTEST_ENABLED(WBTEST_JNLPROCSTUCK_FORCE))
 		{	/* It isn't strictly necessary to hold crit here since we are doing an atomic operation on
 			 * io_in_prog_latch, which won't have any effect if the writer changed. If things are in a bad state,
 			 * though, grabbing crit will call wcs_recover() for us.
@@ -184,6 +202,14 @@ static uint4 jnl_sub_write_attempt(jnl_private_control *jpc, unsigned int *lcnt,
 			stuck_cnt++;
 			if (IS_REPL_INST_FROZEN(TREF(defer_instance_freeze)))
 			{
+
+				if (wait_comment_pid != process_id)
+				{
+					DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
+					GENERATE_INST_FROZEN_COMMENT(wait_comment, MAX_FREEZE_COMMENT_LEN, ERR_JNLPROCSTUCK);
+					wait_comment_pid = process_id;
+					ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
+				}
 				was_frozen = TRUE;
 				assert(jnlpool && jnlpool->jnlpool_ctl);
 				/* Calling library functions like memcpy on memory that is subject to race conditions is
@@ -237,7 +263,7 @@ static uint4 jnl_sub_write_attempt(jnl_private_control *jpc, unsigned int *lcnt,
 uint4 jnl_write_attempt(jnl_private_control *jpc, uint4 threshold)
 {
 	jnl_buffer_ptr_t	jb;
-	uint4			prev_freeaddr;
+	uint4			prev_freeaddr, holder_pid;
 	uint4			index1, index2;
 	unsigned int		lcnt, prev_lcnt, cnt;
 	sgmnt_addrs		*csa;
@@ -297,9 +323,13 @@ uint4 jnl_write_attempt(jnl_private_control *jpc, uint4 threshold)
 				if (was_crit || (!was_crit && (0 == (lcnt % ITERATIONS_100K))
 						&& (grab_crit_immediate(jpc->region, OK_FOR_WCS_RECOVER_TRUE, NOT_APPLICABLE))))
 				{
-					SHM_READ_MEMORY_BARRIER;	/* Ensure the indices read from memory are correct */
 					index1 = jb->phase2_commit_index1;
 					index2 = jb->phase2_commit_index2;
+					/* Must ensure that the reads from freeaddr/rsrv_freeaddr are not reordered to occur
+					 * before the reads from index 1/2.
+					 */
+					SHM_READ_MEMORY_BARRIER;
+					COMPILER_FENCE(__ATOMIC_RELEASE);
 					/* This condition implies that a update/MUMPS process was killed in CMT06, right before
 					 * updating jb->phase2_commit_index2. If crit is held, increment index2 & call
 					 * jnl_phase2_cleanup() to process it as a dead commit.
@@ -312,6 +342,23 @@ uint4 jnl_write_attempt(jnl_private_control *jpc, uint4 threshold)
 					JNL_PHASE2_CLEANUP_IF_POSSIBLE(csa, jb);
 					if (!was_crit)
 						rel_crit(jpc->region);
+				}
+			}
+		}
+		if (0 == (lcnt % ITERATIONS_1M))
+		{
+			/* While the following logic could be exercised on every loop, in that it is valid against eveything but
+			 * pid reuse (which is a vulnerablility also contained in the latch-recovery logic inside of grab_latch),
+			 * it is relatively heavyweight given the is_proc_alive and compswap. Since this logic is meant to recover
+			 * from an exceptional condition - a process is killed in a window of several instructions in
+			 * SET_JBP_FREEADDR and no other process attempts to do a jnl_phase2_cleanup (which would recover the
+			 * latch and repair the fields), only do this logic on every millionth iteration.
+			 */
+			if ((holder_pid = jb->phase2_commit_latch.u.parts.latch_pid) && (holder_pid != process_id))
+			{
+				if (!is_proc_alive(holder_pid, 1))
+				{
+					COMPSWAP_UNLOCK(&jb->phase2_commit_latch, holder_pid, NULL, 0, NULL);
 				}
 			}
 		}
@@ -392,6 +439,10 @@ uint4 jnl_write_attempt(jnl_private_control *jpc, uint4 threshold)
 			 * triggers jnl_file_lost processing which will terminate the loop due to the JNL_FILE_SWITCHED check.
 			 */
 			assert(!csa->now_crit);
+			if (csa->nl)
+			{
+				INCR_GVSTATS_COUNTER(csa, csa->nl, ms_jnl_nocritsleeps, (MAXSLPTIME < lcnt ? MAXSLPTIME : lcnt));
+			}
 			wcs_sleep(lcnt);
 		} else if (prev_lcnt != lcnt)
 		{

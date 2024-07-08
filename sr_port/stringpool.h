@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -9,20 +9,28 @@
  *	the license, please stop and do not read further.	*
  *								*
  ****************************************************************/
+#include <sys/mman.h>
+#include <errno.h>
+
+#ifndef STRINGPOOL_DEF_INCLUDED
+#define STRINGPOOL_DEF_INCLUDED
 
 typedef struct
 {
-	unsigned char	*base, *free, *top, *lasttop, *invokestpgcollevel;
+	unsigned char	*base, *free, *top, *invokestpgcollevel;
+	size_t		lastallocbytes;	/* stores the last mmap() allocation */
 	unsigned int	gcols;		/* some optimizations need to know if the stringpool garbage collected  */
 	unsigned int	strpllim;	/* non-zero value is user specified guard on expansion */
 	boolean_t	strpllimwarned;	/* if limit is in place, has been exceeded, and not recovered from */
 	unsigned char	prvprt;		/* stores memory protections used in guarding stp space */
 } spdesc;
 
+void	*stp_mmap(size_t size);
 void	stp_expand_array(void);
 void	stp_gcol(size_t space_needed);										/* BYPASSOK */
 void	stp_move(char *from, char *to);
 void	stp_init(size_t size);
+void	stp_fini(unsigned char *strpool_base, size_t size);
 void	s2pool(mstr *a);
 void	s2pool_align(mstr *string);
 void	s2pool_concat(mval *dst, mstr *a);	/* concatenates strings "dst->str" + "a" and stores result in "dst->str" */
@@ -60,6 +68,8 @@ GBLREF	boolean_t	stringpool_unexpandable;
 #define	DBG_MARK_STRINGPOOL_UNEXPANDABLE
 #endif
 
+error_def(ERR_SYSCALL);
+
 #define	ENSURE_STP_FREE_SPACE(SPC)						\
 {										\
 	uint4	lcl_spc_needed;							\
@@ -75,13 +85,15 @@ GBLREF	boolean_t	stringpool_unexpandable;
 {													\
 	GBLREF mstr	**stp_array;									\
 	GBLREF uint4	stp_array_size;									\
+	int     	save_errno;									\
 													\
 	if (NULL == PTRARRAY)										\
 	{												\
 		if (NULL == stp_array)									\
 		{											\
 			/* Same initialization as is in stp_gcol_src.h */				\
-			stp_array = (mstr **)malloc((stp_array_size = STP_MAXITEMS) * SIZEOF(mstr *));	\
+			stp_array_size = STP_MAXITEMS;							\
+			stp_array = (mstr **)stp_mmap(stp_array_size * SIZEOF(mstr *));			\
 		}											\
 		PTRARRAYCUR = PTRARRAY = (TYPE **)stp_array;						\
 		PTRARRAYTOP = PTRARRAYCUR + stp_array_size;						\
@@ -113,3 +125,5 @@ MBSTART {									\
 	(DST)->str.addr = (char *)stringpool.free;				\
 	stringpool.free += keylen;						\
 } MBEND
+
+#endif /* STRINGPOOL_DEF_INCLUDED */

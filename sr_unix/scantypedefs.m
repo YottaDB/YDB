@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-; Copyright (c) 2010-2022 Fidelity National Information		;
+; Copyright (c) 2010-2024 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ; 								;
 ; 	This source code contains the intellectual property	;
@@ -62,7 +62,10 @@
 	Set:(PreV53001&("x86_64"=gtmhdw)) (ExtraCcParms,ExtraCcLdParms)="-m32"
 	Do:("RS6000"=gtmhdw)
 	. Set:(PreV53001) ExtraCcParms=ExtraCcParms_" -q32",ExtraCcLdParms=ExtraCcLdParms_" -b32"
-	. Set:('PreV53001) ExtraCcParms=ExtraCcParms_" -q64",ExtraCcLdParms=ExtraCcLdParms_" -b64"
+	. Set GtCcCompiler=$ZTRNLNM("gt_cc_compiler"),UseClang=(GtCcCompiler["clang")
+	. Set:(('PreV53001)&('UseClang)) ExtraCcParms=ExtraCcParms_" -q64",ExtraCcLdParms=ExtraCcLdParms_" -b64"
+	. Set:(('PreV53001)&UseClang) ExtraCcParms=ExtraCcParms_" -m64",ExtraCcLdParms=ExtraCcLdParms_" -m64"
+	. Set:(GtCcCompiler'["langlvl") ExtraCcParms=ExtraCcParms_" -qlanglvl=extc99"
 	Do:("SPARC"=gtmhdw)
 	. Set:(PreV53001) ExtraCcParms=ExtraCcParms_" -m32",ExtraCcLdParms=ExtraCcLdParms_" -m32"
 	. Set:('PreV53001) ExtraCcParms=ExtraCcParms_" -m64",ExtraCcLdParms=ExtraCcLdParms_" -m64"

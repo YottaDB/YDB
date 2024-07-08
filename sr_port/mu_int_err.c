@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -47,7 +47,6 @@ error_def(ERR_NULSUBSC);
 
 /* Look at cert_blk.c for possible changes to macro format */
 
-#define MAX_UTIL_LEN 50
 #define BLOCK_WINDOW MAX_HEX_DIGITS_IN_INT8
 #define LEVEL_WINDOW 3
 #define OFFSET_WINDOW 4
@@ -68,7 +67,10 @@ LITDEF nametabent mu_int_sev_names[] =
 	{4, "Data"},
 	{9, "Transient"}
 };
+#define MAX_NAMETABENT_LEN 9
 #define	NEWLINE	"\n"
+#define MAX_UTIL_LEN ((SIZEOF(TABINTRO) - 1) + MAX_NAMETABENT_LEN + (SIZEOF(NEWLINE) - 1) + BLOCK_WINDOW + (SIZEOF(TEXT3) - 1) \
+		+ OFFSET_WINDOW + 1 + LEVEL_WINDOW + (SIZEOF(TEXT2) - 1) + 1)
 
 void	mu_int_err(
 		int err,
@@ -105,6 +107,7 @@ void	mu_int_err(
 			mu_int_sev = &mu_int_sev_names[mu_int_sev_idx];
 			MEMCPY_LIT(&util_buff[util_len], TABINTRO);
 			util_len += SIZEOF(TABINTRO) - 1;
+			assert(mu_int_sev->len <= MAX_NAMETABENT_LEN);
 			memcpy(&util_buff[util_len], mu_int_sev->name, mu_int_sev->len);
 			util_len += mu_int_sev->len;
 		}
@@ -121,6 +124,7 @@ void	mu_int_err(
 	util_len += LEVEL_WINDOW;
 	MEMCPY_LIT(&util_buff[util_len], TEXT2);
 	util_len += SIZEOF(TEXT2) - 1;
+	assert((util_len >= 0) && (util_len < MAX_UTIL_LEN));
 	util_buff[util_len] = 0;
 	if (ERR_NULSUBSC == err)
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) err, 4, LEN_AND_STR((char*)util_buff), DB_LEN_STR(gv_cur_region));
@@ -142,6 +146,7 @@ void	mu_int_err(
 				util_len += i2hex_nofill(trees->offset[i], (uchar_ptr_t)&util_buff[util_len], OFFSET_WINDOW);
 				MEMCPY_LIT(&util_buff[util_len], TEXT4);
 				util_len += SIZEOF(TEXT4) - 1;
+				assert((util_len >= 0) && (util_len < MAX_UTIL_LEN));
 				util_buff[util_len] = 0;
 				util_out_print((caddr_t)util_buff, FALSE);
 			}
@@ -149,6 +154,7 @@ void	mu_int_err(
 			MEMCPY_LIT(&util_buff[util_len], TEXT3);
 			util_len += SIZEOF(TEXT3) - 1;
 			util_len += i2hex_nofill(trees->offset[i], (uchar_ptr_t)&util_buff[util_len], OFFSET_WINDOW);
+			assert((util_len >= 0) && (util_len < MAX_UTIL_LEN));
 			util_buff[util_len] = 0;
 			util_out_print((caddr_t)util_buff, TRUE);
 			util_out_print("                           Path:  ", FALSE);
@@ -162,6 +168,7 @@ void	mu_int_err(
 			util_len += i2hex_nofill(mu_int_offset[i], (uchar_ptr_t)&util_buff[util_len], OFFSET_WINDOW);
 			MEMCPY_LIT(&util_buff[util_len], TEXT4);
 			util_len += SIZEOF(TEXT4) - 1;
+			assert((util_len >= 0) && (util_len < MAX_UTIL_LEN));
 			util_buff[util_len] = 0;
 			util_out_print((caddr_t)util_buff, FALSE);
 		}
@@ -169,6 +176,7 @@ void	mu_int_err(
 		MEMCPY_LIT(&util_buff[util_len], TEXT3);
 		util_len += SIZEOF(TEXT3) - 1;
 		util_len += i2hex_nofill(mu_int_offset[i], (uchar_ptr_t)&util_buff[util_len], OFFSET_WINDOW);
+		assert((util_len >= 0) && (util_len < MAX_UTIL_LEN));
 		util_buff[util_len] = 0;
 		util_out_print((caddr_t)util_buff, TRUE);
 	}

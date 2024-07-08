@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -56,7 +56,7 @@ GBLREF int			object_file_des;
 error_def(ERR_SYSCALL);
 error_def(ERR_TEXT);
 
-void	cg_lab (mlabel *l, int4 base);
+void	cg_lab (mtreenode *node, void *do_emit_arg);
 
 /* The sections of the internal GT.M object are grouped according to their type (R/O, R/W).
  * Note: Once an object is linked, no section will be released from memory. All sections
@@ -133,8 +133,8 @@ void	obj_code (uint4 src_lines, void *checksum_ctx)
 	rhead.compiler_qlf = cmd_qlf.qlf;
 	if (cmd_qlf.qlf & CQ_EMBED_SOURCE)
 	{
-                rhead.routine_source_offset = TREF(routine_source_offset);
-                rhead.routine_source_length = (uint4)(stringpool.free - stringpool.base) - TREF(routine_source_offset);
+		rhead.routine_source_offset = TREF(routine_source_offset);
+		rhead.routine_source_length = (uint4)(stringpool.free - stringpool.base) - TREF(routine_source_offset);
 	}
 	rhead.temp_mvals = sa_temps[TVAL_REF];
 	rhead.temp_size = sa_temps_offset[TCAD_REF];
@@ -149,13 +149,13 @@ void	obj_code (uint4 src_lines, void *checksum_ctx)
 	/* Variable table: */
 	vptr = (var_tabent *)mcalloc(mvmax * SIZEOF(var_tabent));
 	if (mvartab)
-		walktree(mvartab, cg_var, (char *)&vptr);
+		walktree((mtreenode *)mvartab, cg_var, &vptr);
 	else
 		assert(0 == mvmax);
 	emit_immed((char *)vptr, mvmax * SIZEOF(var_tabent));
 	/* Label table: */
 	if (mlabtab)
-		walktree((mvar *)mlabtab, cg_lab, (char *)rhead.lnrtab_ptr);
+		walktree((mtreenode *)mlabtab, cg_lab, rhead.lnrtab_ptr);
 	else
 		assert(0 == mlmax);
 	/* External entry definitions: */
@@ -193,19 +193,20 @@ void	obj_code (uint4 src_lines, void *checksum_ctx)
 	RENAME_TMP_OBJECT_FILE(object_file_name);
 }
 
-void	cg_lab (mlabel *l, int4 base)
+void	cg_lab (mtreenode *node, void *arg)
 {
+	int4		base = *arg;
 	mstr		glob_name;
 	lab_tabent	lent;
 
-	if (l->ml && l->gbl)
+	if (node->lab.ml && node->lab.gbl)
 	{
-		lent.lab_name.len = l->mvname.len;
-		lent.lab_name.addr = (char *)(l->mvname.addr - (char *)stringpool.base);
-		lent.LABENT_LNR_OFFSET = (SIZEOF(lnr_tabent) * l->ml->line_number) + base;
-		lent.has_parms = (NO_FORMALLIST != l->formalcnt);	/* Flag to indicate a formallist */
+		lent.lab_name.len = node->lab.mvname.len;
+		lent.lab_name.addr = (char *)(node->lab.mvname.addr - (char *)stringpool.base);
+		lent.LABENT_LNR_OFFSET = (SIZEOF(lnr_tabent) * node->lab.ml->line_number) + base;
+		lent.has_parms = (NO_FORMALLIST != node->lab.formalcnt);	/* Flag to indicate a formallist */
 		emit_immed((char *)&lent, SIZEOF(lent));
-		mlabel2xtern(&glob_name, &int_module_name, &l->mvname);
+		mlabel2xtern(&glob_name, &int_module_name, &node->lab.mvname);
 		define_symbol(GTM_CODE, &glob_name, lent.LABENT_LNR_OFFSET);
 	}
 }

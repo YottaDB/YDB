@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2005-2023 Fidelity National Information	*
+ * Copyright (c) 2005-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -37,6 +37,7 @@
 #include "gtm_c_stack_trace.h"
 #include "eintr_wrappers.h"
 #include "eintr_wrapper_semop.h"
+#include "hugetlbfs_overrides.h"
 #include "mu_all_version_standalone.h"
 #ifdef __MVS__
 #include "gtm_zos_io.h"

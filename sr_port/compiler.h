@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -158,6 +158,17 @@ typedef struct
 {
 	uint4		octype;
 } octabstruct;
+
+typedef union mtreenode_union
+{
+	struct mtreelinks_struct
+	{
+		union mtreenode_union	*lson,
+					*rson;
+	}		links;
+	mvar		var;
+	mlabel		lab;
+} mtreenode;
 
 /* Values for octype */
 #define OCT_NULL	0
@@ -645,6 +656,20 @@ MBSTART {									\
 # define CDREF_REF CDLT_REF
 #endif
 
+typedef int (*indir_fptr_void_t)(void);
+typedef int (*indir_fptr_opr_t)(oprtype *, opctype);
+
+#if defined(DEBUG) && (defined(__clang__) || defined(__GNUC__))
+#define DO_INDIR_FUNCTION_CHECK
+GBLREF unsigned int indir_fntype[];
+
+#define ASSERT_INDIR_FUNCTION_VOID(ARGCODE) assert(1 == indir_fntype[ARGCODE])
+#define ASSERT_INDIR_FUNCTION_OPR(ARGCODE) assert(2 == indir_fntype[ARGCODE])
+#else
+#define ASSERT_INDIR_FUNCTION_VOID(ARGCODE) (1)
+#define ASSERT_INDIR_FUNCTION_OPR(ARGCODE) (1)
+#endif
+
 int		actuallist(oprtype *opr);
 int		bool_expr(boolean_t sense, oprtype *addr);
 void		bx_boollit(triple *t);
@@ -786,7 +811,7 @@ void		start_for_fetches(void);
 void		tnxtarg(oprtype *a);
 void		tripinit(void);
 boolean_t	unuse_literal(mval *x);
-void		walktree(mvar *n,void (*f)(),char *arg);
+void		walktree(mtreenode *node, void (*f)(mtreenode *, void *), void *arg);
 void		wrtcatopt(triple *r, triple ***lpx, triple **lptop);
 int		zlcompile(unsigned char len, unsigned char *addr);		/***type int added***/
 

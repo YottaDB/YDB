@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;                                                               ;
-; Copyright (c) 2017-2023 Fidelity National Information		;
+; Copyright (c) 2017-2024 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.  ;
 ;                                                               ;
 ;       This source code contains the intellectual property     ;
@@ -146,7 +146,7 @@ SHOW(wkstat,stat)
 	. . set ret="",tmp=%YGS("*") for i=1:1:%YGS(0) do
 	. . . set nextstat=$zpiece(tmp,",",i)
 	. . . ; Test must consider stats that are proper substrings like DEX/DEXA, WS1/WS15 etc so add terminal comma on both sides
-	. . . do:(stat_",")[(nextstat_",")
+	. . . do:(","_stat_",")[(","_nextstat_",")
 	. . . . set offset=%YGS(nextstat)
 	. . . . set r=$&gblstat.toulong(.num,$zextract(wkstat,offset,offset+7))
 	. . . . set ret=ret_nextstat_":"_num_","

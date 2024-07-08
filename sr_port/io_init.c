@@ -39,6 +39,32 @@ error_def(ERR_FILEOPENFAIL);
 error_def(ERR_LOGTOOLONG);
 error_def(ERR_SYSCALL);
 
+inline static void io_init_check_fd(int fd, struct stat *statbuf)
+{
+	int4		status;
+	int		newfd;
+
+	status = fstat(fd, statbuf);
+	if (-1 == status)
+	{
+		if (EBADF == errno)
+		{
+			OPENFILE(DEVNULL, ((0 == fd) ? O_RDONLY : O_RDWR), newfd);
+			if (-1 == newfd)
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_SYSCALL, 5,
+						LEN_AND_LIT("open /dev/null on std descriptor"), CALLFROM, errno, 0);
+			assert(newfd == fd);
+			status = fstat(fd, statbuf);
+		} else
+		{
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(9) ERR_SYSCALL, 5, LEN_AND_LIT("fstat of std descriptor"), CALLFROM,
+					errno, 0);
+			GTM_UNREACHABLE();
+		}
+	}
+	assert(-1 != status);
+}
+
 void io_init(boolean_t term_ctrl)
 {
 	static readonly unsigned char open_params_list[2] =
@@ -80,7 +106,7 @@ void io_init(boolean_t term_ctrl)
 	io_log_name		*ln;
 	enum io_dev_type	dev_type;
 #	ifdef UNIX
-	int			fd, newfd;
+	int			fd;
 	struct stat		statbuf, out_statbuf;
 #	endif
 
@@ -88,35 +114,10 @@ void io_init(boolean_t term_ctrl)
 	/* Make sure we have valid descriptors on stdin/stdout/stderr.
 	 * Otherwise we could end up "filling the hole" with a database file and writing an error message to it.
 	 */
-	for (fd = 0; fd < 3; fd++)
-	{
-		status = fstat(fd, &statbuf);
-		if (-1 == status)
-		{
-			if (EBADF == errno)
-			{
-				OPENFILE(DEVNULL, ((0 == fd) ? O_RDONLY : O_RDWR), newfd);
-				if (-1 == newfd)
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_SYSCALL, 5,
-							LEN_AND_LIT("open /dev/null on std descriptor"), CALLFROM, errno, 0);
-				assert(newfd == fd);
-				status = fstat(fd, &statbuf);
-			} else
-			{
-				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(9) ERR_SYSCALL, 5,
-					LEN_AND_LIT("fstat of std descriptor"), CALLFROM, errno, 0);
-				GTM_UNREACHABLE();
-			}
-		}
-		assert(-1 != status);
-		if (0 < fd)
-		{
-			if (1 == fd)
-				out_statbuf = statbuf;
-			else if (2 == fd)
-				err_same_as_out = (statbuf.st_dev == out_statbuf.st_dev) && (statbuf.st_ino == out_statbuf.st_ino);
-		}
-	}
+	io_init_check_fd(0, &statbuf);
+	io_init_check_fd(1, &out_statbuf);
+	io_init_check_fd(2, &statbuf);
+	err_same_as_out = (statbuf.st_dev == out_statbuf.st_dev) && (statbuf.st_ino == out_statbuf.st_ino);
 #	endif
 	io_init_name();
 	/* default logical names */

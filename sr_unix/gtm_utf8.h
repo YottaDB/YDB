@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2023 Fidelity National Information	*
+ * Copyright (c) 2006-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -876,5 +876,17 @@ boolean_t       valid_utf_string(const mstr *str);
 typedef	int	(*gtm_wcswidth_fnptr_t)(unsigned char* ptr, int len, boolean_t strict, int nonprintwidth);
 
 GBLREF	gtm_wcswidth_fnptr_t	gtm_wcswidth_fnptr;	/* see comment above about this typedef */
+
+#ifdef UTF8_SUPPORTED
+static inline unsigned int MV_FORCE_LEN(mval *v)
+{
+	if (!(v->mvtype & MV_UTF_LEN))
+	{
+		utf8_len(&v->str);
+		v->mvtype |= MV_UTF_LEN;
+	}
+	return v->str.char_len;
+}
+#endif
 
 #endif /* GTM_UTF8_H */

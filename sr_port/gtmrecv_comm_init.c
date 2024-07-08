@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -39,10 +39,13 @@
 #include "util.h"
 #include "repl_log.h"
 #include "repl_comm.h"
+#include "sgtm_putmsg.h"
+#include "repl_msg.h"
 
 GBLDEF	int                	gtmrecv_listen_sock_fd = FD_INVALID;
 GBLREF	gtmrecv_options_t  	gtmrecv_options;
 GBLREF	intrpt_state_t		intrpt_ok_state;
+GBLREF  FILE                    *gtmrecv_log_fp;
 
 error_def(ERR_GETADDRINFO);
 error_def(ERR_REPLCOMM);
@@ -68,6 +71,7 @@ int gtmrecv_comm_init(in_port_t port)
 	unsigned int		save_errno;
 	GTM_SOCKLEN_TYPE        len;
 	intrpt_state_t		prev_intrpt_state;
+	char                    print_msg[REPL_MSG_SIZE];
 
 	if (FD_INVALID != gtmrecv_listen_sock_fd) /* Initialization done already */
 		return (0);
@@ -93,7 +97,10 @@ int gtmrecv_comm_init(in_port_t port)
 	{
 		ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 		CLOSEFILE(temp_sock_fd, rc);
-		RTS_ERROR_ADDRINFO_CTX(NULL, ERR_GETADDRINFO, errcode, "FAILED in obtaining IP address on receiver server.");
+		REPL_LOG_ADDRINFO(gtmrecv_log_fp, repl_log, print_msg, ERR_GETADDRINFO,
+					errcode, "FAILED in obtaining IP address on receiver server.");
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2,
+					LEN_AND_LIT("FAILED in obtaining IP address on receiver server."));
 		return -1;
 	}
 	gtmrecv_listen_sock_fd = temp_sock_fd;

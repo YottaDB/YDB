@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -604,7 +604,6 @@ CONDITION_HANDLER(mdb_condition_handler)
 	if ((int)ERR_CTRLC == SIGNAL)
 	{
 		xfer_reset_if_setter(ctrlc);
-		outofband = no_event;
 		if (!trans_action && !dm_action)
 		{	/* Verify not indirect or that context is unchanged before reset context */
 			assert(NULL != frame_pointer->restart_pc);
@@ -660,7 +659,6 @@ CONDITION_HANDLER(mdb_condition_handler)
 			real_xfer_reset(outofband);
 			TAREF1(save_xfer_root, outofband).event_state = not_in_play;	/* sighup & ctrap both headed to trap */
 		}
-		outofband = no_event;
 		if (!trans_action && !(frame_pointer->type & SFT_DM))
 		{
 			if (!repeat_error)

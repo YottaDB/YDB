@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -683,6 +683,66 @@ void dbsecspc(gd_region *reg, sgmnt_data_ptr_t csd, gtm_uint64_t *sec_size)
 	return;
 }
 
+void bg_sync_init(node_local_ptr_t cnl)
+{	/* Initialize mutex/cond for notifying processes of completed reads */
+#	if PTHREAD_MUTEX_ROBUST_SUPPORTED
+	int			status;
+	pthread_mutexattr_t	read_completed_ctl_attr;
+	pthread_condattr_t	read_completed_attr;
+
+	status = pthread_mutexattr_init(&read_completed_ctl_attr);
+	if (0 != status)
+	{
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5,
+			LEN_AND_LIT("pthread_mutexattr_init"), CALLFROM, status, 0);
+	}
+	status = pthread_mutexattr_settype(&read_completed_ctl_attr, PTHREAD_MUTEX_ERRORCHECK);
+	if (0 != status)
+	{
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5,
+			LEN_AND_LIT("pthread_mutexattr_settype"), CALLFROM, status, 0);
+	}
+	status = pthread_mutexattr_setpshared(&read_completed_ctl_attr, PTHREAD_PROCESS_SHARED);
+	if (0 != status)
+	{
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5,
+			LEN_AND_LIT("pthread_mutexattr_setpshared"), CALLFROM, status, 0);
+	}
+#	if PTHREAD_MUTEX_ROBUST_SUPPORTED
+	status = pthread_mutexattr_setrobust(&read_completed_ctl_attr, PTHREAD_MUTEX_ROBUST);
+	if (0 != status)
+	{
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5,
+			LEN_AND_LIT("pthread_mutexattr_setrobust"), CALLFROM, status, 0);
+	}
+#	endif
+	status = pthread_mutex_init(&cnl->read_completed_ctl, &read_completed_ctl_attr);
+	if (0 != status)
+	{
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5,
+			LEN_AND_LIT("pthread_mutex_init"), CALLFROM, status, 0);
+	}
+	status = pthread_condattr_init(&read_completed_attr);
+	if (0 != status)
+	{
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5,
+			LEN_AND_LIT("pthread_condattr_init"), CALLFROM, status, 0);
+	}
+	status = pthread_condattr_setpshared(&read_completed_attr, PTHREAD_PROCESS_SHARED);
+	if (0 != status)
+	{
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5,
+			LEN_AND_LIT("pthread_condattr_setpshared"), CALLFROM, status, 0);
+	}
+	status = pthread_cond_init(&cnl->read_completed, &read_completed_attr);
+	if (0 != status)
+	{
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5,
+			LEN_AND_LIT("pthread_cond_init"), CALLFROM, status, 0);
+	}
+#	endif
+}
+
 int db_init(gd_region *reg, boolean_t ok_to_bypass)
 {
 	boolean_t		is_bg, read_only, need_stacktrace, have_standalone_access;
@@ -1356,6 +1416,7 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 			cnl->cache_off = -CACHE_CONTROL_SIZE(csd);
 			db_csh_ini(csa);
 			bt_malloc(csa);
+			bg_sync_init(cnl);
 		}
 		db_csh_ref(csa, TRUE);
 		shmpool_buff_init(reg);

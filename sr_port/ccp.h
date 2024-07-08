@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -68,7 +69,7 @@ typedef struct ccp_db_header_struct
 	trans_num master_map_start_tn;		/* t.n. for last master map update*/
 	trans_num tick_tn;			/* t.n. as of last clock tick*/
 	uint4 last_lk_sequence;		/* sequence for last lock update */
-	short unsigned wc_rover;		/* used when flushing dirty buffers so that we don't have to start at the beginning
+	unsigned short wc_rover;		/* used when flushing dirty buffers so that we don't have to start at the beginning
 						   each time */
 	struct ccp_db_header_struct *tick_timer_id;	/* unique values to use as timer id and pointer to db */
 	struct ccp_db_header_struct *quantum_timer_id;

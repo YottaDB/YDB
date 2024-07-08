@@ -1,7 +1,7 @@
 #!/usr/local/bin/tcsh -f
 #################################################################
 #								#
-# Copyright (c) 2001-2019 Fidelity National Information		#
+# Copyright (c) 2001-2024 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -76,10 +76,10 @@ if ( $buildshr_status != 0 ) then
 endif
 
 set gt_ld_linklib_options = "-L$gtm_obj $gtm_obj/gtm_main.o -lmumps -lgnpclient -lcmisockettcp"
-set nolibgtmshr = "no"	# by default build libgtmshr
 
+set build_libgtmshr = "yes"		# by default build libgtmshr
 if ($gt_image == "bta") then
-	set nolibgtmshr = "yes"	# if bta build, build a static mumps executable
+	set build_libgtmshr = "no"	# if bta build, build a static mumps executable
 endif
 
 if ("OS/390" == $HOSTOS) then
@@ -94,7 +94,7 @@ $shell $gtm_tools/genexport.csh $gtm_tools/gtmshr_symbols.exp gtmshr_symbols.$ex
 
 $shell $gtm_tools/genexport.csh $gtm_tools/gtmexe_symbols.exp gtmexe_symbols.$exp
 
-if ($nolibgtmshr == "no") then	# do not build libgtmshr.so for bta builds
+if ($build_libgtmshr == "yes") then
 	# Building libgtmshr.so shared library
 	set aix_loadmap_option = ''
 	set aix_binitfini_option = ''
@@ -127,6 +127,9 @@ if ($nolibgtmshr == "no") then	# do not build libgtmshr.so for bta builds
 		cp $gtm_obj/gtmshr_symbols.$exp $3/
 	endif
 	set gt_ld_linklib_options = "-L$gtm_obj"	# do not link in mumps whatever is already linked in libgtmshr.so
+else
+	# Do not build libgtmshr.so for bta builds. Export symbols for XC when linking MUMPS
+	set gt_ld_linklib_options = "$gt_ld_linklib_options $gt_ld_options_all_exe"
 endif
 
 # Building mumps executable

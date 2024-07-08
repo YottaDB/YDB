@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -200,15 +200,16 @@ LITDEF boolean_t mvs_save[] =
 LITDEF mval skiparg		= DEFINE_MVAL_COMMON(0, 0, 0, 0, 0, 0, 0, 0);
 
 static readonly unsigned char localpool[15] = {'-', '1', '1', '1', '0', '1', '0', '0', '5', '2', '4', '2', '8', '6'};
-LITDEF mval literal_minusone	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 2, (char *)&localpool[0], 0,  -1 * MV_BIAS);
-LITDEF mval literal_zero	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 1, (char *)&localpool[4], 0,   0);
-LITDEF mval literal_one 	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 1, (char *)&localpool[1], 0,   1 * MV_BIAS);
-LITDEF mval literal_ten 	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 2, (char *)&localpool[3], 0,  10 * MV_BIAS);
-LITDEF mval literal_eleven	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 2, (char *)&localpool[1], 0,  11 * MV_BIAS);
-LITDEF mval literal_oneohoh	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 3, (char *)&localpool[5], 0, 100 * MV_BIAS);
-LITDEF mval literal_oneohone	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 3, (char *)&localpool[3], 0, 101 * MV_BIAS);
-LITDEF mval literal_oneten	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 3, (char *)&localpool[2], 0, 110 * MV_BIAS);
-LITDEF mval literal_oneeleven	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 3, (char *)&localpool[1], 0, 111 * MV_BIAS);
+LITDEF mval literal_minusone	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 2, (char *)&localpool[0], 0,   -1 * MV_BIAS);
+LITDEF mval literal_zero	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 1, (char *)&localpool[4], 0,    0);
+LITDEF mval literal_one 	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 1, (char *)&localpool[1], 0,    1 * MV_BIAS);
+LITDEF mval literal_ten 	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 2, (char *)&localpool[3], 0,   10 * MV_BIAS);
+LITDEF mval literal_eleven	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 2, (char *)&localpool[1], 0,   11 * MV_BIAS);
+LITDEF mval literal_oneohoh	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 3, (char *)&localpool[5], 0,  100 * MV_BIAS);
+LITDEF mval literal_oneohone	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 3, (char *)&localpool[3], 0,  101 * MV_BIAS);
+LITDEF mval literal_oneten	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 3, (char *)&localpool[2], 0,  110 * MV_BIAS);
+LITDEF mval literal_oneeleven	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 3, (char *)&localpool[1], 0,  111 * MV_BIAS);
+LITDEF mval literal_mv_bias	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 4, (char *)&localpool[1], 0, 1000 * MV_BIAS);
 LITDEF mval literal_notimeout	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 6, (char *)&localpool[8], 0, NO_M_TIMEOUT);
 
 /* --------------------------------------------------------------------------------------------------------------------------

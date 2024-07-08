@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -45,7 +45,7 @@ void stop_image(void)
 }
 
 /* This entry point will core if necessary */
-void stop_image_conditional_core(void)
+CONDITION_HANDLER(stop_image_conditional_core)
 {
 	/* If coming here because of an IO error presumably while handling a real error,
 	   then don't core. */

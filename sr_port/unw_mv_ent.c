@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -99,10 +99,10 @@ GBLREF gv_trigger_t		*gtm_trigdsc_last;		/* For debugging purposes - parms gtm_t
 
 void unw_mv_ent(mv_stent *mv_st_ent)
 {
-	boolean_t		defer_tptimeout, defer_ztimeout;
 	d_rm_struct		*rm_ptr;
 	d_socket_struct		*dsocketptr;
 	d_tt_struct		*tt_ptr;
+	int4			lcl_outofband;
 	intrpt_state_t		prev_intrpt_state;
 	ht_ent_mname		*hte;
 	lv_blk			*lp, *lpnext;
@@ -410,8 +410,6 @@ void unw_mv_ent(mv_stent *mv_st_ent)
 			/* Restore environment to pre-$zinterrupt evocation. Note the first few elements of MVST_ZINTR
 			 * and MVST_TRIGR are the same, so the processing of those elements is commonized.
 			 */
-			dollar_zininterrupt = FALSE;
-			TAREF1(save_xfer_root, jobinterrupt).event_state = not_in_play;
 			/* Get rid of old values that may exist */
 			if (dollar_ecode.begin)
 				free(dollar_ecode.begin);
@@ -427,6 +425,11 @@ void unw_mv_ent(mv_stent *mv_st_ent)
 			error_frame = mv_st_ent->mv_st_cont.mvs_zintr.error_frame_save;
 			memcpy(&dollar_ecode, &mv_st_ent->mv_st_cont.mvs_zintr.dollar_ecode_save, SIZEOF(dollar_ecode));
 			memcpy(&dollar_stack, &mv_st_ent->mv_st_cont.mvs_zintr.dollar_stack_save, SIZEOF(dollar_stack));
+			/* ZTIMEOUT shares ZINTERRUPT transcendental frame. Explicitly set event since outofband can change */
+			lcl_outofband = (frame_pointer->type | SFT_ZTIMEOUT) ? ztimeout : jobinterrupt;
+			(void)xfer_reset_if_setter(lcl_outofband);
+			TAREF1(save_xfer_root, lcl_outofband).event_state = not_in_play;
+			dollar_zininterrupt = FALSE; /* Once reset, SIGUSR1s are not ignored and engage event handling */
 			TRY_EVENT_POP;							/* Fall into MVST_TRIGR */
 		case MVST_TRIGR:
 			dollar_truth = (boolean_t)mv_st_ent->mv_st_cont.mvs_trigr.saved_dollar_truth;

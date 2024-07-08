@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -48,26 +48,16 @@
 				ERR_TEXT, 2, RTS_ERROR_STRING(gai_strerror(ERRCODE)));		\
 }
 /* Macro to issue an ERR_GETADDRINFO and continue (no rts_error) */
-#define GTM_PUTMSG_CSA_ADDRINFO(CSA, MNEMONIC, ERRCODE, HOSTINFO)				\
+#define REPL_LOG_ADDRINFO(FP, REPL_LOG, PRINT_MSG, MNEMONIC, ERRCODE, HOSTINFO)			\
 {												\
 	if (EAI_SYSTEM == ERRCODE)								\
-		gtm_putmsg_csa(CSA_ARG(CSA) VARLSTCNT(8) MNEMONIC, 0, errno, 0,			\
+		sgtm_putmsg(PRINT_MSG, REPL_MSG_SIZE, VARLSTCNT(8) MNEMONIC, 0, errno, 0,	\
 				ERR_TEXT, 2, LEN_AND_STR(HOSTINFO));				\
 	else											\
-		gtm_putmsg_csa(CSA_ARG(CSA) VARLSTCNT(10) MNEMONIC, 0,				\
+		sgtm_putmsg(PRINT_MSG, REPL_MSG_SIZE, VARLSTCNT(10) MNEMONIC, 0,		\
 				ERR_TEXT, 2, RTS_ERROR_STRING(gai_strerror(ERRCODE)),		\
 				ERR_TEXT, 2, LEN_AND_STR(HOSTINFO));				\
-}
-/* Same as above, but with a literal string context description. */
-#define RTS_ERROR_ADDRINFO_CTX(CSA, MNEMONIC, ERRCODE, CONTEXT)					\
-{												\
-	if (EAI_SYSTEM == ERRCODE)								\
-		rts_error_csa(CSA_ARG(CSA) VARLSTCNT(8) MNEMONIC, 0,				\
-				ERR_TEXT, 2, RTS_ERROR_LITERAL(CONTEXT), errno, 0);		\
-	else											\
-		rts_error_csa(CSA_ARG(CSA) VARLSTCNT(10) MNEMONIC, 0,				\
-				ERR_TEXT, 2, RTS_ERROR_LITERAL(CONTEXT),			\
-				ERR_TEXT, 2, RTS_ERROR_STRING(gai_strerror(ERRCODE)));		\
+	REPL_LOG(FP, TRUE, TRUE, PRINT_MSG);							\
 }
 /* Get either string for either system or gai error */
 #define TEXT_ADDRINFO(TEXT, ERRCODE, SAVEERRNO)			\
@@ -75,7 +65,7 @@
 	if (EAI_SYSTEM == ERRCODE)				\
 		TEXT = (char *)STRERROR(SAVEERRNO);		\
 	else							\
-		TEXT = (char *)gai_strerror(ERRCODE);			\
+		TEXT = (char *)gai_strerror(ERRCODE);		\
 }
 
 #endif

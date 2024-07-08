@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -137,7 +137,7 @@ void mupip_restore(void)
 	backup_type		type;
 	unsigned short		port;
 	int4			timeout, cut, match;
-	void			(*common_read)();
+	void			(*common_read)(BFILE *, char *, int4);
 	char			*errptr;
 	pid_t			waitpid_res;
 	muinc_blk_hdr_ptr_t	sblkh_p;
@@ -315,7 +315,7 @@ void mupip_restore(void)
 				util_out_print("Unrecognized input format !AD", TRUE, ptr->input_file.len, ptr->input_file.addr);
 				CLNUP_AND_EXIT(ERR_MUPRESTERR, inbuf);
 		}
-		COMMON_READ(in, &inhead, SIZEOF(inc_header), inbuf);
+		COMMON_READ(in, (char *)&inhead, SIZEOF(inc_header), inbuf);
 		check_mdb_ver = FALSE;
 		if (!memcmp(inhead.label, INC_HEADER_LABEL_V5_NOENCR, INC_HDR_LABEL_SZ))
 			assert(!IS_ENCRYPTED(inhead.is_encrypted));
@@ -516,7 +516,7 @@ void mupip_restore(void)
 			COMMON_READ(in, inbuf, rsize, inbuf);	/* Note rsize == sblkh_p */
 			if (0 == sblkh_p->blkid && FALSE == sblkh_p->valid_data)
 			{	/* This is supposed to be the end of list marker (null entry */
-				COMMON_READ(in, &rsize, SIZEOF(rsize), inbuf);
+				COMMON_READ(in, (char *)&rsize, SIZEOF(rsize), inbuf);
 				if (SIZEOF(END_MSG) + SIZEOF(int4) == rsize)
 				{	/* the length of our secondary check is correct .. now check substance */
 					COMMON_READ(in, inbuf, rsize - SIZEOF(int4), inbuf);
@@ -616,7 +616,7 @@ void mupip_restore(void)
 			}
 		}
 		/* Next section is the file header which we need to restore */
-		COMMON_READ(in, &rsize, SIZEOF(rsize), inbuf);
+		COMMON_READ(in, (char *)&rsize, SIZEOF(rsize), inbuf);
 		assert((SGMNT_HDR_LEN + SIZEOF(int4)) == rsize);
 		COMMON_READ(in, inbuf, rsize, inbuf);
 		if (0 == memcmp(inbuf, V6_GDS_LABEL, GDS_LABEL_SZ - 1))

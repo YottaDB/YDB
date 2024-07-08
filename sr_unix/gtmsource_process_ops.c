@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2023 Fidelity National Information	*
+ * Copyright (c) 2006-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -137,10 +137,12 @@ int gtmsource_est_conn()
 	char			print_msg[PROC_OPS_PRINT_MSG_LEN], msg_str[1024], *errmsg;
 	int			connection_attempts, max_heartbeat_wait, save_errno, comminit_retval, status;
 	int 			logging_period, logging_interval; /* logging period = soft_tries_period*logging_interval */
-	int			alert_period, hardtries_count, hardtries_period;
-	int 			max_shutdown_wait, max_sleep, soft_tries_period;
+	int			alert_period, alert_period_ms, hardtries_count, hardtries_period;
+	int 			max_shutdown_wait, max_sleep, soft_tries_period, soft_tries_period_ms;
 	int			secondary_addrlen;
 	time_t			alert_time_start = 0, noconnection_time = 0; /* For logging the REPLALERT message */
+	struct timeval		cur_time;
+	int			cur_time_ms, diff_time_ms;
 	boolean_t		throw_errors = TRUE;
 	sockaddr_ptr		secondary_sa;
 	gtmsource_local_ptr_t	gtmsource_local;
@@ -276,7 +278,14 @@ int gtmsource_est_conn()
 				} else /* Decrease the frequency of showing the connection failure error messages */
 					throw_errors = FALSE;
 			}
-			LONG_SLEEP(soft_tries_period);
+
+			/* Sometimes we undersleep in AIX.  We adopt the solution from op_hang.c to add an additional 2ms and make
+			 * sure we get into the next second */
+			soft_tries_period_ms = soft_tries_period * 1000;
+#ifdef AIX
+			soft_tries_period_ms += 2;
+#endif
+			LONG_SLEEP_MSEC(soft_tries_period_ms);
 			gtmsource_poll_actions(FALSE);
 			if ((GTMSOURCE_CHANGING_MODE == gtmsource_state) || (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state))
 				return (SS_NORMAL);
@@ -284,8 +293,13 @@ int gtmsource_est_conn()
 			if (FD_INVALID == gtmsource_sock_fd)
 				comminit_retval = gtmsource_comm_init(throw_errors);
 			connection_attempts++;
-			if ((0 != alert_period) && ((double)alert_period <= difftime(time(NULL), alert_time_start)))
-			{ 	/* Log the REPLALERT message */
+
+			alert_period_ms = alert_period * 1000;
+			gettimeofday(&cur_time, NULL);
+			cur_time_ms = (cur_time.tv_sec * 1000) + (cur_time.tv_usec / 1000);
+			diff_time_ms = cur_time_ms - (alert_time_start * 1000);
+			if ((0 != alert_period) && (alert_period_ms - ((5 <= soft_tries_period) ? 500 : 0) <= diff_time_ms))
+			{ 	/* Log the REPLALERT message if we close to, at or after our fire time */
 				sgtm_putmsg(print_msg, PROC_OPS_PRINT_MSG_LEN, VARLSTCNT(4) ERR_REPLALERT, 2,
 						jnlpool->gtmsource_local->secondary_instname,
 						(UINTPTR_T)difftime(time(NULL), noconnection_time));
@@ -1063,8 +1077,10 @@ void	gtmsource_repl_send(repl_msg_ptr_t msg, char *msgtypestr, seq_num optional_
 				repl_log(gtmsource_log_fp, TRUE, TRUE, "Connection reset while sending %s. Status = %d ; %s\n",
 					msgtypestr, status, STRERROR(status));
 				repl_log_conn_info(gtmsource_sock_fd, gtmsource_log_fp, TRUE);
+#ifdef DEBUG
 				if (WBTEST_ENABLED(WBTEST_REPLCOMM_SEND_SRC))
 					gtm_wbox_input_test_case_count = 6; /*Do not got into white box case again */
+#endif
 				close_retry = TRUE;
 			}
 			if (close_retry)

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -173,13 +173,13 @@ unsigned char *mval2subsc(mval *in_val, gv_key *out_key, boolean_t std_null_coll
 		}
 		if (10 > mt)
 		{
-			*out_ptr++ = is_negative ? ~(SUBSCRIPT_BIAS - 2) : (SUBSCRIPT_BIAS - 2);
+			*out_ptr++ = is_negative ? (unsigned char)~(SUBSCRIPT_BIAS - 2) : (unsigned char)(SUBSCRIPT_BIAS - 2);
 			*out_ptr++ = cvt_table[mt * 10];
 			goto FINISH_NUMBER;
 		}
 		if (100 > mt)
 		{
-			*out_ptr++ = is_negative ? ~(SUBSCRIPT_BIAS - 1) : (SUBSCRIPT_BIAS - 1);
+			*out_ptr++ = is_negative ? (unsigned char)~(SUBSCRIPT_BIAS - 1) : (unsigned char)(SUBSCRIPT_BIAS - 1);
 			*out_ptr++ = cvt_table[mt];
 			goto FINISH_NUMBER;
 		}

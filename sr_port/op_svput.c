@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -14,7 +14,7 @@
 
 #include "gtm_stdlib.h"
 #include "gtm_string.h"
-
+#include "gtm_fcntl.h"	/* Needed for AIX's silly open to open64 translations */
 #include "svnames.h"
 #include "io.h"
 #include "gdsroot.h"
@@ -57,7 +57,10 @@
 #include "getstorage.h"
 #include "try_event_pop.h"
 #include "restrict.h"
-
+#include "tpnotacid_chk_inline.h"
+#ifdef DEBUG
+#include "compiler.h"
+#endif
 
 GBLREF boolean_t		dollar_zquit_anyway, dollar_ztexit_bool, malloccrit_issued, ztrap_new;
 GBLREF boolean_t		ztrap_explicit_null;		/* whether $ZTRAP was explicitly set to NULL in this frame */
@@ -83,7 +86,7 @@ GBLREF int4		tstart_trigger_depth;
 GBLREF uint4		dollar_tlevel;
 #endif
 
-LITREF mval		default_etrap;
+LITREF mval		default_etrap, literal_null;
 #ifdef GTM_TRIGGER
 LITREF mval		gvtr_cmd_mval[GVTR_CMDTYPES];
 #endif
@@ -108,7 +111,7 @@ void op_svput(int varnum, mval *v)
 	size_t		rtmp;
 	sgmnt_addrs	*csa;			/* for ZGBLDIR */
 	gd_region	*reg, *reg_top;
-	mstr		trap_v;
+	mval		save_mval, *save_mval_ptr;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -183,7 +186,20 @@ void op_svput(int varnum, mval *v)
 			}
 			break;
 		case SV_ZMAXTPTIME:
-			TREF(dollar_zmaxtptime) = mval2i(v);	/* Negative values == no timeout */
+			save_mval = *v;	/* use a stack variable copy to avoid modifying the state of what might be a GT.M literal */
+			save_mval_ptr = push_mval(&save_mval);	/* compiled code-runtime interactions rely on stable shared lits */
+			MV_FORCE_NUM(save_mval_ptr);
+			assert(MV_BIAS == MILLISECS_IN_SEC);				/* check math if this changes */
+			if (0 != save_mval_ptr->m[1])
+			{       /* just millisecond (3 digit) precision */
+			        op_fnj3(save_mval_ptr, 0, 3, save_mval_ptr);
+			        MV_FORCE_INT(save_mval_ptr);
+			        save_mval_ptr->mvtype = MV_INT | MV_NM;
+			}
+			if (!((0 > save_mval_ptr->m[1]) || (TPTIMEOUT_MAX_TIME < save_mval_ptr->m[1])))
+			        TREF(dollar_zmaxtptime) = save_mval_ptr->m[1];
+			if ((MVST_MVAL == mv_chain->mv_st_type) && (save_mval_ptr == &mv_chain->mv_st_cont.mvs_mval))
+			        POP_MV_STENT();
 			break;
 		case SV_ZROUTINES:
 			if (RESTRICTED(zroutines_op))
@@ -210,15 +226,29 @@ void op_svput(int varnum, mval *v)
 #			endif
 			MV_FORCE_STR(v);
 			/* Save v->str before op_newintrinsic(), which might overflow it. (gtm-DE304273) */
-			trap_v = v->str;
+			save_mval = *v;
+			DBG_MARK_STRINGPOOL_UNEXPANDABLE;
 			if (ztrap_new)
 				op_newintrinsic(SV_ZTRAP);
-			if (!trap_v.len)
+			DBG_MARK_STRINGPOOL_EXPANDABLE;
+			save_mval_ptr = push_mval(&save_mval);
+			s2pool(&save_mval_ptr->str);
+#ifdef			DEBUG
+			if (WBTEST_ENABLED(WBTEST_MUNMAP_FREE) && (3 == gtm_white_box_test_case_count))
+				INVOKE_STP_GCOL(stringpool.top - stringpool.free + 1);
+			if (WBTEST_ENABLED(WBTEST_ZTTEST))
+				INVOKE_STP_GCOL(MAX_SRCLINE);
+			if (WBTEST_ENABLED(WBTEST_MUNMAP_FREE) && (3 == gtm_white_box_test_case_count))
+				INVOKE_STP_GCOL(stringpool.top - stringpool.free + 1);
+#endif
+			if (!save_mval_ptr->str.len)
 			{	/* Setting $ZTRAP to empty causes any current error trapping to be canceled */
 				(TREF(dollar_etrap)).mvtype = (TREF(dollar_ztrap)).mvtype = MV_STR;
-				(TREF(dollar_ztrap)).str = trap_v;
+				(TREF(dollar_ztrap)).str = save_mval_ptr->str;
 				(TREF(dollar_etrap)).str.len = 0;
 				ztrap_explicit_null = TRUE;
+				if ((MVST_MVAL == mv_chain->mv_st_type) && (save_mval_ptr == &mv_chain->mv_st_cont.mvs_mval))
+					POP_MV_STENT();
 				if (!dollar_zininterrupt)
 					TRY_EVENT_POP;		/* not in interrupt code, so check for pending timed events */
 			} else /* Ensure that $ETRAP and $ZTRAP are not both active at the same time */
@@ -230,7 +260,9 @@ void op_svput(int varnum, mval *v)
 					op_unwind();
 				}
 				(TREF(dollar_ztrap)).mvtype = MV_STR;
-				(TREF(dollar_ztrap)).str = trap_v;
+				(TREF(dollar_ztrap)).str = save_mval_ptr->str;
+				if ((MVST_MVAL == mv_chain->mv_st_type) && (save_mval_ptr == &mv_chain->mv_st_cont.mvs_mval))
+					POP_MV_STENT();
 				if ((TREF(dollar_etrap)).str.len > 0)
 				{
 					gtm_newintrinsic(&(TREF(dollar_etrap)));

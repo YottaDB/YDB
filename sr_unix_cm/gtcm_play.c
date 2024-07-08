@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -128,7 +128,7 @@ int main(int argc, char_ptr_t argv[])
 	for (;;)
 		if (omi_srvc_xact(&conn) < 0)
 			break;
-	PRINTF("%ld seconds connect time\n", time((time_t)0) - conn.stats.start);
+	PRINTF("%ld seconds connect time\n", time((time_t *)0) - conn.stats.start);
 	PRINTF("%d OMI transactions\n", omi_nxact);
 	PRINTF("%d OMI errors\n", omi_nerrs);
 #	ifdef GTCM_RC

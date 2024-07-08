@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,6 +13,6 @@
 #ifndef DM_READ_INCLUDED
 #define DM_READ_INCLUDED
 
-void dm_read(mval *v);
+mval *dm_read(mval *v);
 
 #endif /* DM_READ_INCLUDED */

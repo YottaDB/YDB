@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -19,8 +19,6 @@
 #include "gdscc.h"
 #include "buddy_list.h"
 #include "jnl.h"
-
-error_def(ERR_TPNOTACID);
 
 #define JNL_LIST_INIT_ALLOC		16		/* initial allocation for si->jnl_list */
 #define	CW_SET_LIST_INIT_ALLOC		64		/* initial allocation for si->cw_set_list */
@@ -929,69 +927,6 @@ typedef enum
 /* The following GBLREFs are needed by the IS_TP_AND_FINAL_RETRY macro */
 GBLREF	uint4		dollar_tlevel;
 GBLREF	unsigned int	t_tries;
-
-#define	IS_TP_AND_FINAL_RETRY 		(dollar_tlevel && (CDB_STAGNATE <= t_tries))
-
-#define	TP_REL_CRIT_ALL_REG							\
-{										\
-	sgmnt_addrs		*csa;						\
-	tp_region		*tr;						\
-										\
-	GBLREF	tp_region	*tp_reg_list;					\
-										\
-	for (tr = tp_reg_list;  NULL != tr;  tr = tr->fPtr)			\
-	{									\
-		assert(tr->reg->open);						\
-		if (!tr->reg->open)						\
-			continue;						\
-		csa = (sgmnt_addrs *)&FILE_INFO(tr->reg)->s_addrs;		\
-		assert(!csa->hold_onto_crit);					\
-		if (csa->now_crit)						\
-			rel_crit(tr->reg);					\
-	}									\
-	assert(!have_crit(CRIT_HAVE_ANY_REG));					\
-}
-
-#define	TP_FINAL_RETRY_DECREMENT_T_TRIES_IF_OK									\
-{														\
-	GBLREF	boolean_t	mupip_jnl_recover;								\
-														\
-	assert(dollar_tlevel);											\
-	assert(CDB_STAGNATE == t_tries);									\
-	/* mupip_jnl_recovery operates with t_tries=CDB_STAGNATE so we should not adjust t_tries		\
-	 * In that case, because we have standalone access, we don't expect anyone else to interfere with us 	\
-	 * and cause a restart, but if they do, TPNOTACID_CHECK (below) gives a TPNOTACID message.		\
-	 */													\
-	if (!mupip_jnl_recover)											\
-	{													\
-		assert(dollar_trestart >= TREF(tp_restart_dont_counts));					\
-		t_tries = CDB_STAGNATE - 1;									\
-		DEBUG_ONLY(if (0 == TREF(tp_restart_dont_counts)))						\
-			DEBUG_ONLY((TREF(tp_restart_dont_counts))++);	/* can live with one too many */	\
-		DEBUG_ONLY(if (0 < TREF(tp_restart_dont_counts)))						\
-			DEBUG_ONLY((TREF(tp_restart_dont_counts)) = -(TREF(tp_restart_dont_counts)));		\
-	}													\
-}
-
-#define TPNOTACID_DEFAULT_TIME	2 * MILLISECS_IN_SEC	/* default for tpnotacidtime */
-#define TPNOTACID_MAX_TIME	30	/* maximum (in seconds)for tpnotacidtime */
-#define TPTIMEOUT_MAX_TIME	60	/* maximum (in seconds) for dollar_zmaxtptime - enforced in gtm_env_init, not in op_svput */
-
-#define	TPNOTACID_CHECK(CALLER_STR)												\
-{																\
-	GBLREF	boolean_t	mupip_jnl_recover;										\
-	mval		zpos;													\
-																\
-	if (IS_TP_AND_FINAL_RETRY)												\
-	{															\
-		TP_REL_CRIT_ALL_REG;												\
-		assert(!mupip_jnl_recover);											\
-		TP_FINAL_RETRY_DECREMENT_T_TRIES_IF_OK;										\
-		getzposition(&zpos);												\
-		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_TPNOTACID, 7, LEN_AND_LIT(CALLER_STR), zpos.str.len, zpos.str.addr, \
-			 (TREF(tpnotacidtime)).str.len, (TREF(tpnotacidtime)).str.addr, dollar_trestart);			\
-	}															\
-}
 
 #define SAVE_REGION_INFO(SAVE_KEY_BUF, SAVE_TARGET, SAVE_CUR_REG, SAVE_SI_PTR, SAVE_JNLPOOL)	\
 MBSTART {											\

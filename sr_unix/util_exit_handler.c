@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -88,7 +88,7 @@ void util_exit_handler()
 	 * be holding crit in one or more regions and/or we could have other odds/ends to cleanup.
 	 */
 	secshr_db_clnup(NORMAL_TERMINATION);
-	WITH_CH(exi_ch, gv_rundown(), 0);
+	WITH_CH(exi_ch, gv_rundown(), if(FALSE));
 	print_exit_stats();
 	util_out_close();
 	GTMCRYPT_CLOSE;

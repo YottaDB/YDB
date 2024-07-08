@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -26,11 +26,15 @@
 #include "zroutines.h"
 #include "eintr_wrappers.h"
 #include "stringpool.h"
+#include "tpnotacid_chk_inline.h"
 #include "op.h"
 #include "fork_init.h"
 #include "geteditor.h"
 #include "restrict.h"
 #include "wbox_test_init.h"
+
+
+#define	ZEDITSTR	"ZEDIT"
 
 GBLREF	io_pair		io_std_device;
 GBLREF	mval 		dollar_zsource;
@@ -60,6 +64,8 @@ void op_zedit(mval *v, mval *p)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	if (RESTRICTED(zedit_op))
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_RESTRICTEDOP, 1, "ZEDIT");
 	geteditor();
 	if (!editor.len)
 	{
@@ -171,10 +177,7 @@ void op_zedit(mval *v, mval *p)
 			es[ path_len ] = 0;
 		}
 	}
-
-	if (RESTRICTED(zedit_op))
-		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_RESTRICTEDOP, 1, "ZEDIT");
-
+	TPNOTACID_CHECK(ZEDITSTR);
 	flush_pio();
 	if (tt == io_std_device.in->type)
 		iott_resetterm(io_std_device.in);

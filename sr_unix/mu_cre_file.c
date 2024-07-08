@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -118,6 +118,7 @@ MBSTART {									\
 } MBEND
 
 #define	OUT_LINE	512 + 1
+#define	USUAL_UMASK	022
 
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	jnlpool_addrs_ptr_t	jnlpool;
@@ -182,7 +183,7 @@ unsigned char mu_cre_file(void)
 	gd_segment	*seg;
 	gd_region	*baseDBreg;
 	char		hash[GTMCRYPT_HASH_LEN];
-	int		retcode, perms, user_id, group_id;
+	int		retcode, perms, user_id, group_id, umask_orig;
 	uint4		gtmcrypt_errno;
 	off_t		new_eof;
 	uint4		fsb_size;
@@ -501,7 +502,13 @@ unsigned char mu_cre_file(void)
 			return EXIT_ERR;
 		}
 	} else
-		perms = 0666;
+	{
+		/* gtm_permissions() is derived from the DB file permissions. Only enforce umask when creating DBs */
+		umask_orig = umask(USUAL_UMASK);	/* determine umask (destructive) */
+		if (USUAL_UMASK != umask_orig)
+			(void)umask(umask_orig);	/* reset umask */
+		perms = 0666 & ~umask_orig;
+	}
 	if (-1 == CHMOD(pblk.l_dir, perms))
 	{
 		save_errno = errno;

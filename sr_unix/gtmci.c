@@ -1,7 +1,7 @@
 
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -1009,7 +1009,7 @@ int gtm_ci_filter(const char *c_rtn_name, ...)
 
 #ifdef GTM_PTHREAD
 /* Java flavor of gtm_init() */
-int gtm_jinit()
+gtm_status_t gtm_jinit(void)
 {
 	gtm_jvm_process = TRUE;
 	return gtm_init();

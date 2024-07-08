@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2023 Fidelity National Information	*
+ * Copyright (c) 2006-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -1328,7 +1328,8 @@ static	tr_search_state_t position_read(repl_ctl_element *ctl, seq_num read_seqno
 	repl_buff_t		*rb;
 	repl_buff_desc		*b;
 	uint4			lo_addr, hi_addr;
-	tr_search_state_t	found, (*srch_func)();
+	tr_search_state_t	found, (*srch_func)(repl_ctl_element *ctl, uint4 lo_addr, uint4 max_readaddr, seq_num read_seqno,
+							tr_search_status_t *srch_status);
 	tr_search_status_t	srch_status;
 	uint4			willnotbefound_addr = 0, willnotbefound_stop_at = 0;
 	int			eof_change;

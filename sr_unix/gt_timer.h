@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -16,8 +16,8 @@
 /* System dependent include file for gtm timer package */
 #include <signal.h>
 
-typedef INTPTR_T TID;		/* Timer ID type */
-typedef void (*timer_hndlr)();	/* Timer handler type */
+typedef INTPTR_T TID;						/* Timer ID type */
+typedef void (*timer_hndlr)(TID tid, int4 len, void *data);	/* Timer handler type */
 
 /* Gtm timer package uses ABS_TIME structure to carry
  * the time information in operating system independent
@@ -65,10 +65,10 @@ typedef struct tag_ts
 {
 	ABS_TIME	expir_time;	/* Absolute time when timer expires */
 	ABS_TIME	start_time;	/* Time when the timer is added */
-	void		(*handler)();	/* Pointer to handler routine */
+	timer_hndlr	handler;	/* Pointer to handler routine */
 	struct tag_ts	*next;		/* Pointer to next */
-        TID             tid;            /* Timer id */
-        int4            safe;           /* Indicates if handler can be delivered while we are in
+	TID		tid;		/* Timer id */
+	int4		safe;		/* Indicates if handler can be delivered while we are in
 					 * a deferred mode
 					 */
 	int4		block_int;	/* Set to intrpt_state_t value if timer handling was blocked

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,7 +19,7 @@
 #include "hashtab_objcode.h"
 #include "op.h"
 
-UNIX_ONLY(GBLREF) VMS_ONLY(LITREF) int (*indir_fcn[])();
+GBLREF int (*indir_fcn[])();
 
 #define INDIR(a, b, c) c
 static readonly opctype indir_opcode[] = {
@@ -44,7 +45,8 @@ void op_indfun(mval *v, mint argcode, mval *dst)
 	{
 		obj = &object;
 		comp_init(&v->str, &getdst);
-		rval = (*indir_fcn[argcode])(&x, indir_opcode[argcode]);
+		ASSERT_INDIR_FUNCTION_OPR(argcode);
+		rval = (*(indir_fptr_opr_t)(indir_fcn[argcode]))(&x, indir_opcode[argcode]);
 		if (EXPR_FAIL == comp_fini(rval, obj, OC_IRETMVAL, &x, &getdst, v->str.len))
 			return;
 		indir_src.str.addr = v->str.addr;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information 	*
+ * Copyright (c) 2001-2024 Fidelity National Information 	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -826,7 +826,7 @@ LITDEF	err_msg merrors[] = {
 	{ "JNLBUFINFO", "Pid 0x!XL dsk 0x!XL free 0x!XL bytcnt 0x!XL io_in_prog 0x!XL fsync_in_prog 0x!XL dskaddr 0x!XL freeaddr 0x!XL qiocnt 0x!XL now_writer 0x!XL fsync_pid 0x!XL filesize 0x!XL cycle 0x!XL errcnt 0x!XL wrtsize 0x!XL fsync_dskaddr 0x!XL rsrv_free 0x!XL rsrv_freeaddr 0x!XL phase2_commit_index1 0x!XL phase2_commit_index2 0x!XL next_align_addr 0x!XL", 21, 0 },
 	{ "SDSEEKERR", "Sequential device seek error - !AD", 2, 0 },
 	{ "LOCALSOCKREQ", "LOCAL socket required", 0, 0 },
-	{ "TPNOTACID", "!AD at !AD violates ACID properties of a TRANSACTION and could exceed !AD seconds; $TRESTART = !UL and indefinite RESTARTs may occur", 7, 0 },
+	{ "TPNOTACID", "!AD at !AD violates ACID properties of a TRANSACTION and could exceed !UL milliseconds; !UL RESTARTs have occurred", 6, 0 },
 	{ "JNLSETDATA2LONG", "SET journal record has data of length !UL.  Target system cannot handle data more than !UL bytes.", 2, 0 },
 	{ "JNLNEWREC", "Target system cannot recognize journal record of type !UL, last recognized type is !UL", 2, 0 },
 	{ "REPLFTOKSEM", "Error with replication semaphores for instance file !AD", 2, 0 },
@@ -1521,8 +1521,8 @@ LITDEF	err_msg merrors[] = {
 	{ "EXCEEDSPREALLOC", "Preallocated size !UL for M external call label !AZ exceeded by string of length !UL", 3, 0 },
 	{ "ZTIMEOUT", "Time expired", 0, 0 },
 	{ "ERRWZTIMEOUT", "Error while processing $ZTIMEOUT", 0, 0 },
-	{ "MLKHASHRESIZE", "LOCK hash table increased in size from !UL to !UL and placed in shared memory (id = !UL)", 3, 0 },
-	{ "MLKHASHRESIZEFAIL", "Failed to increase LOCK hash table size from !UL to !UL. Will retry with larger size.", 2, 0 },
+	{ "MLKHASHRESIZE", "LOCK hash table for region !AD (!AD) increased in size from !UL to !UL and placed in shared memory (id = !UL)", 7, 0 },
+	{ "MLKHASHRESIZEFAIL", "Failed to increase LOCK hash table for region !AD (!AD) size from !UL to !UL. Will retry with larger size.", 6, 0 },
 	{ "MLKCLEANED", "LOCK garbage collection freed !UL lock slots for region !AD", 3, 0 },
 	{ "NOTMNAME", "!AD is not a valid M name", 2, 0 },
 	{ "DEVNAMERESERVED", "Cannot use !AD as device name. Reserved for GTM internal usage", 2, 0 },
@@ -1537,7 +1537,7 @@ LITDEF	err_msg merrors[] = {
 	{ "AIOQUEUESTUCK", "Waited !UL minutes for AIO work queue to complete (cr = !XL)", 2, 0 },
 	{ "INVGVPATQUAL", "Invalid Global Value Pattern file qualifier value.  !AD", 2, 0 },
 	{ "NULLPATTERN", "Empty line found in the Pattern file.", 0, 0 },
-	{ "MLKREHASH", "LOCK hash table rebuilt for region !AD (seed = !UJ)", 3, 0 },
+	{ "MLKREHASH", "LOCK hash table rebuilt for region !AD (!AD) (seed = !UJ)", 5, 0 },
 	{ "MUKEEPPERCENT", "Keep threshold percentage should be from 0 to 99", 0, 0 },
 	{ "MUKEEPNODEC", "Expected decimal integer input for keep", 0, 0 },
 	{ "MUKEEPNOTRUNC", "Keep issued without -truncate", 0, 0 },
@@ -2380,7 +2380,7 @@ LITDEF	int ERR_FILERENAME = 150378835;
 LITDEF	int ERR_JNLBUFINFO = 150378843;
 LITDEF	int ERR_SDSEEKERR = 150378850;
 LITDEF	int ERR_LOCALSOCKREQ = 150378858;
-LITDEF	int ERR_TPNOTACID = 150378867;
+LITDEF	int ERR_TPNOTACID = 150378864;
 LITDEF	int ERR_JNLSETDATA2LONG = 150378874;
 LITDEF	int ERR_JNLNEWREC = 150378882;
 LITDEF	int ERR_REPLFTOKSEM = 150378890;

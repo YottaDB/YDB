@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -339,6 +339,8 @@ cache_rec_ptr_t	db_csh_getn(block_id block)
 				continue; /* try to find some other cache-record to reuse until the 3rd pass */
 			for (ocnt = 1; (MAXWRTLATCHWAIT >= ocnt) && (LATCH_CLEAR != WRITE_LATCH_VAL(cr)); ocnt++)
 				wcs_sleep(SLEEP_WRTLATCHWAIT);	/* since it is a short lock, sleep the minimum */
+			if (1 < ocnt)
+				INCR_GVSTATS_COUNTER(csa, csa->nl, ms_getn_critsleeps, ((ocnt - 1) * SLEEP_WRTLATCHWAIT));
 			if (MAXWRTLATCHWAIT <= ocnt)
 			{
 				BG_TRACE_PRO(db_csh_getn_wrt_latch_stuck);

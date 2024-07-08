@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -113,6 +113,107 @@ error_def(ERR_CRYPTBADCONFIG);
 error_def(ERR_DBFILERR);
 error_def(ERR_GVPUTFAIL);
 
+void	bg_read_complete(node_local_ptr_t cnl);
+void	bg_read_wait(sgmnt_addrs *csa, node_local_ptr_t cnl);
+
+void bg_read_complete(node_local_ptr_t cnl)
+{
+#	if PTHREAD_MUTEX_ROBUST_SUPPORTED
+	int4			status;
+	intrpt_state_t		prev_intrpt_state;
+
+	DEFER_INTERRUPTS(INTRPT_IN_RIP_NOTIFY, prev_intrpt_state);
+	status = pthread_mutex_lock(&cnl->read_completed_ctl);
+	if (0 != status)
+	{
+		if (EOWNERDEAD == status)
+		{
+#			if PTHREAD_MUTEX_CONSISTENT_SUPPORTED
+			status = pthread_mutex_consistent(&cnl->read_completed_ctl);
+			if (0 != status)
+			{
+				ENABLE_INTERRUPTS(INTRPT_IN_RIP_NOTIFY, prev_intrpt_state);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("pthread_mutex_consistent"),
+							CALLFROM, status, 0);
+			}
+#			endif
+		} else
+		{
+			ENABLE_INTERRUPTS(INTRPT_IN_RIP_NOTIFY, prev_intrpt_state);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("pthread_mutex_lock"),
+						CALLFROM, status, 0);
+		}
+	}
+	status = pthread_cond_broadcast(&cnl->read_completed);
+	if (0 != status)
+	{
+		pthread_mutex_unlock(&cnl->read_completed_ctl);
+		ENABLE_INTERRUPTS(INTRPT_IN_RIP_NOTIFY, prev_intrpt_state);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("pthread_cond_broadcast"), CALLFROM, status, 0);
+	}
+	status = pthread_mutex_unlock(&cnl->read_completed_ctl);
+	ENABLE_INTERRUPTS(INTRPT_IN_RIP_NOTIFY, prev_intrpt_state);
+	if (0 != status)
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("pthread_mutex_unlock"), CALLFROM, status, 0);
+#	endif
+}
+
+void bg_read_wait(sgmnt_addrs *csa, node_local_ptr_t cnl)
+{
+#	if PTHREAD_MUTEX_ROBUST_SUPPORTED
+	int4			status;
+	struct timespec		waketime;
+	intrpt_state_t		prev_intrpt_state;
+
+	status = clock_gettime(CLOCK_REALTIME, &waketime);
+	assert(0 == status);
+	waketime.tv_nsec += 1000 * NANOSECS_IN_USEC; /* Match the old sleep; consider reducing. */
+	if (NANOSECS_IN_SEC <= waketime.tv_nsec)
+	{
+		waketime.tv_sec++;
+		waketime.tv_nsec -= NANOSECS_IN_SEC;
+	}
+	DEFER_INTERRUPTS(INTRPT_IN_RIP_NOTIFY, prev_intrpt_state);
+	status = pthread_mutex_lock(&cnl->read_completed_ctl);
+	csa->in_read_wait = TRUE;
+	if (0 != status)
+	{
+		if (EOWNERDEAD == status)
+		{
+#			if PTHREAD_MUTEX_CONSISTENT_SUPPORTED
+			status = pthread_mutex_consistent(&cnl->read_completed_ctl);
+			if (0 != status)
+			{
+				csa->in_read_wait = FALSE;
+				ENABLE_INTERRUPTS(INTRPT_IN_RIP_NOTIFY, prev_intrpt_state);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("pthread_mutex_consistent"),
+						CALLFROM, status, 0);
+			}
+#			endif
+		} else
+		{
+			csa->in_read_wait = FALSE;
+			ENABLE_INTERRUPTS(INTRPT_IN_RIP_NOTIFY, prev_intrpt_state);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("pthread_mutex_lock"), CALLFROM, status,
+					0);
+		}
+	}
+	status = pthread_cond_timedwait(&cnl->read_completed, &cnl->read_completed_ctl, &waketime);
+	if ((0 != status) && (ETIMEDOUT != status))
+	{
+		pthread_mutex_unlock(&cnl->read_completed_ctl);
+		csa->in_read_wait = FALSE;
+		ENABLE_INTERRUPTS(INTRPT_IN_RIP_NOTIFY, prev_intrpt_state);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("pthread_cond_timedwait"), CALLFROM, status, 0);
+	}
+	status = pthread_mutex_unlock(&cnl->read_completed_ctl);
+	csa->in_read_wait = FALSE;
+	ENABLE_INTERRUPTS(INTRPT_IN_RIP_NOTIFY, prev_intrpt_state);
+	if (0 != status)
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("pthread_mutex_unlock"), CALLFROM, status, 0);
+#	endif
+}
+
 /**
  * Returns pointer to the global buffer containing block blk.
  *
@@ -153,6 +254,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 #	ifdef DEBUG
 	cache_rec_ptr_t		cr_lo, bt_cr;
 #	endif
+	unsigned char		tmp_levl;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -434,11 +536,13 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 				/* assume defaults for flush_target and buffs_per_flush */
 				flush_target = csd->flush_trigger;
 				buffs_per_flush = 0;
-				if ((0 != csd->epoch_taper) && (FALSE == gv_cur_region->read_only) && JNL_ENABLED(csd) &&
+				if ((0 != csd->epoch_taper) && (cnl->epoch_taper_last_pid != process_id) &&
+						(FALSE == gv_cur_region->read_only) && JNL_ENABLED(csd) &&
 						(0 != cnl->wcs_active_lvl) && (NOJNL != csa->jnl->channel) &&
 						(0 != cnl->jnl_file.u.inode) && csd->jnl_before_image)
 				{
 					EPOCH_TAPER_IF_NEEDED(csa, csd, cnl, (gd_region *) 0, FALSE, buffs_per_flush, flush_target);
+					cnl->epoch_taper_last_pid = process_id;
 				}
 				if ((flush_target <= cnl->wcs_active_lvl) && (FALSE == gv_cur_region->read_only))
 					JNL_ENSURE_OPEN_WCS_WTSTART(csa, gv_cur_region, buffs_per_flush, NULL, FALSE, dummy_errno);
@@ -556,6 +660,10 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 				assert(was_crit == csa->now_crit);
 				if (reset_first_tp_srch_status)
 					RESET_FIRST_TP_SRCH_STATUS(first_tp_srch_status, cr, *cycle);
+				tmp_levl = ((blk_hdr_ptr_t) (buffaddr))->levl;
+				if ((0 < tmp_levl) && (255 != tmp_levl))
+					INCR_GVSTATS_COUNTER(csa, cnl, n_idxblk_csh_miss, 1);
+				bg_read_complete(cnl);
 				return buffaddr;
 			} else  if (!was_crit && (BAD_LUCK_ABOUNDS > ocnt))
 			{
@@ -717,6 +825,9 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 				 * corresponds to "blk" passed in. It is crucial to get an accurate value for both the fields
 				 * since "tp_hist" relies on this for its intermediate validation.
 				 */
+				tmp_levl = ((blk_hdr_ptr_t) GDS_ANY_REL2ABS(csa, cr->buffaddr))->levl;
+				if ((0 < tmp_levl) && (255 != tmp_levl))
+					INCR_GVSTATS_COUNTER(csa, cnl, n_idxblk_csh_hit, 1);
 				return (sm_uc_ptr_t)GDS_ANY_REL2ABS(csa, cr->buffaddr);
 			}
 			if (blk != cr->blk)
@@ -813,7 +924,11 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 					 * 					 					 */
 					INCR_GVSTATS_COUNTER(csa, cnl, n_wait_read_long, 1);
 				}
+#				if PTHREAD_MUTEX_ROBUST_SUPPORTED
+				bg_read_wait(csa, cnl);
+#				else
 				wcs_sleep(lcnt);
+#				endif
 				sleep_invoked = TRUE;
 				exceed_sleep_count++;
 			}

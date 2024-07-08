@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -268,7 +268,7 @@ int4 gds_rundown(boolean_t cleanup_udi)
 	if (err_caught)
 	{
 		REVERT;
-		WITH_CH(gds_rundown_ch, gds_rundown_err_cleanup(have_standalone_access), 0);
+		WITH_CH(gds_rundown_ch, gds_rundown_err_cleanup(have_standalone_access), if(FALSE));
 		ENABLE_INTERRUPTS(INTRPT_IN_GDS_RUNDOWN, prev_intrpt_state);
 		DEBUG_ONLY(ok_to_UNWIND_in_exit_handling = FALSE);
 		return EXIT_ERR;
@@ -645,6 +645,11 @@ int4 gds_rundown(boolean_t cleanup_udi)
 				assert(FALSE);
 				COMPSWAP_UNLOCK(&jbp->io_in_prog_latch, process_id, 0, LOCK_AVAILABLE, 0);
 			}
+			if (jbp->phase2_commit_latch.u.parts.latch_pid == process_id)
+			{
+				FIXUP_JBP_FREE_IF_NEEDED(jbp);
+				COMPSWAP_UNLOCK(&jbp->phase2_commit_latch, process_id, 0, LOCK_AVAILABLE, 0);
+			}
 			/* If we are last writer, it is possible cnl->remove_shm is set to FALSE from the "wcs_flu" call
 			 * above (e.g. we are source server and "wcs_flu" noticed a phase2 commit that need to be cleaned up
 			 * which needs a "wcs_recover" call but that is a no-op for the source server). So check that
@@ -899,6 +904,14 @@ int4 gds_rundown(boolean_t cleanup_udi)
 		assert(!csa->now_crit);
 		rel_crit(reg);
 	}
+#	if PTHREAD_MUTEX_ROBUST_SUPPORTED
+	if (csa->in_read_wait)
+	{	/* Release the read control mutex before detaching shared memory, allowing waiters to retry first. */
+		PTHREAD_COND_BROADCAST(&cnl->read_completed, status);
+		pthread_mutex_unlock(&cnl->read_completed_ctl);
+		csa->in_read_wait = FALSE;
+	}
+#	endif
 	/* Dereferencing nl or hdr+friends after detach is not right; Nullify ahead of the detach operation so that concurrent
 	 * code, e.g. signal handlers, can test before a dereference the occurs in the middle of a detach. */
 	csa->nl = NULL;

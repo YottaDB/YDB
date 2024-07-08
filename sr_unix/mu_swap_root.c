@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2023 Fidelity National Information	*
+ * Copyright (c) 2012-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -240,8 +240,6 @@ void	mu_swap_root(glist *gl_ptr, int *root_swap_statistic_ptr, block_id upg_mv_b
 			inctn_opcode = inctn_mu_reorg;
 			assert(1 == kill_set_list.used);
 			need_kip_incr = TRUE;
-			if (!csa->now_crit)
-				WAIT_ON_INHIBIT_KILLS(cnl, MAXWAIT2KILL);
 			DEBUG_ONLY(lcl_t_tries = t_tries);
 			TREF(in_mu_swap_root_state) = MUSWP_DIRECTORY_SWAP;
 			if ((trans_num)0 == (ret_tn = t_end(dir_hist_ptr, NULL, TN_NOT_SPECIFIED)))
@@ -292,8 +290,6 @@ block_id mu_swap_root_blk(glist *gl_ptr, srch_hist *gvt_hist_ptr, srch_hist *dir
 	/* There is either a kill/set list OR the code is moving the root block */
 	assert((1 == kill_set_list->used) || ((DIR_ROOT == gv_target->root) && (1 == gv_target->hist.h[1].blk_num)));
 	need_kip_incr = TRUE;
-	if (!cs_addrs->now_crit)
-		WAIT_ON_INHIBIT_KILLS(cs_addrs->nl, MAXWAIT2KILL);
 	DEBUG_ONLY(lcl_t_tries = t_tries);
 	TREF(in_mu_swap_root_state) = MUSWP_INCR_ROOT_CYCLE;
 	assert(!TREF(in_gvcst_redo_root_search));

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -19,29 +19,10 @@
 #include "stringpool.h"
 #include "op.h"
 #include "ebc_xlat.h"
-
-#include "gdsroot.h"
-#include "gdskill.h"
-#include "gdsbt.h"
-#include "gtm_facility.h"
-#include "fileinfo.h"
-#include "gdsfhead.h"
-#include "gdscc.h"
-#include "filestruct.h"
-#include "buddy_list.h"		/* needed for tp.h */
-#include "jnl.h"
-#include "tp.h"
-#include "send_msg.h"
-#include "gtmmsg.h"		/* for gtm_putmsg() prototype */
-#include "change_reg.h"
-#include "getzposition.h"
-#include "min_max.h"
+#include "tpnotacid_chk_inline.h"
 #include "mvalconv.h"
 #include "restrict.h"
 #include "dm_audit_log.h"
-#ifdef DEBUG
-#include "have_crit.h"		/* for the TPNOTACID_CHECK macro */
-#endif
 
 GBLREF io_pair		io_curr_device;
 GBLREF io_desc		*active_device;
@@ -61,7 +42,7 @@ int op_read(mval *v, mval *timeout)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	MV_FORCE_MSTIMEOUT(timeout, msec_timeout, READTIMESTR);
+	MV_FORCE_MSTIMEOUT(timeout, &msec_timeout, READTIMESTR);
 	active_device = io_curr_device.in;
 	v->mvtype = MV_STR;
 	v->str.len = 0;

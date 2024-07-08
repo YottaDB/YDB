@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -155,7 +155,7 @@ static inline void free_alts(alternation *init_altp)
 int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 {
 	alternation	*cur_alt = NULL, init_alt;
-	boolean_t	dfa, dfa_fixed_len, done, fixed_len, infinite, last_infinite,
+	boolean_t	dfa, dfa_fixed_len = FALSE, done, fixed_len, infinite, last_infinite,
 			prev_fixed_len, split_atom, start_dfa = FALSE;
 	boolean_t	topseen = FALSE;/* If TRUE it means we found inchar to be == in_top and so did NOT scan the NEXT
 					 * byte in inchar (to be stored in curchar). Therefore from this point onwards,
@@ -167,7 +167,7 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 			charpos, chidx, count, curr_leaf_num, curr_min_dfa, cursize,
 			exp_temp[CHAR_CLASSES], high_in, jump, leafcnt, leaf_num = 0, low_in,
 			max[MAX_PATTERN_ATOMS], min[MAX_PATTERN_ATOMS], min_dfa = 0,
-			saw_delimiter, seq, seqcnt, size[MAX_PATTERN_ATOMS], size_in, sym_num, total_max, total_min;
+			saw_delimiter, seq, seqcnt, size[MAX_PATTERN_ATOMS], size_in, sym_num = 0, total_max, total_min;
 	int4		allmask, alloclen, altactive, altend, altlen, bitpos, bytelen, lower_bound = -1, status, upper_bound = 0;
 	mstr		alttail;
 	pat_strlit	strlit;

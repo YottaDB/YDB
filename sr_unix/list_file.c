@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -95,7 +95,7 @@ void open_list_file(void)
 	pblk.fop = F_SYNTAXO;
 	fstr.len = (MV_DEFINED(&cmd_qlf.list_file) ? cmd_qlf.list_file.str.len : 0);
 	fstr.addr = cmd_qlf.list_file.str.addr;
-	if (!(status = parse_file(&fstr, &pblk)) & 1)
+	if (!(status = parse_file(&fstr, &pblk)))
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 
 	file.mvtype = parms.mvtype = MV_STR;

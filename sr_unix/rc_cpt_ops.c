@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -38,6 +38,7 @@
 #include "rc_cpt_ops.h"
 #include "do_shmat.h"
 #include "trans_log_name.h"
+#include "hugetlbfs_overrides.h"
 
 GBLDEF	trans_num		rc_read_stamp;
 

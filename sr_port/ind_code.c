@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -133,7 +134,7 @@ void	ind_code(mstr *obj)
 	itext->vartab_len = mvmax;
 	vptr = (var_tabent*)mcalloc(mvmax * SIZEOF(var_tabent));
 	if (mvartab)
-		walktree(mvartab, ind_cg_var, (char *)&vptr);
+		walktree((mtreenode *)mvartab, ind_cg_var, (char *)&vptr);
 	else
 		assert(0 == mvmax);
 	emit_immed((char *) vptr, mvmax * SIZEOF(var_tabent));

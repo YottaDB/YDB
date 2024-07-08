@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2010-2018 Fidelity National Information		#
+# Copyright (c) 2010-2024 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -38,12 +38,13 @@ BEGIN \
 	gsub("\\]", " & ");		# Remaining ] gets space around it
 	gsub("[#;:,{}=*-//)(]", " & ");	# Other special chars get spaces around them so can be recognized
 	gsub("unsigned int", "unsigned-int");		# Turn types into single-token types
+	gsub("unsigned long long", "unsigned-long-long");
+	gsub("long long", "long-long");
 	gsub("unsigned long", "unsigned-long");
 	gsub("unsigned short", "unsigned-short");
-	gsub("unsigned char", "unsigned-short");
+	gsub("unsigned char", "unsigned-char");
 	gsub("unsigned int", "unsigned-int");
 	gsub("unsigned int", "unsigned-int");
-	gsub("short unsigned", "unsigned-short");
 	gsub("signed int", "int");
 	gsub("signed char", "char");
 
@@ -54,7 +55,7 @@ BEGIN \
 			if (intypedef)
 			{
 				printf("Error: nested typedef - not supported at line %d\n", NR);
-				exit(1);
+				exit(1); #BYPASSOK
 			}
 			intypedef = 1;
 			tokenssincetypedef = -1;	# Since we increment it for the typedef as well

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -243,7 +243,7 @@ void op_zlink (mval *v, mval *quals)
 				cpy_len = sizeof(objnamebuf) - pblk.b_dir;
 			assert(256 >= cpy_len); /* For Veracode grins */
 			memmove(&objnamebuf[pblk.b_dir], objnamebuf, cpy_len);
-			assert(sizeof(objnamebuf) >= pblk.b_dir);
+			/* assert(sizeof(objnamebuf) >= pblk.b_dir); */		/* Compiler complains that it is always true */
 			memcpy(objnamebuf, file.addr, pblk.b_dir);
 			objnamelen += pblk.b_dir;
 		}

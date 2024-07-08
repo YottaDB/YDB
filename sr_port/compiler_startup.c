@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -271,6 +271,14 @@ boolean_t compiler_startup(void)
 	assert(indr_stringpool.base == stringpool.base);
 	indr_stringpool = stringpool;
 	stringpool = rts_stringpool;
+	if (STP_MIN_CONTRACTION < indr_stringpool.lastallocbytes)
+	{	/* Free the indirection stringpool when there is a large compilation.
+		 * The memory would have returned to the OS within the next compilation.
+		 * However, there is no guarantee GT.M would have another compilation.
+		 */
+		stp_fini(indr_stringpool.base, indr_stringpool.lastallocbytes);
+		indr_stringpool.base = NULL;
+	}
 	mstr_native_align = save_mstr_native_align;
 	REVERT;
 	return errknt ? TRUE : FALSE;

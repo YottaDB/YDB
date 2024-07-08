@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -454,6 +454,11 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 					RELEASE_LATCH_IF_OWNER(&jbp->fsync_in_prog_latch);
 					if (jbp->io_in_prog_latch.u.parts.latch_pid == process_id)
 						RELEASE_SWAPLOCK(&jbp->io_in_prog_latch);
+					if (jbp->phase2_commit_latch.u.parts.latch_pid == process_id)
+					{
+						FIXUP_JBP_FREE_IF_NEEDED(jbp);
+						COMPSWAP_UNLOCK(&jbp->phase2_commit_latch, process_id, 0, LOCK_AVAILABLE, 0);
+					}
 					if (jbp->blocked == process_id)
 					{
 						assert(csa->now_crit);

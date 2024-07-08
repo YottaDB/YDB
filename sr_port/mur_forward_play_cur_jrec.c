@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2023 Fidelity National Information	*
+ * Copyright (c) 2010-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -64,7 +64,7 @@ error_def(ERR_DUPTN);
 error_def(ERR_FORCEDHALT);
 error_def(ERR_JNLTPNEST);
 
-static	void	(* const extraction_routine[])() =
+static	void	(* const extraction_routine[])(jnl_ctl_list *, enum broken_type, jnl_record *, pini_list_struct *) =
 {
 #define JNL_TABLE_ENTRY(rectype, extract_rtn, label, update, fixed_size, is_replicated)	extract_rtn,
 #include "jnl_rec_table.h"

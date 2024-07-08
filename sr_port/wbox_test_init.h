@@ -1,7 +1,6 @@
-
 /****************************************************************
  *								*
- * Copyright (c) 2005-2023 Fidelity National Information	*
+ * Copyright (c) 2005-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -233,13 +232,21 @@ typedef enum {
 	WBTEST_SEQNO_PREKILL,			/* 182 : Kill right after incrementing the sequence number. */
 	WBTEST_REL_LOCK_PREKILL,		/* 183 : Kill right before releaseing instance crit. */
 	WBTEST_REL_LOCK_POSTKILL,		/* 184 : Kill after releasing instance crit and sleeping for a second. */
-	WBTEST_PHS1_NOSPACE			/* 185 : Set fake enospc right before releasing instance crit. */
+	WBTEST_PHS1_NOSPACE,			/* 185 : Set fake enospc right before releasing instance crit. */
+	WBTEST_MUNMAP_FREE,			/* 186 : Verify that munmap() returns memory to the OS */
+	WBTEST_JNL_CLEANUP,			/* 187 : Various asynchronous events in a jnl cleanup */
+	WBTEST_ZTTEST				/* 188 : Inject garbage collection at awkward place in sv_put.c SV_ZTRAP code */
 
 	/* Note 1: when adding new white box test cases, please make use of WBTEST_ENABLED and WBTEST_ASSIGN_ONLY (defined below)
 	 * whenever applicable
 	 * Note 2: when adding a new white box test case, see if an existing WBTEST_UNUSED* slot can be leveraged.
 	 */
 } wbtest_code_t;
+
+enum jnl_cleanup_wbox {
+	JNL_CLEANUP_KILL9 = 1,
+	JNL_CLEANUP_MUPIP_STOP = 300
+};
 
 #if defined (DEBUG) && !defined (STATIC_ANALYSIS)
 /* Make sure to setenv gtm_white_box_test_case_count if you are going to use GTM_WHITE_BOX_TEST */

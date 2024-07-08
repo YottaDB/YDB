@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2005-2023 Fidelity National Information	*
+ * Copyright (c) 2005-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -98,7 +98,7 @@ int	dsk_write_nocache(gd_region *reg, block_id blk, sm_uc_ptr_t buff, enum db_ve
 	 * which would not anyways open the journal pool. But now that GT.M can call "mucregini" to create a statsdb while
 	 * it has other basedbs open, it could have the jnlpool open which is why we need this safety check.
 	 */
-	assert(!reg->open || !csa->acc_meth.bg.cache_state->cache_array || buff != (sm_uc_ptr_t)csd);
+	assert(!reg->open || buff != (sm_uc_ptr_t)csd);
 	assert(size <= csd->blk_size);
 	if (udi->raw)
 		size = ROUND_UP(size, DISK_BLOCK_SIZE);	/* raw I/O must be a multiple of DISK_BLOCK_SIZE */

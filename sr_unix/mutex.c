@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -152,6 +152,8 @@ GBLREF jnlpool_addrs_ptr_t	jnlpool;
 GBLREF uint4			process_id;
 GBLREF uint4			mutex_per_process_init_pid;
 GBLREF uint4			mu_upgrade_in_prog;
+GBLREF volatile boolean_t	timer_in_handler;
+GBLREF volatile boolean_t	exit_handler_active;
 #ifdef MUTEX_MSEM_WAKE
 #  ifdef POSIX_MSEM
 static sem_t			*mutex_wake_msem_ptr = NULL;
@@ -265,7 +267,7 @@ void rollback_mutex_cln_ctl(seq_num max_seqno)
 	mutex_cln_ctl_struct	lcl_cln_ctl = { .top = 0, .pids = {0}, .seqnos = {0} };
 
 	assert(jnlpool && jnlpool->jnlpool_ctl);
-	assert(MAX_MUTEX_CLNS && (((MAX_MUTEX_CLNS) & (MAX_MUTEX_CLNS - 1)) == 0));
+	assert((MAX_MUTEX_CLNS & (MAX_MUTEX_CLNS - 1)) == 0);
 	jpl = jnlpool->jnlpool_ctl;
 	/* If top is zero, then the array is empty. We guarantee this with our overflow handling. Values of top from 0 to
 	 * MAX_MUTEX_CLNS count the number of valid entries starting at index 0; values over MAX_MUTEX_CLNS indicate there are
@@ -302,6 +304,8 @@ static inline enum mutex_cln_status get_mutex_cln_info(sgmnt_addrs *csa, uint4 h
 	jnlpool_ctl_ptr_t	jpl;
 	unsigned int		start, top, i, j;
 	seq_num			rec_seqno, min_seqno = UINT64_MAX;
+	sgmnt_addrs		*repl_csa = NULL;
+	boolean_t		was_crit = FALSE, in_async_code;
 #	ifdef DEBUG
 	seq_num			last_seqno = 0;
 #	endif
@@ -309,7 +313,7 @@ static inline enum mutex_cln_status get_mutex_cln_info(sgmnt_addrs *csa, uint4 h
 	enum mutex_cln_status	status;
 
 	assert(csa->hdr);
-	assert(MAX_MUTEX_CLNS && (((MAX_MUTEX_CLNS) & (MAX_MUTEX_CLNS - 1)) == 0));
+	assert((MAX_MUTEX_CLNS & (MAX_MUTEX_CLNS - 1)) == 0);
 	info->pid = 0;
 	info->seqno = 0;
 	status = mutex_cln_absent;
@@ -318,7 +322,12 @@ static inline enum mutex_cln_status get_mutex_cln_info(sgmnt_addrs *csa, uint4 h
 		assert(!jnlpool || (jnlpool != csa->jnlpool));
 		return mutex_cln_invalid;
 	}
-	grab_lock(jnlpool->jnlpool_dummy_reg, TRUE, ASSERT_NO_ONLINE_ROLLBACK);
+	repl_csa = &FILE_INFO(jnlpool->jnlpool_dummy_reg)->s_addrs;
+	was_crit = repl_csa->now_crit;
+	assert(!was_crit);
+	in_async_code = timer_in_handler || exit_handler_active;
+	if (!was_crit && !grab_lock(jnlpool->jnlpool_dummy_reg, !in_async_code, ASSERT_NO_ONLINE_ROLLBACK))
+		return mutex_cln_invalid;
 	/* If top is zero, then the array is empty. We guarantee this with our overflow handling. Values of top from 0 to
 	 * MAX_MUTEX_CLNS count the number of valid entries starting at index 0; values over MAX_MUTEX_CLNS indicate there are
 	 * MAX_MUTEX_CLNS entries and the start location is at (top - MAX_MUTEX_CLNS) % MAX_MUTEX_CLNS (since MAX_MUTEX_CLNS is
@@ -362,11 +371,12 @@ static inline enum mutex_cln_status get_mutex_cln_info(sgmnt_addrs *csa, uint4 h
 	 */
 	if ((top >= MAX_MUTEX_CLNS) && (min_seqno >= jbuf_seqno) && (mutex_cln_absent == status))
 		status = mutex_cln_invalid;
-	rel_lock(jnlpool->jnlpool_dummy_reg);
+	if (!was_crit)
+		rel_lock(jnlpool->jnlpool_dummy_reg);
 	return status;
 }
 
-/* Called during a mutex_clean_dead_owner on a jnlpool mutex. The corresponding get_mutex_cln_info is called 
+/* Called during a mutex_clean_dead_owner on a jnlpool mutex. The corresponding get_mutex_cln_info is called
  * during a region-crit mutex_clean_dead_owner.
  */
 static inline void set_mutex_cln_info(sgmnt_addrs *csa, uint4 holder_pid)
@@ -376,7 +386,7 @@ static inline void set_mutex_cln_info(sgmnt_addrs *csa, uint4 holder_pid)
 
 	assert(!csa->hdr);
 	assert(jnlpool);
-	assert(MAX_MUTEX_CLNS && (((MAX_MUTEX_CLNS) & (MAX_MUTEX_CLNS - 1)) == 0));
+	assert((MAX_MUTEX_CLNS & (MAX_MUTEX_CLNS - 1)) == 0);
 	/* Gracefully return even in cases we think are impossible since this is a sensitive location. */
 	if ((!jnlpool) || !(jpl = jnlpool->jnlpool_ctl))
 	{
@@ -1414,7 +1424,7 @@ void mutex_clean_dead_owner(gd_region* reg, uint4 holder_pid)
 		else
 		{
 			SHM_READ_MEMORY_BARRIER;
-			assert(DECL_CMT06 <= cnl->cur_cmt_step);
+			assert(DECL_CMT05 <= cnl->cur_cmt_step);
 			assert((lastJplCmt->jnl_seqno == jpl->jnl_seqno) || ((lastJplCmt->jnl_seqno + 1) == jpl->jnl_seqno));
 			if (lastJplCmt->jnl_seqno == jpl->jnl_seqno)
 			{

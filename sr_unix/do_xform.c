@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -56,9 +56,9 @@ void do_xform(collseq *csp, int fc_type, mstr *input, mstr *output, int *length)
 		outbuff.val = (NULL != ba) ? ba : output->addr;
 
 		if (XFORM == fc_type)
-			status = (csp->xform)(&insub, 1, &outbuff, length);
+			status = (csp->xform)((gtm_descriptor_alt *)&insub, 1, (gtm_descriptor_alt *)&outbuff, length);
 		else
-			status = (csp->xback)(&insub, 1, &outbuff, length);
+			status = (csp->xback)((gtm_descriptor_alt *)&insub, 1, (gtm_descriptor_alt *)&outbuff, length);
 
 		if (*length > output->len)
 		{
@@ -90,9 +90,9 @@ void do_xform(collseq *csp, int fc_type, mstr *input, mstr *output, int *length)
 		outbuff1.val = (NULL != ba) ? ba : output->addr;
 
 		if (XFORM == fc_type)
-			status = (csp->xform)(&insub1, 1, &outbuff1, length);
+			status = (csp->xform)((gtm_descriptor_alt *)&insub1, 1, (gtm_descriptor_alt *)&outbuff1, length);
 		else
-			status = (csp->xback)(&insub1, 1, &outbuff1, length);
+			status = (csp->xback)((gtm_descriptor_alt *)&insub1, 1, (gtm_descriptor_alt *)&outbuff1, length);
 
 		if (*length > output->len)
 		{

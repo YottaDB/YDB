@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2010-2018 Fidelity National Information		#
+# Copyright (c) 2010-2024 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -56,6 +56,8 @@ BEGIN \
 	#
 	# Change 2 word types to single word for more consistent (less complex) parsing
 	#
+	gsub("unsigned long long", "unsigned-long-long");
+	gsub("long long", "long-long");
 	gsub("unsigned int", "unsigned-int");
 	gsub("unsigned long", "unsigned-long");
 	gsub("unsigned short", "unsigned-short");

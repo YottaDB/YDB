@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2007-2023 Fidelity National Information	*
+ * Copyright (c) 2007-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -1322,10 +1322,11 @@ void wcs_timer_start(gd_region *reg, boolean_t io_ok)
 	/* assume defaults for flush_target and buffs_per_flush */
 	flush_target = csd->flush_trigger;
 	buffs_per_flush = 0;
-	if ((0 != csd->epoch_taper) && (0 != cnl->wcs_active_lvl) &&
-			JNL_ENABLED(csd) && (0 != cnl->jnl_file.u.inode) && csd->jnl_before_image)
+	if ((0 != csd->epoch_taper) && (0 != cnl->wcs_active_lvl) && JNL_ENABLED(csd) && (0 != cnl->jnl_file.u.inode) &&
+		 csd->jnl_before_image && (cnl->epoch_taper_last_pid != process_id))
 	{
 		EPOCH_TAPER_IF_NEEDED(csa, csd, cnl, reg, TRUE, buffs_per_flush, flush_target);
+		cnl->epoch_taper_last_pid = process_id;
 	}
 	if ((flush_target <= cnl->wcs_active_lvl) && !FROZEN_CHILLED(csa))
 	{	/* Already in need of a good flush */
@@ -1353,10 +1354,11 @@ void wcs_stale(TID tid, int4 hd_len, gd_region **region)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	save_region = gv_cur_region;		/* Certain debugging calls expect gv_cur_region to be correct */
-	save_csaddrs = cs_addrs;
-	save_csdata = cs_data;
 	save_jnlpool = jnlpool;
+	save_csdata = cs_data;
+	save_csaddrs = cs_addrs;
+	COMPILER_FENCE(__ATOMIC_ACQUIRE);
+	save_region = gv_cur_region;		/* Certain debugging calls expect gv_cur_region to be correct */
 	check_csaddrs = (NULL == save_region || FALSE == save_region->open) ? NULL : &FILE_INFO(save_region)->s_addrs;
 		/* Save to see if we are in crit anywhere */
 	reg = *region;
@@ -1387,13 +1389,10 @@ void wcs_stale(TID tid, int4 hd_len, gd_region **region)
 		csa->timer = FALSE;		/* No timer set for this region by this process anymore */
 		csa->canceled_flush_timer = TRUE;
 		/* Restore region */
-		if (save_region != gv_cur_region)
-		{
-			gv_cur_region = save_region;
-			cs_addrs = save_csaddrs;
-			cs_data = save_csdata;
-			jnlpool = save_jnlpool;
-		}
+		gv_cur_region = save_region;
+		cs_addrs = save_csaddrs;
+		cs_data = save_csdata;
+		jnlpool = save_jnlpool;
 		return;
 	}
 	BG_TRACE_ANY(csa, stale_timer_pop);
@@ -1435,8 +1434,7 @@ void wcs_stale(TID tid, int4 hd_len, gd_region **region)
 					/* If there is no dirty buffer left in the active queue, then no need for new timer */
 					if (0 == csa->acc_meth.bg.cache_state->cacheq_active.fl)
 						need_new_timer = FALSE;
-				}
-				else
+				} else
 				{	/* We can't flush to the file, but we can flush the journal */
 					jnl_wait(reg);
 				}

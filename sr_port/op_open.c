@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -20,28 +20,10 @@
 #include "trans_log_name.h"
 #include "iotimer.h"
 #include "iott_setterm.h"
-
-#include "gdsroot.h"
-#include "gdskill.h"
-#include "gdsbt.h"
-#include "gtm_facility.h"
-#include "fileinfo.h"
-#include "gdsfhead.h"
-#include "gdscc.h"
-#include "filestruct.h"
-#include "buddy_list.h"		/* needed for tp.h */
-#include "jnl.h"
-#include "tp.h"
-#include "send_msg.h"
-#include "gtmmsg.h"		/* for gtm_putmsg() prototype */
-#include "change_reg.h"
-#include "getzposition.h"
+#include "tpnotacid_chk_inline.h"
 #include "mmemory.h"
 #include "min_max.h"
 #include "mvalconv.h"
-#ifdef DEBUG
-#include "have_crit.h"		/* for the TPNOTACID_CHECK macro */
-#endif
 
 GBLREF uint4		dollar_trestart;
 GBLREF io_log_name	*io_root_log_name;
@@ -82,7 +64,7 @@ int op_open(mval *device, mval *devparms, mval *timeout, mval *mspace)
 	if (mspace)
 		MV_FORCE_STR(mspace);
 	assert((unsigned char)*devparms->str.addr < n_iops);
-	MV_FORCE_MSTIMEOUT(timeout, msec_timeout, OPENTIMESTR);
+	MV_FORCE_MSTIMEOUT(timeout, &msec_timeout, OPENTIMESTR);
 	if (dollar_principal || io_root_log_name->iod)
 	{
 		/* make sure that dollar_principal is defined or iod has been defined for the root */

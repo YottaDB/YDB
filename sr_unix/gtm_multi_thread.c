@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2015-2021 Fidelity National Information	*
+ * Copyright (c) 2015-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -166,7 +166,6 @@ int	gtm_multi_thread(gtm_pthread_fnptr_t fnptr, int ntasks, int max_threads,
 				final_ret = rc1;
 		} else
 		{
-			ret;	/* "ret" would have been set by "pthread_join" */
 			if (ret && !final_ret)
 			{
 				DEBUG_ONLY(if (!error_line) error_line = __LINE__;)

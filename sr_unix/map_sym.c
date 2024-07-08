@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -58,9 +58,9 @@ boolean_t map_collseq(mstr *fspec, collseq *ret_collseq)
 		return FALSE;
 	if (NULL == (handle = fgn_getpak(buffer, INFO)))
 		return FALSE;
-	if ((ret_collseq->xform = fgn_getrtn(handle, &xform_sym_1, SUCCESS)))
+	if ((ret_collseq->xform = (collseq_xform_fptr_t)fgn_getrtn(handle, &xform_sym_1, SUCCESS)))
 	{
-		if ((ret_collseq->xback = fgn_getrtn(handle, &xback_sym_1, SUCCESS)))
+		if ((ret_collseq->xback = (collseq_xback_fptr_t)fgn_getrtn(handle, &xback_sym_1, SUCCESS)))
 		{
 			coll_lib_found = TRUE;
 			ret_collseq->argtype = 1;
@@ -76,9 +76,9 @@ boolean_t map_collseq(mstr *fspec, collseq *ret_collseq)
 	}
 	if ( FALSE == coll_lib_found)
 	{
-		if ((ret_collseq->xform = fgn_getrtn(handle, &xform_sym, SUCCESS)))
+		if ((ret_collseq->xform = (collseq_xform_fptr_t)fgn_getrtn(handle, &xform_sym, SUCCESS)))
 		{
-			if ((ret_collseq->xback = fgn_getrtn(handle, &xback_sym, SUCCESS)))
+			if ((ret_collseq->xback = (collseq_xback_fptr_t)fgn_getrtn(handle, &xback_sym, SUCCESS)))
 			{
 				coll_lib_found = TRUE;
 				ret_collseq->argtype = 0;
@@ -95,9 +95,9 @@ boolean_t map_collseq(mstr *fspec, collseq *ret_collseq)
 			ERR_FGNSYM;
 	}
 	assert(TRUE == coll_lib_found);
-	if (!(ret_collseq->verify = fgn_getrtn(handle, &verify_sym, INFO)))
+	if (!(ret_collseq->verify = (collseq_verify_fptr_t)fgn_getrtn(handle, &verify_sym, INFO)))
 		ERR_FGNSYM;
-	if (!(ret_collseq->version = fgn_getrtn(handle, &version_sym, INFO)))
+	if (!(ret_collseq->version = (collseq_version_fptr_t)fgn_getrtn(handle, &version_sym, INFO)))
 		ERR_FGNSYM;
 
 	/*
@@ -105,7 +105,7 @@ boolean_t map_collseq(mstr *fspec, collseq *ret_collseq)
 	 * The xutil routine is only needed for the -2/2
 	 * zatransform collation functionality.  Other operations do not use it.
 	 */
-	if (!(ret_collseq->xutil = fgn_getrtn(handle, &xutil_sym, SUCCESS)))
+	if (!(ret_collseq->xutil = (collseq_xutil_fptr_t)fgn_getrtn(handle, &xutil_sym, SUCCESS)))
 	{
 		ret_collseq->xutil = NULL;
 	}

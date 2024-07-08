@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -292,8 +292,7 @@ static inline int4 num_recs_in_blk(sm_uc_ptr_t pBlkBase)
 void	gvcst_put(mval *val)
 {
 	block_id			lcl_root;
-	boolean_t			est_first_pass, fits, found, sn_tpwrapped;
-	boolean_t			save_in_gvcst_incr; /* gvcst_put2 sets this FALSE, so save it in case we need to back out */
+	boolean_t			est_first_pass, fits, found, save_in_gvcst_incr, sn_tpwrapped;
 	int				chunk_size, gblsize, i, oldend, rc, save_dollar_tlevel;
 	mval				*pre_incr_mval, *save_val, val_ctrl, val_dummy, val_piece;
 	span_parms			parms;
@@ -311,6 +310,7 @@ void	gvcst_put(mval *val)
 	/* deal with possibility of spanning nodes */
 	DEBUG_ONLY(save_dollar_tlevel = dollar_tlevel);
 	fits = RECORD_FITS_IN_A_BLOCK(val, gv_currkey, cs_data->blk_size, parms.blk_reserved_bytes);
+	/* gvcst_put2 sets in_gvcst_incr to FALSE, so save for SET and INCREMENT statistics and other purposes */
 	save_in_gvcst_incr = in_gvcst_incr;
 	if (fits)
 	{
@@ -423,6 +423,8 @@ test_incr_numoflow:
 		val_ctrl.str.len = 6;
 		/* Count the spanning node set as one set */
 		INCR_GVSTATS_COUNTER(cs_addrs, cs_addrs->nl, n_set, 1);
+		if (save_in_gvcst_incr)
+			INCR_GVSTATS_COUNTER(cs_addrs, cs_addrs->nl, n_increment, 1);
 		gvcst_put2(&val_ctrl, &parms);	/* Set control subscript, indicating glbsize and number of chunks */
 		for (i = 0; i < numsubs; i++)
 		{
@@ -518,6 +520,8 @@ void	gvcst_put2(mval *val, span_parms *parms)
 	boolean_t		lcl_implicit_tstart;		/* local copy of the global variable "implicit_tstart" */
 	boolean_t		lcl_is_dollar_incr = FALSE;	/* local copy of is_dollar_incr taken at start of module.
 								 * used to restore is_dollar_incr in case of TP restarts */
+	boolean_t		save_in_gvcst_incr;		/* local copy of in_gvcst_incr in order to distinguish between
+								 * SET and $INCREMENT operations in GVSTATS */
 	boolean_t		skip_hasht_read, ztval_gvcst_put_redo;
 	DEBUG_ONLY(enum cdb_sc	save_cdb_status;)
 	gtm_trigger_parms	trigparms;
@@ -574,7 +578,7 @@ void	gvcst_put2(mval *val, span_parms *parms)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	is_dollar_incr = in_gvcst_incr;
+	save_in_gvcst_incr = is_dollar_incr = in_gvcst_incr;
 	in_gvcst_incr = FALSE;
 	csa = cs_addrs;
 	csd = csa->hdr;
@@ -651,11 +655,17 @@ void	gvcst_put2(mval *val, span_parms *parms)
 		TREF(gvcst_incr_numoflow) = FALSE;
 		is_dollar_incr = TRUE;
 		status = cdb_sc_blkmod;
+#		ifdef DEBUG
+		dbg_num_iters = 0;
+		lcl_t_tries = -1;
+#		endif
 		GOTO_RETRY;
 	}
 fresh_tn_start:
-	DEBUG_ONLY(lcl_t_tries = -1;)
-	DEBUG_ONLY(is_fresh_tn_start = TRUE;)
+#	ifdef DEBUG
+	lcl_t_tries = -1;
+	is_fresh_tn_start = TRUE;
+#	endif
 	assert(!jnl_format_done || (dollar_tlevel GTMTRIG_ONLY(&& ztval_gvcst_put_redo)) || lcl_span_status);
 	T_BEGIN_SETORKILL_NONTP_OR_TP(ERR_GVPUTFAIL);
 tn_restart:
@@ -668,21 +678,21 @@ tn_restart:
 	blk_fill_size = (blk_size * gv_fillfactor) / 100 - blk_reserved_bytes;
 	assert(csa == cs_addrs);	/* no amount of retries should change cs_addrs from what it was at entry into gvcst_put */
 	assert((((int)t_tries) > lcl_t_tries) || (CDB_STAGNATE == t_tries));
-	DEBUG_ONLY(lcl_t_tries = t_tries;) /* update lcl_t_tries */
-	DEBUG_ONLY(
-		dbg_num_iters++;
-		assert(dbg_num_iters < ARRAYSIZE(dbg_trace_array));
-		dbg_trace_array[dbg_num_iters].is_fresh_tn_start = is_fresh_tn_start;
-		dbg_trace_array[dbg_num_iters].t_tries = t_tries;
-		is_fresh_tn_start = FALSE;
-		dbg_trace_array[dbg_num_iters].is_dollar_incr = is_dollar_incr;
-		GTMTRIG_ONLY(dbg_trace_array[dbg_num_iters].ztval_gvcst_put_redo = ztval_gvcst_put_redo;)
-		dbg_trace_array[dbg_num_iters].val = val;
-		GTMTRIG_ONLY(dbg_trace_array[dbg_num_iters].lcl_implicit_tstart = lcl_implicit_tstart;)
-		dbg_trace_array[dbg_num_iters].is_extra_block_split = FALSE;
-		dbg_trace_array[dbg_num_iters].retry_line = 0;
-		split_targ = NULL;
-	)
+#	ifdef DEBUG
+	lcl_t_tries = t_tries; /* update lcl_t_tries */
+	dbg_num_iters++;
+	assert(dbg_num_iters < ARRAYSIZE(dbg_trace_array));
+	dbg_trace_array[dbg_num_iters].is_fresh_tn_start = is_fresh_tn_start;
+	dbg_trace_array[dbg_num_iters].t_tries = t_tries;
+	is_fresh_tn_start = FALSE;
+	dbg_trace_array[dbg_num_iters].is_dollar_incr = is_dollar_incr;
+	GTMTRIG_ONLY(dbg_trace_array[dbg_num_iters].ztval_gvcst_put_redo = ztval_gvcst_put_redo;)
+	dbg_trace_array[dbg_num_iters].val = val;
+	GTMTRIG_ONLY(dbg_trace_array[dbg_num_iters].lcl_implicit_tstart = lcl_implicit_tstart;)
+	dbg_trace_array[dbg_num_iters].is_extra_block_split = FALSE;
+	dbg_trace_array[dbg_num_iters].retry_line = 0;
+	split_targ = NULL;
+#	endif
 	assert(csd == cs_data);	/* To ensure they are the same even if MM extensions happened in between */
 #	ifdef GTM_TRIGGER
 	gvtr_parms.num_triggers_invoked = 0;	/* clear any leftover value */
@@ -2967,7 +2977,11 @@ tn_restart:
 		assert(!JNL_WRITE_LOGICAL_RECS(csa) || jnl_format_done);
 		/* Now that the SET/$INCR is finally complete, increment the corresponding GVSTAT counter */
 		if (!lcl_span_status)
+		{
 			INCR_GVSTATS_COUNTER(csa, cnl, n_set, 1);
+			if (save_in_gvcst_incr)
+				INCR_GVSTATS_COUNTER(csa, cnl, n_increment, 1);
+		}
 		DBG_CHECK_VAL_AT_FUN_EXIT;
 		assert(lcl_dollar_tlevel == dollar_tlevel);
 		return;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -26,6 +26,7 @@ static inline void try_event_pop(void)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	DBGDFRDEVNT((stderr, "%d %s: try_event_pop oob:%d next:%d/%d\n", __LINE__, __FILE__, outofband, (TREF(save_xfer_root_ptr))->ev_que.fl->outofband, (TREF(save_xfer_root_ptr))->ev_que.fl->event_state));
 	if ((no_event == outofband)
 		&& (no_event != (TREF(save_xfer_root_ptr))->ev_que.fl->outofband))
 	{	/* perhaps pop an_event */

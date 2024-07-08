@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2023 Fidelity National Information	*
+ * Copyright (c) 2003-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -695,11 +695,11 @@ int4 mur_open_files(boolean_t retry)
 			if (cs_data->kill_in_prog)
 				gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(6) ERR_MUKILLIP, 4, DB_LEN_STR(reg),
 					       LEN_AND_LIT("ONLINE ROLLBACK"));
-			/* Ensure that inhibit_kills is ZERO at this point. This is because, we hold crit at this point and anyone
-			 * who wants to set inhibit_kills need crit. The reason this is important is because t_end/tp_tend has
-			 * logic to restart if inhibit_kills is set to TRUE and we don't want online rollback to restart
+			/* Set inhibit_kills to ZERO because t_end and tp_tend have logic to restart if inhibit_kills is
+			 * NON-ZERO and we don't want online rollback to restart. We can do this because we hold crit at
+			 * this point and anybody else that wants to inhibit kills needs crit.
 			 */
-			assert(0 == cs_addrs->nl->inhibit_kills);
+			cs_addrs->nl->inhibit_kills = 0;
 		}
 		TREF(donot_write_inctn_in_wcs_recover) = FALSE;
 	}

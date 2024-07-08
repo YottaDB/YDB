@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -92,7 +92,8 @@ int m_xecute(void)
 			run_time = TREF(xecute_literal_parse) = TRUE;
 			for (;;)
 			{
-				rval = (*indir_fcn[indir_linetail])();
+				ASSERT_INDIR_FUNCTION_VOID(indir_linetail);
+				rval = (*(indir_fptr_void_t)(indir_fcn[indir_linetail]))();
 				if (OC_FORLOOP == tmpchain.exorder.bl->opcode)	/* Evil violation of information hiding */
 					rval = EXPR_FAIL;	/* FOR termination would jmp too far (to EOL) */
 				if ((EXPR_FAIL == rval) || (TK_COMMA != TREF(window_token)))

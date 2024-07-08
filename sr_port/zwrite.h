@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -148,10 +148,11 @@ typedef struct gvzwrite_datablk_struct
 	boolean_t			fixed;
 	uint4				mask;
 	mval				*pat;
-	unsigned char			*old_key;
-	unsigned char			*old_targ;
+	gd_addr				*ref_gbldir;	/* ZWRITE doesn't support explicit external references, but best be ready */
+	gv_key				*ref_key;
+	gd_region			*ref_reg;
+	gv_namehead			*ref_targ;	/* in dbg, used to check that reset_gv_target tracks correctly */
 	zwr_sub_lst			*sub;
-	gd_region			*gd_reg;
 	boolean_t			gv_last_subsc_null;
 	boolean_t			gv_some_subsc_null;
 } gvzwrite_datablk;

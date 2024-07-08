@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -15,7 +15,7 @@
 #include "mdef.h"
 #include "gtm_string.h"		/* for memcpy */
 #include "gtm_stdlib.h"
-
+#include "gtm_fcntl.h"	/* Needed for AIX's silly open to open64 translations */
 #include "gdsroot.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
@@ -26,16 +26,12 @@
 #include "lockdefs.h"
 #include "cdb_sc.h"
 #include "jnl.h"
-#include "gdscc.h"
-#include "gdskill.h"
-#include "buddy_list.h"		/* needed for tp.h */
-#include "tp.h"
+#include "tpnotacid_chk_inline.h"
 #include "gtmimagename.h"
 #include "cmidef.h"		/* for cmmdef.h */
 #include "hashtab_mname.h"	/* needed for cmmdef.h */
 #include "cmmdef.h"		/* for curr_entry structure definition */
 #include "do_shmat.h"
-#include "getzposition.h"	/* for TPNOTACID_CHECK */
 
 /* Include prototypes */
 #include "mlk_ops.h"
@@ -85,6 +81,7 @@ gtm_uint64_t mlk_lock(mlk_pvtblk *p, UINTPTR_T auxown, boolean_t new)
 	mlk_ctldata_ptr_t	ctl;
 	mlk_shrblk_ptr_t	d;
 	sgmnt_addrs		*csa;
+	intrpt_state_t		prev_intrpt_state;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -126,7 +123,9 @@ gtm_uint64_t mlk_lock(mlk_pvtblk *p, UINTPTR_T auxown, boolean_t new)
 			RELEASE_SWAPLOCK(&ctl->lock_gc_in_progress);
 		}
 		assert(!new || (0 == TREF(mlk_yield_pid)) || (MLK_FAIRNESS_DISABLED == TREF(mlk_yield_pid)));
+		DEFER_INTERRUPTS(INTRPT_IN_MLK_SHM_MODIFY, prev_intrpt_state);
 		blocked = mlk_shrblk_find(p, &d, auxown);
+		ENABLE_INTERRUPTS(INTRPT_IN_MLK_SHM_MODIFY, prev_intrpt_state);
 		if (NULL != d)
 		{
 			if (d->owner)

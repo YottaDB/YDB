@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -31,6 +31,7 @@
 #include "gtm_reservedDB.h"
 #include "proc_wait_stat.h"
 #include "region_freeze_multiproc.h"
+#include "gtm_atomic.h"
 
 #define CACHE_STATE_OFF SIZEOF(que_ent)
 
@@ -915,6 +916,7 @@ MBSTART {													\
 MBSTART {											\
 	GBLREF	jnlpool_addrs_ptr_t	jnlpool;						\
 	gv_cur_region = reg;									\
+	COMPILER_FENCE(memory_order_release);							\
 	if (NULL == gv_cur_region || FALSE == gv_cur_region->open)				\
 	{											\
 		cs_addrs = (sgmnt_addrs *)0;							\
@@ -949,6 +951,7 @@ MBSTART {											\
 	if (reg != gv_cur_region)								\
 	{											\
 		gv_cur_region = reg;								\
+		COMPILER_FENCE(memory_order_release);						\
 		switch (REG_ACC_METH(reg))							\
 		{										\
 			case dba_mm:								\
@@ -975,16 +978,18 @@ MBSTART {											\
 
 #define PUSH_GV_CUR_REGION(REG, SAV_REG, SAV_CS_ADDRS, SAV_CS_DATA, SAV_JNLPOOL)		\
 MBSTART {											\
-	SAV_REG = gv_cur_region;								\
-	SAV_CS_ADDRS = cs_addrs;								\
-	SAV_CS_DATA = cs_data;									\
 	SAV_JNLPOOL = jnlpool;									\
+	SAV_CS_DATA = cs_data;									\
+	SAV_CS_ADDRS = cs_addrs;								\
+	COMPILER_FENCE(memory_order_acquire);							\
+	SAV_REG = gv_cur_region;								\
 	TP_CHANGE_REG(REG);									\
 } MBEND
 
 #define POP_GV_CUR_REGION(SAV_REG, SAV_CS_ADDRS, SAV_CS_DATA, SAV_JNLPOOL)			\
 MBSTART {											\
 	gv_cur_region = SAV_REG;								\
+	COMPILER_FENCE(memory_order_release);							\
 	cs_addrs = SAV_CS_ADDRS;								\
 	cs_data = SAV_CS_DATA;									\
 	jnlpool = SAV_JNLPOOL;									\
@@ -999,6 +1004,7 @@ MBSTART {											\
 #define	TP_TEND_CHANGE_REG(si)				\
 MBSTART {						\
 	gv_cur_region = si->gv_cur_region;		\
+	COMPILER_FENCE(memory_order_release);		\
 	cs_addrs = si->tp_csa;				\
 	cs_data = si->tp_csd;				\
 } MBEND
@@ -1012,6 +1018,7 @@ MBSTART {													\
 														\
 	curr_cm_reg_head = (reghead);										\
 	gv_cur_region = curr_cm_reg_head->reg;									\
+	COMPILER_FENCE(memory_order_release);									\
 	assert(IS_REG_BG_OR_MM(gv_cur_region));									\
 	cs_addrs = &FILE_INFO(gv_cur_region)->s_addrs;								\
 	cs_data = cs_addrs->hdr;										\
@@ -2245,20 +2252,20 @@ typedef struct
 	int	filler;
 } sgmm_addrs;
 
-#define MAX_NM_LEN	MAX_MIDENT_LEN
-#define MIN_RN_LEN	1
-#define MAX_RN_LEN	MAX_MIDENT_LEN
-#define MIN_SN_LEN	1
-#define MAX_SN_LEN	MAX_MIDENT_LEN
-#define STR_SUB_PREFIX  0x0FF
-#define SUBSCRIPT_STDCOL_NULL 0x01
-#define STR_SUB_ESCAPE  0X01
-#define SPANGLOB_SUB_ESCAPE  0X02
-#define	STR_SUB_MAXVAL	0xFF
-#define SUBSCRIPT_ZERO  0x080
-#define SUBSCRIPT_BIAS  0x0BE
-#define NEG_MNTSSA_END  0x0FF
-#define KEY_DELIMITER   0X00
+#define MAX_NM_LEN		MAX_MIDENT_LEN
+#define MIN_RN_LEN		1
+#define MAX_RN_LEN		MAX_MIDENT_LEN
+#define MIN_SN_LEN		1
+#define MAX_SN_LEN		MAX_MIDENT_LEN
+#define STR_SUB_PREFIX  	((unsigned char)0xFF)
+#define SUBSCRIPT_STDCOL_NULL 	((unsigned char)0x01)
+#define STR_SUB_ESCAPE  	((unsigned char)0X01)
+#define SPANGLOB_SUB_ESCAPE  	((unsigned char)0X02)
+#define	STR_SUB_MAXVAL		((unsigned char)0xFF)
+#define SUBSCRIPT_ZERO  	((unsigned char)0x80)
+#define SUBSCRIPT_BIAS  	((unsigned char)0xBE)
+#define NEG_MNTSSA_END  	((unsigned char)0xFF)
+#define KEY_DELIMITER   	((unsigned char)0X00)
 #ifdef BIGENDIAN
 typedef struct
 {	unsigned int	two : 4;
@@ -2449,7 +2456,8 @@ MBSTART {														\
 			|| (IS_MUPIP_IMAGE && in_mupip_freeze));							\
 		if (!(DEFER_COPY))											\
 		{													\
-			COPY_ENC_INFO(CSD, CSA->encr_ptr, CSA->nl->reorg_encrypt_cycle);				\
+			COPY_ENC_INFO(CSD, CSA->encr_ptr, (USES_NEW_KEY(CSD) && (NULL == CSA->encr_key_handle2)) ? -1 :	\
+											CSA->nl->reorg_encrypt_cycle);	\
 			CSA->encr_ptr->issued_db_init_crypt_warning = CRYPT_WARNING;					\
 		} else													\
 		{	/* Defer the copy until needed later, as detected by a mismatch in reorg_encrypt_cycle.	*/	\
@@ -2805,6 +2813,7 @@ typedef struct	sgmnt_addrs_struct
 	int				mlkhash_shmid;	/* Shared memory id of attached lock hash array, or INVALID_SHMID
 							 * if internal. Set by GRAB_LOCK_CRIT_AND_SYNC().
 							 */
+	boolean_t	in_read_wait;		/* TRUE if we are waiting in tq_read() for another process to complete a read */
 } sgmnt_addrs;
 
 typedef struct gd_binding_struct
@@ -3500,7 +3509,7 @@ MBSTART {													\
 				((gv_currkey->base) + gv_currkey->top));					\
 			memcpy((gv_currkey->base + gv_currkey->end), mvarg->str.addr, stlen);			\
 			if (is_null && 0 != reg->std_null_coll)							\
-				gv_currkey->base[gv_currkey->end] = SUBSCRIPT_STDCOL_NULL;			\
+				*((gv_currkey->base) + gv_currkey->end) = SUBSCRIPT_STDCOL_NULL;		\
 			gv_currkey->prev = gv_currkey->end;							\
 			gv_currkey->end += len - 1;								\
 		}												\
@@ -3944,7 +3953,6 @@ MBSTART {									\
 	GBLREF	boolean_t	need_kip_incr;					\
 	GBLREF	uint4		dollar_tlevel;					\
 										\
-	assert(dollar_tlevel || need_kip_incr);					\
 	for (sleep_counter = 1; (0 < CNL->inhibit_kills); ++sleep_counter)	\
 	{									\
 		if (MAXKILLINHIBITWAIT <= sleep_counter)			\

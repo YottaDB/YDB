@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2007-2020 Fidelity National Information	*
+ * Copyright (c) 2007-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -37,6 +37,7 @@
 
 GBLREF	gd_region		*gv_cur_region;	/* for the LOCK_HIST macro used in LOCK_BUFF_FOR_UPDATE macro */
 GBLREF	sgmnt_data_ptr_t	cs_data;
+GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	uint4			process_id;	/* for the LOCK_HIST macro used in LOCK_BUFF_FOR_UPDATE macro */
 
 error_def (ERR_WRITEWAITPID);
@@ -101,7 +102,15 @@ boolean_t	wcs_write_in_progress_wait(node_local_ptr_t cnl, cache_rec_ptr_t cr, w
 				}
 			}
 			if (WRITER_STILL_OWNS_BUFF(cr, n))
+			{
+				if (cs_addrs && cs_addrs->nl)
+				{
+					assert(cs_addrs->now_crit);
+					INCR_GVSTATS_COUNTER(cs_addrs, cs_addrs->nl, ms_wip_critsleeps,
+							(MAXSLPTIME < lcnt ? MAXSLPTIME : lcnt));
+				}
 				wcs_sleep(lcnt);
+			}
 		}
 	}	/* end of for loop to control buffer */
 	return TRUE;

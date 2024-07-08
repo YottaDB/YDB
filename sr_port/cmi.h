@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -11,7 +11,7 @@
  ****************************************************************/
 
 #ifndef CMI_INCLUDED
-#define CMI__INCLUDED
+#define CMI_INCLUDED
 
 cmi_status_t cmi_read(struct CLB *lnk);
 cmi_status_t cmi_write(struct CLB *lnk);

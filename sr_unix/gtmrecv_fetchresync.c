@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -294,8 +294,10 @@ int gtmrecv_fetchresync(int port, seq_num *resync_seqno, seq_num max_reg_seqno)
 				repl_log_conn_info(gtmrecv_sock_fd, stdout, FALSE);
 				SEND_REPL_FETCH_RESYNC_MSG(resync_msg,max_reg_seqno);
 				reconnect = FALSE;
+#ifdef DEBUG
 				if (WBTEST_ENABLED(WBTEST_FETCHCOMM_ERR))
 					gtm_wbox_input_test_case_count = 6; /* Do not go to white box again*/
+#endif
 			}
 		}
 		CHECK_SEND_RECV_LOOP_ERROR(status, wait_count, "RESYNC JNLSEQNO");

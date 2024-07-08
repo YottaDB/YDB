@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2004-2023 Fidelity National Information	*
+ * Copyright (c) 2004-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -14,9 +14,8 @@
 
 #include "gtm_string.h"
 #include "gtm_stdlib.h"
-
+#include "gtm_fcntl.h"	/* Needed for AIX's silly open to open64 translations */
 #include <stddef.h>		/* For offsetof macro */
-
 #include "gtm_logicals.h"
 #include "gtm_multi_thread.h"
 #include "logical_truth_value.h"
@@ -39,13 +38,7 @@
 #include "fullbool.h"
 #include "trace_table.h"
 #include "parse_trctbl_groups.h"
-#include "gtm_facility.h"
-#include "fileinfo.h"
-#include "gdscc.h"
-#include "filestruct.h"
-#include "buddy_list.h"		/* needed for tp.h */
-#include "jnl.h"
-#include "tp.h"
+#include "tpnotacid_chk_inline.h"
 #include "cli.h"
 #include "getstorage.h"
 
@@ -79,7 +72,6 @@ GBLREF	bool		undef_inhibit;
 GBLREF	uint4		outOfMemoryMitigateSize;	/* Reserve that we will freed to help cleanup if run out of memory */
 GBLREF	uint4		max_cache_memsize;	/* Maximum bytes used for indirect cache object code */
 GBLREF	uint4		max_cache_entries;	/* Maximum number of cached indirect compilations */
-GBLREF	block_id	gtm_tp_allocation_clue;	/* block# hint to start allocation for created blocks in TP */
 GBLREF	boolean_t	gtm_stdxkill;		/* Use M Standard exclusive kill instead of historical GTM */
 GBLREF	boolean_t	ztrap_new;		/* Each time $ZTRAP is set it is automatically NEW'd */
 GBLREF	size_t		gtm_max_storalloc;	/* Used for testing: creates an allocation barrier */
@@ -89,16 +81,18 @@ GBLREF	boolean_t	malloccrit_issued;	/* MEMORY error limit set at time of MALLOCC
 GBLREF	bool		pin_shared_memory;	/* pin shared memory into physical memory on creation */
 GBLREF	bool		hugetlb_shm_enabled;	/* allocate shared memory backed by huge pages */
 
+LITREF	mval literal_one, literal_zero;
+
 void	gtm_env_init(void)
 {
 	boolean_t		ret, is_defined;
 	char			buf[MAX_TRANS_NAME_LEN];
 	double			time;
-	int			status2, i, j;
-	int4			status;
+	int			i, j, save_errno;
+	int4			status, tpnat;
 	mstr			val, trans;
 	size_t			tmp_malloc_limit;
-	uint4			tdbglvl, tmsock, reservesize, memsize, cachent, trctblsize, trctblbytes;
+	uint4			cachent, memsize, reservesize, tdbglvl, tmsock, trctblbytes, trctblsize;
 	uint4			max_threads, max_procs;
 	DCL_THREADGBL_ACCESS;
 
@@ -226,12 +220,6 @@ void	gtm_env_init(void)
 		if (is_defined)
 			TREF(gtm_dirtree_collhdr_always) = ret; /* if logical is not defined, the TREF takes the default value */
 #		endif
-		/* Initialize variable that controls TP allocation clue (for created blocks) */
-		val.addr = GTM_TP_ALLOCATION_CLUE;
-		val.len = SIZEOF(GTM_TP_ALLOCATION_CLUE) - 1;
-		gtm_tp_allocation_clue = (block_id)trans_numeric_64(&val, &is_defined, TRUE);
-		if (!is_defined)
-			gtm_tp_allocation_clue = (block_id)MAXTOTALBLKS_MAX;
 		/* GDS Block certification */
 		val.addr = GTM_GDSCERT;
 		val.len = SIZEOF(GTM_GDSCERT) - 1;
@@ -313,18 +301,28 @@ void	gtm_env_init(void)
 			}
 		}
 		/* Initialize tpnotacidtime */
-		(TREF(tpnotacidtime)).m[1] = TPNOTACID_DEFAULT_TIME;
+		TREF(tpnotacidtime) = TPNOTACID_DEFAULT_TIME;
 		val.addr = GTM_TPNOTACIDTIME;
 		val.len = SIZEOF(GTM_TPNOTACIDTIME) - 1;
 		if (SS_NORMAL == (status = TRANS_LOG_NAME(&val, &trans, buf, SIZEOF(buf), do_sendmsg_on_log2long)))
 		{
+			save_errno = errno;
 			assert(SIZEOF(buf) > trans.len);
 			*(char *)(buf + trans.len) = 0;
-			errno = 0;
-			time = strtod(buf, NULL);
-			if ((ERANGE != errno) && (TPNOTACID_MAX_TIME >= time))
-				(TREF(tpnotacidtime)).m[1] = time * MILLISECS_IN_SEC;
-		}	/* gtm_startup completes initialization of the tpnotacidtime mval */
+			time = strtod(buf, NULL) + 0.0005;				/* round to millisec precision */
+			assert(MV_BIAS == MILLISECS_IN_SEC);				/* check math if this changes */
+			time *= MV_BIAS;
+			i = (int)time;
+			if ((ERANGE != save_errno) && (0 <= i) && (TPNOTACID_MAX_TIME >= i))
+				TREF(tpnotacidtime) = i;
+		}
+		/* Initialize tpnotacidtries */
+		TREF(tpnotacidtries) = TPNOTACID_DEF_MAX_TRIES;
+		val.addr = GTM_TPNOTACIDTRIES;
+		val.len = SIZEOF(GTM_TPNOTACIDTRIES) - 1;
+		tpnat = trans_numeric(&val, &is_defined, TRUE);
+		if ((is_defined && (0 == tpnat)) || ((TPNOTACID_LIM_MAX_TRIES >= tpnat) && (CDB_STAGNATE < tpnat)))
+			TREF(tpnotacidtries) = tpnat;
 		/* Initialize $gtm_tprestart_log_first */
 		val.addr = GTM_TPRESTART_LOG_FIRST;
 		val.len = STR_LIT_LEN(GTM_TPRESTART_LOG_FIRST);
@@ -387,8 +385,18 @@ void	gtm_env_init(void)
 		/* Initialize dollar_zmaxtptime */
 		val.addr = GTM_ZMAXTPTIME;
 		val.len = SIZEOF(GTM_ZMAXTPTIME) - 1;
-		if ((status = trans_numeric(&val, &is_defined, TRUE)) && (0 <= status) && (TPTIMEOUT_MAX_TIME >= status))
-			TREF(dollar_zmaxtptime) = status;	 /* NOTE assignment above */
+		if (SS_NORMAL == (status = TRANS_LOG_NAME(&val, &trans, buf, SIZEOF(buf), do_sendmsg_on_log2long)))
+		{
+			save_errno = errno;
+			assert(SIZEOF(buf) > trans.len);
+			*(char *)(buf + trans.len) = 0;
+			time = strtod(buf, NULL) + 0.0005;				/* round to millisec precision */
+			assert(MV_BIAS == MILLISECS_IN_SEC);				/* check math if this changes */
+			time *= MV_BIAS;
+			i = (int)time;
+			if ((ERANGE != save_errno) && (0 <= i) && (TPTIMEOUT_MAX_TIME >= i))
+				TREF(dollar_zmaxtptime) = i;
+		}
 		/* See if $gtm_ztrap_new/GTM_ZTRAP_NEW has been specified */
 		val.addr = ZTRAP_NEW;
 		val.len = SIZEOF(ZTRAP_NEW) - 1;

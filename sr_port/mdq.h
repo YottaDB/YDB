@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -11,7 +11,7 @@
  ****************************************************************/
 
 #ifndef MDQ_H_DEFINED
-#define HDQ_H_DEFINED
+#define MDQ_H_DEFINED
 
 /* Define basic working macros for queue management of doubly linked list is defined using elements "N.fl" and "N.bl".
  * The DSRINS insert at tail rather than head and so work FIFO rather than LIFO with DQLOOP and associated macros
@@ -43,8 +43,8 @@
  * the test to see if should do debugging is not elegant but it does allow decent debugging. Note those macros without
  * debugging are statically defined.
  */
-#  define OCQ_NOOP 0L		/* This needs to align with OC_NOOP, which is 0, but 'twould make a mess to do the includes */
-#  define OCQ_INVALID -1L
+#define OCQ_NOOP	((opctype)0)	/* This needs to match OC_NOOP, which is 0, but 'twould make a mess to do the includes */
+#define OCQ_INVALID	((opctype)-1)
 #define dqloop(Q, N, I) DQLOOP(Q, N, I)
 #ifdef GTM_MALLOC_BUILD		/* gtm_malloc doesn't deal with triples and the #include they require makes for trouble */
 #define dqinit(Q, N) DQINIT(Q, N)

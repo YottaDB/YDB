@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,6 +10,8 @@
  *								*
  ****************************************************************/
 
+#ifndef TIMERS_H_INCLUDED
+#define TIMERS_H_INCLUDED
 #include "timersp.h"
 
 /* TIM_DEFER_DBSYNC is the defer-time used in wcs_clean_dbsync_timer() to flush the filehdr (and epoch if before imaging).
@@ -21,8 +24,8 @@ typedef enum
 {	tim_wcs_starved = 10,
 	tim_wcs_flu_mod,
 	n_timers
-}timers;
+} timers;
 
 void change_fhead_timer(char *timer_name, sm_int_ptr_t timer_address, int default_time,
 	bool zero_is_ok);
-
+#endif

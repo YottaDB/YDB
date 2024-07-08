@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -36,6 +36,7 @@
 #include "jnl.h"
 #include "buddy_list.h"		/* needed for tp.h */
 #include "tp.h"
+#include "tpnotacid_chk_inline.h"
 #include "gtm_stdlib.h"		/* for ATOI */
 #include "gtmimagename.h"
 #include "cryptdef.h"

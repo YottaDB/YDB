@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -32,3 +32,4 @@
 			 * part, it will be concentrated at the bottom of the stringpool (so the OS can swap the rest out).
 			 */
 #define STP_GCOL_TRIGGER_FLOOR 100000 /* Don't set the target level to call the garbage collector below this value. */
+#define STP_MIN_CONTRACTION (1024 * 1024) /* Don't contract (mmap/munmap) the stringpool below this value (1MiB) */

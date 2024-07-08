@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2023 Fidelity National Information	*
+ * Copyright (c) 2006-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -70,7 +70,7 @@ int gtmrecv_shutdown(boolean_t auto_shutdown, int exit_status)
 	unix_db_info	*udi;
 
 	udi = (unix_db_info *)FILE_INFO(recvpool.recvpool_dummy_reg);
-	repl_log(stdout, TRUE, TRUE, "Initiating shut down\n");
+	repl_log(stdout, TRUE, TRUE, "Initiating SHUTDOWN operation on receiver server pid [%ld]\n", process_id);
 	call_on_signal = NULL;		/* So we don't reenter on error */
 	/* assert that auto shutdown should be invoked only if the current process is a receiver server */
 	assert(!auto_shutdown || gtmrecv_srv_count);
@@ -206,6 +206,7 @@ int gtmrecv_shutdown(boolean_t auto_shutdown, int exit_status)
 	if (!ftok_sem_release(recvpool.recvpool_dummy_reg,
 					!jnlpool->jnlpool_ctl->ftok_counter_halted && udi->counter_ftok_incremented, FALSE))
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_RECVPOOLSETUP);
+	repl_log(stdout, TRUE, TRUE, "Finished SHUTDOWN operation on receiver server pid [%d]\n", process_id);
 	return (exit_status);
 }
 

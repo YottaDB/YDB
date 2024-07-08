@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -116,7 +116,7 @@ void trans_code_cleanup(void)
 				 * is not a direct mode frame, we'll assert in debug or break in pro and just continue.
 				 * to direct mode.
 				 */
-				assert(fp->flags && (SFF_INDCE));
+				assert(fp->flags & SFF_INDCE);
 				if (!fp->old_frame_pointer || !(fp->old_frame_pointer->type & SFT_DM))
 				{
 					assert(FALSE);

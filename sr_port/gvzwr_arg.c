@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,7 +27,7 @@ void gvzwr_arg(int t, mval *a1, mval *a2)
 	int i;
 
 	i = gvzwrite_block->subsc_count++;
-	/* it would be good to guard the array i < sizeof... */
+	assert(MAX_GVSUBSCRIPTS >= i);	/* guard the array */
 	if (a1)
 	{
 		MV_FORCE_DEFINED(a1);
@@ -50,7 +51,6 @@ void gvzwr_arg(int t, mval *a1, mval *a2)
 	((zwr_sub_lst *)gvzwrite_block->sub)->subsc_list[i].second = a2;
 	if ((ZWRITE_ASTERISK != t) && (ZWRITE_ALL != t))
 		gvzwrite_block->mask |= 1 << i;
-
 	if (ZWRITE_VAL != t)
 		gvzwrite_block->fixed = FALSE;
 	return;

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,15 +13,15 @@
 #include "mdef.h"
 #include "compiler.h"
 
-void walktree(mvar *n,void (*f)(),char *arg)
+void walktree(mtreenode *node, void (*f)(mtreenode *, void *), void *arg)
 {
 	while (TRUE)
 	{
-		if (n->lson)
-			walktree(n->lson,f,arg);
-		(*f)(n,arg);
-		if (n->rson)
-			n = n->rson;
+		if (node->var.lson)
+			walktree(node->links.lson, f, arg);
+		(*f)(node, arg);
+		if (node->var.rson)
+			node = node->links.rson;
 		else
 			break;
 	}

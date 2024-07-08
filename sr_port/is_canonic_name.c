@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -71,9 +71,9 @@ boolean_t is_canonic_name(mval *src, int *subscripts, int *start_off, int *stop_
 			*stop_off = stop[contains_env + seq];
 		}
 		if ('"' == src->str.addr[*start_off])
-			*start_off++;
+			start_off++;
 		if ((0 < *stop_off) && ('"' == src->str.addr[*stop_off - 1]))
-			*stop_off--;
+			stop_off--;
 		return TRUE;
 	}
 	return FALSE;

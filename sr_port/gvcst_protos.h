@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2004-2023 Fidelity National Information	*
+ * Copyright (c) 2004-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -27,6 +27,8 @@ void		db_init_err_cleanup(boolean_t retry_dbinit);
 void		gvcst_redo_root_search(void);
 gd_region	*dbfilopn (gd_region *reg);
 void		dbsecspc(gd_region *reg, sgmnt_data_ptr_t csd, gtm_uint64_t *sec_size);
+void		bg_sync_init(node_local_ptr_t cnl);
+
 unsigned char	gvcst_cre_autoDB(gd_region *reg);
 mint		gvcst_data(void);
 mint		gvcst_data2(void);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2008-2023 Fidelity National Information	*
+ * Copyright (c) 2008-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -85,14 +85,6 @@ TAB_GVSTATS_REC(n_set_trigger_fired  , "STG", "# of SET triggers fired          
 TAB_GVSTATS_REC(n_kill_trigger_fired , "KTG", "# of KILL triggers fired              ")
 TAB_GVSTATS_REC(n_ztrigger_fired     , "ZTG", "# of ZTRIGGERs fired                  ")
 
-/* Begin stats for GTM-8863 (please do not delete this) */
-/*
- * Unfortunately we can't generate the enum for wait states directly
- * from the list below, because we need to keep the code instrumented
- * for wait states which are no longer displayed, but which may be used
- * in the future, or which are components of other states.  We go with
- * defining the first and last values
- */
 #define FIRST_WS_STATE 1
 #define LAST_WS_STATE 102
 
@@ -124,17 +116,32 @@ TAB_GVSTATS_REC(n_jnl_wait           , "JNL",  "counter for jnl acc in prog     
 TAB_GVSTATS_REC(n_mlk_wait           , "MLK",  "counter for mlk acc in prog           ")
 TAB_GVSTATS_REC(n_proc_wait          , "PRC",  "counter for proc cleanup in prog      ")
 TAB_GVSTATS_REC(n_trans_wait         , "TRX",  "counter for trans in prog             ")
+/* Cachline border (128-byte and 64-byte) */
 TAB_GVSTATS_REC(n_util_wait          , "ZAD",  "counter for utility cmd in prog       ")
 TAB_GVSTATS_REC(n_ws2                , "JOPA", "counter for journal open in prog      ")
 TAB_GVSTATS_REC(n_ws12               , "AFRA", "counter for auto freeze release       ")
 TAB_GVSTATS_REC(n_ws15               , "BREA", "counter for blk rd encryp cycle sync  ")
 TAB_GVSTATS_REC(n_ws39               , "MLBA", "counter for mlk acquire blocked       ")
 TAB_GVSTATS_REC(n_ws47               , "TRGA", "counter for grab region for trans     ")
+/* Read/Write helper counters */
 TAB_GVSTATS_REC(n_wait_read_long     , "WRL",  "# times sleep read exceeds counter X  ")
 TAB_GVSTATS_REC(n_pre_read_globals   , "PRG",  "# of pre-read globals                 ")
+/* Cacheline border (64-byte) */
 TAB_GVSTATS_REC(n_writer_flush       , "WFL",  "# of DB FLushes by the writer helpers ")
 TAB_GVSTATS_REC(n_writer_helper_epoch, "WHE",  "# of waits for jnl write lock or fsync")
-/* End stats for GTM-8863 (please do not delete this) */
+/* This aggregate is also included in n_set */
+/* New sleep statistics. If possible, in-crit counters should not share cacheline with out-of-crit counters
+ * Otherwise, the least active crit counters should share the out-of-crit cacheline. */
+TAB_GVSTATS_REC(ms_jnl_critsleeps    , "JCS",  "ms of sleep time for jnl write in crit")
+TAB_GVSTATS_REC(ms_jnl_nocritsleeps  , "JNS",  "ms of sleep time for jnl write no crit")
+TAB_GVSTATS_REC(ms_wip_critsleeps    , "WPCS", "ms of sleep time for wip in crit      ")
+TAB_GVSTATS_REC(ms_rip_critsleeps    , "RCS",  "ms of sleep time for rip in crit      ")
+TAB_GVSTATS_REC(ms_flu_critsleeps    , "WFCS", "ms of sleep time for wcs_flu in crit  ")
+TAB_GVSTATS_REC(ms_getn_critsleeps   , "GCS",  "ms of sleep time for csh_getn in crit ")
+/* Cacheline border (128-byte and 64-byte) */
+TAB_GVSTATS_REC(n_increment          , "INC",  "# of INCREMENT operations             ")
+TAB_GVSTATS_REC(n_idxblk_csh_hit     , "IDXH",  "# of index block cache hits          ")
+TAB_GVSTATS_REC(n_idxblk_csh_miss    , "IDXM",  "# of index block cache misses        ")
 /* If new stats are added beyond this point, edit gvstats_rec_cnl2csd in gvstats_rec.c */
 
 /*
