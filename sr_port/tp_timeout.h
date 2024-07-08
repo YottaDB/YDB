@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -25,7 +25,7 @@
 /* Routines to perform state transitions */
 
 /* Start timer (Clear -> Set) */
-void tp_start_timer(int4 timer_seconds);
+void tp_start_timer(int4 timer_milliseconds);
 
 /* Transaction done, clear any pending timeout:
  *     (Set -> Clear)

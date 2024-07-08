@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries. *
@@ -104,8 +104,14 @@ void open_list_file(void)
 	pblk.fop = F_SYNTAXO;
 	fstr.len = (MV_DEFINED(&cmd_qlf.list_file) ? cmd_qlf.list_file.str.len : 0);
 	fstr.addr = cmd_qlf.list_file.str.addr;
+<<<<<<< HEAD
 	status = parse_file(&fstr, &pblk);
 	if (!(status & 1))
+||||||| parent of 07a11a26bb (GT.M V7.1-004)
+	if (!(status = parse_file(&fstr, &pblk)) & 1)
+=======
+	if (!(status = parse_file(&fstr, &pblk)))
+>>>>>>> 07a11a26bb (GT.M V7.1-004)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 
 	file.mvtype = parms.mvtype = MV_STR;

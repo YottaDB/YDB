@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
@@ -57,8 +57,14 @@ int	iosocket_rdone(mint *v, uint8 nsec_timeout)
 		} else
 		{	/* Null length string returns 0 */
 			codepoint = 0;
+<<<<<<< HEAD
 		}
 		*v = (mint)(codepoint);
+||||||| parent of 07a11a26bb (GT.M V7.1-004)
+		*v = (mint)(codepoint);
+=======
+		*v = (0 == io_curr_device.in->dollar.za) ? (mint)(codepoint) : -1;
+>>>>>>> 07a11a26bb (GT.M V7.1-004)
 	} else
 		*v = -1;
 	return ret;

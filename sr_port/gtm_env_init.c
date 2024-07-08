@@ -1,6 +1,12 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright (c) 2004-2022 Fidelity National Information	*
+||||||| parent of 07a11a26bb (GT.M V7.1-004)
+ * Copyright (c) 2004-2023 Fidelity National Information	*
+=======
+ * Copyright (c) 2004-2024 Fidelity National Information	*
+>>>>>>> 07a11a26bb (GT.M V7.1-004)
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries. *
@@ -17,10 +23,17 @@
 
 #include "gtm_string.h"
 #include "gtm_stdlib.h"
-
+#include "gtm_fcntl.h"	/* Needed for AIX's silly open to open64 translations */
 #include <stddef.h>		/* For offsetof macro */
+<<<<<<< HEAD
 
 #include "ydb_logicals.h"
+||||||| parent of 07a11a26bb (GT.M V7.1-004)
+
+#include "gtm_logicals.h"
+=======
+#include "gtm_logicals.h"
+>>>>>>> 07a11a26bb (GT.M V7.1-004)
 #include "gtm_multi_thread.h"
 #include "ydb_logical_truth_value.h"
 #include "ydb_trans_numeric.h"
@@ -42,13 +55,7 @@
 #include "fullbool.h"
 #include "trace_table.h"
 #include "parse_trctbl_groups.h"
-#include "gtm_facility.h"
-#include "fileinfo.h"
-#include "gdscc.h"
-#include "filestruct.h"
-#include "buddy_list.h"		/* needed for tp.h */
-#include "jnl.h"
-#include "tp.h"
+#include "tpnotacid_chk_inline.h"
 #include "cli.h"
 #include "repl_filter.h"
 #include "gds_blk_upgrade.h"
@@ -81,7 +88,14 @@ GBLREF	bool		undef_inhibit;
 GBLREF	uint4		outOfMemoryMitigateSize;	/* Reserve that we will freed to help cleanup if run out of memory */
 GBLREF	uint4		max_cache_memsize;	/* Maximum bytes used for indirect cache object code */
 GBLREF	uint4		max_cache_entries;	/* Maximum number of cached indirect compilations */
+<<<<<<< HEAD
 GBLREF	boolean_t	ydb_stdxkill;		/* Use M Standard exclusive kill instead of historical GTM */
+||||||| parent of 07a11a26bb (GT.M V7.1-004)
+GBLREF	block_id	gtm_tp_allocation_clue;	/* block# hint to start allocation for created blocks in TP */
+GBLREF	boolean_t	gtm_stdxkill;		/* Use M Standard exclusive kill instead of historical GTM */
+=======
+GBLREF	boolean_t	gtm_stdxkill;		/* Use M Standard exclusive kill instead of historical GTM */
+>>>>>>> 07a11a26bb (GT.M V7.1-004)
 GBLREF	boolean_t	ztrap_new;		/* Each time $ZTRAP is set it is automatically NEW'd */
 GBLREF	size_t		ydb_max_storalloc;	/* Used for testing: creates an allocation barrier */
 GBLREF	int		ydb_repl_filter_timeout;/* # of seconds that source server waits before issuing FILTERTIMEDOUT */
@@ -92,20 +106,35 @@ GBLREF	boolean_t	malloccrit_issued;	/* MEMORY error limit set at time of MALLOCC
 GBLREF	bool		pin_shared_memory;	/* pin shared memory into physical memory on creation */
 GBLREF	bool		hugetlb_shm_enabled;	/* allocate shared memory backed by huge pages */
 
+<<<<<<< HEAD
 #ifdef DEBUG
 GBLREF	block_id	ydb_skip_bml_num;
 #endif
+||||||| parent of 07a11a26bb (GT.M V7.1-004)
+=======
+LITREF	mval literal_one, literal_zero;
+>>>>>>> 07a11a26bb (GT.M V7.1-004)
 
 void	gtm_env_init(void)
 {
 	boolean_t		ret, is_defined;
 	char			buf[MAX_TRANS_NAME_LEN];
 	double			time;
+<<<<<<< HEAD
 	int			status2, i, j;
 	int4			status;
 	mstr			trans;
+||||||| parent of 07a11a26bb (GT.M V7.1-004)
+	int			status2, i, j;
+	int4			status;
+	mstr			val, trans;
+=======
+	int			i, j, save_errno;
+	int4			status, tpnat;
+	mstr			val, trans;
+>>>>>>> 07a11a26bb (GT.M V7.1-004)
 	size_t			tmp_malloc_limit;
-	uint4			tdbglvl, tmsock, reservesize, memsize, cachent, trctblsize, trctblbytes;
+	uint4			cachent, memsize, reservesize, tdbglvl, tmsock, trctblbytes, trctblsize;
 	uint4			max_threads, max_procs;
 	DCL_THREADGBL_ACCESS;
 
@@ -230,6 +259,7 @@ void	gtm_env_init(void)
 		assert(FALSE == TREF(ydb_gvundef_fatal));	/* should have been set to FALSE by gtm_threadgbl_defs */
 		ret = ydb_logical_truth_value(YDBENVINDX_GVUNDEF_FATAL, FALSE, &is_defined);
 		if (is_defined)
+<<<<<<< HEAD
 			TREF(ydb_gvundef_fatal) = ret; /* if logical is not defined, ydb_gvundef_fatal takes the default value */
 		/* ydb_lockhash_n_bits environment/logical */
 		TREF(ydb_lockhash_n_bits) = ydb_trans_numeric(YDBENVINDX_LOCKHASH_N_BITS, &is_defined, IGNORE_ERRORS_TRUE, NULL);
@@ -255,6 +285,32 @@ void	gtm_env_init(void)
 			ydb_skip_bml_num = 0;
 		else
 			ydb_skip_bml_num *= BLKS_PER_LMAP;
+||||||| parent of 07a11a26bb (GT.M V7.1-004)
+			TREF(gtm_gvundef_fatal) = ret; /* if logical is not defined, gtm_gvundef_fatal takes the default value */
+		/* GTM_DIRTREE_COLLHDR_ALWAYS environment/logical */
+		val.addr = GTM_DIRTREE_COLLHDR_ALWAYS;
+		val.len = SIZEOF(GTM_DIRTREE_COLLHDR_ALWAYS) - 1;
+		assert(FALSE == TREF(gtm_dirtree_collhdr_always));	/* should have been set to FALSE by gtm_threadgbl_defs */
+		ret = logical_truth_value(&val, FALSE, &is_defined);
+		if (is_defined)
+			TREF(gtm_dirtree_collhdr_always) = ret; /* if logical is not defined, the TREF takes the default value */
+#		endif
+		/* Initialize variable that controls TP allocation clue (for created blocks) */
+		val.addr = GTM_TP_ALLOCATION_CLUE;
+		val.len = SIZEOF(GTM_TP_ALLOCATION_CLUE) - 1;
+		gtm_tp_allocation_clue = (block_id)trans_numeric_64(&val, &is_defined, TRUE);
+		if (!is_defined)
+			gtm_tp_allocation_clue = (block_id)MAXTOTALBLKS_MAX;
+=======
+			TREF(gtm_gvundef_fatal) = ret; /* if logical is not defined, gtm_gvundef_fatal takes the default value */
+		/* GTM_DIRTREE_COLLHDR_ALWAYS environment/logical */
+		val.addr = GTM_DIRTREE_COLLHDR_ALWAYS;
+		val.len = SIZEOF(GTM_DIRTREE_COLLHDR_ALWAYS) - 1;
+		assert(FALSE == TREF(gtm_dirtree_collhdr_always));	/* should have been set to FALSE by gtm_threadgbl_defs */
+		ret = logical_truth_value(&val, FALSE, &is_defined);
+		if (is_defined)
+			TREF(gtm_dirtree_collhdr_always) = ret; /* if logical is not defined, the TREF takes the default value */
+>>>>>>> 07a11a26bb (GT.M V7.1-004)
 #		endif
 		/* GDS Block certification */
 		ret = ydb_logical_truth_value(YDBENVINDX_GDSCERT, FALSE, &is_defined);
@@ -324,11 +380,25 @@ void	gtm_env_init(void)
 			}
 		}
 		/* Initialize tpnotacidtime */
+<<<<<<< HEAD
 		(TREF(tpnotacidtime)).m[1] = TPNOTACID_DEFAULT_TIME;
 		if (SS_NORMAL == (status = ydb_trans_log_name(YDBENVINDX_TPNOTACIDTIME, &trans, buf, SIZEOF(buf),
 												IGNORE_ERRORS_TRUE, NULL)))
+||||||| parent of 07a11a26bb (GT.M V7.1-004)
+		(TREF(tpnotacidtime)).m[1] = TPNOTACID_DEFAULT_TIME;
+		val.addr = GTM_TPNOTACIDTIME;
+		val.len = SIZEOF(GTM_TPNOTACIDTIME) - 1;
+		if (SS_NORMAL == (status = TRANS_LOG_NAME(&val, &trans, buf, SIZEOF(buf), do_sendmsg_on_log2long)))
+=======
+		TREF(tpnotacidtime) = TPNOTACID_DEFAULT_TIME;
+		val.addr = GTM_TPNOTACIDTIME;
+		val.len = SIZEOF(GTM_TPNOTACIDTIME) - 1;
+		if (SS_NORMAL == (status = TRANS_LOG_NAME(&val, &trans, buf, SIZEOF(buf), do_sendmsg_on_log2long)))
+>>>>>>> 07a11a26bb (GT.M V7.1-004)
 		{
+			save_errno = errno;
 			assert(SIZEOF(buf) > trans.len);
+<<<<<<< HEAD
 			assert('\0' == buf[trans.len]);
 			errno = 0;
 			time = strtod(buf, NULL);
@@ -338,6 +408,38 @@ void	gtm_env_init(void)
 		/* Initialize $ydb_tprestart_log_first */
 		TREF(tprestart_syslog_first) = ydb_trans_numeric(YDBENVINDX_TPRESTART_LOG_FIRST, &is_defined,
 												IGNORE_ERRORS_TRUE, NULL);
+||||||| parent of 07a11a26bb (GT.M V7.1-004)
+			*(char *)(buf + trans.len) = 0;
+			errno = 0;
+			time = strtod(buf, NULL);
+			if ((ERANGE != errno) && (TPNOTACID_MAX_TIME >= time))
+				(TREF(tpnotacidtime)).m[1] = time * MILLISECS_IN_SEC;
+		}	/* gtm_startup completes initialization of the tpnotacidtime mval */
+		/* Initialize $gtm_tprestart_log_first */
+		val.addr = GTM_TPRESTART_LOG_FIRST;
+		val.len = STR_LIT_LEN(GTM_TPRESTART_LOG_FIRST);
+		TREF(tprestart_syslog_first) = trans_numeric(&val, &is_defined, TRUE);
+=======
+			*(char *)(buf + trans.len) = 0;
+			time = strtod(buf, NULL) + 0.0005;				/* round to millisec precision */
+			assert(MV_BIAS == MILLISECS_IN_SEC);				/* check math if this changes */
+			time *= MV_BIAS;
+			i = (int)time;
+			if ((ERANGE != save_errno) && (0 <= i) && (TPNOTACID_MAX_TIME >= i))
+				TREF(tpnotacidtime) = i;
+		}
+		/* Initialize tpnotacidtries */
+		TREF(tpnotacidtries) = TPNOTACID_DEF_MAX_TRIES;
+		val.addr = GTM_TPNOTACIDTRIES;
+		val.len = SIZEOF(GTM_TPNOTACIDTRIES) - 1;
+		tpnat = trans_numeric(&val, &is_defined, TRUE);
+		if ((is_defined && (0 == tpnat)) || ((TPNOTACID_LIM_MAX_TRIES >= tpnat) && (CDB_STAGNATE < tpnat)))
+			TREF(tpnotacidtries) = tpnat;
+		/* Initialize $gtm_tprestart_log_first */
+		val.addr = GTM_TPRESTART_LOG_FIRST;
+		val.len = STR_LIT_LEN(GTM_TPRESTART_LOG_FIRST);
+		TREF(tprestart_syslog_first) = trans_numeric(&val, &is_defined, TRUE);
+>>>>>>> 07a11a26bb (GT.M V7.1-004)
 		if (0 > TREF(tprestart_syslog_first))
 			TREF(tprestart_syslog_first) = 0;
 		/* Initialize $ydb_tprestart_log_delta */
@@ -387,6 +489,7 @@ void	gtm_env_init(void)
 		/* Initialize jnl_extract_nocol */
 		TREF(jnl_extract_nocol) = ydb_trans_numeric(YDBENVINDX_EXTRACT_NOCOL, &is_defined, IGNORE_ERRORS_TRUE, NULL);
 		/* Initialize dollar_zmaxtptime */
+<<<<<<< HEAD
 		status = ydb_trans_numeric(YDBENVINDX_MAXTPTIME, &is_defined, IGNORE_ERRORS_TRUE, NULL);
 		if (is_defined && (0 <= status) && (TPTIMEOUT_MAX_TIME >= status))
 			TREF(dollar_zmaxtptime) = status;
@@ -394,6 +497,37 @@ void	gtm_env_init(void)
 		ztrap_new = ydb_logical_truth_value(YDBENVINDX_ZTRAP_NEW, FALSE, NULL);
 		/* See if $ydb_malloc_limit is set. Initialize dollar_zmalloclim and malloccrit_issued */
 		zmalloclim = ydb_trans_numeric_64(YDBENVINDX_MALLOC_LIMIT, &is_defined, IGNORE_ERRORS_TRUE, NULL);
+||||||| parent of 07a11a26bb (GT.M V7.1-004)
+		val.addr = GTM_ZMAXTPTIME;
+		val.len = SIZEOF(GTM_ZMAXTPTIME) - 1;
+		if ((status = trans_numeric(&val, &is_defined, TRUE)) && (0 <= status) && (TPTIMEOUT_MAX_TIME >= status))
+			TREF(dollar_zmaxtptime) = status;	 /* NOTE assignment above */
+		/* See if $gtm_ztrap_new/GTM_ZTRAP_NEW has been specified */
+		val.addr = ZTRAP_NEW;
+		val.len = SIZEOF(ZTRAP_NEW) - 1;
+		ztrap_new = logical_truth_value(&val, FALSE, NULL);
+		/* Initialize dollar_zmalloclim and malloccrit_issued */
+=======
+		val.addr = GTM_ZMAXTPTIME;
+		val.len = SIZEOF(GTM_ZMAXTPTIME) - 1;
+		if (SS_NORMAL == (status = TRANS_LOG_NAME(&val, &trans, buf, SIZEOF(buf), do_sendmsg_on_log2long)))
+		{
+			save_errno = errno;
+			assert(SIZEOF(buf) > trans.len);
+			*(char *)(buf + trans.len) = 0;
+			time = strtod(buf, NULL) + 0.0005;				/* round to millisec precision */
+			assert(MV_BIAS == MILLISECS_IN_SEC);				/* check math if this changes */
+			time *= MV_BIAS;
+			i = (int)time;
+			if ((ERANGE != save_errno) && (0 <= i) && (TPTIMEOUT_MAX_TIME >= i))
+				TREF(dollar_zmaxtptime) = i;
+		}
+		/* See if $gtm_ztrap_new/GTM_ZTRAP_NEW has been specified */
+		val.addr = ZTRAP_NEW;
+		val.len = SIZEOF(ZTRAP_NEW) - 1;
+		ztrap_new = logical_truth_value(&val, FALSE, NULL);
+		/* Initialize dollar_zmalloclim and malloccrit_issued */
+>>>>>>> 07a11a26bb (GT.M V7.1-004)
 		tmp_malloc_limit = (size_t)getstorage();
 		if (!is_defined || IS_GTMSECSHR_IMAGE)
 		{

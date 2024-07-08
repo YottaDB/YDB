@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -112,7 +112,7 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 	int		old_levelp_cur_prev_keysz,
 			old_levelp_cur_keysz,
 			old_levelp_cur_next_keysz = 0,
-			newblk1_last_keysz,
+			newblk1_last_keysz = 0,
 			newblk2_first_keysz = 0,
 			new_blk2_ances_first_keysz = 0;
 	int		old_levelp_cur_keylen,

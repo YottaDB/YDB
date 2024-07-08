@@ -1,9 +1,16 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
+||||||| parent of 07a11a26bb (GT.M V7.1-004)
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+=======
+ * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> 07a11a26bb (GT.M V7.1-004)
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,11 +35,23 @@ static char rcsid[] = "$Header:$";
 #include "error.h"
 
 
+<<<<<<< HEAD
 int omi_prc_setp(cptr, xend, buff, bend)
     omi_conn	*cptr;
     char	*xend;
     char	*buff;
     char	*bend;
+||||||| parent of 07a11a26bb (GT.M V7.1-004)
+int
+omi_prc_setp(cptr, xend, buff, bend)
+    omi_conn	*cptr;
+    char	*xend;
+    char	*buff;
+    char	*bend;
+=======
+int
+omi_prc_setp(omi_conn *cptr, char *xend, char *buff, char *bend)
+>>>>>>> 07a11a26bb (GT.M V7.1-004)
 {
     int		 rv;
     omi_si	 replicate;

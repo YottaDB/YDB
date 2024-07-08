@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries. *
@@ -37,6 +37,7 @@ GBLREF int	num_additional_processors;	/* needed by a few macros below */
 #define MAXSLPTIME 		10	/* max (millisec) sleep possible thru wcs_sleep */
 #define	SLEEP_ONE_MIN		6000	/* # of wcs_sleep iterations (each max MAXSLPTIME msec) needed to wait 1 minute */
 #define SLEEP_FIVE_SEC		5000	/* # of wcs_sleep(1) iterations needed to wait 5 seconds */
+#define SLEEP_TWO_SEC		2000	/* # of wcs_sleep(1) iterations needed to wait 2 seconds */
 
 #define MAXWTSTARTWAIT 		SLEEP_ONE_MIN
 #define BUF_OWNER_STUCK 	SLEEP_ONE_MIN

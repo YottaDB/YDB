@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
@@ -98,5 +98,5 @@ void gvcmz_errmsg(struct CLB *c, bool close)
 
 	if (DUMPABLE)
 		created_core = dont_want_core = FALSE;
-	DRIVECH(NULL);
+	DRIVECH(0);
 }

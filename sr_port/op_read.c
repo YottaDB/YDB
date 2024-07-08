@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	*
@@ -22,30 +22,21 @@
 #include "stringpool.h"
 #include "op.h"
 #include "ebc_xlat.h"
-
-#include "gdsroot.h"
-#include "gdskill.h"
-#include "gdsbt.h"
-#include "gtm_facility.h"
-#include "fileinfo.h"
-#include "gdsfhead.h"
-#include "gdscc.h"
-#include "filestruct.h"
-#include "buddy_list.h"		/* needed for tp.h */
-#include "jnl.h"
-#include "tp.h"
-#include "send_msg.h"
-#include "gtmmsg.h"		/* for gtm_putmsg() prototype */
-#include "change_reg.h"
-#include "getzposition.h"
-#include "min_max.h"
+#include "tpnotacid_chk_inline.h"
 #include "mvalconv.h"
 #include "restrict.h"
 #include "dm_audit_log.h"
+<<<<<<< HEAD
 #include "is_equ.h"		/* for MV_FORCE_NSTIMEOUT macro */
 #ifdef DEBUG
 #include "have_crit.h"		/* for the TPNOTACID_CHECK macro */
 #endif
+||||||| parent of 07a11a26bb (GT.M V7.1-004)
+#ifdef DEBUG
+#include "have_crit.h"		/* for the TPNOTACID_CHECK macro */
+#endif
+=======
+>>>>>>> 07a11a26bb (GT.M V7.1-004)
 
 GBLREF io_pair		io_curr_device;
 GBLREF io_desc		*active_device;
@@ -61,7 +52,13 @@ int op_read(mval *v, mval *timeout)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+<<<<<<< HEAD
 	MV_FORCE_NSTIMEOUT(timeout, nsec_timeout, READTIMESTR);
+||||||| parent of 07a11a26bb (GT.M V7.1-004)
+	MV_FORCE_MSTIMEOUT(timeout, msec_timeout, READTIMESTR);
+=======
+	MV_FORCE_MSTIMEOUT(timeout, &msec_timeout, READTIMESTR);
+>>>>>>> 07a11a26bb (GT.M V7.1-004)
 	active_device = io_curr_device.in;
 	v->mvtype = MV_STR;
 	v->str.len = 0;

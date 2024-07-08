@@ -1,6 +1,12 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright (c) 2001-2022 Fidelity National Information	*
+||||||| parent of 07a11a26bb (GT.M V7.1-004)
+ * Copyright (c) 2001-2023 Fidelity National Information	*
+=======
+ * Copyright (c) 2001-2024 Fidelity National Information	*
+>>>>>>> 07a11a26bb (GT.M V7.1-004)
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries. *
@@ -175,13 +181,27 @@ GBLREF mval			*dollar_ztdata, *dollar_ztdelim, *dollar_ztoldval, *dollar_ztrigge
 GBLREF mval			*dollar_ztupdate, *dollar_ztvalue, dollar_ztwormhole;
 #endif
 
+<<<<<<< HEAD
 LITREF mval		literal_zero, literal_one, literal_null, literal_sqlnull;
+||||||| parent of 07a11a26bb (GT.M V7.1-004)
+LITREF mval		literal_zero, literal_one, literal_null;
+=======
+>>>>>>> 07a11a26bb (GT.M V7.1-004)
 LITREF char		gtm_release_name[];
 LITREF int4		gtm_release_name_len;
+<<<<<<< HEAD
 LITREF char		ydb_release_stamp[];
 LITREF int4		ydb_release_stamp_len;
 LITREF char		ydb_release_name[];
 LITREF int4		ydb_release_name_len;
+||||||| parent of 07a11a26bb (GT.M V7.1-004)
+LITREF char		gtm_release_stamp[];
+LITREF int4		gtm_release_stamp_len;
+=======
+LITREF char		gtm_release_stamp[];
+LITREF int4		gtm_release_stamp_len;
+LITREF mval		literal_mv_bias, literal_null, literal_zero, literal_one;
+>>>>>>> 07a11a26bb (GT.M V7.1-004)
 
 #define ZWRITE_DOLLAR_PRINCIPAL(MVAL, X, TEXT, OUTPUT)					\
 {											\
@@ -345,9 +365,11 @@ void zshow_svn(zshow_out *output, int one_sv)
 				break;
 		/* CAUTION: fall through */
 		case SV_STORAGE:
-			/* double2mval(&var, getstorage()); Causes issues with unaligned stack on x86_64 - remove until fixed */
-			count = (0 < zmalloclim) ? ((int)zmalloclim) : ((int)getstorage());
-			MV_FORCE_MVAL(&var, (count - (int)totalRmalloc));
+			count = (0 < zmalloclim) ? ((int)zmalloclim) : ((int)gtm_getrlimit());
+			count -= (int)totalRmalloc;
+			if (0 > count)
+				count = 0;
+			MV_FORCE_MVAL(&var, count);
 			ZS_VAR_EQU(&x, storage_text);
 			mval_write(output, &var, TRUE);
 			if (SV_ALL != one_sv)
@@ -611,6 +633,8 @@ void zshow_svn(zshow_out *output, int one_sv)
 		/* CAUTION: fall through */
 		case SV_ZMAXTPTIME:
 			MV_FORCE_MVAL(&var, TREF(dollar_zmaxtptime));
+			assert(MV_BIAS == MILLISECS_IN_SEC);				/* check math if this changes */
+			op_div(&var, (mval*)&literal_mv_bias, &var);
 			ZS_VAR_EQU(&x, zmaxtptime_text);
 			mval_write(output, &var, TRUE);
 			if (SV_ALL != one_sv)

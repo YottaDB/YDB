@@ -1,6 +1,12 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright (c) 2001-2026 Fidelity National Information	*
+||||||| parent of 07a11a26bb (GT.M V7.1-004)
+ * Copyright (c) 2001-2023 Fidelity National Information 	*
+=======
+ * Copyright (c) 2001-2024 Fidelity National Information 	*
+>>>>>>> 07a11a26bb (GT.M V7.1-004)
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries.*

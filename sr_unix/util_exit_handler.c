@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
@@ -94,7 +94,7 @@ void util_exit_handler()
 	 * be holding crit in one or more regions and/or we could have other odds/ends to cleanup.
 	 */
 	secshr_db_clnup(NORMAL_TERMINATION);
-	WITH_CH(exi_ch, gv_rundown(), 0);
+	WITH_CH(exi_ch, gv_rundown(), if(FALSE));
 	print_exit_stats();
 	util_out_close();
 	exit_handler_complete = TRUE;

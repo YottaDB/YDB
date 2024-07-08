@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
@@ -55,9 +55,24 @@ boolean_t map_collseq(int act, collseq *ret_collseq)
 
 	SETUP_THREADGBL_ACCESS;
 	coll_lib_found = FALSE;
+<<<<<<< HEAD
 	tmpmst.len = SNPRINTF(tmpbuff, SIZEOF(tmpbuff), "%d", act);
 	if ((0 > tmpmst.len) || (SIZEOF(tmpbuff) <= tmpmst.len))
+||||||| parent of 07a11a26bb (GT.M V7.1-004)
+	if (SS_NORMAL != (status = TRANS_LOG_NAME(fspec, &fspec_trans, buffer, SIZEOF(buffer), do_sendmsg_on_log2long)))
+		return FALSE;
+	if (NULL == (handle = fgn_getpak(buffer, INFO)))
+		return FALSE;
+	if ((ret_collseq->xform = fgn_getrtn(handle, &xform_sym_1, SUCCESS)))
+=======
+	if (SS_NORMAL != (status = TRANS_LOG_NAME(fspec, &fspec_trans, buffer, SIZEOF(buffer), do_sendmsg_on_log2long)))
+		return FALSE;
+	if (NULL == (handle = fgn_getpak(buffer, INFO)))
+		return FALSE;
+	if ((ret_collseq->xform = (collseq_xform_fptr_t)fgn_getrtn(handle, &xform_sym_1, SUCCESS)))
+>>>>>>> 07a11a26bb (GT.M V7.1-004)
 	{
+<<<<<<< HEAD
 		assert(FALSE);
 		return FALSE;	/* SNPRINTF returned error or truncated result */
 	}
@@ -71,6 +86,11 @@ boolean_t map_collseq(int act, collseq *ret_collseq)
 	if ((ret_collseq->xform = fgn_getrtn(handle, &xform_sym_1, SUCCESS, FGN_ERROR_IF_NOT_FOUND)))
 	{
 		if ((ret_collseq->xback = fgn_getrtn(handle, &xback_sym_1, SUCCESS, FGN_ERROR_IF_NOT_FOUND)))
+||||||| parent of 07a11a26bb (GT.M V7.1-004)
+		if ((ret_collseq->xback = fgn_getrtn(handle, &xback_sym_1, SUCCESS)))
+=======
+		if ((ret_collseq->xback = (collseq_xback_fptr_t)fgn_getrtn(handle, &xback_sym_1, SUCCESS)))
+>>>>>>> 07a11a26bb (GT.M V7.1-004)
 		{
 			coll_lib_found = TRUE;
 			ret_collseq->argtype = 1;
@@ -86,9 +106,21 @@ boolean_t map_collseq(int act, collseq *ret_collseq)
 	}
 	if ( FALSE == coll_lib_found)
 	{
+<<<<<<< HEAD
 		if ((ret_collseq->xform = fgn_getrtn(handle, &xform_sym, SUCCESS, FGN_ERROR_IF_NOT_FOUND)))
+||||||| parent of 07a11a26bb (GT.M V7.1-004)
+		if ((ret_collseq->xform = fgn_getrtn(handle, &xform_sym, SUCCESS)))
+=======
+		if ((ret_collseq->xform = (collseq_xform_fptr_t)fgn_getrtn(handle, &xform_sym, SUCCESS)))
+>>>>>>> 07a11a26bb (GT.M V7.1-004)
 		{
+<<<<<<< HEAD
 			if ((ret_collseq->xback = fgn_getrtn(handle, &xback_sym, SUCCESS, FGN_ERROR_IF_NOT_FOUND)))
+||||||| parent of 07a11a26bb (GT.M V7.1-004)
+			if ((ret_collseq->xback = fgn_getrtn(handle, &xback_sym, SUCCESS)))
+=======
+			if ((ret_collseq->xback = (collseq_xback_fptr_t)fgn_getrtn(handle, &xback_sym, SUCCESS)))
+>>>>>>> 07a11a26bb (GT.M V7.1-004)
 			{
 				coll_lib_found = TRUE;
 				ret_collseq->argtype = 0;
@@ -105,9 +137,21 @@ boolean_t map_collseq(int act, collseq *ret_collseq)
 			ERR_FGNSYM;
 	}
 	assert(TRUE == coll_lib_found);
+<<<<<<< HEAD
 	if (!(ret_collseq->verify = fgn_getrtn(handle, &verify_sym, INFO, FGN_ERROR_IF_NOT_FOUND)))
+||||||| parent of 07a11a26bb (GT.M V7.1-004)
+	if (!(ret_collseq->verify = fgn_getrtn(handle, &verify_sym, INFO)))
+=======
+	if (!(ret_collseq->verify = (collseq_verify_fptr_t)fgn_getrtn(handle, &verify_sym, INFO)))
+>>>>>>> 07a11a26bb (GT.M V7.1-004)
 		ERR_FGNSYM;
+<<<<<<< HEAD
 	if (!(ret_collseq->version = fgn_getrtn(handle, &version_sym, INFO, FGN_ERROR_IF_NOT_FOUND)))
+||||||| parent of 07a11a26bb (GT.M V7.1-004)
+	if (!(ret_collseq->version = fgn_getrtn(handle, &version_sym, INFO)))
+=======
+	if (!(ret_collseq->version = (collseq_version_fptr_t)fgn_getrtn(handle, &version_sym, INFO)))
+>>>>>>> 07a11a26bb (GT.M V7.1-004)
 		ERR_FGNSYM;
 
 	/*
@@ -115,7 +159,13 @@ boolean_t map_collseq(int act, collseq *ret_collseq)
 	 * The xutil routine is only needed for the -2/2
 	 * zatransform collation functionality.  Other operations do not use it.
 	 */
+<<<<<<< HEAD
 	if (!(ret_collseq->xutil = fgn_getrtn(handle, &xutil_sym, SUCCESS, FGN_ERROR_IF_NOT_FOUND)))
+||||||| parent of 07a11a26bb (GT.M V7.1-004)
+	if (!(ret_collseq->xutil = fgn_getrtn(handle, &xutil_sym, SUCCESS)))
+=======
+	if (!(ret_collseq->xutil = (collseq_xutil_fptr_t)fgn_getrtn(handle, &xutil_sym, SUCCESS)))
+>>>>>>> 07a11a26bb (GT.M V7.1-004)
 	{
 		ret_collseq->xutil = NULL;
 	}

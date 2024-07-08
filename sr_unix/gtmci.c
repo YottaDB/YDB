@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
@@ -1105,8 +1105,16 @@ int gtm_ci_filter(const char *c_rtn_name, ...)
 }
 
 #ifdef GTM_PTHREAD
+<<<<<<< HEAD
 /* Java flavor of ydb_init() */
 int ydb_jinit()
+||||||| parent of 07a11a26bb (GT.M V7.1-004)
+/* Java flavor of gtm_init() */
+int gtm_jinit()
+=======
+/* Java flavor of gtm_init() */
+gtm_status_t gtm_jinit(void)
+>>>>>>> 07a11a26bb (GT.M V7.1-004)
 {
 	gtm_jvm_process = TRUE;
 	return ydb_init();

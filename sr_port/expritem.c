@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries.	*
@@ -299,7 +299,7 @@ LITDEF nametabent fun_names[] =
 	,{7, "ZBITSTR"}
 	,{7, "ZBITXOR"}
 	,{5, "ZCHAR"}
-	,{3, "ZCO"}
+	,{3, "ZCO"}	 /* legacy abbreviation for $ZCONVERT() */
 	,{8, "ZCOLLATE"}
 	,{8, "ZCONVERT"}
 	,{2, "ZD"}	/* legacy abbreviation for $ZDATE() */

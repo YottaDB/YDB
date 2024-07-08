@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -51,6 +51,10 @@ enum cdb_sc	gvcst_rtsib(srch_hist *full_hist, int level)
 	boolean_t	long_blk_id;
 
 	new_base = &full_hist->h[level];
+	/* The following assert should never trip; if it does, it means that this function will access an invalid part of
+	 * the history. It is the responsibility of the caller to maintain this invariant.
+	 */
+	assert(level <= gv_target->hist.depth);
 	old = old_base = &gv_target->hist.h[level];
 	for (;;)
 	{

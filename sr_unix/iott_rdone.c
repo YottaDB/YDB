@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
@@ -295,7 +295,7 @@ int	iott_rdone (mint *v, uint8 nsec_timeout)	/* timeout in nanoseconds */
 		{
 			if (timed)
 			{
-				wake_alarm();	/* sets out_of_time to be true for zero as well as non-zero timeouts */
+				wake_alarm(0, 0, NULL);	/* sets out_of_time to be true for zero as well as non-zero timeouts */
 				break;
 			}
 			continue;	/* select() timeout; try again */

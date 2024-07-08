@@ -49,7 +49,15 @@
 #include "gtm_utf8.h"
 #endif
 
+<<<<<<< HEAD
 GBLREF boolean_t		dmterm_default, gtm_utf8_mode, prin_in_dev_failure, prin_out_dev_failure;
+||||||| parent of 07a11a26bb (GT.M V7.1-004)
+GBLREF boolean_t		dmterm_default, gtm_utf8_mode, prin_in_dev_failure,
+				prin_out_dev_failure;
+=======
+GBLREF boolean_t		async_dm_read, dmterm_default, gtm_utf8_mode, prin_in_dev_failure,
+				prin_out_dev_failure;
+>>>>>>> 07a11a26bb (GT.M V7.1-004)
 GBLREF char			*CLR_EOL, *CURSOR_DOWN, *CURSOR_LEFT, *CURSOR_RIGHT, *CURSOR_UP;
 GBLREF char			*KEY_BACKSPACE, *KEY_DC, *KEY_DOWN, *KEY_INSERT, *KEY_LEFT, *KEY_RIGHT, *KEY_UP;
 GBLREF char			*KEY_HOME, *KEY_END;
@@ -162,6 +170,7 @@ MBSTART {												\
 	}												\
 }
 
+<<<<<<< HEAD
 #define	MOVE_CURSOR_TO_START_OF_LINE(TT_PTR_FILDES, DX, DX_INSTR, DX_START, INSTR, IOPTR_WIDTH)	\
 MBSTART {											\
 	int num_lines_above, num_chars_left;							\
@@ -194,6 +203,11 @@ MBSTART {													\
 } MBEND
 
 void	dm_read (mval *v)
+||||||| parent of 07a11a26bb (GT.M V7.1-004)
+void	dm_read (mval *v)
+=======
+mval 	*dm_read (mval *v)
+>>>>>>> 07a11a26bb (GT.M V7.1-004)
 {
 	boolean_t	buffer_moved, insert_mode, terminator_seen, utf8_active, zint_restart;
 #	ifdef UTF8_SUPPORTED
@@ -219,6 +233,7 @@ void	dm_read (mval *v)
 	io_desc 	*io_ptr;
 	io_termmask	mask_term;
 	mv_stent	*mvc, *mv_zintdev;
+	mval		dummy;
 	tt_interrupt	*tt_state;
 	uint4		mask;
 	unsigned int	exp_length, len, length;
@@ -276,6 +291,14 @@ void	dm_read (mval *v)
 			mv_zintdev->mv_st_cont.mvs_zintdev.io_ptr = NULL;
 			if (mv_chain == mv_zintdev)
 				POP_MV_STENT();		/* pop if top of stack */
+			else if ((mv_stent *)((char *) mv_chain + mv_chain->mv_st_next) == mv_zintdev)
+			{	/* ZINTDEV buried under input line on stack, so pop both and replace mval */
+				POP_MV_STENT();
+				assert(mv_chain == mv_zintdev);
+				POP_MV_STENT();
+				dummy.mvtype = dummy.str.len = 0;
+				v = push_mval(&dummy);
+			}
 			buffer_moved = (buffer_start != tt_state->buffer_start);
 			if (utf8_active)
 			{	/* need to properly align U32 buffer */
@@ -365,6 +388,9 @@ void	dm_read (mval *v)
 				tt_state->who_saved = dmread;
 				tt_state->length = length;
 				tt_state->buffer_start = buffer_start;
+				/* since op_oldvar is not called in case of SIGUSR1, pop mval from top of stack */
+				assert(MVST_MVAL == mv_chain->mv_st_type);
+				POP_MV_STENT();
 				PUSH_MV_STENT(MVST_ZINTDEV);
 				mv_chain->mv_st_cont.mvs_zintdev.curr_sp_buffer.addr = (char *)buffer_start;
 				mv_chain->mv_st_cont.mvs_zintdev.curr_sp_buffer.len = exp_length;
@@ -404,6 +430,7 @@ void	dm_read (mval *v)
 			if (sighup == outofband)
 				exi_condition = -ERR_TERMHANGUP;
 			TAREF1(save_xfer_root, outofband).event_state = pending;
+			async_dm_read = TRUE;
 			async_action(FALSE);
 			break;
 		}
@@ -970,6 +997,12 @@ void	dm_read (mval *v)
 		}
 	}
 	active_device = 0;
+<<<<<<< HEAD
 	RESETTERM_IF_NEEDED(io_ptr, EXPECT_SETTERM_DONE_TRUE);
 	return;
+||||||| parent of 07a11a26bb (GT.M V7.1-004)
+	return;
+=======
+	return v;
+>>>>>>> 07a11a26bb (GT.M V7.1-004)
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries. *
@@ -34,7 +34,12 @@
 #include "gtm_reservedDB.h"
 #include "proc_wait_stat.h"
 #include "region_freeze_multiproc.h"
+<<<<<<< HEAD
 #include "tp_set_sgm.h"
+||||||| parent of 07a11a26bb (GT.M V7.1-004)
+=======
+#include "gtm_atomic.h"
+>>>>>>> 07a11a26bb (GT.M V7.1-004)
 
 #define CACHE_STATE_OFF SIZEOF(que_ent)
 
@@ -954,6 +959,7 @@ MBSTART {													\
  * Note that timers can interrupt the syncing and hence any routines that are called by timers should be safe
  *	and use the TP_CHANGE_REG macro only.
  */
+<<<<<<< HEAD
 #define	TP_CHANGE_REG(reg)							\
 MBSTART {									\
 	GBLREF	sgmnt_data_ptr_t	cs_data;				\
@@ -977,8 +983,71 @@ MBSTART {									\
 		cs_addrs = (sgmnt_addrs *)0;					\
 		cs_data = (sgmnt_data_ptr_t)0;					\
 	}									\
+||||||| parent of 07a11a26bb (GT.M V7.1-004)
+#define	TP_CHANGE_REG(reg)									\
+MBSTART {											\
+	GBLREF	jnlpool_addrs_ptr_t	jnlpool;						\
+	gv_cur_region = reg;									\
+	if (NULL == gv_cur_region || FALSE == gv_cur_region->open)				\
+	{											\
+		cs_addrs = (sgmnt_addrs *)0;							\
+		cs_data = (sgmnt_data_ptr_t)0;							\
+	} else											\
+	{											\
+		switch (REG_ACC_METH(reg))							\
+		{										\
+			case dba_mm:								\
+			case dba_bg:								\
+				cs_addrs = &FILE_INFO(gv_cur_region)->s_addrs;			\
+				cs_data = cs_addrs->hdr;					\
+				if (cs_addrs->jnlpool && (jnlpool != cs_addrs->jnlpool))	\
+					jnlpool = cs_addrs->jnlpool;				\
+				break;								\
+			case dba_usr:								\
+			case dba_cm:								\
+				cs_addrs = (sgmnt_addrs *)0;					\
+				cs_data = (sgmnt_data_ptr_t)0;					\
+				break;								\
+			default:								\
+				assertpro(FALSE);						\
+				break;								\
+		}										\
+	}											\
+=======
+#define	TP_CHANGE_REG(reg)									\
+MBSTART {											\
+	GBLREF	jnlpool_addrs_ptr_t	jnlpool;						\
+	gv_cur_region = reg;									\
+	COMPILER_FENCE(memory_order_release);							\
+	if (NULL == gv_cur_region || FALSE == gv_cur_region->open)				\
+	{											\
+		cs_addrs = (sgmnt_addrs *)0;							\
+		cs_data = (sgmnt_data_ptr_t)0;							\
+	} else											\
+	{											\
+		switch (REG_ACC_METH(reg))							\
+		{										\
+			case dba_mm:								\
+			case dba_bg:								\
+				cs_addrs = &FILE_INFO(gv_cur_region)->s_addrs;			\
+				cs_data = cs_addrs->hdr;					\
+				if (cs_addrs->jnlpool && (jnlpool != cs_addrs->jnlpool))	\
+					jnlpool = cs_addrs->jnlpool;				\
+				break;								\
+			case dba_usr:								\
+			case dba_cm:								\
+				cs_addrs = (sgmnt_addrs *)0;					\
+				cs_data = (sgmnt_data_ptr_t)0;					\
+				break;								\
+			default:								\
+				assertpro(FALSE);						\
+				break;								\
+		}										\
+	}											\
+>>>>>>> 07a11a26bb (GT.M V7.1-004)
 } MBEND
 
+<<<<<<< HEAD
 #define	TP_CHANGE_REG_IF_NEEDED(reg)										\
 MBSTART {													\
 	GBLREF	sgmnt_data_ptr_t	cs_data;								\
@@ -1058,20 +1127,84 @@ MBSTART {												\
 		jnlpool = cs_addrs->jnlpool;								\
 	if (dollar_tlevel && (NULL != cs_addrs))							\
 		tp_set_sgm();										\
+||||||| parent of 07a11a26bb (GT.M V7.1-004)
+#define	TP_CHANGE_REG_IF_NEEDED(reg)								\
+MBSTART {											\
+	GBLREF	jnlpool_addrs_ptr_t	jnlpool;						\
+	assert(reg);										\
+	if (reg != gv_cur_region)								\
+	{											\
+		gv_cur_region = reg;								\
+		switch (REG_ACC_METH(reg))							\
+		{										\
+			case dba_mm:								\
+			case dba_bg:								\
+				assert(reg->open);						\
+				cs_addrs = &FILE_INFO(gv_cur_region)->s_addrs;			\
+				cs_data = cs_addrs->hdr;					\
+				assert((&FILE_INFO(gv_cur_region)->s_addrs == cs_addrs)		\
+					&& cs_addrs->hdr == cs_data);				\
+				if (cs_addrs->jnlpool && (jnlpool != cs_addrs->jnlpool))	\
+					jnlpool = cs_addrs->jnlpool;				\
+				break;								\
+			case dba_usr:								\
+			case dba_cm:								\
+				cs_addrs = (sgmnt_addrs *)0;					\
+				cs_data = (sgmnt_data_ptr_t)0;					\
+				break;								\
+			default:								\
+				assertpro(FALSE);						\
+				break;								\
+		}										\
+	}											\
+=======
+#define	TP_CHANGE_REG_IF_NEEDED(reg)								\
+MBSTART {											\
+	GBLREF	jnlpool_addrs_ptr_t	jnlpool;						\
+	assert(reg);										\
+	if (reg != gv_cur_region)								\
+	{											\
+		gv_cur_region = reg;								\
+		COMPILER_FENCE(memory_order_release);						\
+		switch (REG_ACC_METH(reg))							\
+		{										\
+			case dba_mm:								\
+			case dba_bg:								\
+				assert(reg->open);						\
+				cs_addrs = &FILE_INFO(gv_cur_region)->s_addrs;			\
+				cs_data = cs_addrs->hdr;					\
+				assert((&FILE_INFO(gv_cur_region)->s_addrs == cs_addrs)		\
+					&& cs_addrs->hdr == cs_data);				\
+				if (cs_addrs->jnlpool && (jnlpool != cs_addrs->jnlpool))	\
+					jnlpool = cs_addrs->jnlpool;				\
+				break;								\
+			case dba_usr:								\
+			case dba_cm:								\
+				cs_addrs = (sgmnt_addrs *)0;					\
+				cs_data = (sgmnt_data_ptr_t)0;					\
+				break;								\
+			default:								\
+				assertpro(FALSE);						\
+				break;								\
+		}										\
+	}											\
+>>>>>>> 07a11a26bb (GT.M V7.1-004)
 } MBEND
 
 #define PUSH_GV_CUR_REGION(REG, SAV_REG, SAV_CS_ADDRS, SAV_CS_DATA, SAV_JNLPOOL)		\
 MBSTART {											\
-	SAV_REG = gv_cur_region;								\
-	SAV_CS_ADDRS = cs_addrs;								\
-	SAV_CS_DATA = cs_data;									\
 	SAV_JNLPOOL = jnlpool;									\
+	SAV_CS_DATA = cs_data;									\
+	SAV_CS_ADDRS = cs_addrs;								\
+	COMPILER_FENCE(memory_order_acquire);							\
+	SAV_REG = gv_cur_region;								\
 	TP_CHANGE_REG(REG);									\
 } MBEND
 
 #define POP_GV_CUR_REGION(SAV_REG, SAV_CS_ADDRS, SAV_CS_DATA, SAV_JNLPOOL)			\
 MBSTART {											\
 	gv_cur_region = SAV_REG;								\
+	COMPILER_FENCE(memory_order_release);							\
 	cs_addrs = SAV_CS_ADDRS;								\
 	cs_data = SAV_CS_DATA;									\
 	jnlpool = SAV_JNLPOOL;									\
@@ -1086,6 +1219,7 @@ MBSTART {											\
 #define	TP_TEND_CHANGE_REG(si)				\
 MBSTART {						\
 	gv_cur_region = si->gv_cur_region;		\
+	COMPILER_FENCE(memory_order_release);		\
 	cs_addrs = si->tp_csa;				\
 	cs_data = si->tp_csd;				\
 } MBEND
@@ -1099,6 +1233,7 @@ MBSTART {													\
 														\
 	curr_cm_reg_head = (reghead);										\
 	gv_cur_region = curr_cm_reg_head->reg;									\
+	COMPILER_FENCE(memory_order_release);									\
 	assert(IS_REG_BG_OR_MM(gv_cur_region));									\
 	cs_addrs = &FILE_INFO(gv_cur_region)->s_addrs;								\
 	cs_data = cs_addrs->hdr;										\
@@ -2362,6 +2497,7 @@ typedef struct
 	int	filler;
 } sgmm_addrs;
 
+<<<<<<< HEAD
 #define MAX_NM_LEN	MAX_MIDENT_LEN
 #define MIN_RN_LEN	1
 #define MAX_RN_LEN	MAX_MIDENT_LEN
@@ -2376,6 +2512,37 @@ typedef struct
 #define SUBSCRIPT_BIAS  ((unsigned char)0x0BE)
 #define NEG_MNTSSA_END  0x0FF
 #define KEY_DELIMITER   0X00
+||||||| parent of 07a11a26bb (GT.M V7.1-004)
+#define MAX_NM_LEN	MAX_MIDENT_LEN
+#define MIN_RN_LEN	1
+#define MAX_RN_LEN	MAX_MIDENT_LEN
+#define MIN_SN_LEN	1
+#define MAX_SN_LEN	MAX_MIDENT_LEN
+#define STR_SUB_PREFIX  0x0FF
+#define SUBSCRIPT_STDCOL_NULL 0x01
+#define STR_SUB_ESCAPE  0X01
+#define SPANGLOB_SUB_ESCAPE  0X02
+#define	STR_SUB_MAXVAL	0xFF
+#define SUBSCRIPT_ZERO  0x080
+#define SUBSCRIPT_BIAS  0x0BE
+#define NEG_MNTSSA_END  0x0FF
+#define KEY_DELIMITER   0X00
+=======
+#define MAX_NM_LEN		MAX_MIDENT_LEN
+#define MIN_RN_LEN		1
+#define MAX_RN_LEN		MAX_MIDENT_LEN
+#define MIN_SN_LEN		1
+#define MAX_SN_LEN		MAX_MIDENT_LEN
+#define STR_SUB_PREFIX  	((unsigned char)0xFF)
+#define SUBSCRIPT_STDCOL_NULL 	((unsigned char)0x01)
+#define STR_SUB_ESCAPE  	((unsigned char)0X01)
+#define SPANGLOB_SUB_ESCAPE  	((unsigned char)0X02)
+#define	STR_SUB_MAXVAL		((unsigned char)0xFF)
+#define SUBSCRIPT_ZERO  	((unsigned char)0x80)
+#define SUBSCRIPT_BIAS  	((unsigned char)0xBE)
+#define NEG_MNTSSA_END  	((unsigned char)0xFF)
+#define KEY_DELIMITER   	((unsigned char)0X00)
+>>>>>>> 07a11a26bb (GT.M V7.1-004)
 #ifdef BIGENDIAN
 typedef struct
 {	unsigned int	two : 4;
@@ -2563,6 +2730,13 @@ MBSTART {														\
 		assert(UDI->grabbed_ftok_sem || UDI->grabbed_access_sem || IS_DSE_IMAGE || IS_LKE_IMAGE);		\
 		if (!(DEFER_COPY))											\
 		{													\
+<<<<<<< HEAD
+||||||| parent of 07a11a26bb (GT.M V7.1-004)
+			COPY_ENC_INFO(CSD, CSA->encr_ptr, CSA->nl->reorg_encrypt_cycle);				\
+=======
+			COPY_ENC_INFO(CSD, CSA->encr_ptr, (USES_NEW_KEY(CSD) && (NULL == CSA->encr_key_handle2)) ? -1 :	\
+											CSA->nl->reorg_encrypt_cycle);	\
+>>>>>>> 07a11a26bb (GT.M V7.1-004)
 			CSA->encr_ptr->issued_db_init_crypt_warning = CRYPT_WARNING;					\
 			COPY_ENC_INFO(CSD, CSA->encr_ptr, CSA->nl->reorg_encrypt_cycle);				\
 		} else													\
@@ -2954,6 +3128,7 @@ typedef struct	sgmnt_addrs_struct
 	int				mlkhash_shmid;	/* Shared memory id of attached lock hash array, or INVALID_SHMID
 							 * if internal. Set by GRAB_LOCK_CRIT_AND_SYNC().
 							 */
+<<<<<<< HEAD
 	/* YDB#1143 : where this process finds the search index for a global buffer. Held HERE, in private
 	 * memory, rather than read from node_local on every search. The offset never changes after the
 	 * segment is created, so a shared read would buy nothing and cost something: the line it sits on
@@ -2973,6 +3148,10 @@ typedef struct	sgmnt_addrs_struct
 	gvstats_rec_t				gvstats_pend;		/* increments of this process not yet added to
 									 * "cnl->gvstats_rec" (see GVSTATS_FOLD_INTERVAL)
 									 */
+||||||| parent of 07a11a26bb (GT.M V7.1-004)
+=======
+	boolean_t	in_read_wait;		/* TRUE if we are waiting in tq_read() for another process to complete a read */
+>>>>>>> 07a11a26bb (GT.M V7.1-004)
 } sgmnt_addrs;
 
 typedef struct gd_binding_struct
@@ -3692,7 +3871,7 @@ MBSTART {													\
 				((gv_currkey->base) + gv_currkey->top));					\
 			memcpy((gv_currkey->base + gv_currkey->end), mvarg->str.addr, stlen);			\
 			if (is_null && 0 != reg->std_null_coll)							\
-				gv_currkey->base[gv_currkey->end] = SUBSCRIPT_STDCOL_NULL;			\
+				*((gv_currkey->base) + gv_currkey->end) = SUBSCRIPT_STDCOL_NULL;		\
 			gv_currkey->prev = gv_currkey->end;							\
 			gv_currkey->end += len - 1;								\
 		}												\
@@ -4265,7 +4444,6 @@ MBSTART {									\
 	GBLREF	boolean_t	need_kip_incr;					\
 	GBLREF	uint4		dollar_tlevel;					\
 										\
-	assert(dollar_tlevel || need_kip_incr);					\
 	for (sleep_counter = 1; (0 < CNL->inhibit_kills); ++sleep_counter)	\
 	{									\
 		if (MAXKILLINHIBITWAIT <= sleep_counter)			\

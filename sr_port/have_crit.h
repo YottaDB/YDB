@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries. *
@@ -96,12 +96,19 @@ typedef enum
 	INTRPT_IN_KILL_CLEANUP,		/* Deferring interrupts while performing KILL cleanup - used by REORG */
 	INTRPT_IN_RTN_CLEANUP,          /* Deferring interrupts while cleaning up routines */
 	INTRPT_IN_SOCKET_CLOSE,		/* Deferring interrupts while closing some sockets */
+<<<<<<< HEAD
 
 	/****************** Below interrupt states are YottaDB-ONLY **************/
 	INTRPT_IN_SS_DESTROY_CONTEXT,	/* Deferring interrupts in ss_destroy_context() */
 	INTRPT_IN_RELINKCTL_ATTACH,	/* Deferring interrupts in relinkctl_attach() */
 
 	/****************** Below interrupt states are common to both GT.M and YottaDB **************/
+||||||| parent of 07a11a26bb (GT.M V7.1-004)
+=======
+	INTRPT_IN_RIP_NOTIFY,		/* Deferring interrupts while notifying read waiters of completion */
+	INTRPT_IN_JNL_CLEANUP,		/* Deferring interrupts while holding the phase2 latch */
+	INTRPT_IN_MLK_SHM_MODIFY,	/* Deferring interrupts while grabbing a LOCK and initializing a node */
+>>>>>>> 07a11a26bb (GT.M V7.1-004)
 	INTRPT_NUM_STATES		/* Should be the *last* one in the enum. */
 } intrpt_state_t;
 

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries. *
@@ -146,6 +146,8 @@ void	gvcst_kill(boolean_t do_subtree)
 	DEBUG_ONLY(save_dollar_tlevel = dollar_tlevel);
 	if (do_subtree)
 	{	/* If we're killing the whole subtree, that includes any spanning nodes. No need to do anything special */
+		if (!cs_addrs->now_crit)	/* Do not sleep while holding crit */
+			WAIT_ON_INHIBIT_KILLS(cs_addrs->nl, MAXWAIT2KILL);
 		gvcst_kill2(TRUE, NULL, FALSE);
 		assert(save_dollar_tlevel == dollar_tlevel);
 		return;

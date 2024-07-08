@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
@@ -45,7 +45,15 @@ error_def(ERR_WCBLOCKED);
 
 bt_rec_ptr_t bt_put(sgmnt_addrs *csa, block_id block)
 {
+<<<<<<< HEAD
 	bt_rec_ptr_t		bt, q0, q1, hdr;
+||||||| parent of 07a11a26bb (GT.M V7.1-004)
+	bt_rec_ptr_t		bt, q0, q1, hdr;
+	sgmnt_addrs		*csa;
+=======
+	bt_rec_ptr_t		bt, q0, q1, hdr, lbt;
+	sgmnt_addrs		*csa;
+>>>>>>> 07a11a26bb (GT.M V7.1-004)
 	sgmnt_data_ptr_t	csd;
 	cache_rec_ptr_t		cr;
 	th_rec_ptr_t		th;
@@ -63,6 +71,20 @@ bt_rec_ptr_t bt_put(sgmnt_addrs *csa, block_id block)
 	for (lcnt = 0, bt = (bt_rec_ptr_t)((sm_uc_ptr_t)hdr + hdr->blkque.fl);  ;
 		bt = (bt_rec_ptr_t)((sm_uc_ptr_t)bt + bt->blkque.fl), lcnt++)
 	{
+#		ifdef DEBUG
+		if (gtm_white_box_test_case_enabled
+				&& (WBTEST_PHS1_NOSPACE == gtm_white_box_test_case_number)
+				&& (gtm_wbox_input_test_case_count < gtm_white_box_test_case_count))
+		{
+			lbt = (bt_rec_ptr_t)((sm_uc_ptr_t)(csa->th_base) + csa->th_base->tnque.fl - SIZEOF(th->tnque));
+			if (CR_NOTVALID != lbt->cache_index)
+			{
+				cr = (cache_rec_ptr_t)GDS_ANY_REL2ABS(csa, lbt->cache_index);
+				if (cr->dirty)
+					wcs_get_space(reg, 0, cr);
+			}
+		}
+#		endif
 		if (BT_QUEHEAD == bt->blk)
 		{	/* there is no matching bt */
 			assert(bt == hdr);

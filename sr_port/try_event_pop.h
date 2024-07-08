@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2026 YottaDB LLC and/or its subsidiaries.	*
@@ -29,7 +29,12 @@ static inline void try_event_pop(void)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+<<<<<<< HEAD
 	DBG_ASSERT_OUTOFBAND_NOT_QUEUED;	/* else the "no_event == outofband" check below would never replay that event */
+||||||| parent of 07a11a26bb (GT.M V7.1-004)
+=======
+	DBGDFRDEVNT((stderr, "%d %s: try_event_pop oob:%d next:%d/%d\n", __LINE__, __FILE__, outofband, (TREF(save_xfer_root_ptr))->ev_que.fl->outofband, (TREF(save_xfer_root_ptr))->ev_que.fl->event_state));
+>>>>>>> 07a11a26bb (GT.M V7.1-004)
 	if ((no_event == outofband)
 		&& (no_event != (TREF(save_xfer_root_ptr))->ev_que.fl->outofband))
 	{	/* perhaps pop an_event */

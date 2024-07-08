@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2013-2023 Fidelity National Information	*
+ * Copyright (c) 2013-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
@@ -685,8 +685,17 @@ void	op_fnzpeek(mval *structid, int offset, int len, mval *format, mval *ret)
 		case PO_NLREPL:
 		case PO_RIHREPL:
 			/* Make sure jnlpool_addrs are availble */
+<<<<<<< HEAD
 			if (!REPL_INST_AVAILABLE(gd_header))
+||||||| parent of 07a11a26bb (GT.M V7.1-004)
+			if (!REPL_INST_AVAILABLE(NULL))
+=======
+			if (!REPL_INST_AVAILABLE(jnlpool && jnlpool->pool_init ? jnlpool->gd_ptr : NULL))
+			{
+				assert(gd_header);
+>>>>>>> 07a11a26bb (GT.M V7.1-004)
 				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_ZPEEKNORPLINFO);
+			}
 			if (!pool_init)
 			{
 				attach_success = op_fnzpeek_attach_jnlpool();
@@ -729,7 +738,13 @@ void	op_fnzpeek(mval *structid, int offset, int len, mval *format, mval *ret)
 		case PO_UPLREPL:
 		case PO_UHCREPL:
 			/* Make sure recvpool_addrs are available */
+<<<<<<< HEAD
 			if (!REPL_INST_AVAILABLE(gd_header))
+||||||| parent of 07a11a26bb (GT.M V7.1-004)
+			if (!REPL_INST_AVAILABLE(NULL))
+=======
+			if (!REPL_INST_AVAILABLE(jnlpool && jnlpool->pool_init ? jnlpool->gd_ptr : NULL))
+>>>>>>> 07a11a26bb (GT.M V7.1-004)
 				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_ZPEEKNORPLINFO);
 			if (NULL == recvpool.recvpool_ctl)
 			{

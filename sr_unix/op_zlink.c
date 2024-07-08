@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
@@ -238,8 +238,14 @@ void op_zlink (mval *v, mval *quals)
 				cpy_len = sizeof(objnamebuf) - pblk.b_dir;
 			assert(256 >= cpy_len); /* For Veracode grins */
 			memmove(&objnamebuf[pblk.b_dir], objnamebuf, cpy_len);
+<<<<<<< HEAD
 			/* Note: "size_t" typecast below needed to avoid [-Wtautological-constant-out-of-range-compare] warning */
 			assert(sizeof(objnamebuf) >= (size_t)pblk.b_dir);
+||||||| parent of 07a11a26bb (GT.M V7.1-004)
+			assert(sizeof(objnamebuf) >= pblk.b_dir);
+=======
+			/* assert(sizeof(objnamebuf) >= pblk.b_dir); */		/* Compiler complains that it is always true */
+>>>>>>> 07a11a26bb (GT.M V7.1-004)
 			memcpy(objnamebuf, file.addr, pblk.b_dir);
 			objnamelen += pblk.b_dir;
 		}

@@ -1,9 +1,16 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
+||||||| parent of 07a11a26bb (GT.M V7.1-004)
+ *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+=======
+ * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> 07a11a26bb (GT.M V7.1-004)
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,12 +25,11 @@
 GBLREF mv_stent 	*mv_chain;
 GBLREF unsigned char 	*stackbase,*stacktop,*msp,*stackwarn;
 
-mval *push_mval(arg1)
-mval *arg1;
-{
-	error_def(ERR_STACKOFLOW);
-	error_def(ERR_STACKCRIT);
+error_def(ERR_STACKCRIT);
+error_def(ERR_STACKOFLOW);
 
+mval *push_mval(mval *arg1)
+{
 	PUSH_MV_STENT(MVST_MVAL);
 	mv_chain->mv_st_cont.mvs_mval = *arg1;
 	return &mv_chain->mv_st_cont.mvs_mval;

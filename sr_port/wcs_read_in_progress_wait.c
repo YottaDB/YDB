@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2007-2016 Fidelity National Information	*
+ * Copyright (c) 2007-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -33,6 +33,8 @@
 #include "add_inter.h"
 #include "caller_id.h"
 
+GBLREF sgmnt_addrs *cs_addrs;
+
 /* Waits for a concurrently running read (from disk into a global buffer) to complete.
  *
  * Returns TRUE if read completes within timeout of approx. 1 minute.
@@ -57,6 +59,11 @@ boolean_t	wcs_read_in_progress_wait(cache_rec_ptr_t cr, wbtest_code_t wbox_test_
 			cr->r_epid = 0;
 			INTERLOCK_INIT(cr);
 			break;
+		}
+		if (cs_addrs && cs_addrs->nl)
+		{
+			assert(cs_addrs->now_crit);
+			INCR_GVSTATS_COUNTER(cs_addrs, cs_addrs->nl, ms_rip_critsleeps, (MAXSLPTIME < lcnt ? MAXSLPTIME : lcnt));
 		}
 		wcs_sleep(lcnt);
 		GTM_WHITE_BOX_TEST(wbox_test_code, lcnt, (2 * BUF_OWNER_STUCK));

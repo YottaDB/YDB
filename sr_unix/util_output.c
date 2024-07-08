@@ -1,6 +1,6 @@
  /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
@@ -70,6 +70,9 @@ GBLREF	recvpool_addrs		recvpool;
 GBLREF	sigset_t		block_sigsent;
 GBLREF	uint4			is_updhelper, process_id;
 GBLREF	VSIG_ATOMIC_T		forced_exit;
+GBLREF	char			repl_instfilename[MAX_FN_LEN + 1];
+GBLREF	char			repl_inst_name[];
+GBLREF	gd_addr			*repl_inst_from_gld;
 
 error_def(ERR_REPLINSTACC);
 error_def(ERR_SOCKHANGUP);
@@ -684,7 +687,7 @@ void	util_out_send_oper(char *addr, unsigned int len)
 	intrpt_state_t		prev_intrpt_state;
 
 	assert(IS_PTHREAD_LOCKED_AND_HOLDER);
-	if (first_syslog)
+	if (first_syslog)		/* note: utilities may reset this */
 	{
 		first_syslog = FALSE;
 
@@ -736,7 +739,16 @@ void	util_out_send_oper(char *addr, unsigned int len)
 		{	/* Read instace file name from jnlpool */
 			INSERT_MARKER;
 			BUILD_FACILITY((char *)jnlpool->repl_inst_filehdr->inst_info.this_instname);
+<<<<<<< HEAD
 		} else if (!process_exiting)
+||||||| parent of 07a11a26bb (GT.M V7.1-004)
+		} else
+=======
+			assert((!IS_GTM_IMAGE) || ('\0' == repl_inst_name[0]));
+			memcpy(repl_inst_name, jnlpool->repl_inst_filehdr->inst_info.this_instname, MAX_INSTNAME_LEN);
+			repl_inst_from_gld = (jnlpool->gd_instinfo) ? jnlpool->gd_ptr : NULL;	/* for gtmpcat */
+		} else
+>>>>>>> 07a11a26bb (GT.M V7.1-004)
 		{	/* Read instance name from instance file */
 			fn_len = &file_name_len;
 			bufsize = MAX_FN_LEN + 1;
@@ -757,6 +769,12 @@ void	util_out_send_oper(char *addr, unsigned int len)
 					{
 						INSERT_MARKER;
 						BUILD_FACILITY((char *)replhdr.inst_info.this_instname);
+						assert((!IS_GTM_IMAGE) || ('\0' == repl_inst_name[0]));
+						memcpy(repl_inst_name, replhdr.inst_info.this_instname, MAX_INSTNAME_LEN);
+						if (inst_from_gld)
+							repl_inst_from_gld = gd_header;	/* got from global directory */
+						if ('\0' == repl_instfilename[0])
+							memcpy(repl_instfilename, fn, *fn_len + 1);	/* include null */
 					}
 					CLOSEFILE_RESET(fd, status);
 				}

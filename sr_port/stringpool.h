@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries.	*
@@ -12,16 +12,23 @@
  *	the license, please stop and do not read further.	*
  *								*
  ****************************************************************/
+#include <sys/mman.h>
+#include <errno.h>
+
+#ifndef STRINGPOOL_DEF_INCLUDED
+#define STRINGPOOL_DEF_INCLUDED
 
 typedef struct
 {
-	unsigned char	*base, *free, *top, *lasttop, *invokestpgcollevel;
+	unsigned char	*base, *free, *top, *invokestpgcollevel;
+	size_t		lastallocbytes;	/* stores the last mmap() allocation */
 	unsigned int	gcols;		/* some optimizations need to know if the stringpool garbage collected  */
 	unsigned int	strpllim;	/* non-zero value is user specified guard on expansion */
 	boolean_t	strpllimwarned;	/* if limit is in place, has been exceeded, and not recovered from */
 	boolean_t	stp_gcol_nosort;	/* FALSE => stp_gcol_sort() is invoked, TRUE => stp_gcol_nosort() is invoked */
 } spdesc;
 
+void	*stp_mmap(size_t size);
 void	stp_expand_array(void);
 void	stp_gcol(size_t space_needed);										/* BYPASSOK */
 void	stp_gcol_nosort(size_t space_needed);
@@ -29,6 +36,7 @@ void	stp_gcol_sort(size_t space_needed);
 void	stp_gcol_spsize(size_t space_needed);
 void	stp_move(char *from, char *to);
 void	stp_init(size_t size);
+void	stp_fini(unsigned char *strpool_base, size_t size);
 void	s2pool(mstr *a);
 void	s2pool_align(mstr *string);
 void	s2pool_concat(mval *dst, mstr *a);	/* concatenates strings "dst->str" + "a" and stores result in "dst->str" */
@@ -92,6 +100,8 @@ MBSTART {											\
 #define	DBG_MARK_STRINGPOOL_UNEXPANDABLE
 #endif
 
+error_def(ERR_SYSCALL);
+
 #define	ENSURE_STP_FREE_SPACE(SPC)						\
 {										\
 	uint4	lcl_spc_needed;							\
@@ -105,15 +115,25 @@ MBSTART {											\
 
 #define	ADD_TO_STPARRAY(PTR, PTRARRAY, PTRARRAYCUR, PTRARRAYTOP, TYPE)					\
 {													\
+<<<<<<< HEAD
 	GBLREF mstr		**stp_array;								\
 	GBLREF gtm_uint64_t	stp_array_size;								\
+||||||| parent of 07a11a26bb (GT.M V7.1-004)
+	GBLREF mstr	**stp_array;									\
+	GBLREF uint4	stp_array_size;									\
+=======
+	GBLREF mstr	**stp_array;									\
+	GBLREF uint4	stp_array_size;									\
+	int     	save_errno;									\
+>>>>>>> 07a11a26bb (GT.M V7.1-004)
 													\
 	if (NULL == PTRARRAY)										\
 	{												\
 		if (NULL == stp_array)									\
 		{											\
 			/* Same initialization as is in stp_gcol_src.h */				\
-			stp_array = (mstr **)malloc((stp_array_size = STP_MAXITEMS) * SIZEOF(mstr *));	\
+			stp_array_size = STP_MAXITEMS;							\
+			stp_array = (mstr **)stp_mmap(stp_array_size * SIZEOF(mstr *));			\
 		}											\
 		PTRARRAYCUR = PTRARRAY = (TYPE **)stp_array;						\
 		PTRARRAYTOP = PTRARRAYCUR + stp_array_size;						\
@@ -145,3 +165,5 @@ MBSTART {									\
 	(DST)->str.addr = (char *)stringpool.free;				\
 	stringpool.free += keylen;						\
 } MBEND
+
+#endif /* STRINGPOOL_DEF_INCLUDED */

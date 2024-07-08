@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries. *
@@ -557,8 +557,16 @@ void stp_gcol_sort(size_t space_asked)	/* BYPASSOK */
 	unsigned char		*begaddr, *endaddr, *cpyaddr;
 #	endif
 	int			index, fixup_cnt;
+<<<<<<< HEAD
 	ssize_t			space_before_compact, space_after_compact, blklen, delta, space_reclaim, cpylen;
 	ssize_t			space_needed, tmplen, tmplen2;
+||||||| parent of 07a11a26bb (GT.M V7.1-004)
+	ssize_t			space_before_compact, space_after_compact, blklen, delta, space_reclaim, padlen;
+	ssize_t			totspace, space_needed, tmplen, tmplen2;
+=======
+	ssize_t			space_before_compact, space_after_compact, blklen, delta, space_reclaim, padlen;
+	ssize_t			prev_stp_size = 0, reserved_bytes, space_needed, tmplen, tmplen2, totspace;
+>>>>>>> 07a11a26bb (GT.M V7.1-004)
 	io_log_name		*l;		/* logical name pointer		*/
 	lv_blk			*lv_blk_ptr;
 	lv_val			*lvp, *lvlimit;
@@ -571,9 +579,7 @@ void stp_gcol_sort(size_t space_asked)	/* BYPASSOK */
 	tp_frame		*tf;
 	zwr_sub_lst		*zwr_sub;
 	ihdtyp			*ihdr;
-	int			*low_reclaim_passes;
-	int			*incr_factor;
-	int			killcnt;
+	int			*incr_factor, killcnt, *low_reclaim_passes, save_errno;
 	ssize_t			stp_incr;
 	ssize_t			lv_nodes = 0, lvnode_space = 0;
 	ht_ent_objcode 		*tabent_objcode, *topent;
@@ -652,9 +658,10 @@ void stp_gcol_sort(size_t space_asked)	/* BYPASSOK */
 	/* stp_vfy_mval(); / * uncomment to debug lv corruption issues.. */
 #	ifdef STP_MOVE
 	assert(stp_move_from < stp_move_to); /* why did we call with zero length range, or a bad range? */
-	/* Assert that range to be moved does not intersect with stringpool range. */
-	assert(((stp_move_from < (char *)stringpool.base) && (stp_move_to < (char *)stringpool.base))
-		|| ((stp_move_from >= (char *)stringpool.top) && (stp_move_to >= (char *)stringpool.top)));
+	/* Assert that range to be moved does not intersect with stringpool range.
+	 * Since stp_move_from<->stp_move_to is a range, it can hit the edges of the string pool.
+	 */
+	assert((stp_move_to <= (char *)stringpool.base) || (stp_move_from >= (char *)stringpool.top));
 #	endif
 	space_needed = ROUND_UP2(space_asked, NATIVE_WSIZE);
 	assert(0 == (INTPTR_T)stringpool.base % NATIVE_WSIZE);
@@ -668,10 +675,23 @@ void stp_gcol_sort(size_t space_asked)	/* BYPASSOK */
 		incr_factor = &indr_stp_incr_factor;
 	}
 	if (NULL == stp_array)
+<<<<<<< HEAD
 		stp_array = (mstr **)malloc((stp_array_size = STP_MAXITEMS) * SIZEOF(mstr *));
 	sp_topstr = sp_array = stp_array;
 	sp_arraytop = sp_topstr + stp_array_size;
 	sp_totspace = 0;
+||||||| parent of 07a11a26bb (GT.M V7.1-004)
+		stp_array = (mstr **)malloc((stp_array_size = STP_MAXITEMS) * SIZEOF(mstr *));
+	topstr = array = stp_array;
+	arraytop = topstr + stp_array_size;
+=======
+	{
+		stp_array_size = STP_MAXITEMS;
+		stp_array = (mstr **)stp_mmap(stp_array_size * SIZEOF(mstr *));
+	}
+	topstr = array = stp_array;
+	arraytop = topstr + stp_array_size;
+>>>>>>> 07a11a26bb (GT.M V7.1-004)
 	/* If dqloop == 0 then we got here from mcompile. If literal_chain.que.fl == 0 then put_lit was never
 	 * done as is true in gtcm_server. Test for cache_table.size is to check that we have not done a
 	 * cache_init() which would be true if doing mumps standalone compile.
@@ -1155,6 +1175,7 @@ void stp_gcol_sort(size_t space_asked)	/* BYPASSOK */
 						(size_t)(stringpool.top - stringpool.base)));
 			assert((ssize_t)(stringpool.top - stringpool.base)
 					< ((ssize_t)(stp_incr + stringpool.top - stringpool.base)));
+			prev_stp_size = stringpool.lastallocbytes;
 			expand_stp((ssize_t)(stp_incr + stringpool.top - stringpool.base));
 #			ifdef DEBUG
 			/* If expansion failed and stp_gcol_ch did an UNWIND and we were already in exit handling code,
@@ -1192,7 +1213,8 @@ void stp_gcol_sort(size_t space_asked)	/* BYPASSOK */
 			 * stringpool is the run-time or indirection stringpool.
 		 	 */
 			(strpool_base == rts_stringpool.base) ? (rts_stringpool = stringpool) : (indr_stringpool = stringpool);
-			free(strpool_base);
+			assert(0 < prev_stp_size);
+			stp_fini(strpool_base, prev_stp_size);
 			/* Adjust incr_factor */
 			if (*incr_factor < STP_NUM_INCRS) *incr_factor = *incr_factor + 1;
 		} else
@@ -1257,11 +1279,32 @@ void stp_gcol_sort(size_t space_asked)	/* BYPASSOK */
 	assert(stringpool.free <= stringpool.top);
 	stringpool.invokestpgcollevel = (STP_SPACE_USED_MULTIPLIER * (space_asked + stringpool.free - stringpool.base))
 		+ stringpool.base;
+<<<<<<< HEAD
 	if ((stringpool.invokestpgcollevel - stringpool.free) < (space_asked + lvnode_space))
 		stringpool.invokestpgcollevel = stringpool.free + space_asked + lvnode_space;
 	stringpool.invokestpgcollevel = (((stringpool.invokestpgcollevel - stringpool.base) < STP_GCOL_TRIGGER_FLOOR)
+||||||| parent of 07a11a26bb (GT.M V7.1-004)
+	stringpool.invokestpgcollevel = (((stringpool.invokestpgcollevel - stringpool.base) < STP_GCOL_TRIGGER_FLOOR)
+=======
+	reserved_bytes = (ssize_t)(stringpool.top - stringpool.invokestpgcollevel);
+	if (((stringpool.invokestpgcollevel - stringpool.base) < STP_GCOL_TRIGGER_FLOOR)
+>>>>>>> 07a11a26bb (GT.M V7.1-004)
 		|| (stringpool.invokestpgcollevel > stringpool.top))
-		? stringpool.top : stringpool.invokestpgcollevel;
+	{
+		stringpool.invokestpgcollevel = stringpool.top;
+	} else if (( STP_MIN_CONTRACTION < reserved_bytes) && (array < topstr))
+	{	/* Contract the stringpool */
+		assert(stringpool.top > stringpool.invokestpgcollevel);
+		strpool_base = stringpool.base;
+		prev_stp_size = stringpool.lastallocbytes;
+		stp_init((ssize_t)(stringpool.invokestpgcollevel - stringpool.base));
+		assert(strpool_base != stringpool.base); /* Initiate a smaller space successfully */
+		cstr = array;
+		COPY2STPOOL(cstr, topstr);
+		(strpool_base == rts_stringpool.base) ? (rts_stringpool = stringpool) : (indr_stringpool = stringpool);
+		assert(0 < prev_stp_size);
+		stp_fini(strpool_base, prev_stp_size);
+	}
 	assert(stringpool.invokestpgcollevel <= stringpool.top);
 #	ifndef STP_MOVE
 	assert(stringpool.top - stringpool.free >= space_asked);

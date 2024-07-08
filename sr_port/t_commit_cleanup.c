@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2021-2026 YottaDB LLC and/or its subsidiaries.	*
@@ -14,7 +14,7 @@
  ****************************************************************/
 
 #include "mdef.h"
-
+#include "gtm_fcntl.h"	/* Needed for AIX's silly open to open64 translations */
 #include "gdsroot.h"
 #include "gdsbt.h"
 #include "gdskill.h"
@@ -30,6 +30,7 @@
 #include "jnl.h"
 #include "buddy_list.h"		/* needed for tp.h */
 #include "tp.h"
+#include "tpnotacid_chk_inline.h"
 #include "repl_msg.h"		/* for gtmsource.h */
 #include "gtmsource.h"		/* for jnlpool_addrs structure definition */
 #include "secshr_db_clnup.h"

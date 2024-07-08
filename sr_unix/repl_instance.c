@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
@@ -158,11 +158,17 @@ struct gd_addr_struct *repl_inst_get_name(char *fn, unsigned int *fn_len, unsign
 				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_REPLINSTACC, 2, log_nam.len, log_nam.addr,
 					ERR_TEXT, 2, RTS_ERROR_LITERAL("from global directory"));
 		}
-	} else if ('\0' == repl_instfilename[0])
-	{	/* save information from first instance for syslog */
+	} else if (!inst_from_gld && ('\0' == repl_instfilename[0]))
+	{	/* save expanded environment variable gtm_repl_instance for gtmpcat */
 		memcpy(repl_instfilename, fn, *fn_len + 1);	/* include null from get_full_path */
+<<<<<<< HEAD
 		if (inst_from_gld)
 			repl_inst_from_gld = gd_ptr;		/* got from global directory */
+||||||| parent of 07a11a26bb (GT.M V7.1-004)
+		if (inst_from_gld)
+			repl_inst_from_gld = gd_local;		/* got from global directory */
+=======
+>>>>>>> 07a11a26bb (GT.M V7.1-004)
 	}
 	if (FALSE == ret)
 		return NULL;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
@@ -216,6 +216,7 @@ LITDEF boolean_t mvs_save[] =
 LITDEF mval skiparg		= DEFINE_MVAL_COMMON(0, 0, 0, 0, 0, 0, 0, 0);
 
 static readonly unsigned char localpool[15] = {'-', '1', '1', '1', '0', '1', '0', '0', '5', '2', '4', '2', '8', '6'};
+<<<<<<< HEAD
 static readonly unsigned char notimeout_pool[] = {'6', '8', '5', '4', '7', '7', '5', '8', '0', '9', '2', '2', '3', '3', '7', '2', '0', '3'};
 LITDEF mval literal_minusone	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 2, (char *)&localpool[0], 0,  -1 * MV_BIAS);
 LITDEF mval literal_zero	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 1, (char *)&localpool[4], 0,   0);
@@ -230,6 +231,30 @@ LITDEF mval literal_oneeleven	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 
  * to be set up but we need this value before the stringpool is set up.
  */
 LITDEF mval literal_notimeout	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 51, 0, SIZEOF(notimeout_pool), (char *)&notimeout_pool[0], 685477580, 922337203);
+||||||| parent of 07a11a26bb (GT.M V7.1-004)
+LITDEF mval literal_minusone	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 2, (char *)&localpool[0], 0,  -1 * MV_BIAS);
+LITDEF mval literal_zero	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 1, (char *)&localpool[4], 0,   0);
+LITDEF mval literal_one 	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 1, (char *)&localpool[1], 0,   1 * MV_BIAS);
+LITDEF mval literal_ten 	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 2, (char *)&localpool[3], 0,  10 * MV_BIAS);
+LITDEF mval literal_eleven	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 2, (char *)&localpool[1], 0,  11 * MV_BIAS);
+LITDEF mval literal_oneohoh	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 3, (char *)&localpool[5], 0, 100 * MV_BIAS);
+LITDEF mval literal_oneohone	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 3, (char *)&localpool[3], 0, 101 * MV_BIAS);
+LITDEF mval literal_oneten	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 3, (char *)&localpool[2], 0, 110 * MV_BIAS);
+LITDEF mval literal_oneeleven	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 3, (char *)&localpool[1], 0, 111 * MV_BIAS);
+LITDEF mval literal_notimeout	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 6, (char *)&localpool[8], 0, NO_M_TIMEOUT);
+=======
+LITDEF mval literal_minusone	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 2, (char *)&localpool[0], 0,   -1 * MV_BIAS);
+LITDEF mval literal_zero	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 1, (char *)&localpool[4], 0,    0);
+LITDEF mval literal_one 	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 1, (char *)&localpool[1], 0,    1 * MV_BIAS);
+LITDEF mval literal_ten 	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 2, (char *)&localpool[3], 0,   10 * MV_BIAS);
+LITDEF mval literal_eleven	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 2, (char *)&localpool[1], 0,   11 * MV_BIAS);
+LITDEF mval literal_oneohoh	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 3, (char *)&localpool[5], 0,  100 * MV_BIAS);
+LITDEF mval literal_oneohone	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 3, (char *)&localpool[3], 0,  101 * MV_BIAS);
+LITDEF mval literal_oneten	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 3, (char *)&localpool[2], 0,  110 * MV_BIAS);
+LITDEF mval literal_oneeleven	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 3, (char *)&localpool[1], 0,  111 * MV_BIAS);
+LITDEF mval literal_mv_bias	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 4, (char *)&localpool[1], 0, 1000 * MV_BIAS);
+LITDEF mval literal_notimeout	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 6, (char *)&localpool[8], 0, NO_M_TIMEOUT);
+>>>>>>> 07a11a26bb (GT.M V7.1-004)
 
 /* --------------------------------------------------------------------------------------------------------------------------
  * All string mvals defined in this module using LITDEF need to have MV_NUM_APPROX bit set. This is because these mval

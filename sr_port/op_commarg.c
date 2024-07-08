@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
@@ -31,11 +31,29 @@
 #include "min_max.h"
 
 #define INDIR(a, b, c) b
-UNIX_ONLY(GBLDEF) VMS_ONLY(LITDEF) int (*indir_fcn[])() = {
+GBLDEF int (*indir_fcn[])() = {
 #include "indir.h"
 };
 
+<<<<<<< HEAD
 GBLREF int4			aligned_source_buffer[];
+||||||| parent of 07a11a26bb (GT.M V7.1-004)
+GBLREF int4			aligned_source_buffer;
+=======
+#ifdef DO_INDIR_FUNCTION_CHECK
+int indir_dummy_fn_void(void);
+int indir_dummy_fn_opr(oprtype *, opctype);
+
+#undef INDIR
+#define INDIR(a, b, c) ((!!__builtin_types_compatible_p(__typeof__(indir_dummy_fn_void), __typeof__(b)))		\
+			| ((!!__builtin_types_compatible_p(__typeof__(indir_dummy_fn_opr), __typeof__(b))) << 1))
+GBLDEF unsigned int indir_fntype[] = {
+#include "indir.h"
+};
+#endif
+
+GBLREF int4			aligned_source_buffer;
+>>>>>>> 07a11a26bb (GT.M V7.1-004)
 GBLREF stack_frame		*frame_pointer;
 GBLREF unsigned short 		proc_act_type;
 
@@ -85,7 +103,7 @@ void	op_commarg(mval *v, unsigned char argcode)
 			if (NULL == (TREF(source_buffer)).addr)
 			{	/* source_buffer not setup yet, likely from ojchildparams, so do it here */
 				(TREF(source_buffer)).addr = (char *)&aligned_source_buffer;
-				(TREF(source_buffer)).len == MAX_SRCLINE;
+				(TREF(source_buffer)).len = MAX_SRCLINE;
 			}
 			src_buff_temp.addr = (TREF(source_buffer)).addr;	/* in case of improbable nest, remember incoming */
 			src_buff_temp.len = (TREF(source_buffer)).len;
@@ -110,7 +128,8 @@ void	op_commarg(mval *v, unsigned char argcode)
 		comp_init(&v->str, NULL);
 		for (;;)
 		{
-			if (EXPR_FAIL == (rval = (*indir_fcn[argcode])()))	/* NOTE assignment */
+			ASSERT_INDIR_FUNCTION_VOID(argcode);
+			if (EXPR_FAIL == (rval = (*(indir_fptr_void_t)(indir_fcn[argcode]))()))	/* NOTE assignment */
 				break;
 			if (TK_EOL == TREF(window_token))
 				break;

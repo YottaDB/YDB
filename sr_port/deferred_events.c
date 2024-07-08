@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2023-2026 YottaDB LLC and/or its subsidiaries.	*
@@ -37,7 +37,7 @@
  */
 
 GBLREF boolean_t		is_tracing_on;				/* M profiling */
-GBLREF boolean_t		tp_timeout_set_xfer;
+GBLREF boolean_t		async_dm_read, tp_timeout_set_xfer;
 GBLREF intrpt_state_t		intrpt_ok_state;
 GBLREF io_pair			io_std_device;
 GBLREF size_t			gtmMallocErrorSize;			/* Size of malloc limit violation */
@@ -307,11 +307,19 @@ boolean_t real_xfer_reset(int4 event_type)
  */
 void async_action(bool lnfetch_or_start)
 {
+<<<<<<< HEAD
+||||||| parent of 07a11a26bb (GT.M V7.1-004)
+	boolean_t	ours;
+=======
+	boolean_t	ours, save_async_dm_read;
+>>>>>>> 07a11a26bb (GT.M V7.1-004)
 	intrpt_state_t	prev_intrpt_state;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	assert(INTRPT_IN_EVENT_HANDLING != intrpt_ok_state);
+	save_async_dm_read = async_dm_read;
+	async_dm_read = FALSE;
 	DEFER_INTERRUPTS(INTRPT_IN_EVENT_HANDLING, prev_intrpt_state);
 	DBG_ASSERT_OUTOFBAND_NOT_QUEUED;	/* a queued event has to wait in the queue, not be recognized here */
 	if (jobinterrupt == outofband)
@@ -344,6 +352,18 @@ void async_action(bool lnfetch_or_start)
 		case jobinterrupt:
 			dollar_zininterrupt = TRUE;	/* do this at every point to minimize nesting; WARNING: fallthrough*/
 		case ctrlc:							/* these go from pending to active here */
+<<<<<<< HEAD
+||||||| parent of 07a11a26bb (GT.M V7.1-004)
+			TAREF1(save_xfer_root, outofband).event_state = active;
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_CTRLC);
+			break;
+=======
+			TAREF1(save_xfer_root, outofband).event_state = active;
+			if (save_async_dm_read && (MVST_MVAL == mv_chain->mv_st_type))
+				POP_MV_STENT();		/* In Direct Mode, so pop mval from top of stack to avoid memory leak */
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_CTRLC);
+			break;
+>>>>>>> 07a11a26bb (GT.M V7.1-004)
 		case ctrap:
 		case defer_error:
 			TAREF1(save_xfer_root, outofband).event_state = active;			/*WARNING: fallthrough */

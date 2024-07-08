@@ -1,6 +1,12 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright (c) 2001-2022 Fidelity National Information	*
+||||||| parent of 07a11a26bb (GT.M V7.1-004)
+ * Copyright (c) 2001-2023 Fidelity National Information	*
+=======
+ * Copyright (c) 2001-2024 Fidelity National Information	*
+>>>>>>> 07a11a26bb (GT.M V7.1-004)
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries. *
@@ -235,10 +241,18 @@ void	op_fnview(int numarg, mval *dst, ...)
 			MV_FORCE_64MVAL(arg2, stringpool.free - stringpool.base);
 			MV_FORCE_STR(arg2);
 			s2pool_concat(dst, &arg2->str);
+<<<<<<< HEAD
 			s2pool_concat(dst, &commastr);
 			MV_FORCE_64MVAL(arg2, stringpool.top - stringpool.invokestpgcollevel);
 			MV_FORCE_STR(arg2);
 			s2pool_concat(dst, &arg2->str);
+||||||| parent of 07a11a26bb (GT.M V7.1-004)
+			s2pool_concat(dst, &commastr);
+			MV_FORCE_MVAL(arg2, (int)(stringpool.top - stringpool.invokestpgcollevel));
+			MV_FORCE_STR(arg2);
+			s2pool_concat(dst, &arg2->str);
+=======
+>>>>>>> 07a11a26bb (GT.M V7.1-004)
 			break;
 		case VTK_SPSIZESORT:
 			assert(stringpool.base == rts_stringpool.base);

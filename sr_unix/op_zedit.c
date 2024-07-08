@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
@@ -28,12 +28,16 @@
 #include "zroutines.h"
 #include "eintr_wrappers.h"
 #include "stringpool.h"
+#include "tpnotacid_chk_inline.h"
 #include "op.h"
 #include "fork_init.h"
 #include "geteditor.h"
 #include "restrict.h"
 #include "iottdef.h"
 #include "ydb_getenv.h"
+
+
+#define	ZEDITSTR	"ZEDIT"
 
 GBLREF	io_pair		io_std_device;
 GBLREF	mval 		dollar_zsource;
@@ -58,6 +62,8 @@ void op_zedit(mval *v, mval *p)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	if (RESTRICTED(zedit_op))
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_RESTRICTEDOP, 1, "ZEDIT");
 	geteditor();
 	if (!editor.len)
 	{
@@ -169,10 +175,7 @@ void op_zedit(mval *v, mval *p)
 			es[ path_len ] = 0;
 		}
 	}
-
-	if (RESTRICTED(zedit_op))
-		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_RESTRICTEDOP, 1, "ZEDIT");
-
+	TPNOTACID_CHECK(ZEDITSTR);
 	flush_pio();
 	ret = gtm_system_internal(editor.addr, es, NULL, NULL);
 	if (-1 == ret)

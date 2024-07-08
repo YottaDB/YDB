@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2013-2022 Fidelity National Information	*
+ * Copyright (c) 2013-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries. *
@@ -137,7 +137,7 @@ typedef struct relinkrec_struct
 	uint4		cycle;
 	uint4		hashindex_fl;	/* Forward link ptr to linked list of relinkrec_t structures that have same rtnhash value */
 	uint4		numvers;		/* Number of versions of this .o file currently in this relinkctl shared memory */
-	uint4		filler_8byte_align;
+	uint4		rtnobj_supersede;	/* Number of times a routine has been superseded in the autorelink cach */
 	gtm_uint64_t	objLen;			/* Total object file length of various versions of this .o file in shared memory */
 	gtm_uint64_t	usedLen;		/* Total length used up in shared memory for various versions of this .o file.
 						 * Due to rounding up of objLen to nearest 2-power, usedLen >= objLen always.
@@ -149,11 +149,18 @@ typedef struct relinkrec_struct
 					 * object file linked list (starting at rtnobj_shm_offset)
 					 */
 	gtm_uint64_t	objhash;	/* Hash of the object file last touched here */
+<<<<<<< HEAD
 	uint4		rtnobj_supersede;
 	CACHELINE_PAD_COND(92, 1);	/* Add 36 bytes (on top of 92 bytes) to make this structure 128 bytes to avoid cacheline
+||||||| parent of 07a11a26bb (GT.M V7.1-004)
+	uint4		rtnobj_supersede;
+	CACHELINE_PAD_COND(92, 1)	/* Add 36 bytes (on top of 92 bytes) to make this structure 128 bytes to avoid cacheline
+=======
+	CACHELINE_PAD_COND(88, 1)	/* Add 40 bytes (on top of 88 bytes) to make this structure 128 bytes to avoid cacheline
+>>>>>>> 07a11a26bb (GT.M V7.1-004)
 					 * interference (between successive relinkrec_t structures in shared memory) on the RS6000
 					 * (where the cacheline is 128 bytes currently). Other platforms have smaller
-					 * cachelines (i.e. 64 bytes or lesser) and so this structure (92 bytes currently)
+					 * cachelines (i.e. 64 bytes or lesser) and so this structure (88 bytes currently)
 					 * taking up more than one cacheline dont require this padding.
 					 */
 } relinkrec_t;

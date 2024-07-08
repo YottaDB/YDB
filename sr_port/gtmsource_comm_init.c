@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2019-2026 YottaDB LLC and/or its subsidiaries.	*
@@ -46,8 +46,14 @@
 #include "repl_sp.h"
 #include "repl_comm.h"
 #include "repl_log.h"
+<<<<<<< HEAD
 #include "dogetaddrinfo.h"
 #include "util.h"	/* util_out_print in GTM_PUTMSG_CSA_ADDRINFO */
+||||||| parent of 07a11a26bb (GT.M V7.1-004)
+#include "util.h"	/* util_out_print in GTM_PUTMSG_CSA_ADDRINFO */
+=======
+#include "sgtm_putmsg.h"
+>>>>>>> 07a11a26bb (GT.M V7.1-004)
 
 #define RESOLUTION_FAILURE_PREFIX	"Failure in resolving "
 GBLDEF	int			gtmsource_sock_fd = FD_INVALID;
@@ -71,6 +77,13 @@ int gtmsource_comm_init(boolean_t print_addresolve_error)
 	char			hostinfo[SIZEOF(RESOLUTION_FAILURE_PREFIX) + MAX_HOST_NAME_LEN + NI_MAXSERV];
 	int			port_len;
 	int			errcode;
+<<<<<<< HEAD
+||||||| parent of 07a11a26bb (GT.M V7.1-004)
+	intrpt_state_t		prev_intrpt_state;
+=======
+	intrpt_state_t		prev_intrpt_state;
+	char                    print_msg[REPL_MSG_SIZE];
+>>>>>>> 07a11a26bb (GT.M V7.1-004)
 
 	if (FD_INVALID != gtmsource_sock_fd) /* Initialization done already */
 		return(0);
@@ -84,7 +97,7 @@ int gtmsource_comm_init(boolean_t print_addresolve_error)
 	if ((0 != errcode) && print_addresolve_error)
 	{
 		SNPRINTF(hostinfo, SIZEOF(hostinfo), "%s%s:%s", RESOLUTION_FAILURE_PREFIX, host, port_buffer);
-		GTM_PUTMSG_CSA_ADDRINFO(NULL, ERR_GETADDRINFO, errcode, hostinfo);
+		REPL_LOG_ADDRINFO(gtmsource_log_fp, repl_log, print_msg, ERR_GETADDRINFO, errcode, hostinfo);
 	}
 	if (ai_head)
 	{

@@ -1,9 +1,16 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright 2001 Sanchez Computer Associates, Inc.		*
  *								*
  * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
+||||||| parent of 07a11a26bb (GT.M V7.1-004)
+ *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+=======
+ * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> 07a11a26bb (GT.M V7.1-004)
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,8 +38,7 @@ static char rcsid[] = "$Header:$";
 
 
 int
-gtcm_term(sig)
-    int		 sig;
+gtcm_term(int sig)
 {
     extern int	 omi_exitp;
 

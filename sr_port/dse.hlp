@@ -1250,8 +1250,8 @@
 
      o With -ALL specified, DSE includes all region of the current global
        directory for cache recovery.
-     o Attempt DSE CACHE -RECOVER only if a DSE CACHE -VERIFY commands
-       reports the cache is "NOT clean".
+     o Attempt DSE CACHE -RECOVER only if a DSE CACHE -VERIFY command reports
+       that the cache is "NOT clean".
 
    -SH[OW]
 
@@ -2944,7 +2944,7 @@
 1 Copyright
    Copyright
 
-   Copyright 2023
+   Copyright 2024
 
    Fidelity National Information Services, Inc. and/or its subsidiaries. All
    rights reserved.

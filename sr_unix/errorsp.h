@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries. *
@@ -62,9 +62,10 @@
 #define CONDSTK_MAX_STACK	512	/* Actual max is approx 504 due to arithmetic progression */
 #define CONDSTK_RESERVE		4	/* Reserve 4 frames for when process_exiting */
 
-#define CONDITION_HANDLER(name)	ch_ret_type name(int arg)
+#define CONDITION_HANDLER(name)	ch_ret_type name(ch_arg_type arg)
 
 typedef void	ch_ret_type;
+typedef int	ch_arg_type;
 
 /* Note that the condition_handler structure layout is relied upon by assembly code (see chnd_size, chnd_* in error.si).
  * Any changes here need corresponding changes in error.si.
@@ -78,7 +79,7 @@ typedef struct condition_handler_struct
 								 * simple (it keeps track of offsets of members in structures
 								 * and we dont want it to be conditional on PRO vs DBG).
 								 */
-	ch_ret_type			(*ch)();		/* Condition handler address */
+	ch_ret_type			(*ch)(ch_arg_type);	/* Condition handler address */
 	jmp_buf				jmp;			/* setjmp/longjmp buffer associated with ESTABLISH point */
 	intrpt_state_t			intrpt_ok_state;	/* intrpt_ok_state at time of ESTABLISH_RET/ESTABLISH */
 } condition_handler;
@@ -528,7 +529,7 @@ MBSTART {													\
 #define MDB_START
 
 void stop_image(void);
-void stop_image_conditional_core(void);
+CONDITION_HANDLER(stop_image_conditional_core);
 void stop_image_no_core(void);
 
 #define TERMINATE		{						\

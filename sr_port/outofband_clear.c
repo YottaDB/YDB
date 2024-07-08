@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2022 Fidelity National Information	*
+ * Copyright (c) 2006-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -30,6 +30,7 @@ void outofband_clear(void)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	DBGDFRDEVNT((stderr, "%d %s: outofband_clear oob:%d\n", __LINE__, __FILE__, outofband));
 	if (ctrlc == outofband)
 	{
 		assert(!tp_timeout_set_xfer);	/* TP timeout should not have been the primary event */

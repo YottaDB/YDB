@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries. *
@@ -281,11 +281,17 @@ boolean_t	tp_tend()
 	int			tmp_jnl_participants;
 	jnl_tm_t		save_gbl_jrec_time;
 	uint4			max_upd_num, prev_upd_num, upd_num, upd_num_end, upd_num_start, dbg_jrec_len;
-	sgm_info		*last_upd_tp_si_by_ftok = NULL, *last_p2_tp_si_by_ftok;
+	sgm_info		*last_upd_tp_si_by_ftok = NULL, *last_p2_tp_si_by_ftok = NULL;
 	cw_set_element		*last_p1_cse = NULL, *last_p2_cse = NULL, *sgm_last_p1_cse = NULL, *sgm_last_p2_cse = NULL,
 				*dbg_cse = NULL;
+<<<<<<< HEAD
 	sgmnt_addrs		*last_6a_csa = NULL, *last_jnld_csa;
 	boolean_t		frozen_hard;	/* used only by asserts, see DBG_SET_FROZEN_HARD_CONFIRMED */
+||||||| parent of 07a11a26bb (GT.M V7.1-004)
+	sgmnt_addrs		*last_6a_csa = NULL, *last_jnld_csa;
+=======
+	sgmnt_addrs		*last_6a_csa = NULL, *last_jnld_csa = NULL;
+>>>>>>> 07a11a26bb (GT.M V7.1-004)
 #	endif
 	int4			tprestart_syslog_delta;
 	block_id		pvt_total_blks;
@@ -1544,10 +1550,10 @@ boolean_t	tp_tend()
 					continue;
 				assert(si->tp_csd->trans_hist.early_tn == si->tp_csd->trans_hist.curr_tn + 1);
 				si->tp_csd->trans_hist.early_tn = si->tp_csd->trans_hist.curr_tn;
+				si->tp_csa->t_commit_crit = FALSE;
 				jpc = si->tp_csa->jnl;
-				jbp = jpc->jnl_buff;
-				jrs = si->jbuf_rsrv_ptr;
-				REINIT_JBUF_RSRV_STRUCT(jrs, si->tp_csa, jpc, jbp);
+				if (jpc && (jbp = jpc->jnl_buff) && (jrs = si->jbuf_rsrv_ptr)) /* Warning - assignment */
+					REINIT_JBUF_RSRV_STRUCT(jrs, si->tp_csa, jpc, jbp);
 			}
 			goto failed;
 		}
@@ -1597,6 +1603,7 @@ boolean_t	tp_tend()
 					continue;
 				assert(si->tp_csd->trans_hist.early_tn == si->tp_csd->trans_hist.curr_tn + 1);
 				si->tp_csd->trans_hist.early_tn = si->tp_csd->trans_hist.curr_tn;
+				si->tp_csa->t_commit_crit = FALSE;
 				jpc = si->tp_csa->jnl;
 				if (jpc && (jbp = jpc->jnl_buff) && (jrs = si->jbuf_rsrv_ptr)) /* Warning - assignment */
 					REINIT_JBUF_RSRV_STRUCT(jrs, si->tp_csa, jpc, jbp);
@@ -2049,10 +2056,6 @@ boolean_t	tp_tend()
 #	endif
 	END_IGNORE_EXTFREEZES(TREF(defer_instance_freeze));
 	assert(cdb_sc_normal == status);
-	/* Now that all buffers needed for commit are locked in shared memory (in phase1 for BG), it is safe to
-	 * release the jnlpool lock. Releasing it before this could cause an instance freeze to sneak in while
-	 * the phase1 is still midway causing trouble for this transaction in case it needs to do any db/jnl writes.
-	 */
 	/* Check that we DON'T own crit on ANY region. The only exception is online mupip journal rollback/recovery
 	 * or MUPIP TRIGGER -UPGRADE which holds crit for the entire process lifetime. */
 	assert(jgbl.onlnrlbk || TREF(in_trigger_upgrade) || (0 == have_crit(CRIT_HAVE_ANY_REG)));
@@ -2173,7 +2176,6 @@ failed:
 			if (release_crit)
 			{
 				assert(!si->tp_csa->hold_onto_crit);
-				si->tp_csa->t_commit_crit = FALSE;
 				rel_crit(si->gv_cur_region);
 			}
 		}

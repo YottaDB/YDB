@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2005-2023 Fidelity National Information	*
+ * Copyright (c) 2005-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
@@ -237,6 +237,14 @@ typedef enum {
 	WBTEST_REL_LOCK_PREKILL,		/* 183 : Kill right before releaseing instance crit. */
 	WBTEST_REL_LOCK_POSTKILL,		/* 184 : Kill after releasing instance crit and sleeping for a second. */
 	WBTEST_PHS1_NOSPACE,			/* 185 : Set fake enospc right before releasing instance crit. */
+<<<<<<< HEAD
+||||||| parent of 07a11a26bb (GT.M V7.1-004)
+	WBTEST_PHS1_NOSPACE			/* 185 : Set fake enospc right before releasing instance crit. */
+=======
+	WBTEST_MUNMAP_FREE,			/* 186 : Verify that munmap() returns memory to the OS */
+	WBTEST_JNL_CLEANUP,			/* 187 : Various asynchronous events in a jnl cleanup */
+	WBTEST_ZTTEST				/* 188 : Inject garbage collection at awkward place in sv_put.c SV_ZTRAP code */
+>>>>>>> 07a11a26bb (GT.M V7.1-004)
 
 	/* Note 1: when adding new white box test cases, please make use of WBTEST_ENABLED and WBTEST_ASSIGN_ONLY (defined below)
 	 * whenever applicable
@@ -269,8 +277,16 @@ typedef enum {
 						 * so a signal sent then interrupts code that a fork() would deadlock with */
 } wbtest_code_t;
 
+<<<<<<< HEAD
 #define	WBTEST_HOLD_FORK_LOCK_MIN_SIZE	(64 * 1024 * 1024)	/* Size of the malloc() that WBTEST_HOLD_FORK_LOCK_IN_MALLOC stops */
 #define	WBTEST_HOLD_FORK_LOCK_SECONDS	5			/* How long WBTEST_HOLD_FORK_LOCK_IN_MALLOC holds the lock */
+||||||| parent of 07a11a26bb (GT.M V7.1-004)
+=======
+enum jnl_cleanup_wbox {
+	JNL_CLEANUP_KILL9 = 1,
+	JNL_CLEANUP_MUPIP_STOP = 300
+};
+>>>>>>> 07a11a26bb (GT.M V7.1-004)
 
 #if defined (DEBUG) && !defined (STATIC_ANALYSIS)
 /* Make sure to setenv ydb_white_box_test_case_count if you are going to use GTM_WHITE_BOX_TEST */

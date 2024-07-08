@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
@@ -126,11 +126,19 @@ void trans_code_cleanup(void)
 				 * between (i.e. frames where "fp->flags & SFF_INDCE" is TRUE) as long as eventually they
 				 * lead to a direct mode frame.
 				 */
+<<<<<<< HEAD
 				stack_frame	*tmp_fp;
 
 				assert(fp->flags & SFF_INDCE);
 				tmp_fp = fp;
 				for ( ; ; )
+||||||| parent of 07a11a26bb (GT.M V7.1-004)
+				assert(fp->flags && (SFF_INDCE));
+				if (!fp->old_frame_pointer || !(fp->old_frame_pointer->type & SFT_DM))
+=======
+				assert(fp->flags & SFF_INDCE);
+				if (!fp->old_frame_pointer || !(fp->old_frame_pointer->type & SFT_DM))
+>>>>>>> 07a11a26bb (GT.M V7.1-004)
 				{
 					tmp_fp = tmp_fp->old_frame_pointer;
 					if (NULL == tmp_fp)

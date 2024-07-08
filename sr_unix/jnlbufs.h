@@ -1,6 +1,6 @@
 /****************************************************************
  *                                                              *
- * Copyright (c) 2023 Fidelity National Information             *
+ * Copyright (c) 2023-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved. *
  *                                                              *
  *      This source code contains the intellectual property     *
@@ -14,6 +14,7 @@
 #define JNLBUFS_H
 #include "mdef.h"
 #include "jnl.h"
+#include "gtm_atomic.h"
 
 #define JPLWRITES_NEEDED 0x1U
 #define SRC_JPLWRITES_NEEDED_MASK(IDX) (JPLWRITES_NEEDED << IDX)
@@ -49,55 +50,24 @@
  * variable. Doing the read-modify-write in crit itself isn't necessary under the current design.
  */
 
-#if defined (__linux__)
 #define SRC_NEEDS_JPLWRITES(JPL, GTMSOURCE_LOCAL) (SRC_JPLWRITES_NEEDED_MASK(GTMSOURCE_LOCAL->gtmsrc_lcl_array_index)           \
-                & __atomic_load_n(&JPL->jnlpool_ctl->write_jnldata, __ATOMIC_RELAXED))
-#define INST_NEEDS_JPLWRITES(JPL) (INST_JPLWRITES_NEEDED_MASK                                                                   \
-                & __atomic_load_n(&JPL->jnlpool_ctl->write_jnldata, __ATOMIC_RELAXED))
+                & ATOMIC_LOAD(&JPL->jnlpool_ctl->write_jnldata, memory_order_relaxed))
 
-#define SET_SRC_NEEDS_JPLWRITES(JPL, GTMSOURCE_LOCAL) __atomic_fetch_or(&JPL->jnlpool_ctl->write_jnldata,                       \
-                SRC_JPLWRITES_NEEDED_MASK(GTMSOURCE_LOCAL->gtmsrc_lcl_array_index), __ATOMIC_RELAXED)
+#define INST_NEEDS_JPLWRITES(JPL) (INST_JPLWRITES_NEEDED_MASK                                                                   \
+                & ATOMIC_LOAD(&JPL->jnlpool_ctl->write_jnldata, memory_order_relaxed))
+
+#define SET_SRC_NEEDS_JPLWRITES(JPL, GTMSOURCE_LOCAL) ATOMIC_FETCH_OR(&JPL->jnlpool_ctl->write_jnldata,				\
+                SRC_JPLWRITES_NEEDED_MASK(GTMSOURCE_LOCAL->gtmsrc_lcl_array_index), memory_order_relaxed)
 
 #define FIRST_SRC_NEEDING_JPLWRITES(JPL, GTMSOURCE_LOCAL)                                                                       \
         !(INST_JPLWRITES_NEEDED_MASK & SET_SRC_NEEDS_JPLWRITES(JPL, GTMSOURCE_LOCAL))
 
-#define UNSET_SRC_NEEDS_JPLWRITES(JPL, GTMSOURCE_LOCAL) __atomic_fetch_and(&JPL->jnlpool_ctl->write_jnldata,                    \
-                ~SRC_JPLWRITES_NEEDED_MASK(GTMSOURCE_LOCAL->gtmsrc_lcl_array_index), __ATOMIC_RELAXED)
+#define UNSET_SRC_NEEDS_JPLWRITES(JPL, GTMSOURCE_LOCAL) ATOMIC_FETCH_AND(&JPL->jnlpool_ctl->write_jnldata,                    \
+                ~SRC_JPLWRITES_NEEDED_MASK(GTMSOURCE_LOCAL->gtmsrc_lcl_array_index), memory_order_relaxed)
 
 #define LAST_SRC_NEEDING_JPLWRITES(JPL, GTMSOURCE_LOCAL)                                                                        \
         (SRC_JPLWRITES_NEEDED_MASK(GTMSOURCE_LOCAL->gtmsrc_lcl_array_index) == UNSET_SRC_NEEDS_JPLWRITES(JPL, GTMSOURCE_LOCAL))
 
-#define INIT_JPLWRITES_NEEDED(JPL)                                                                                      \
-MBSTART {                                                                                                               \
-        __atomic_store_n(&JPL->jnlpool_ctl->write_jnldata, 0U, __ATOMIC_RELEASE);                                       \
-        assert(__atomic_is_lock_free(sizeof(JPL->jnlpool_ctl->write_jnldata), &JPL->jnlpool_ctl->write_jnldata));       \
-} MBEND
-
-#elif defined(_AIX)
-#define SRC_NEEDS_JPLWRITES(JPL, GTMSOURCE_LOCAL) (SRC_JPLWRITES_NEEDED_MASK(GTMSOURCE_LOCAL->gtmsrc_lcl_array_index)           \
-                & (JPL->jnlpool_ctl->write_jnldata))
-#define INST_NEEDS_JPLWRITES(JPL) (INST_JPLWRITES_NEEDED_MASK                                                                   \
-                & (JPL->jnlpool_ctl->write_jnldata))
-
-#define SET_SRC_NEEDS_JPLWRITES(JPL, GTMSOURCE_LOCAL) __fetch_and_or(&JPL->jnlpool_ctl->write_jnldata,                          \
-                SRC_JPLWRITES_NEEDED_MASK(GTMSOURCE_LOCAL->gtmsrc_lcl_array_index))
-
-#define FIRST_SRC_NEEDING_JPLWRITES(JPL, GTMSOURCE_LOCAL)                                                                       \
-        !(INST_JPLWRITES_NEEDED_MASK & SET_SRC_NEEDS_JPLWRITES(JPL, GTMSOURCE_LOCAL))
-
-#define UNSET_SRC_NEEDS_JPLWRITES(JPL, GTMSOURCE_LOCAL) __fetch_and_and(&JPL->jnlpool_ctl->write_jnldata,                       \
-                ~SRC_JPLWRITES_NEEDED_MASK(GTMSOURCE_LOCAL->gtmsrc_lcl_array_index))
-
-#define LAST_SRC_NEEDING_JPLWRITES(JPL, GTMSOURCE_LOCAL)                                                                        \
-        (SRC_JPLWRITES_NEEDED_MASK(GTMSOURCE_LOCAL->gtmsrc_lcl_array_index) == UNSET_SRC_NEEDS_JPLWRITES(JPL, GTMSOURCE_LOCAL))
-
-#define INIT_JPLWRITES_NEEDED(JPL)                                                              \
-MBSTART {                                                                                       \
-        JPL->jnlpool_ctl->write_jnldata = 0U;                                                   \
-} MBEND
-
-#else
-#error "Platform unsupported"
-#endif
+#define INIT_JPLWRITES_NEEDED(JPL) ATOMIC_STORE(&JPL->jnlpool_ctl->write_jnldata, 0U, memory_order_release)
 
 #endif

@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-; Copyright (c) 2001-2020 Fidelity National Information		;
+; Copyright (c) 2001-2024 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
 ; Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries.	;
@@ -158,7 +158,7 @@ GDEINIT
 	s minreg("COLLATION_DEFAULT")=0,maxreg("COLLATION_DEFAULT")=255
 	s minreg("EPOCH_INTERVAL")=1,maxreg("EPOCH_INTERVAL")=32767
 	s minreg("EPOCHTAPER")=0,maxreg("EPOCHTAPER")=1
-	s minreg("EXTENSION")=0,maxreg("EXTENSION")=1073741823
+	s minreg("EXTENSION")=0,maxreg("EXTENSION")=8388607
 	s minreg("INST_FREEZE_ON_ERROR")=0,maxreg("INST_FREEZE_ON_ERROR")=1
 	s minreg("JOURNAL")=0,maxreg("JOURNAL")=1
 	s minreg("KEY_SIZE")=3

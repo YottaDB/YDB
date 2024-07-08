@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2006-2024 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2022 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
@@ -150,7 +151,7 @@ int lke_getki(char* src, int srclen, char* outbuff)
 							*outptr++ = '"';
 						if ('_' == *tmpptr)
 						{
-							*--outptr;
+							--outptr;
 							nextptr = tmpptr;
 						}
 					}

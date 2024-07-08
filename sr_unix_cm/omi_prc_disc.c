@@ -1,9 +1,16 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright 2001 Sanchez Computer Associates, Inc.		*
  *								*
  * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
+||||||| parent of 07a11a26bb (GT.M V7.1-004)
+ *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+=======
+ * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> 07a11a26bb (GT.M V7.1-004)
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,11 +35,7 @@ static char rcsid[] = "$Header:$";
 
 
 int
-omi_prc_disc(cptr, xend, buff, bend)
-    omi_conn	*cptr;
-    char	*xend;
-    char	*buff;
-    char	*bend;
+omi_prc_disc(omi_conn *cptr, char *xend, char *buff, char *bend)
 {
     omi_li	 li;
 

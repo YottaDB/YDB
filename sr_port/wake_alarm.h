@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -13,6 +13,6 @@
 #ifndef WAKE_ALARM_H_INCLUDED
 #define WAKE_ALARM_H_INCLUDED
 
-void wake_alarm(void);
+void wake_alarm(TID tid, int4 len, void *data);
 
 #endif

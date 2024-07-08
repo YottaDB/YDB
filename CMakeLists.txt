@@ -34,7 +34,21 @@ foreach(lang ${languages})
 endforeach()
 
 # Defaults
+<<<<<<< HEAD
 set(version r207)
+||||||| parent of 07a11a26bb (GT.M V7.1-004)
+set(version ${V7.1-003})
+if("${version}" STREQUAL "")
+        set(version V9.9-0)
+endif()
+
+=======
+set(version ${V7.1-004})
+if("${version}" STREQUAL "")
+        set(version V9.9-0)
+endif()
+
+>>>>>>> 07a11a26bb (GT.M V7.1-004)
 # If CMAKE_BUILD_TYPE is not defined make it a Release build
 if(NOT CMAKE_CONFIGURATION_TYPES AND NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE "RelWithDebInfo" CACHE STRING "Build type" FORCE)

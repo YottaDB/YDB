@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2016 Fidelity National Information	*
+ * Copyright (c) 2003-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries. *
@@ -18,6 +18,7 @@
 
 #ifndef MEMCOHERENCY_H_INCLUDED
 #define MEMCOHERENCY_H_INCLUDED
+#include "gtm_atomic.h"
 
 /* for Uniprocessor systems, no need for "memory barrier" as memory is always coherent.
  * But almost always we expect to be running on a multi-processor system so we want to avoid the cost
@@ -26,8 +27,186 @@
 
 /* A barrier here has to do TWO jobs, and on some architectures they need different things.
  *
+<<<<<<< HEAD
  * The first is to stop the PROCESSOR reordering memory accesses around this point. That needs a
  * fence INSTRUCTION, and only on architectures that are weakly ordered.
+||||||| parent of 07a11a26bb (GT.M V7.1-004)
+ * MB and IMB force all preceding writes to at least reach their respective coherency points. This does not mean that
+ * main-memory writes have been done, just that the order of the eventual writes is committed. MB and IMB also force all
+ * queued cache invalidates to be delivered to the local caches before starting any subsequent reads (that may otherwise
+ * cache hit on stale data) or writes (that may otherwise write the cache, only to have the write effectively overwriiten
+ * by a late-delivered invalidate)
+ */
+#define SHM_WRITE_MEMORY_BARRIER	asm("mb")
+#define SHM_READ_MEMORY_BARRIER		SHM_WRITE_MEMORY_BARRIER /* same MB instruction for both read and write barriers */
+#define MM_WRITE_MEMORY_BARRIER
+
+#elif defined(POWER) || defined(PWRPC)	/* GT.M defines POWER and PWRPC if _AIX is defined, see sr_rs6000/mdefsp.h */
+
+/* Refer to article "POWER4 and shared memory synchronization by R. William Hay and Gary R. Hook" available at
+ * http://www-106.ibm.com/developerworks/eserver/articles/power4_mem.html
+ */
+
+/* prototypes */
+void do_sync(void);
+void do_lwsync(void);
+void do_eieio(void);
+void do_isync(void);
+
+/* The machine codes were fetched from http://www-106.ibm.com/developerworks/eserver/articles/powerpc.html */
+
+/* sync : Creates a memory barrier. On a given processor, any load or store instructions ahead of the sync instruction
+ * in the program sequence must complete their accesses to memory first, and then any load or store instructions after
+ * sync can begin
+ */
+#pragma mc_func	do_sync{"7c0004ac"}
+#pragma reg_killed_by do_sync
+
+/* lwsync : Creates a memory barrier that provides the same ordering function as the sync instruction, except that a
+ * load caused by an instruction following the lwsync may be performed before a store caused by an instruction that
+ * precedes the lwsync, and the ordering does not apply to accesses to I/O memory (memory-mapped I/O).
+ * lwsync is a new variant of the sync instruction and is interpreted by older processors as a sync. The instruction,
+ * as its name implies, has much less performance impact than sync, and is recommended for syncrhonisation of most
+ * memory (but not I/O) references.
+ */
+#pragma mc_func	do_lwsync{"7c2004ac"}
+#pragma reg_killed_by do_lwsync
+
+/* eieio : Creates a memory barrier that provides the same ordering function as the sync instruction except that
+ * ordering applies only to accesses to I/O memory
+ */
+#pragma mc_func	do_eieio{"7c0006ac"}
+#pragma reg_killed_by do_eieio
+
+/* isync : Causes the processor to discard any prefetched (and possibly speculatively executed) instructions and
+ * refetch the next following instructions. It is used in locking code (e.g. __check_lock()) to ensure that no
+ * loads following entry into a critical section can access data (because of aggressive out-of-order and speculative
+ * execution in the processor) before the lock is acquired.
+ */
+#pragma mc_func	do_isync{"4c00012c"}
+#pragma reg_killed_by do_isync
+
+#define SHM_WRITE_MEMORY_BARRIER										\
+{ /* Ensure that code does not rely on ordering of "loads" following lwsync in programming sequence to occur */ \
+  /* after "stores" before lwsync. Use do_sync() if such ordering is required. Replication code (t_end.c,    */ \
+  /* tp_end.c) do not rely on store-load order across memory barrier. Note that grab/rel_lock() perform      */ \
+  /* "sync" (via call to _clear_lock()), and so, we are guaranteed strict ordering of loads and stores of    */ \
+  /* code that reads/writes to journal pool in transaction logic					     */ \
+	do_lwsync();												\
+}
+
+#define SHM_READ_MEMORY_BARRIER		\
+{					\
+	do_isync();			\
+}
+
+#define  MM_WRITE_MEMORY_BARRIER	\
+{					\
+	SHM_WRITE_MEMORY_BARRIER;	\
+	do_eieio();			\
+}
+
+#elif defined(__hppa)
+/* For _PA_RISC1_0, _PA_RISC1_1, accesses to the address space (both to memory and I/O) through load, store and
+ * semaphore instructions are strongly ordered. This means that accesses appear to software to be done in program order
+ * For _PA_RISC2_0, accesses could be "strongly ordered", "ordered", or "weakly ordered" (read PA-RISC 2.0 ARCHITECTURE
+ * by Gerry Kane, appendix "Memory Ordering Model").
+=======
+ * MB and IMB force all preceding writes to at least reach their respective coherency points. This does not mean that
+ * main-memory writes have been done, just that the order of the eventual writes is committed. MB and IMB also force all
+ * queued cache invalidates to be delivered to the local caches before starting any subsequent reads (that may otherwise
+ * cache hit on stale data) or writes (that may otherwise write the cache, only to have the write effectively overwriiten
+ * by a late-delivered invalidate)
+ */
+#define SHM_WRITE_MEMORY_BARRIER	asm("mb")
+#define SHM_READ_MEMORY_BARRIER		SHM_WRITE_MEMORY_BARRIER /* same MB instruction for both read and write barriers */
+#define MM_WRITE_MEMORY_BARRIER
+
+#elif defined(POWER) || defined(PWRPC)	/* GT.M defines POWER and PWRPC if _AIX is defined, see sr_rs6000/mdefsp.h */
+
+#if defined(__xlc__)
+#define do_sync()	__sync()
+#define do_lwsync()	__lwsync()
+#define do_eieio()	__eieio()
+#define do_isync()	__isync()
+#elif defined(__open_xl__ )
+#define do_sync()	__builtin_ppc_sync()
+#define do_lwsync()	__builtin_ppc_lwsync()
+#define do_eieio()	__builtin_ppc_eieio()
+#define do_isync()	__builtin_ppc_isync()
+#else
+/* Refer to article "POWER4 and shared memory synchronization by R. William Hay and Gary R. Hook" available at
+ * http://www-106.ibm.com/developerworks/eserver/articles/power4_mem.html
+ */
+
+/* prototypes */
+void do_sync(void);
+void do_lwsync(void);
+void do_eieio(void);
+void do_isync(void);
+
+/* The machine codes were fetched from http://www-106.ibm.com/developerworks/eserver/articles/powerpc.html */
+
+/* sync : Creates a memory barrier. On a given processor, any load or store instructions ahead of the sync instruction
+ * in the program sequence must complete their accesses to memory first, and then any load or store instructions after
+ * sync can begin
+ */
+#pragma mc_func	do_sync{"7c0004ac"}
+#pragma reg_killed_by do_sync
+
+/* lwsync : Creates a memory barrier that provides the same ordering function as the sync instruction, except that a
+ * load caused by an instruction following the lwsync may be performed before a store caused by an instruction that
+ * precedes the lwsync, and the ordering does not apply to accesses to I/O memory (memory-mapped I/O).
+ * lwsync is a new variant of the sync instruction and is interpreted by older processors as a sync. The instruction,
+ * as its name implies, has much less performance impact than sync, and is recommended for syncrhonisation of most
+ * memory (but not I/O) references.
+ */
+#pragma mc_func	do_lwsync{"7c2004ac"}
+#pragma reg_killed_by do_lwsync
+
+/* eieio : Creates a memory barrier that provides the same ordering function as the sync instruction except that
+ * ordering applies only to accesses to I/O memory
+ */
+#pragma mc_func	do_eieio{"7c0006ac"}
+#pragma reg_killed_by do_eieio
+
+/* isync : Causes the processor to discard any prefetched (and possibly speculatively executed) instructions and
+ * refetch the next following instructions. It is used in locking code (e.g. __check_lock()) to ensure that no
+ * loads following entry into a critical section can access data (because of aggressive out-of-order and speculative
+ * execution in the processor) before the lock is acquired.
+ */
+#pragma mc_func	do_isync{"4c00012c"}
+#pragma reg_killed_by do_isync
+#endif
+
+#define SHM_WRITE_MEMORY_BARRIER										\
+{ /* Ensure that code does not rely on ordering of "loads" following lwsync in programming sequence to occur */ \
+  /* after "stores" before lwsync. Use do_sync() if such ordering is required. Replication code (t_end.c,    */ \
+  /* tp_end.c) do not rely on store-load order across memory barrier. Note that grab/rel_lock() perform      */ \
+  /* "sync" (via call to _clear_lock()), and so, we are guaranteed strict ordering of loads and stores of    */ \
+  /* code that reads/writes to journal pool in transaction logic					     */ \
+	COMPILER_FENCE(memory_order_release);									\
+	do_lwsync();												\
+}
+
+#define SHM_READ_MEMORY_BARRIER			\
+{						\
+	do_isync();				\
+	COMPILER_FENCE(memory_order_acquire);	\
+}
+
+#define  MM_WRITE_MEMORY_BARRIER	\
+{					\
+	SHM_WRITE_MEMORY_BARRIER;	\
+	do_eieio();			\
+}
+
+#elif defined(__hppa)
+/* For _PA_RISC1_0, _PA_RISC1_1, accesses to the address space (both to memory and I/O) through load, store and
+ * semaphore instructions are strongly ordered. This means that accesses appear to software to be done in program order
+ * For _PA_RISC2_0, accesses could be "strongly ordered", "ordered", or "weakly ordered" (read PA-RISC 2.0 ARCHITECTURE
+ * by Gerry Kane, appendix "Memory Ordering Model").
+>>>>>>> 07a11a26bb (GT.M V7.1-004)
  *
  * The second is to stop the COMPILER doing the same, and it is needed EVERYWHERE, including on
  * architectures so strongly ordered that the first job takes no instruction at all. Code that reads
@@ -119,7 +298,21 @@
 
 #else
 
+<<<<<<< HEAD
 #  error "Unsupported architecture : memcoherency.h supports x86_64, aarch64, armv7l and armv6l"
+||||||| parent of 07a11a26bb (GT.M V7.1-004)
+/* Memory accesses in Intel x86 and IBM S390 archtectures are strongly ordered */
+
+#define SHM_WRITE_MEMORY_BARRIER
+#define SHM_READ_MEMORY_BARRIER
+#define MM_WRITE_MEMORY_BARRIER
+=======
+/* Memory accesses in Intel x86 and IBM S390 archtectures are strongly ordered */
+
+#define SHM_WRITE_MEMORY_BARRIER COMPILER_FENCE(memory_order_release);
+#define SHM_READ_MEMORY_BARRIER COMPILER_FENCE(memory_order_acquire);
+#define MM_WRITE_MEMORY_BARRIER COMPILER_FENCE(memory_order_release);
+>>>>>>> 07a11a26bb (GT.M V7.1-004)
 
 #endif
 

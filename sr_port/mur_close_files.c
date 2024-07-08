@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2023 Fidelity National Information	*
+ * Copyright (c) 2003-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
@@ -159,6 +159,7 @@ boolean_t mur_close_files(void)
 #	ifdef DEBUG
 	int		semval;
 #	endif
+	boolean_t		local_ftok_counter_halted = FALSE;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -602,6 +603,7 @@ boolean_t mur_close_files(void)
 	 * (due to some other process still accessing the instance file and/or db/jnl). In that case "clean_exit" should be FALSE.
 	 */
 	assert(!mur_options.rollback || mur_options.forward || murgbl.repl_standalone || !murgbl.clean_exit);
+	local_ftok_counter_halted = FALSE;
 	if (mur_options.rollback)
 	{
 		if (mur_options.forward && murgbl.clean_exit && murgbl.consist_jnl_seqno && strm_seqno_nonzero)
@@ -807,6 +809,8 @@ boolean_t mur_close_files(void)
 					}
 				}
 				csa->hold_onto_crit = FALSE;
+				/* Stash value so that we have it after detaching the journal pool */
+				local_ftok_counter_halted = jnlpool->jnlpool_ctl->ftok_counter_halted;
 			}
 		}
 	}
@@ -978,9 +982,22 @@ boolean_t mur_close_files(void)
 		 * to error out because the semaphore should still exist in the system
 		 */
 		assert(udi->counter_ftok_incremented || jgbl.onlnrlbk || anticipatory_freeze_available);
+<<<<<<< HEAD
 		if (!ftok_sem_lock(jnlpool->jnlpool_dummy_reg, IMMEDIATE_FALSE)
 				|| !ftok_sem_release(jnlpool->jnlpool_dummy_reg, udi->counter_ftok_incremented, FALSE))
 			wrn_count++;
+||||||| parent of 07a11a26bb (GT.M V7.1-004)
+		if (!ftok_sem_lock(jnlpool->jnlpool_dummy_reg, FALSE)
+				|| !ftok_sem_release(jnlpool->jnlpool_dummy_reg, udi->counter_ftok_incremented, FALSE))
+			wrn_count++;
+=======
+		if (!local_ftok_counter_halted && udi->counter_ftok_incremented)
+		{
+			if (!ftok_sem_lock(jnlpool->jnlpool_dummy_reg, FALSE)
+					|| !ftok_sem_release(jnlpool->jnlpool_dummy_reg, udi->counter_ftok_incremented, FALSE))
+				wrn_count++;
+		}
+>>>>>>> 07a11a26bb (GT.M V7.1-004)
 	}
 	if (jgbl.onlnrlbk)
 	{	/* Signal completion */

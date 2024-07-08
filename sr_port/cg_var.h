@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,7 +13,7 @@
 #ifndef CG_VAR_H_INCLUDED
 #define CG_VAR_H_INCLUDED
 
-void cg_var(mvar *v, var_tabent **p);
-void ind_cg_var(mvar *v, var_tabent **p);
+void cg_var(mtreenode *node, void *var_tabent_arg);
+void ind_cg_var(mtreenode *node, void *var_tabent_arg);
 
 #endif

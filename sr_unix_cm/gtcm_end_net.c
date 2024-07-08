@@ -1,9 +1,16 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright 2001, 2013 Fidelity Information Services, Inc 	*
  *								*
  * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
+||||||| parent of 07a11a26bb (GT.M V7.1-004)
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc *
+=======
+ * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> 07a11a26bb (GT.M V7.1-004)
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -37,8 +44,7 @@ GBLREF char	*omi_errlist[];
 
 
 void
-gtcm_end_net(cll)
-    omi_conn_ll	*cll;
+gtcm_end_net(omi_conn_ll *cll)
 {
     extern int4	 omi_nxact, omi_nerrs, omi_brecv, omi_bsent;
 

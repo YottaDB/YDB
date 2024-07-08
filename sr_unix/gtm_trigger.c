@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2022 Fidelity National Information	*
+ * Copyright (c) 2010-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries. *
@@ -371,7 +371,13 @@ int gtm_trigger_complink(gv_trigger_t *trigdsc, boolean_t dolink)
 	}
 	/* Write trigger execute string out to temporary file and compile it */
 	assert(MAX_XECUTE_LEN >= trigdsc->xecute_str.str.len);
+<<<<<<< HEAD
 	assert(GTM_PATH_MAX >= ((TREF(gtm_tmpdir)).len + SIZEOF("/trgtmpXXXXXX") + 1));
+||||||| parent of 07a11a26bb (GT.M V7.1-004)
+	assert(GTM_PATH_MAX >= (TREF(gtm_tmpdir)).len + SIZEOF("/trgtmpXXXXXX" + 1));
+=======
+	assert(GTM_PATH_MAX >= (TREF(gtm_tmpdir)).len + SIZEOF("/trgtmpXXXXXX"));
+>>>>>>> 07a11a26bb (GT.M V7.1-004)
 	rc = SNPRINTF(rtnname_template, GTM_PATH_MAX, "%.*s/trgtmpXXXXXX", (TREF(gtm_tmpdir)).len, (TREF(gtm_tmpdir)).addr);
 	assert(0 < rc);					/* Note rc is return code aka length - we expect a non-zero length */
 	PRO_ONLY(UNUSED(rc));

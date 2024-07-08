@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
@@ -193,10 +193,18 @@ boolean_t is_timer_initialized(ABS_TIME timer) { return (((0 == timer.tv_sec) &&
 
 void generic_signal_handler(int sig, siginfo_t *info, void *context, boolean_t is_os_signal_handler)
 {
+<<<<<<< HEAD
 	boolean_t		signal_forwarded, is_sigterm;
 	int			rc;
 	sigset_t		savemask;
 	boolean_t		using_alternate_sighandling;
+||||||| parent of 07a11a26bb (GT.M V7.1-004)
+	gtm_sigcontext_t	*context_ptr;
+	void			(*signal_routine)();
+=======
+	gtm_sigcontext_t	*context_ptr;
+	void			(*signal_routine)(int4);
+>>>>>>> 07a11a26bb (GT.M V7.1-004)
 	intrpt_state_t		prev_intrpt_state;
 	ABS_TIME		mu_stop_timer;
 #	ifdef DEBUG
@@ -565,7 +573,37 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context, boolean_t i
 		/* The thread that received a signal sent with kill() does not wait to fork the core (see the comment in the
 		 * DO_FORK_N_CORE_IN_THIS_THREAD_IF_NEEDED macro), so fork it in this thread even if the signal was forwarded.
 		 */
+<<<<<<< HEAD
 		MULTI_THREAD_AWARE_FORK_N_CORE(signal_forwarded && (GTMSIGINFO_USER != signal_info.infotype));
+||||||| parent of 07a11a26bb (GT.M V7.1-004)
+		if (!dont_want_core && IS_MCODE_RUNNING && (NULL != (signal_routine = RFPTR(create_fatal_error_zshow_dmp_fptr))))
+		{	/* note assignment of signal_routine above */
+			SFPTR(create_fatal_error_zshow_dmp_fptr, NULL);
+			(*signal_routine)(exi_condition);
+		}
+		/* Some mupip functions define an entry point to drive on signals. Make sure to do this AFTER we create the
+		 * dump file above as it may detach things (like the recvpool) we need to create the above dump.
+		 */
+		if (NULL != (signal_routine = call_on_signal))	/* Note assignment */
+		{
+			call_on_signal = NULL;		/* So we don't recursively call ourselves */
+			(*signal_routine)();
+		}
+=======
+		if (!dont_want_core && IS_MCODE_RUNNING && (NULL != (signal_routine = RFPTR(create_fatal_error_zshow_dmp_fptr))))
+		{	/* note assignment of signal_routine above */
+			SFPTR(create_fatal_error_zshow_dmp_fptr, NULL);
+			(*signal_routine)(exi_condition);
+		}
+		/* Some mupip functions define an entry point to drive on signals. Make sure to do this AFTER we create the
+		 * dump file above as it may detach things (like the recvpool) we need to create the above dump.
+		 */
+		if (NULL != (signal_routine = call_on_signal))	/* Note assignment */
+		{
+			call_on_signal = NULL;		/* So we don't recursively call ourselves */
+			(*signal_routine)(0);
+		}
+>>>>>>> 07a11a26bb (GT.M V7.1-004)
 	}
 	if (IS_GTMSECSHR_IMAGE)
 	{

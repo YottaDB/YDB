@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -362,12 +362,14 @@ int dfa_calc(struct leaf *leaves, int leaf_num, struct e_table *expand, uint4 **
 			}
 			for (numexpand = clsnum; numexpand < maxcls; numexpand++)
 			{
-				ASSERT_IF_2DIM_ARRAY_OVERFLOW(fpos, numexpand, count);
 				for (count = fst[LST][FST]; count <= fst[LST][LST]; count++)
 				{
 					ASSERT_IF_2DIM_ARRAY_OVERFLOW(nodes.last, node_num - 1, numexpand);
 					if (nodes.last[node_num - 1][numexpand])
+					{
+						ASSERT_IF_2DIM_ARRAY_OVERFLOW(fpos, numexpand, count);
 						fpos[numexpand][count] = TRUE;
+					}
 				}
 				ASSERT_IF_2DIM_ARRAY_OVERFLOW(fpos, numexpand, count);
 			}

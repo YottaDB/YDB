@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
@@ -18,7 +18,7 @@
 #include "mdef.h"
 #include "gtm_string.h"		/* for memcpy */
 #include "gtm_stdlib.h"
-
+#include "gtm_fcntl.h"	/* Needed for AIX's silly open to open64 translations */
 #include "gdsroot.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
@@ -29,16 +29,12 @@
 #include "lockdefs.h"
 #include "cdb_sc.h"
 #include "jnl.h"
-#include "gdscc.h"
-#include "gdskill.h"
-#include "buddy_list.h"		/* needed for tp.h */
-#include "tp.h"
+#include "tpnotacid_chk_inline.h"
 #include "gtmimagename.h"
 #include "cmidef.h"		/* for cmmdef.h */
 #include "hashtab_mname.h"	/* needed for cmmdef.h */
 #include "cmmdef.h"		/* for curr_entry structure definition */
 #include "do_shmat.h"
-#include "getzposition.h"	/* for TPNOTACID_CHECK */
 
 /* Include prototypes */
 #include "mlk_ops.h"
@@ -88,6 +84,7 @@ gtm_uint64_t mlk_lock(mlk_pvtblk *p, UINTPTR_T auxown, boolean_t new)
 	mlk_ctldata_ptr_t	ctl;
 	mlk_shrblk_ptr_t	d;
 	sgmnt_addrs		*csa;
+	intrpt_state_t		prev_intrpt_state;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -97,6 +94,7 @@ gtm_uint64_t mlk_lock(mlk_pvtblk *p, UINTPTR_T auxown, boolean_t new)
 	ctl = pctl->ctl;
 	if (dollar_tlevel)
 	{
+<<<<<<< HEAD
 		assert((CDB_STAGNATE > t_tries) || csa->now_crit || !csa->lock_crit_with_db);
 		/* make sure this region is in the list in case we end up retrying */
 		insert_region(pctl->region, &tp_reg_list, &tp_reg_free_list, SIZEOF(tp_region));
@@ -138,6 +136,133 @@ gtm_uint64_t mlk_lock(mlk_pvtblk *p, UINTPTR_T auxown, boolean_t new)
 			{	/* We are already the owner */
 				p->nodptr = d;
 				retval = 0;
+||||||| parent of 07a11a26bb (GT.M V7.1-004)
+		csa = p->pvtctl.csa;
+		ctl = p->pvtctl.ctl;
+		if (dollar_tlevel)
+		{
+			assert((CDB_STAGNATE > t_tries) || csa->now_crit || !csa->lock_crit_with_db);
+			/* make sure this region is in the list in case we end up retrying */
+			insert_region(p->pvtctl.region, &tp_reg_list, &tp_reg_free_list, SIZEOF(tp_region));
+		}
+		GRAB_LOCK_CRIT_AND_SYNC(p->pvtctl, was_crit);
+		retval = ctl->wakeups;
+		assert(retval);
+		/* this calculation is size of basic mlk_shrsub blocks plus the padded value length
+		   that already contains the consideration for the length byte. This is so we get
+		   room to put a bunch of nicely aligned blocks so the compiler can give us its
+		   best shot at efficient code. */
+		siz = MLK_PVTBLK_SHRSUB_SIZE(p, p->subscript_cnt);
+		assert(siz >= 0);
+		assert(ctl->blkcnt >= 0);
+		if (ctl->gc_needed || ctl->resize_needed || ctl->rehash_needed
+			|| (ctl->subtop - ctl->subfree < siz) || (ctl->blkcnt < p->subscript_cnt))
+		{
+			REL_LOCK_CRIT(p->pvtctl, was_crit);
+			TPNOTACID_CHECK(LOCKGCINTP);
+			prepare_for_gc(&p->pvtctl);
+			GRAB_LOCK_CRIT_AND_SYNC(p->pvtctl, was_crit);
+			assert(ctl->lock_gc_in_progress.u.parts.latch_pid == process_id);
+			if (ctl->rehash_needed)
+				mlk_rehash(&p->pvtctl);
+			if (ctl->resize_needed)
+				mlk_shrhash_resize(&p->pvtctl);
+			else if (ctl->gc_needed || (ctl->subtop - ctl->subfree < siz) || (ctl->blkcnt < p->subscript_cnt))
+				mlk_garbage_collect(p, siz, FALSE);
+			assert(ctl->lock_gc_in_progress.u.parts.latch_pid == process_id);
+			RELEASE_SWAPLOCK(&ctl->lock_gc_in_progress);
+		}
+		assert(!new || (0 == TREF(mlk_yield_pid)) || (MLK_FAIRNESS_DISABLED == TREF(mlk_yield_pid)));
+		blocked = mlk_shrblk_find(p, &d, auxown);
+		if (NULL != d)
+		{
+			if (d->owner)
+			{	/* The lock already exists */
+				if ((d->owner == process_id) && (d->auxowner == auxown))
+				{	/* We are already the owner */
+					p->nodptr = d;
+					retval = 0;
+				} else
+				{	/* Someone else has it. Block on it */
+					assert(blocked);
+					added = TRUE;
+					/* If we get a new prcblk, we should update the values
+					 *   if we attempt to get a new prcblk and fail, we should update the transaction number
+					 *   but take no further action */
+					if (new)
+						added = mlk_prcblk_add(p->pvtctl.region, ctl, d, process_id);
+					if (added)
+					{
+						p->nodptr = d;
+						p->sequence = d->sequence;
+					}
+					csa->hdr->trans_hist.lock_sequence++;
+				}
+=======
+		csa = p->pvtctl.csa;
+		ctl = p->pvtctl.ctl;
+		if (dollar_tlevel)
+		{
+			assert((CDB_STAGNATE > t_tries) || csa->now_crit || !csa->lock_crit_with_db);
+			/* make sure this region is in the list in case we end up retrying */
+			insert_region(p->pvtctl.region, &tp_reg_list, &tp_reg_free_list, SIZEOF(tp_region));
+		}
+		GRAB_LOCK_CRIT_AND_SYNC(p->pvtctl, was_crit);
+		retval = ctl->wakeups;
+		assert(retval);
+		/* this calculation is size of basic mlk_shrsub blocks plus the padded value length
+		   that already contains the consideration for the length byte. This is so we get
+		   room to put a bunch of nicely aligned blocks so the compiler can give us its
+		   best shot at efficient code. */
+		siz = MLK_PVTBLK_SHRSUB_SIZE(p, p->subscript_cnt);
+		assert(siz >= 0);
+		assert(ctl->blkcnt >= 0);
+		if (ctl->gc_needed || ctl->resize_needed || ctl->rehash_needed
+			|| (ctl->subtop - ctl->subfree < siz) || (ctl->blkcnt < p->subscript_cnt))
+		{
+			REL_LOCK_CRIT(p->pvtctl, was_crit);
+			TPNOTACID_CHECK(LOCKGCINTP);
+			prepare_for_gc(&p->pvtctl);
+			GRAB_LOCK_CRIT_AND_SYNC(p->pvtctl, was_crit);
+			assert(ctl->lock_gc_in_progress.u.parts.latch_pid == process_id);
+			if (ctl->rehash_needed)
+				mlk_rehash(&p->pvtctl);
+			if (ctl->resize_needed)
+				mlk_shrhash_resize(&p->pvtctl);
+			else if (ctl->gc_needed || (ctl->subtop - ctl->subfree < siz) || (ctl->blkcnt < p->subscript_cnt))
+				mlk_garbage_collect(p, siz, FALSE);
+			assert(ctl->lock_gc_in_progress.u.parts.latch_pid == process_id);
+			RELEASE_SWAPLOCK(&ctl->lock_gc_in_progress);
+		}
+		assert(!new || (0 == TREF(mlk_yield_pid)) || (MLK_FAIRNESS_DISABLED == TREF(mlk_yield_pid)));
+		DEFER_INTERRUPTS(INTRPT_IN_MLK_SHM_MODIFY, prev_intrpt_state);
+		blocked = mlk_shrblk_find(p, &d, auxown);
+		ENABLE_INTERRUPTS(INTRPT_IN_MLK_SHM_MODIFY, prev_intrpt_state);
+		if (NULL != d)
+		{
+			if (d->owner)
+			{	/* The lock already exists */
+				if ((d->owner == process_id) && (d->auxowner == auxown))
+				{	/* We are already the owner */
+					p->nodptr = d;
+					retval = 0;
+				} else
+				{	/* Someone else has it. Block on it */
+					assert(blocked);
+					added = TRUE;
+					/* If we get a new prcblk, we should update the values
+					 *   if we attempt to get a new prcblk and fail, we should update the transaction number
+					 *   but take no further action */
+					if (new)
+						added = mlk_prcblk_add(p->pvtctl.region, ctl, d, process_id);
+					if (added)
+					{
+						p->nodptr = d;
+						p->sequence = d->sequence;
+					}
+					csa->hdr->trans_hist.lock_sequence++;
+				}
+>>>>>>> 07a11a26bb (GT.M V7.1-004)
 			} else
 			{	/* Someone else has it. Block on it */
 				assert(blocked);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2009-2023 Fidelity National Information	*
+ * Copyright (c) 2009-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
@@ -64,6 +64,7 @@
 #include "ss_lock_facility.h"
 #include "gtmimagename.h"
 #include "jnl_file_close_timer.h"
+#include "hugetlbfs_overrides.h"
 
 GBLREF	boolean_t		muint_fast, ointeg_this_reg, online_specified;
 GBLREF	gd_region		*gv_cur_region;

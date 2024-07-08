@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
@@ -61,6 +61,7 @@
 #include "gds_rundown.h"
 #include "wcs_clean_dbsync.h"
 #include "gtmcrypt.h"
+#include "hugetlbfs_overrides.h"
 #ifdef DEBUG
 #include "is_proc_alive.h"
 #endif

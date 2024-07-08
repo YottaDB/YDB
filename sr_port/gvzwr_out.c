@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,9 +22,14 @@
 #include "format_targ_key.h"
 #include "mlkdef.h"
 #include "zwrite.h"
+#include "gvt_inline.h"
 
-GBLREF gv_key		*gv_currkey;
-GBLREF zshow_out	*zwr_output;
+GBLREF gd_addr			*gd_header;
+GBLREF gd_region		*gv_cur_region;
+GBLREF gv_key			*gv_currkey;
+GBLREF gv_namehead		*gv_target;
+GBLREF gvzwrite_datablk	*gvzwrite_block;
+GBLREF zshow_out		*zwr_output;
 
 void gvzwr_out(void)
 {
@@ -42,10 +48,17 @@ void gvzwr_out(void)
 	outdesc.mvtype = MV_STR;
 	outdesc.str.addr = &buff[0];
 	outdesc.str.len = INTCAST(end - outdesc.str.addr);
-	zshow_output(zwr_output,&outdesc.str);
+	zshow_output(zwr_output, &outdesc.str);
 	buff[0] = '=';
 	one.addr = &buff[0];
 	one.len = 1;
-	zshow_output(zwr_output,&one);
-	mval_write(zwr_output,&val,TRUE);
+	zshow_output(zwr_output, &one);
+	mval_write(zwr_output, &val, TRUE);
+	gvzwrite_block->ref_gbldir = gd_header;
+	DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC(CHECK_CSA_TRUE);
+	COPY_KEY(gvzwrite_block->ref_key, gv_currkey);
+	gvzwrite_block->ref_reg = gv_cur_region;
+	assert(gvzwrite_block->ref_targ == reset_gv_target);
+	DEBUG_ONLY(gvzwrite_block->ref_targ = gv_target);
+	reset_gv_target = gv_target;
 }

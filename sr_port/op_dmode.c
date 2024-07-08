@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
@@ -16,8 +16,16 @@
 #include "mdef.h"
 
 #include <errno.h>
+<<<<<<< HEAD
 
 #include "gtm_stdio.h"
+||||||| parent of 07a11a26bb (GT.M V7.1-004)
+#include "gtm_stdlib.h"
+
+=======
+#include "gtm_stdlib.h"
+#include "gtm_fcntl.h"	/* Needed for AIX's silly open to open64 translations */
+>>>>>>> 07a11a26bb (GT.M V7.1-004)
 #include "gdsroot.h"
 #include "gdskill.h"
 #include "gdsbt.h"
@@ -32,20 +40,13 @@
 #include "iottdef.h"
 #include "iotimer.h"
 #include "stack_frame.h"
-#include "buddy_list.h"		/* needed for tp.h */
-#include "tp.h"
-#include "send_msg.h"
-#include "gtmmsg.h"		/* for gtm_putmsg() prototype */
+#include "tpnotacid_chk_inline.h"
 #include "op.h"
-#include "change_reg.h"
 #include "dm_read.h"
-#include "tp_change_reg.h"
-#include "getzposition.h"
 #include "restrict.h"
 #include "dm_audit_log.h"
 #include "svnames.h"
 #include "util.h"
-#include "have_crit.h"
 #include "deferred_events_queue.h"
 #include "readline.h"
 
@@ -117,6 +118,7 @@ void	op_dmode(void)
 	TPNOTACID_CHECK(DIRECTMODESTR);
 	if (io_curr_device.in->type == tt)
 	{
+<<<<<<< HEAD
 		/* Read input from user, using readline or old direct mode */
 		readline_check_and_loadlib(); /* sets readline_file on the first call if readline is requested */
 		if (NULL != readline_file) {
@@ -125,6 +127,11 @@ void	op_dmode(void)
 			dm_read(input_line);
 			op_wteol(1);
 		}
+||||||| parent of 07a11a26bb (GT.M V7.1-004)
+		dm_read(input_line);
+=======
+		input_line = dm_read(input_line);
+>>>>>>> 07a11a26bb (GT.M V7.1-004)
 		/* If direct mode auditing is enabled, this attempts to send the command to logger */
 		if ((AUDIT_ENABLE_DMODE & RESTRICTED(dm_audit_enable)) && !dm_audit_log(input_line, AUDIT_SRC_DMREAD))
 		{

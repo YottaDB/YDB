@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2023 Fidelity National Information	*
+ * Copyright (c) 2010-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries. *
@@ -110,7 +110,7 @@ THREADGBLDEF(fetch_control,			fetch_ctrl)			/* structure for managing lvn fetche
 
 /* Database */
 THREADGBLDEF(dbinit_max_delta_secs,		uint4)				/* max time before we bail out in db_init */
-THREADGBLDEF(dollar_zmaxtptime, 		int4)				/* tp timeout in seconds */
+THREADGBLDEF(dollar_zmaxtptime, 		int4)				/* tp timeout in milliseconds */
 THREADGBLAR1DEF(save_xfer_root,		save_xfer_entry, DEFERRED_EVENTS)	/* array of deferred events with the zeroth
 										 * acting as the root of a queue identified by the
 										 * _ptr item immediately following
@@ -201,7 +201,8 @@ THREADGBLDEF(redo_rootsrch_ctxt,		redo_root_search_context)	/* context to be sav
 										 * gvcst_redo_root_search */
 THREADGBLDEF(skip_DB_exists_check,		boolean_t)			/* skip check for whether the DB file exists */
 THREADGBLDEF(skip_file_corrupt_check,		boolean_t)			/* skip file_corrupt check in grab_crit */
-THREADGBLDEF(tpnotacidtime,			mval)				/* limit for long non-ACID ops in transactions */
+THREADGBLDEF(tpnotacidtime,			int4)				/* millisecond limit 4 possibly long non-ACID ops */
+THREADGBLDEF(tpnotacidtries,			int4)				/* limit on tpnotacid events in TP */
 THREADGBLDEF(tp_restart_count,			uint4)				/* tp_restart counter */
 THREADGBLDEF(tp_restart_dont_counts,		int4)				/* tp_restart count adjustment; NOTE: DEBUG only */
 THREADGBLDEF(tp_restart_entryref,		mval)				/* tp_restart position for reporting */
@@ -252,10 +253,16 @@ THREADGBLDEF(arlink_loaded,			uint4)				/* Count of auto-relink enabled routines
 THREADGBLDEF(collseq_list,			collseq *)			/* list of pointers to currently mapped collation
 										 * algorithms - since this seems only used in
 										 * collseq.c -seems more like a STATICDEF */
+<<<<<<< HEAD
 THREADGBLFPTR(create_fatal_error_zshow_dmp_fptr, void, 		(void))		/* Fptr for gtm_fatal_error* zshow dmp routine */
 THREADGBLDEF(stapi_errstr,			ydb_buffer_t *)			/* Pointer to ydb_buffer_t that is filled in case
 										 * of error inside a SimpleThreadAPI call.
 										 */
+||||||| parent of 07a11a26bb (GT.M V7.1-004)
+THREADGBLFPTR(create_fatal_error_zshow_dmp_fptr, void, 		(void))		/* Fptr for gtm_fatal_error* zshow dmp routine */
+=======
+THREADGBLFPTR(create_fatal_error_zshow_dmp_fptr, void, 		(int4))		/* Fptr for gtm_fatal_error* zshow dmp routine */
+>>>>>>> 07a11a26bb (GT.M V7.1-004)
 THREADGBLDEF(disable_sigcont,			boolean_t)			/* indicates whether the SIGCONT signal
 										 * is allowed internally */
 THREADGBLDEF(dollar_zcompile,			mstr)				/* compiler qualifiers */
@@ -284,8 +291,17 @@ THREADGBLDEF(ydb_dbgflags_freq,			int)
 THREADGBLDEF(ydb_dbgflags_freq_cntr,		int)
 #endif
 THREADGBLDEF(gtm_env_init_started,		boolean_t)			/* gtm_env_init flag envvar processing */
+<<<<<<< HEAD
 THREADGBLFPTR(gtm_env_xlate_entry,		int,		())		/* gtm_env_xlate() or ydb_env_xlate() function pointer */
 THREADGBLDEF(ydb_environment_init,		boolean_t)			/* indicates a development environment rather
+||||||| parent of 07a11a26bb (GT.M V7.1-004)
+THREADGBLFPTR(gtm_env_xlate_entry,		int,		())		/* gtm_env_xlate() function pointer */
+THREADGBLDEF(gtm_environment_init,		boolean_t)			/* indicates GT.M development environment rather
+=======
+										/* gtm_env_xlate() function pointer */
+THREADGBLFPTR(gtm_env_xlate_entry,		int,		(xc_string_t *, xc_string_t *, xc_string_t *, xc_string_t *))
+THREADGBLDEF(gtm_environment_init,		boolean_t)			/* indicates GT.M development environment rather
+>>>>>>> 07a11a26bb (GT.M V7.1-004)
 										 * than a production environment */
 THREADGBLFPTR(gtm_sigusr1_handler,		void, 		(void))		/* SIGUSR1 signal handler function ptr */
 THREADGBLDEF(ydb_linktmpdir,			mstr)				/* Directory to use for relinkctl files */

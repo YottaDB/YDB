@@ -57,10 +57,18 @@
    To retain the default Global Directory, exit GDE without making any
    changes.
 
+<<<<<<< HEAD
    Example:
 
    $ export ydb_gbldir=/home/jdoe/node1/prod.gld
 
+||||||| parent of 07a11a26bb (GT.M V7.1-004)
+   Example:
+
+   $ export gtmgbldir=/home/jdoe/node1/prod.gld
+
+=======
+>>>>>>> 07a11a26bb (GT.M V7.1-004)
 2 Creating_a_Default_Global_Directory
    Creating a Default Global Directory
 
@@ -682,9 +690,9 @@
 
    This command creates a segment-name TEMP and maps it to the file
    scratch.dat in the current working directory. However, if you were to
-   specify scratch as the file-name, in other words, an environment variable,
-   each process uses the file using the translation of that environment
-   variable at run-time.
+   specify $scratch as the file-name, in other words, an environment
+   variable, each process selects the file using the translation of that
+   environment variable at run-time.
 
 3 Region
    Region
@@ -2247,7 +2255,7 @@
 1 Copyright
    Copyright
 
-   Copyright 2023
+   Copyright 2024
 
    Fidelity National Information Services, Inc. and/or its subsidiaries. All
    rights reserved.

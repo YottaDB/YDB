@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
@@ -50,6 +50,7 @@
 #include "gtmsource.h"
 #include "repl_instance.h"
 #include "util.h"		/* For OUT_BUFF_SIZE */
+#include "hugetlbfs_overrides.h"
 
 GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	jnlpool_addrs_ptr_t	jnlpool_head;
@@ -60,9 +61,15 @@ GBLREF 	gtmrecv_options_t	gtmrecv_options;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	repl_conn_info_t	*this_side, *remote_side;
 GBLREF	int4			strm_index;
+<<<<<<< HEAD
 GBLREF	char			repl_instfilename[MAX_FN_LEN + 1];	/* save first instance */
 GBLREF	char			repl_inst_name[MAX_INSTNAME_LEN];	/* for syslog */
 GBLREF	gd_addr			*gd_header;
+||||||| parent of 07a11a26bb (GT.M V7.1-004)
+GBLREF	char			repl_instfilename[MAX_FN_LEN + 1];	/* save first instance */
+GBLREF	char			repl_inst_name[MAX_INSTNAME_LEN];	/* for syslog */
+=======
+>>>>>>> 07a11a26bb (GT.M V7.1-004)
 
 LITREF	char			ydb_release_name[];
 LITREF	int4			ydb_release_name_len;
@@ -619,10 +626,5 @@ void recvpool_init(recvpool_user pool_user, boolean_t gtmrecv_startup)
 			RTS_ERROR_LITERAL("Error with receive pool options semaphore"), save_errno);
 	}
 	jnlpool = save_jnlpool;
-	if (('\0' == repl_inst_name[0]) && ('\0' != repl_instfilename[0]))
-	{	/* fill in instance name for syslog if right instance file name and first */
-		if (0 == STRCMP(repl_instfilename, instfilename))
-			memcpy(repl_inst_name, repl_instance.inst_info.this_instname, MAX_INSTNAME_LEN);
-	}
 	return;
 }

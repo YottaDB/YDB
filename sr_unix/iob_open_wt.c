@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,10 +37,7 @@
 
 #include "iob.h"
 
-BFILE *iob_open_wt(path, blksiz, blkfactor)
-    char *path;
-    int blksiz;
-    int blkfactor;
+BFILE *iob_open_wt(char *path, int blksiz, int blkfactor)
 {
     int fd;
     BFILE *file;
@@ -62,9 +60,3 @@ BFILE *iob_open_wt(path, blksiz, blkfactor)
 
     return file;
 }
-
-
-
-
-
-

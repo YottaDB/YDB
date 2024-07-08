@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2023-2024 YottaDB LLC and/or its subsidiaries.	*
@@ -68,11 +68,10 @@ void mubclnup(backup_reg_list *curr_ptr, clnup_stage stage)
 
 	assert(stage >= need_to_free_space && stage < num_of_clnup_stage);
 
-	free(stringpool.base);
+	stp_fini(stringpool.base, stringpool.lastallocbytes);
 	stringpool.base = NULL;
 	stringpool.free = NULL;
 	stringpool.top = NULL;
-	stringpool.lasttop = NULL;
 	stringpool.invokestpgcollevel = NULL;
 
 	switch(stage)

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc *
+ * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -365,7 +366,7 @@ typedef struct	omi_conn_ll
 } omi_conn_ll;
 
 /*  Operation pointers */
-typedef int (*omi_op)(/* omi_conn *, char * */);
+typedef int (*omi_op)(omi_conn *, char *, char *, char *);
 
 /*  Routines */
 int		omi_prc_conn (omi_conn *, char *, char *, char *);

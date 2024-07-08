@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
@@ -497,6 +497,7 @@ LITREF unsigned char ebcdic_spaces_block[];
 	}															\
 }
 
+<<<<<<< HEAD
 #define DEF_EXCEPTION(PP, P_OFF, IOD)							\
 MBSTART {										\
 	mval	*tmpMV;									\
@@ -522,6 +523,42 @@ MBSTART {										\
 	IOD->error_handler = tmpMV->str;						\
 	s2pool(&IOD->error_handler);							\
 	POP_MV_STENT();									\
+||||||| parent of 07a11a26bb (GT.M V7.1-004)
+#define DEF_EXCEPTION(PP, P_OFF, IOD)					\
+MBSTART {								\
+	mval	MV;							\
+									\
+	MV.mvtype = MV_STR;						\
+	MV.str.len = (unsigned char)(*(PP->str.addr + P_OFF));		\
+	MV.str.addr = (char *)(PP->str.addr + P_OFF + 1);		\
+	if (!(ZTRAP_ENTRYREF & TREF(ztrap_form)))			\
+	{								\
+		op_commarg(&MV, indir_linetail);			\
+		op_unwind();						\
+	}								\
+	IOD->error_handler = MV.str;					\
+	s2pool(&IOD->error_handler);					\
+=======
+#define DEF_EXCEPTION(PP, P_OFF, IOD)									\
+MBSTART {												\
+	mval	MV, *MV_P;										\
+													\
+	MV.mvtype = MV_STR;										\
+	MV.str.len = (unsigned char)(*(PP->str.addr + P_OFF));						\
+	MV.str.addr = (char *)(PP->str.addr + P_OFF + 1);						\
+	MV_P = push_mval(&MV);										\
+	if (WBTEST_ENABLED(WBTEST_ZTTEST))								\
+		INVOKE_STP_GCOL(8192);									\
+	if (!(ZTRAP_ENTRYREF & TREF(ztrap_form)))							\
+	{												\
+		op_commarg(MV_P, indir_linetail);							\
+		op_unwind();										\
+	}												\
+	IOD->error_handler = MV_P->str;									\
+	s2pool(&IOD->error_handler);									\
+	if ((MVST_MVAL == mv_chain->mv_st_type) && (MV_P == &mv_chain->mv_st_cont.mvs_mval))		\
+		POP_MV_STENT();										\
+>>>>>>> 07a11a26bb (GT.M V7.1-004)
 } MBEND
 
 #define	ONE_COMMA		"1,"
