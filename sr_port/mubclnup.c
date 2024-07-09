@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2023-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -100,7 +100,16 @@ void mubclnup(backup_reg_list *curr_ptr, clnup_stage stage)
 				|| (give_up_after_create_tempfile == ptr->not_this_time));
 			if (give_up_before_create_tempfile != ptr->not_this_time)
 			{
-				free(ptr->backup_hdr);
+				/* Need to free "ptr->backup_hdr". Use temporary variable to avoid double-free in
+				 * case we get a signal (e.g. SIGTERM during the "free") as the deferred signal handler
+				 * would then notice a non-NULL value of "ptr->backup_hdr" and try to free it again
+				 * even though it was already freed before the signal/interrupt.
+				 */
+				sgmnt_data_ptr_t	tmp_hdr;
+
+				tmp_hdr = ptr->backup_hdr;
+				ptr->backup_hdr = NULL;
+				free(tmp_hdr);
 				if (online)
 				{	/* Stop temporary file from growing if we made it active */
 					if (keep_going == ptr->not_this_time)
