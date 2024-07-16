@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -140,6 +140,50 @@ void alloc_reg(void)
 					opc = x->opcode = OC_NOOP;
 					assert((NO_REF == x->operand[0].oprclass) && (NO_REF == x->operand[1].oprclass));
 				}				/* WARNING fallthrough */
+			case OC_BOOLEXPRSTART:
+				/* Check if OC_BOOLEXPRSTART/OC_BOOLEXPRFINISH triple removal is pending (phase 2 of
+				 * OC_EQUNUL_RETBOOL optimization, see comment in "sr_port/bool_expr.c" for details).
+				 * It is easily identified by operand[0] pointing to a non-empty triple. Instead of
+				 * removing the triple, replace it with a OC_NOOP opcode as later OC_BOOLEXPRFINISH
+				 * triples also need to be replaced for the same optimization and this triple is the
+				 * only way they can all note the need for the optimization.
+				 */
+				if (NO_REF != x->operand[0].oprclass)
+				{
+					assert(TRIP_REF == x->operand[0].oprclass);
+					assert((OC_EQUNUL_RETBOOL == x->operand[0].oprval.tref->opcode)
+						|| (OC_NEQUNUL_RETBOOL == x->operand[0].oprval.tref->opcode));
+					x->opcode = OC_NOOP;	/* Replace OC_BOOLEXPRSTART triple with OC_NOOP */
+					continue;
+				}
+				break;
+			case OC_BOOLEXPRFINISH:
+				/* Normally, a OC_BOOLEXPRFINISH triple points to the corresponding OC_BOOLEXPRSTART
+				 * triple through its operand[0]. But in case the OC_BOOLEXPRSTART triple was optimized
+				 * out (see previous "case" for details), it would have been replaced with a OC_NOOP
+				 * opcode.
+				 */
+				assert(TRIP_REF == x->operand[0].oprclass);
+				y = x->operand[0].oprval.tref;	/* y points to corresponding OC_BOOLEXPRSTART triple */
+				assert((OC_BOOLEXPRSTART == y->opcode) || (OC_NOOP == y->opcode));
+				if (OC_NOOP == y->opcode)
+				{
+					assert(TRIP_REF == y->operand[0].oprclass);
+					assert((OC_EQUNUL_RETBOOL == y->operand[0].oprval.tref->opcode)
+						|| (OC_NEQUNUL_RETBOOL == y->operand[0].oprval.tref->opcode));
+					x->opcode = OC_NOOP;	/* Replace OC_BOOLEXPRFINISH triple with OC_NOOP */
+					/* Check if OC_BOOLEXPRFINISH is preceded by an OC_JMP that jumps past just
+					 * this OC_BOOLEXPRFINISH triple. In that case, we can safely remove the
+					 * unnecessary OC_JMP triple too. Just like OC_BOOLEXPRFINISH, we replace
+					 * the OC_JMP triple with OC_NOOP.
+					 */
+					y = x->exorder.bl;
+					if ((OC_JMP == y->opcode) && (TJMP_REF == y->operand[0].oprclass)
+							&& (y->operand[0].oprval.tref == x->exorder.fl))
+						y->opcode = OC_NOOP;
+					continue;
+				}
+				break;
 			default:
 				break;
 		}

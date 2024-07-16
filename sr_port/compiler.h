@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -394,6 +394,8 @@ typedef struct
 
 /* note assignment below */
 #define SHIFT_SIDE_EFFECTS	((TREF(saw_side_effect) = TREF(shift_side_effects)) && (YDB_BOOL == TREF(ydb_fullbool)))
+
+#define	OK_TO_SHORT_CIRCUIT	(!TREF(saw_side_effect) || (YDB_BOOL == TREF(ydb_fullbool)))
 
 #define INITIAL_SIDE_EFFECT_DEPTH 33	/* initial allocation for expression nesting to track side effects */
 

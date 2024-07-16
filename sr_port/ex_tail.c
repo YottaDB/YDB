@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -75,15 +75,108 @@ void ex_tail(oprtype *opr, int depth)
 		return;
 	}
 	/* the following code deals with Booleans where the expression is not directly managing flow - those go through bool_expr */
-	t1 = bool_return_leftmost_triple(t);
-	bitrip = maketriple(OC_BOOLINIT);
-	DEBUG_ONLY(bitrip->src = t->src);
-	dqrins(t1, exorder, bitrip);
 	t2 = t->exorder.fl;
 	assert((OC_COMVAL == t2->opcode) || (OC_COMINT == t2->opcode));	/* may need to change COMINT to COMVAL in bx_boolop */
 	assert(&t2->operand[0] == opr);				/* check next operation ensures an expression */
-	/* Overwrite depth (set in coerce.c to INIT_GBL_BOOL_DEPTH) to current bool expr depth */
 	assert(TRIP_REF == t2->operand[1].oprclass);
+	/* Check if OC_EQU or OC_NEQU can be optimized (YDB#777).
+	 *
+	 * Don't do this in case any side effects were seen and boolean short circuiting is not in effect (hence the
+	 * OK_TO_SHORT_CIRCUIT usage below). This is because "bx_boolop()" (which is recursively called from the "ex_tail()"
+	 * call below) plays with the triple chains (replacing OC_COMVAL with OC_PASSTHRU etc.) in case OK_TO_SHORT_CIRCUIT
+	 * is FALSE and is not aware of the triple manipulations happening here (dqdel(), t->opcode changes etc.) as part
+	 * of the optimization. See https://gitlab.com/YottaDB/DB/YDB/-/merge_requests/1544#note_2010673163 for an example
+	 * that fails otherwise.
+	 *
+	 * One can try and make "bx_boolop()" aware of this YDB#777 optimization and make the two work together but it is
+	 * more work and not considered worth it as the use cases that would benefit from it don't happen in practice in my
+	 * understanding. Therefore it is left as an exercise for the future --- nars -- 2024/07/23.
+	 */
+	if (OK_TO_SHORT_CIRCUIT)
+	{
+		boolean_t	optimizable;
+		int		num_coms;
+		optimizable = TRUE;
+		num_coms = 0;
+		switch(t->opcode)
+		{
+		case OC_COM:
+			t1 = t;
+			for ( ; ; )
+			{
+				assert(OC_COM == t->opcode);
+				num_coms++;
+				t = t->operand[0].oprval.tref;
+				if ((OC_EQU == t->opcode) || (OC_NEQU == t->opcode))
+					break;
+				if (OC_COM != t->opcode)
+				{
+					optimizable = FALSE;
+					break;
+				}
+			}
+			if (!optimizable)
+			{
+				t = t1;	/* Reset "t" since we now know YDB#777 optimization is not possible */
+				break;
+			}
+			/* WARNING: fall-through */
+		case OC_EQU:
+		case OC_NEQU:;
+			oprtype	*t_opr;
+			int	j;
+
+			for (t_opr = t->operand, j = 0; t_opr < ARRAYTOP(t->operand); t_opr++, j++)
+			{
+				if ((TRIP_REF == t_opr->oprclass) && (OC_LIT == t_opr->oprval.tref->opcode)
+					&& (0 == t_opr->oprval.tref->operand[0].oprval.mlit->v.str.len))
+				{
+					/* OC_EQU for [x=""] or [""=x] OR OC_NEQU for [x'=""] or [""'=x] can be optimized
+					 * to OC_EQUNUL_RETMVAL/OC_NEQUNUL_RETMVAL opcode (i.e. without any surrounding
+					 * OC_BOOLINIT/OC_BOOLFINI opcodes). [YDB#777]
+					 */
+					t2->operand[1].oprclass = NO_REF;
+					t2->operand[0] = t->operand[1-j];
+					if (num_coms % 2)
+						t2->opcode = ((OC_EQU == t->opcode) ? OC_NEQUNUL_RETMVAL : OC_EQUNUL_RETMVAL);
+					else
+						t2->opcode = ((OC_EQU == t->opcode) ? OC_EQUNUL_RETMVAL : OC_NEQUNUL_RETMVAL);
+					CHECK_AND_RETURN_IF_BOOLEXPRTOODEEP(depth + 1);
+					ex_tail(&t2->operand[0], depth + 1);
+					dqdel(t, exorder);
+					/* Finally check if we came to OC_EQU/OC_NEQU through a OC_COM sequence.
+					 * If so, remove those triples by replacing them with a OC_NOOP opcode.
+					 */
+					if (num_coms)
+					{
+						for ( ; ; )
+						{
+							assert(OC_COM == t1->opcode);
+							t1->opcode = OC_NOOP;
+							t1 = t1->operand[0].oprval.tref;
+							if (OC_COM != t1->opcode)
+								break;
+						}
+					}
+					CHKTCHAIN(TREF(curtchain), exorder, TRUE);
+					return;
+				}
+			}
+			if (num_coms)
+			{
+				t = t1;	/* Reset "t" since we now know YDB#777 optimization is not possible */
+				break;
+			}
+			break;
+		default:
+			break;
+		}
+	}
+	bitrip = maketriple(OC_BOOLINIT);
+	DEBUG_ONLY(bitrip->src = t->src);
+	t1 = bool_return_leftmost_triple(t);
+	dqrins(t1, exorder, bitrip);
+	/* Overwrite depth (set in coerce.c to INIT_GBL_BOOL_DEPTH) to current bool expr depth */
 	depthtrip = t2->operand[1].oprval.tref;
 	assert(OC_ILIT == depthtrip->opcode);
 	assert(ILIT_REF == depthtrip->operand[0].oprclass);

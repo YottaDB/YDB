@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -99,7 +99,7 @@ void bx_boolop(triple *t, boolean_t jmp_type_one, boolean_t jmp_to_next, boolean
 		*p = put_tjmp(t);
 	} else
 		p = addr;
-	if (!TREF(saw_side_effect) || (YDB_BOOL == TREF(ydb_fullbool)))
+	if (OK_TO_SHORT_CIRCUIT)
 	{	/* nice simple short circuit */
 		assert(NULL == TREF(boolchain_ptr));
 		leftmost[0] = bool_return_leftmost_triple(t->operand[0].oprval.tref);

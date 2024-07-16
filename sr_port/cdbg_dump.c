@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -135,8 +135,21 @@ void cdbg_dump_triple(triple *dtrip, int indent)
 		(unsigned long)dtrip->exorder.fl, (unsigned long)dtrip->exorder.bl,
 	       (unsigned long)dtrip->backptr.que.fl, (unsigned long)dtrip->backptr.que.bl, (unsigned long)dtrip->backptr.bkptr,
 	       dtrip->src.line, dtrip->src.column, dtrip->rtaddr);
-	cdbg_dump_operand(indent + 1, &dtrip->operand[0], OP_0);
-	cdbg_dump_operand(indent + 1, &dtrip->operand[1], OP_1);
+	switch(dtrip->opcode)
+	{
+	case OC_BOOLEXPRSTART:
+	case OC_NOOP:
+		/* This triple does not have any operands in general. But in case of an optimization, operand[0]
+		 * could point to an OC_EQUNUL_RETBOOL/OC_NEQUNUL_RETBOOL opcode. In that case, the operand is
+		 * a reference to a triple that is later in the execution chain and so dumping that operand could
+		 * end up in an infinite loop. We avoid that by not descending down any operands in this case.
+		 */
+		 break;
+	default:
+		cdbg_dump_operand(indent + 1, &dtrip->operand[0], OP_0);
+		cdbg_dump_operand(indent + 1, &dtrip->operand[1], OP_1);
+		break;
+	}
 	if (dtrip->destination.oprclass)
 		cdbg_dump_operand(indent + 1, &dtrip->destination, OP_DEST);
 	else if (CGP_ADDR_OPT == cg_phase)

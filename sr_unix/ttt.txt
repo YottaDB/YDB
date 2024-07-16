@@ -1103,3 +1103,13 @@ OC_ANDOR:	pushl	val.1
 		calls	#1,xfer.xf_bool_andor
 OC_BOOLEXPRSTART:	calls	#0,xfer.xf_boolexprstart
 OC_BOOLEXPRFINISH:	calls	#0,xfer.xf_boolexprfinish
+OC_EQUNUL_RETMVAL:	pushab	val.0			; /* destination mval */
+			pushab	val.1			; /* source (string) mval */
+			calls   #2,xfer.xf_equnul_retmval
+OC_NEQUNUL_RETMVAL:	pushab	val.0			; /* destination mval */
+			pushab	val.1			; /* source (string) mval */
+			calls   #2,xfer.xf_nequnul_retmval
+OC_EQUNUL_RETBOOL:	pushab	val.1			; /* source (string) mval */
+			jsb	xfer.xf_equnul_retbool
+OC_NEQUNUL_RETBOOL:	pushab	val.1			; /* source (string) mval */
+			jsb	xfer.xf_nequnul_retbool

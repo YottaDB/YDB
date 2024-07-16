@@ -330,4 +330,11 @@ void	op_zut(mval *s);
 void	op_zwritesvn(int svn);
 void	op_zst_over_retarg_helper(void);
 void	op_zstepretarg_helper(void);
+
+void	op_equnul_retmval(mval *u, mval *ret);
+void	op_nequnul_retmval(mval *u, mval *ret);
+void	opp_equnul_retbool();		/* Prototype of opp_equnul_retbool.s */
+int	op_equnul_retbool(mval *u);	/* Prototype of op_equnul_retbool.c */
+void	opp_nequnul_retbool();		/* Prototype of opp_nequnul_retbool.s */
+int	op_nequnul_retbool(mval *u);	/* Prototype of op_nequnul_retbool.c */
 #endif
