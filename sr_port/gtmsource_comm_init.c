@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -102,7 +102,7 @@ int gtmsource_comm_init(boolean_t print_addresolve_error)
 		}
 		if (0 != err_status)
 		{
-			freeaddrinfo(ai_head); /* prevent mem-leak */
+			FREEADDRINFO(ai_head); /* prevent mem-leak */
 			SNPRINTF(error_string, SIZEOF(error_string), "Error with source server socket create : %s",
 				 STRERROR(err_status));
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, RTS_ERROR_STRING(error_string));
@@ -113,7 +113,7 @@ int gtmsource_comm_init(boolean_t print_addresolve_error)
 		gtmsource_local->secondary_af = ai_ptr->ai_family;
 		gtmsource_local->secondary_addrlen = ai_ptr->ai_addrlen;
 		memcpy((struct sockaddr*)(&gtmsource_local->secondary_inet_addr), ai_ptr->ai_addr, ai_ptr->ai_addrlen);
-		freeaddrinfo(ai_head); /* prevent mem-leak */
+		FREEADDRINFO(ai_head); /* prevent mem-leak */
 		/* A connection breakage should get rid of the socket */
 		if (-1 == setsockopt(gtmsource_sock_fd, SOL_SOCKET, SO_LINGER,
 				(const void *)&disable_linger, SIZEOF(disable_linger)))

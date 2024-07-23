@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -130,7 +130,7 @@ int tcp_open(char *host, unsigned short port, uint8 timeout, boolean_t passive) 
          		errlen = STRLEN(errptr);
                 	gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_SETSOCKOPTERR, 5,
 				       LEN_AND_LIT("SO_REUSEADDR"), save_errno, errlen, errptr);
-			freeaddrinfo(ai_ptr);
+			FREEADDRINFO(ai_ptr);
 			assert(FALSE);
 			return -1;
 		}
@@ -140,10 +140,10 @@ int tcp_open(char *host, unsigned short port, uint8 timeout, boolean_t passive) 
 			CLOSEFILE(lsock, rc);
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
 				       LEN_AND_LIT("bind()"), CALLFROM, save_errno);
-			freeaddrinfo(ai_ptr);
+			FREEADDRINFO(ai_ptr);
 			return -1;
 		}
-		freeaddrinfo(ai_ptr);
+		FREEADDRINFO(ai_ptr);
 		/* establish a queue of length MAX_CONN_PENDING for incoming connections */
 		if (-1 == listen(lsock, MAX_CONN_PENDING))
 		{
@@ -299,7 +299,7 @@ int tcp_open(char *host, unsigned short port, uint8 timeout, boolean_t passive) 
 				errptr = (char *)STRERROR(save_errno);
 				errlen = STRLEN(errptr);
 				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_SOCKINIT, 3, save_errno, errlen, errptr);
-				freeaddrinfo(remote_ai_head);
+				FREEADDRINFO(remote_ai_head);
 				assert(FALSE);
 				return -1;
 			}
@@ -307,7 +307,7 @@ int tcp_open(char *host, unsigned short port, uint8 timeout, boolean_t passive) 
 			if (-1 == setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &on, SIZEOF(on)))
 			{
 				save_errno = errno;
-				freeaddrinfo(remote_ai_head);
+				FREEADDRINFO(remote_ai_head);
 				CLOSEFILE(sock, rc);
 				errptr = (char *)STRERROR(save_errno);
 				errlen = STRLEN(errptr);
@@ -322,7 +322,7 @@ int tcp_open(char *host, unsigned short port, uint8 timeout, boolean_t passive) 
 			assert((0 <= temp_1) || (EINTR != save_errno));
 			if ((0 > temp_1) && (ECONNREFUSED != save_errno))
 			{
-				freeaddrinfo(remote_ai_head);
+				FREEADDRINFO(remote_ai_head);
 				CLOSEFILE(sock, rc);
 				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
 					   LEN_AND_LIT("connect()"), CALLFROM, save_errno);
@@ -345,12 +345,12 @@ int tcp_open(char *host, unsigned short port, uint8 timeout, boolean_t passive) 
 
 		if (0 > temp_1) /* out of time */
 		{
-			freeaddrinfo(remote_ai_head);
+			FREEADDRINFO(remote_ai_head);
 			CLOSEFILE(sock, rc);
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_TCPCONNTIMEOUT, 1, timeout);
 			return -1;
 		}
-		freeaddrinfo(remote_ai_head);
+		FREEADDRINFO(remote_ai_head);
 	}
 	return sock;
 }

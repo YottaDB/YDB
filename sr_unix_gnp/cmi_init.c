@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -63,7 +63,7 @@ cmi_status_t cmi_init(cmi_descriptor *tnd, unsigned char tnr,
 	endprotoent();
 	if (!p)
 	{
-		freeaddrinfo(local_ai_ptr);
+		FREEADDRINFO(local_ai_ptr);
 		return CMI_NETFAIL;
 	}
 	/* create the listening socket */
@@ -72,7 +72,7 @@ cmi_status_t cmi_init(cmi_descriptor *tnd, unsigned char tnr,
 		af = AF_INET6;
 	else if (FD_INVALID == (ntd_root->listen_fd = socket(AF_INET, SOCK_STREAM, p->p_proto)))
 	{
-		freeaddrinfo(local_ai_ptr);
+		FREEADDRINFO(local_ai_ptr);
 		return errno;
 	} else
 		af = AF_INET;
@@ -83,7 +83,7 @@ cmi_status_t cmi_init(cmi_descriptor *tnd, unsigned char tnr,
 	{
 		save_errno = errno;
 		CLOSEFILE_RESET(ntd_root->listen_fd, rc);	/* resets "ntd_root->listen_fd" to FD_INVALID */
-		freeaddrinfo(local_ai_ptr);
+		FREEADDRINFO(local_ai_ptr);
 		return save_errno;
 	}
 	for(ai_ptr = local_ai_ptr; NULL != ai_ptr; ai_ptr = ai_ptr->ai_next)
@@ -92,11 +92,11 @@ cmi_status_t cmi_init(cmi_descriptor *tnd, unsigned char tnr,
 	if (NULL == ai_ptr)
 	{
 		CLOSEFILE_RESET(ntd_root->listen_fd, rc);
-		freeaddrinfo(local_ai_ptr);
+		FREEADDRINFO(local_ai_ptr);
 		return CMI_NETFAIL;
 	}
 	status = bind(ntd_root->listen_fd, ai_ptr->ai_addr, ai_ptr->ai_addrlen);
-	freeaddrinfo(local_ai_ptr);
+	FREEADDRINFO(local_ai_ptr);
 	if (-1 == status)
 	{
 		save_errno = errno;

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -27,8 +27,8 @@
 #include "gtmio.h"
 #include "eintr_wrappers.h"
 #include "deferred_events_queue.h"
-
 #include "relqop.h"
+#include "gtm_ipv6.h"
 
 GBLREF struct NTD *ntd_root;
 
@@ -78,7 +78,7 @@ cmi_status_t cmi_open(struct CLB *lnk)
 	}
 	if (NULL == ai_ptr)
 	{
-		freeaddrinfo(ai_head);
+		FREEADDRINFO(ai_head);
 		return save_errno;
 	}
 	rval = connect(new_fd, ai_ptr->ai_addr, ai_ptr->ai_addrlen);		/* BYPASSOK(connect) */
@@ -122,7 +122,7 @@ cmi_status_t cmi_open(struct CLB *lnk)
 	{
 		save_errno = errno;
 		CLOSEFILE_RESET(new_fd, rc);	/* resets "new_fd" to FD_INVALID */
-		freeaddrinfo(ai_head);
+		FREEADDRINFO(ai_head);
 		return save_errno;
 	}
 	SIGPROCMASK(SIG_BLOCK, &ntd_root->mutex_set, &oset, rc);
@@ -147,6 +147,6 @@ cmi_status_t cmi_open(struct CLB *lnk)
 			CLOSEFILE_RESET(new_fd, rc);	/* resets "new_fd" to FD_INVALID */
 	}
 	SIGPROCMASK(SIG_SETMASK, &oset, NULL, rc);
-	freeaddrinfo(ai_head);			/* prevent mem-leak */
+	FREEADDRINFO(ai_head);			/* prevent mem-leak */
 	return status;
 }

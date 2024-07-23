@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -147,7 +147,7 @@ cmi_status_t cmj_getsockaddr(cmi_descriptor *nod, cmi_descriptor *tnd, struct ad
 		port = ATOI(port_str);
 		if ((0 == port) && (0 != errno) || (0 >= port))
 		{
-			freeaddrinfo(ai_ptr);
+			FREEADDRINFO(ai_ptr);
 			return CMI_BADIPADDRPORT;
 		}
 	} else

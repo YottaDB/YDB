@@ -121,14 +121,22 @@ GBLREF	boolean_t	ipv4_only;	/* If TRUE, only use AF_INET. */
 #endif
 
 /* Note: The man pages of "freeaddrinfo()" indicate this is a "void" return function.
- * Therefore, there is no possibility of an EINTR error return and so I don't see any
- * need for DEFER_INTERRUPTS/ENABLE_INTERRUPTS macros in the YottaDB code (they are present
- * in the GT.M code in the callers of "freeaddrinfo()").
+ * Therefore, there is no possibility of an EINTR error return. Usually that is the reason
+ * why we surround a call with DEFER_INTERRUPTS/ENABLE_INTERRUPTS macros. But since this
+ * is going to "free()" the resources allocated as part of the "getaddrinfo()" call, it is
+ * possible we end up with a "free()" deadlock just like we got a "malloc()" deadlock like
+ * is described at YDB#481 when "getaddrinfo()" call was interrupted). Therefore, to be safe
+ * we surround the below with DEFER_INTERRUPTS/ENABLE_INTERRUPTS macros just like we did the
+ * "getaddrinfo()" call (in "dogetaddrinfo.c").
  */
 #define FREEADDRINFO(ai_ptr)						\
 {									\
+	intrpt_state_t	prevIntrptState;				\
+									\
+	DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prevIntrptState);	\
 	if (NULL != ai_ptr)						\
 		freeaddrinfo(ai_ptr);					\
+	ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prevIntrptState);	\
 }
 
 union gtm_sockaddr_in46

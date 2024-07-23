@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2013 Fidelity Information Services, Inc 	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -120,7 +120,7 @@ int gtcm_bgn_net(omi_conn_ll *cll)
 		if (0 != (errcode = getnameinfo(ai_ptr->ai_addr, ai_ptr->ai_addrlen, NULL, 0, port_buffer,
 						 NI_MAXSERV, NI_NUMERICSERV)))
 		{
-			freeaddrinfo(ai_ptr);
+			FREEADDRINFO(ai_ptr);
 			assert(FALSE);
 			RTS_ERROR_ADDRINFO(NULL, ERR_GETNAMEINFO, errcode);
 			return errcode;
@@ -130,19 +130,19 @@ int gtcm_bgn_net(omi_conn_ll *cll)
 	/*  Reuse a specified address */
 	if (port && setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (const void *)&reuseaddr, SIZEOF(reuseaddr)) < 0)
 	{
-		freeaddrinfo(ai_ptr);
+		FREEADDRINFO(ai_ptr);
 		save_errno = errno;
 		CLOSEFILE_RESET(fd, rc);	/* resets "fd" to FD_INVALID */
 		return save_errno;
 	}
 	if (bind(fd, ai_ptr->ai_addr, ai_ptr->ai_addrlen) < 0)
 	{
-		freeaddrinfo(ai_ptr);
+		FREEADDRINFO(ai_ptr);
 		save_errno = errno;
 		CLOSEFILE_RESET(fd, rc);	/* resets "fd" to FD_INVALID */
 		return save_errno;
 	}
-	freeaddrinfo(ai_ptr);
+	FREEADDRINFO(ai_ptr);
 	/*  Initialize the listen queue */
 	if (listen(fd, 5) < 0)
 	{

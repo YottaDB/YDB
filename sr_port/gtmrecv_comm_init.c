@@ -91,13 +91,13 @@ int gtmrecv_comm_init(in_port_t port)
 		return -1;
 	}
 	/* Note: Since the "dogetaddrinfo" call succeeded, "ai_ptr" would have been allocated.
-	 * So need to free it up (using "freeaddrinfo") before returning normally or with an error.
+	 * So need to free it up (using "FREEADDRINFO") before returning normally or with an error.
 	 */
 	gtmrecv_listen_sock_fd = temp_sock_fd;
 	if (0 > setsockopt(gtmrecv_listen_sock_fd, SOL_SOCKET, SO_LINGER, (const void *)&disable_linger, SIZEOF(disable_linger)))
 	{
 		save_errno = ERRNO;
-		freeaddrinfo(ai_ptr);
+		FREEADDRINFO(ai_ptr);
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
 				RTS_ERROR_LITERAL("Error with receiver server listen socket disable linger"), save_errno);
 	}
@@ -105,7 +105,7 @@ int gtmrecv_comm_init(in_port_t port)
 			SIZEOF(enable_reuseaddr)))
 	{
 		save_errno = ERRNO;
-		freeaddrinfo(ai_ptr);
+		FREEADDRINFO(ai_ptr);
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
 				RTS_ERROR_LITERAL("Error with receiver server listen socket enable reuseaddr"), save_errno);
 	}
@@ -115,7 +115,7 @@ int gtmrecv_comm_init(in_port_t port)
 		GTM_WHITE_BOX_TEST(WBTEST_REPL_INIT_ERR, errno, 98);
 		SNPRINTF(err_buffer, 512, "Could not bind local address. Local Port : %hu", port);
 		SEND_SYSMSG_REPLCOMM(LEN_AND_STR(err_buffer));
-		freeaddrinfo(ai_ptr);
+		FREEADDRINFO(ai_ptr);
 		CLOSEFILE_RESET(gtmrecv_listen_sock_fd, rc);	/* resets "gtmrecv_listen_sock_fd" to FD_INVALID */
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
 				 RTS_ERROR_STRING(err_buffer), save_errno);
@@ -131,12 +131,12 @@ int gtmrecv_comm_init(in_port_t port)
 			SNPRINTF(err_buffer, 512, "Could not listen. Local port : *UNKNOWN* : %s\n", strerror(errno));
 		GTM_WHITE_BOX_TEST(WBTEST_REPL_INIT_ERR2, save_errno, 98);
 		SEND_SYSMSG_REPLCOMM(LEN_AND_STR(err_buffer));
-		freeaddrinfo(ai_ptr);
+		FREEADDRINFO(ai_ptr);
 		CLOSEFILE_RESET(gtmrecv_listen_sock_fd, rc);	/* resets "gtmrecv_listen_sock_fd" to FD_INVALID */
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
 				 RTS_ERROR_STRING(err_buffer), save_errno);
 		return (-1);
 	}
-	freeaddrinfo(ai_ptr);
+	FREEADDRINFO(ai_ptr);
 	return (0);
 }

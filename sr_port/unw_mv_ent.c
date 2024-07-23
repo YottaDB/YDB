@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -60,6 +60,7 @@
 #include "deferred_events_queue.h"
 #include "ztimeout_routines.h"
 #include "try_event_pop.h"
+#include "gtm_ipv6.h"
 
 GBLREF symval			*curr_symval;
 GBLREF boolean_t		dollar_truth;
@@ -390,7 +391,7 @@ void unw_mv_ent(mv_stent *mv_st_ent)
 									&& (FD_INVALID != socketptr->sd))
 								close(socketptr->sd);
 							if (NULL != socketptr->remote.ai_head)
-								freeaddrinfo(socketptr->remote.ai_head);
+								FREEADDRINFO(socketptr->remote.ai_head);
 							if (NULL != socketptr->zff.addr)
 								free(socketptr->zff.addr);
 							if (NULL != socketptr->buffer)
