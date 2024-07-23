@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -42,6 +42,7 @@
 #include "util.h"
 #include "repl_log.h"
 #include "repl_comm.h"
+#include "dogetaddrinfo.h"
 
 GBLDEF	int		gtmrecv_listen_sock_fd = FD_INVALID;
 
@@ -83,13 +84,13 @@ int gtmrecv_comm_init(in_port_t port)
 	/* Make it known to the world that you are ready for a Source Server */
 	SERVER_HINTS(hints, af);
 	SNPRINTF(port_buffer, NI_MAXSERV, "%hu", port);
-	if (0 != (errcode = getaddrinfo(NULL, port_buffer, &hints, &ai_ptr)))
+	if (0 != (errcode = dogetaddrinfo(NULL, port_buffer, &hints, &ai_ptr)))
 	{
 		CLOSEFILE(temp_sock_fd, rc);
 		RTS_ERROR_ADDRINFO_CTX(NULL, ERR_GETADDRINFO, errcode, "FAILED in obtaining IP address on receiver server.");
 		return -1;
 	}
-	/* Note: Since the "getaddrinfo" call succeeded, "ai_ptr" would have been allocated.
+	/* Note: Since the "dogetaddrinfo" call succeeded, "ai_ptr" would have been allocated.
 	 * So need to free it up (using "freeaddrinfo") before returning normally or with an error.
 	 */
 	gtmrecv_listen_sock_fd = temp_sock_fd;
