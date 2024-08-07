@@ -3,7 +3,7 @@
  * Copyright (c) 2008-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -50,12 +50,8 @@ void OP_FNEXTRACT(int last, int first, mval *src, mval *dest)
 #	endif
 	DCL_THREADGBL_ACCESS;
 
-	if (!gtm_utf8_mode)
-	{	/* Might be called directly from compiler with no check for utf8 mode or not */
-		op_fnzextract(last, first, src, dest);
-		return;
-	}
 	SETUP_THREADGBL_ACCESS;
+	assert(gtm_utf8_mode);
 	assert(!TREF(compile_time) || valid_utf_string(&src->str));
 	MV_FORCE_STR(src);
 	if (0 >= first)

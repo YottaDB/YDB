@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved. *
  *								*
+ * Copyright (c) 2024 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -83,9 +86,17 @@ int f_extract(oprtype *a, opctype op)
 		tmp_mval.str.addr = scratch_space.addr;
 		if ((OC_FNEXTRACT == op) || (OC_FNZEXTRACT == op))
 		{
-			OP_FNEXTRACT(last->operand[0].oprval.tref->operand[0].oprval.ilit,
-				first->operand[0].oprval.tref->operand[0].oprval.ilit,
-				&r->operand[0].oprval.tref->operand[0].oprval.mlit->v, &tmp_mval);
+			if (!gtm_utf8_mode || (OC_FNZEXTRACT == op))
+			{
+				op_fnzextract(last->operand[0].oprval.tref->operand[0].oprval.ilit,
+					first->operand[0].oprval.tref->operand[0].oprval.ilit,
+					&r->operand[0].oprval.tref->operand[0].oprval.mlit->v, &tmp_mval);
+			} else
+			{
+				OP_FNEXTRACT(last->operand[0].oprval.tref->operand[0].oprval.ilit,
+					first->operand[0].oprval.tref->operand[0].oprval.ilit,
+					&r->operand[0].oprval.tref->operand[0].oprval.mlit->v, &tmp_mval);
+			}
 		} else
 		{
 			assert(OC_FNZSUBSTR == op);
