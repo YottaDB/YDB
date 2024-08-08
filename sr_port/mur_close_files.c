@@ -3,7 +3,7 @@
  * Copyright (c) 2003-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -951,10 +951,10 @@ boolean_t mur_close_files(void)
 		if (got_ftok)
 			ftok_sem_release(jnlpool->jnlpool_dummy_reg, FALSE, TRUE); /* immediate=TRUE */
 		ASSERT_DONOT_HOLD_REPLPOOL_SEMS;
-		assert(jgbl.onlnrlbk || inst_frozen ||
-			((INVALID_SEMID == repl_instance.jnlpool_semid) && (0 == repl_instance.jnlpool_semid_ctime)));
-		assert(jgbl.onlnrlbk || inst_frozen ||
-			((INVALID_SEMID == repl_instance.recvpool_semid) && (0 == repl_instance.recvpool_semid_ctime)));
+		assert(jgbl.onlnrlbk || inst_frozen || !got_ftok
+			|| ((INVALID_SEMID == repl_instance.jnlpool_semid) && (0 == repl_instance.jnlpool_semid_ctime)));
+		assert(jgbl.onlnrlbk || inst_frozen || !got_ftok
+			|| ((INVALID_SEMID == repl_instance.recvpool_semid) && (0 == repl_instance.recvpool_semid_ctime)));
 		repl_inst_write(udi->fn, (off_t)0, (sm_uc_ptr_t)&repl_instance, SIZEOF(repl_inst_hdr));
 		/* Now that the standalone access is released, we should decrement the counter in the ftok semaphore obtained in
 		 * mu_rndwn_repl_instance(). If the counter is zero, ftok_sem_release will automatically remove it from the system
