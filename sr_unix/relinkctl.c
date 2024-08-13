@@ -255,6 +255,7 @@ int relinkctl_open(open_relinkctl_sgm *linkctl, boolean_t object_dir_missing)
 {
 #	ifdef AUTORELINK_SUPPORTED
 	int			fd, i, j, rc, save_errno, shmid, status, stat_res, user_id, group_id, perm;
+	int			umask_orig;
 	struct stat     	stat_buf;
 	size_t			shm_size;
 	boolean_t		is_mu_rndwn_rlnkctl, shm_removed, rctl_create_attempted, rctl_existed, need_shmctl;
@@ -302,7 +303,9 @@ int relinkctl_open(open_relinkctl_sgm *linkctl, boolean_t object_dir_missing)
 				 */
 				GET_USER_ID_GROUP_ID_AND_PERM(linkctl, user_id, group_id, perm);
 				/* Attempt to create the relinkctl file with desired permissions. */
+				umask_orig = umask(000);	/* Determine umask (destructive) */
 				OPEN3_CLOEXEC(linkctl->relinkctl_path, O_CREAT | O_RDWR | O_EXCL, perm, fd);
+				(void)umask(umask_orig);	/* Reset umask */
 				rctl_create_attempted = TRUE;
 			}
 		} else
