@@ -4,7 +4,7 @@
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
 
  *								*
- * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -49,7 +49,6 @@ lv_val *lv_getslot(symval *sym)
 		sym->lv_flist = (lv_val *)lv->ptrs.free_ent.next_free;
 	} else
 	{
-		DEBUG_ONLY(numElems = MAXUINT4);	/* maximum value */
 		for (p = sym->lv_first_block; ; p = p->next)
 		{
 			if (NULL == p)
@@ -72,8 +71,22 @@ lv_val *lv_getslot(symval *sym)
 				p->numUsed++;
 				break;
 			}
-			assert(numElems >= p->numAlloc);
-			DEBUG_ONLY(numElems = p->numAlloc);
+			/* Note: The following assert exists in "lvtree_getslot()" and "lvtreenode_getslot()".
+			 *	assert(numElems >= p->numAlloc);
+			 * This assert basically says that the "sym->lv_first_block" linked list has the property
+			 * that earlier nodes in the linked list have a "numAlloc" that is greater or equal to
+			 * later nodes. This is guaranteed to be true since the only allocations for lvtree and
+			 * lvtreenode happen inside "lvtree_getslot()" and "lvtreenode_getslot()" respectively
+			 * where the allocation is incrementally done and doubled at every node until it is maxed
+			 * out at 128.
+			 *
+			 * One would be tempted to have a similar assert here. But it is not guaranteed
+			 * to be true since "lv_newblock()" is called not just in "lv_getslot()" but also in
+			 * "sr_port/symbinit.c" with a bulk allocation based on the number of local variables used
+			 * in a given M program. This means that the initial allocation could be greater than 128
+			 * (see YDB#1088 issue description for example). In that case, later allocations would get
+			 * maxed out at "128" and so the assert would fail. Hence the assert is commented out here.
+			 */
 		}
 	}
 	assert(lv);
