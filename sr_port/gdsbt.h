@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -1069,7 +1069,7 @@ MBSTART	{															\
 	{															\
 		/* This starting point only needs to be approximate so no locking is needed */					\
 		if (0 == CNL->epoch_taper_start_dbuffs)										\
-			CNL->epoch_taper_start_dbuffs = CNL->wcs_active_lvl;							\
+			CNL->epoch_taper_start_dbuffs = CSD->flush_trigger;							\
 		/* Note, the below cannot use MAX(1, CNL->epoch_taper_start_dbuffs) since the result could end up being 0	\
 		 * in case CNL->epoch_taper_start_dbuffs is > 1 initially when the MAX(a,b) macro does the "if (a>b)" check	\
 		 * but could concurrently be changed to 0 by another process (executing this same macro but going through	\
