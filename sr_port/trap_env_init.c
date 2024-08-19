@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -35,6 +35,7 @@
 
 GBLREF	boolean_t		is_updproc, run_time;
 GBLREF	enum gtmImageTypes	image_type;
+GBLREF	boolean_t		shebang_invocation;	/* TRUE if yottadb is invoked through the "ydbsh" soft link */
 
 #ifdef GTM_TRIGGER
 LITREF mval			default_etrap;
@@ -44,6 +45,8 @@ error_def(ERR_LOGTOOLONG);
 error_def(ERR_TRNLOGFAIL);
 
 static readonly unsigned char init_break[1] = {'B'};
+static readonly unsigned char init_shebang_etrap[] = "write:(0=$stack) \"Error occurred: \",$zstatus,! zhalt +$zstatus";
+
 /* Initialize ztrap_form appropriately. Note this routine is not resident in gtm_env_init() because it raises errors
  * and error handling is not set up yet in gtm_env_init().
  */
@@ -71,10 +74,18 @@ void trap_env_init(void)
 		op_commarg(TREF(ind_source), indir_linetail);
 		op_unwind();
 	} else if (0 == (TREF(dollar_etrap)).mvtype)
-	{	/* If didn't setup $ETRAP, set default $ZTRAP instead */
-		(TREF(dollar_ztrap)).mvtype = MV_STR;
-		(TREF(dollar_ztrap)).str.len = SIZEOF(init_break);
-		(TREF(dollar_ztrap)).str.addr = (char *)init_break;
+	{
+		if (!shebang_invocation)
+		{	/* If didn't setup $ETRAP, set default $ZTRAP instead */
+			(TREF(dollar_ztrap)).mvtype = MV_STR;
+			(TREF(dollar_ztrap)).str.len = SIZEOF(init_break);
+			(TREF(dollar_ztrap)).str.addr = (char *)init_break;
+		} else
+		{	/* For a shebang invocation, set $ETRAP to halt out after printing $zstatus */
+			(TREF(dollar_etrap)).mvtype = MV_STR;
+			(TREF(dollar_etrap)).str.len = SIZEOF(init_shebang_etrap);
+			(TREF(dollar_etrap)).str.addr = (char *)init_shebang_etrap;
+		}
 	}
 #	ifdef GTM_TRIGGER
 	(TREF(ydb_trigger_etrap)).mvtype = MV_STR;

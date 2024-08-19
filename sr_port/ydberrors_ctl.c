@@ -68,6 +68,7 @@ LITDEF	err_msg ydberrors[] = {
 	{ "MUTRUNCALREADY", "Region !AD: no further truncation possible", 2, 0 },
 	{ "ARGSLONGLINE", "Entered line is greater than maximum characters allowed (!UL)", 1, 0 },
 	{ "ZGBLDIRUNDEF", "Global Directory env var $ydb_gbldir/$gtmgbldir is undefined", 0, 0 },
+	{ "SHEBANGMEXT", "!AZ needs a .m extension to be a valid shebang script", 1, 0 },
 };
 
 
@@ -80,7 +81,7 @@ GBLDEF	err_ctl ydberrors_ctl = {
 	256,
 	"YDB",
 	&ydberrors[0],
-	51,
+	52,
 	&ydberrors_undocarr[0],
 	0
 };

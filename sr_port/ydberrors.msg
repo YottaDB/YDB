@@ -77,6 +77,7 @@ SECSHRPATHMAX	<gtmsecshr executable path length is greater than maximum (!UL)>/e
 MUTRUNCALREADY	<Region !AD: no further truncation possible>/info/fao=2
 ARGSLONGLINE	<Entered line is greater than maximum characters allowed (!UL)>/warning/fao=1
 ZGBLDIRUNDEF	<Global Directory env var $ydb_gbldir/$gtmgbldir is undefined>/error/fao=0
+SHEBANGMEXT	<!AZ needs a .m extension to be a valid shebang script>/error/fao=1
 !
 ! If there are UNUSEDMSG* lines unused for more than one year and at least two non-patch releases, use them before adding new lines.
 !

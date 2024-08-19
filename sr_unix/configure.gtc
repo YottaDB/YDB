@@ -589,10 +589,14 @@ if [ "$doutf8" -ne 0 ]; then
 fi
 
 # Install mumps as a soft link to yottadb for backward compatibility purposes just in case
-ln -s ./yottadb $ydbdist/mumps || echo ln -s ./yottadb $ydbdist/mumps
-if [ "$doutf8" -ne 0 ]; then
-	ln -s ./yottadb $ydbdist/utf8/mumps || echo ln -s ./yottadb $ydbdist/utf8/mumps
-fi
+# Also install ydbsh as a soft link to yottadb to help implement shebang functionality (YDB#1084)
+for binary in mumps ydbsh
+do
+	ln -s ./yottadb $ydbdist/$binary || echo ln -s ./yottadb $ydbdist/$binary
+	if [ "$doutf8" -ne 0 ]; then
+		ln -s ./yottadb $ydbdist/utf8/$binary || echo ln -s ./yottadb $ydbdist/utf8/$binary
+	fi
+done
 
 # Install soft links from gtm*.h files to corresponding ydb*.h files
 ydbhdrfiles="ydb_tls_interface.h ydbcrypt_interface.h"

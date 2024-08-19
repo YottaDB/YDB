@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -39,6 +39,7 @@
 #include "gtmci.h"
 #include "send_msg.h"
 #include "have_crit.h"
+#include "ydb_shebang.h"
 
 #define FILE_NAME_SIZE	255
 
@@ -51,6 +52,7 @@ LITDEF char 		other_mode_buf[] = "OTHER";
 
 GBLREF stack_frame	*frame_pointer;
 GBLREF uint4		process_id;
+GBLREF boolean_t	shebang_invocation;	/* TRUE if yottadb is invoked through the "ydbsh" soft link */
 
 error_def(ERR_RUNPARAMERR);
 error_def(ERR_TEXT);
@@ -124,11 +126,49 @@ void jobchild_init(void)
 	{	/* If we are not a child, setup a dummy mumps routine */
 		if (MUMPS_RUN == invocation_mode)
 		{
+			char		*rtn_name;
+			boolean_t	created_tmpdir, ret;
+
 			arg_len = FILE_NAME_SIZE;
 			if (!cli_get_str("INFILE", run_file_name, &arg_len))
 				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_RUNPARAMERR);
-			lref_parse((uchar_ptr_t)run_file_name, &routine, &label, &offset);
-			if (!job_addr(&routine, &label, offset, (char **)&base_addr, (char **)&transfer_addr))
+			assert(arg_len < SIZEOF(run_file_name));
+			run_file_name[arg_len] = '\0';	/* null terminate it as "ydb_shebang()" relies on this */
+			if (shebang_invocation)
+				rtn_name = ydb_shebang(run_file_name, &created_tmpdir);
+			else
+				rtn_name = run_file_name;
+			lref_parse((unsigned char *)rtn_name, &routine, &label, &offset);
+			ret = job_addr(&routine, &label, offset, (char **)&base_addr, (char **)&transfer_addr);
+			if (shebang_invocation && created_tmpdir)
+			{	/* Remove the temporary object directory now that .o file has been linked into the process.
+				 * The object directory would have been added as the first element of "$zroutines".
+				 */
+				char	buf[YDB_PATH_MAX + 7];	/* + 7 for "rm -r " and '\0' byte at end */
+				char	*start, *end;
+
+				start = (TREF(dollar_zroutines)).addr;
+				end = strchr(start, '(');
+				assert(NULL != end);
+				if (NULL != end)
+				{
+					int	ret;
+
+					SNPRINTF(buf, SIZEOF(buf), "rm -r %.*s", end - start, start);
+					ret = SYSTEM(buf);
+					if (-1 == ret)
+					{
+						char	buf2[256];
+						int	save_errno;
+
+						save_errno = errno;
+						SNPRINTF(buf2, SIZEOF(buf2), "rm -r %.*s", end - start, start);
+						RTS_ERROR_CSA_ABT(CSA_ARG(NULL) VARLSTCNT(8)
+							ERR_SYSCALL, 5, LEN_AND_STR(buf2), CALLFROM, save_errno);
+					}
+				}
+			}
+			if (!ret)
 				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_JOBLABOFF);
 		} else if (MUMPS_CALLIN & invocation_mode) /* call-in mode */
 		{

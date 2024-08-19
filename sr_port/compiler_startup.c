@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -37,6 +37,7 @@
 #include "gtmmsg.h"
 #include "iosp.h"	/* for SS_NORMAL */
 #include "start_fetches.h"
+#include "ydb_shebang.h"	/* for REPLACE_IF_SHEBANG_WITH_SEMICOLON */
 
 #define HOPELESS_COMPILE 128
 
@@ -54,6 +55,7 @@ GBLREF src_line_struct 	src_head;
 GBLREF triple			t_orig;
 GBLREF unsigned char		source_file_name[];
 GBLREF unsigned short		source_name_len;
+GBLREF boolean_t		shebang_invocation;	/* TRUE if yottadb is invoked through the "ydbsh" soft link */
 
 LITDEF char compile_terminated[] = "COMPILATION TERMINATED DUE TO EXCESS ERRORS";
 
@@ -151,6 +153,11 @@ boolean_t compiler_startup(void)
 	{
 		if (-1 == (n = read_source_file()))
 			break;
+		/* Whether or not, we come here through "ydbsh" or "yottadb", allow for shebang lines in the first line
+		 * and do not issue a compile error. Hence the below macro is invoked even if "shebang_invocation" is FALSE.
+		 */
+		if (1 == TREF(source_line))
+			REPLACE_IF_SHEBANG_WITH_SEMICOLON(TREF(source_buffer));
 		rtn_src_chksum_line(&checksum_ctx, (TREF(source_buffer)).addr, n);
 		/* Save the source lines; a check later determines whether to include them in the object file */
 		/* Accumulate list of M source lines */

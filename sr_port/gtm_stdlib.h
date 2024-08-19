@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -60,6 +60,7 @@
 	mkstemp_res = mkstemp(template);				\
 	ENABLE_INTERRUPTS(INTRPT_IN_MKSTEMP, prev_intrpt_state);	\
 }
+#define MKDTEMP		mkdtemp
 # if defined(STATIC_ANALYSIS)
 #  define SYSTEM	system
 # else

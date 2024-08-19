@@ -53,6 +53,7 @@
 #include "gtm_tls.h"
 #include "ydb_getenv.h"
 #endif
+#include "ydb_shebang.h"
 
 GBLREF	IN_PARMS			*cli_lex_in_ptr;
 GBLREF	char				cli_token_buf[];
@@ -70,6 +71,7 @@ GBLREF	ch_ret_type			(*ch_at_trigger_init)();
 GBLREF	u_casemap_t 			gtm_strToTitle_ptr;		/* Function pointer for gtm_strToTitle */
 #endif
 GBLREF	char 				**gtmenvp;
+GBLREF	boolean_t			shebang_invocation;	/* TRUE if yottadb is invoked through the "ydbsh" soft link */
 
 #define GTMCRYPT_ERRLIT			"during GT.M startup"
 #define YDBXC_gblstat			"ydb_xc_gblstat=%s/gtmgblstat.xc"
@@ -94,6 +96,7 @@ int gtm_main(int argc, char **argv, char **envp)
 	char		*pathptr;				/* this is similar to code in "dlopen_libyottadb.c" */
 	char		curr_exe_realpath[YDB_PATH_MAX];	/* this is similar to code in "dlopen_libyottadb.c" */
 	size_t		cplen;
+	char		*exe_basename;
 
 #	ifdef GTM_SOCKET_SSL_SUPPORT
 	char			tlsid_env_name[MAX_TLSID_LEN * 2];
@@ -145,6 +148,13 @@ int gtm_main(int argc, char **argv, char **envp)
 	if (parse_ret && (EOF != parse_ret))
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) parse_ret, 2, LEN_AND_STR(cli_err_str));
 	invocation_exe_str = argv[0];
+	/* Now that we know which program was used in the invocation, check if it is a shebang invocation. */
+	exe_basename = strrchr(invocation_exe_str, '/');
+	if (NULL == exe_basename)
+		exe_basename = invocation_exe_str;
+	else
+		exe_basename++;
+	shebang_invocation = !STRCMP(exe_basename, YDBSH);
 	if (cli_present("VERSION")) {
 		char stamp[SIZEOF(YDB_RELEASE_STAMP)];
 		char *date, *time, *commit, *saveptr;
@@ -170,6 +180,7 @@ int gtm_main(int argc, char **argv, char **envp)
 	}
 	if (cli_present("DIRECT_MODE"))
 	{
+		shebang_invocation = FALSE;
 		if (!((ptr = getenv(CHILD_FLAG_ENV)) && strlen(ptr)) && (RESTRICTED(dmode))) /* note assignment */
 		{	/* first tell them it's a no-no without engaging the condition handling so we keep control */
 			dec_err(VARLSTCNT(3) MAKE_MSG_SEVERE(ERR_RESTRICTEDOP), 1, "mumps -direct");
@@ -177,7 +188,7 @@ int gtm_main(int argc, char **argv, char **envp)
 		}
 		invocation_mode = MUMPS_DIRECT;
 	}
-	else if (cli_present("RUN"))
+	else if (cli_present("RUN") || shebang_invocation)
 		invocation_mode = MUMPS_RUN;
 	/* this should be after cli_lex_setup() due to S390 A/E conversion in cli_lex_setup   */
 	init_gtm();

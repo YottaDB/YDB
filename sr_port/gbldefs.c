@@ -1477,3 +1477,5 @@ GBLDEF	boolean_t		in_fake_enospc;	/* used by an assert in "send_msg.c" */
 GBLDEF gdr_name	*gdr_name_head;
 GBLDEF gd_addr	*gd_addr_head;
 
+GBLDEF	boolean_t	shebang_invocation;	/* TRUE if yottadb is invoked through the "ydbsh" (YDBSH macro) soft link */
+
