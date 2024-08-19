@@ -38,7 +38,7 @@ DBG:	;transfer point for DEBUG and "runtime" %gde
 	s $et=$s(debug:"b:$zs'[""%GDE""!allerrs  ",1:"")_"g:(""%GDE%NONAME""[$p($p($zs,"","",3),""-"")) SHOERR^GDE d ABORT^GDE"
 	s io=$io,useio="io",comlevel=0,combase=$zl,resume(comlevel)=$zl_":INTERACT"
 	i $$set^%PATCODE("M")
-	d GDEINIT^GDEINIT,GDEMSGIN^GDEMSGIN,GDFIND^GDESETGD,CREATE^GDEGET:create,LOAD^GDEGET:'create
+	d GDEMSGIN^GDEMSGIN,GDEINIT^GDEINIT,GDFIND^GDESETGD,CREATE^GDEGET:create,LOAD^GDEGET:'create
 	; Determine whether GDE is running from a terminal, and if so enable EDITING
 	s gdeIOPat=1_""""_io_""""_1_""" "".E1"" TERMINAL "".E" ; pattern to see if a ZSH "D" line is for the current io device
 	zsh "d":gdeDev

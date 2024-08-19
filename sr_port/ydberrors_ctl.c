@@ -67,6 +67,7 @@ LITDEF	err_msg ydberrors[] = {
 	{ "SECSHRPATHMAX", "gtmsecshr executable path length is greater than maximum (!UL)", 1, 0 },
 	{ "MUTRUNCALREADY", "Region !AD: no further truncation possible", 2, 0 },
 	{ "ARGSLONGLINE", "Entered line is greater than maximum characters allowed (!UL)", 1, 0 },
+	{ "ZGBLDIRUNDEF", "Global Directory env var $ydb_gbldir/$gtm_gbldir is undefined", 0, 0 },
 };
 
 
@@ -79,7 +80,7 @@ GBLDEF	err_ctl ydberrors_ctl = {
 	256,
 	"YDB",
 	&ydberrors[0],
-	50,
+	51,
 	&ydberrors_undocarr[0],
 	0
 };

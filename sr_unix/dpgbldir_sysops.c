@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -51,6 +51,8 @@ char LITDEF gde_labels[GDE_LABEL_NUM][GDE_LABEL_SIZE] =
 GBLREF mstr	env_ydb_gbldir_xlate;
 GBLREF mval	dollar_zgbldir;
 GBLREF gd_addr	*gd_header;
+
+LITREF	mval	literal_null;
 
 error_def(ERR_ZGBLDIRACC);
 error_def(ERR_IOEOF);
@@ -192,6 +194,19 @@ void dpzgbini(void)
 	uint4		status;
 	parse_blk	pblk;
 
+	/* At this point, "common_startup_init()" has been run. It would have done a "ydb_getenv(YDBENVINDX_GBLDIR,...)"
+	 * call which would have set "ydb_gbldir" env var in case it is not set but "gtmgbldir" env var is set.
+	 * Therefore, it is safe to just check "ydb_gbldir" env var here and not worry about "gtmgbldir" env var.
+	 */
+	assert('$' == ydbenvname[YDBENVINDX_GBLDIR][0]);
+	if (NULL == getenv(ydbenvname[YDBENVINDX_GBLDIR] + 1))	/* + 1 to skip '$' */
+	{
+		assert('$' == gtmenvname[YDBENVINDX_GBLDIR][0]);
+		assert(NULL == getenv(gtmenvname[YDBENVINDX_GBLDIR] + 1));
+		dollar_zgbldir = literal_null;
+		gd_header = NULL;
+		return;
+	}
 	gbldirenv_mstr.addr = (char *)YDB_GBLDIR;
 	gbldirenv_mstr.len = STRLEN(YDB_GBLDIR);
 	tran_mstr = &gbldirenv_mstr;	/* Set to default value (will be overridden later if appropriate) */

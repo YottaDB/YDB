@@ -3,7 +3,7 @@
 ; Copyright (c) 2001-2020 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
-; Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries.	;
+; Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries.	;
 ; All rights reserved.						;
 ;								;
 ; Copyright (c) 2017-2018 Stephen L Johnson.			;
@@ -455,6 +455,7 @@ UNIX:
 	s hdrlab="GTCGBDUNX015"         ; must be concurrently maintained in gbldirnam.h!!!
 	i (gtm64=TRUE) s hdrlab="GTCGBDUNX115" ; the high order digit is a 64-bit flag
 	s tfile=$view("GBLDIRXLATE",$ztrnlnm("ydb_gbldir"))
+	i ""=tfile d message^GDE(gdeerr("ZGBLDIRUNDEF"),"""""")
 	s accmeth="\BG\MM"
 	s helpfile="$ydb_dist/gdehelp.gld"
 	s defdb="mumps.dat"
