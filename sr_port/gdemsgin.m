@@ -102,5 +102,8 @@ GDEMSGIN
 	s gdeerr("NOPERCENTY")=150504114
 	s gdeerr("GDELOGFAIL")=150504122
 	;
+	; Below errors are YottaDB-specific errors (i.e. in sr_port/ydberrors.msg)
+	; while the above errors are possible in YottaDB and GT.M.
+	;
 	s gdeerr("ZGBLDIRUNDEF")=151028122
 	q
