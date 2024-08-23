@@ -76,3 +76,5 @@ undefmval:
 	call	underr					# Give undef error
 	jmp	done					# Should never return but if do - at least return
 
+# Below line is needed to avoid the ELF executable from ending up with an executable stack marking.
+.section        .note.GNU-stack,"",@progbits
