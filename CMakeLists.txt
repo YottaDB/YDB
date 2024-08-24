@@ -530,21 +530,6 @@ add_custom_command(
 add_custom_target(gen_tls_options
   DEPENDS ${YDB_BINARY_DIR}/gen_tls_options.h ${YDB_BINARY_DIR}/gen_tls_verify_options.h)
 
-# Locate libgcrypt's header files (assumption: all others headers are found in the same location)
-find_program(LIBGCRYPT_CONFIG_SCRIPT NAMES libgcrypt-config)
-if (LIBGCRYPT_CONFIG_SCRIPT MATCHES ".+-NOTFOUND")
-	message(FATAL_ERROR "FATAL: libgcrypt-config not found (${LIBGCRYPT_CONFIG_SCRIPT})")
-else()
-	# libgcrypt-config --cflags returns "\n" when the includes are located in the default search path
-	execute_process(COMMAND ${LIBGCRYPT_CONFIG_SCRIPT} --cflags RESULT_VARIABLE _return_VALUE OUTPUT_VARIABLE LIBGCRYPT_CFLAGS)
-	# If a path is returned, it is preceded by '-I' for use as CFLAG directive
-	string(REGEX REPLACE "^-I" "" LIBGCRYPT_INCLUDES "${LIBGCRYPT_CFLAGS}")
-	if (NOT (${LIBGCRYPT_INCLUDES} MATCHES "\n"))
-		message("INFO: ${LIBGCRYPT_CONFIG_SCRIPT} ${_return_VALUE} '${LIBGCRYPT_INCLUDES}'")
-		include_directories(${LIBGCRYPT_INCLUDES})
-	endif()
-endif()
-
 #-----------------------------------------------------------------------------
 install(TARGETS
   yottadb
