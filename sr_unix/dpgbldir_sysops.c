@@ -122,12 +122,11 @@ void *open_gd_file(mstr *v)
 		if (!dollar_zgbldir.str.len || ((dollar_zgbldir.str.len == temp.len)
 							&& !memcmp(dollar_zgbldir.str.addr, temp.addr, temp.len)))
 		{
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_ZGBLDIRACC, 6, temp.len, temp.addr,
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(9) ERR_ZGBLDIRACC, 6, temp.len, temp.addr,
 				LEN_AND_LIT(".  Cannot continue"), LEN_AND_LIT(""), errno);
-			assert(FALSE);
-		}
-		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(9) ERR_ZGBLDIRACC, 6, temp.len, temp.addr, LEN_AND_LIT(".  Retaining "),
-			dollar_zgbldir.str.len, dollar_zgbldir.str.addr, errno);
+		} else
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(9) ERR_ZGBLDIRACC, 6, temp.len, temp.addr,
+				LEN_AND_LIT(".  Retaining "), dollar_zgbldir.str.len, dollar_zgbldir.str.addr, errno);
 	}
 #ifdef __MVS__
 	if (-1 == gtm_zos_tag_to_policy(fp->fd, TAG_BINARY, &realfiletag))
@@ -191,6 +190,7 @@ void dpzgbini(void)
 	mval		tran_mval, temp_mval;
 	char		temp_buff1[MAX_FN_LEN + 1];
 	char		temp_buff2[MAX_FN_LEN + 1];
+	char		*ptr;
 	uint4		status;
 	parse_blk	pblk;
 
@@ -199,10 +199,12 @@ void dpzgbini(void)
 	 * Therefore, it is safe to just check "ydb_gbldir" env var here and not worry about "gtmgbldir" env var.
 	 */
 	assert('$' == ydbenvname[YDBENVINDX_GBLDIR][0]);
-	if (NULL == getenv(ydbenvname[YDBENVINDX_GBLDIR] + 1))	/* + 1 to skip '$' */
+	ptr = getenv(ydbenvname[YDBENVINDX_GBLDIR] + 1);	/* + 1 to skip '$' */
+	if ((NULL == ptr) || ('\0' == *ptr))
 	{
 		assert('$' == gtmenvname[YDBENVINDX_GBLDIR][0]);
-		assert(NULL == getenv(gtmenvname[YDBENVINDX_GBLDIR] + 1));
+		assert((NULL != ptr) || (NULL == getenv(gtmenvname[YDBENVINDX_GBLDIR] + 1)));
+		assert((NULL == ptr) || ('\0' == *getenv(gtmenvname[YDBENVINDX_GBLDIR] + 1)));
 		dollar_zgbldir = literal_null;
 		gd_header = NULL;
 		return;

@@ -140,6 +140,12 @@ gd_addr *zgbldir_opt(mval *v, boolean_t env_translated, boolean_t force_load)
 		{	/* Do not need gbldir translation for sure. Use env var name as is. */
 			temp_mstr.addr = gbldirenv_mstr.addr;
 			temp_mstr.len  = gbldirenv_mstr.len;
+			/* If the env var is undefined OR if it is defined and set to "",
+			 * treat both as the same scenario and issue a ZGBLDIRUNDEF error.
+			 */
+			status = trans_log_name(&temp_mstr, &trnlnm_mstr, temp_buff, MAX_FN_LEN + 1, dont_sendmsg_on_log2long);
+			if ((SS_NOLOGNAM == status) || ((SS_NORMAL == status) && !trnlnm_mstr.len))
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_ZGBLDIRUNDEF);
 		} else
 		{	/* Translate the logical name (environment variable) ydb_gbldir/gtmgbldir which would be done in
 			 * "parse_file" (invoked inside "get_name" below) but we need to know the its value so that we can

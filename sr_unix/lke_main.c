@@ -68,6 +68,7 @@
 #include "readline.h"
 #include "restrict.h"
 #include "dm_audit_log.h"
+#include "dpgbldir_sysops.h"	/* for dpzgbini prototype */
 
 #ifdef UTF8_SUPPORTED
 # include "gtm_icu_api.h"
@@ -108,6 +109,7 @@ int lke_main(int argc, char *argv[], char **envp)
 	getjobname();
 	getzdir();
 	INIT_ENV_AND_GBLDIR_XLATE;
+	dpzgbini();
 	ydb_chk_dist(argv[0]);
 	prealloc_gt_timers();
 	gt_timers_add_safe_hndlrs();
