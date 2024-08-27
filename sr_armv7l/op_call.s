@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 # Copyright (c) 2017-2018 Stephen L Johnson.			#
@@ -45,3 +45,6 @@ ENTRY op_callb
 	pop	{r4, pc}
 
 .end
+
+# Below line is needed to avoid the ELF executable from ending up with an executable stack marking.
+.section        .note.GNU-stack,"",@progbits

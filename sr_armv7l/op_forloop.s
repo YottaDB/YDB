@@ -241,3 +241,6 @@ newiter:
 	bx	lr
 
 	.end
+
+# Below line is needed to avoid the ELF executable from ending up with an executable stack marking.
+.section        .note.GNU-stack,"",@progbits

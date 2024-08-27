@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 # Copyright (c) 2017 Stephen L Johnson. All rights reserved.	#
@@ -14,7 +14,7 @@
 
 /* op_forchk1.s */
 
-/* 
+/*
 	op_forchk1 - dummy routine called at start of FOR-statement
 
 	During normal execution, this routine would be called at the beginning
@@ -39,3 +39,6 @@ ENTRY op_forchk1
 	bx	lr
 
 	.end
+
+# Below line is needed to avoid the ELF executable from ending up with an executable stack marking.
+.section        .note.GNU-stack,"",@progbits

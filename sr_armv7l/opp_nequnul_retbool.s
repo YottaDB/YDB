@@ -39,3 +39,6 @@ ENTRY opp_nequnul_retbool
 	pop	{r6, pc}
 
 	.end
+
+# Below line is needed to avoid the ELF executable from ending up with an executable stack marking.
+.section        .note.GNU-stack,"",@progbits
