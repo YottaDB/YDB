@@ -42,7 +42,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* DBNOTGDS */
 	   0,	/* DBOPNERR */
 	   0,	/* DBRDERR */
-	   0,	/* CCEDUMPNOW */
+	   0,	/* UNUSEDMSG211 */
 	   0,	/* DEVPARINAP */
 	   0,	/* RECORDSTAT */
 	   0,	/* NOTGBL */
@@ -151,7 +151,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* JNLTMQUAL3 */
 	  57,	/* MULTLAB */
 	   0,	/* GTMCURUNSUPP */
-	   0,	/* CCEDUMPOFF */
+	   0,	/* UNUSEDMSG320 */
 	   0,	/* NOPLACE */
 	   0,	/* JNLCLOSE */
 	   0,	/* NOTPRINCIO */
@@ -334,17 +334,17 @@ const static readonly int error_ansi[] = {
 	   0,	/* EXTRFAIL */
 	   0,	/* LDBINFMT */
 	   0,	/* NOPREVLINK */
-	   0,	/* CCEDUMPON */
-	   0,	/* CCEDMPQUALREQ */
-	   0,	/* CCEDBDUMP */
-	   0,	/* CCEDBNODUMP */
-	   0,	/* CCPMBX */
+	   0,	/* UNUSEDMSG503 */
+	   0,	/* UNUSEDMSG504 */
+	   0,	/* UNUSEDMSG505 */
+	   0,	/* UNUSEDMSG506 */
+	   0,	/* UNUSEDMSG507 */
 	   0,	/* REQRUNDOWN */
-	   0,	/* CCPINTQUE */
-	   0,	/* CCPBADMSG */
+	   0,	/* UNUSEDMSG509 */
+	   0,	/* UNUSEDMSG510 */
 	   0,	/* CNOTONSYS */
-	   0,	/* CCPNAME */
-	   0,	/* CCPNOTFND */
+	   0,	/* UNUSEDMSG512 */
+	   0,	/* UNUSEDMSG513 */
 	   0,	/* OPRCCPSTOP */
 	   0,	/* SELECTSYNTAX */
 	   0,	/* LOADABORT */
@@ -356,7 +356,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* BACKUPSEQNO */
 	   0,	/* DIRACCESS */
 	   0,	/* TXTSRCMAT */
-	   0,	/* CCENOGROUP */
+	   0,	/* UNUSEDMSG525 */
 	   0,	/* BADDBVER */
 	   0,	/* LINKVERSION */
 	   0,	/* TOTALBLKMAX */
@@ -366,7 +366,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* LCKGONE */
 	   0,	/* SUB2LONG */
 	   0,	/* EXTRACTCTRLY */
-	   0,	/* CCENOWORLD */
+	   0,	/* UNUSEDMSG535 */
 	   0,	/* GVQUERYFAIL */
 	   0,	/* LCKSCANCELLED */
 	   0,	/* INVNETFILNM */
@@ -384,26 +384,26 @@ const static readonly int error_ansi[] = {
 	   0,	/* DSEINVLCLUSFN */
 	  18,	/* RDFLTOOSHORT */
 	   0,	/* TIMRBADVAL */
-	   0,	/* CCENOSYSLCK */
-	   0,	/* CCPGRP */
+	   0,	/* UNUSEDMSG553 */
+	   0,	/* UNUSEDMSG554 */
 	   0,	/* UNSOLCNTERR */
 	   0,	/* BACKUPCTRL */
 	   0,	/* NOCCPPID */
-	   0,	/* CCPJNLOPNERR */
+	   0,	/* UNUSEDMSG558 */
 	   0,	/* LCKSGONE */
 	   0,	/* UNUSEDMSG560 */
 	   0,	/* DBFILOPERR */
-	   0,	/* CCERDERR */
-	   0,	/* CCEDBCL */
-	   0,	/* CCEDBNTCL */
-	   0,	/* CCEWRTERR */
-	   0,	/* CCEBADFN */
-	   0,	/* CCERDTIMOUT */
-	   0,	/* CCPSIGCONT */
-	   0,	/* CCEBGONLY */
-	   0,	/* CCENOCCP */
-	   0,	/* CCECCPPID */
-	   0,	/* CCECLSTPRCS */
+	   0,	/* UNUSEDMSG562 */
+	   0,	/* UNUSEDMSG563 */
+	   0,	/* UNUSEDMSG564 */
+	   0,	/* UNUSEDMSG565 */
+	   0,	/* UNUSEDMSG566 */
+	   0,	/* UNUSEDMSG567 */
+	   0,	/* UNUSEDMSG568 */
+	   0,	/* UNUSEDMSG569 */
+	   0,	/* UNUSEDMSG570 */
+	   0,	/* UNUSEDMSG571 */
+	   0,	/* UNUSEDMSG572 */
 	   0,	/* ZSHOWBADFUNC */
 	   0,	/* NOTALLJNLEN */
 	   0,	/* BADLOCKNEST */
@@ -510,7 +510,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* GTMSECSHRSRVF */
 	   0,	/* FREEZECTRL */
 	   0,	/* JNLFLUSH */
-	   0,	/* CCPSIGDMP */
+	   0,	/* UNUSEDMSG679 */
 	   0,	/* NOPRINCIO */
 	   0,	/* INVPORTSPEC */
 	   0,	/* INVADDRSPEC */
@@ -976,29 +976,29 @@ const static readonly int error_ansi[] = {
 	   0,	/* TMPFILENOCRE */
 	   0,	/* DEVICEOPTION */
 	   0,	/* JNLSENDOPER */
-	   0,	/* DDPSUBSNUL */
-	   0,	/* DDPNOCONNECT */
-	   0,	/* DDPCONGEST */
-	   0,	/* DDPSHUTDOWN */
-	   0,	/* DDPTOOMANYPROCS */
-	   0,	/* DDPBADRESPONSE */
-	   0,	/* DDPINVCKT */
-	   0,	/* DDPVOLSETCONFIG */
-	   0,	/* DDPCONFGOOD */
-	   0,	/* DDPCONFIGNORE */
-	   0,	/* DDPCONFINCOMPL */
-	   0,	/* DDPCONFBADVOL */
-	   0,	/* DDPCONFBADUCI */
-	   0,	/* DDPCONFBADGLD */
-	   0,	/* DDPRECSIZNOTNUM */
-	   0,	/* DDPOUTMSG2BIG */
-	   0,	/* DDPNOSERVER */
+	   0,	/* UNUSEDMSG1145 */
+	   0,	/* UNUSEDMSG1146 */
+	   0,	/* UNUSEDMSG1147 */
+	   0,	/* UNUSEDMSG1148 */
+	   0,	/* UNUSEDMSG1149 */
+	   0,	/* UNUSEDMSG1150 */
+	   0,	/* UNUSEDMSG1151 */
+	   0,	/* UNUSEDMSG1152 */
+	   0,	/* UNUSEDMSG1153 */
+	   0,	/* UNUSEDMSG1154 */
+	   0,	/* UNUSEDMSG1155 */
+	   0,	/* UNUSEDMSG1156 */
+	   0,	/* UNUSEDMSG1157 */
+	   0,	/* UNUSEDMSG1158 */
+	   0,	/* UNUSEDMSG1159 */
+	   0,	/* UNUSEDMSG1160 */
+	   0,	/* UNUSEDMSG1161 */
 	   0,	/* MUTEXRELEASED */
 	   0,	/* JNLCRESTATUS */
 	   0,	/* ZBREAKFAIL */
 	   0,	/* DLLVERSION */
 	   0,	/* INVZROENT */
-	   0,	/* DDPLOGERR */
+	   0,	/* UNUSEDMSG1167 */
 	   0,	/* GETSOCKNAMERR */
 	   0,	/* INVYDBEXIT */
 	   0,	/* CIMAXPARAM */

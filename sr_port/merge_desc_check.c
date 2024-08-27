@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -35,7 +35,6 @@
 #include "gvname_info.h"
 #include "op_merge.h"
 #include "format_targ_key.h"
-#include "ddphdr.h"
 #include "mvalconv.h"
 #include "gvcst_protos.h"	/* needed by OPEN_BASEREG_IF_STATSREG */
 
@@ -202,11 +201,7 @@ boolean_t merge_desc_check(void)
 				if (!((NULL != gvt1->gd_csa) && (gvt1->gd_csa == gvt2->gd_csa))
 					&& !((dba_cm == acc_meth1) && (dba_cm == acc_meth2)
 						&& (reg1->dyn.addr->cm_blk == reg2->dyn.addr->cm_blk)
-						&& (reg1->cmx_regnum == reg2->cmx_regnum))
-					VMS_ONLY (&&
-						!((dba_usr == acc_meth1) && (dba_usr == acc_meth2)
-							&& ((ddp_info *)(&FILE_INFO(reg1)->file_id))->volset
-								== ((ddp_info *)(&FILE_INFO(reg2)->file_id))->volset)))
+						&& (reg1->cmx_regnum == reg2->cmx_regnum)))
 				{
 					UNIX_ONLY(assert((dba_usr != acc_meth1) && (dba_usr != acc_meth2));)
 					return 1;

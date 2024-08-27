@@ -208,7 +208,7 @@ DBFILERR	<Error with database file !AD>/error/fao=2!/ansi=0
 DBNOTGDS	<!AD - Unrecognized database file format>/error/fao=2!/ansi=0/A
 DBOPNERR	<Error opening database file !AD>/error/fao=2!/ansi=0//1
 DBRDERR		<Cannot read database file !AD after opening>/error/fao=2!/ansi=0//1
-CCEDUMPNOW	<>/fatal/fao=0!/ansi=0
+UNUSEDMSG211	<CCEDUMPNOW nixed in r2.02 because it is a VMS only error>/fatal/fao=0!/ansi=0
 DEVPARINAP	<Device parameter inappropriate to this command>/error/fao=0!/ansi=0
 RECORDSTAT	<!AD:!_  Key cnt: !@ZQ  max subsc len: !UL  max rec len: !UL  max node len: !UL>/info/fao=6!/ansi=0
 NOTGBL		<Expected a global variable name starting with an up-arrow (^): !AD>/error/fao=2!/ansi=0
@@ -317,7 +317,7 @@ BACKUPSUCCESS	<Backup completed successfully>/info/fao=0!/ansi=0
 JNLTMQUAL3	<Time qualifier BEFORE_TIME="!AZ" is less than the journal file(s) minimum timestamp="!AZ">/error/fao=2!/ansi=0
 MULTLAB		<This label has been previously defined>/error/fao=0!/ansi=57
 GTMCURUNSUPP	<The requested operation is unsupported in this version of YottaDB>/error/fao=0!/ansi=0
-CCEDUMPOFF	<>/fatal/fao=0!/ansi=0
+UNUSEDMSG320	<CCEDUMPOFF nixed in r2.02 because it is a VMS only error>/fatal/fao=0!/ansi=0
 NOPLACE		<Line specified in a ZBREAK cannot be found>/error/fao=0!/ansi=0
 JNLCLOSE	<Error closing journal file !AD>/error/fao=2!/ansi=0
 NOTPRINCIO	<Output currently directed to device !AD>/warning/fao=2!/ansi=0
@@ -500,17 +500,17 @@ NOSELECT	<None of the selected variables exist -- halting>/warning/fao=0!/ansi=0
 EXTRFAIL	<Extract failed for the global ^!AD. MUPIP INTEG should be run.>/error/fao=2!/ansi=0
 LDBINFMT	<Unrecognized header for load file>/error/fao=0!/ansi=0
 NOPREVLINK	<Journal file !AD has a null previous link>/error/fao=2!/ansi=0
-CCEDUMPON	<>/fatal/fao=0!/ansi=0
-CCEDMPQUALREQ	<A qualifier (DB,[NO]ON, or NOW) is required with the DUMP command>/error/fao=0!/ansi=0
-CCEDBDUMP	<Section !AD dumped>/info/fao=2!/ansi=0
-CCEDBNODUMP	<Section !AD not dumped; status = >/info/fao=2!/ansi=0
-CCPMBX		<Error accessing Cluster Control Program Mailbox>/error/fao=0!/ansi=0
+UNUSEDMSG503	<CCEDUMPON nixed in r2.02 because it is a VMS only error>/fatal/fao=0!/ansi=0
+UNUSEDMSG504	<CCEDMPQUALREQ nixed in r2.02 because it is a VMS only error>/error/fao=0!/ansi=0
+UNUSEDMSG505	<CCEDBDUMP nixed in r2.02 because it is a VMS only error>/info/fao=2!/ansi=0
+UNUSEDMSG506	<CCEDBNODUMP nixed in r2.02 because it is a VMS only error>/info/fao=2!/ansi=0
+UNUSEDMSG507	<CCPMBX nixed in r2.02 because it is a VMS only error>/error/fao=0!/ansi=0
 REQRUNDOWN	<Error accessing database !AD.  Must be rundown on cluster node !AD.>/error/fao=4!/ansi=0
-CCPINTQUE	<Interlock failure accessing Cluster Control Program queue>/error/fao=0!/ansi=0
-CCPBADMSG	<Invalid message code received by Cluster Control Program>/error/fao=0!/ansi=0
+UNUSEDMSG509	<CCPINTQUE nixed in r2.02 because it is a VMS only error>/error/fao=0!/ansi=0
+UNUSEDMSG510	<CCPBADMSG nixed in r2.02 because it is a VMS only error>/error/fao=0!/ansi=0
 CNOTONSYS	<Command is not supported by this operating system>/error/fao=0!/ansi=0
-CCPNAME		<Error setting the Cluster Control Program process name>/fatal/fao=0!/ansi=0
-CCPNOTFND	<The Cluster Control Program is not responding>/error/fao=0!/ansi=0
+UNUSEDMSG512	<CCPNAME nixed in r2.02 because it is a VMS only error>/fatal/fao=0!/ansi=0
+UNUSEDMSG513	<CCPNOTFND nixed in r2.02 because it is a VMS only error>/error/fao=0!/ansi=0
 OPRCCPSTOP	<The Cluster Control Program has been halted by an operator stop request>/info/fao=0!/ansi=0
 SELECTSYNTAX	<Argument to !AD clause is not valid>/fatal/fao=2!/ansi=0
 LOADABORT	<Aborting load at record !UL>/error/fao=1!/ansi=0
@@ -522,7 +522,7 @@ BACKUPREPL	<Replication Instance file !AD backed up in file !AD>/info/fao=4!/ans
 BACKUPSEQNO	<Journal Seqnos up to 0x!16@XQ are backed up>/info/fao=1!/ansi=0
 DIRACCESS	<Do not have full access to directory for temporary files: !AD>/error/fao=2!/ansi=0
 TXTSRCMAT	<M object module and source file do not match>/error/fao=0!/ansi=0
-CCENOGROUP	<CCE does not have GROUP privilege.  Information may be incomplete.>/warning/fao=0!/ansi=0
+UNUSEDMSG525	<CCENOGROUP nixed in r2.02 because it is a VMS only error>/warning/fao=0!/ansi=0
 BADDBVER	<Incorrect database version: !AD>/error/fao=2!/ansi=0
 LINKVERSION	<This image must be relinked with the current version of YottaDB>/fatal/fao=0!/ansi=0
 TOTALBLKMAX	<Extension exceeds maximum total blocks.  Not extending.>/error/fao=0!/ansi=0
@@ -532,7 +532,7 @@ SRCNAM		<in source module !AD>/info/fao=2!/ansi=0
 LCKGONE		<Lock removed: !AD>/success/fao=2!/ansi=0
 SUB2LONG	<Subscript invalid, too long>/error/fao=0!/ansi=0
 EXTRACTCTRLY	<User interrupt encountered during extract -- halting>/info/fao=0!/ansi=0
-CCENOWORLD	<CCE does not have WORLD privilege.  Information may be incomplete.>/warning/fao=0!/ansi=0
+UNUSEDMSG535	<CCENOWORLD nixed in r2.02 because it is a VMS only error>/warning/fao=0!/ansi=0
 GVQUERYFAIL	<Global variable $QUERY function failed.  Failure code: !AD.>/error/fao=2!/ansi=0
 LCKSCANCELLED	<Error on remote node holding LOCKs or ZALLOCATEs.  All LOCKs and ZALLOCATEs cancelled.>/error/fao=0!/ansi=0
 INVNETFILNM	<Invalid file name following node designation in global directory>/error/fao=0!/ansi=0
@@ -550,26 +550,26 @@ DSEONLYBGMM	<!AD is supported only for BG/MM access methods>/warning/fao=2!/ansi
 DSEINVLCLUSFN	<Specified function is invalid for clustered databases>/warning/fao=0!/ansi=0
 RDFLTOOSHORT	<Length specified for fixed length read less than or equal to zero>/error/fao=0!/ansi=18
 TIMRBADVAL	<Bad value specified.  Timer not changed.>/info/fao=0!/ansi=0
-CCENOSYSLCK	<CCE does not have SYSLCK privilege.  Information may be incomplete.>/warning/fao=0!/ansi=0
-CCPGRP		<Error with the Cluster Control Program's group number>/fatal/fao=0!/ansi=0
+UNUSEDMSG553	<CCENOSYSLCK nixed in r2.02 because it is a VMS only error>/warning/fao=0!/ansi=0
+UNUSEDMSG554	<CCPGRP nixed in r2.02 because it is a VMS only error>/fatal/fao=0!/ansi=0
 UNSOLCNTERR	<An unsolicited error message has been received from the network>/error/fao=0!/ansi=0
 BACKUPCTRL	<Control Y or control C encountered during backup, aborting backup>/info/fao=0!/ansi=0
 NOCCPPID	<Cannot find CCP process id>/error/fao=0!/ansi=0
-CCPJNLOPNERR	<Error opening journal file.  Database not opened.>/error/fao=0!/ansi=0
+UNUSEDMSG558	<CCPJNLOPNERR nixed in r2.02 because it is a VMS only error>/error/fao=0!/ansi=0
 LCKSGONE	<Locks selected for deletion removed>/success/fao=0!/ansi=0
 UNUSEDMSG560	<ZLKIDBADARG nixed in r1.20 because it is a VMS only error>/error/fao=0!/ansi=0
 DBFILOPERR	<Error doing database I/O to database file !AD>/error/fao=2!/ansi=0
-CCERDERR	<Error reading from database file !AD>/error/fao=2!/ansi=0
-CCEDBCL		<Database file !AD is clustered>/info/fao=2!/ansi=0
-CCEDBNTCL	<Database file !AD is not clustered>/info/fao=2!/ansi=0
-CCEWRTERR	<Error writing to database file !AD>/error/fao=2!/ansi=0
-CCEBADFN	<Filename error>/error/fao=0!/ansi=0
-CCERDTIMOUT	<Read timeout, CCP has not responded to request>/error/fao=0!/ansi=0
-CCPSIGCONT	<CCP non fatal error at pc 0x!XJ.  Continuing operation.>/info/fao=1!/ansi=0
-CCEBGONLY	<Only BG databases can be clustered>/error/fao=0!/ansi=0
-CCENOCCP	<The cluster control program is not running on this node>/info/fao=0!/ansi=0
-CCECCPPID	<The cluster control program has PID 0x!XL>/info/fao=1!/ansi=0
-CCECLSTPRCS	<!UL processes are accessing clustered database files>/info/fao=1!/ansi=0
+UNUSEDMSG562	<CCERDERR nixed in r2.02 because it is a VMS only error>/error/fao=2!/ansi=0
+UNUSEDMSG563	<CCEDBCL nixed in r2.02 because it is a VMS only error>/info/fao=2!/ansi=0
+UNUSEDMSG564	<CCEDBNTCL nixed in r2.02 because it is a VMS only error>/info/fao=2!/ansi=0
+UNUSEDMSG565	<CCEWRTERR nixed in r2.02 because it is a VMS only error>/error/fao=2!/ansi=0
+UNUSEDMSG566	<CCEBADFN nixed in r2.02 because it is a VMS only error>/error/fao=0!/ansi=0
+UNUSEDMSG567	<CCERDTIMOUT nixed in r2.02 because it is a VMS only error>/error/fao=0!/ansi=0
+UNUSEDMSG568	<CCPSIGCONT nixed in r2.02 because it is a VMS only error>/info/fao=1!/ansi=0
+UNUSEDMSG569	<CCEBGONLY nixed in r2.02 because it is a VMS only error>/error/fao=0!/ansi=0
+UNUSEDMSG570	<CCENOCCP nixed in r2.02 because it is a VMS only error>/info/fao=0!/ansi=0
+UNUSEDMSG571	<CCECCPPID nixed in r2.02 because it is a VMS only error>/info/fao=1!/ansi=0
+UNUSEDMSG572	<CCECLSTPRCS nixed in r2.02 because it is a VMS only error>/info/fao=1!/ansi=0
 ZSHOWBADFUNC	<An invalid information code was specified with ZSHOW or $ZJOBEXAM()>/error/fao=0!/ansi=0
 NOTALLJNLEN	<Journaling disabled/off for !AD regions>/warning/fao=2!/ansi=0
 BADLOCKNEST	<Unsupported nesting of LOCK commands>/error/fao=0!/ansi=0
@@ -676,7 +676,7 @@ MSTACKCRIT	<User-specified M stack size critical threshold of !UL not appropriat
 GTMSECSHRSRVF	<!AD - !UL : Attempt to service request failed (retry = !UL)>/error/fao=4!/ansi=0
 FREEZECTRL	<Control Y or control C encountered during attempt to freeze the database. Aborting freeze.>/info/fao=0!/ansi=0
 JNLFLUSH	<Error flushing journal buffers to journal file !AD>/info/fao=2!/ansi=0
-CCPSIGDMP	<CCP non fatal dump, continuing operation. Report to your YottaDB Support Channel.>/info/fao=0!/ansi=0
+UNUSEDMSG679	<CCPSIGDMP nixed in r2.02 because it is a VMS only error>/info/fao=0!/ansi=0
 NOPRINCIO	<Unable to !AD principal device: !AD at !AD due to: !AD>/fatal/fao=8!/ansi=0
 INVPORTSPEC	<Invalid port specification>/error/fao=0!/ansi=0
 INVADDRSPEC	<Invalid IP address specification>/error/fao=0!/ansi=0
@@ -1142,29 +1142,29 @@ NOTRNDMACC	<Only random access files are supported as backup files for non-incre
 TMPFILENOCRE	<Error in MUPIP BACKUP while trying to create temporary file !AD>/error/fao=2!/ansi=0
 DEVICEOPTION	<Option !AD on !AZ command: !AZ>/error/fao=4!/ansi=0
 JNLSENDOPER	<pid = 0x!XL : status = 0x!XL : jpc_status = 0x!XL : jpc_status2 = 0x!XL : iosb.cond = 0x!XW>/info/fao=5!/ansi=0
-DDPSUBSNUL	<NUL characters in subscripts are not supported by DDP>/error/fao=0!/ansi=0
-DDPNOCONNECT	<Named volume set, !AD, is not connected>/error/fao=2!/ansi=0
-DDPCONGEST	<Agent congestion>/error/fao=0!/ansi=0
-DDPSHUTDOWN	<Server has shut down>/error/fao=0!/ansi=0
-DDPTOOMANYPROCS	<Maximum process limit of !UL exceeded>/error/fao=1!/ansi=0
-DDPBADRESPONSE	<DDP invalid response code: !XB; message text follows>/error/fao=1!/ansi=0
-DDPINVCKT	<Invalid format for CIRCUIT>/error/fao=0!/ansi=0
-DDPVOLSETCONFIG	<Volume Set Configuration file error>/error/fao=0!/ansi=0
-DDPCONFGOOD	<Volume Set Configuration entry accepted>/success/fao=0!/ansi=0
-DDPCONFIGNORE	<Volume Set Configuration line ignored>/success/fao=0!/ansi=0
-DDPCONFINCOMPL	<Volume Set Configuration entry incomplete>/warning/fao=0!/ansi=0
-DDPCONFBADVOL	<Volume Set Configuration entry : invalid volume>/error/fao=0!/ansi=0
-DDPCONFBADUCI	<Volume Set Configuration entry : invalid uci>/error/fao=0!/ansi=0
-DDPCONFBADGLD	<Volume Set Configuration entry : invalid global directory>/error/fao=0!/ansi=0
-DDPRECSIZNOTNUM	<Maximum record size is not numeric>/error/fao=0!/ansi=0
-DDPOUTMSG2BIG	<DDP message too big to be accommodated in outbound buffer>/error/fao=0!/ansi=0
-DDPNOSERVER	<DDP Server not running on local node>/error/fao=0!/ansi=0
+UNUSEDMSG1145	<DDPSUBSNUL nixed in r2.02 because it is a VMS only error>/error/fao=0!/ansi=0
+UNUSEDMSG1146	<DDPNOCONNECT nixed in r2.02 because it is a VMS only error>/error/fao=2!/ansi=0
+UNUSEDMSG1147	<DDPCONGEST nixed in r2.02 because it is a VMS only error>/error/fao=0!/ansi=0
+UNUSEDMSG1148	<DDPSHUTDOWN nixed in r2.02 because it is a VMS only error>/error/fao=0!/ansi=0
+UNUSEDMSG1149	<DDPTOOMANYPROCS nixed in r2.02 because it is a VMS only error>/error/fao=1!/ansi=0
+UNUSEDMSG1150	<DDPBADRESPONSE nixed in r2.02 because it is a VMS only error>/error/fao=1!/ansi=0
+UNUSEDMSG1151	<DDPINVCKT nixed in r2.02 because it is a VMS only error>/error/fao=0!/ansi=0
+UNUSEDMSG1152	<DDPVOLSETCONFIG nixed in r2.02 because it is a VMS only error>/error/fao=0!/ansi=0
+UNUSEDMSG1153	<DDPCONFGOOD nixed in r2.02 because it is a VMS only error>/success/fao=0!/ansi=0
+UNUSEDMSG1154	<DDPCONFIGNORE nixed in r2.02 because it is a VMS only error>/success/fao=0!/ansi=0
+UNUSEDMSG1155	<DDPCONFINCOMPL nixed in r2.02 because it is a VMS only error>/warning/fao=0!/ansi=0
+UNUSEDMSG1156	<DDPCONFBADVOL nixed in r2.02 because it is a VMS only error>/error/fao=0!/ansi=0
+UNUSEDMSG1157	<DDPCONFBADUCI nixed in r2.02 because it is a VMS only error>/error/fao=0!/ansi=0
+UNUSEDMSG1158	<DDPCONFBADGLD nixed in r2.02 because it is a VMS only error>/error/fao=0!/ansi=0
+UNUSEDMSG1159	<DDPRECSIZNOTNUM nixed in r2.02 because it is a VMS only error>/error/fao=0!/ansi=0
+UNUSEDMSG1160	<DDPOUTMSG2BIG nixed in r2.02 because it is a VMS only error>/error/fao=0!/ansi=0
+UNUSEDMSG1161	<DDPNOSERVER nixed in r2.02 because it is a VMS only error>/error/fao=0!/ansi=0
 MUTEXRELEASED	<Process !UL [0x!XL] has released the critical section for database !AD to avoid deadlock. $TLEVEL: !UL  t_tries: !UL>/error/fao=6!/ansi=0
 JNLCRESTATUS	<!AD at line !UL for journal file !AD, database file !AD encountered error>/warning/fao=7!/ansi=0
 ZBREAKFAIL	<Could not set breakpoint at !AD due to insufficient memory>/info/fao=2!/ansi=0
 DLLVERSION	<Routine !AD in library !AD was compiled with an incompatible version of GT.M/YottaDB.  Recompile with the current version of YottaDB and re-link>/error/fao=4!/ansi=0
 INVZROENT	<!AD is neither a directory nor an object library(DLL)>/error/fao=2!/ansi=0
-DDPLOGERR	<!AD: !AD>/error/fao=4!/ansi=0
+UNUSEDMSG1167	<DDPLOGERR nixed in r2.02 because it is a VMS only error>/error/fao=4!/ansi=0
 GETSOCKNAMERR	<Getting the socket name failed from getsockname(): (errno==!UL) !AD>/error/fao=3!/ansi=0
 INVYDBEXIT	<Inappropriate invocation of ydb_exit(). Calls to ydb_exit() cannot be made from external calls.>/error/fao=0!/ansi=0
 CIMAXPARAM	<Exceeded maximum number of parameters in the call-in table entry. An M routine cannot accept more than 32 parameters.>/error/fao=0!/ansi=0
