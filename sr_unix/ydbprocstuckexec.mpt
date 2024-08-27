@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-; Copyright (c) 2020-2022 YottaDB LLC and/or its subsidiaries.	;
+; Copyright (c) 2020-2024 YottaDB LLC and/or its subsidiaries.	;
 ; All rights reserved.						;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -35,10 +35,10 @@
 	view "unsetenv":"ydb_procstuckexec"	; Prevent JOB'd process from invoking %YDBPROCSTUCKEXEC
 	view "unsetenv":"gtm_procstuckexec"
 	;
-	; Use the global directory pointed to by $ydb_gbldir / $gtm_gbldir env vars (inherited from the parent process).
+	; Use the global directory pointed to by $ydb_gbldir / $gtmgbldir env vars (inherited from the parent process).
 	; That would already be stored in the ISV "$zgbldir" at process startup of this process. But if the env var
 	; $ydb_cur_gbldir exists (points to the current $zgbldir when the parent process invoked %YDBPROCSTUCKEXEC),
-	; use that to override the $ydb_gbldir / $gtm_gbldir env vars. This is because %YDBPROCSTUCKEXEC needs to analyze
+	; use that to override the $ydb_gbldir / $gtmgbldir env vars. This is because %YDBPROCSTUCKEXEC needs to analyze
 	; a hang situation. The hang will be in the current global directory of the parent process, not the global directory
 	; that the process started out with. Though in most practical cases, we expect both to be the same, we do want to
 	; handle the rare case when they are different by using the override scheme if the parent process did a SET $ZGBLDIR.
