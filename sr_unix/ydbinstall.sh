@@ -1541,7 +1541,7 @@ fi
 			# will cause YDB-E-SYSCALL errors from "getcwd()" in ydb_env_set calls made later.
 echo $product_name version $ydb_version installed successfully at $ydb_installdir
 
-# Create copies of, or links to, environment scripts and ydb & gtm executables
+# Create copies of, or links to, environment scripts and ydb, gtm and ydbsh executables
 if [ -n "$gtm_linkenv" ] ; then
 	dirensure $gtm_linkenv
 	( cd $gtm_linkenv ; \rm -f ydb_env_set ydb_env_unset gtmprofile ; ln -s $ydb_installdir/ydb_env_set $ydb_installdir/ydb_env_unset $ydb_installdir/gtmprofile ./ )
@@ -1553,11 +1553,11 @@ elif [ -n "$gtm_copyenv" ] ; then
 fi
 if [ -n "$gtm_linkexec" ] ; then
 	dirensure $gtm_linkexec
-	( cd $gtm_linkexec ; \rm -f ydb gtm ; ln -s $ydb_installdir/ydb $ydb_installdir/gtm $ydb_installdir/ydbsh ./ )
+	( cd $gtm_linkexec ; \rm -f ydb gtm ydbsh ; ln -s $ydb_installdir/ydb $ydb_installdir/gtm $ydb_installdir/ydbsh ./ )
 	if [ "Y" = "$gtm_verbose" ] ; then echo Linked exec ; ls -l $gtm_linkexec ; fi
 elif [ -n "$gtm_copyexec" ] ; then
 	dirensure $gtm_copyexec
-	( cd $gtm_copyexec ; \rm -f ydb gtm ; cp -P $ydb_installdir/ydb $ydb_installdir/gtm ./ )
+	( cd $gtm_copyexec ; \rm -f ydb gtm ydbsh ; cp -P $ydb_installdir/ydb $ydb_installdir/gtm $ydb_installdir/ydbsh ./ )
 	if [ "Y" = "$gtm_verbose" ] ; then echo Copied exec ; ls -l $gtm_copyexec ; fi
 fi
 
