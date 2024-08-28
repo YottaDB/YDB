@@ -183,7 +183,8 @@ char *ydb_shebang(char *m_file_name, boolean_t *created_tmpdir)
 		*created_tmpdir = TRUE;
 		space_needed = STRLEN(buf) + 4 + STRLEN(rtn_path) + (TREF(dollar_zroutines)).len; /* 4 for '(', ')', ' ' and '\0 */
 		new_zro = malloc(space_needed);
-		SNPRINTF(new_zro, space_needed, "%s(%s) %s", buf, rtn_path, (TREF(dollar_zroutines)).addr);
+		SNPRINTF(new_zro, space_needed, "%s(%s) %.*s", buf, rtn_path,
+			(TREF(dollar_zroutines)).len, (TREF(dollar_zroutines)).addr);
 		trans.addr = new_zro;
 		trans.len = space_needed - 1;	/* do not take '\0' into account */
 		zro_load(&trans);
