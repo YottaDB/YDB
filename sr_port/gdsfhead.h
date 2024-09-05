@@ -4336,7 +4336,7 @@ MBSTART {								\
 
 #define SET_SNAPSHOTS_IN_PROG(X)	MBSTART { (X)->snapshot_in_prog = TRUE; START_JNL_FILE_CLOSE_TIMER_IF_NEEDED; } MBEND
 #define CLEAR_SNAPSHOTS_IN_PROG(X)	((X)->snapshot_in_prog = FALSE)
-# define SNAPSHOTS_IN_PROG(X)	((X)->snapshot_in_prog)
+#define SNAPSHOTS_IN_PROG(X)		((X)->snapshot_in_prog)
 /* Creates a new snapshot context. Called by GT.M (or utilities like update process, MUPIP LOAD which uses
  * GT.M runtime. As a side effect sets csa->snapshot_in_prog to TRUE if the context creation went fine.
  */
@@ -4404,18 +4404,21 @@ MBSTART {										\
 # define DBG_ENSURE_SNAPSHOT_GOOD_TO_GO(LCL_SS_CTX, CNL)
 #endif
 /* Destroy an existing snapshot. Called by GT.M (or utilities like update process, MUPIP LOAD which uses
- * GT.M runtime. Assumes that csa->snapshot_in_prog is TRUE and as a side effect sets csa->snapshot_in_prog
- * to FALSE if the context is destroyed
+ * GT.M runtime. Does NOT assume that csa->snapshot_in_prog is TRUE and as a side effect sets csa->snapshot_in_prog
+ * to FALSE if the context is destroyed.
  */
 # define SS_RELEASE_IF_NEEDED(CSA, CNL)								\
 MBSTART {											\
 	int			ss_shmcycle;							\
 	snapshot_context_ptr_t	lcl_ss_ctx;							\
 												\
-	if (SNAPSHOTS_IN_PROG(CSA))								\
+	lcl_ss_ctx = SS_CTX_CAST((CSA)->ss_ctx);						\
+	/* The SNAPSHOT_INIT_DONE check is to ensure we do not invoke ss_destroy_context() as	\
+	 * part of a jnl_file_close_timer interrupt when we are in the midst of ss_initiate()	\
+	 * or ss_create_context() and have not set up the lcl_ss_ctx structure completely yet.	\
+	 */											\
+	if ((NULL != lcl_ss_ctx) && (SNAPSHOT_INIT_DONE == lcl_ss_ctx->cur_state)) 		\
 	{											\
-		lcl_ss_ctx = SS_CTX_CAST((CSA)->ss_ctx);					\
-		assert(NULL != lcl_ss_ctx);							\
 		ss_shmcycle = (CNL)->ss_shmcycle;						\
 		if (!SNAPSHOTS_IN_PROG(CNL) || (lcl_ss_ctx->ss_shmcycle != ss_shmcycle))	\
 		{										\
