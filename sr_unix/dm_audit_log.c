@@ -414,7 +414,6 @@ int	dm_audit_init(char *host_info, boolean_t is_tls)
 	struct addrinfo		*remote_ai_head, hints;
 	intrpt_state_t		prev_intrpt_state;
 	char			port_buffer[NI_MAXSERV + 1];
-	int			host_len, port_len;
 	unsigned int		host_info_len;
 	int			errcode, real_errno;
 	int			fields, port;
@@ -443,8 +442,7 @@ int	dm_audit_init(char *host_info, boolean_t is_tls)
 	else
 		/* Otherwise, we assume "host_info" contains an IPV4 address or is a path to file domain socket file */
 		fields = SSCANF(host_info, IPV4_FMTSTR " : " PORTNUM_FMTSTR " : " TLSID_FMTSTR, host, port_buffer, tlsid);
-	host_len = STRLEN(host);
-	if ((0 == fields) || (0 == host_len))
+	if ((0 == fields) || (0 == STRLEN(host)))
 	{
 		restrict_initialized = TRUE;
 		if ((IS_MUPIP_IMAGE) || (IS_DSE_IMAGE) || (IS_LKE_IMAGE))
@@ -456,8 +454,6 @@ int	dm_audit_init(char *host_info, boolean_t is_tls)
 	}
 	if ((3 == fields) || (2 == fields))
 	{	/* If we get  2 or 3 fields, then we assume host_info contains IP and port information */
-		port_len = STRLEN(port_buffer);
-		port_buffer[port_len]='\0';
 		CLIENT_HINTS(hints);
 		if (0  != (errcode = dogetaddrinfo(host, port_buffer, &hints, &remote_ai_head)))
 		{
