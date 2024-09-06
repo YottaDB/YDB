@@ -466,7 +466,7 @@ LITDEF	err_msg merrors[] = {
 	{ "COLLTYPVERSION", "Collation type !UL, version !UL mismatch", 2, 0 },
 	{ "LVNULLSUBS", "Null subscripts not allowed in local variables", 0, 0 },
 	{ "GVREPLERR", "Error replicating global in region !AD", 2, 0 },
-	{ "UNUSEDMSG634", "DBFILERDONLY error nixed in YottaDB r1.36 (still in use in GT.M)", 3, 0 },
+	{ "UNUSEDMSG633", "DBFILERDONLY error nixed in YottaDB r1.36 (still in use in GT.M)", 3, 0 },
 	{ "RMWIDTHPOS", "File record size or width must be greater than zero", 0, 0 },
 	{ "OFFSETINV", "Entry point !AD+!SL not valid", 3, 0 },
 	{ "JOBPARTOOLONG", "Total parameter length is too long for job command", 0, 0 },
@@ -613,7 +613,7 @@ LITDEF	err_msg merrors[] = {
 	{ "KRNLKILL", "Process was terminated by SIGDANGER signal from the system -- System swap space is too low -- Report to System Administrator", 0, 0 },
 	{ "MEMORYRECURSIVE", "Memory Subsystem called recursively", 0, 0 },
 	{ "FREEZEID", "Cache !AD on !AD by freeze id 0x!XL with match 0x!XL from 0x!XJ", 7, 0 },
-	{ "UNUSEDMSG778", "BLKWRITERR last used in V6.3-001A May 2017", 0, 0 },
+	{ "UNUSEDMSG780", "BLKWRITERR last used in V6.3-001A May 2017", 0, 0 },
 	{ "DSEINVALBLKID", "Trying to edit DB with 64-bit block IDs using pre-GT.M-V7/pre-YottaDB-r2.00 DSE", 0, 0 },
 	{ "PINENTRYERR", "Custom pinentry program failure", 0, 0 },
 	{ "BCKUPBUFLUSH", "Unable to flush buffer for online backup", 0, 0 },
@@ -733,7 +733,7 @@ LITDEF	err_msg merrors[] = {
 	{ "GTMSECSHRSSIDF", "gtmsecshr server setsid failed", 0, 0 },
 	{ "GTMSECSHRFORKF", "gtmsecshr server unable to fork off a child process", 0, 0 },
 	{ "DBFSYNCERR", "Error synchronizing database file !AD to disk", 2, 0 },
-	{ "UNUSEDMSG898", "SECONDAHEAD last used in V7.0-000 Jan 2021", 0, 0 },
+	{ "UNUSEDMSG900", "SECONDAHEAD last used in V7.0-000 Jan 2021", 0, 0 },
 	{ "SCNDDBNOUPD", "Database Updates not allowed on the secondary", 0, 0 },
 	{ "MUINFOUINT4", "!AD : !UL [0x!XL]", 4, 0 },
 	{ "NLMISMATCHCALC", "Location of !AD expected at 0x!XL, but found at 0x!XL", 4, 0 },
@@ -886,7 +886,7 @@ LITDEF	err_msg merrors[] = {
 	{ "FILTERBADCONV", "Bad conversion of seqno !16@XQ by filter", 1, 0 },
 	{ "PRIMARYISROOT", "Attempted operation not valid on root primary instance !AD", 2, 0 },
 	{ "GVQUERYGETFAIL", "Global variable QUERY and GET failed.  Failure code: !AD.", 2, 0 },
-	{ "UNUSEDMSG1051", "DBCREC2BIGINBLK removed from code in V7.0-000 Nov 2020", 0, 0 },
+	{ "UNUSEDMSG1053", "DBCREC2BIGINBLK removed from code in V7.0-000 Nov 2020", 0, 0 },
 	{ "MERGEDESC", "Merge operation not possible.  !AD is descendent of !AD.", 4, 0 },
 	{ "MERGEINCOMPL", "Error encountered during MERGE; operation may be incomplete", 0, 0 },
 	{ "DBNAMEMISMATCH", "Database file !AD points to shared memory (id = !UL) which in turn points to an inaccessible database file !AZ", 4, 0 },
@@ -950,7 +950,7 @@ LITDEF	err_msg merrors[] = {
 	{ "JNLALIGNSZCHG", "Journal ALIGNSIZE is rounded up to !UL blocks (closest next higher power of two)", 1, 0 },
 	{ "SEFCTNEEDSFULLB", "Current side effect setting does not permit full Boolean to be turned off", 0, 0 },
 	{ "GVFAILCORE", "A core file is being created for later analysis if necessary", 0, 0 },
-	{ "UNUSEDMSG1115", "DBCDBNOCERTIFY removed from code in V7.0-000 Nov 2020", 0, 0 },
+	{ "UNUSEDMSG1117", "DBCDBNOCERTIFY removed from code in V7.0-000 Nov 2020", 0, 0 },
 	{ "DBFRZRESETSUC", "Freeze released successfully on database file !AD", 2, 0 },
 	{ "JNLFILEXTERR", "Error during extension of journal file !AD", 2, 0 },
 	{ "JOBEXAMDONE", "YottaDB process !UL successfully executed $ZJOBEXAM() into !AD", 3, 0 },
@@ -1047,18 +1047,18 @@ LITDEF	err_msg merrors[] = {
 	{ "DBBTUWRNG", "The blocks-to-upgrade file-header field is incorrect. Expected 0x!16@XQ, found 0x!16@XQ", 2, 5 },
 	{ "DBBTUFIXED", "The blocks-to-upgrade file-header field has been changed to the correct value", 0, 0 },
 	{ "DBMAXREC2BIG", "Maximum record size (!UL) is too large for this block size (!UL) - Maximum is !UL", 3, 0 },
-	{ "UNUSEDMSG1212", "DBCSCNNOTCMPLT removed from code in V7.0-000 Nov 2020", 0, 0 },
-	{ "UNUSEDMSG1213", "DBCBADFILE removed from code in V7.0-000 Nov 2020", 0, 0 },
-	{ "UNUSEDMSG1214", "DBCNOEXTND removed from code in V7.0-000 Nov 2020", 0, 0 },
-	{ "UNUSEDMSG1215", "DBCINTEGERR removed from code in V7.0-000 Nov 2020", 0, 0 },
+	{ "UNUSEDMSG1214", "DBCSCNNOTCMPLT removed from code in V7.0-000 Nov 2020", 0, 0 },
+	{ "UNUSEDMSG1215", "DBCBADFILE removed from code in V7.0-000 Nov 2020", 0, 0 },
+	{ "UNUSEDMSG1216", "DBCNOEXTND removed from code in V7.0-000 Nov 2020", 0, 0 },
+	{ "UNUSEDMSG1217", "DBCINTEGERR removed from code in V7.0-000 Nov 2020", 0, 0 },
 	{ "DBMINRESBYTES", "Minimum RESERVED BYTES value required for certification/upgrade is !UL - Currently is !UL", 2, 0 },
-	{ "UNUSEDMSG1217", "DBCNOTSAMEDB removed from code in V7.0-000 Nov 2020", 0, 0 },
-	{ "UNUSEDMSG1218", "DBCDBCERTIFIED removed from code in V7.0-000 Nov 2020", 0, 0 },
-	{ "UNUSEDMSG1219", "DBCMODBLK2BIG removed from code in V7.0-000 Nov 2020", 0, 0 },
-	{ "UNUSEDMSG1220", "DBCREC2BIG removed from code in V7.0-000 Nov 2020", 0, 0 },
-	{ "UNUSEDMSG1221", "DBCCMDFAIL removed from code in V7.0-000 Nov 2020", 0, 0 },
-	{ "UNUSEDMSG1222", "DBCKILLIP removed from code in V7.0-000 Nov 2020", 0, 0 },
-	{ "UNUSEDMSG1223", "DBCNOFINISH removed from code in V7.0-000 Nov 2020", 0, 0 },
+	{ "UNUSEDMSG1219", "DBCNOTSAMEDB removed from code in V7.0-000 Nov 2020", 0, 0 },
+	{ "UNUSEDMSG1220", "DBCDBCERTIFIED removed from code in V7.0-000 Nov 2020", 0, 0 },
+	{ "UNUSEDMSG1221", "DBCMODBLK2BIG removed from code in V7.0-000 Nov 2020", 0, 0 },
+	{ "UNUSEDMSG1222", "DBCREC2BIG removed from code in V7.0-000 Nov 2020", 0, 0 },
+	{ "UNUSEDMSG1223", "DBCCMDFAIL removed from code in V7.0-000 Nov 2020", 0, 0 },
+	{ "UNUSEDMSG1224", "DBCKILLIP removed from code in V7.0-000 Nov 2020", 0, 0 },
+	{ "UNUSEDMSG1225", "DBCNOFINISH removed from code in V7.0-000 Nov 2020", 0, 0 },
 	{ "DYNUPGRDFAIL", "Unable to dynamically upgrade block 0x!16@XQ in database !AD due to lack of free space in block", 3, 0 },
 	{ "MMNODYNDWNGRD", "Unable to use dynamic downgrade with MM access method for region !AD. Use BG access method for downgrade", 2, 0 },
 	{ "MMNODYNUPGRD", "Unable to use MM access method for region !AD until all database blocks are upgraded", 2, 0 },
@@ -1574,6 +1574,7 @@ LITDEF	err_msg merrors[] = {
 LITDEF	int merrors_undocarr[] = {
 	0,	/* ACK */
 	656,	/* ASC2EBCDICCONV */
+	1142,	/* BADTAG */
 	1444,	/* DBGLDMISMATCH */
 	1472,	/* DRVLONGJMP */
 	44,	/* ENQ */
@@ -1584,6 +1585,7 @@ LITDEF	int merrors_undocarr[] = {
 	410,	/* JNLWRTNOWWRTR */
 	989,	/* JOBINTRRETHROW */
 	938,	/* JOBINTRRQST */
+	593,	/* KRNLKILL */
 	336,	/* LKSECINIT */
 	1480,	/* LVMONBADVAL */
 	824,	/* MUDESTROYFAIL */
@@ -1606,6 +1608,6 @@ GBLDEF	err_ctl merrors_ctl = {
 	&merrors[0],
 	1550,
 	&merrors_undocarr[0],
-	25
+	27
 };
 

@@ -464,7 +464,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* COLLTYPVERSION */
 	   0,	/* LVNULLSUBS */
 	   0,	/* GVREPLERR */
-	   0,	/* UNUSEDMSG634 */
+	   0,	/* UNUSEDMSG633 */
 	  72,	/* RMWIDTHPOS */
 	  13,	/* OFFSETINV */
 	   0,	/* JOBPARTOOLONG */
@@ -611,7 +611,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* KRNLKILL */
 	   0,	/* MEMORYRECURSIVE */
 	   0,	/* FREEZEID */
-	   0,	/* UNUSEDMSG778 */
+	   0,	/* UNUSEDMSG780 */
 	   0,	/* DSEINVALBLKID */
 	   0,	/* PINENTRYERR */
 	   0,	/* BCKUPBUFLUSH */
@@ -731,7 +731,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* GTMSECSHRSSIDF */
 	   0,	/* GTMSECSHRFORKF */
 	   0,	/* DBFSYNCERR */
-	   0,	/* UNUSEDMSG898 */
+	   0,	/* UNUSEDMSG900 */
 	   0,	/* SCNDDBNOUPD */
 	   0,	/* MUINFOUINT4 */
 	   0,	/* NLMISMATCHCALC */
@@ -884,7 +884,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* FILTERBADCONV */
 	   0,	/* PRIMARYISROOT */
 	   0,	/* GVQUERYGETFAIL */
-	   0,	/* UNUSEDMSG1051 */
+	   0,	/* UNUSEDMSG1053 */
 	  19,	/* MERGEDESC */
 	   0,	/* MERGEINCOMPL */
 	   0,	/* DBNAMEMISMATCH */
@@ -948,7 +948,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* JNLALIGNSZCHG */
 	   0,	/* SEFCTNEEDSFULLB */
 	   0,	/* GVFAILCORE */
-	   0,	/* UNUSEDMSG1115 */
+	   0,	/* UNUSEDMSG1117 */
 	   0,	/* DBFRZRESETSUC */
 	   0,	/* JNLFILEXTERR */
 	   0,	/* JOBEXAMDONE */
@@ -1045,18 +1045,18 @@ const static readonly int error_ansi[] = {
 	   0,	/* DBBTUWRNG */
 	   0,	/* DBBTUFIXED */
 	   0,	/* DBMAXREC2BIG */
-	   0,	/* UNUSEDMSG1212 */
-	   0,	/* UNUSEDMSG1213 */
 	   0,	/* UNUSEDMSG1214 */
 	   0,	/* UNUSEDMSG1215 */
-	   0,	/* DBMINRESBYTES */
+	   0,	/* UNUSEDMSG1216 */
 	   0,	/* UNUSEDMSG1217 */
-	   0,	/* UNUSEDMSG1218 */
+	   0,	/* DBMINRESBYTES */
 	   0,	/* UNUSEDMSG1219 */
 	   0,	/* UNUSEDMSG1220 */
 	   0,	/* UNUSEDMSG1221 */
 	   0,	/* UNUSEDMSG1222 */
 	   0,	/* UNUSEDMSG1223 */
+	   0,	/* UNUSEDMSG1224 */
+	   0,	/* UNUSEDMSG1225 */
 	   0,	/* DYNUPGRDFAIL */
 	   0,	/* MMNODYNDWNGRD */
 	   0,	/* MMNODYNUPGRD */

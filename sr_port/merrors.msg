@@ -151,6 +151,7 @@
 !  List of known undocumented messages follows (along with a comment) (do not change "known undocumented" phrase)
 !	ERR_ACK			internal error (not displayed to the users)
 !	ERR_ASC2EBCDICCONV	not yet documented since zOS is not officially supported
+!	ERR_BADTAG		is issued only on a zOS build (unsupported by YottaDB) so no need to document
 !	ERR_DBGLDMISMATCH	used internally to rectify an gld vs database characteristic mismatch in favor of the DB
 !	ERR_DRVLONGJMP		used internally in condition handler management
 !	ERR_ENQ			internal error (not displayed to the users)
@@ -161,6 +162,7 @@
 !	ERR_JNLWRTNOWWRTR	internal error (not displayed to the users)
 !	ERR_JOBINTRRETHROW	internal error (not displayed to users - drives rethrow of jobinterrupt)
 !	ERR_JOBINTRRQST		internal error (not displayed to users - drives jobinterrupt)
+!	ERR_KRNLKILL		is issued only on an AIX build (unsupported by YottaDB) so no need to document
 !	ERR_LKSECINIT		message referenced only in GT.CX code (not supported currently)
 !	ERR_LVMONBADVAL		message used only in an undocumented feature (VIEW "LVMON...]" used for YottaDB debugging
 !	ERR_MUDESTROYFAIL	referenced only if #define IPCRM_FOR_SANCHEZ_ONLY is TRUE.
@@ -178,8 +180,6 @@
 !
 !  Note new YottaDB error messages should be added to ydberrors.msg instead of to this file to avoid collisions with errors
 !  added here for GT.M by FIS.
-!
-!  In addition all messages of the LMU and GTLP message facility are not documented as Licensing is out of GT.M/YottaDB since V4.2.
 !
 ACK		<>/success/fao=0!/ansi=0
 BREAKZST	<Break instruction encountered during ZSTEP action>/info/fao=0!/ansi=0
@@ -630,7 +630,7 @@ TERMWRITE	<Error writing to terminal>/error/fao=0!/ansi=0
 COLLTYPVERSION	<Collation type !UL, version !UL mismatch>/error/fao=2!/ansi=0
 LVNULLSUBS	<Null subscripts not allowed in local variables>/error/fao=0!/ansi=0
 GVREPLERR	<Error replicating global in region !AD>/error/fao=2!/ansi=0
-UNUSEDMSG634	<DBFILERDONLY error nixed in YottaDB r1.36 (still in use in GT.M)>/error/fao=3!/ansi=0
+UNUSEDMSG633	<DBFILERDONLY error nixed in YottaDB r1.36 (still in use in GT.M)>/error/fao=3!/ansi=0
 RMWIDTHPOS	<File record size or width must be greater than zero>/error/fao=0!/ansi=72
 OFFSETINV	<Entry point !AD+!SL not valid>/error/fao=3!/ansi=13
 JOBPARTOOLONG	<Total parameter length is too long for job command>/error/fao=0!/ansi=0
@@ -777,7 +777,7 @@ CALLERID	<Routine !AD called from 0x!XJ>/info/fao=3!/ansi=0
 KRNLKILL	<Process was terminated by SIGDANGER signal from the system -- System swap space is too low -- Report to System Administrator>/fatal/fao=0!/ansi=0
 MEMORYRECURSIVE	<Memory Subsystem called recursively>/fatal/fao=0!/ansi=0
 FREEZEID	<Cache !AD on !AD by freeze id 0x!XL with match 0x!XL from 0x!XJ>/info/fao=7!/ansi=0
-UNUSEDMSG778	<BLKWRITERR last used in V6.3-001A May 2017>/error/fao=0!/ansi=0
+UNUSEDMSG780	<BLKWRITERR last used in V6.3-001A May 2017>/error/fao=0!/ansi=0
 DSEINVALBLKID	<Trying to edit DB with 64-bit block IDs using pre-GT.M-V7/pre-YottaDB-r2.00 DSE>/error/fao=0!/ansi=0
 PINENTRYERR	<Custom pinentry program failure>/error/fao=0!/ansi=0
 BCKUPBUFLUSH	<Unable to flush buffer for online backup>/error/fao=0!/ansi=0
@@ -897,7 +897,7 @@ GTMSECSHRSGIDF	<gtmsecshr server setgid to root failed>/warning/fao=0!/ansi=0
 GTMSECSHRSSIDF	<gtmsecshr server setsid failed>/warning/fao=0!/ansi=0
 GTMSECSHRFORKF	<gtmsecshr server unable to fork off a child process>/fatal/fao=0!/ansi=0
 DBFSYNCERR	<Error synchronizing database file !AD to disk>/error/fao=2!/ansi=0
-UNUSEDMSG898	<SECONDAHEAD last used in V7.0-000 Jan 2021>/error/fao=0!/ansi=0
+UNUSEDMSG900	<SECONDAHEAD last used in V7.0-000 Jan 2021>/error/fao=0!/ansi=0
 SCNDDBNOUPD	<Database Updates not allowed on the secondary>/error/fao=0!/ansi=0
 MUINFOUINT4	<!AD : !UL [0x!XL]>/info/fao=4!/ansi=0
 NLMISMATCHCALC	<Location of !AD expected at 0x!XL, but found at 0x!XL>/error/fao=4!/ansi=0
@@ -1050,7 +1050,7 @@ FILTERCOMM	<Error communicating seqno !16@XQ with the filter>/error/fao=1!/ansi=
 FILTERBADCONV	<Bad conversion of seqno !16@XQ by filter>/error/fao=1!/ansi=0
 PRIMARYISROOT	<Attempted operation not valid on root primary instance !AD>/error/fao=2!/ansi=0
 GVQUERYGETFAIL	<Global variable QUERY and GET failed.  Failure code: !AD.>/error/fao=2!/ansi=0
-UNUSEDMSG1051	<DBCREC2BIGINBLK removed from code in V7.0-000 Nov 2020>/error/fao=0!/ansi=0
+UNUSEDMSG1053	<DBCREC2BIGINBLK removed from code in V7.0-000 Nov 2020>/error/fao=0!/ansi=0
 MERGEDESC	<Merge operation not possible.  !AD is descendent of !AD.>/error/fao=4!/ansi=19
 MERGEINCOMPL	<Error encountered during MERGE; operation may be incomplete>/warning/fao=0!/ansi=0
 DBNAMEMISMATCH	<Database file !AD points to shared memory (id = !UL) which in turn points to an inaccessible database file !AZ>/error/fao=4!/ansi=0
@@ -1114,7 +1114,7 @@ INVMNEMCSPC	<Unsupported mnemonicspace !AD>/error/fao=2!/ansi=35
 JNLALIGNSZCHG	<Journal ALIGNSIZE is rounded up to !UL blocks (closest next higher power of two)>/info/fao=1!/ansi=0
 SEFCTNEEDSFULLB	<Current side effect setting does not permit full Boolean to be turned off>/error/fao=0!/ansi=0
 GVFAILCORE	<A core file is being created for later analysis if necessary>/error/fao=0!/ansi=0
-UNUSEDMSG1115	<DBCDBNOCERTIFY removed from code in V7.0-000 Nov 2020>/error/fao=0!/ansi=0
+UNUSEDMSG1117	<DBCDBNOCERTIFY removed from code in V7.0-000 Nov 2020>/error/fao=0!/ansi=0
 DBFRZRESETSUC	<Freeze released successfully on database file !AD>/info/fao=2!/ansi=0
 JNLFILEXTERR	<Error during extension of journal file !AD>/error/fao=2!/ansi=0
 JOBEXAMDONE	<YottaDB process !UL successfully executed $ZJOBEXAM() into !AD>/info/fao=3!/ansi=0
@@ -1211,18 +1211,18 @@ STPEXPFAIL	<Stringpool expansion failed. It could not expand to !UL bytes.>/erro
 DBBTUWRNG	<The blocks-to-upgrade file-header field is incorrect. Expected 0x!16@XQ, found 0x!16@XQ>/warning/fao=2!/ansi=0/T
 DBBTUFIXED	<The blocks-to-upgrade file-header field has been changed to the correct value>/info/fao=0!/ansi=0
 DBMAXREC2BIG	<Maximum record size (!UL) is too large for this block size (!UL) - Maximum is !UL>/error/fao=3!/ansi=0
-UNUSEDMSG1212	<DBCSCNNOTCMPLT removed from code in V7.0-000 Nov 2020>/error/fao=0!/ansi=0
-UNUSEDMSG1213	<DBCBADFILE removed from code in V7.0-000 Nov 2020>/error/fao=0!/ansi=0
-UNUSEDMSG1214	<DBCNOEXTND removed from code in V7.0-000 Nov 2020>/error/fao=0!/ansi=0
-UNUSEDMSG1215	<DBCINTEGERR removed from code in V7.0-000 Nov 2020>/error/fao=0!/ansi=0
+UNUSEDMSG1214	<DBCSCNNOTCMPLT removed from code in V7.0-000 Nov 2020>/error/fao=0!/ansi=0
+UNUSEDMSG1215	<DBCBADFILE removed from code in V7.0-000 Nov 2020>/error/fao=0!/ansi=0
+UNUSEDMSG1216	<DBCNOEXTND removed from code in V7.0-000 Nov 2020>/error/fao=0!/ansi=0
+UNUSEDMSG1217	<DBCINTEGERR removed from code in V7.0-000 Nov 2020>/error/fao=0!/ansi=0
 DBMINRESBYTES	<Minimum RESERVED BYTES value required for certification/upgrade is !UL - Currently is !UL>/error/fao=2!/ansi=0
-UNUSEDMSG1217	<DBCNOTSAMEDB removed from code in V7.0-000 Nov 2020>/error/fao=0!/ansi=0
-UNUSEDMSG1218	<DBCDBCERTIFIED removed from code in V7.0-000 Nov 2020>/info/fao=0!/ansi=0
-UNUSEDMSG1219	<DBCMODBLK2BIG removed from code in V7.0-000 Nov 2020>/error/fao=0!/ansi=0
-UNUSEDMSG1220	<DBCREC2BIG removed from code in V7.0-000 Nov 2020>/error/fao=0!/ansi=0
-UNUSEDMSG1221	<DBCCMDFAIL removed from code in V7.0-000 Nov 2020>/error/fao=0!/ansi=0
-UNUSEDMSG1222	<DBCKILLIP removed from code in V7.0-000 Nov 2020>/error/fao=0!/ansi=0
-UNUSEDMSG1223	<DBCNOFINISH removed from code in V7.0-000 Nov 2020>/error/fao=0!/ansi=0
+UNUSEDMSG1219	<DBCNOTSAMEDB removed from code in V7.0-000 Nov 2020>/error/fao=0!/ansi=0
+UNUSEDMSG1220	<DBCDBCERTIFIED removed from code in V7.0-000 Nov 2020>/info/fao=0!/ansi=0
+UNUSEDMSG1221	<DBCMODBLK2BIG removed from code in V7.0-000 Nov 2020>/error/fao=0!/ansi=0
+UNUSEDMSG1222	<DBCREC2BIG removed from code in V7.0-000 Nov 2020>/error/fao=0!/ansi=0
+UNUSEDMSG1223	<DBCCMDFAIL removed from code in V7.0-000 Nov 2020>/error/fao=0!/ansi=0
+UNUSEDMSG1224	<DBCKILLIP removed from code in V7.0-000 Nov 2020>/error/fao=0!/ansi=0
+UNUSEDMSG1225	<DBCNOFINISH removed from code in V7.0-000 Nov 2020>/error/fao=0!/ansi=0
 DYNUPGRDFAIL	<Unable to dynamically upgrade block 0x!16@XQ in database !AD due to lack of free space in block>/error/fao=3!/ansi=0
 MMNODYNDWNGRD	<Unable to use dynamic downgrade with MM access method for region !AD. Use BG access method for downgrade>/error/fao=2!/ansi=0
 MMNODYNUPGRD	<Unable to use MM access method for region !AD until all database blocks are upgraded>/error/fao=2!/ansi=0
