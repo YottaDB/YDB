@@ -778,7 +778,7 @@ KRNLKILL	<Process was terminated by SIGDANGER signal from the system -- System s
 MEMORYRECURSIVE	<Memory Subsystem called recursively>/fatal/fao=0!/ansi=0
 FREEZEID	<Cache !AD on !AD by freeze id 0x!XL with match 0x!XL from 0x!XJ>/info/fao=7!/ansi=0
 UNUSEDMSG778	<BLKWRITERR last used in V6.3-001A May 2017>/error/fao=0!/ansi=0
-DSEINVALBLKID	<Trying to edit DB with 64-bit block IDs using pre-V7 DSE>/error/fao=0!/ansi=0
+DSEINVALBLKID	<Trying to edit DB with 64-bit block IDs using pre-GT.M-V7/pre-YottaDB-r2.00 DSE>/error/fao=0!/ansi=0
 PINENTRYERR	<Custom pinentry program failure>/error/fao=0!/ansi=0
 BCKUPBUFLUSH	<Unable to flush buffer for online backup>/error/fao=0!/ansi=0
 NOFORKCORE	<Unable to fork off process to create core.  Core creation postponed.>/warning/fao=0!/ansi=0
@@ -1695,7 +1695,7 @@ MLKHASHRESIZE	<LOCK hash table increased in size from !UL to !UL and placed in s
 MLKHASHRESIZEFAIL	<Failed to increase LOCK hash table size from !UL to !UL. Will retry with larger size.>/warning/fao=2!/ansi=0
 MLKCLEANED	<LOCK garbage collection freed !UL lock slots for region !AD>/info/fao=3!/ansi=0
 NOTMNAME	<!AD is not a valid M name>/error/fao=2!/ansi=0
-DEVNAMERESERVED	 <Cannot use !AD as device name. Reserved for GTM internal usage>/error/fao=2!/ansi=0
+DEVNAMERESERVED	 <Cannot use !AD as device name. Reserved for internal usage>/error/fao=2!/ansi=0
 ORLBKREL	<ONLINE ROLLBACK releasing all locking resources to allow a freeze OFF to proceed>/info/fao=0!/ansi=0
 ORLBKRESTART	<ONLINE ROLLBACK restarted on instance !AD corresponding to !AD>/info/fao=4!/ansi=0
 UNIQNAME	<Cannot provide same file name (!AD) for !AD and !AD>/error/fao=6!/ansi=0
