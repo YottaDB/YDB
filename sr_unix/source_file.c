@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -338,9 +338,15 @@ void	close_source_file (void)
 	val.mvtype = MV_STR;
 	val.str.len = source_name_len;
 	val.str.addr = (char *)source_file_name;
-	SAVE_IN_OUT_IS_CURR_DEVICE(tmp_list_dev, in_is_curr_device, out_is_curr_device);
+	/* Restore current device to "tmp_list_dev" (which would point to the current device BEFORE the M source file
+	 * was opened for compilation). It is possible this device is closed too as part of the above "op_close()"
+	 * call (see commit message of YDB@c6d1a9a2 for example). In that case, "op_close()" would take care of resetting
+	 * "io_curr_device.in" and "io_curr_device.out" to the principal device (io_std_device.in and .out respectively).
+	 */
+	io_curr_device = tmp_list_dev;
 	op_close(&val, &pars);
-	/* Note: Use tmp_list_dev and not dev_in_use below to make sure list file works */
-	RESTORE_IO_CURR_DEVICE(tmp_list_dev, in_is_curr_device, out_is_curr_device);
+	/* Ensure that after the "op_close()" call, "io_curr_device" points to open input and output devices */
+	assert(dev_open == io_curr_device.in->state);
+	assert(dev_open == io_curr_device.out->state);
 	return;
 }
