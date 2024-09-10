@@ -140,7 +140,7 @@ void cdbg_dump_triple(triple *dtrip, int indent)
 	case OC_BOOLEXPRSTART:
 	case OC_NOOP:
 		/* This triple does not have any operands in general. But in case of an optimization, operand[0]
-		 * could point to an OC_EQUNUL_RETBOOL/OC_NEQUNUL_RETBOOL opcode. In that case, the operand is
+		 * could point to an OC_EQUNUL_RETBOOL/OC_NEQUNUL_RETBOOL etc. opcode. In that case, the operand is
 		 * a reference to a triple that is later in the execution chain and so dumping that operand could
 		 * end up in an infinite loop. We avoid that by not descending down any operands in this case.
 		 */

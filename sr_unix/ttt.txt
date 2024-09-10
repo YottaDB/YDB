@@ -1113,3 +1113,17 @@ OC_EQUNUL_RETBOOL:	pushab	val.1			; /* source (string) mval */
 			jsb	xfer.xf_equnul_retbool
 OC_NEQUNUL_RETBOOL:	pushab	val.1			; /* source (string) mval */
 			jsb	xfer.xf_nequnul_retbool
+OC_EQU_RETBOOL:		pushab	val.2			; /* source (string) mval operand 2 */
+			pushab	val.1			; /* source (string) mval operand 1 */
+			jsb	xfer.xf_equ_retbool
+OC_NEQU_RETBOOL:	pushab	val.2			; /* source (string) mval operand 2 */
+			pushab	val.1			; /* source (string) mval operand 1 */
+			jsb	xfer.xf_nequ_retbool
+OC_EQU_RETMVAL:		pushab	val.0			; /* destination mval */
+			pushab	val.2			; /* source (string) mval operand 2 */
+			pushab	val.1			; /* source (string) mval operand 1 */
+			calls   #3,xfer.xf_equ_retmval
+OC_NEQU_RETMVAL:	pushab	val.0			; /* destination mval */
+			pushab	val.2			; /* source (string) mval operand 2 */
+			pushab	val.1			; /* source (string) mval operand 1 */
+			calls   #3,xfer.xf_nequ_retmval

@@ -142,7 +142,7 @@ void alloc_reg(void)
 				}				/* WARNING fallthrough */
 			case OC_BOOLEXPRSTART:
 				/* Check if OC_BOOLEXPRSTART/OC_BOOLEXPRFINISH triple removal is pending (phase 2 of
-				 * OC_EQUNUL_RETBOOL optimization, see comment in "sr_port/bool_expr.c" for details).
+				 * OC_EQUNUL_RETBOOL etc. optimization, see comment in "sr_port/bool_expr.c" for details).
 				 * It is easily identified by operand[0] pointing to a non-empty triple. Instead of
 				 * removing the triple, replace it with a OC_NOOP opcode as later OC_BOOLEXPRFINISH
 				 * triples also need to be replaced for the same optimization and this triple is the
@@ -152,7 +152,9 @@ void alloc_reg(void)
 				{
 					assert(TRIP_REF == x->operand[0].oprclass);
 					assert((OC_EQUNUL_RETBOOL == x->operand[0].oprval.tref->opcode)
-						|| (OC_NEQUNUL_RETBOOL == x->operand[0].oprval.tref->opcode));
+						|| (OC_NEQUNUL_RETBOOL == x->operand[0].oprval.tref->opcode)
+						|| (OC_EQU_RETBOOL == x->operand[0].oprval.tref->opcode)
+						|| (OC_NEQU_RETBOOL == x->operand[0].oprval.tref->opcode));
 					x->opcode = OC_NOOP;	/* Replace OC_BOOLEXPRSTART triple with OC_NOOP */
 					continue;
 				}
@@ -170,7 +172,9 @@ void alloc_reg(void)
 				{
 					assert(TRIP_REF == y->operand[0].oprclass);
 					assert((OC_EQUNUL_RETBOOL == y->operand[0].oprval.tref->opcode)
-						|| (OC_NEQUNUL_RETBOOL == y->operand[0].oprval.tref->opcode));
+						|| (OC_NEQUNUL_RETBOOL == y->operand[0].oprval.tref->opcode)
+						|| (OC_EQU_RETBOOL == y->operand[0].oprval.tref->opcode)
+						|| (OC_NEQU_RETBOOL == y->operand[0].oprval.tref->opcode));
 					x->opcode = OC_NOOP;	/* Replace OC_BOOLEXPRFINISH triple with OC_NOOP */
 					/* Check if OC_BOOLEXPRFINISH is preceded by an OC_JMP that jumps past just
 					 * this OC_BOOLEXPRFINISH triple. In that case, we can safely remove the

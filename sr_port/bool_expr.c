@@ -124,16 +124,17 @@ int bool_expr(boolean_t sense, oprtype *addr, triple **boolexprfinish_ptr)
 		/* WARNING: fall-through */
 	case OC_EQU:
 	case OC_NEQU:;
-		oprtype	*t_opr;
-		int	j;
+		oprtype		*t_opr;
+		int		j;
+		boolean_t	is_equnul;
+		triple		*ref;
 
+		is_equnul = FALSE;
 		for (t_opr = t1->operand, j = 0; t_opr < ARRAYTOP(t1->operand); t_opr++, j++)
 		{
 			if ((TRIP_REF == t_opr->oprclass) && (OC_LIT == t_opr->oprval.tref->opcode)
 				&& (0 == t_opr->oprval.tref->operand[0].oprval.mlit->v.str.len))
 			{
-				triple	*ref;
-
 				/* OC_EQU for say [set:x="" ...] or [set:""=x ...] OR
 				 * OC_NEQU for [set:x'="" ...] or [set:""'=x ...] can be optimized
 				 * to one OC_EQUNUL_RETBOOL/OC_NEQUNUL_RETBOOL opcode. [YDB#777]
@@ -148,42 +149,53 @@ int bool_expr(boolean_t sense, oprtype *addr, triple **boolexprfinish_ptr)
 				 */
 				if (0 == j)
 					t1->operand[0] = t1->operand[1];
-				ref = maketriple(sense ? OC_JMPNEQ : OC_JMPEQU);
-				ref->operand[0] = put_indr(addr);
-				dqins(t1, exorder, ref);
-				t1->operand[1] = put_tref(boolexprstart);
-				/* Normally a OC_BOOLEXPRSTART triple has no operands. But in this case where
-				 * we are postponing an optimization, we signal "alloc_reg.c" of this pending
-				 * todo by setting operand[0] to the OC_EQUNUL_RETBOOL or OC_NEQUNUL_RETBOOL
-				 * triple. This is checked in "alloc_reg.c" and if found to be non-NULL it
-				 * removes the OC_BOOLEXPRSTART/OC_BOOLEXPRFINISH triples (by replacing them
-				 * with OC_NOOP triples).
-				 */
-				boolexprstart->operand[0] = put_tref(t1);	/* signal alloc_reg() a later optimization */
-				if (num_coms % 2)
-					t1->opcode = ((OC_EQU == t1->opcode) ? OC_NEQUNUL_RETBOOL : OC_EQUNUL_RETBOOL);
-				else
-					t1->opcode = ((OC_EQU == t1->opcode) ? OC_EQUNUL_RETBOOL : OC_NEQUNUL_RETBOOL);
-				ex_tail(&t1->operand[0], 0);
-				/* Finally check if we came to OC_EQU/OC_NEQU through a OC_COM sequence.
-				 * If so, remove those triples by replacing them with a OC_NOOP opcode.
-				 */
-				if (num_coms)
-				{
-					t1 = t2;	/* set t1 to point to outermost OC_COM triple */
-					for ( ; ; )
-					{
-						assert(OC_COM == t1->opcode);
-						t1->opcode = OC_NOOP;
-						t1 = t1->operand[0].oprval.tref;
-						if (OC_COM != t1->opcode)
-							break;
-					}
-				}
-				DECREMENT_EXPR_DEPTH;
-				return TRUE;
+				is_equnul = TRUE;
+				break;
 			}
 		}
+		ref = maketriple(sense ? OC_JMPNEQ : OC_JMPEQU);
+		ref->operand[0] = put_indr(addr);
+		dqins(t1, exorder, ref);
+		/* Normally a OC_BOOLEXPRSTART triple has no operands. But in this case where we are postponing
+		 * an optimization, we signal "alloc_reg.c" of this pending todo by setting operand[0] to the
+		 * OC_EQUNUL_RETBOOL, OC_NEQUNUL_RETBOOL etc. triple. This is checked in "alloc_reg.c" and if
+		 * found to be non-NULL it removes the OC_BOOLEXPRSTART/OC_BOOLEXPRFINISH triples (by replacing
+		 * them with OC_NOOP triples).
+		 */
+		boolexprstart->operand[0] = put_tref(t1);	/* signal alloc_reg() a later optimization */
+		if (is_equnul)
+		{
+			if (num_coms % 2)
+				t1->opcode = ((OC_EQU == t1->opcode) ? OC_NEQUNUL_RETBOOL : OC_EQUNUL_RETBOOL);
+			else
+				t1->opcode = ((OC_EQU == t1->opcode) ? OC_EQUNUL_RETBOOL : OC_NEQUNUL_RETBOOL);
+			ex_tail(&t1->operand[0], 0);
+		} else
+		{
+			if (num_coms % 2)
+				t1->opcode = ((OC_EQU == t1->opcode) ? OC_NEQU_RETBOOL : OC_EQU_RETBOOL);
+			else
+				t1->opcode = ((OC_EQU == t1->opcode) ? OC_EQU_RETBOOL : OC_NEQU_RETBOOL);
+			ex_tail(&t1->operand[0], 0);
+			ex_tail(&t1->operand[1], 0);
+		}
+		/* Finally check if we came to OC_EQU/OC_NEQU through a OC_COM sequence.
+		 * If so, remove those triples by replacing them with a OC_NOOP opcode.
+		 */
+		if (num_coms)
+		{
+			t1 = t2;	/* set t1 to point to outermost OC_COM triple */
+			for ( ; ; )
+			{
+				assert(OC_COM == t1->opcode);
+				t1->opcode = OC_NOOP;
+				t1 = t1->operand[0].oprval.tref;
+				if (OC_COM != t1->opcode)
+					break;
+			}
+		}
+		DECREMENT_EXPR_DEPTH;
+		return TRUE;
 		break;
 	default:
 		break;
