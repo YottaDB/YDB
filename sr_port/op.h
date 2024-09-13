@@ -333,14 +333,20 @@ void	op_zstepretarg_helper(void);
 
 void	op_equnul_retmval(mval *u, mval *ret);
 void	op_nequnul_retmval(mval *u, mval *ret);
-void	opp_equnul_retbool();			/* Prototype of opp_equnul_retbool.s */
-int	op_equnul_retbool(mval *u);		/* Prototype of op_equnul_retbool.c */
-void	opp_nequnul_retbool();			/* Prototype of opp_nequnul_retbool.s */
-int	op_nequnul_retbool(mval *u);		/* Prototype of op_nequnul_retbool.c */
-void	opp_equ_retbool();			/* Prototype of opp_equ_retbool.s */
-int	op_equ_retbool(mval *u, mval *v);	/* Prototype of op_equ_retbool.c */
-void	opp_nequ_retbool();			/* Prototype of opp_nequ_retbool.s */
-int	op_nequ_retbool(mval *u, mval *v);	/* Prototype of op_nequ_retbool.c */
+void	opp_equnul_retbool();				/* Prototype of opp_equnul_retbool.s */
+int	op_equnul_retbool(mval *u);			/* Prototype of op_equnul_retbool.c */
+void	opp_nequnul_retbool();				/* Prototype of opp_nequnul_retbool.s */
+int	op_nequnul_retbool(mval *u);			/* Prototype of op_nequnul_retbool.c */
+void	opp_equ_retbool();				/* Prototype of opp_equ_retbool.s */
+int	op_equ_retbool(mval *u, mval *v);		/* Prototype of op_equ_retbool.c */
+void	opp_nequ_retbool();				/* Prototype of opp_nequ_retbool.s */
+int	op_nequ_retbool(mval *u, mval *v);		/* Prototype of op_nequ_retbool.c */
 void	op_equ_retmval(mval *u, mval *v, mval *ret);
 void	op_nequ_retmval(mval *u, mval *v, mval *ret);
+void	opp_contain_retbool();				/* Prototype of opp_contain_retbool.s */
+int	op_contain_retbool(mval *u, mval *v);		/* Prototype of op_contain_retbool.c */
+void	opp_ncontain_retbool();				/* Prototype of opp_ncontain_retbool.s */
+int	op_ncontain_retbool(mval *u, mval *v);		/* Prototype of op_ncontain_retbool.c */
+void	op_contain_retmval(mval *u, mval *v, mval *ret);
+void	op_ncontain_retmval(mval *u, mval *v, mval *ret);
 #endif

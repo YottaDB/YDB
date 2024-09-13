@@ -1127,3 +1127,17 @@ OC_NEQU_RETMVAL:	pushab	val.0			; /* destination mval */
 			pushab	val.2			; /* source (string) mval operand 2 */
 			pushab	val.1			; /* source (string) mval operand 1 */
 			calls   #3,xfer.xf_nequ_retmval
+OC_CONTAIN_RETBOOL:	pushab	val.2			; /* source (string) mval operand 2 */
+			pushab	val.1			; /* source (string) mval operand 1 */
+			jsb	xfer.xf_contain_retbool
+OC_NCONTAIN_RETBOOL:	pushab	val.2			; /* source (string) mval operand 2 */
+			pushab	val.1			; /* source (string) mval operand 1 */
+			jsb	xfer.xf_ncontain_retbool
+OC_CONTAIN_RETMVAL:	pushab	val.0			; /* destination mval */
+			pushab	val.2			; /* source (string) mval operand 2 */
+			pushab	val.1			; /* source (string) mval operand 1 */
+			calls   #3,xfer.xf_contain_retmval
+OC_NCONTAIN_RETMVAL:	pushab	val.0			; /* destination mval */
+			pushab	val.2			; /* source (string) mval operand 2 */
+			pushab	val.1			; /* source (string) mval operand 1 */
+			calls   #3,xfer.xf_ncontain_retmval

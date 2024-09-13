@@ -34,6 +34,9 @@ int	op_nequ_retbool(mval *u, mval *v)
 		MV_FORCE_DEFINED(u);
 		return FALSE;
 	}
+	/* Note: The below code is similar to that in "is_equ.c" (invoked from bx_relop_operator.c for OC_NEQU case).
+	 * We do not directly call "is_equ()" for performance reasons (to avoid function call overhead).
+	 */
 	for ( ; ; )	/* have a dummy for loop to be able to use "break" for various codepaths below */
 	{
 		land = utyp & vtyp;
