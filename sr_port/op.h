@@ -349,4 +349,10 @@ void	opp_ncontain_retbool();				/* Prototype of opp_ncontain_retbool.s */
 int	op_ncontain_retbool(mval *u, mval *v);		/* Prototype of op_ncontain_retbool.c */
 void	op_contain_retmval(mval *u, mval *v, mval *ret);
 void	op_ncontain_retmval(mval *u, mval *v, mval *ret);
+void	opp_follow_retbool();				/* Prototype of opp_follow_retbool.s */
+int	op_follow_retbool(mval *u, mval *v);		/* Prototype of op_follow_retbool.c */
+void	opp_nfollow_retbool();				/* Prototype of opp_nfollow_retbool.s */
+int	op_nfollow_retbool(mval *u, mval *v);		/* Prototype of op_nfollow_retbool.c */
+void	op_follow_retmval(mval *u, mval *v, mval *ret);
+void	op_nfollow_retmval(mval *u, mval *v, mval *ret);
 #endif
