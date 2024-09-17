@@ -22,27 +22,18 @@ LITREF	mval	literal_sqlnull;
 
 void op_npattern_retmval(mval *u, mval *v, mval *ret)
 {
-	int		utyp, vtyp;
 	boolean_t	result;
 	uint4		tempuint;
 
-	utyp = u->mvtype;
-	vtyp = v->mvtype;
-	if (MVTYPE_IS_SQLNULL(utyp))
+	if (MV_IS_SQLNULL(u))
 	{
-		MV_FORCE_DEFINED(v);
+		assert(MV_FORCE_DEFINED(v));
 		*ret = literal_sqlnull;
 		return;
 	}
-	if (MVTYPE_IS_SQLNULL(vtyp))
-	{
-		MV_FORCE_DEFINED(u);
-		*ret = literal_sqlnull;
-		return;
-	}
+	assert(!MV_IS_SQLNULL(v));
 	/* The below code is similar to that in "bxrelop_operator.c" (for OC_NPATTERN case) */
-	MV_FORCE_STR(u);
-	MV_FORCE_STR(v);
+	assert(MV_IS_STRING(v));
 	GET_ULONG(tempuint, v->str.addr);
 	result = (tempuint ? do_patfixed(u, v) : do_pattern(u, v));
 	*ret = (!result ? literal_one : literal_zero);

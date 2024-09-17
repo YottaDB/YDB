@@ -20,25 +20,17 @@
 /* Note: This C function is called by "opp_pattern_retbool.s". */
 int	op_pattern_retbool(mval *u, mval *v)
 {
-	int		utyp, vtyp;
 	boolean_t	result;
 	uint4		tempuint;
 
-	utyp = u->mvtype;
-	vtyp = v->mvtype;
-	if (MVTYPE_IS_SQLNULL(utyp))
+	if (MV_IS_SQLNULL(u))
 	{
-		MV_FORCE_DEFINED(v);
+		assert(MV_FORCE_DEFINED(v));
 		return FALSE;
 	}
-	if (MVTYPE_IS_SQLNULL(vtyp))
-	{
-		MV_FORCE_DEFINED(u);
-		return FALSE;
-	}
+	assert(!MV_IS_SQLNULL(v));
 	/* The below code is similar to that in "bxrelop_operator.c" (for OC_PATTERN case) */
-	MV_FORCE_STR(u);
-	MV_FORCE_STR(v);
+	assert(MV_IS_STRING(v));
 	GET_ULONG(tempuint, v->str.addr);
 	result = (tempuint ? do_patfixed(u, v) : do_pattern(u, v));
 	return result;

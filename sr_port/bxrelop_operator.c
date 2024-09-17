@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2020-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *                                                              *
  *      This source code contains the intellectual property     *
@@ -67,6 +67,7 @@ int	bxrelop_operator(mval *lhs, mval *rhs, opctype relopcode, int this_bool_dept
 			break;
 		case OC_NPATTERN:
 		case OC_PATTERN:
+			assert(MV_IS_STRING(rhs));
 			GET_ULONG(tempuint, rhs->str.addr);
 			result = (tempuint ? do_patfixed(lhs, rhs) : do_pattern(lhs, rhs));
 			bool_result = (OC_PATTERN == relopcode) ? result : !result;
