@@ -158,7 +158,9 @@ void alloc_reg(void)
 						|| (OC_CONTAIN_RETBOOL == x->operand[0].oprval.tref->opcode)
 						|| (OC_NCONTAIN_RETBOOL == x->operand[0].oprval.tref->opcode)
 						|| (OC_FOLLOW_RETBOOL == x->operand[0].oprval.tref->opcode)
-						|| (OC_NFOLLOW_RETBOOL == x->operand[0].oprval.tref->opcode));
+						|| (OC_NFOLLOW_RETBOOL == x->operand[0].oprval.tref->opcode)
+						|| (OC_PATTERN_RETBOOL == x->operand[0].oprval.tref->opcode)
+						|| (OC_NPATTERN_RETBOOL == x->operand[0].oprval.tref->opcode));
 					x->opcode = OC_NOOP;	/* Replace OC_BOOLEXPRSTART triple with OC_NOOP */
 					continue;
 				}
@@ -182,7 +184,9 @@ void alloc_reg(void)
 						|| (OC_CONTAIN_RETBOOL == y->operand[0].oprval.tref->opcode)
 						|| (OC_NCONTAIN_RETBOOL == y->operand[0].oprval.tref->opcode)
 						|| (OC_FOLLOW_RETBOOL == y->operand[0].oprval.tref->opcode)
-						|| (OC_NFOLLOW_RETBOOL == y->operand[0].oprval.tref->opcode));
+						|| (OC_NFOLLOW_RETBOOL == y->operand[0].oprval.tref->opcode)
+						|| (OC_PATTERN_RETBOOL == y->operand[0].oprval.tref->opcode)
+						|| (OC_NPATTERN_RETBOOL == y->operand[0].oprval.tref->opcode));
 					x->opcode = OC_NOOP;	/* Replace OC_BOOLEXPRFINISH triple with OC_NOOP */
 					/* Check if OC_BOOLEXPRFINISH is preceded by an OC_JMP that jumps past just
 					 * this OC_BOOLEXPRFINISH triple. In that case, we can safely remove the

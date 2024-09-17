@@ -355,4 +355,10 @@ void	opp_nfollow_retbool();				/* Prototype of opp_nfollow_retbool.s */
 int	op_nfollow_retbool(mval *u, mval *v);		/* Prototype of op_nfollow_retbool.c */
 void	op_follow_retmval(mval *u, mval *v, mval *ret);
 void	op_nfollow_retmval(mval *u, mval *v, mval *ret);
+void	opp_pattern_retbool();				/* Prototype of opp_pattern_retbool.s */
+int	op_pattern_retbool(mval *u, mval *v);		/* Prototype of op_pattern_retbool.c */
+void	opp_npattern_retbool();				/* Prototype of opp_npattern_retbool.s */
+int	op_npattern_retbool(mval *u, mval *v);		/* Prototype of op_npattern_retbool.c */
+void	op_pattern_retmval(mval *u, mval *v, mval *ret);
+void	op_npattern_retmval(mval *u, mval *v, mval *ret);
 #endif
