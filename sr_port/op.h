@@ -373,4 +373,10 @@ void	opp_ngt_retbool();				/* Prototype of opp_ngt_retbool.s */
 int	op_ngt_retbool(mval *u, mval *v);		/* Prototype of op_ngt_retbool.c */
 void	op_gt_retmval(mval *u, mval *v, mval *ret);
 void	op_ngt_retmval(mval *u, mval *v, mval *ret);
+void	opp_lt_retbool();				/* Prototype of opp_lt_retbool.s */
+int	op_lt_retbool(mval *u, mval *v);		/* Prototype of op_lt_retbool.c */
+void	opp_nlt_retbool();				/* Prototype of opp_nlt_retbool.s */
+int	op_nlt_retbool(mval *u, mval *v);		/* Prototype of op_nlt_retbool.c */
+void	op_lt_retmval(mval *u, mval *v, mval *ret);
+void	op_nlt_retmval(mval *u, mval *v, mval *ret);
 #endif

@@ -124,6 +124,8 @@ int bool_expr(boolean_t sense, oprtype *addr, triple **boolexprfinish_ptr)
 				break;
 			if ((OC_GT == t1->opcode) || (OC_NGT == t1->opcode))
 				break;
+			if ((OC_LT == t1->opcode) || (OC_NLT == t1->opcode))
+				break;
 			if (OC_COM != t1->opcode)
 			{
 				optimizable = FALSE;
@@ -210,6 +212,13 @@ int bool_expr(boolean_t sense, oprtype *addr, triple **boolexprfinish_ptr)
 				new_opcode = ((OC_GT == t1->opcode) ? OC_NGT_RETBOOL : OC_GT_RETBOOL);
 			else
 				new_opcode = ((OC_GT == t1->opcode) ? OC_GT_RETBOOL : OC_NGT_RETBOOL);
+			break;
+		case OC_LT:
+		case OC_NLT:
+			if (num_coms % 2)
+				new_opcode = ((OC_LT == t1->opcode) ? OC_NLT_RETBOOL : OC_LT_RETBOOL);
+			else
+				new_opcode = ((OC_LT == t1->opcode) ? OC_LT_RETBOOL : OC_NLT_RETBOOL);
 			break;
 		default:
 			optimizable = FALSE;

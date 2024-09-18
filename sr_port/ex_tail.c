@@ -119,6 +119,8 @@ void ex_tail(oprtype *opr, int depth)
 					break;
 				if ((OC_GT == t->opcode) || (OC_NGT == t->opcode))
 					break;
+				if ((OC_LT == t->opcode) || (OC_NLT == t->opcode))
+					break;
 				if (OC_COM != t->opcode)
 				{
 					optimizable = FALSE;
@@ -202,6 +204,13 @@ void ex_tail(oprtype *opr, int depth)
 					new_opcode = ((OC_GT == t->opcode) ? OC_NGT_RETMVAL : OC_GT_RETMVAL);
 				else
 					new_opcode = ((OC_GT == t->opcode) ? OC_GT_RETMVAL : OC_NGT_RETMVAL);
+				break;
+			case OC_LT:
+			case OC_NLT:
+				if (num_coms % 2)
+					new_opcode = ((OC_LT == t->opcode) ? OC_NLT_RETMVAL : OC_LT_RETMVAL);
+				else
+					new_opcode = ((OC_LT == t->opcode) ? OC_LT_RETMVAL : OC_NLT_RETMVAL);
 				break;
 			default:
 				optimizable = FALSE;
