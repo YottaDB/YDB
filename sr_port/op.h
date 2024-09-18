@@ -367,4 +367,10 @@ void	opp_nsortsafter_retbool();				/* Prototype of opp_nsortsafter_retbool.s */
 int	op_nsortsafter_retbool(mval *u, mval *v);		/* Prototype of op_nsortsafter_retbool.c */
 void	op_sortsafter_retmval(mval *u, mval *v, mval *ret);
 void	op_nsortsafter_retmval(mval *u, mval *v, mval *ret);
+void	opp_gt_retbool();				/* Prototype of opp_gt_retbool.s */
+int	op_gt_retbool(mval *u, mval *v);		/* Prototype of op_gt_retbool.c */
+void	opp_ngt_retbool();				/* Prototype of opp_ngt_retbool.s */
+int	op_ngt_retbool(mval *u, mval *v);		/* Prototype of op_ngt_retbool.c */
+void	op_gt_retmval(mval *u, mval *v, mval *ret);
+void	op_ngt_retmval(mval *u, mval *v, mval *ret);
 #endif

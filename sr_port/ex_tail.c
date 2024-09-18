@@ -117,6 +117,8 @@ void ex_tail(oprtype *opr, int depth)
 					break;
 				if ((OC_SORTSAFTER == t->opcode) || (OC_NSORTSAFTER == t->opcode))
 					break;
+				if ((OC_GT == t->opcode) || (OC_NGT == t->opcode))
+					break;
 				if (OC_COM != t->opcode)
 				{
 					optimizable = FALSE;
@@ -193,6 +195,13 @@ void ex_tail(oprtype *opr, int depth)
 				else
 					new_opcode = ((OC_SORTSAFTER == t->opcode)
 							? OC_SORTSAFTER_RETMVAL : OC_NSORTSAFTER_RETMVAL);
+				break;
+			case OC_GT:
+			case OC_NGT:
+				if (num_coms % 2)
+					new_opcode = ((OC_GT == t->opcode) ? OC_NGT_RETMVAL : OC_GT_RETMVAL);
+				else
+					new_opcode = ((OC_GT == t->opcode) ? OC_GT_RETMVAL : OC_NGT_RETMVAL);
 				break;
 			default:
 				optimizable = FALSE;
