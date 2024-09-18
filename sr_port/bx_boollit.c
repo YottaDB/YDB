@@ -201,8 +201,8 @@ void bx_boollit(triple *t, int depth)
 			if (ERR_PATNOTFOUND == TREF(source_error_found))
 				return;
 			break;
-		case OC_NSORTS_AFTER:
-		case OC_SORTS_AFTER:
+		case OC_NSORTSAFTER:
+		case OC_SORTSAFTER:
 			tvr = (0 < sorts_after(v[0], v[1]));
 			break;
 		default:

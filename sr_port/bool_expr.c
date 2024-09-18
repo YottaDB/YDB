@@ -120,6 +120,8 @@ int bool_expr(boolean_t sense, oprtype *addr, triple **boolexprfinish_ptr)
 				break;
 			if ((OC_PATTERN == t1->opcode) || (OC_NPATTERN == t1->opcode))
 				break;
+			if ((OC_SORTSAFTER == t1->opcode) || (OC_NSORTSAFTER == t1->opcode))
+				break;
 			if (OC_COM != t1->opcode)
 			{
 				optimizable = FALSE;
@@ -192,6 +194,13 @@ int bool_expr(boolean_t sense, oprtype *addr, triple **boolexprfinish_ptr)
 				new_opcode = ((OC_PATTERN == t1->opcode) ? OC_NPATTERN_RETBOOL : OC_PATTERN_RETBOOL);
 			else
 				new_opcode = ((OC_PATTERN == t1->opcode) ? OC_PATTERN_RETBOOL : OC_NPATTERN_RETBOOL);
+			break;
+		case OC_SORTSAFTER:
+		case OC_NSORTSAFTER:
+			if (num_coms % 2)
+				new_opcode = ((OC_SORTSAFTER == t1->opcode) ? OC_NSORTSAFTER_RETBOOL : OC_SORTSAFTER_RETBOOL);
+			else
+				new_opcode = ((OC_SORTSAFTER == t1->opcode) ? OC_SORTSAFTER_RETBOOL : OC_NSORTSAFTER_RETBOOL);
 			break;
 		default:
 			optimizable = FALSE;

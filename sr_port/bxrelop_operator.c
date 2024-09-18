@@ -60,10 +60,10 @@ int	bxrelop_operator(mval *lhs, mval *rhs, opctype relopcode, int this_bool_dept
 													&result, &numpcs);
 			bool_result = (OC_CONTAIN == relopcode) ? (0 < result) : !result;
 			break;
-		case OC_NSORTS_AFTER:
-		case OC_SORTS_AFTER:
+		case OC_NSORTSAFTER:
+		case OC_SORTSAFTER:
 			result = sorts_after(lhs, rhs);
-			bool_result = (OC_SORTS_AFTER == relopcode) ? (0 < result) : (0 >= result);
+			bool_result = (OC_SORTSAFTER == relopcode) ? (0 < result) : (0 >= result);
 			break;
 		case OC_NPATTERN:
 		case OC_PATTERN:

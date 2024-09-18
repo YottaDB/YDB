@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -135,8 +135,8 @@ LITDEF toktabtype tokentable[] =
 	tokdef("TK_STRLIT", 0, 0, 0),
 	tokdef("TK_VBAR", 0, 0, 0),
 	tokdef("TK_EXPONENT", OC_EXP, 0, OCT_MVAL),
-	tokdef("TK_SORTS_AFTER", OC_SORTS_AFTER, 0, OCT_MVAL),
-	tokdef("TK_NSORTS_AFTER", OC_NSORTS_AFTER, 0, OCT_MVAL),
+	tokdef("TK_SORTS_AFTER", OC_SORTSAFTER, 0, OCT_MVAL),
+	tokdef("TK_NSORTS_AFTER", OC_NSORTSAFTER, 0, OCT_MVAL),
 	tokdef("TK_ATHASH", 0, 0, 0),
 	tokdef("TK_SQLFIELDNAME", 0, 0, 0),
 	tokdef("TK_CR", 0, 0, 0 ),

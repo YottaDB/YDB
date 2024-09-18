@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -49,8 +49,8 @@ void bx_relop(triple *t, opctype cmp, boolean_t sense, oprtype *addr, int depth,
 		break;
 	case OC_NFOLLOW:
 	case OC_FOLLOW:
-	case OC_NSORTS_AFTER:
-	case OC_SORTS_AFTER:
+	case OC_NSORTSAFTER:
+	case OC_SORTSAFTER:
 	case OC_NGT:
 	case OC_GT:
 		jmp_opcode = sense ? OC_JMPGTR : OC_JMPLEQ;

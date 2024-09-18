@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2020-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2020-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -89,8 +89,8 @@ void bx_tail(triple *t, boolean_t sense, oprtype *addr, int depth, opctype andor
 	case OC_FOLLOW:
 		bx_relop(t, c, sense, addr, depth, andor_opcode, caller_is_bool_expr, jmp_depth, is_last_bool_operand);
 		break;
-	case OC_NSORTS_AFTER:
-	case OC_SORTS_AFTER:
+	case OC_NSORTSAFTER:
+	case OC_SORTSAFTER:
 		bx_relop(t, c, sense, addr, depth, andor_opcode, caller_is_bool_expr, jmp_depth, is_last_bool_operand);
 		break;
 	case OC_NCONTAIN:

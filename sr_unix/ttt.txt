@@ -1169,3 +1169,17 @@ OC_NPATTERN_RETMVAL:	pushab	val.0			; /* destination mval */
 			pushab	val.2			; /* source (string) mval operand 2 */
 			pushab	val.1			; /* source (string) mval operand 1 */
 			calls   #3,xfer.xf_npattern_retmval
+OC_SORTSAFTER_RETBOOL:	pushab	val.2			; /* source (string) mval operand 2 */
+			pushab	val.1			; /* source (string) mval operand 1 */
+			jsb	xfer.xf_sortsafter_retbool
+OC_NSORTSAFTER_RETBOOL:	pushab	val.2			; /* source (string) mval operand 2 */
+			pushab	val.1			; /* source (string) mval operand 1 */
+			jsb	xfer.xf_nsortsafter_retbool
+OC_SORTSAFTER_RETMVAL:	pushab	val.0			; /* destination mval */
+			pushab	val.2			; /* source (string) mval operand 2 */
+			pushab	val.1			; /* source (string) mval operand 1 */
+			calls   #3,xfer.xf_sortsafter_retmval
+OC_NSORTSAFTER_RETMVAL:	pushab	val.0			; /* destination mval */
+			pushab	val.2			; /* source (string) mval operand 2 */
+			pushab	val.1			; /* source (string) mval operand 1 */
+			calls   #3,xfer.xf_nsortsafter_retmval
