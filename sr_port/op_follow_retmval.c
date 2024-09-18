@@ -12,8 +12,8 @@
 
 #include "mdef.h"
 
-#include "mmemory.h"
 #include "op.h"
+#include "gtm_string.h"
 
 LITREF	mval	literal_zero, literal_one;
 LITREF	mval	literal_sqlnull;
@@ -37,7 +37,8 @@ void op_follow_retmval(mval *u, mval *v, mval *ret)
 	/* The below code is similar to that in "bxrelop_operator.c" (for OC_FOLLOW case) */
 	MV_FORCE_STR(u);
 	MV_FORCE_STR(v);
-	result = memvcmp(u->str.addr, u->str.len, v->str.addr, v->str.len);
+	/* Use MEMVCMP macro and not "memvcmp()" function to avoid overhead of function call */
+	MEMVCMP(u->str.addr, u->str.len, v->str.addr, v->str.len, result);
 	*ret = ((0 < result) ? literal_one : literal_zero);
 	return;
 }

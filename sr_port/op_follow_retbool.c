@@ -12,8 +12,8 @@
 
 #include "mdef.h"
 
-#include "mmemory.h"
 #include "op.h"
+#include "gtm_string.h"
 
 /* Note: This C function is called by "opp_follow_retbool.s". */
 int	op_follow_retbool(mval *u, mval *v)
@@ -33,6 +33,7 @@ int	op_follow_retbool(mval *u, mval *v)
 	/* The below code is similar to that in "bxrelop_operator.c" (for OC_FOLLOW case) */
 	MV_FORCE_STR(u);
 	MV_FORCE_STR(v);
-	result = memvcmp(u->str.addr, u->str.len, v->str.addr, v->str.len);
+	/* Use MEMVCMP macro and not "memvcmp()" function to avoid overhead of function call */
+	MEMVCMP(u->str.addr, u->str.len, v->str.addr, v->str.len, result);
 	return (0 < result);
 }

@@ -65,24 +65,16 @@
 #define	MEMVCMP(STR1, STR1LEN, STR2, STR2LEN, RESULT)							\
 {													\
 	int	lcl_str1Len, lcl_str2Len;								\
-	int	lcl_minLen, lcl_retVal, lcl_retVal2;							\
+	int	lcl_retVal;										\
 													\
 	lcl_str1Len = STR1LEN;										\
 	lcl_str2Len = STR2LEN;										\
 	if (lcl_str1Len < lcl_str2Len)									\
-	{												\
-		lcl_minLen = lcl_str1Len;								\
-		lcl_retVal = -1;									\
-	} else if (lcl_str1Len > lcl_str2Len)								\
-	{												\
-		lcl_minLen = lcl_str2Len;								\
-		lcl_retVal = 1;										\
-	} else												\
-	{												\
-		lcl_minLen = lcl_str1Len;								\
-		lcl_retVal = 0;										\
-	}												\
-	RESULT = (0 == (lcl_retVal2 = memcmp(STR1, STR2, lcl_minLen))) ? lcl_retVal : lcl_retVal2;	\
+		RESULT = (0 == (lcl_retVal = memcmp(STR1, STR2, lcl_str1Len))) ? -1 : lcl_retVal;	\
+	else if (lcl_str1Len > lcl_str2Len)								\
+		RESULT = (0 == (lcl_retVal = memcmp(STR1, STR2, lcl_str2Len))) ? 1 : lcl_retVal;	\
+	else												\
+		RESULT = (0 == (lcl_retVal = memcmp(STR1, STR2, lcl_str1Len))) ? 0: lcl_retVal;		\
 }
 
 /* There are 2 MSTR*CMP macros. One is if the parameters are available as MSTRs and another if the parameters
