@@ -21,7 +21,6 @@
 #	See op_sortsafter_retbool.c for input args details
 #
 	.data
-	.extern	frame_pointer
 
 	.text
 	.extern	op_sortsafter_retbool

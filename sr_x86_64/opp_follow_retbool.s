@@ -21,7 +21,6 @@
 #	See op_follow_retbool.c for input args details
 #
 	.data
-	.extern	frame_pointer
 
 	.text
 	.extern	op_follow_retbool

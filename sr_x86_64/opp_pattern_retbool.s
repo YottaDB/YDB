@@ -22,7 +22,6 @@
 #	See op_pattern_retbool.c for input args details
 #
 	.data
-	.extern	frame_pointer
 
 	.text
 	.extern	do_patfixed
