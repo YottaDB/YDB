@@ -3,7 +3,7 @@
 ; Copyright (c) 2001-2015 Fidelity National Information 	;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
-; Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	;
+; Copyright (c) 2020-2024 YottaDB LLC and/or its subsidiaries.	;
 ; All rights reserved.						;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -135,6 +135,11 @@ argstsh	s ttt(ttt)="VXT_REG",ttt=ttt+1
 err	i erflag q
 	u "" w "%TTTGEN-F ",em," at line ",oldlin," character ",oldptr,!
 	s erflag=1
+	; Caller scripts (e.g. pre-commit) expect a non-zero exit status in case of an error in tttgen.m invocation
+	; (for example if an opcode with more than 2 underscores is seen in ttt.txt and an "invalid opcode name" error
+	; code is stored in "em" variable). Therefore do not continue processing as it would result in a zero exit status.
+	; Exit right here with non-zero exit status as we know we encountered an error.
+	zhalt 1
 	q
 scan	i eof g sceof
 	s oldlin=linnum,oldptr=ptr

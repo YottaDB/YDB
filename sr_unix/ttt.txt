@@ -794,12 +794,8 @@ OC_RHDADDR1:	pushl	#-1
 		pushab	val.1
 		calls	#2,xfer.xf_rhdaddr
 		movl	r0,val.0
-;
-; Note if OC_RTERROR call changes, linetail.c and eval_expr.c will also need
-; to change due to it dereferencing the backpoints to get to the opcode.
-;
-OC_RTERROR:	pushl	val.2
-		pushl	val.1
+OC_RTERROR:	pushl	val.2   ; Note if OC_RTERROR call changes, linetail.c and eval_expr.c will also need
+		pushl	val.1   ; to change due to it dereferencing the backpoints to get to the opcode.
 		jsb	xfer.xf_rterror
 OC_SETALS2ALS:	pushl	val.1
 		pushab	val.2
