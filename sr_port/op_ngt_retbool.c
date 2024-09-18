@@ -18,7 +18,7 @@
 /* Note: This C function is called by "opp_ngt_retbool.s". */
 int	op_ngt_retbool(mval *u, mval *v)
 {
-	boolean_t	result;
+	long	ret;
 
 	if (MV_IS_SQLNULL(u))
 	{
@@ -30,7 +30,10 @@ int	op_ngt_retbool(mval *u, mval *v)
 		MV_FORCE_DEFINED(u);
 		return FALSE;
 	}
-	/* The below code is similar to that in "bxrelop_operator.c" (for OC_NGT case) */
-	result = numcmp(u, v);
-	return (0 >= result);
+	/* The below code is similar to that in "bxrelop_operator.c" (for OC_NGT case).
+	 * We avoid a call to "numcmp()" but instead do a "NUMCMP_SKIP_SQLNULL_CHECK" macro call since we have already
+	 * checked for "MV_IS_SQLNULL" above. Avoiding that and the "numcmp()" function call helps cut down a few instructions.
+	 */
+	NUMCMP_SKIP_SQLNULL_CHECK(u, v, ret);	/* sets "ret" to the result of the numeric comparison of "u" and "v" */
+	return (0 >= ret);
 }

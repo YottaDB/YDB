@@ -18,24 +18,27 @@
 LITREF	mval	literal_zero, literal_one;
 LITREF	mval	literal_sqlnull;
 
-void op_gt_retmval(mval *u, mval *v, mval *ret)
+void op_gt_retmval(mval *u, mval *v, mval *result)
 {
-	boolean_t	result;
+	long	ret;
 
 	if (MV_IS_SQLNULL(u))
 	{
 		MV_FORCE_DEFINED(v);
-		*ret = literal_sqlnull;
+		*result = literal_sqlnull;
 		return;
 	}
 	if (MV_IS_SQLNULL(v))
 	{
 		MV_FORCE_DEFINED(u);
-		*ret = literal_sqlnull;
+		*result = literal_sqlnull;
 		return;
 	}
-	/* The below code is similar to that in "bxrelop_operator.c" (for OC_GT case) */
-	result = numcmp(u, v);
-	*ret = ((0 < result) ? literal_one : literal_zero);
+	/* The below code is similar to that in "bxrelop_operator.c" (for OC_GT case).
+	 * We avoid a call to "numcmp()" but instead do a "NUMCMP_SKIP_SQLNULL_CHECK" macro call since we have already
+	 * checked for "MV_IS_SQLNULL" above. Avoiding that and the "numcmp()" function call helps cut down a few instructions.
+	 */
+	NUMCMP_SKIP_SQLNULL_CHECK(u, v, ret);	/* sets "ret" to the result of the numeric comparison of "u" and "v" */
+	*result = ((0 < ret) ? literal_one : literal_zero);
 	return;
 }
