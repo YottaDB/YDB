@@ -34,7 +34,7 @@ void op_nequ_retmval(mval *u, mval *v, mval *ret)
 		*ret = literal_sqlnull;
 		return;
 	}
-	IS_EQU(u, v, result);	/* sets "result" to 1 if u == v and 0 otherwise */
-	*ret = (result ? literal_zero : literal_one);
+	IS_NEQU(u, v, result);	/* sets "result" to 1 if u != v and 0 otherwise */
+	*ret = (result ? literal_one : literal_zero);
 	return;
 }

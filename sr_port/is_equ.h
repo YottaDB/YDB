@@ -18,7 +18,10 @@
 /* This is kept as a macro to avoid overhead of a "is_equ()" function call from performance sensitive
  * callers like "op_equ_retbool.c".
  */
-#define	IS_EQU(u, v, result)													\
+#define	IS_EQU(u, v, result)	IS_EQU_COMMON(u, v, result, TRUE)
+#define	IS_NEQU(u, v, result)	IS_EQU_COMMON(u, v, result, FALSE)
+
+#define	IS_EQU_COMMON(u, v, result, t)											\
 {																\
 	int	land, lor, utyp, vtyp;												\
 																\
@@ -34,17 +37,19 @@
 			/* If they are both integers, compare only the relevant cells */					\
 			if (land & MV_INT)											\
 			{													\
-				result = (u->m[1] == v->m[1]);									\
+				result = t ? (u->m[1] == v->m[1]) : (u->m[1] != v->m[1]);					\
 				break;												\
 			}													\
 			/* If one is an integer and the other is not, the two values cannot be equal */				\
 			if (lor & MV_INT)											\
 			{													\
-				result = 0;											\
+				result = t ? 0 : 1;										\
 				break;												\
 			}													\
 			/* They are both decimal floating numbers, do a full comparison */					\
-			result = ((((mval_b *)u)->sgne == ((mval_b *)v)->sgne) && (u->m[1] == v->m[1]) && (u->m[0] == v->m[0]));\
+			result = t												\
+				? ((((mval_b *)u)->sgne == ((mval_b *)v)->sgne) && (u->m[1] == v->m[1]) && (u->m[0] == v->m[0]))\
+				: ((((mval_b *)u)->sgne != ((mval_b *)v)->sgne) || (u->m[1] != v->m[1]) || (u->m[0] != v->m[0]));\
 			break;													\
 		}														\
 		/* At least one of the numbers is not in numeric form or is not a canonical number, do a string compare */	\
@@ -52,9 +57,9 @@
 		MV_FORCE_STR(v);												\
 		if ((u->str.len != v->str.len)											\
 				|| (u->str.len && (u->str.addr != v->str.addr) && memcmp(u->str.addr, v->str.addr, u->str.len)))\
-			result = 0;												\
+			result = t ? 0 : 1;											\
 		else														\
-			result = 1;												\
+			result = t ? 1 : 0;											\
 		break;														\
 	}															\
 }

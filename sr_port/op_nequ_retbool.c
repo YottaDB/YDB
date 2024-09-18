@@ -30,6 +30,6 @@ int	op_nequ_retbool(mval *u, mval *v)
 		MV_FORCE_DEFINED(u);
 		return FALSE;
 	}
-	IS_EQU(u, v, result);	/* sets "result" to 1 if u == v and 0 otherwise */
-	return !result;
+	IS_NEQU(u, v, result);	/* sets "result" to 1 if u != v and 0 otherwise */
+	return result;
 }
