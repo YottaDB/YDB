@@ -30,7 +30,6 @@ int	op_follow_retbool(mval *u, mval *v)
 		MV_FORCE_DEFINED(u);
 		return FALSE;
 	}
-	/* The below code is similar to that in "bxrelop_operator.c" (for OC_FOLLOW case) */
 	MV_FORCE_STR(u);
 	MV_FORCE_STR(v);
 	/* Use MEMVCMP macro and not "memvcmp()" function to avoid overhead of function call */

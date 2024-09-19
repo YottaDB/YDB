@@ -379,4 +379,32 @@ void	opp_nlt_retbool();				/* Prototype of opp_nlt_retbool.s */
 int	op_nlt_retbool(mval *u, mval *v);		/* Prototype of op_nlt_retbool.c */
 void	op_lt_retmval(mval *u, mval *v, mval *ret);
 void	op_nlt_retmval(mval *u, mval *v, mval *ret);
+void	opp_bxrelop_equ();				/* Prototype of opp_bxrelop_equ.s */
+void	opp_bxrelop_nequ();				/* Prototype of opp_bxrelop_nequ.s */
+void	opp_bxrelop_contain();				/* Prototype of opp_bxrelop_contain.s */
+void	opp_bxrelop_ncontain();				/* Prototype of opp_bxrelop_ncontain.s */
+void	opp_bxrelop_sortsafter();			/* Prototype of opp_bxrelop_sortsafter.s */
+void	opp_bxrelop_nsortsafter();			/* Prototype of opp_bxrelop_nsortsafter.s */
+void	opp_bxrelop_pattern();				/* Prototype of opp_bxrelop_pattern.s */
+void	opp_bxrelop_npattern();				/* Prototype of opp_bxrelop_npattern.s */
+void	opp_bxrelop_follow();				/* Prototype of opp_bxrelop_follow.s */
+void	opp_bxrelop_nfollow();				/* Prototype of opp_bxrelop_nfollow.s */
+void	opp_bxrelop_gt();				/* Prototype of opp_bxrelop_gt.s */
+void	opp_bxrelop_ngt();				/* Prototype of opp_bxrelop_ngt.s */
+void	opp_bxrelop_lt();				/* Prototype of opp_bxrelop_lt.s */
+void	opp_bxrelop_nlt();				/* Prototype of opp_bxrelop_nlt.s */
+int	op_bxrelop_equ(mval *lhs, mval *rhs, int this_bool_depth, uint4 combined_opcode);
+int	op_bxrelop_nequ(mval *lhs, mval *rhs, int this_bool_depth, uint4 combined_opcode);
+int	op_bxrelop_contain(mval *lhs, mval *rhs, int this_bool_depth, uint4 combined_opcode);
+int	op_bxrelop_ncontain(mval *lhs, mval *rhs, int this_bool_depth, uint4 combined_opcode);
+int	op_bxrelop_sortsafter(mval *lhs, mval *rhs, int this_bool_depth, uint4 combined_opcode);
+int	op_bxrelop_nsortsafter(mval *lhs, mval *rhs, int this_bool_depth, uint4 combined_opcode);
+int	op_bxrelop_pattern(mval *lhs, mval *rhs, int this_bool_depth, uint4 combined_opcode);
+int	op_bxrelop_npattern(mval *lhs, mval *rhs, int this_bool_depth, uint4 combined_opcode);
+int	op_bxrelop_follow(mval *lhs, mval *rhs, int this_bool_depth, uint4 combined_opcode);
+int	op_bxrelop_nfollow(mval *lhs, mval *rhs, int this_bool_depth, uint4 combined_opcode);
+int	op_bxrelop_gt(mval *lhs, mval *rhs, int this_bool_depth, uint4 combined_opcode);
+int	op_bxrelop_ngt(mval *lhs, mval *rhs, int this_bool_depth, uint4 combined_opcode);
+int	op_bxrelop_lt(mval *lhs, mval *rhs, int this_bool_depth, uint4 combined_opcode);
+int	op_bxrelop_nlt(mval *lhs, mval *rhs, int this_bool_depth, uint4 combined_opcode);
 #endif

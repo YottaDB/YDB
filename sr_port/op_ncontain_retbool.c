@@ -31,7 +31,6 @@ int	op_ncontain_retbool(mval *u, mval *v)
 		MV_FORCE_DEFINED(u);
 		return FALSE;
 	}
-	/* The below code is similar to that in "bxrelop_operator.c" (for OC_NCONTAIN case) */
 	MV_FORCE_STR(u);
 	MV_FORCE_STR(v);
 	numpcs = 1;

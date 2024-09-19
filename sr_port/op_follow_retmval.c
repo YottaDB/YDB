@@ -34,7 +34,6 @@ void op_follow_retmval(mval *u, mval *v, mval *ret)
 		*ret = literal_sqlnull;
 		return;
 	}
-	/* The below code is similar to that in "bxrelop_operator.c" (for OC_FOLLOW case) */
 	MV_FORCE_STR(u);
 	MV_FORCE_STR(v);
 	/* Use MEMVCMP macro and not "memvcmp()" function to avoid overhead of function call */

@@ -31,32 +31,68 @@ void bx_relop(triple *t, opctype cmp, boolean_t sense, oprtype *addr, int depth,
  */
 {
 	oprtype		*p;
-	opctype		jmp_opcode;
+	opctype		jmp_opcode, new_opcode;
 	tbp		*tripbp;
-	triple		*bini, *comv, *ref, *ref0, ref1, *parm1, *parm2;
+	triple		*bini, *comv, *ref, *ref0, ref1, *parm1;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	switch(t->opcode)
 	{
 	case OC_NEQU:
+		new_opcode = OC_BXRELOP_NEQU;
+		jmp_opcode = sense ? OC_JMPNEQ : OC_JMPEQU;
+		break;
 	case OC_EQU:
+		new_opcode = OC_BXRELOP_EQU;
+		jmp_opcode = sense ? OC_JMPNEQ : OC_JMPEQU;
+		break;
 	case OC_NPATTERN:
+		new_opcode = OC_BXRELOP_NPATTERN;
+		jmp_opcode = sense ? OC_JMPNEQ : OC_JMPEQU;
+		break;
 	case OC_PATTERN:
+		new_opcode = OC_BXRELOP_PATTERN;
+		jmp_opcode = sense ? OC_JMPNEQ : OC_JMPEQU;
+		break;
 	case OC_NCONTAIN:
+		new_opcode = OC_BXRELOP_NCONTAIN;
+		jmp_opcode = sense ? OC_JMPNEQ : OC_JMPEQU;
+		break;
 	case OC_CONTAIN:
+		new_opcode = OC_BXRELOP_CONTAIN;
 		jmp_opcode = sense ? OC_JMPNEQ : OC_JMPEQU;
 		break;
 	case OC_NFOLLOW:
+		new_opcode = OC_BXRELOP_NFOLLOW;
+		jmp_opcode = sense ? OC_JMPGTR : OC_JMPLEQ;
+		break;
 	case OC_FOLLOW:
+		new_opcode = OC_BXRELOP_FOLLOW;
+		jmp_opcode = sense ? OC_JMPGTR : OC_JMPLEQ;
+		break;
 	case OC_NSORTSAFTER:
+		new_opcode = OC_BXRELOP_NSORTSAFTER;
+		jmp_opcode = sense ? OC_JMPGTR : OC_JMPLEQ;
+		break;
 	case OC_SORTSAFTER:
+		new_opcode = OC_BXRELOP_SORTSAFTER;
+		jmp_opcode = sense ? OC_JMPGTR : OC_JMPLEQ;
+		break;
 	case OC_NGT:
+		new_opcode = OC_BXRELOP_NGT;
+		jmp_opcode = sense ? OC_JMPGTR : OC_JMPLEQ;
+		break;
 	case OC_GT:
+		new_opcode = OC_BXRELOP_GT;
 		jmp_opcode = sense ? OC_JMPGTR : OC_JMPLEQ;
 		break;
 	case OC_NLT:
+		new_opcode = OC_BXRELOP_NLT;
+		jmp_opcode = sense ? OC_JMPLSS : OC_JMPGEQ;
+		break;
 	case OC_LT:
+		new_opcode = OC_BXRELOP_LT;
 		jmp_opcode = sense ? OC_JMPLSS : OC_JMPGEQ;
 		break;
 	default:
@@ -72,11 +108,8 @@ void bx_relop(triple *t, opctype cmp, boolean_t sense, oprtype *addr, int depth,
 	parm1 = maketriple(OC_PARAMETER);
 	parm1->operand[0] = t->operand[1];
 	t->operand[1] = put_tref(parm1);
-	parm2 = maketriple(OC_PARAMETER);
-	parm1->operand[1] = put_tref(parm2);
-	parm2->operand[0] = make_ilit((mint)cmp);
-	ADD_BOOL_ZYSQLNULL_PARMS(parm2, depth, jmp_opcode, andor_opcode, caller_is_bool_expr, is_last_bool_operand, jmp_depth);
-	t->opcode = OC_BXRELOP;
+	ADD_BOOL_ZYSQLNULL_PARMS(parm1, depth, jmp_opcode, andor_opcode, caller_is_bool_expr, is_last_bool_operand, jmp_depth);
+	t->opcode = new_opcode;
 	for (p = t->operand ; p < ARRAYTOP(t->operand); )
 	{	/* Some day investigate whether this is still needed */
 		if (TRIP_REF == p->oprclass)

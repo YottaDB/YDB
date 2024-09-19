@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -151,7 +151,20 @@ int resolve_ref(int errknt)
 			{
 				switch(looptrip->opcode)
 				{
-				case OC_BXRELOP:
+				case OC_BXRELOP_EQU:
+				case OC_BXRELOP_NEQU:
+				case OC_BXRELOP_CONTAIN:
+				case OC_BXRELOP_NCONTAIN:
+				case OC_BXRELOP_SORTSAFTER:
+				case OC_BXRELOP_NSORTSAFTER:
+				case OC_BXRELOP_PATTERN:
+				case OC_BXRELOP_NPATTERN:
+				case OC_BXRELOP_FOLLOW:
+				case OC_BXRELOP_NFOLLOW:
+				case OC_BXRELOP_GT:
+				case OC_BXRELOP_NGT:
+				case OC_BXRELOP_LT:
+				case OC_BXRELOP_NLT:
 					if (TRIP_REF == opnd->oprclass)
 					{	/* Iterate over all parameters of the current triple */
 						tripref = opnd->oprval.tref;
@@ -162,6 +175,7 @@ int resolve_ref(int errknt)
 							continue;
 						}
 					}
+					break;
 				default:
 					break;
 				}

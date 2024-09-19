@@ -30,7 +30,6 @@ int	op_nsortsafter_retbool(mval *u, mval *v)
 		MV_FORCE_DEFINED(u);
 		return FALSE;
 	}
-	/* The below code is similar to that in "bxrelop_operator.c" (for OC_NSORTSAFTER case) */
 	SORTS_AFTER(u, v, result);
 	return (0 >= result);
 }

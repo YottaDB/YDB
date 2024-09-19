@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2020-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -391,7 +391,7 @@ static inline void bool_zysqlnull_finish_error_if_needed(void)
 	}
 }
 
-/* This function is invoked from `mval2bool()` and `bxrelop_operator()` in case they need to do $ZYSQLNULL related processing */
+/* This function is invoked from `mval2bool()` and `op_bxrelop_*()` in case they need to do $ZYSQLNULL related processing */
 static inline int bxoprnd_is_zysqlnull(int this_bool_depth, uint4 combined_opcode, boolean_t caller_is_mval2bool)
 {
 	bool_sqlnull_t	*bool_ptr;
@@ -414,9 +414,9 @@ static inline int bxoprnd_is_zysqlnull(int this_bool_depth, uint4 combined_opcod
 	 * boolean expression). Hence the need to do this here.
 	 */
 	bool_ptr->andor_opcode = andor_opcode;
-	/* The current opcode (OC_COBOOL/OC_BXRELOP) is guaranteed to be followed by some JMP opcode (e.g. OC_JMPEQU etc.)
-	 * but we do not want to do the jump because $ZYSQLNULL is the value of the boolean expression till now.
-	 * Therefore we set the boolean evaluation result such a way that the jump is never taken.
+	/* The current opcode (OC_COBOOL/OC_BXRELOP_EQU/OC_BXRELOP_CONTAIN etc.) is guaranteed to be followed by some
+	 * JMP opcode (e.g. OC_JMPEQU etc.) but we do not want to do the jump because $ZYSQLNULL is the value of the boolean
+	 * expression till now. Therefore we set the boolean evaluation result such a way that the jump is never taken.
 	 */
 	switch(jmp_opcode)
 	{
@@ -444,7 +444,7 @@ static inline int bxoprnd_is_zysqlnull(int this_bool_depth, uint4 combined_opcod
 	return result;
 }
 
-/* This function is invoked from `mval2bool()` and `bxrelop_operator()` in case they find an operand in the boolean expression
+/* This function is invoked from `mval2bool()` and `op_bxrelop_*()` in case they find an operand in the boolean expression
  * that is not $ZYSQLNULL but is part of a boolean expression that has already seen a $ZYSQLNULL. This does some state
  * maintenance of the boolean evaluation result.
  */

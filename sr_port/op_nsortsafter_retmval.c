@@ -34,7 +34,6 @@ void op_nsortsafter_retmval(mval *u, mval *v, mval *ret)
 		*ret = literal_sqlnull;
 		return;
 	}
-	/* The below code is similar to that in "bxrelop_operator.c" (for OC_NSORTSAFTER case) */
 	SORTS_AFTER(u, v, result);
 	*ret = ((0 >= result) ? literal_one : literal_zero);
 	return;

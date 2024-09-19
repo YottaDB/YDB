@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 # Copyright (c) 2018 Stephen L Johnson. All rights reserved.	#
@@ -12,23 +12,20 @@
 #								#
 #################################################################
 
-/* op_bxrelop.s */
+/* opp_bxrelop_follow.s */
 
 
 	.include "linkage.si"
 #	include "debug.si"
 
-# args:
-#	See bxrelop_operator.c for input args details
-#
 	.text
-	.extern	bxrelop_operator
+	.extern	op_bxrelop_follow
 
-ENTRY op_bxrelop
+ENTRY opp_bxrelop_follow
 	stp	x29, x30, [sp, #-16]!
 	mov	x29, sp
 	CHKSTKALIGN				/* Verify stack alignment */
-	bl	bxrelop_operator
+	bl	op_bxrelop_follow
 	cmp	w0, wzr
 	mov	sp, x29
 	ldp	x29, x30, [sp], #16

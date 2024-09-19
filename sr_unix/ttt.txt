@@ -862,12 +862,6 @@ OC_SETZPIECE:	pushab	val.0
 		pushab	val.2
 		pushab	val.1
 		calls	#6,xfer.xf_setzpiece
-OC_BXRELOP:	pushl	val.5
-		pushl	val.4
-		pushl	val.3
-		pushab	val.2
-		pushab	val.1
-		jsb	xfer.xf_bxrelop
 OC_SRCHINDX:	irepab	val.2
 		calls	val.1,xfer.xf_srchindx
 		movl	r0,addr.0
@@ -1207,3 +1201,73 @@ OC_NLT_RETMVAL:		pushab	val.0			; /* destination mval */
 			pushab	val.2			; /* source (string) mval operand 2 */
 			pushab	val.1			; /* source (string) mval operand 1 */
 			calls   #3,xfer.xf_nlt_retmval
+OC_BXRELOP_EQU:		pushl	val.4
+			pushl	val.3
+			pushab	val.2
+			pushab	val.1
+			jsb	xfer.xf_bxrelop_equ
+OC_BXRELOP_NEQU:	pushl	val.4
+			pushl	val.3
+			pushab	val.2
+			pushab	val.1
+			jsb	xfer.xf_bxrelop_nequ
+OC_BXRELOP_CONTAIN:	pushl	val.4
+			pushl	val.3
+			pushab	val.2
+			pushab	val.1
+			jsb	xfer.xf_bxrelop_contain
+OC_BXRELOP_NCONTAIN:	pushl	val.4
+			pushl	val.3
+			pushab	val.2
+			pushab	val.1
+			jsb	xfer.xf_bxrelop_ncontain
+OC_BXRELOP_SORTSAFTER:	pushl	val.4
+			pushl	val.3
+			pushab	val.2
+			pushab	val.1
+			jsb	xfer.xf_bxrelop_sortsafter
+OC_BXRELOP_NSORTSAFTER:	pushl	val.4
+			pushl	val.3
+			pushab	val.2
+			pushab	val.1
+			jsb	xfer.xf_bxrelop_nsortsafter
+OC_BXRELOP_PATTERN:	pushl	val.4
+			pushl	val.3
+			pushab	val.2
+			pushab	val.1
+			jsb	xfer.xf_bxrelop_pattern
+OC_BXRELOP_NPATTERN:	pushl	val.4
+			pushl	val.3
+			pushab	val.2
+			pushab	val.1
+			jsb	xfer.xf_bxrelop_npattern
+OC_BXRELOP_FOLLOW:	pushl	val.4
+			pushl	val.3
+			pushab	val.2
+			pushab	val.1
+			jsb	xfer.xf_bxrelop_follow
+OC_BXRELOP_NFOLLOW:	pushl	val.4
+			pushl	val.3
+			pushab	val.2
+			pushab	val.1
+			jsb	xfer.xf_bxrelop_nfollow
+OC_BXRELOP_GT:		pushl	val.4
+			pushl	val.3
+			pushab	val.2
+			pushab	val.1
+			jsb	xfer.xf_bxrelop_gt
+OC_BXRELOP_NGT:		pushl	val.4
+			pushl	val.3
+			pushab	val.2
+			pushab	val.1
+			jsb	xfer.xf_bxrelop_ngt
+OC_BXRELOP_LT:		pushl	val.4
+			pushl	val.3
+			pushab	val.2
+			pushab	val.1
+			jsb	xfer.xf_bxrelop_lt
+OC_BXRELOP_NLT:		pushl	val.4
+			pushl	val.3
+			pushab	val.2
+			pushab	val.1
+			jsb	xfer.xf_bxrelop_nlt

@@ -35,7 +35,6 @@ void op_ncontain_retmval(mval *u, mval *v, mval *ret)
 		*ret = literal_sqlnull;
 		return;
 	}
-	/* The below code is similar to that in "bxrelop_operator.c" (for OC_NCONTAIN case) */
 	MV_FORCE_STR(u);
 	MV_FORCE_STR(v);
 	numpcs = 1;

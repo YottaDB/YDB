@@ -32,7 +32,6 @@ void op_pattern_retmval(mval *u, mval *v, mval *ret)
 		return;
 	}
 	assert(!MV_IS_SQLNULL(v));
-	/* The below code is similar to that in "bxrelop_operator.c" (for OC_PATTERN case) */
 	assert(MV_IS_STRING(v));
 	GET_ULONG(tempuint, v->str.addr);
 	result = (tempuint ? do_patfixed(u, v) : do_pattern(u, v));

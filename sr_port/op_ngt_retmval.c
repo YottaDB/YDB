@@ -34,8 +34,7 @@ void op_ngt_retmval(mval *u, mval *v, mval *result)
 		*result = literal_sqlnull;
 		return;
 	}
-	/* The below code is similar to that in "bxrelop_operator.c" (for OC_NGT case).
-	 * We avoid a call to "numcmp()" but instead do a "NUMCMP_SKIP_SQLNULL_CHECK" macro call since we have already
+	/* We avoid a call to "numcmp()" but instead do a "NUMCMP_SKIP_SQLNULL_CHECK" macro call since we have already
 	 * checked for "MV_IS_SQLNULL" above. Avoiding that and the "numcmp()" function call helps cut down a few instructions.
 	 */
 	NUMCMP_SKIP_SQLNULL_CHECK(u, v, ret);	/* sets "ret" to the result of the numeric comparison of "u" and "v" */

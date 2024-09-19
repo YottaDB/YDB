@@ -3,7 +3,7 @@
 # Copyright (c) 2007-2015 Fidelity National Information 	#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
-# Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
@@ -18,16 +18,13 @@
 	.include "mval_def.si"
 #	include "debug.si"
 
-# args:
-#	See bxrelop_operator.c for input args details
-#
 	.text
-	.extern	bxrelop_operator
+	.extern	op_bxrelop_contain
 
-ENTRY	op_bxrelop
+ENTRY	opp_bxrelop_contain
 	subq	$8, %rsp		# Bump stack for 16 byte alignment
 	CHKSTKALIGN			# Verify stack alignment
-	call	bxrelop_operator
+	call	op_bxrelop_contain
 	addq	$8, %rsp		# Remove stack alignment bump
 	cmpl	$0, %eax
 	ret

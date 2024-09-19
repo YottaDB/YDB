@@ -240,7 +240,20 @@ void bx_boolop(triple *t, boolean_t jmp_type_one, boolean_t jmp_to_next, boolean
 				t1->opcode = OC_NOOP;				/* wipe out original JMP */
 				t1->operand[0].oprclass = NO_REF;
 				break;
-			case OC_BXRELOP:
+			case OC_BXRELOP_EQU:
+			case OC_BXRELOP_NEQU:
+			case OC_BXRELOP_CONTAIN:
+			case OC_BXRELOP_NCONTAIN:
+			case OC_BXRELOP_SORTSAFTER:
+			case OC_BXRELOP_NSORTSAFTER:
+			case OC_BXRELOP_PATTERN:
+			case OC_BXRELOP_NPATTERN:
+			case OC_BXRELOP_FOLLOW:
+			case OC_BXRELOP_NFOLLOW:
+			case OC_BXRELOP_GT:
+			case OC_BXRELOP_NGT:
+			case OC_BXRELOP_LT:
+			case OC_BXRELOP_NLT:
 				/* insert copies of orig OC and following JMP in boolchain & overlay originals with STOTEMPs */
 				assert(TRIP_REF == tb->operand[0].oprclass);
 				assert(TRIP_REF == tb->operand[1].oprclass);
