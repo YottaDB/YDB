@@ -16,12 +16,13 @@
 #include "gtm_string.h"
 
 /* This is kept as a macro to avoid overhead of a "is_equ()" function call from performance sensitive
- * callers like "op_equ_retbool.c".
+ * callers like "op_equ_retbool.c". The macro has a 4th parameter "t" which is TRUE or FALSE depending on
+ * the caller context and has code to return a result or the negation of that result accordingly. This
+ * is done again for performance reasons to avoid having just one version of the macro and later do the
+ * negation of the result in the caller. That way, this macro can be invoked by both IS_EQU and IS_NEQU
+ * without code duplication and yet maintain the performance advantage (by a few instructions).
  */
-#define	IS_EQU(u, v, result)	IS_EQU_COMMON(u, v, result, TRUE)
-#define	IS_NEQU(u, v, result)	IS_EQU_COMMON(u, v, result, FALSE)
-
-#define	IS_EQU_COMMON(u, v, result, t)											\
+#define	IS_EQU_COMMON(u, v, result, t)												\
 {																\
 	int	land, lor, utyp, vtyp;												\
 																\
@@ -63,6 +64,9 @@
 		break;														\
 	}															\
 }
+
+#define	IS_EQU(u, v, result)	IS_EQU_COMMON(u, v, result, TRUE)
+#define	IS_NEQU(u, v, result)	IS_EQU_COMMON(u, v, result, FALSE)
 
 /* The function is also made available (inspite of the above macro) for callers that are not performance sensitive.
  * The rest of callers use the above IS_EQU macro to avoid the overhead of a function call.

@@ -36,7 +36,7 @@ void op_sortsafter_retmval(mval *u, mval *v, mval *ret)
 		return;
 	}
 	/* The below code is similar to that in "bxrelop_operator.c" (for OC_SORTSAFTER case) */
-	result = sorts_after(u, v);
+	SORTS_AFTER(u, v, result);
 	*ret = ((0 < result) ? literal_one : literal_zero);
 	return;
 }
