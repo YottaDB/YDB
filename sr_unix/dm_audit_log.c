@@ -328,7 +328,11 @@ int	dm_audit_connect(void)
 				return -1;
 			}
 			/* Attempt TLS handshake with logger */
-			if (0 > gtm_tls_connect(audit_conn[save_is_zauditlog].tls_sock))
+			do
+			{
+				status = gtm_tls_connect(audit_conn[save_is_zauditlog].tls_sock);
+			} while ((GTMTLS_WANT_READ == status) || (GTMTLS_WANT_WRITE == status));
+			if (0 > status)
 			{
 				errptr = (char *)gtm_tls_get_error(audit_conn[save_is_zauditlog].tls_sock);
 				gtm_tls_socket_close(audit_conn[save_is_zauditlog].tls_sock);
