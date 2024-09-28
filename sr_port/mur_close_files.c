@@ -98,6 +98,8 @@ GBLREF	void			(*call_on_signal)();
 GBLREF	boolean_t		prin_out_dev_failure;
 GBLREF	bool			only_usr_jnlpool_flush;
 #endif
+GBLREF int			in_rlbk;
+GBLREF boolean_t		repl_inst_rlbk_fd;
 
 error_def(ERR_FILERENAME);
 error_def(ERR_JNLACTINCMPLT);
@@ -939,6 +941,7 @@ boolean_t mur_close_files(void)
 		 * later (for flushing the sem-id fields). But, these should have negligible penalty as the file system caches the
 		 * disk reads/writes.
 		 */
+		in_rlbk = RLBKEXITING; /* indicate to re-create repl inst file if needed */
 		repl_inst_write(udi->fn, (off_t)0, (sm_uc_ptr_t)&repl_instance, SIZEOF(repl_inst_hdr));
 		assert((NULL != jnlpool) && (NULL != jnlpool->jnlpool_dummy_reg));
 		got_ftok = ftok_sem_lock(jnlpool->jnlpool_dummy_reg, TRUE); /* immediate=TRUE */
@@ -972,6 +975,9 @@ boolean_t mur_close_files(void)
 				wrn_count++;
 		}
 	}
+	in_rlbk = RLBKNOTACTIVE;
+	if (FD_INVALID != repl_inst_rlbk_fd) /* No need to check status below as we are exiting */
+		CLOSEFILE_RESET(repl_inst_rlbk_fd, status);    /* resets "fd" to FD_INVALID */
 	if (jgbl.onlnrlbk)
 	{	/* Signal completion */
 		assert(NULL != jnlpool);

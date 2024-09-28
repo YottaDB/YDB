@@ -15,6 +15,11 @@
 #include "mdef.h"
 #include "jnl.h"
 #include "gtm_atomic.h"
+DEFINE_ATOMIC_OP(gtm_atomic_uint, ATOMIC_FETCH_OR, memory_order_relaxed)
+DEFINE_ATOMIC_OP(gtm_atomic_uint, ATOMIC_FETCH_AND, memory_order_relaxed)
+DEFINE_ATOMIC_OP(gtm_atomic_uint, ATOMIC_STORE, memory_order_release)
+DEFINE_ATOMIC_OP(gtm_atomic_uint, ATOMIC_LOAD, memory_order_relaxed)
+
 
 #define JPLWRITES_NEEDED 0x1U
 #define SRC_JPLWRITES_NEEDED_MASK(IDX) (JPLWRITES_NEEDED << IDX)

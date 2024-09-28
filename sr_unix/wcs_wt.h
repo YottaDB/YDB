@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2016-2021 Fidelity National Information	*
+ * Copyright (c) 2016-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -18,10 +18,10 @@
 
 #define WT_LATCH_TIMEOUT_SEC    (4 * 60)        /* Define latch timeout as being 4 mins */
 
-#define	REINSERT_CR_AT_TAIL(csr, ahead, n, csa, csd, trace_cntr)	\
+#define	REINSERT_CR_AT_TAIL(CSR, AHEAD, N, csa, csd, trace_cntr)	\
 MBSTART {								\
-	n = INSQTI((que_ent_ptr_t)csr, (que_head_ptr_t)ahead);		\
-	if (INTERLOCK_FAIL == n)					\
+	N = INSQTI((que_ent_ptr_t)CSR, (que_head_ptr_t)AHEAD);		\
+	if (INTERLOCK_FAIL == N)					\
 	{								\
 		assert(FALSE);						\
 		SET_TRACEABLE_VAR((cnl)->wc_blocked, WC_BLOCK_RECOVER);	\
@@ -29,24 +29,24 @@ MBSTART {								\
 	}								\
 } MBEND
 
-#define	BREAK_TWIN(CSR, CSA)											\
+#define	BREAK_TWIN(CR, CSA)											\
 MBSTART {													\
 	cache_rec_ptr_t		cr_new;										\
 														\
-	assert((CSR)->twin && (CSA)->now_crit); 	/* We need crit to break twin connections. */		\
-	assert(!(CSR)->bt_index);	/* It has to be an OLDER twin. It cannot be a NEWER twin because	\
+	assert((CR)->twin && (CSA)->now_crit); 	/* We need crit to break twin connections. */		\
+	assert(!(CR)->bt_index);	/* It has to be an OLDER twin. It cannot be a NEWER twin because	\
 					 * as long as the OLDER twin exists in the WIP queue, the NEWER		\
 					 * twin write would not have been issued by "wcs_wtstart".		\
 					 */									\
-	assert(!(CSR)->in_cw_set);	/* no other process should be needing this buffer */			\
-	cr_new = (cache_rec_ptr_t)GDS_ANY_REL2ABS((CSA), (CSR)->twin); /* Get NEWER twin cr */			\
-	assert((void *)&((cache_rec_ptr_t)GDS_ANY_REL2ABS((CSA), cr_new->twin))->state_que == (void *)(CSR));	\
+	assert(!(CR)->in_cw_set);	/* no other process should be needing this buffer */			\
+	cr_new = (cache_rec_ptr_t)GDS_ANY_REL2ABS((CSA), (CR)->twin); /* Get NEWER twin cr */			\
+	assert(((cache_rec_ptr_t)GDS_ANY_REL2ABS((CSA), cr_new->twin)) == (CR));				\
 	/* NEWER twin should be in ACTIVE queue, except in rare cases where processes were killed. */		\
 	assert(cr_new->dirty || WBTEST_ENABLED(WBTEST_CRASH_SHUTDOWN_EXPECTED));				\
-	(CSR)->cycle++;	/* increment cycle whenever blk number changes (tp_hist needs it) */			\
-	(CSR)->blk = CR_BLKEMPTY;										\
+	(CR)->cycle++;	/* increment cycle whenever blk number changes (tp_hist needs it) */			\
+	(CR)->blk = CR_BLKEMPTY;										\
 	assert(CR_BLKEMPTY != cr_new->blk);	/* NEWER twin should have a valid block number */		\
-	cr_new->twin = (CSR)->twin = 0;	/* Break the twin link */						\
+	cr_new->twin = (CR)->twin = 0;	/* Break the twin link */						\
 	cr_new->backup_cr_is_twin = FALSE;									\
 } MBEND
 /* "wcs_wtfini" is called with a second parameter which indicates whether it has to do "is_proc_alive" check or not.
@@ -82,7 +82,7 @@ typedef struct  wtstart_cr_list_struct
 	cache_rec_ptr_t *listcrs;
 } wtstart_cr_list_t;
 
-int		wcs_wt_restart(unix_db_info *udi, cache_state_rec_ptr_t csr);
+int		wcs_wt_restart(unix_db_info *udi, cache_rec_ptr_t cr);
 int		wcs_wtfini(gd_region *reg, boolean_t do_is_proc_alive_check, cache_rec_ptr_t cr2flush);
 void		wcs_wtfini_nocrit(gd_region *reg, wtstart_cr_list_t *cr_list_ptr);
 void		wcs_wterror(gd_region *reg, int4 save_errno);

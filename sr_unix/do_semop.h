@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -13,9 +13,13 @@
 #ifndef DO_SEMOP_INCLUDED
 #define DO_SEMOP_INCLUDED
 
+#include <sys/sem.h>
+#include "gtm_sem.h"
+
 error_def(ERR_NOMORESEMCNT);
 
 int do_semop(int sems, int num, int op, int flg);
+boolean_t is_sem_undo_overflow(int semid, struct sembuf *sops, int sopcnt);
 
 /* Check whether a counter semaphore is ignored or not */
 #define IS_SEM_COUNTER_ONLINE(HDR, COUNTER_HALTED) (!((HDR)->mumps_can_bypass) || !(COUNTER_HALTED))

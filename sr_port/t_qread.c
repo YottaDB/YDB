@@ -251,6 +251,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 	gd_segment		*seg;
 	uint4			buffs_per_flush, flush_target;
 	enc_info_t		*encr_ptr;
+	boolean_t		twinning_on;
 #	ifdef DEBUG
 	cache_rec_ptr_t		cr_lo, bt_cr;
 #	endif
@@ -266,6 +267,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 	csd = csa->hdr;
 	INCR_DB_CSH_COUNTER(csa, n_t_qreads, 1);
 	is_mm = (dba_mm == csd->acc_meth);
+	twinning_on = TWINNING_ON(csd);
 	/* We better hold crit in the final retry (TP & non-TP). Only exception is journal recovery */
 #	ifdef DEBUG
 	assert((t_tries < CDB_STAGNATE) || csa->now_crit || mupip_jnl_recover || mu_reorg_encrypt_in_prog);
@@ -660,12 +662,14 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 				assert(was_crit == csa->now_crit);
 				if (reset_first_tp_srch_status)
 					RESET_FIRST_TP_SRCH_STATUS(first_tp_srch_status, cr, *cycle);
+#ifdef				DEBUG_DB_CSH_COUNTER
 				tmp_levl = ((blk_hdr_ptr_t) (buffaddr))->levl;
 				if ((0 < tmp_levl) && (255 != tmp_levl))
-					INCR_GVSTATS_COUNTER(csa, cnl, n_idxblk_csh_miss, 1);
+					INCR_DB_CSH_COUNTER(csa, n_idxblk_csh_miss, 1);
+#endif
 				bg_read_complete(cnl);
 				return buffaddr;
-			} else  if (!was_crit && (BAD_LUCK_ABOUNDS > ocnt))
+			} else if (!was_crit && (BAD_LUCK_ABOUNDS > ocnt))
 			{
 				assert(!hold_onto_crit);
 				assert(TRUE == csa->now_crit);
@@ -718,7 +722,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 				 * we depend on the the fact that "bg_update" sets cr->bt_index to 0 before incrementing cr->cycle.
 				 * Given that order, cr->bt_index can be guaranteed to be 0 if we read the incremented cycle.
 				 */
-				if (cr->twin && (0 == cr->bt_index))
+				if (twinning_on && cr->twin && (0 == cr->bt_index))
 					break;
 				if (cr->blk != blk)
 					break;
@@ -825,9 +829,11 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 				 * corresponds to "blk" passed in. It is crucial to get an accurate value for both the fields
 				 * since "tp_hist" relies on this for its intermediate validation.
 				 */
+#ifdef				DEBUG_DB_CSH_COUNTER
 				tmp_levl = ((blk_hdr_ptr_t) GDS_ANY_REL2ABS(csa, cr->buffaddr))->levl;
 				if ((0 < tmp_levl) && (255 != tmp_levl))
-					INCR_GVSTATS_COUNTER(csa, cnl, n_idxblk_csh_hit, 1);
+					INCR_DB_CSH_COUNTER(csa, n_idxblk_csh_hit, 1);
+#endif
 				return (sm_uc_ptr_t)GDS_ANY_REL2ABS(csa, cr->buffaddr);
 			}
 			if (blk != cr->blk)

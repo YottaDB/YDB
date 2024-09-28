@@ -1,6 +1,7 @@
 /****************************************************************
  *                                                              *
- *	Copyright 2006, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2006-2024 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *                                                              *
  *      This source code contains the intellectual property     *
  *      of its copyright holder(s), and is made available       *
@@ -23,6 +24,8 @@ int verify_chset(const mstr *parm);
 int verify_case(const mstr *parm);
 UConverter* get_chset_desc(const mstr *chset);
 int gtm_conv(UConverter* from, UConverter* to, mstr* src, char* dstbuff, int* bufflen);
+gtm_chset_t check_w1252(const mstr *parm);
+gtm_chset_t check_valid_utf(const mstr *parm);
 
 typedef void 	(*m_casemap_t)(uchar_ptr_t, uchar_ptr_t, int4);
 typedef int32_t	(*u_casemap_t)(UChar *dest, int32_t destCapacity, const UChar *src,

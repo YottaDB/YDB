@@ -80,6 +80,8 @@ GBLREF	uint4			process_id;
 #ifdef DEBUG
 GBLREF	bool			only_usr_jnlpool_flush;
 #endif
+GBLREF int			in_rlbk;
+GBLREF boolean_t		repl_inst_rlbk_fd;
 
 ZOS_ONLY(error_def(ERR_BADTAG);)
 error_def(ERR_LOGTOOLONG);
@@ -92,6 +94,7 @@ error_def(ERR_REPLINSTFMT);
 error_def(ERR_REPLINSTNOHIST);
 error_def(ERR_REPLINSTOPEN);
 error_def(ERR_REPLINSTREAD);
+error_def(ERR_REPLINSTRECR);
 error_def(ERR_REPLINSTSEQORD);
 error_def(ERR_REPLINSTUNDEF);
 error_def(ERR_REPLINSTWRITE);
@@ -177,7 +180,7 @@ struct gd_addr_struct *repl_inst_get_name(char *fn, unsigned int *fn_len, unsign
  */
 void	repl_inst_read(char *fn, off_t offset, sm_uc_ptr_t buff, size_t buflen)
 {
-	int			status, fd;
+	int			status, fd, oflag;
 	size_t			actual_readlen;
 	unix_db_info		*udi;
 	gd_region		*reg;
@@ -209,9 +212,14 @@ void	repl_inst_read(char *fn, off_t offset, sm_uc_ptr_t buff, size_t buflen)
 		assert(udi->grabbed_ftok_sem || ((jnlpool && jnlpool->jnlpool_ctl) && udi->s_addrs.now_crit)
 				|| jgbl.mur_rollback || ((NULL != jnlpool) && in_repl_inst_edit));
 	}
-	OPENFILE_CLOEXEC(fn, O_RDONLY, fd);
-	if (FD_INVALID == fd)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_REPLINSTOPEN, 2, LEN_AND_STR(fn), errno);
+	oflag = in_rlbk ? O_RDWR : O_RDONLY; /* for onrlbk hold fd for repl_inst_write() so use O_RDWR */
+	if (!in_rlbk || (in_rlbk && (FD_INVALID == repl_inst_rlbk_fd)))
+	{
+		OPENFILE_CLOEXEC(fn, oflag, fd);
+		if (FD_INVALID == fd)
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_REPLINSTOPEN, 2, LEN_AND_STR(fn), errno);
+	} else
+		fd = repl_inst_rlbk_fd;
 	assert(0 < buflen);
 	if (0 != offset)
 	{
@@ -276,10 +284,15 @@ void	repl_inst_read(char *fn, off_t offset, sm_uc_ptr_t buff, size_t buflen)
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_REPLINSTREAD, 4, buflen, (qw_off_t *)&offset, LEN_AND_STR(fn),
 				status);
 	}
-	CLOSEFILE_RESET(fd, status);	/* resets "fd" to FD_INVALID */
-	assert(0 == status);
-	if (0 != status)
-		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_REPLINSTCLOSE, 2, LEN_AND_STR(fn), status);
+	if (in_rlbk)
+		repl_inst_rlbk_fd = fd;
+	else
+	{
+		CLOSEFILE_RESET(fd, status);	/* resets "fd" to FD_INVALID */
+		assert(0 == status);
+		if (0 != status)
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_REPLINSTCLOSE, 2, LEN_AND_STR(fn), status);
+	}
 }
 
 /* Description:
@@ -304,6 +317,12 @@ void	repl_inst_write(char *fn, off_t offset, sm_uc_ptr_t buff, size_t buflen)
 	size_t			gtmsrc_lcl_start, gtmsrc_lcl_top;
 	gtmsource_local_ptr_t	gtmsourcelocal_ptr;
 #	endif
+	boolean_t		replfilegone, recreatereplfile;
+#define CPBUFSIZE		4096
+	char			cpbuf[CPBUFSIZE];
+	ssize_t			bytesread, byteswritten;
+	off_t			lseekreturn;
+	int			save_errno;
 
 	assert(!jgbl.mur_rollback || !jgbl.mur_options_forward); /* ROLLBACK -FORWARD should not call this function */
 	/* Assert that except for MUPIP REPLIC -INSTANCE_CREATE or -EDITINSTANCE, all callers hold the FTOK semaphore on the
@@ -374,32 +393,91 @@ void	repl_inst_write(char *fn, off_t offset, sm_uc_ptr_t buff, size_t buflen)
 		}
 	}
 #	endif
+	replfilegone = (access(fn, F_OK) != 0);
+	/* RLBKEXITING == in_rlbk means we are about to exit rollback so re-create repl inst file if needed */
+	recreatereplfile = ((RLBKEXITING == in_rlbk) && replfilegone && (FD_INVALID != repl_inst_rlbk_fd));
 	oflag = O_RDWR;
-	if (in_repl_inst_create)
+	if ((in_repl_inst_create) || recreatereplfile )
 		oflag |= (O_CREAT | O_EXCL);
-	OPENFILE3_CLOEXEC(fn, oflag, 0666, fd);
-	if (FD_INVALID == fd)
+	if (!in_rlbk || (in_rlbk && (FD_INVALID == repl_inst_rlbk_fd)) || recreatereplfile)
 	{
-		if (!in_repl_inst_create)
-			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_REPLINSTOPEN, 2, LEN_AND_STR(fn), errno);
-		else
-			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_REPLINSTCREATE, 2, LEN_AND_STR(fn), errno);
+		OPENFILE3_CLOEXEC(fn, oflag, 0666, fd);
+		if (FD_INVALID == fd)
+		{
+			if (!in_repl_inst_create)
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_REPLINSTOPEN, 2, LEN_AND_STR(fn), errno);
+			else
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_REPLINSTCREATE, 2, LEN_AND_STR(fn), errno);
+		}
 	}
+	else
+		fd = repl_inst_rlbk_fd;
 #ifdef __MVS__
 	if (-1 == (in_repl_inst_create ? gtm_zos_set_tag(fd, TAG_BINARY, TAG_NOTTEXT, TAG_FORCE, &realfiletag) :
 					 gtm_zos_tag_to_policy(fd, TAG_BINARY, &realfiletag)))
 		TAG_POLICY_GTM_PUTMSG(fn, errno, realfiletag, TAG_BINARY);
 #endif
 	assert(0 < buflen);
+	if (recreatereplfile && (FD_INVALID != repl_inst_rlbk_fd))
+	{
+		/* For the online_rollback/orlbkinstrecr test, which only runs in DEBUG, ensure we have up-to-date
+		 * ipc info otherwise other processes might have issues exiting.
+		 */
+#       	ifdef DEBUG
+		REPL_INST_LSEEKWRITE(fd, offset, buff, buflen, status);
+		REPL_INST_LSEEKWRITE(repl_inst_rlbk_fd, offset, buff, buflen, status);
+#		endif
+		/* Go to the beginning using the file descriptor we have held open */
+		lseekreturn = lseek(repl_inst_rlbk_fd, 0, SEEK_SET);
+		save_errno = errno;
+lseekfail:
+		if (-1 != lseekreturn)
+		{
+			for (;;)
+			{	/* read from the file descriptor we have held open ... */
+				DOREADRL(repl_inst_rlbk_fd, cpbuf, CPBUFSIZE, bytesread);
+				save_errno = errno;
+bytesreadfail:
+				if (bytesread > 0)
+				{
+					/* write to the recreated repl instance file */
+					DOWRITERL(fd, cpbuf, bytesread, byteswritten);
+					save_errno = errno;
+byteswrittenfail:
+					if (bytesread != byteswritten)
+						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_REPLINSTRECR, 2, LEN_AND_STR(fn),
+							save_errno);
+				} else if (0 == bytesread)
+						break; /* No more bytes to copy so we are done */
+					else
+						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_REPLINSTRECR, 2, LEN_AND_STR(fn),
+							save_errno);
+			}
+		} else
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_REPLINSTRECR, 2, LEN_AND_STR(fn), save_errno);
+		CLOSEFILE_RESET(repl_inst_rlbk_fd, status);    /* resets "repl_inst_rlbk_fd" to FD_INVALID */
+	}
 	REPL_INST_LSEEKWRITE(fd, offset, buff, buflen, status);
 	assert(0 == status);
 	if (0 != status)
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_REPLINSTWRITE, 4, buflen, (qw_off_t *)&offset, LEN_AND_STR(fn),
 			status);
-	CLOSEFILE_RESET(fd, status);	/* resets "fd" to FD_INVALID */
-	assert(0 == status);
-	if (0 != status)
-		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_REPLINSTCLOSE, 2, LEN_AND_STR(fn), status);
+	if (in_rlbk)
+		repl_inst_rlbk_fd = fd;
+	else
+	{
+		CLOSEFILE_RESET(fd, status);	/* resets "fd" to FD_INVALID */
+		assert(0 == status);
+		if (0 != status)
+		{
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_REPLINSTCLOSE, 2, LEN_AND_STR(fn), status);
+			assert(FALSE);
+			/* Dummy gotos satisfy the compiler that labels used for breakpoints testing are legit */
+			goto lseekfail;
+			goto bytesreadfail;
+			goto byteswrittenfail;
+		}
+	}
 }
 
 /* Description:
@@ -434,17 +512,27 @@ void	repl_inst_sync(char *fn)
 		assert((NULL != jnlpool) && (NULL != jnlpool->jnlpool_ctl) && udi->s_addrs.now_crit);
 	)
 	oflag = O_RDWR;
-	OPENFILE3_CLOEXEC(fn, oflag, 0666, fd);
-	if (FD_INVALID == fd)
-		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_REPLINSTOPEN, 2, LEN_AND_STR(fn), errno);
+	if (!in_rlbk || (in_rlbk && (FD_INVALID == repl_inst_rlbk_fd)))
+	{
+		OPENFILE3_CLOEXEC(fn, oflag, 0666, fd);
+		if (FD_INVALID == fd)
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_REPLINSTOPEN, 2, LEN_AND_STR(fn), errno);
+	}
+	else
+		fd = repl_inst_rlbk_fd;
 	GTM_REPL_INST_FSYNC(fd, status);
 	assert(0 == status);
 	if (0 != status)
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("fsync()"), CALLFROM, errno);
-	CLOSEFILE_RESET(fd, status);	/* resets "fd" to FD_INVALID */
-	assert(0 == status);
-	if (0 != status)
-		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_REPLINSTCLOSE, 2, LEN_AND_STR(fn), status);
+	if (in_rlbk)
+		repl_inst_rlbk_fd = fd;
+	else
+	{
+		CLOSEFILE_RESET(fd, status);	/* resets "fd" to FD_INVALID */
+		assert(0 == status);
+		if (0 != status)
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_REPLINSTCLOSE, 2, LEN_AND_STR(fn), status);
+	}
 }
 
 /* Description:

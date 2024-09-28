@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -284,7 +284,17 @@ static inline size_t gtm_fwrite(void *buff, size_t elemsize, size_t nelems, FILE
 	do							\
 	{							\
 		RC = read(FD, BUF, SIZE);			\
-	} while (-1 == RC && EINTR == errno);			\
+	} while ((-1 == RC) && (EINTR == errno));		\
+}
+
+#define PREAD_FILE(FD, BUF, SIZE, OFFSET, RC)			\
+{								\
+	off_t	offset = (off_t)(OFFSET);			\
+								\
+	do							\
+	{							\
+		RC = pread(FD, BUF, SIZE, offset);		\
+	} while ((-1 == RC) && (EINTR == errno));		\
 }
 
 #define RECV(SOCKET, BUF, LEN, FLAGS, RC)			\

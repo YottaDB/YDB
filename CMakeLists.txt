@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2012-2023 Fidelity National Information		#
+# Copyright (c) 2012-2024 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -29,7 +29,7 @@ foreach(lang ${languages})
 endforeach()
 
 # Defaults
-set(version ${V7.1-004})
+set(version ${V7.1-005})
 if("${version}" STREQUAL "")
         set(version V9.9-0)
 endif()
@@ -87,6 +87,9 @@ if(CMAKE_VERSION VERSION_LESS 3.0.0)
 else()
     set_property(DIRECTORY APPEND PROPERTY COMPILE_DEFINITIONS $<$<CONFIG:Debug>:DEBUG>)
 endif()
+
+# Import packages
+find_package(PkgConfig)
 
 # Only IA64 and x86_64 architectures use this option
 set(gen_xfer_desc 0)
@@ -548,7 +551,11 @@ add_custom_target(gen_tls_options
 # Locate libgcrypt's header files (assumption: all others headers are found in the same location)
 find_program(LIBGCRYPT_CONFIG_SCRIPT NAMES libgcrypt-config)
 if (LIBGCRYPT_CONFIG_SCRIPT MATCHES ".+-NOTFOUND")
-	message(FATAL_ERROR "FATAL: libgcrypt-config not found (${LIBGCRYPT_CONFIG_SCRIPT})")
+	pkg_check_modules (LIBGCRYPT REQUIRED libgcrypt)
+	if (NOT ${LIBGCRYPT_FOUND})
+		message(FATAL_ERROR "FATAL: neither libgcrypt-config nor pkg-config libgcrypt  found (${LIBGCRYPT_CONFIG_SCRIPT})")
+	endif ()
+	include_directories(${LIBGCRYPT_INCLUDE_DIRS})
 else()
 	# libgcrypt-config --cflags returns "\n" when the includes are located in the default search path
 	exec_program(${LIBGCRYPT_CONFIG_SCRIPT} ARGS --cflags RETURN_VALUE _return_VALUE OUTPUT_VARIABLE LIBGCRYPT_CFLAGS)

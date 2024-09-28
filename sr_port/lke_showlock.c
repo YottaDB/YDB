@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -44,17 +44,22 @@
 #include "is_proc_alive.h"
 #include "real_len.h"		/* for real_len() prototype */
 #include "zshow.h"
+#include "filestruct.h"
+#include "mlk_ops.h"
 
-#define LNAM		24
-#define NDIM		32		/* max node name size */
 #define	CLNTNODE_LIT	" : CLNTNODE = "
 #define CLNTPID_LIT	" : CLNTPID = "
-
+#define	GNAM_FMT_STR	"!AD "
+#define LNAM	24
+#define NDIM	32		/* max node name size */
 #define	PID_FMT_STR	"!UL"
 #define	PIDPRINT_LIT	"%d"
-#define	GNAM_FMT_STR	"!AD "
 
+GBLREF	intrpt_state_t	intrpt_ok_state;
 GBLREF	uint4		process_id;
+GBLREF	VSIG_ATOMIC_T	util_interrupt;
+
+error_def(ERR_CTRLC);
 
 #define	NODE_SIZE	64 + 1
 
@@ -72,10 +77,10 @@ static	char	gnam[]    = GNAM_FMT_STR,
 
 void lke_formatlocknode(mlk_shrblk_ptr_t node, mstr* name)
 {
-	mlk_shrsub_ptr_t	value;
 	char			save_ch;
-	short			len1;
 	int			len2;
+	mlk_shrsub_ptr_t	value;
+	short			len1;
 	static mval		subsc = DEFINE_MVAL_STRING(MV_STR, 0, 0, 0, NULL, 0, 0);
 
 	value = (mlk_shrsub_ptr_t) R2A(node->value);
@@ -85,14 +90,12 @@ void lke_formatlocknode(mlk_shrblk_ptr_t node, mstr* name)
 		memcpy(name->addr, value->data, value->length);
 		name->len = value->length;
 		name->addr[name->len++] = '(';
-	}
-	else
+	} else
 	{
 		/* perform ZWR translation on the subscript */
 		len1 = name->len - 1;
 		if (')' == name->addr[len1])
 			name->addr[len1] = ',';
-
 		subsc.str.len = value->length;
 		subsc.str.addr = (char*) value->data;
 		len2 = MAX_ZWR_KEY_SZ + 1;
@@ -127,7 +130,7 @@ void lke_formatlockname(mlk_shrblk_ptr_t node, mstr* name)
 		name->len--;
 }
 
-bool	lke_showlock(
+bool	lke_showlock(mlk_pvtctl_ptr_t	pctl,
 		     struct CLB		*lnk,
 		     mlk_shrblk_ptr_t	node,
 		     mstr		*name,
@@ -136,24 +139,21 @@ bool	lke_showlock(
 		     bool		interactive,
 		     int4 		pid,
 		     mstr		one_lock,
-		     boolean_t		exact)
+		     boolean_t		exact,
+		     intrpt_state_t	*prev_intrpt_state)
 {
-	boolean_t	lock = FALSE, owned, unsub;
-	char		format[NODE_SIZE], gtcmbuf[NODE_SIZE]; /* gtcmbuf[] holds ": CLNTNODE = %s : CLNTPID = %d" */
-	char		*msg, save_ch;
-	int 		len2;
-	int4            gtcmbufidx, item, ret;
-	mlk_prcblk	pblk;
-	mlk_prcblk_ptr_t r;
-	short		len1;
-	uint4		status;
-	UINTPTR_T	f[7];
+	boolean_t		lock = FALSE, owned, unsub, was_crit = FALSE;
+	char			format[NODE_SIZE], gtcmbuf[NODE_SIZE], *msg;
+	int 			len2;
+	int4			gtcmbufidx;
+	mlk_prcblk		pblk;
+	mlk_prcblk_ptr_t	our;
+	short			len1;
+	UINTPTR_T		f[7];
 
 	unsub = (0 == name->len);
-
 	lke_formatlocknode(node, name);
-	/* Subtract one for the lparen in unsubscripted name */
-	f[0] = name->len + (unsub ? -1 : 0);
+	f[0] = name->len + (unsub ? -1 : 0);		/* Subtract one for the lparen in unsubscripted name */
 	f[1] = (UINTPTR_T)name->addr;
 	if (node->owner || (node->pending && wait))
 	{
@@ -162,15 +162,15 @@ bool	lke_showlock(
 			(ptroff_t)((uchar_ptr_t)&node->pending - (uchar_ptr_t)&pblk.next + node->pending)
 						       : 0;
 		owned = (all || !wait) && node->owner;
-		r = owned ? &pblk
+		our = owned ? &pblk
 			  : ((0 == node->pending) ? NULL
 						: (mlk_prcblk_ptr_t)R2A(node->pending));
-		while (NULL != r)
+		while (NULL != our)
 		{
-			if ((0 == pid) || (pid == r->process_id))
+			if ((0 == pid) || (pid == our->process_id))
 			{
-				f[2] = r->process_id;
-				if (is_proc_alive((int4)r->process_id, 0))
+				f[2] = our->process_id;
+				if (is_proc_alive((int4)our->process_id, 0))
 				{
 					f[3] = STR_LIT_LEN(existpr);
 					f[4] = (INTPTR_T)existpr;
@@ -239,9 +239,17 @@ bool	lke_showlock(
 					return lock;
 				}
 				lock = TRUE;
+				if (util_interrupt)
+				{
+					if (LOCK_CRIT_HELD(pctl->csa))
+						REL_LOCK_CRIT(pctl, was_crit);
+					if (NULL != prev_intrpt_state)
+						ENABLE_INTERRUPTS(INTRPT_IN_MLK_SHM_MODIFY, *prev_intrpt_state);
+					rts_error_csa(CSA_ARG(pctl->csa) VARLSTCNT(1) ERR_CTRLC);
+				}
 			}
 			f[0] = 0;
-			r = (0 == r->next) ? (mlk_prcblk_ptr_t)NULL : (mlk_prcblk_ptr_t)R2A(r->next);
+			our = (0 == our->next) ? (mlk_prcblk_ptr_t)NULL : (mlk_prcblk_ptr_t)R2A(our->next);
 		}
 	}
 	return lock;

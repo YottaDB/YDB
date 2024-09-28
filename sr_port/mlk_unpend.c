@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -29,18 +29,19 @@
 #include "interlock.h"
 #include "rel_quant.h"
 
-GBLREF uint4	process_id;
-GBLREF short	crash_count;
+GBLREF intrpt_state_t	intrpt_ok_state;
+GBLREF uint4		process_id;
 
 void mlk_unpend(mlk_pvtblk *p)
 {
 	boolean_t		was_crit;
-	sgmnt_addrs		*csa;
+	intrpt_state_t		prev_intrpt_state;
 
-	csa = p->pvtctl.csa;
-	GRAB_LOCK_CRIT_AND_SYNC(p->pvtctl, was_crit);
+	GRAB_LOCK_CRIT_AND_SYNC(&p->pvtctl, was_crit);
+	DEFER_INTERRUPTS(INTRPT_IN_MLK_SHM_MODIFY, prev_intrpt_state);
 	mlk_prcblk_delete(&p->pvtctl, p->nodptr, process_id);
 	/* p->pvtctl.ctl->wakeups++; removed, which might matter to gtcml_chkreg, seems unneeded, certainly within LOCK crit */
-	REL_LOCK_CRIT(p->pvtctl, was_crit);
+	REL_LOCK_CRIT(&p->pvtctl, was_crit);
+	ENABLE_INTERRUPTS(INTRPT_IN_MLK_SHM_MODIFY, prev_intrpt_state);
 	return;
 }

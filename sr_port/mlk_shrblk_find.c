@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -24,19 +24,19 @@
 #include "gdsfhead.h"
 #include "mlk_wake_pending.h"
 
-GBLREF uint4 process_id;
+GBLREF	intrpt_state_t	intrpt_ok_state;
+GBLREF	uint4		process_id;
 
 boolean_t	mlk_find_blocking_child_lock(mlk_pvtblk *p, mlk_shrblk_ptr_t child, UINTPTR_T auxown);
 
 boolean_t	mlk_find_blocking_child_lock(mlk_pvtblk *p, mlk_shrblk_ptr_t child, UINTPTR_T auxown)
 {
-	mlk_shrblk_ptr_t	d, dhead, d1;
 	boolean_t		blocked;
+	mlk_shrblk_ptr_t	d, d1, dhead;
 
 	blocked = FALSE;
 	for (dhead = d = child, d1 = NULL ; dhead != d1 && !blocked ; d = d1 = (mlk_shrblk_ptr_t)R2A(d->rsib))
-	{
-		/* There is similar code below to check if the process that owns the lock still exists.
+	{	/* There is similar code below to check if the process that owns the lock still exists.
 		 * Any change in this part of the code should be propogated to those segments too.
 		 */
 		if (d->owner && (d->owner != process_id || d->auxowner != auxown))
@@ -74,18 +74,16 @@ mlk_shrblk_ptr_t mlk_shrhash_find(mlk_pvtblk *p, int subnum, unsigned char *subv
 boolean_t	mlk_shrblk_find(mlk_pvtblk *p, mlk_shrblk_ptr_t *ret, UINTPTR_T auxown)
 {
 	boolean_t		blocked;
-	int			i, j;
+	int			i;
 	mlk_ctldata_ptr_t	ctl;
-	mlk_ctldata		ctl_bak;
 	mlk_prcblk_ptr_t	pr;
-	mlk_shrblk_ptr_t	pnt, d, d0, d1, dhead;
-	mlk_shrsub_ptr_t	dsub;
+	mlk_shrblk_ptr_t	d, d0, d1, dhead, pnt;
 	ptroff_t		*chld_of_pnt;
-	unsigned char		*cp, slen;
 	uint4			yield_pid;
-	mlk_shrblk_ptr_t	dh;
+	unsigned char		*cp, slen;
 	DCL_THREADGBL_ACCESS;
 
+	assert(INTRPT_IN_MLK_SHM_MODIFY == intrpt_ok_state);
 	blocked = FALSE;
 	/* Note: If ever this function returns with "blocked" set to "TRUE",
 	 * make sure TREF(mlk_yield_pid) is initialized appropriately.
@@ -106,7 +104,7 @@ boolean_t	mlk_shrblk_find(mlk_pvtblk *p, mlk_shrblk_ptr_t *ret, UINTPTR_T auxown
 				CHECK_SHRBLKPTR(p->pvtctl.ctl->blkroot, p->pvtctl);
 				return TRUE;
 			}
-			assert((dh = mlk_shrhash_find(p, p->subscript_cnt - i, cp, slen, pnt)) == d);
+			assert((dhead = mlk_shrhash_find(p, p->subscript_cnt - i, cp, slen, pnt)) == d);
 			assert(d->value != 0);
 			A2R(d->lsib, d);
 			CHECK_SHRBLKPTR(d->lsib, p->pvtctl);
@@ -178,7 +176,7 @@ boolean_t	mlk_shrblk_find(mlk_pvtblk *p, mlk_shrblk_ptr_t *ret, UINTPTR_T auxown
 					assert(NULL == mlk_shrhash_find(p, p->subscript_cnt - i, cp, slen, pnt));
 					return TRUE;	/* resource starve -- no room for new shrblk */
 				}
-				assert((dh = mlk_shrhash_find(p, p->subscript_cnt - i, cp, slen, pnt)) == d);
+				assert((dhead = mlk_shrhash_find(p, p->subscript_cnt - i, cp, slen, pnt)) == d);
 				A2R(d->rsib, d0);
 				CHECK_SHRBLKPTR(d->rsib, p->pvtctl);
 				d->lsib = 0;
@@ -208,14 +206,14 @@ boolean_t	mlk_shrblk_find(mlk_pvtblk *p, mlk_shrblk_ptr_t *ret, UINTPTR_T auxown
 
 mlk_shrblk_ptr_t mlk_shrhash_find(mlk_pvtblk *p, int subnum, unsigned char *subval, unsigned char sublen, mlk_shrblk_ptr_t parent)
 {
-	mlk_shrblk_ptr_t	res = NULL, search_shrblk;
-	mlk_shrsub_ptr_t	search_sub;
 	int			bi, si;
-	uint4			hash, num_buckets;
+	mlk_shrblk_ptr_t	res = NULL, search_shrblk;
 	mlk_shrhash_map_t	usedmap;
 	mlk_shrhash_ptr_t	shrhash, bucket, search_bucket;
+	mlk_shrsub_ptr_t	search_sub;
+	uint4			hash, num_buckets;
 
-	assert(LOCK_CRIT_HELD(p->pvtctl.csa));
+	assert(LOCK_CRIT_HELD(p->pvtctl.csa) && (INTRPT_IN_MLK_SHM_MODIFY == intrpt_ok_state));
 	shrhash = p->pvtctl.shrhash;
 	num_buckets = p->pvtctl.shrhash_size;
 	assert(p->hash_seed == p->pvtctl.ctl->hash_seed);

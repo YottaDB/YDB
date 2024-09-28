@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -44,32 +44,36 @@
 #include "do_shmat.h"
 #include "mlk_ops.h"
 #include "restrict.h"
+#include "have_crit.h"
 
 #define NOFLUSH_OUT	0
 #define FLUSH		1
 #define RESET		2
 
+GBLREF	intrpt_state_t	intrpt_ok_state;
 GBLREF	gd_addr		*gd_header;
-GBLREF	short		crash_count;
 
-error_def(ERR_NOREGION);
-error_def(ERR_UNIMPLOP);
-error_def(ERR_TEXT);
 error_def(ERR_BADREGION);
 error_def(ERR_NOLOCKMATCH);
+error_def(ERR_NOREGION);
 error_def(ERR_RESTRICTEDOP);
+error_def(ERR_TEXT);
+error_def(ERR_UNIMPLOP);
 
 void	lke_clear(void)
 {
-	bool		locks, all = TRUE, wait = FALSE, interactive = TRUE, match = FALSE, memory = FALSE, nocrit = FALSE;
-	boolean_t	exact = TRUE, was_crit;
-	int4		pid;
-	int		n;
-	char		regbuf[MAX_RN_LEN], nodebuf[32], one_lockbuf[MAX_KEY_SZ];
-	mstr		regname, node, one_lock;
+	bool		all = TRUE, interactive = TRUE, locks, match = FALSE, memory = FALSE, nocrit = FALSE, wait = FALSE;
+	boolean_t	exact = TRUE, was_crit = FALSE;
+	char		nodebuf[32], one_lockbuf[MAX_KEY_SZ], regbuf[MAX_RN_LEN];
 	gd_region	*reg;
+	int		num_reg;
+	int4		pid;
+	intrpt_state_t	prev_intrpt_state;
 	mlk_pvtctl	pctl;
+	mstr		node, one_lock, regname;
 
+	if (RESTRICTED(lkeclear))
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_RESTRICTEDOP, 1, "LKECLEAR");
 	/* Get all command parameters */
 	regname.addr = regbuf;
 	regname.len = SIZEOF(regbuf);
@@ -77,12 +81,10 @@ void	lke_clear(void)
 	node.len = SIZEOF(nodebuf);
 	one_lock.addr = one_lockbuf;
 	one_lock.len = SIZEOF(one_lockbuf);
-	if (RESTRICTED(lkeclear))
-		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_RESTRICTEDOP, 1, "LKECLEAR");
-	if (lke_getcli(&all, &wait, &interactive, &pid, &regname, &node, &one_lock, &memory, &nocrit, &exact, 0, 0) == 0)
+	if (0 == lke_getcli(&all, &wait, &interactive, &pid, &regname, &node, &one_lock, &memory, &nocrit, &exact, 0, 0))
 		return;
 	/* Search all regions specified on the command line */
-	for (reg = gd_header->regions, n = 0; n != gd_header->n_regions; ++reg, ++n)
+	for (reg = gd_header->regions, num_reg = gd_header->n_regions; num_reg; ++reg, --num_reg)
 	{	/* If region matches and is open */
 		if (((0 == regname.len) || ((reg->rname_len == regname.len) && !memcmp(reg->rname, regname.addr, regname.len)))
 			&& reg->open)
@@ -107,12 +109,13 @@ void	lke_clear(void)
 			{	/* Local region */
 				MLK_PVTCTL_INIT(pctl, reg);
 				/* Prevent any modifications of locks while we are clearing */
-				GRAB_LOCK_CRIT_AND_SYNC(pctl, was_crit);
+				GRAB_LOCK_CRIT_AND_SYNC(&pctl, was_crit);
+				DEFER_INTERRUPTS(INTRPT_IN_MLK_SHM_MODIFY, prev_intrpt_state);
 				locks = pctl.ctl->blkroot == 0 ? FALSE
-							  : lke_cleartree(&pctl, NULL,
-									  (mlk_shrblk_ptr_t)R2A(pctl.ctl->blkroot),
-									  all, interactive, pid, one_lock, exact);
-				REL_LOCK_CRIT(pctl, was_crit);
+					: lke_cleartree(&pctl, NULL,  (mlk_shrblk_ptr_t)R2A(pctl.ctl->blkroot),
+						all, interactive, pid, one_lock, exact, &prev_intrpt_state);
+				REL_LOCK_CRIT(&pctl, was_crit);
+				ENABLE_INTERRUPTS(INTRPT_IN_MLK_SHM_MODIFY, prev_intrpt_state);
 			} else
 			{
 				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(2) ERR_BADREGION, 0);

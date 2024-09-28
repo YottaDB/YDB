@@ -671,7 +671,7 @@ LITDEF	err_msg merrors[] = {
 	{ "REORGINC", "Reorg was incomplete.  Not all globals were reorged.", 0, 0 },
 	{ "ASC2EBCDICCONV", "ASCII/EBCDIC conversion failed when calling !AD", 2, 0 },
 	{ "GTMSECSHRSTART", "!AD - !UL : gtmsecshr failed to startup", 3, 0 },
-	{ "DBVERPERFWARN1", "Performance warning: Database !AD is running in compatibility mode which degrades performance. Run MUPIP REORG UPGRADE for best overall performance", 2, 0 },
+	{ "UNUSEDMSG840", "DBVERPERFWARN1 removed from code in V7.1-004 Sep 2024", 0, 0 },
 	{ "FILEIDGBLSEC", "File ID in global section does not match with the database file !AD", 2, 0 },
 	{ "GBLSECNOTGDS", "Global Section !AD is not a GT.M global section", 2, 0 },
 	{ "BADGBLSECVER", "Global Section !AD does not match the current database version", 2, 0 },
@@ -788,7 +788,7 @@ LITDEF	err_msg merrors[] = {
 	{ "MUPIPSET2SML", "!UL too small, minimum !AD allowed is !UL", 4, 0 },
 	{ "DBREADBM", "!AD Read error on bit map", 2, 3 },
 	{ "DBCOMPTOOLRG", "!AD Record has too large compression count", 2, 4 },
-	{ "DBVERPERFWARN2", "Peformance warning: Database !AD is not fully upgraded. Run MUPIP REORG UPGRADE for best overall performance", 2, 0 },
+	{ "UNUSEDMSG957", "DBVERPERFWARN2 removed from code in V7.1-004 Sep 2024", 0, 0 },
 	{ "DBRBNTOOLRG", "!AD Root block number greater than last block number in file", 2, 3 },
 	{ "DBRBNLBMN", "!AD Root block number is a local bit map number", 2, 3 },
 	{ "DBRBNNEG", "!AD Root block number negative", 2, 3 },
@@ -1044,9 +1044,9 @@ LITDEF	err_msg merrors[] = {
 	{ "DBBTUFIXED", "The blocks-to-upgrade file-header field has been changed to the correct value", 0, 0 },
 	{ "DBMAXREC2BIG", "Maximum record size (!UL) is too large for this block size (!UL) - Maximum is !UL", 3, 0 },
 	{ "SOCKHANGUP", "Socket has disconnected", 0, 0 },
-	{ "UNUSEDMSG1213", "DBCBADFILE removed from code in V7.0-000 Nov 2020", 0, 0 },
-	{ "UNUSEDMSG1214", "DBCNOEXTND removed from code in V7.0-000 Nov 2020", 0, 0 },
-	{ "UNUSEDMSG1215", "DBCINTEGERR removed from code in V7.0-000 Nov 2020", 0, 0 },
+	{ "REPLINSTRECR", "Error recreating replication instance file !AD", 2, 0 },
+	{ "SEMUNDOOVERFLOW", "The operating system per-process SEM_UNDO table is full and region !AD cannot be opened.", 2, 0 },
+	{ "ENCODING", "M or W-1252 code designation for character set encoding, might return unexpected results when \"UTF-8\"=$ZCHSET", 0, 0 },
 	{ "DBMINRESBYTES", "Minimum RESERVED BYTES value required for certification/upgrade is !UL - Currently is !UL", 2, 0 },
 	{ "UNUSEDMSG1217", "DBCNOTSAMEDB removed from code in V7.0-000 Nov 2020", 0, 0 },
 	{ "UNUSEDMSG1218", "DBCDBCERTIFIED removed from code in V7.0-000 Nov 2020", 0, 0 },
@@ -1500,8 +1500,8 @@ LITDEF	err_msg merrors[] = {
 	{ "JNLBUFFPHS2SALVAGE", "Salvaged journal records from process !UL for database file !AD at transaction number [0x!16@XQ] and journal-sequence-number/unique-token [0x!16@XQ] with journal file starting offset [0x!XL] and length [0x!XL]", 7, 0 },
 	{ "JNLPOOLPHS2SALVAGE", "Salvaged journal records from process !UL for replication instance file !AD at journal sequence number [0x!16@XQ] with journal pool starting offset [0x!16@XQ] and length [0x!XL]", 6, 0 },
 	{ "MURNDWNARGLESS", "Argumentless MUPIP RUNDOWN started with process id !UL by userid !UL from directory !AD", 4, 0 },
-	{ "DBFREEZEON", "Region !AD is FROZEN (!AZOVERRIDE !AZONLINE !AZAUTOREL)", 5, 0 },
-	{ "DBFREEZEOFF", "Region !AD is UNFROZEN (!AZOVERRIDE !AZAUTOREL)", 4, 0 },
+	{ "DBFREEZEON", "Region !AD (!AD) is FROZEN (!AZOVERRIDE !AZONLINE !AZAUTOREL)", 7, 0 },
+	{ "DBFREEZEOFF", "Region !AD (!AD) is UNFROZEN (!AZOVERRIDE !AZAUTOREL)", 6, 0 },
 	{ "STPCRIT", "String pool space critical", 0, 0 },
 	{ "STPOFLOW", "String pool space overflow", 0, 0 },
 	{ "SYSUTILCONF", "Error determining the path for system utility. !AD", 2, 0 },
@@ -2225,7 +2225,7 @@ LITDEF	int ERR_EXCLUDEREORG = 150377592;
 LITDEF	int ERR_REORGINC = 150377600;
 LITDEF	int ERR_ASC2EBCDICCONV = 150377610;
 LITDEF	int ERR_GTMSECSHRSTART = 150377618;
-LITDEF	int ERR_DBVERPERFWARN1 = 150377624;
+LITDEF	int ERR_UNUSEDMSG840 = 150377626;
 LITDEF	int ERR_FILEIDGBLSEC = 150377634;
 LITDEF	int ERR_GBLSECNOTGDS = 150377642;
 LITDEF	int ERR_BADGBLSECVER = 150377650;
@@ -2342,7 +2342,7 @@ LITDEF	int ERR_REPLAHEAD = 150378530;
 LITDEF	int ERR_MUPIPSET2SML = 150378536;
 LITDEF	int ERR_DBREADBM = 150378546;
 LITDEF	int ERR_DBCOMPTOOLRG = 150378554;
-LITDEF	int ERR_DBVERPERFWARN2 = 150378560;
+LITDEF	int ERR_UNUSEDMSG957 = 150378562;
 LITDEF	int ERR_DBRBNTOOLRG = 150378570;
 LITDEF	int ERR_DBRBNLBMN = 150378578;
 LITDEF	int ERR_DBRBNNEG = 150378586;
@@ -2598,9 +2598,9 @@ LITDEF	int ERR_DBBTUWRNG = 150380576;
 LITDEF	int ERR_DBBTUFIXED = 150380587;
 LITDEF	int ERR_DBMAXREC2BIG = 150380594;
 LITDEF	int ERR_SOCKHANGUP = 150380602;
-LITDEF	int ERR_UNUSEDMSG1213 = 150380610;
-LITDEF	int ERR_UNUSEDMSG1214 = 150380618;
-LITDEF	int ERR_UNUSEDMSG1215 = 150380626;
+LITDEF	int ERR_REPLINSTRECR = 150380610;
+LITDEF	int ERR_SEMUNDOOVERFLOW = 418816074;
+LITDEF	int ERR_ENCODING = 150380624;
 LITDEF	int ERR_DBMINRESBYTES = 150380634;
 LITDEF	int ERR_UNUSEDMSG1217 = 150380642;
 LITDEF	int ERR_UNUSEDMSG1218 = 150380651;

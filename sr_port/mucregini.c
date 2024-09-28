@@ -325,5 +325,4 @@ void mucregini(block_id blk_init_size, enum db_ver desired_db_ver)
 				 */
 	csd->max_tn = max_tn_default;
 	SET_TN_WARN(csd, csd->max_tn_warn);
-	SET_LATCH_GLOBAL(&csd->next_upgrd_warn.time_latch, LOCK_AVAILABLE);
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -284,7 +284,7 @@ int4	wcs_wtstart(gd_region *region, int4 writes, wtstart_cr_list_t *cr_list_ptr,
 				if (grab_latch(&ahead->latch, WT_LATCH_TIMEOUT_SEC, WS_26, csa))
 				{
 					cr = cr2flush;
-					csr = (cache_state_rec_ptr_t)((sm_uc_ptr_t)cr + SIZEOF(cr->blkque));
+					csr = CR2CSR(cr);
 					if (csr->dirty && !csr->epid && csr->state_que.fl)
 					{	/* Now that we know csr is in the active queue, remove it. */
 						retcsrptr = remqh((que_ent_ptr_t)((sm_uc_ptr_t)&csr->state_que
@@ -336,7 +336,7 @@ int4	wcs_wtstart(gd_region *region, int4 writes, wtstart_cr_list_t *cr_list_ptr,
 				BG_TRACE_PRO_ANY(csa, wcb_wtstart_lckfail1);
 				break;
 			}
-			cr = (cache_rec_ptr_t)((sm_uc_ptr_t)csr - SIZEOF(cr->blkque));
+			cr = CSR2CR(csr);
 		}
 		if (NULL == csr)
 			break;				/* the queue is empty */
@@ -347,28 +347,28 @@ int4	wcs_wtstart(gd_region *region, int4 writes, wtstart_cr_list_t *cr_list_ptr,
 			assert(!keep_buff_lock);
 			/* the if check and lock clear is for PRO just in case */
 			if (keep_buff_lock)
-				CLEAR_BUFF_UPDATE_LOCK(csr, &cnl->db_latch);
+				CLEAR_BUFF_UPDATE_LOCK(cr, &cnl->db_latch);
 			REINSERT_CR_AT_TAIL(csr, ahead, n, csa, csd, wcb_wtstart_lckfail2);
 			if (INTERLOCK_FAIL == n)
 				err_status = ERR_DBCCERR;
 			break;
 		}
 		assert(!CR_NOT_ALIGNED(cr, cr_lo) && !CR_NOT_IN_RANGE(cr, cr_lo, cr_hi));
-		if (CR_BLKEMPTY == csr->blk)
+		if (CR_BLKEMPTY == cr->blk)
 		{	/* must be left by t_commit_cleanup - removing it from the queue and the following
 			 * completes the cleanup
 			 */
 			WCS_OPS_TRACE(csa, process_id, wcs_ops_wtstart4, cr->blk, GDS_ANY_ABS2REL(csa,cr), cr->dirty, 0, 0);
-			assert(0 != csr->dirty);
-			assert(csr->data_invalid);
-			csr->data_invalid = FALSE;
-			csr->dirty = 0;
+			assert(0 != cr->dirty);
+			assert(cr->data_invalid);
+			cr->data_invalid = FALSE;
+			cr->dirty = 0;
 			assert(!keep_buff_lock);
 			/* the if check and lock clear is for PRO just in case */
 			if (keep_buff_lock)
-				CLEAR_BUFF_UPDATE_LOCK(csr, &cnl->db_latch);
+				CLEAR_BUFF_UPDATE_LOCK(cr, &cnl->db_latch);
 			ADD_ENT_TO_FREE_QUE_CNT(cnl);
-			assert(LATCH_CLEAR == WRITE_LATCH_VAL(csr));
+			assert(LATCH_CLEAR == WRITE_LATCH_VAL(cr));
 			queue_empty = !SUB_ENT_FROM_ACTIVE_QUE_CNT(cnl);
 			continue;
 		}
@@ -376,10 +376,10 @@ int4	wcs_wtstart(gd_region *region, int4 writes, wtstart_cr_list_t *cr_list_ptr,
 		if (JNL_ENABLED(csd))
 		{	/* this looks to be a long lock and hence should use a mutex */
 			jb = jpc->jnl_buff;
-			need_jnl_sync = (csr->jnl_addr > jb->fsync_dskaddr);
+			need_jnl_sync = (cr->jnl_addr > jb->fsync_dskaddr);
 			assert(!need_jnl_sync || ((NOJNL) != jpc->channel) || (cnl->wcsflu_pid != process_id));
 			got_lock = FALSE;
-			if ((csr->jnl_addr > jb->dskaddr)
+			if ((cr->jnl_addr > jb->dskaddr)
 			    || (need_jnl_sync && (NOJNL == jpc->channel
 			    || (FALSE == (got_lock = GET_SWAPLOCK(&jb->fsync_in_prog_latch))))))
 			{
@@ -388,7 +388,7 @@ int4	wcs_wtstart(gd_region *region, int4 writes, wtstart_cr_list_t *cr_list_ptr,
 				if (need_jnl_sync)
 					BG_TRACE_PRO_ANY(csa, n_jnl_fsync_tries);
 				if (keep_buff_lock)
-					CLEAR_BUFF_UPDATE_LOCK(csr, &cnl->db_latch);
+					CLEAR_BUFF_UPDATE_LOCK(cr, &cnl->db_latch);
 				REINSERT_CR_AT_TAIL(csr, ahead, n, csa, csd, wcb_wtstart_lckfail3);
 				if (INTERLOCK_FAIL == n)
 				{
@@ -417,7 +417,7 @@ int4	wcs_wtstart(gd_region *region, int4 writes, wtstart_cr_list_t *cr_list_ptr,
 							 ERR_TEXT, 2, RTS_ERROR_TEXT("Error with fsync"), errno);
 						RELEASE_SWAPLOCK(&jb->fsync_in_prog_latch);
 						if (keep_buff_lock)
-							CLEAR_BUFF_UPDATE_LOCK(csr, &cnl->db_latch);
+							CLEAR_BUFF_UPDATE_LOCK(cr, &cnl->db_latch);
 						REINSERT_CR_AT_TAIL(csr, ahead, n, csa, csd, wcb_wtstart_lckfail3);
 						if (INTERLOCK_FAIL == n)
 						{
@@ -439,7 +439,7 @@ int4	wcs_wtstart(gd_region *region, int4 writes, wtstart_cr_list_t *cr_list_ptr,
 		/* If twin exists then do not issue write of NEWER twin until OLDER twin has been removed from WIP queue.
 		 * The act of removal from the WIP queue clears "csr->twin" so checking just that is enough.
 		 */
-		if (csr->twin)
+		if (cr->twin)
 		{
 			assert(csd->asyncio);	/* Assert that ASYNCIO is turned ON as that is a necessity for twinning */
 			/* Check if crit can be obtained right away. If so, call "wcs_wtfini" after getting crit.
@@ -451,10 +451,10 @@ int4	wcs_wtstart(gd_region *region, int4 writes, wtstart_cr_list_t *cr_list_ptr,
 			if (!wtfini_called_once &&
 				(was_crit || grab_crit_immediate(region, OK_FOR_WCS_RECOVER_FALSE, NOT_APPLICABLE)))
 			{
-				if (csr->twin)
+				if (cr->twin)
 				{
 					DEBUG_ONLY(dbg_wtfini_lcnt = dbg_wtfini_wcs_wtstart);	/* used by "wcs_wtfini" */
-					older_twin = (csr->bt_index ? (cache_rec_ptr_t)GDS_ANY_REL2ABS(csa, csr->twin) : cr);
+					older_twin = (cr->bt_index ? (cache_rec_ptr_t)GDS_ANY_REL2ABS(csa, cr->twin) : cr);
 					assert(!older_twin->bt_index);
 					wcs_wtfini(region, CHECK_IS_PROC_ALIVE_FALSE, older_twin);
 					wtfini_called_once = TRUE;
@@ -467,12 +467,12 @@ int4	wcs_wtstart(gd_region *region, int4 writes, wtstart_cr_list_t *cr_list_ptr,
 			 * the write got killed and "wcs_wtfini" moved the csr back into the active queue. csr->bt_index
 			 * being non-zero indicates it is a NEWER twin in which case we need to wait for the twin link to be broken.
 			 */
-			if (csr->twin && csr->bt_index)
+			if (cr->twin && cr->bt_index)
 			{
 				WCS_OPS_TRACE(csa, process_id, wcs_ops_wtstart6, cr->blk, GDS_ANY_ABS2REL(csa,cr), cr->dirty,	\
 					cr->bt_index, 0);
 				if (keep_buff_lock)
-					CLEAR_BUFF_UPDATE_LOCK(csr, &cnl->db_latch);
+					CLEAR_BUFF_UPDATE_LOCK(cr, &cnl->db_latch);
 				REINSERT_CR_AT_TAIL(csr, ahead, n, csa, csd, wcb_wtstart_lckfail3);
 				if (INTERLOCK_FAIL == n)
 				{
@@ -484,28 +484,29 @@ int4	wcs_wtstart(gd_region *region, int4 writes, wtstart_cr_list_t *cr_list_ptr,
 				continue;
 			}
 		}
-		csr->aio_issued = FALSE;	/* set this to TRUE before csr->epid is set to a non-zero value.
-						 * To avoid out-of-order execution place this BEFORE the LOCK_BUFF_FOR_WRITE.
-						 * It does not hurt in the case we skip the "if (OWN_BUFF(n))" check.
-						 */
+		if (csd->asyncio)
+			cr->aio_issued = FALSE;	/* set this to TRUE before csr->epid is set to a non-zero value.
+						* To avoid out-of-order execution place this BEFORE the LOCK_BUFF_FOR_WRITE.
+						* It does not hurt in the case we skip the "if (OWN_BUFF(n))" check.
+						*/
 		if (!keep_buff_lock)
-			LOCK_BUFF_FOR_WRITE(csr, n, &cnl->db_latch);
+			LOCK_BUFF_FOR_WRITE(cr, n, &cnl->db_latch);
 		else
 			assert(OWN_BUFF(n)); /* since we keep it we better own it */
-		assert(WRITE_LATCH_VAL(csr) >= LATCH_CLEAR);
-		assert(WRITE_LATCH_VAL(csr) <= LATCH_CONFLICT);
+		assert(WRITE_LATCH_VAL(cr) >= LATCH_CLEAR);
+		assert(WRITE_LATCH_VAL(cr) <= LATCH_CONFLICT);
 		if (OWN_BUFF(n))
 		{	/* sole owner */
-			assert(csr->dirty);
-			assert(WRITE_LATCH_VAL(csr) > LATCH_CLEAR);
+			assert(cr->dirty);
+			assert(WRITE_LATCH_VAL(cr) > LATCH_CLEAR);
 			assert(0 == n);
 			/* We're going to write this block out now */
 			save_errno = 0;
-			assert(FALSE == csr->data_invalid);	/* check that buffer has valid data */
-			csr->epid = process_id;
+			assert(FALSE == cr->data_invalid);	/* check that buffer has valid data */
+			cr->epid = process_id;
 			CR_BUFFER_CHECK1(region, csa, csd, cr, cr_lo, cr_hi);
-			bp = (blk_hdr_ptr_t)(GDS_ANY_REL2ABS(csa, csr->buffaddr));
-			VALIDATE_BM_BLK(csr->blk, bp, csa, region, bmp_status);	/* bmp_status holds bmp buffer's validity */
+			bp = (blk_hdr_ptr_t)(GDS_ANY_REL2ABS(csa, cr->buffaddr));
+			VALIDATE_BM_BLK(cr->blk, bp, csa, region, bmp_status);	/* bmp_status holds bmp buffer's validity */
 			assert((((blk_hdr_ptr_t)bp)->bver)
 			       || WBTEST_ENABLED(WBTEST_CRASH_SHUTDOWN_EXPECTED)
 			       || WBTEST_ENABLED(WBTEST_MURUNDOWN_KILLCMT06));
@@ -514,19 +515,19 @@ int4	wcs_wtstart(gd_region *region, int4 writes, wtstart_cr_list_t *cr_list_ptr,
 			if (csd->write_fullblk)
 			{	/* See similiar logic in wcs_wtstart.c */
 #			ifdef DEBUG
-				if (WBTEST_ENABLED(WBTEST_FULLBLKWRT_DB) && (3 == csr->blk))
+				if (WBTEST_ENABLED(WBTEST_FULLBLKWRT_DB) && (3 == cr->blk))
 				{
 					DBGFPF((stdout,"Rounding the write size: %d with %d\n", size, \
-					((FULL_DATABASE_WRITE == csd->write_fullblk && csr->needs_first_write) ? \
+					((FULL_DATABASE_WRITE == csd->write_fullblk && cr->needs_first_write) ? \
 					csd->blk_size : csa->fullblockwrite_len)));
 				}
 #			endif
 				size = (int)ROUND_UP(size,
-						(FULL_DATABASE_WRITE == csd->write_fullblk && csr->needs_first_write)
+						(FULL_DATABASE_WRITE == csd->write_fullblk && cr->needs_first_write)
 						? csd->blk_size : csa->fullblockwrite_len);
 			}
 #			ifdef DEBUG
-			else if (WBTEST_ENABLED(WBTEST_FULLBLKWRT_DB) && (3 == csr->blk))
+			else if (WBTEST_ENABLED(WBTEST_FULLBLKWRT_DB) && (3 == cr->blk))
 				DBGFPF((stdout, "Not rounding the write size\n"));
 #			endif
 			assert(size <= csd->blk_size);
@@ -613,21 +614,21 @@ int4	wcs_wtstart(gd_region *region, int4 writes, wtstart_cr_list_t *cr_list_ptr,
 							GTMCRYPT_ENCRYPT(csa, csd->non_null_iv, csa->encr_key_handle, in,
 									in_len, out, bp, SIZEOF(blk_hdr), gtmcrypt_errno);
 						}
-						DBG_RECORD_BLOCK_WRITE(csd, csa, cnl, process_id, csr->blk,
+						DBG_RECORD_BLOCK_WRITE(csd, csa, cnl, process_id, cr->blk,
 							((blk_hdr *)bp)->tn,
 							4, use_new_key, bp, save_bp, bp->bsiz, in_len);
 						save_errno = gtmcrypt_errno;
 					} else
 					{
 						memcpy(save_bp, bp, bp->bsiz);
-						DBG_RECORD_BLOCK_WRITE(csd, csa, cnl, process_id, csr->blk,
+						DBG_RECORD_BLOCK_WRITE(csd, csa, cnl, process_id, cr->blk,
 							((blk_hdr *)bp)->tn,
 							5, use_new_key, bp, save_bp, bp->bsiz, in_len);
 					}
 				}
 			} else
 			{
-				DBG_RECORD_BLOCK_WRITE(csd, csa, cnl, process_id, csr->blk,
+				DBG_RECORD_BLOCK_WRITE(csd, csa, cnl, process_id, cr->blk,
 					((blk_hdr *)bp)->tn,
 					6, use_new_key, bp, save_bp, bp->bsiz, 0);
 			}
@@ -652,19 +653,19 @@ int4	wcs_wtstart(gd_region *region, int4 writes, wtstart_cr_list_t *cr_list_ptr,
 				 */
 #ifdef DEBUG
 				/* Going to do a write below, check the size being written for full blk writes */
-				if (WBTEST_ENABLED(WBTEST_FULLBLKWRT_DB) && (3 == csr->blk))
+				if (WBTEST_ENABLED(WBTEST_FULLBLKWRT_DB) && (3 == cr->blk))
 				{
-					DBGFPF((stdout, "Region : %s Blk num : %ld ",region->rname, csr->blk));
-					DBGFPF((stdout, "needs_first_write : %d ", csr->needs_first_write));
+					DBGFPF((stdout, "Region : %s Blk num : %ld ",region->rname, cr->blk));
+					DBGFPF((stdout, "needs_first_write : %d ", cr->needs_first_write));
 					DBGFPF((stdout, "size written: %ld ", size));
 					DBGFPF((stdout, "fullblkwrite_len : %ld\n", csa->fullblockwrite_len));
 				}
 #endif
-				offset = BLK_ZERO_OFF(csd->start_vbn) + (off_t)csr->blk * csd->blk_size;
+				offset = BLK_ZERO_OFF(csd->start_vbn) + (off_t)cr->blk * csd->blk_size;
 				if (!do_asyncio)
 				{
 					DB_LSEEKWRITE(csa, udi, udi->fn, udi->fd, offset, save_bp, size, save_errno);
-					csr->needs_first_write = FALSE;
+					cr->needs_first_write = FALSE;
 				} else
 				{
 					cr->wip_is_encr_buf = (save_bp != bp);
@@ -678,11 +679,11 @@ int4	wcs_wtstart(gd_region *region, int4 writes, wtstart_cr_list_t *cr_list_ptr,
 							BG_TRACE_PRO_ANY(csa, wcs_wtstart_eagain_incrit);
 							DB_LSEEKWRITE(csa, udi, udi->fn, udi->fd, offset,		\
 											save_bp, size, save_errno);
-							csr->needs_first_write = FALSE;
+							cr->needs_first_write = FALSE;
 						}
 						/* else: We do not hold crit so flushing this is not critical. */
 					} else if (0 == save_errno)
-						csr->aio_issued = TRUE;
+						cr->aio_issued = TRUE;
 				}
 			}
 			if ((blk_hdr_ptr_t)reformat_buffer == bp)
@@ -697,8 +698,8 @@ int4	wcs_wtstart(gd_region *region, int4 writes, wtstart_cr_list_t *cr_list_ptr,
 				WCS_OPS_TRACE(csa, process_id, wcs_ops_wtstart7, cr->blk, GDS_ANY_ABS2REL(csa,cr), cr->dirty,	\
 					skip_in_trans, save_errno);
 				assert((ERR_ENOSPCQIODEFER != save_errno) || !was_crit || skip_in_trans);
-				csr->epid = 0; /* before releasing update lock, clear epid */
-				CLEAR_BUFF_UPDATE_LOCK(csr, &cnl->db_latch);
+				cr->epid = 0; /* before releasing update lock, clear epid */
+				CLEAR_BUFF_UPDATE_LOCK(cr, &cnl->db_latch);
 				REINSERT_CR_AT_TAIL(csr, ahead, n, csa, csd, wcb_wtstart_lckfail4);
 				if (INTERLOCK_FAIL == n)
 				{
@@ -722,7 +723,7 @@ int4	wcs_wtstart(gd_region *region, int4 writes, wtstart_cr_list_t *cr_list_ptr,
 				if (INTERLOCK_FAIL == n)
 				{
 					assert(FALSE);
-					csr->epid = 0;
+					cr->epid = 0;
 					SET_TRACEABLE_VAR(cnl->wc_blocked, WC_BLOCK_RECOVER);
 					BG_TRACE_PRO_ANY(csa, wcb_wtstart_lckfail4);
 					err_status = ERR_DBCCERR;
@@ -744,17 +745,17 @@ int4	wcs_wtstart(gd_region *region, int4 writes, wtstart_cr_list_t *cr_list_ptr,
 			queue_empty = !SUB_ENT_FROM_ACTIVE_QUE_CNT(cnl);
 			if (!do_asyncio)
 			{
-				csr->flushed_dirty_tn = csr->dirty;
-				csr->epid = 0;
+				cr->flushed_dirty_tn = cr->dirty;
+				cr->epid = 0;
 				ADD_ENT_TO_FREE_QUE_CNT(cnl);
-				csr->dirty = 0;
+				cr->dirty = 0;
 				/* Even though asyncio is ON we may have done a synchronous I/O to get it done, e.g.,
 				 * we were holding crit and got an asyncio error. If that is the case, check for
 				 * a twin.
 				 */
-				if (csd->asyncio && csr->twin)
-					BREAK_TWIN(csr, csa);
-				CLEAR_BUFF_UPDATE_LOCK(csr, &cnl->db_latch);
+				if (csd->asyncio && cr->twin)
+					BREAK_TWIN(cr, csa);
+				CLEAR_BUFF_UPDATE_LOCK(cr, &cnl->db_latch);
 				/* Note we are still under protection of wbuf_dqd lock at this point. Reason we keep
 				 * it so long is so that all the counters are updated along with the queue being correct.
 				 * The result of not doing this previously is that wcs_recover was NOT called when we

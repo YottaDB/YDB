@@ -235,7 +235,8 @@ typedef enum {
 	WBTEST_PHS1_NOSPACE,			/* 185 : Set fake enospc right before releasing instance crit. */
 	WBTEST_MUNMAP_FREE,			/* 186 : Verify that munmap() returns memory to the OS */
 	WBTEST_JNL_CLEANUP,			/* 187 : Various asynchronous events in a jnl cleanup */
-	WBTEST_ZTTEST				/* 188 : Inject garbage collection at awkward place in sv_put.c SV_ZTRAP code */
+	WBTEST_ZTTEST,				/* 188 : Inject garbage collection at awkward place in sv_put.c SV_ZTRAP code */
+	WBTEST_JNL_PREAD			/* 189 : Benchmark pread() against lseek()+read() */
 
 	/* Note 1: when adding new white box test cases, please make use of WBTEST_ENABLED and WBTEST_ASSIGN_ONLY (defined below)
 	 * whenever applicable

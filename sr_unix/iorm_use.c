@@ -370,6 +370,14 @@ void	iorm_use(io_desc *iod, mval *pp)
 				rm_ptr->read_occurred = FALSE;
 				if (rm_ptr->input_encrypted)
 					reset_input_encryption = TRUE;
+			} else if (iod->state == dev_open && (rm_ptr->fifo || rm_ptr->is_pipe))
+			{	/* For FIFO or PIPE, just reset ISVs and needed state */
+				iod->dollar.zeof = FALSE;
+				if (io_std_device.in == iod)
+					prin_in_dev_failure = FALSE;
+				iod->dollar.y = 0;
+				iod->dollar.x = 0;
+				rm_ptr->lastop = RM_NOOP;
 			}
 			break;
 		case iop_stream:

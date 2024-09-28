@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -52,12 +52,12 @@ bool	lke_clearlock(
 		      bool 		interactive,
 		      int4 		pid)
 {
+	bool 		unlock = FALSE;
 	clear_confirm	confirm;
 	clear_reply	reply;
-	uint4		status;
 	int		len;
-	bool 		unlock = FALSE;
 	sgmnt_addrs	*csa;
+	uint4		status;
 
 	if (node->owner != 0  &&  (pid == node->owner  ||  pid == 0))
 	{

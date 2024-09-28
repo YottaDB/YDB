@@ -506,6 +506,7 @@ enum cdb_sc bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 	assert(0 != ctn);
 	assert(csa->now_crit);
 	blkid = cs->blk;
+	twinning_on = TWINNING_ON(csd);
 	/* assert changed to assertpro 2/15/2012. can be changed back once reorg truncate has been running for say 3 to 4 years */
 	assert((0 <= blkid) && (blkid < csa->ti->total_blks));
 	INCR_DB_CSH_COUNTER(csa, n_bgmm_updates, 1);
@@ -634,7 +635,11 @@ enum cdb_sc bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 		BG_TRACE(new_buff);
 		cr->bt_index = GDS_ABS2REL(bt);
 		bt->cache_index = (int4)GDS_ABS2REL(cr);
-		cr->backup_cr_is_twin = FALSE;
+		/* Avoid writing to cr and causing false sharing if possible. Cost of branch infrequently taken (never in typical
+		 * non-AIO case) should be smaller overall than total cost to all processes of an incrementally busier cacheline.
+		 */
+		if (EXPECT_NOAIO(csd, twinning_on, FALSE))
+			cr->backup_cr_is_twin = FALSE;
 	} else	/* end of if else on cr NOTVALID */
 	{
 		cr = (cache_rec_ptr_t)GDS_REL2ABS(cr);
@@ -675,9 +680,7 @@ enum cdb_sc bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 		 */
 		LOCK_BUFF_FOR_UPDATE(cr, n, &cnl->db_latch);
 		assert((LATCH_CONFLICT >= n) && (LATCH_CLEAR <= n));
-		twinning_on = TWINNING_ON(csd);
-		cr->backup_cr_is_twin = FALSE;
-		if (!twinning_on)
+		if (EXPECT_NOAIO(csd, !twinning_on, TRUE))
 		{	/* TWINNING is not active because of asyncio=OFF */
 			if (!OWN_BUFF(n))
 			{
@@ -698,6 +701,7 @@ enum cdb_sc bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 				wait_for_rip = TRUE;
 		} else
 		{	/* TWINNING is enabled because of asyncio=ON. Create TWIN instead of waiting for write to complete */
+			cr->backup_cr_is_twin = FALSE;
 			if (0 == cr->dirty)		/* Free, move to active queue */
 			{	/* If "asyncio" is turned ON, "wcs_wtfini" is the only one that will reset "cr->dirty". And
 				 * that runs inside crit. Since we hold crit now, wcs_wtfini could not have run after we
@@ -1082,7 +1086,7 @@ enum cdb_sc bg_update_phase2(cw_set_element *cs, trans_num ctn, trans_num effect
 	/* Take backup of block in phase2 (outside of crit). */
 	if (!WAS_FREE(cs->blk_prior_state)) /* don't do before image write for backup for FREE blocks */
 	{
-		if (!cr->backup_cr_is_twin)
+		if (EXPECT_NOAIO(csd, !TWINNING_ON(csd), TRUE) || !cr->backup_cr_is_twin)
 		{
 			backup_cr = cr;
 			backup_blk_ptr = blk_ptr;

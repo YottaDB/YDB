@@ -777,6 +777,8 @@ GBLDEF	uint4		gtm_principal_editing_defaults;	/* ext_cap flags if tt */
 GBLDEF	enum db_ver	gtm_db_create_ver;		/* database creation version */
 GBLDEF	boolean_t	in_repl_inst_edit;		/* used by an assert in repl_inst_read/repl_inst_write */
 GBLDEF	boolean_t	in_repl_inst_create;		/* used by repl_inst_read/repl_inst_write */
+GBLDEF	boolean_t	in_rlbk;			/* used by repl_inst_read/repl_inst_write */
+GBLDEF	int		repl_inst_rlbk_fd;		/* used by repl_inst_read/repl_inst_write */
 GBLDEF	boolean_t	holds_sem[NUM_SEM_SETS][NUM_SRC_SEMS];	/* whether a particular replication semaphore is being held
 								 * by the current process or not. */
 GBLDEF	boolean_t	detail_specified;	/* Set to TRUE if -DETAIL is specified in MUPIP REPLIC -JNLPOOL or -EDITINST */

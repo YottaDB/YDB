@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2016-2021 Fidelity National Information	*
+ * Copyright (c) 2016-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -274,6 +274,7 @@ STATICFNDCL void clean_wip_queue(unix_db_info *udi)
 	int4			max_sleep_mask;
 	cache_que_head_ptr_t	que_head;
 	cache_state_rec_ptr_t   cstt;
+	cache_rec_ptr_t		cr;
 	struct aiocb 		*aiocbp;
 	sgmnt_data_ptr_t	csd;
 	sgmnt_addrs		*csa;
@@ -307,7 +308,8 @@ STATICFNDCL void clean_wip_queue(unix_db_info *udi)
 			     (cstt != (cache_state_rec_ptr_t)que_head);
 			      cstt = (cache_state_rec_ptr_t)((sm_uc_ptr_t)cstt + cstt->state_que.fl))
 			{
-				if ((cstt->epid == process_id) && ((aiocbp = &cstt->aiocb)->aio_fildes == udi->fd))
+				cr = CSR2CR(cstt);
+				if ((cr->epid == process_id) && ((aiocbp = &cr->aiocb)->aio_fildes == udi->fd))
 				{
 					AIO_SHIM_ERROR(aiocbp, ret);
 					if (EINPROGRESS == ret)

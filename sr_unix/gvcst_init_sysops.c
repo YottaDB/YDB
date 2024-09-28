@@ -410,6 +410,7 @@ error_def(ERR_STATSDBNOTSUPP);
 error_def(ERR_SYSCALL);
 error_def(ERR_TEXT);
 error_def(ERR_VERMISMATCH);
+error_def(ERR_SEMUNDOOVERFLOW);
 
 gd_region *dbfilopn(gd_region *reg)
 {
@@ -792,6 +793,7 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 	node_local_ptr_t	baseDBnl;
 	int			slp_cnt = 0;
 	boolean_t		is_logged = FALSE;
+	boolean_t		got_undo_overflow = FALSE;
 #	ifdef DEBUG
 	int			i;
 	char			*ptr;
@@ -1089,7 +1091,14 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 			if (-1 != status)
 				break;
 			save_errno = errno;
-			assert(!udi->sem_created); /* If we created the semaphore, we should be able to do the semop */
+
+			/* If we got EINVAL, we might have encountered SEM_UNDO overflow */
+			got_undo_overflow = FALSE;
+			if (EINVAL == save_errno)
+				got_undo_overflow = is_sem_undo_overflow(udi->semid, sop, sopcnt);
+
+			/* If we created the semaphore, we should be able to do the semop unless we got SEM_UNDO overflow */
+			assert((!udi->sem_created) || (got_undo_overflow));
 			if ((EAGAIN == save_errno) || (ERANGE == save_errno))
 			{
 				if ((EAGAIN == save_errno) && (NO_SEMWAIT_ON_EAGAIN == TREF(dbinit_max_delta_secs)))
@@ -1142,6 +1151,16 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 				RTS_ERROR(VARLSTCNT(12) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg), ERR_SYSCALL, 5,
 						RTS_ERROR_LITERAL("semop()"), CALLFROM, save_errno);
 			}
+
+			/* If we get here, either our sem was removed, or we have SEM_UNDO overflow
+			 * If we have overflow, we treat it as fatal since there is nothing to be done
+			 * but we log an informative message */
+			if (got_undo_overflow)
+			{
+				RTS_ERROR(VARLSTCNT(12) ERR_SEMUNDOOVERFLOW, 2, DB_LEN_STR(reg), ERR_SYSCALL, 5,  \
+					RTS_ERROR_LITERAL("semop()"), CALLFROM, save_errno);
+			}
+
 			assert(SEM_REMOVED(save_errno));
 			if ((MAX_ACCESS_SEM_RETRIES - 1) == loopcnt)
 				RTS_ERROR(VARLSTCNT(12) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg), ERR_SYSCALL, 5,

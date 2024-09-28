@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -147,6 +147,7 @@ uint4	mur_output_record(reg_ctl_list *rctl)
 	if (mur_options.rollback && IS_REPLICATED(rectype))
 	{
 		jgbl.mur_jrec_seqno = GET_JNL_SEQNO(rec);
+		csd->reg_seqno = jgbl.mur_jrec_seqno;
 		if (jgbl.mur_jrec_seqno >= murgbl.consist_jnl_seqno)
 		{
 			assert(murgbl.losttn_seqno >= (jgbl.mur_jrec_seqno + 1));

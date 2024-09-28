@@ -105,17 +105,6 @@ int gc_load_gtmshr_symbols()
 	return 0;
 }
 
-/* Libgcrypt doesn't do a good job of handling error messages and simply dumps them onto the console if
- * no handler is set. One such example is when libgcrypt is doing a select on /dev/random and when it
- * is interrupted due to a SIGALRM, libgcrypt dumps an error message onto the console. To avoid this,
- * setup a dummy handler and swallow libgcrypt messages as long as they are not FATAL or BUG.
- */
-void gtm_gcry_log_handler(void *opaque, int level, const char *fmt, va_list arg_ptr)
-{
-	assert((GCRY_LOG_FATAL != level) && (GCRY_LOG_BUG != level));
-	return;
-}
-
 int gc_read_passwd(char *prompt, char *buf, int maxlen, void *tty)
 {
 	struct termios		new_tty, old_tty, *tty_copy;

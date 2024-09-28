@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -44,40 +44,42 @@
 #include "rel_quant.h"
 #include "do_shmat.h"
 #include "mlk_ops.h"
+#include "have_crit.h"
 
 #define NOFLUSH_OUT	0
 #define FLUSH		1
 #define RESET		2
 
 GBLREF	gd_addr		*gd_header;
-GBLREF	short		crash_count;
+GBLREF	uint4		process_id;
+GBLREF	intrpt_state_t	intrpt_ok_state;
 
-error_def(ERR_UNIMPLOP);
-error_def(ERR_TEXT);
-error_def(ERR_NOREGION);
 error_def(ERR_BADREGION);
-error_def(ERR_NOLOCKMATCH);
-error_def(ERR_LOCKSPACEUSE);
+error_def(ERR_LOCKCRITOWNER);
 error_def(ERR_LOCKSPACEFULL);
 error_def(ERR_LOCKSPACEINFO);
-error_def(ERR_LOCKCRITOWNER);
+error_def(ERR_LOCKSPACEUSE);
+error_def(ERR_NOLOCKMATCH);
+error_def(ERR_NOREGION);
+error_def(ERR_TEXT);
+error_def(ERR_UNIMPLOP);
 
 
 void	lke_show(void)
 {
-	bool			locks, all = TRUE, wait = TRUE, interactive = FALSE, match = FALSE, memory = TRUE, nocrit = TRUE;
-	boolean_t		exact = FALSE, was_crit = FALSE;
-	int4			pid;
-	size_t			ls_len;
-	int			n;
-	char 			regbuf[MAX_RN_LEN], nodebuf[32], one_lockbuf[MAX_KEY_SZ];
-	mlk_ctldata_ptr_t	ctl;
-	mstr			regname, node, one_lock;
-	gd_region		*reg;
-	sgmnt_addrs		*csa;
-	int			shr_sub_len = 0;
+	bool			all = TRUE, interactive = FALSE, match = FALSE, memory = TRUE, nocrit = TRUE, wait = TRUE;
+	boolean_t		exact = FALSE, locks, was_crit = FALSE;
+	char 			nodebuf[32], one_lockbuf[MAX_KEY_SZ], regbuf[MAX_RN_LEN];
 	float			ls_free = 0;	/* Free space in bottleneck subspace */
+	gd_region		*reg;
+	int			num_reg, shr_sub_len = 0;;
+	int4			lcnt, pid;
+	intrpt_state_t		prev_intrpt_state;
+	mlk_ctldata_ptr_t	ctl;
 	mlk_pvtctl		pctl, pctl2;
+	mstr			node, one_lock, regname;
+	sgmnt_addrs		*csa;
+	size_t			ls_len;
 
 	/* Get all command parameters */
 	regname.addr = regbuf;
@@ -89,7 +91,7 @@ void	lke_show(void)
 	if (lke_getcli(&all, &wait, &interactive, &pid, &regname, &node, &one_lock, &memory, &nocrit, &exact, 0, 0) == 0)
 		return;
 	/* Search all regions specified on the command line */
-	for (reg = gd_header->regions, n = 0; n != gd_header->n_regions; ++reg, ++n)
+	for (reg = gd_header->regions, num_reg = gd_header->n_regions; num_reg; ++reg, --num_reg)
 	{
 		/* If region matches and is open */
 		if (((0 == regname.len) || ((reg->rname_len == regname.len) && !memcmp(reg->rname, regname.addr, regname.len)))
@@ -102,7 +104,7 @@ void	lke_show(void)
 			{
 #				if defined(LKE_WORKS_OK_WITH_CM)
 				/* Obtain lock info from the remote node */
-				locks = gtcmtr_lke_showreq(reg->dyn.addr->cm_blk, reg->cmx_regnum,
+				locks = (boolean_t)gtcmtr_lke_showreq(reg->dyn.addr->cm_blk, reg->cmx_regnum,
 							   all, wait, pid, &node);
 				assert(FALSE);	/* because "csa" is not initialized here and is used below */
 #				else
@@ -112,7 +114,7 @@ void	lke_show(void)
 				continue;
 #				endif
 			} else if (IS_REG_BG_OR_MM(reg))
-			{	/* Local region */
+			{	/* non-remote region */
 				csa = &FILE_INFO(reg)->s_addrs;
 				ls_len = (size_t)csa->mlkctl_len;
 				ctl = (mlk_ctldata_ptr_t)malloc(ls_len);
@@ -129,8 +131,16 @@ void	lke_show(void)
 						pctl.shrhash = do_shmat(pctl.ctl->hash_shmid, NULL, 0);
 				}
 				/* Prevent any modification of the lock space while we make a local copy of it */
-				if (!nocrit)
-					GRAB_LOCK_CRIT_AND_SYNC(pctl, was_crit);
+				for (lcnt = csa->mlkctl->max_prccnt; lcnt; lcnt--)
+				{	/* this is a bit of a sleaze as show -nocrit might lose access to crit betewn if and grab */
+					if ((0 == LOCK_CRIT_OWNER(csa)) || !nocrit)
+					{	/* however, that should be harmless as a truely stuck crit would exhaust the loop */
+						GRAB_LOCK_CRIT_AND_SYNC(&pctl, was_crit);
+						DEFER_INTERRUPTS(INTRPT_IN_MLK_SHM_MODIFY, prev_intrpt_state);
+						break;
+					}	/* a "cleaner" alternative involves modifying not only other code but interfaces */
+					rel_quant();
+				}
 				memcpy((uchar_ptr_t)ctl, (uchar_ptr_t)csa->mlkctl, ls_len);
 				assert((ctl->max_blkcnt > 0) && (ctl->max_prccnt > 0) && (ctl->subtop > ctl->subbase));
 				pctl2 = pctl;
@@ -139,17 +149,22 @@ void	lke_show(void)
 					pctl2.shrhash = (mlk_shrhash_ptr_t)malloc(SIZEOF(mlk_shrhash) * pctl.shrhash_size);
 					memcpy(pctl2.shrhash, pctl.shrhash, SIZEOF(mlk_shrhash) * pctl.shrhash_size);
 				}
-				if (!nocrit)
-					REL_LOCK_CRIT(pctl, was_crit);
-				else if (MLK_CTL_BLKHASH_EXT == pctl.ctl->blkhash)
+				if (nocrit)
+				{
+					if (LOCK_CRIT_HELD(csa))
+					{
+						REL_LOCK_CRIT(&pctl, was_crit);
+						ENABLE_INTERRUPTS(INTRPT_IN_MLK_SHM_MODIFY, prev_intrpt_state);
+					}
+				} else if (MLK_CTL_BLKHASH_EXT == pctl.ctl->blkhash)
 					SHMDT(pctl.shrhash);
 				shr_sub_len = 0;
 				MLK_PVTCTL_SET_CTL(pctl2, ctl);
 				if (MLK_CTL_BLKHASH_EXT != pctl.ctl->blkhash)
 					pctl2.shrhash = (mlk_shrhash_ptr_t)R2A(pctl2.ctl->blkhash);
-				locks = (ctl->blkroot == 0)
-						? FALSE
-						: lke_showtree(NULL, &pctl2, all, wait, pid, one_lock, memory, &shr_sub_len);
+				locks = (ctl->blkroot == 0) ? FALSE
+					: lke_showtree(&pctl2, NULL, all, wait, pid, one_lock, memory, &shr_sub_len,
+					nocrit ? NULL : &prev_intrpt_state);
 				/* lock space usage consists of: control_block + nodes(locks) +  processes + substrings */
 				/* any of those subspaces can be bottleneck.
 				 * Therefore we will report the subspace which is running out.
@@ -166,6 +181,11 @@ void	lke_show(void)
 				if (MLK_CTL_BLKHASH_EXT == pctl.ctl->blkhash)
 					free(pctl2.shrhash);
 				free(ctl);
+				if (!nocrit)
+				{
+					REL_LOCK_CRIT(&pctl, was_crit);
+					ENABLE_INTERRUPTS(INTRPT_IN_MLK_SHM_MODIFY, prev_intrpt_state);
+				}
 			} else
 			{
 				gtm_putmsg_csa(NULL, VARLSTCNT(2) ERR_BADREGION, 0);

@@ -74,7 +74,7 @@ void util_exit_handler()
 						mlk_pvtctl	pctl;
 
 						MLK_PVTCTL_INIT(pctl, reg);
-						REL_LOCK_CRIT(pctl, FALSE);
+						REL_LOCK_CRIT(&pctl, FALSE);
 					}
 					if ((0 == severity) && csa->now_crit)
 						rel_crit(reg);

@@ -123,7 +123,7 @@ NULL
 #undef ICU_DEF
 
 /* duplicated prototypes needed to avoid including header file gtm_icu_api.h */
-void gtm_icu_init(void);
+boolean_t gtm_icu_init(boolean_t called_by_zconvert);
 void gtm_conv_init(void);
 
 error_def(ERR_DLLNOOPEN);
@@ -205,7 +205,7 @@ static boolean_t parse_gtm_icu_version(char *icu_ver_buf, int len, char *icusymv
 	return TRUE;
 }
 
-void gtm_icu_init(void)
+boolean_t gtm_icu_init(boolean_t called_by_zconvert)
 {
 	char		*locale, *chset, *libname, err_msg[MAX_ERRSTR_LEN];
 	char		icu_final_fname[MAX_ICU_FNAME_LEN + 1 + MAX_ICU_VERSION_STRLEN];	/* 1 for '_' in between */
@@ -474,6 +474,8 @@ void gtm_icu_init(void)
 			}
 			if (NULL == fptr)
 			{
+				if (called_by_zconvert)
+					return FALSE;
 				COPY_DLLERR_MSG(err_str, err_msg);
 				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_ICUSYMNOTFOUND, 2, LEN_AND_STR(cur_icu_fname),
 					ERR_TEXT, 2, LEN_AND_STR(err_msg));
@@ -515,4 +517,5 @@ void gtm_icu_init(void)
 	gtm_utf8_mode = TRUE;
 	/* gtm_wcswidth()/U_ISPRINT() in util_format() can henceforth be safely called now that ICU initialization is complete */
 	gtm_conv_init();
+	return TRUE;
 }

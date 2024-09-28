@@ -589,6 +589,7 @@ CONDITION_HANDLER(mupip_upgrade_ch);
 CONDITION_HANDLER(omi_dbms_ch);
 CONDITION_HANDLER(rc_dbms_ch);
 CONDITION_HANDLER(read_source_ch);
+CONDITION_HANDLER(relinkctl_handler);
 CONDITION_HANDLER(source_ch);
 #ifdef GTM_TRIGGER
 CONDITION_HANDLER(gtm_trigger_ch);

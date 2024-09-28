@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -27,8 +27,9 @@
 #include "do_shmat.h"
 #include "mlk_ops.h"
 #include "mlk_wake_pending.h"
+#include "have_crit.h"
 
-GBLREF	short		crash_count;
+GBLREF	intrpt_state_t  intrpt_ok_state;
 #ifdef DEBUG
 GBLREF	unsigned int	t_tries;
 #endif
@@ -45,15 +46,16 @@ GBLREF	unsigned int	t_tries;
  */
 boolean_t	mlk_check_own(mlk_pvtblk *x)
 {
-	int4		status;
-	int4		icount, time[2];
 	boolean_t	ret_val, was_crit;
+	int4		icount, status, time[2];
+	intrpt_state_t	prev_intrpt_state;
 	sgmnt_addrs	*csa;
 
 	if (!x->blocked)
 		return FALSE;
 	csa = x->pvtctl.csa;
-	GRAB_LOCK_CRIT_AND_SYNC(x->pvtctl, was_crit);
+	GRAB_LOCK_CRIT_AND_SYNC(&x->pvtctl, was_crit);
+	DEFER_INTERRUPTS(INTRPT_IN_MLK_SHM_MODIFY, prev_intrpt_state);
 	assert((csa->lock_crit_with_db) || !csa->now_crit || (CDB_STAGNATE <= t_tries));
 	ret_val = FALSE;
 	if (x->blocked->owner)
@@ -73,6 +75,7 @@ boolean_t	mlk_check_own(mlk_pvtblk *x)
 		mlk_wake_pending(&x->pvtctl, x->blocked);
 	else
 		ret_val = TRUE;	/* There is no owner. Take credit for freeing it.. */
-	REL_LOCK_CRIT(x->pvtctl, was_crit);
+	REL_LOCK_CRIT(&x->pvtctl, was_crit);
+	ENABLE_INTERRUPTS(INTRPT_IN_MLK_SHM_MODIFY, prev_intrpt_state);
 	return ret_val;
 }

@@ -34,8 +34,8 @@
 #endif
 
 #define IS_TP_AND_FINAL_RETRY  (dollar_tlevel && (CDB_STAGNATE <= t_tries))
-#define TPNOTACID_DEFAULT_TIME	2000	/* default (in milliseconds) for tpnotacidtime */
-#define TPNOTACID_MAX_TIME	30000	/* maximum (in milliseconds) for tpnotacidtime */
+#define TPNOTACID_DEFAULT_TIME	300	/* default (in milliseconds) for tpnotacidtime */
+#define TPNOTACID_MAX_TIME	10000	/* maximum (in milliseconds) for tpnotacidtime */
 #define TPTIMEOUT_MAX_TIME	60000	/* maximum (in milliseconds) for dollar_zmaxtptime */
 #define TPNOTACID_DEF_MAX_TRIES	16	/* default TPNOTACID tries */
 #define TPNOTACID_LIM_MAX_TRIES	100	/* limit on TPNOTACID tries */

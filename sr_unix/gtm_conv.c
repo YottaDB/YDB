@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2023 Fidelity National Information	*
+ * Copyright (c) 2006-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -28,6 +28,13 @@ LITREF mstr		chset_names[CHSET_MAX_IDX_ALL];
 LITREF unsigned char 	lower_to_upper_table[];
 
 error_def(ERR_MAXSTRLEN);
+
+#define W1252		"W-1252"
+#define W1252_LEN	STRLEN(W1252)
+#define UTF8		"UTF-8"
+#define UTF8_LEN	STRLEN(UTF8)
+#define UTF16		"UTF-16"
+#define UTF16_LEN	STRLEN(UTF16)
 
 /* Routine to verify given parameter against supported case conversion codes.
  * Valid arguments (case-insensitive):
@@ -118,4 +125,34 @@ int gtm_conv(UConverter* from, UConverter* to, mstr *src, char* dstbuff, int* bu
 		UTF8_BADCHAR(1,(unsigned char *) (srcptr - 1), NULL,STRLEN(ichset), ichset);
 	}
 	return (int) (dstptr - dstbase);
+}
+
+/* Routine to verify given parameter against "W-1252" */
+gtm_chset_t check_w1252(const mstr *parm)
+{
+	char		tmp_w1252[MAX_CHSET_LEN];
+
+	if ((MIN_CHSET_LEN > parm->len) || (W1252_LEN < parm->len))
+		return CHSET_MAX_IDX_ALL;
+	lower_to_upper((unsigned char *)tmp_w1252, (unsigned char *)parm->addr, parm->len);
+	if ((MIN_CHSET_LEN == parm->len) && ('M' == tmp_w1252[0]))
+		return CHSET_M;
+	if ((W1252_LEN == parm->len) && (0 == memcmp(tmp_w1252, W1252, W1252_LEN)))
+		return CHSET_M;
+	return CHSET_MAX_IDX_ALL;
+}
+
+/* Routine to verify given parameter against "UTF-8/UTF-16" */
+gtm_chset_t check_valid_utf(const mstr *parm)
+{
+	char		tmp_utf[MAX_CHSET_LEN];
+
+	if ((UTF8_LEN > parm->len) || (UTF16_LEN < parm->len))
+		return CHSET_MAX_IDX_ALL;
+	lower_to_upper((unsigned char *)tmp_utf, (unsigned char *)parm->addr, parm->len);
+	if ((UTF8_LEN == parm->len) && (0 == memcmp(tmp_utf, UTF8, UTF8_LEN)))
+		return CHSET_UTF8;
+	if ((UTF16_LEN == parm->len) && (0 == memcmp(tmp_utf, UTF16, UTF16_LEN)))
+		return CHSET_UTF16;
+	return CHSET_MAX_IDX_ALL;
 }

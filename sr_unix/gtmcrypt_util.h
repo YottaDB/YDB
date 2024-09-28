@@ -230,7 +230,6 @@ GBLREF	char			gtmcrypt_err_string[MAX_GTMCRYPT_ERR_STRLEN + 1];
 GBLREF	char			*gtmtls_err_string;
 
 int				gc_load_gtmshr_symbols(void);
-void 				gtm_gcry_log_handler(void *opaque, int level, const char *fmt, va_list arg_ptr);
 int				gc_read_passwd(char *prompt, char *buf, int maxlen, void *tty);
 int				gc_mask_unmask_passwd(int nparm, gtm_string_t *in, gtm_string_t *out);
 void				gc_freeup_pwent(passwd_entry_t *pwent);

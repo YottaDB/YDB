@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2016-2023 Fidelity National Information	*
+ * Copyright (c) 2016-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -34,7 +34,7 @@ GBLREF	uint4		process_id;
  * And if the SYNCIO succeeds, a special value of SYNCIO_MORPH_SUCCESS is returned so caller can handle this
  * situation appropriately (by moving the cr from wip queue to active queue or out of all queues).
  */
-int	wcs_wt_restart(unix_db_info *udi, cache_state_rec_ptr_t csr)
+int	wcs_wt_restart(unix_db_info *udi, cache_rec_ptr_t cr)
 {
 	int			save_errno;
 	blk_hdr_ptr_t		bp, save_bp;
@@ -48,15 +48,15 @@ int	wcs_wt_restart(unix_db_info *udi, cache_state_rec_ptr_t csr)
 	csa = &udi->s_addrs;
 	BG_TRACE_PRO_ANY(csa, wcs_wt_restart_invoked);
 	csd = csa->hdr;
-	bp = (blk_hdr_ptr_t)(GDS_ANY_REL2ABS(csa, csr->buffaddr));
-	if (!csr->wip_is_encr_buf)
+	bp = (blk_hdr_ptr_t)(GDS_ANY_REL2ABS(csa, cr->buffaddr));
+	if (!cr->wip_is_encr_buf)
 		save_bp = bp;
 	else
 		save_bp = (blk_hdr_ptr_t)GDS_ANY_ENCRYPTGLOBUF(bp, csa);
-	DB_LSEEKWRITEASYNCRESTART(csa, udi, udi->fn, udi->fd, save_bp, csr, save_errno);
+	DB_LSEEKWRITEASYNCRESTART(csa, udi, udi->fn, udi->fd, save_bp, cr, save_errno);
 	assert(0 == save_errno IF_LIBAIO(|| EAGAIN  == save_errno));
 	if (0 == save_errno)
-		csr->epid = process_id;
+		cr->epid = process_id;
 	else if (EAGAIN == save_errno)
 	{	/* ASYNC IO could not be started */
 		BG_TRACE_PRO_ANY(csa, wcs_wt_restart_eagain);
@@ -65,7 +65,7 @@ int	wcs_wt_restart(unix_db_info *udi, cache_state_rec_ptr_t csr)
 			 * Do synchronous IO given OS does not have enough memory temporarily.
 			 */
 			DB_LSEEKWRITE(csa, udi, udi->fn, udi->fd,
-				csr->aiocb.aio_offset, save_bp, csr->aiocb.aio_nbytes, save_errno);
+				cr->aiocb.aio_offset, save_bp, cr->aiocb.aio_nbytes, save_errno);
 			assert(0 <= save_errno);
 			if (0 == save_errno)
 			{	/* SYNCIO succeeded. Return special status */
@@ -76,7 +76,7 @@ int	wcs_wt_restart(unix_db_info *udi, cache_state_rec_ptr_t csr)
 			 * Clearing csr->epid and returning 0 indicates this to caller.
 			 */
 			BG_TRACE_PRO_ANY(csa, wcs_wt_restart_reinsert);
-			csr->epid = 0;
+			cr->epid = 0;
 			save_errno = 0;
 		}
 	}

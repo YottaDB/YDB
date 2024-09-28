@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2018-2021 Fidelity National Information	*
+ * Copyright (c) 2018-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -33,23 +33,26 @@
 #include "gtmmsg.h"
 #include "do_shmat.h"
 #include "mlk_ops.h"
+#include "have_crit.h"
 
 GBLREF	gd_addr		*gd_header;
+GBLREF	intrpt_state_t	intrpt_ok_state;
 
 error_def(ERR_NOREGION);
 
 void lke_growhash(void)
 {
 	/* Arguments for lke_getcli */
-	bool			locks, all = TRUE, wait = TRUE, interactive = FALSE, match = FALSE, memory = TRUE, nocrit = TRUE;
+	bool			all = TRUE, interactive = FALSE, match = FALSE, memory = TRUE, nocrit = TRUE, wait = TRUE;
 	boolean_t		exact = TRUE, resize_status;
-	int4			pid;
-	mstr			regname, node, one_lock;
-	char			regbuf[MAX_RN_LEN], nodebuf[32], one_lockbuf[MAX_KEY_SZ];
+	boolean_t		was_crit = FALSE;
+	char			nodebuf[32], one_lockbuf[MAX_KEY_SZ], regbuf[MAX_RN_LEN];
 	gd_region		*reg;
-	int			regidx;
-	boolean_t		was_crit;
+	int			num_reg;
+	int4			pid;
+	intrpt_state_t		prev_intrpt_state;
 	mlk_pvtctl		pctl;
+	mstr			node, one_lock, regname;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -62,7 +65,7 @@ void lke_growhash(void)
 	if (lke_getcli(&all, &wait, &interactive, &pid, &regname, &node, &one_lock, &memory, &nocrit, &exact,
 				NULL, NULL) == 0)
 		return;
-	for (reg = gd_header->regions, regidx = 0; regidx != gd_header->n_regions; ++reg, ++regidx)
+	for (reg = gd_header->regions, num_reg = gd_header->n_regions; num_reg; ++reg, --num_reg)
 	{
 		/* If region matches and is open */
 		if (((0 == regname.len)
@@ -75,9 +78,11 @@ void lke_growhash(void)
 			match = TRUE;
 			/* Construct a dummy pctl to pass in */
 			MLK_PVTCTL_INIT(pctl, reg);
-			GRAB_LOCK_CRIT_AND_SYNC(pctl, was_crit);
+			GRAB_LOCK_CRIT_AND_SYNC(&pctl, was_crit);
+			DEFER_INTERRUPTS(INTRPT_IN_MLK_SHM_MODIFY, prev_intrpt_state);
 			resize_status = mlk_shrhash_resize(&pctl);
-			REL_LOCK_CRIT(pctl, was_crit);
+			REL_LOCK_CRIT(&pctl, was_crit);
+			ENABLE_INTERRUPTS(INTRPT_IN_MLK_SHM_MODIFY, prev_intrpt_state);
 			util_out_print("Resize of lock hash memory !AZ for region !AD", TRUE,
 					(resize_status ? "succeeded" : "FAILED"), REG_LEN_STR(reg));
 		}

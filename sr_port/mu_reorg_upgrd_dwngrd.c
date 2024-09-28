@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2005-2023 Fidelity National Information	*
+ * Copyright (c) 2005-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -1017,11 +1017,12 @@ enum cdb_sc upgrade_idx_block(block_id *curr_blk, gd_region *reg, mname_entry *g
 			t_abort(gv_cur_region, csa);					/* do crit and other cleanup */
 			return cdb_sc_onln_rlbk1;
 		}
-		if ((trans_num)0 == t_end(&alt_hist, NULL, TN_NOT_SPECIFIED))
+		if (0 == (lcl_tn = t_end(&alt_hist, NULL, TN_NOT_SPECIFIED)))
 		{	/* failed to commit the block revision */
 			t_abort(gv_cur_region, csa);						/* do crit and other cleanup */
 			return (enum cdb_sc)t_fail_hist[t_tries];
 		}
+		lcl_bsiz = new_blk_sz;
 		if (1 == level)
 			tot_data_blks += child_data_blks;
 		else

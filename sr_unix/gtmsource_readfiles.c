@@ -61,8 +61,10 @@
 #include "gtmcrypt.h"
 #include "gtmdbgflags.h"
 #include "anticipatory_freeze.h"
+#ifdef DEBUG
+#include "util.h"
+#endif
 
-#define LSEEK_ERR_STR		"Error in lseek"
 #define READ_ERR_STR		"Error in read"
 #define UNKNOWN_ERR_STR		"Error unknown"
 
@@ -174,6 +176,13 @@ static	int repl_read_file(repl_buff_t *rb)
 	int			eof_change;
 	uint4			start_addr;
 	uint4			end_addr;
+#	ifdef DEBUG
+	ssize_t			rc;
+	struct timespec		ts1, ts2;
+	uint4			len;
+	char			*jnl_buffer;
+	unsigned long long	lseek_time, pread_time;
+#	endif
 
 	fc = rb->fc;
 	b = &rb->buff[rb->buffindex];
@@ -215,14 +224,29 @@ static	int repl_read_file(repl_buff_t *rb)
 	}
 	start_addr = ROUND_DOWN2(b->readaddr, fc->fs_block_size);
 	end_addr = ROUND_UP2(b->readaddr + b->buffremaining - read_less, fc->fs_block_size);
-	if ((off_t)-1 == lseek(fc->fd, (off_t)start_addr, SEEK_SET))
-	{
-		repl_errno = EREPL_JNLFILESEEK;
-		return (errno);
-	}
-	READ_FILE(fc->fd, b->base + REPL_BLKSIZE(rb) - b->buffremaining - (b->readaddr - start_addr),
-		  end_addr - start_addr, nb);
+	PREAD_FILE(fc->fd, b->base + REPL_BLKSIZE(rb) - b->buffremaining - (b->readaddr - start_addr),
+										end_addr - start_addr, start_addr, nb);
 	status = errno;
+#	ifdef DEBUG
+	if (WBTEST_ENABLED(WBTEST_JNL_PREAD))
+	{
+		len = end_addr - start_addr;
+		jnl_buffer = (char *)malloc(len+1);
+		clock_gettime(CLOCK_REALTIME, &ts1);
+		if ((off_t)-1 == lseek(fc->fd, (off_t)start_addr, SEEK_SET))
+			util_out_print("TEST-E-TIME : lseek() error", TRUE);
+		READ_FILE(fc->fd, jnl_buffer, len, rc);
+		clock_gettime(CLOCK_REALTIME, &ts2);
+		lseek_time = (((ts2.tv_sec - ts1.tv_sec) * NANOSECS_IN_SEC) + ts2.tv_nsec) - ts1.tv_nsec;
+		memset(jnl_buffer, 0, len+1);
+		clock_gettime(CLOCK_REALTIME, &ts1);
+		PREAD_FILE(fc->fd, jnl_buffer, len, start_addr, rc);
+		clock_gettime(CLOCK_REALTIME, &ts2);
+		pread_time = (((ts2.tv_sec - ts1.tv_sec) * NANOSECS_IN_SEC) + ts2.tv_nsec) - ts1.tv_nsec;
+		util_out_print("WBTEST_JNL_PREAD : pread !UL : lseek !UL", TRUE, pread_time, lseek_time);
+		free(jnl_buffer);
+	}
+#	endif
 	if (nb < (b->readaddr - start_addr))
 	{	/* This case means that we didn't read enough bytes to get from the alignment point in the disk file
 		 * to the start of the actual desired read (the offset we did the lseek to above).  This can't happen
@@ -292,9 +316,7 @@ static	int repl_next(repl_buff_t *rb)
 			}
 		} else
 		{
-			if (repl_errno == EREPL_JNLFILESEEK)
-				MEMCPY_LIT(err_string, LSEEK_ERR_STR);
-			else if (repl_errno == EREPL_JNLFILEREAD)
+			if (repl_errno == EREPL_JNLFILEREAD)
 				MEMCPY_LIT(err_string, READ_ERR_STR);
 			else
 				MEMCPY_LIT(err_string, UNKNOWN_ERR_STR);

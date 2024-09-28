@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -944,7 +944,7 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 			(cstt != (cache_state_rec_ptr_t)que_head) && (cnt > 0);
 			cstt_prev = cstt, cnt--, cstt = (cache_state_rec_ptr_t)((sm_uc_ptr_t)cstt + cstt->state_que.fl))
 		{
-			cr = (cache_rec_ptr_t)((sm_uc_ptr_t)cstt - SIZEOF(cr->blkque));
+			cr = CSR2CR(cstt);
 			if (CR_NOT_IN_RANGE((cache_rec_ptr_t)cr, cr_lo, cr_hi))
 			{
 				assert(expect_damage);
@@ -965,37 +965,37 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 			{
 				assert(expect_damage);
 				ret = FALSE;
-				SEND_MSG_CSA(VARLSTCNT(10) ERR_DBQUELINK, 8, DB_LEN_STR(reg), cstt, &cstt->blk,
+				SEND_MSG_CSA(VARLSTCNT(10) ERR_DBQUELINK, 8, DB_LEN_STR(reg), cstt, &cr->blk,
 					RTS_ERROR_TEXT("active queue.bl"), (UINTPTR_T)cstt->state_que.bl,
 					(sm_uc_ptr_t)cstt_prev - (sm_uc_ptr_t)cstt);
 			}
-			if (0 == cstt->dirty)
+			if (0 == cr->dirty)
 			{
 				assert(expect_damage);
 				ret = FALSE;
 				dummy_tn = (trans_num)TRUE;
-				SEND_MSG_CSA(VARLSTCNT(13) ERR_DBCRERR8, 11, DB_LEN_STR(reg), cr, &(cstt->blk),
-					RTS_ERROR_TEXT("active cr->dirty"), &(cstt->dirty), &dummy_tn, CALLFROM);
+				SEND_MSG_CSA(VARLSTCNT(13) ERR_DBCRERR8, 11, DB_LEN_STR(reg), cr, &(cr->blk),
+					RTS_ERROR_TEXT("active cr->dirty"), &(cr->dirty), &dummy_tn, CALLFROM);
 			}
-			if (((0 != cstt->flushed_dirty_tn) && (cstt->dirty <= cstt->flushed_dirty_tn))
-				|| (cstt->dirty > csd->trans_hist.curr_tn))
+			if (((0 != cr->flushed_dirty_tn) && (cr->dirty <= cr->flushed_dirty_tn))
+				|| (cr->dirty > csd->trans_hist.curr_tn))
 			{
 				assert(expect_damage);
 				ret = FALSE;
-				dummy_tn = cstt->flushed_dirty_tn + 1;
-				SEND_MSG_CSA(VARLSTCNT(11) ERR_DBADDRANGE8, 9, DB_LEN_STR(reg), cstt + SIZEOF(que_head), &cstt->blk,
-					&cstt->dirty, RTS_ERROR_TEXT("active dirty (tn)"), &dummy_tn, &csd->trans_hist.curr_tn);
+				dummy_tn = cr->flushed_dirty_tn + 1;
+				SEND_MSG_CSA(VARLSTCNT(11) ERR_DBADDRANGE8, 9, DB_LEN_STR(reg), cstt + SIZEOF(que_head), &cr->blk,
+					&cr->dirty, RTS_ERROR_TEXT("active dirty (tn)"), &dummy_tn, &csd->trans_hist.curr_tn);
 			}
 			/* if caller_is_wcs_recover, we would have waited for all writers to stop manipulating the active/wip queues
 			 * and so it is ok to do the FAKE_DIRTY check. but otherwise it is not.
 			 */
 			if (caller_is_wcs_recover)
-				cstt->dirty = FAKE_DIRTY;	/* change the flag to indicate it was found in a state queue */
+				cr->dirty = FAKE_DIRTY;	/* change the flag to indicate it was found in a state queue */
 			if (0 == cstt->state_que.fl)
 			{	/* No point proceeding to next iteration as "cstt + cstt->state_que.fl" will be same as "cstt" */
 				assert(expect_damage);
 				ret = FALSE;
-				SEND_MSG_CSA(VARLSTCNT(10) ERR_DBQUELINK, 8, DB_LEN_STR(reg), cstt, &cstt->blk,
+				SEND_MSG_CSA(VARLSTCNT(10) ERR_DBQUELINK, 8, DB_LEN_STR(reg), cstt, &cr->blk,
 					RTS_ERROR_TEXT("active queue.fl"), (UINTPTR_T)cstt->state_que.fl, (UINTPTR_T)-1);
 				break;
 			}
@@ -1040,7 +1040,7 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 			(cstt != (cache_state_rec_ptr_t)que_head) && (cnt > 0);
 				cstt_prev = cstt, cnt--, cstt = (cache_state_rec_ptr_t)((sm_uc_ptr_t)cstt + cstt->state_que.fl))
 		{
-			cr = (cache_rec_ptr_t)((sm_uc_ptr_t)cstt - SIZEOF(cr->blkque));
+			cr = CSR2CR(cstt);
 			if (CR_NOT_IN_RANGE((cache_rec_ptr_t)cr, cr_lo, cr_hi))
 			{
 				assert(expect_damage);
@@ -1061,45 +1061,45 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 			{
 				assert(expect_damage);
 				ret = FALSE;
-				SEND_MSG_CSA(VARLSTCNT(10) ERR_DBQUELINK, 8, DB_LEN_STR(reg), cstt, &cstt->blk,
+				SEND_MSG_CSA(VARLSTCNT(10) ERR_DBQUELINK, 8, DB_LEN_STR(reg), cstt, &cr->blk,
 					RTS_ERROR_TEXT("wip queue.bl"), (UINTPTR_T)cstt->state_que.bl,
 					(sm_uc_ptr_t)cstt_prev - (sm_uc_ptr_t)cstt);
 			}
-			if (cstt->epid == 0)
+			if (cr->epid == 0)
 			{
 				assert(expect_damage);
 				ret = FALSE;
 				SEND_MSG_CSA(VARLSTCNT(13) ERR_DBCRERR, 11, DB_LEN_STR(reg),
-					cr, &(cstt->blk), RTS_ERROR_TEXT("wip cr->epid"), cstt->epid, -1, CALLFROM);
+					cr, &(cr->blk), RTS_ERROR_TEXT("wip cr->epid"), cr->epid, -1, CALLFROM);
 			}
 			if (0 == cstt->dirty)
 			{
 				assert(expect_damage);
 				ret = FALSE;
 				dummy_tn = (trans_num)TRUE;
-				SEND_MSG_CSA(VARLSTCNT(13) ERR_DBCRERR8, 11, DB_LEN_STR(reg), cr, &(cstt->blk),
-					RTS_ERROR_TEXT("wip cr->dirty"), &(cstt->dirty), &dummy_tn, CALLFROM);
+				SEND_MSG_CSA(VARLSTCNT(13) ERR_DBCRERR8, 11, DB_LEN_STR(reg), cr, &(cr->blk),
+					RTS_ERROR_TEXT("wip cr->dirty"), &(cr->dirty), &dummy_tn, CALLFROM);
 			}
-			if (((0 != cstt->flushed_dirty_tn) && (cstt->dirty <= cstt->flushed_dirty_tn))
-								|| (cstt->dirty > csd->trans_hist.curr_tn))
+			if (((0 != cr->flushed_dirty_tn) && (cr->dirty <= cr->flushed_dirty_tn))
+								|| (cr->dirty > csd->trans_hist.curr_tn))
 			{
 				assert(expect_damage);
 				ret = FALSE;
-				dummy_tn = cstt->flushed_dirty_tn + 1;
+				dummy_tn = cr->flushed_dirty_tn + 1;
 				SEND_MSG_CSA(VARLSTCNT(11) ERR_DBADDRANGE8, 9, DB_LEN_STR(reg),
-					(sm_uc_ptr_t)cstt + SIZEOF(que_head), &cstt->blk, &cstt->dirty,
+					(sm_uc_ptr_t)cstt + SIZEOF(que_head), &cr->blk, &cr->dirty,
 					RTS_ERROR_TEXT("wip dirty (tn)"), &dummy_tn, &csd->trans_hist.curr_tn);
 			}
 			/* if caller_is_wcs_recover, we would have waited for all writers to stop manipulating the active/wip queues
 			 * and so it is ok to do the FAKE_DIRTY check. but otherwise it is not.
 			 */
 			if (caller_is_wcs_recover)
-				cstt->dirty = FAKE_DIRTY;	/* change the flag to indicate it was found in a state queue */
+				cr->dirty = FAKE_DIRTY;	/* change the flag to indicate it was found in a state queue */
 			if (0 == cstt->state_que.fl)
 			{
 				assert(expect_damage);
 				ret = FALSE;
-				SEND_MSG_CSA(VARLSTCNT(10) ERR_DBQUELINK, 8, DB_LEN_STR(reg), cstt, &cstt->blk,
+				SEND_MSG_CSA(VARLSTCNT(10) ERR_DBQUELINK, 8, DB_LEN_STR(reg), cstt, &cr->blk,
 					RTS_ERROR_TEXT("wip queue.fl"), (UINTPTR_T)cstt->state_que.fl, (UINTPTR_T)-1);
 				break;
 			}

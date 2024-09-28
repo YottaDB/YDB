@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -185,12 +185,13 @@ typedef mlk_shrhash	*mlk_shrhash_ptr_t;
 # endif
 #endif
 
+typedef	struct sgmnt_addrs_struct	*cs_addrs_ptr_t;
 /* Now define main private lock structures */
 
 typedef struct mlk_pvtctl_struct
 {
 	struct gd_region_struct		*region;	/* pointer to the database region */
-	struct sgmnt_addrs_struct	*csa;		/* pointer to the database cs_addrs */
+	cs_addrs_ptr_t			csa;		/* pointer to the database cs_addrs */
 	mlk_ctldata_ptr_t		ctl;		/* pointer to the shared mlk_ctldata */
 	mlk_shrblk_ptr_t		shrblk;		/* pointer to the base of the shrblk array (indexed from one) */
 	mlk_shrhash_ptr_t		shrhash;	/* pointer to the hash array */
@@ -375,11 +376,11 @@ typedef struct mlk_stats_struct
 
 /* macros to grab and release a critical section (either shared with DB or not) for LOCK operations */
 #define GRAB_LOCK_CRIT_AND_SYNC(PCTL, RET_WAS_CRIT)						\
-		grab_lock_crit_and_sync(&(PCTL), &(RET_WAS_CRIT))
+		grab_lock_crit_and_sync(PCTL, &(RET_WAS_CRIT))
 #define GRAB_LOCK_CRIT_INTL(PCTL, RET_WAS_CRIT)							\
-		grab_lock_crit_intl(&(PCTL), &(RET_WAS_CRIT))
+		grab_lock_crit_intl(PCTL, &(RET_WAS_CRIT))
 #define REL_LOCK_CRIT(PCTL, WAS_CRIT)								\
-		rel_lock_crit(&(PCTL), WAS_CRIT)
+		rel_lock_crit(PCTL, WAS_CRIT)
 #define LOCK_CRIT_OWNER(CSA)									\
 		((CSA)->lock_crit_with_db ? -1 : (CSA)->nl->lock_crit.u.parts.latch_pid)
 #define LOCK_CRIT_HELD(CSA)									\

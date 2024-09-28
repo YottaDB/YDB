@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -18,87 +18,97 @@
 #include "copy.h"
 #include "mlk_shrblk_delete_if_empty.h"
 #include "mmrhash.h"
+#include "have_crit.h"
+#include "gdsroot.h"
+#include "gdsbt.h"
+#include "gdsfhead.h"
+
+GBLREF	intrpt_state_t	intrpt_ok_state;
+GBLREF	uint4		process_id;
 
 void mlk_shrhash_delete(mlk_pvtctl_ptr_t ctl, mlk_shrblk_ptr_t d);
 
-boolean_t mlk_shrblk_delete_if_empty(mlk_pvtctl_ptr_t pctl, mlk_shrblk_ptr_t d)
+boolean_t mlk_shrblk_delete_if_empty(mlk_pvtctl_ptr_t pctl, mlk_shrblk_ptr_t our)
 {
-	mlk_shrblk_ptr_t	r, l, p, child;
+	intrpt_state_t		prev_intrpt_state;
+	mlk_shrblk_ptr_t	rght, lft, parent, child;
 	mlk_shrsub_ptr_t	sub;
 #	ifdef DEBUG
 	ptroff_t		offset;
 #	endif
 
-	if (d->children != 0  ||  d->owner != 0  ||  d->pending != 0)
+	assert(LOCK_CRIT_HELD(pctl->csa) && (INTRPT_IN_MLK_SHM_MODIFY == intrpt_ok_state));
+	if (our->children != 0  ||  our->owner != 0  ||  our->pending != 0)
 		return FALSE;
 #	ifdef DEBUG
-	A2R(offset, d);
+	A2R(offset, our);
 	CHECK_SHRBLKPTR(offset, *pctl);
 #	endif
-	p = (d->parent == 0) ? NULL : (mlk_shrblk_ptr_t)R2A(d->parent);
-	if (p)
-		CHECK_SHRBLKPTR(d->parent, *pctl);
-	assertpro((0 != d->lsib) && (0 != d->rsib));
-	l = (mlk_shrblk_ptr_t)R2A(d->lsib);
-	r = (mlk_shrblk_ptr_t)R2A(d->rsib);
-	mlk_shrhash_delete(pctl, d);
-	if (d == r)
-	{	/* If d == r, it means d is the last element in the sibling circular list */
-		if (p == NULL)
+	parent = (our->parent == 0) ? NULL : (mlk_shrblk_ptr_t)R2A(our->parent);
+	if (parent)
+		CHECK_SHRBLKPTR(our->parent, *pctl);
+	assertpro((0 != our->lsib) && (0 != our->rsib));
+	lft = (mlk_shrblk_ptr_t)R2A(our->lsib);
+	rght = (mlk_shrblk_ptr_t)R2A(our->rsib);
+	mlk_shrhash_delete(pctl, our);
+	if (our == rght)
+	{	/* If our == rght, it means our is the last element in the sibling circular list */
+		if (NULL == parent)
 			pctl->ctl->blkroot = 0;
 		else
-			p->children = 0;
+			parent->children = 0;
 	} else
 	{
-		assert(d != l);
-		A2R(r->lsib, l);
-		A2R(l->rsib, r);
-		if ((p != NULL) && (mlk_shrblk_ptr_t)R2A(p->children) == d)
+		assert(our != lft);
+		A2R(rght->lsib, lft);
+		A2R(lft->rsib, rght);
+		if ((NULL != parent) && ((mlk_shrblk_ptr_t)R2A(parent->children) == our))
 		{
-			A2R(p->children, r);
-			if (l == r)
-				assertpro((mlk_shrblk_ptr_t)R2A(p->children) == l);
+			A2R(parent->children, rght);
+			if (lft == rght)
+				assertpro((mlk_shrblk_ptr_t)R2A(parent->children) == lft);
 		}
-		if ((mlk_shrblk_ptr_t)R2A(pctl->ctl->blkroot) == d)
+		if ((mlk_shrblk_ptr_t)R2A(pctl->ctl->blkroot) == our)
 		{
-			assertpro(p == NULL);
-			A2R(pctl->ctl->blkroot, r);
+			assertpro(NULL == parent);
+			A2R(pctl->ctl->blkroot, rght);
 		}
 	}
-	if (p)
+	if (parent)
 	{
-		assertpro(!p->children || ((mlk_shrblk_ptr_t)R2A(p->children) != d));
-		if (p->children)
+		assertpro(!parent->children || ((mlk_shrblk_ptr_t)R2A(parent->children) != our));
+		if (parent->children)
 		{
-			child = (mlk_shrblk_ptr_t)R2A(p->children);
-			assertpro((mlk_shrblk_ptr_t)R2A(child->parent) == p);
+			child = (mlk_shrblk_ptr_t)R2A(parent->children);
+			assertpro((mlk_shrblk_ptr_t)R2A(child->parent) == parent);
 		}
 	}
-	sub = (mlk_shrsub_ptr_t)R2A(d->value);
+	sub = (mlk_shrsub_ptr_t)R2A(our->value);
 	sub->backpointer = 0;
-	memset(d, 0, SIZEOF(mlk_shrblk));
+	memset(our, 0, SIZEOF(mlk_shrblk));
 	if (0 != pctl->ctl->blkfree)
 	{
-		p = (mlk_shrblk_ptr_t)R2A(pctl->ctl->blkfree);
-		A2R(d->rsib, p);
+		parent = (mlk_shrblk_ptr_t)R2A(pctl->ctl->blkfree);
+		A2R(our->rsib, parent);
 	}
-	d->lsib = INVALID_LSIB_MARKER;
-	A2R(pctl->ctl->blkfree, d);
+	our->lsib = INVALID_LSIB_MARKER;
+	A2R(pctl->ctl->blkfree, our);
 	++pctl->ctl->blkcnt;
 	return TRUE;
 }
 
 void mlk_shrhash_delete(mlk_pvtctl_ptr_t pctl, mlk_shrblk_ptr_t d)
 {
-	mlk_subhash_state_t	hs;
-	mlk_subhash_res_t	hashres;
-	mlk_subhash_val_t	hash;
-	uint4			total_len, num_buckets;
-	mlk_shrhash_map_t	usedmap;
-	mlk_shrblk_ptr_t	search_shrblk;
 	int			bi, si;
-	mlk_shrhash_ptr_t	shrhash, bucket, search_bucket;
+	mlk_shrblk_ptr_t	search_shrblk;
+	mlk_shrhash_map_t	usedmap;
+	mlk_shrhash_ptr_t	bucket, search_bucket, shrhash;
+	mlk_subhash_res_t	hashres;
+	mlk_subhash_state_t	hs;
+	mlk_subhash_val_t	hash;
+	uint4			num_buckets, total_len;
 
+	assert(LOCK_CRIT_HELD(pctl->csa) && (INTRPT_IN_MLK_SHM_MODIFY == intrpt_ok_state));
 	shrhash = pctl->shrhash;
 	num_buckets = pctl->shrhash_size;
 #	ifdef DEBUG
@@ -146,6 +156,7 @@ void mlk_shrhash_val_build(mlk_shrblk_ptr_t d, uint4 *total_len, mlk_subhash_sta
 {
 	mlk_shrsub_ptr_t	shrsub;
 
+	assert(INTRPT_IN_MLK_SHM_MODIFY == intrpt_ok_state);
 	assertpro(0 != d->value);
 	if (d->parent)
 		mlk_shrhash_val_build((mlk_shrblk_ptr_t)R2A(d->parent), total_len, hs);

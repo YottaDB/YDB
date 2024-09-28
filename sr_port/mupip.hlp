@@ -3884,22 +3884,23 @@
        and unless, you have data from testing and benchmarking that
        demonstrates a benefit from a change.
 
-3 STATs
-   STATs
+3 STATS
+   STATS
 
    Specifies whether GT.M should permit statistics sharing for this region.
    This characteristic permits operational exclusion of statistics sharing
    for a region. The format of the STATS qualifier is:
 
-   -[NO]STAT[S]
+   -[NO]STATS
 
      o At database creation, GDE controls this characteristic, which, by
        default it specifies as STATS (on). When on, this characteristic
        causes GT.M to create a small MM database for the associated region to
        hold the shared statistics.
-     o A process disables itself from maintaining the shared statistics when
-       it fails to open a statsDB. It does not, however, disable subsequently
-       starting processes from maintaining the shared statistics.
+     o If a process tries and fails to open a statsDB, it disables itself
+       from maintaining the shared statistics. It does not, however, disable
+       subsequently starting processes from maintaining the shared
+       statistics.
 
 3 StatsDB_allocation
    StatsDB_allocation

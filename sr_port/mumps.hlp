@@ -9816,6 +9816,14 @@
 
    $ZCO[NVERT](expr1, expr2,[expr3])
 
+   **Warning**
+
+   When $gtm_chset is set to UTF-8, the "M" or "W-1252" code specifing input
+   or output one-byte encoding requires care in the multi-byte environment.
+   Therefore use caution in choosing between character- and byte-oriented
+   functions in the surrounding code, such as between $CHAR() and $ZCHAR().
+   The BADCHAR setting is also a factor to keep in mind.
+
    **Note**
 
    When UTF-8 mode is enabled, GT.M uses the ICU Library to perform case
@@ -9853,6 +9861,12 @@
    GTM>Set T16=$ZCOnvert(T16,"UTF-16LE","UTF-8")
    GTM>Write $length(T16)
    9
+   GTM>set WTOUTF8=$zconvert($ZCHAR(128),"W-1252","UTF-8")
+   GTM>write WTOUTF8
+   EUR
+   GTM>set UTF8TOW=$zconvert(WTOUTF8,"utf-8","M")
+   GTM>write UTF8TOW
+   ?
 
    In the above example, $LENGTH() function triggers an error because it
    takes only UTF-8 encoding strings as the argument.
@@ -12556,9 +12570,11 @@
 2 $ZMAXTPTIme
    $ZMAXTPTIme
 
-   $ZMAXTPTI[ME] contains an integer value indicating the time duration GT.M
-   should wait for the completion of all activities fenced by the current
-   transaction's outermost TSTART/TCOMMIT pair.
+   $ZMAXTPTI[ME] contains a value between zero (0) and 60 in seconds with
+   millisecond precision indicating the time duration GT.M should wait for
+   the completion of all activities fenced by the current transaction's
+   outermost TSTART/TCOMMIT pair. Values outside the accepted range leave the
+   current value unchanged.
 
    $ZMAXTPTIME can be SET but cannot be NEWed.
 
@@ -16965,15 +16981,17 @@
 5 REWIND
    REWIND
 
-   REWIND Applies to: SD
+   REWIND Applies to: SD FIFO PIPE
 
-   REWIND Applies to: Sequential Files
+   REWIND Applies to: Sequential Files, FIFO, PIPE
 
    REWIND positions the file pointer of a sequential disk.
 
    When $PRINCIPAL identifies a device that supports REWIND, the REWIND or
    INREWIND device parameters perform a REWIND of the input and OUTREWIND
    performs a REWIND of the output.
+
+   For FIFO or PIPE devices, REWIND only sets $X, $Y, and $ZEOF to zero.
 
    By default, OPEN does not REWIND.
 
@@ -17473,6 +17491,8 @@
    |----------------------+-----+----+------+------+------+-----|
    | INDEPENDENT          |     |    |      | X    |      |     |
    |----------------------+-----+----+------+------+------+-----|
+   | INREWIND             |     | X  | X    | X    |      |     |
+   |----------------------+-----+----+------+------+------+-----|
    | IOERROR=expr         |     |    |      |      |      | X   |
    |----------------------+-----+----+------+------+------+-----|
    | KEY                  |     | X  | X    | X    |      |     |
@@ -17485,6 +17505,8 @@
    |----------------------+-----+----+------+------+------+-----|
    | OKEY                 |     | X  | X    | X    |      |     |
    |----------------------+-----+----+------+------+------+-----|
+   | OUTREWIND            |     | X  | X    | X    |      |     |
+   |----------------------+-----+----+------+------+------+-----|
    | OWNER=expr           |     | X  | X    |      |      |     |
    |----------------------+-----+----+------+------+------+-----|
    | PARSE                |     |    |      | X    |      |     |
@@ -17492,6 +17514,8 @@
    | [NO]READONLY         |     | X  | X    | X    |      |     |
    |----------------------+-----+----+------+------+------+-----|
    | RECORDSIZE=intexpr   |     | X  | X    | X    |      |     |
+   |----------------------+-----+----+------+------+------+-----|
+   | REWIND               |     | X  | X    | X    |      |     |
    |----------------------+-----+----+------+------+------+-----|
    | SEEK=strexpr         |     | X  |      |      |      |     |
    |----------------------+-----+----+------+------+------+-----|
@@ -18083,7 +18107,7 @@
 5 INREWIND
    INREWIND
 
-   Applies to: SD
+   Applies to: SD FIFO PIPE
 
    Performs a REWIND on input when $PRINCIPAL identifies a device that
    supports REWIND. Use this deviceparameter with $PRINCIPAL when redirected
@@ -18259,7 +18283,7 @@
 5 OUTREWIND
    OUTREWIND
 
-   Applies to: SD
+   Applies to: SD FIFO PIPE
 
    Performs a REWIND on output when $PRINCIPAL identifies a device that
    supports REWIND. Use this deviceparameter with $PRINCIPAL when redirected
@@ -18307,9 +18331,11 @@
 5 REWIND
    REWIND
 
-   REWIND Applies to: SD
+   REWIND Applies to: SD FIFO PIPE
 
    REWIND places the file pointer to the beginning of the file.
+
+   For FIFO and PIPE devices, REWIND only sets $X, $Y, and $ZEOF to zero.
 
    By default, USE does not REWIND.
 
@@ -18693,7 +18719,7 @@
    |---------------------+-----+----+------+------+------+-----|
    | IKEY                |     | X  | X    | X    |      |     |
    |---------------------+-----+----+------+------+------+-----|
-   | INREWIND            |     | X  |      |      |      |     |
+   | INREWIND            |     | X  | X    | X    |      |     |
    |---------------------+-----+----+------+------+------+-----|
    | INSEEK              |     | X  |      |      |      |     |
    |---------------------+-----+----+------+------+------+-----|
@@ -18707,13 +18733,13 @@
    |---------------------+-----+----+------+------+------+-----|
    | OKEY                |     | X  | X    | X    |      |     |
    |---------------------+-----+----+------+------+------+-----|
-   | OUTREWIND           |     | X  |      |      |      |     |
+   | OUTREWIND           |     | X  | X    | X    |      |     |
    |---------------------+-----+----+------+------+------+-----|
    | OUTSEEK             |     | X  |      |      |      |     |
    |---------------------+-----+----+------+------+------+-----|
    | [NO]PASTHRU         | X   |    |      |      |      |     |
    |---------------------+-----+----+------+------+------+-----|
-   | REWIND              |     | X  |      |      |      |     |
+   | REWIND              |     | X  | X    | X    |      |     |
    |---------------------+-----+----+------+------+------+-----|
    | SEEK=strexpr        |     | X  |      |      |      |     |
    |---------------------+-----+----+------+------+------+-----|
@@ -18814,7 +18840,7 @@
    |-----------------------+-----+----+------+-----|
    | REPLACE               |     | X  | X    |     |
    |-----------------------+-----+----+------+-----|
-   | REWIND                |     | X  |      |     |
+   | REWIND                |     | X  | X    |     |
    |-----------------------+-----+----+------+-----|
    | SOCKET                |     |    |      | X   |
    |-----------------------+-----+----+------+-----|

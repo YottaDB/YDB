@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2014-2023 Fidelity National Information	*
+ * Copyright (c) 2014-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -458,7 +458,7 @@ void	remq_rtnobj_specific(que_ent_ptr_t que_base, sm_uc_ptr_t shm_base, rtnobj_h
 sm_uc_ptr_t rtnobj_shm_malloc(zro_hist *zhist, int fd, off_t objSize, gtm_uint64_t objhash)
 {
 	boolean_t		has_relinkctl_lock, has_rtnobj_lock;
-	boolean_t		initialized, return_NULL, need_shmctl;
+	boolean_t		initialized, need_shmctl, return_NULL = FALSE;
 	char			errstr[256];
 	gtm_uint64_t		src_cksum_8byte;
 	int			min_index, max_index, min_free_index, max_free_index, shm_index;
@@ -927,13 +927,9 @@ sm_uc_ptr_t rtnobj_shm_malloc(zro_hist *zhist, int fd, off_t objSize, gtm_uint64
 		relinkrec->numvers++;
 		/* Fill the shared memory buffer with the object code */
 		objBuff = (sm_uc_ptr_t)&rtnobj->userStorage.userStart;
-		if (-1 == lseek(fd, NATIVE_HDR_LEN, SEEK_SET))
+		DOPREADRL(fd, objBuff, objSize, NATIVE_HDR_LEN, actualSize);
+		if ((-1 == actualSize) || (actualSize != objSize))
 			return_NULL = TRUE;
-		else
-		{
-			DOREADRL(fd, objBuff, objSize, actualSize);
-			return_NULL = (actualSize != objSize);
-		}
 		if (return_NULL)
 		{
 			/* Free allocated object in shared memory using rtnobj_shm_free. Set up a dummy rtnhdr

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -50,19 +50,21 @@
 
 GBLREF	connection_struct	*curr_entry;
 GBLREF	gd_region		*gv_cur_region;
-GBLREF	short			crash_count;
+GBLREF	intrpt_state_t		intrpt_ok_state;
+// GBLREF	short			crash_count;
 
 char gtcmtr_lke_showrep(struct CLB *lnk, show_request *sreq)
 {
-	gd_region		*cur_region;
-	sgmnt_addrs		*csa;
-	mlk_ctldata		*lke_ctl;
-	ssize_t			ls_len;
-	mstr 			dnode;
-	show_reply		srep;
-	uint4			status;
 	boolean_t		was_crit;
+	gd_region		*cur_region;
+	int4			status;
+	intrpt_state_t		prev_intrpt_state;
+	mlk_ctldata		*lke_ctl;
 	mlk_pvtctl		pctl, pctl2;
+	mstr 			dnode;
+	sgmnt_addrs		*csa;
+	show_reply		srep;
+	ssize_t			ls_len;
 
 	cur_region = gv_cur_region = gtcm_find_region(curr_entry, sreq->rnum)->reghead->reg;
 	if (IS_REG_BG_OR_MM(cur_region))
@@ -75,16 +77,18 @@ char gtcmtr_lke_showrep(struct CLB *lnk, show_request *sreq)
 		pctl.csa = csa;
 		pctl.ctl = (mlk_ctldata_ptr_t)pctl.csa->mlkctl;
 		/* No need to set up shrblk just to do an lke_showtree() with no memory dump. */
-		GRAB_LOCK_CRIT_AND_SYNC(pctl, was_crit);
+		GRAB_LOCK_CRIT_AND_SYNC(&pctl, was_crit);
+		DEFER_INTERRUPTS(INTRPT_IN_MLK_SHM_MODIFY, prev_intrpt_state);
 		memcpy((uchar_ptr_t)lke_ctl, pctl.ctl, ls_len);
+		REL_LOCK_CRIT(&pctl, was_crit);
+		ENABLE_INTERRUPTS(INTRPT_IN_MLK_SHM_MODIFY, prev_intrpt_state);
 		pctl2 = pctl;
-		REL_LOCK_CRIT(pctl, was_crit);
 		pctl2.ctl = lke_ctl;
 		util_cm_print(lnk, 0, NULL, 0, RESET);
 		dnode.len = sreq->nodelength;
 		dnode.addr = sreq->node;
 		if (lke_ctl->blkroot != 0)
-			(void)lke_showtree(lnk, &pctl2, sreq->all, sreq->wait, sreq->pid, dnode, FALSE, NULL);
+			(void)lke_showtree(&pctl2, lnk, sreq->all, sreq->wait, sreq->pid, dnode, FALSE, NULL, NULL);
 		free(lke_ctl);
 	}
 	srep.code = CMMS_U_LKESHOW;

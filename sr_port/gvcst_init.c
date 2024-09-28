@@ -43,8 +43,6 @@
 #include "mlkdef.h"
 #include "error.h"
 #include "gt_timer.h"
-#include "trans_log_name.h"
-#include "gtm_logicals.h"
 #include "dbfilop.h"
 #include "set_num_additional_processors.h"
 #include "have_crit.h"
@@ -135,17 +133,12 @@ MBSTART {														\
 } MBEND
 
 GBLREF	boolean_t		mu_reorg_process;
-GBLREF	boolean_t		created_core, dont_want_core;
 GBLREF  gd_region               *db_init_region, *gv_cur_region, *ftok_sem_reg;
-GBLREF	gv_key			*gv_currkey;
-GBLREF	gv_namehead		*gv_target;
 GBLREF	sgmnt_addrs		*cs_addrs_list;
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	boolean_t		gtmcrypt_initialized;
-GBLREF	boolean_t		gtcm_connection;
 GBLREF	gd_addr			*gd_header;
 GBLREF	bool			licensed;
-GBLREF	int4			lkid;
 GBLREF	char			*update_array, *update_array_ptr;
 GBLREF	uint4			update_array_size, cumul_update_array_size;
 GBLREF	ua_list			*first_ua, *curr_ua;
@@ -175,10 +168,6 @@ GBLREF	jnlpool_addrs_ptr_t	jnlpool_head;
 GBLREF	uint4			process_id;
 GBLREF	int4			pre_drvlongjmp_error_condition;
 
-LITREF char			gtm_release_name[];
-LITREF int4			gtm_release_name_len;
-LITREF mval			literal_statsDB_gblname;
-
 #define MAX_DBINIT_RETRY	3
 #define MAX_DBFILOPN_RETRY_CNT	4
 
@@ -201,15 +190,8 @@ typedef enum {
 	STATSDB_FTOKSEMRMIDERR
 } statsdb_recreate_errors;
 
-error_def(ERR_BADDBVER);
-error_def(ERR_DBCREINCOMP);
-error_def(ERR_DBFLCORRP);
 error_def(ERR_DBGLDMISMATCH);
-error_def(ERR_DBNOTGDS);
 error_def(ERR_DBOPNERR);
-error_def(ERR_DBROLLEDBACK);
-error_def(ERR_DBVERPERFWARN1);
-error_def(ERR_DBVERPERFWARN2);
 error_def(ERR_DRVLONGJMP);	/* Generic internal only error used to drive longjump() in a queued condition handler */
 error_def(ERR_ENCRYPTCONFLT2);
 error_def(ERR_INVSTATSDB);
@@ -340,34 +322,29 @@ void gvcst_init(gd_region *reg, gd_addr *addr)
 	sgmnt_data		statsDBcsd;
 	jnlpool_addrs_ptr_t	save_jnlpool;
 	uint4			segment_update_array_size;
-	int4			bsize, padsize;
+	int4			bsize;
 	boolean_t		is_statsDB, realloc_alt_buff, retry_dbinit;
 	file_control		*fc;
-	gd_region		*prev_reg, *reg_top, *baseDBreg, *statsDBreg;
+	gd_region		*prev_reg, *baseDBreg, *statsDBreg;
 #	ifdef DEBUG
 	cache_rec_ptr_t		cr;
 	bt_rec_ptr_t		bt;
 	blk_ident		tmp_blk;
 #	endif
 	int			db_init_ret, loopcnt, max_fid_index, fd, rc, save_errno, errrsn_text_len, status;
-	mstr			log_nam, trans_log_nam;
-	char			trans_buff[MAX_FN_LEN + 1], statsdb_path[MAX_FN_LEN + 1], *errrsn_text;
+	char			statsdb_path[MAX_FN_LEN + 1], *errrsn_text;
 	unique_file_id		*reg_fid, *tmp_reg_fid;
 	gd_id			replfile_gdid, *tmp_gdid;
 	tp_region		*tr;
 	ua_list			*tmp_ua;
-	time_t			curr_time;
-	uint4			curr_time_uint4, next_warn_uint4;
 	gtm_uint8		minus1 = (gtm_uint8)-1;
 	enum db_acc_method	reg_acc_meth;
 	boolean_t		onln_rlbk_cycle_mismatch = FALSE;
 	boolean_t		replpool_valid = FALSE, replfilegdid_valid = FALSE, jnlpool_found = FALSE;
-	intrpt_state_t		save_intrpt_ok_state;
 	replpool_identifier	replpool_id;
 	unsigned int		full_len;
 	int4			db_init_retry;
 	srch_blk_status		*bh;
-	mstr			*gld_str;
 	node_local_ptr_t	baseDBnl;
 	unsigned char		cstatus;
 	statsdb_recreate_errors	statsdb_rcerr;
@@ -796,7 +773,7 @@ void gvcst_init(gd_region *reg, gd_addr *addr)
 	CWS_INIT;	/* initialize the cw_stagnate hash-table */
 	/* check the header design assumptions */
 	assert(SIZEOF(th_rec) == (SIZEOF(bt_rec) - SIZEOF(bt->blkque)));
-	assert(SIZEOF(cache_rec) == (SIZEOF(cache_state_rec) + SIZEOF(cr->blkque)));
+	assert(SIZEOF(cache_rec) == (SIZEOF(cache_state_rec) + OFFSETOF(cache_rec, state_que)));
 	DEBUG_ONLY(assert_jrec_member_offsets());
 	assert(MAX_DB_BLK_SIZE < (1ULL << NEXT_OFF_MAX_BITS));	/* Ensure a off_chain record's next_off member
 								 * can work with all possible block sizes */
@@ -1053,25 +1030,6 @@ void gvcst_init(gd_region *reg, gd_addr *addr)
 	 */
 	PROCESS_GVT_PENDING_LIST(reg, csa);
 	db_common_init(reg, csa, csd);	/* do initialization common to db_init() and mu_rndwn_file() */
-	/* If we are not fully upgraded, see if we need to send a warning to the operator console about
-	   performance. Compatibility mode is a known performance drain. Actually, we can send one of two
-	   messages. If the desired_db_format is for an earlier release than the current release, we send
-	   a performance warning that this mode degrades performance. However, if the desired_db_format is
-	   for the current version but there are blocks to convert still, we send a gengle reminder that
-	   running mupip reorg upgrade would be a good idea to get the full performance benefit of V5.
-	*/
-	time(&curr_time);
-	assert(MAXUINT4 > curr_time);
-	curr_time_uint4 = (uint4)curr_time;
-	next_warn_uint4 = csd->next_upgrd_warn.cas_time;
-	if (!csd->fully_upgraded && curr_time_uint4 > next_warn_uint4
-	    && COMPSWAP_LOCK(&csd->next_upgrd_warn.time_latch, next_warn_uint4, 0, (curr_time_uint4 + UPGRD_WARN_INTERVAL), 0))
-	{	/* The msg is due and we have successfully updated the next time interval */
-		if (GDSVCURR != csd->desired_db_format)
-			send_msg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_DBVERPERFWARN1, 2, DB_LEN_STR(reg));
-		else
-			send_msg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_DBVERPERFWARN2, 2, DB_LEN_STR(reg));
-	}
 	csa->lock_crit_with_db = csd->lock_crit_with_db;	/* put a copy in csa where it's cheaper for mlk* to access */
 	/* Compute the maximum journal space requirements for a PBLK (including possible ALIGN record).
 	 * Use this variable in the TOTAL_TPJNL_REC_SIZE and TOTAL_NONTP_JNL_REC_SIZE macros instead of recomputing.

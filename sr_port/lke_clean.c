@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2018-2021 Fidelity National Information	*
+ * Copyright (c) 2018-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -34,44 +34,46 @@
 #include "min_max.h"
 #include "gtmmsg.h"
 #include "do_shmat.h"
-
+#include "have_crit.h"
 #include "mlk_ops.h"
 #include "mlk_shrblk_delete_if_empty.h"
 #include "mlk_shrhash_find_bucket.h"
 
 GBLREF	gd_addr		*gd_header;
-GBLREF	VSIG_ATOMIC_T	util_interrupt;
+GBLREF	intrpt_state_t	intrpt_ok_state;
 GBLREF	uint4		process_id;
+GBLREF	VSIG_ATOMIC_T	util_interrupt;
 
+error_def(ERR_CTRLC);
 error_def(ERR_MLKCLEANED);
 error_def(ERR_MLKHASHTABERR);
-error_def(ERR_NOREGION);
 error_def(ERR_MLKHASHWRONG);
-error_def(ERR_CTRLC);
+error_def(ERR_NOREGION);
 
 void lke_clean(void)
 {
 	/* Arguments for lke_getcli */
-	bool			locks, all = TRUE, wait = TRUE, interactive = FALSE, match = FALSE, memory = TRUE, nocrit = TRUE;
-	boolean_t		exact = TRUE, integ = FALSE;
-	int4			pid, repeat, bc_before, bc_after;
-	gtm_int8		sleep_time;
-	mstr			regname, node, one_lock;
-	char			regbuf[MAX_RN_LEN], nodebuf[32], one_lockbuf[MAX_KEY_SZ];
-	int			fi, mi;
-	uint4			ti, num_buckets, bucket_offset, loop_cnt, loop_cnt2, total_len;
-	mlk_shrhash_map_t	usedmap, usedmap2;
-	mlk_subhash_state_t	hs;
-	mlk_subhash_res_t	hashres;
-	mlk_shrhash_ptr_t	shrhash, search_bucket, check_bucket, free_bucket;
-	mlk_shrblk_ptr_t	shrblk, shr;
-	mlk_shrsub_ptr_t	sub, sub2;
+	bool			all = TRUE, interactive = FALSE, match = FALSE, memory = TRUE, nocrit = TRUE, wait = TRUE;
+	boolean_t		exact = TRUE, integ = FALSE, was_crit = FALSE;
+	char			nodebuf[32], one_lockbuf[MAX_KEY_SZ], regbuf[MAX_RN_LEN];
 	gd_region		*reg;
-	int			n;
-	boolean_t		was_crit;
+	gtm_int8		sleep_time;
+	int			fi, mi, num_reg;
+	int4			bc_before, bc_after, pid, repeat;
+	intrpt_state_t		prev_intrpt_state;
+	mstr			node, one_lock, regname;
+	uint4			bucket_offset, loop_cnt, num_buckets, ti, total_len;
 	mlk_pvtblk		pvtblk;
-	DEBUG_ONLY(mlk_shrblk_ptr_t		blk);
-	struct timespec		start_clock, end_clock;
+	mlk_shrblk_ptr_t	shrblk, shr;
+	mlk_shrsub_ptr_t	sub;
+	mlk_shrhash_map_t	usedmap;
+	mlk_shrhash_ptr_t	check_bucket, free_bucket, search_bucket, shrhash;
+	mlk_subhash_res_t	hashres;
+	mlk_subhash_state_t	hs;
+	struct timespec		end_clock, start_clock;
+#	ifdef DEBUG
+	mlk_shrblk_ptr_t	blk, newfreehead;
+#	endif
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -87,7 +89,7 @@ void lke_clean(void)
 		return;
 	do {
 		clock_gettime(CLOCK_MONOTONIC, &start_clock);
-		for (reg = gd_header->regions, n = 0; n != gd_header->n_regions; ++reg, ++n)
+		for (reg = gd_header->regions, num_reg = gd_header->n_regions; num_reg ; ++reg, --num_reg)
 		{
 			/* If region matches and is open */
 			if (((0 == regname.len)
@@ -101,9 +103,10 @@ void lke_clean(void)
 				/* Construct a dummy pvtblk to pass in */
 				MLK_PVTCTL_INIT(pvtblk.pvtctl, reg);
 				prepare_for_gc(&pvtblk.pvtctl);
+				GRAB_LOCK_CRIT_AND_SYNC(&pvtblk.pvtctl, was_crit);
+				DEFER_INTERRUPTS(INTRPT_IN_MLK_SHM_MODIFY, prev_intrpt_state);
 				assert(pvtblk.pvtctl.ctl->lock_gc_in_progress.u.parts.latch_pid == process_id);
-				GRAB_LOCK_CRIT_AND_SYNC(pvtblk.pvtctl, was_crit);
-				WBTEST_ONLY(WBTEST_MLOCK_HANG, SLEEP_USEC(10000ULL * MILLISECS_IN_SEC, 0););
+				WBTEST_ONLY(WBTEST_MLOCK_HANG, SLEEP_USEC(5000ULL * MILLISECS_IN_SEC, FALSE););
 				bc_before = pvtblk.pvtctl.ctl->blkcnt;
 				mlk_garbage_collect(&pvtblk, 0, TRUE);
 				assert(pvtblk.pvtctl.ctl->lock_gc_in_progress.u.parts.latch_pid == process_id);
@@ -114,18 +117,17 @@ void lke_clean(void)
 							(bc_after - bc_before), REG_LEN_STR(reg));
 				if (!integ)
 				{
-					REL_LOCK_CRIT(pvtblk.pvtctl, was_crit);
+					REL_LOCK_CRIT(&pvtblk.pvtctl, was_crit);
+					ENABLE_INTERRUPTS(INTRPT_IN_MLK_SHM_MODIFY, prev_intrpt_state);
 					continue;
 				}
 				shrhash = pvtblk.pvtctl.shrhash;
 				num_buckets = pvtblk.pvtctl.shrhash_size;
-
-				/* NOTE; this test will overwrite values currently locked, do NOT use in production
+				/* NOTE; the following test overwrites values currently locked - do NOT use in production
 				 *  fills the hash table with junk and puts something outside of the neighborhood
-				 *  to verify it is detected and reported correctly */
+				 *  to verify it detects and reports correctly
+				 */
 				WBTEST_ONLY(WBTEST_TRASH_HASH_NO_RECOVER,
-						mlk_shrblk_ptr_t	newfreehead;
-
 						MLK_SUBHASH_INIT(&pvtblk, hs);
 						sub = malloc(SIZEOF(mlk_shrsub) + 23);
 						sub->length = 24;
@@ -156,13 +158,11 @@ void lke_clean(void)
 						check_bucket = &shrhash[ti];
 						check_bucket->usedmap = ~(0);
 				);
-				/* NOTE; this test will overwrite values currently locked, do NOT use in production
+				/* NOTE; the following test overwrites values currently locked - do NOT use in production
 				 *  puts space in the first 10 slots of the hash table starting at some position, then fills
-				 *  outside of the neighborhood to verify that the cleanup will move the misplaced value
-				 *  if it can */
+				 *  outside of the neighborhood to verify that the cleanup moves the misplaced value if it can
+				 */
 				WBTEST_ONLY(WBTEST_TRASH_HASH_RECOVER,
-						mlk_shrblk_ptr_t	newfreehead;
-
 						MLK_SUBHASH_INIT(&pvtblk, hs);
 						sub = malloc(SIZEOF(mlk_shrsub) + 32);
 						sub->length = 33;
@@ -247,7 +247,8 @@ void lke_clean(void)
 							if (((MLK_SUBHASH_RES_VAL(hashres) % num_buckets) != fi) ||
 									(MLK_SUBHASH_RES_VAL(hashres) != check_bucket->hash))
 							{
-								REL_LOCK_CRIT(pvtblk.pvtctl, was_crit);
+								REL_LOCK_CRIT(&pvtblk.pvtctl, was_crit);
+								ENABLE_INTERRUPTS(INTRPT_IN_MLK_SHM_MODIFY, prev_intrpt_state);
 								RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_MLKHASHWRONG,
 									2, LEN_AND_LIT("Can't correct, exiting."));
 							}
@@ -297,7 +298,8 @@ void lke_clean(void)
 							 */
 							if (!IS_NEIGHBOR(usedmap, bucket_offset))
 							{
-								REL_LOCK_CRIT(pvtblk.pvtctl, was_crit);
+								REL_LOCK_CRIT(&pvtblk.pvtctl, was_crit);
+								ENABLE_INTERRUPTS(INTRPT_IN_MLK_SHM_MODIFY, prev_intrpt_state);
 								RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_MLKHASHWRONG,
 									2, LEN_AND_LIT("Can't correct, exiting."));
 							}
@@ -305,9 +307,12 @@ void lke_clean(void)
 					}
 				}
 				WBTEST_ONLY(WBTEST_TRASH_HASH_RECOVER,
-						lke_show_hashtable(&pvtblk.pvtctl);
+						lke_show_hashtable(&pvtblk.pvtctl, &prev_intrpt_state);
 				);
-				REL_LOCK_CRIT(pvtblk.pvtctl, was_crit);
+				REL_LOCK_CRIT(&pvtblk.pvtctl, was_crit);
+				ENABLE_INTERRUPTS(INTRPT_IN_MLK_SHM_MODIFY, prev_intrpt_state);
+				if (util_interrupt)
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CTRLC);
 			}
 		}
 		if (!match && (0 != regname.len))

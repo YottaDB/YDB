@@ -46,19 +46,18 @@
 #include "gvusr.h"
 #include "interlock.h"
 #include "rel_quant.h"
+#include "have_crit.h"
 
-GBLREF	uint4		process_id;
-GBLREF	short		crash_count;
-GBLREF	uint4		dollar_tlevel;
-GBLREF	uint4		dollar_trestart;	/* for TPNOTACID_CHECK */
-GBLREF	unsigned int	t_tries;
+GBLREF	intrpt_state_t  intrpt_ok_state;
 GBLREF	tp_region	*tp_reg_free_list;	/* Ptr to list of tp_regions that are unused */
-GBLREF  tp_region	*tp_reg_list;		/* Ptr to list of tp_regions for this transaction */
+GBLREF	tp_region	*tp_reg_list;		/* Ptr to list of tp_regions for this transaction */
+GBLREF	uint4		dollar_tlevel, process_id;
+#ifdef	DEBUG
+GBLREF	unsigned int	t_tries;
+#endif
 
 error_def(ERR_LOCKSPACEFULL);
 error_def(ERR_LOCKSPACEINFO);
-error_def(ERR_GCBEFORE);
-error_def(ERR_GCAFTER);
 
 #define LOCKGCINTP		"LOCKGCINTP"	 /* Garbage collection in the third retry is TPNOTACID */
 
@@ -74,14 +73,14 @@ error_def(ERR_GCAFTER);
  */
 gtm_uint64_t mlk_lock(mlk_pvtblk *p, UINTPTR_T auxown, boolean_t new)
 {
-	boolean_t		blocked, was_crit, added;
+	boolean_t		added, blocked, was_crit;
 	connection_struct	*curr_entry;	/* for GT.CM GNP server */
 	gtm_uint64_t		retval;
-	int			siz, status;
-	mlk_ctldata_ptr_t	ctl;
-	mlk_shrblk_ptr_t	d;
-	sgmnt_addrs		*csa;
+	int			siz;
 	intrpt_state_t		prev_intrpt_state;
+	mlk_ctldata_ptr_t	ctl;
+	mlk_shrblk_ptr_t	our;
+	sgmnt_addrs		*csa;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -95,7 +94,8 @@ gtm_uint64_t mlk_lock(mlk_pvtblk *p, UINTPTR_T auxown, boolean_t new)
 			/* make sure this region is in the list in case we end up retrying */
 			insert_region(p->pvtctl.region, &tp_reg_list, &tp_reg_free_list, SIZEOF(tp_region));
 		}
-		GRAB_LOCK_CRIT_AND_SYNC(p->pvtctl, was_crit);
+		GRAB_LOCK_CRIT_AND_SYNC(&p->pvtctl, was_crit);
+		DEFER_INTERRUPTS(INTRPT_IN_MLK_SHM_MODIFY, prev_intrpt_state);
 		retval = ctl->wakeups;
 		assert(retval);
 		/* this calculation is size of basic mlk_shrsub blocks plus the padded value length
@@ -108,10 +108,12 @@ gtm_uint64_t mlk_lock(mlk_pvtblk *p, UINTPTR_T auxown, boolean_t new)
 		if (ctl->gc_needed || ctl->resize_needed || ctl->rehash_needed
 			|| (ctl->subtop - ctl->subfree < siz) || (ctl->blkcnt < p->subscript_cnt))
 		{
-			REL_LOCK_CRIT(p->pvtctl, was_crit);
+			REL_LOCK_CRIT(&p->pvtctl, was_crit);
+			ENABLE_INTERRUPTS(INTRPT_IN_MLK_SHM_MODIFY, prev_intrpt_state);
 			TPNOTACID_CHECK(LOCKGCINTP);
 			prepare_for_gc(&p->pvtctl);
-			GRAB_LOCK_CRIT_AND_SYNC(p->pvtctl, was_crit);
+			GRAB_LOCK_CRIT_AND_SYNC(&p->pvtctl, was_crit);
+			DEFER_INTERRUPTS(INTRPT_IN_MLK_SHM_MODIFY, prev_intrpt_state);
 			assert(ctl->lock_gc_in_progress.u.parts.latch_pid == process_id);
 			if (ctl->rehash_needed)
 				mlk_rehash(&p->pvtctl);
@@ -123,16 +125,14 @@ gtm_uint64_t mlk_lock(mlk_pvtblk *p, UINTPTR_T auxown, boolean_t new)
 			RELEASE_SWAPLOCK(&ctl->lock_gc_in_progress);
 		}
 		assert(!new || (0 == TREF(mlk_yield_pid)) || (MLK_FAIRNESS_DISABLED == TREF(mlk_yield_pid)));
-		DEFER_INTERRUPTS(INTRPT_IN_MLK_SHM_MODIFY, prev_intrpt_state);
-		blocked = mlk_shrblk_find(p, &d, auxown);
-		ENABLE_INTERRUPTS(INTRPT_IN_MLK_SHM_MODIFY, prev_intrpt_state);
-		if (NULL != d)
+		blocked = mlk_shrblk_find(p, &our, auxown);
+		if (NULL != our)
 		{
-			if (d->owner)
+			if (our->owner)
 			{	/* The lock already exists */
-				if ((d->owner == process_id) && (d->auxowner == auxown))
+				if ((our->owner == process_id) && (our->auxowner == auxown))
 				{	/* We are already the owner */
-					p->nodptr = d;
+					p->nodptr = our;
 					retval = 0;
 				} else
 				{	/* Someone else has it. Block on it */
@@ -142,11 +142,11 @@ gtm_uint64_t mlk_lock(mlk_pvtblk *p, UINTPTR_T auxown, boolean_t new)
 					 *   if we attempt to get a new prcblk and fail, we should update the transaction number
 					 *   but take no further action */
 					if (new)
-						added = mlk_prcblk_add(p->pvtctl.region, ctl, d, process_id);
+						added = mlk_prcblk_add(p->pvtctl.region, ctl, our, process_id);
 					if (added)
 					{
-						p->nodptr = d;
-						p->sequence = d->sequence;
+						p->nodptr = our;
+						p->sequence = our->sequence;
 					}
 					csa->hdr->trans_hist.lock_sequence++;
 				}
@@ -156,31 +156,31 @@ gtm_uint64_t mlk_lock(mlk_pvtblk *p, UINTPTR_T auxown, boolean_t new)
 				{	/* We can't have it right now because of child or parent locks */
 					added = TRUE;
 					if (new)
-						added = mlk_prcblk_add(p->pvtctl.region, ctl, d, process_id);
+						added = mlk_prcblk_add(p->pvtctl.region, ctl, our, process_id);
 					if (added)
 					{
-						p->nodptr = d;
-						p->sequence = d->sequence;
+						p->nodptr = our;
+						p->sequence = our->sequence;
 					}
 					csa->hdr->trans_hist.lock_sequence++;
 				} else
 				{	/* The lock is graciously granted */
 					if (!new)
-						mlk_prcblk_delete(&p->pvtctl, d, process_id);
-					d->owner = process_id;
-					d->auxowner = auxown;
+						mlk_prcblk_delete(&p->pvtctl, our, process_id);
+					our->owner = process_id;
+					our->auxowner = auxown;
 					if (auxown && IS_GTCM_GNP_SERVER_IMAGE)
 					{	/* called from gtcml_lock_internal() */
 						curr_entry = (connection_struct *)auxown;
-						d->auxpid = curr_entry->pvec->jpv_pid;
-						assert(SIZEOF(curr_entry->pvec->jpv_node) <= SIZEOF(d->auxnode));
-						memcpy(d->auxnode,
+						our->auxpid = curr_entry->pvec->jpv_pid;
+						assert(SIZEOF(curr_entry->pvec->jpv_node) <= SIZEOF(our->auxnode));
+						memcpy(our->auxnode,
 							&curr_entry->pvec->jpv_node[0], SIZEOF(curr_entry->pvec->jpv_node));
 						/* cases of calls from omi_prc_lock() and rc_prc_lock() are not currently handled */
 					}
-					d->sequence = p->sequence = csa->hdr->trans_hist.lock_sequence++;
-					MLK_LOGIN(d);
-					p->nodptr = d;
+					our->sequence = p->sequence = csa->hdr->trans_hist.lock_sequence++;
+					MLK_LOGIN(our);
+					p->nodptr = our;
 					retval = 0;
 				}
 			}
@@ -196,7 +196,8 @@ gtm_uint64_t mlk_lock(mlk_pvtblk *p, UINTPTR_T auxown, boolean_t new)
 					(ctl->max_blkcnt - ctl->blkcnt), ctl->max_blkcnt,
 					(ctl->subfree - ctl->subbase), (ctl->subtop - ctl->subbase));
 		}
-		REL_LOCK_CRIT(p->pvtctl, was_crit);
+		REL_LOCK_CRIT(&p->pvtctl, was_crit);
+		ENABLE_INTERRUPTS(INTRPT_IN_MLK_SHM_MODIFY, prev_intrpt_state);
 		if (!retval)
 		{
 			INCR_GVSTATS_COUNTER(csa, csa->nl, n_lock_success, 1);

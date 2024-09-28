@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -20,6 +20,10 @@
 #include "mlk_garbage_collect.h"
 #include "mlk_shrclean.h"
 #include "mlk_shrsub_garbage_collect.h"
+#include "have_crit.h"
+
+GBLREF	intrpt_state_t	intrpt_ok_state;
+GBLREF	uint4		process_id;
 
 void mlk_garbage_collect(mlk_pvtblk *p,
 			 uint4 size,
@@ -27,6 +31,7 @@ void mlk_garbage_collect(mlk_pvtblk *p,
 {
 	mlk_ctldata_ptr_t	ctl;
 
+	assert(LOCK_CRIT_HELD(p->pvtctl.csa) && (INTRPT_IN_MLK_SHM_MODIFY == intrpt_ok_state));
 	ctl = p->pvtctl.ctl;
 	if (force || ctl->gc_needed || (ctl->subtop - ctl->subfree < size))
 		mlk_shrsub_garbage_collect(&p->pvtctl);
@@ -38,7 +43,5 @@ void mlk_garbage_collect(mlk_pvtblk *p,
 		mlk_shrsub_garbage_collect(&p->pvtctl);
 	}
 	ctl->gc_needed = FALSE;
-
 	return;
 }
-

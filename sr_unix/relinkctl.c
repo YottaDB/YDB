@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2014-2023 Fidelity National Information	*
+ * Copyright (c) 2014-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -57,6 +57,7 @@
 #define MAX_RCTL_DELETED_RETRIES	16	/* # of times to allow an existing relinkctl file to be deleted before open(). */
 
 DEBUG_ONLY(GBLDEF int	saved_errno;)
+GBLDEF	int		umask_orig;
 GBLREF	uint4		process_id;
 GBLREF	rtn_tabent	*rtn_names, *rtn_names_end;
 GBLREF	stack_frame	*frame_pointer;
@@ -81,6 +82,13 @@ error_def(ERR_RLNKCTLRNDWNFL);
 error_def(ERR_RLNKCTLRNDWNSUC);
 error_def(ERR_SYSCALL);
 error_def(ERR_TEXT);
+
+CONDITION_HANDLER(relinkctl_handler)
+{
+	START_CH(TRUE);
+	(void)umask(umask_orig);	/* reset umask */
+	NEXTCH;
+}
 
 /* Routine called to see if a relinkctl structure already exists for the given zroutines element.
  *
@@ -184,12 +192,18 @@ open_relinkctl_sgm *relinkctl_attach(mstr *obj_container_name, mstr *objpath, in
 	 * It is also possible to get a non-zero return status if the caller is MUPIP RUNDOWN -RELINKCTL and the relinkctl file does
 	 * not exist and therefore does not need to be run down.
 	 */
+	umask_orig = umask(000);	/* clear umask */
+	ESTABLISH_RET(relinkctl_handler,0);
 	if (0 != relinkctl_open(&new_link, !obj_dir_found))
 	{
 		if (!obj_dir_found)
 			errno = save_errno;
+		REVERT;
+		(void)umask(umask_orig);	/* reset umask */
 		return NULL;
 	}
+	REVERT;
+	(void)umask(umask_orig);	/* reset umask */
 	/* No errors were raised so far, so copy the segment information into a malloced space. */
 	new_link_ptr = malloc(SIZEOF(open_relinkctl_sgm) + objdir.len + 1 + len); /* + 1 for trailing null in zro_entry_name */
 	memcpy(new_link_ptr, &new_link, SIZEOF(open_relinkctl_sgm));

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -56,6 +56,7 @@
 #include "ftok_sems.h"
 #include "ipcrmid.h"
 #include "do_semop.h"
+#include "mu_rndwn_rlnkctl.h"
 
 GBLREF	bool			in_backup;
 GBLREF	bool			error_mupip;
@@ -67,6 +68,8 @@ GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	boolean_t		holds_sem[NUM_SEM_SETS][NUM_SRC_SEMS];
 GBLREF	boolean_t		argumentless_rundown;
 GBLREF	semid_queue_elem	*keep_semids;
+GBLREF	boolean_t		in_relinkctl;
+GBLDEF	boolean_t		in_rundown;
 
 error_def(ERR_MUFILRNDWNSUC);
 error_def(ERR_MUJPOOLRNDWNFL);
@@ -84,8 +87,8 @@ error_def(ERR_TEXT);
 void mupip_rundown(void)
 {
 	int			exit_status, semid, shmid, save_errno, status;
-	boolean_t		region, file, arg_present, do_jnlpool_detach, jnlpool_sem_created, jnlpool_rndwn_required;
-	boolean_t		shm_removed = FALSE, anticipatory_freeze_available;
+	boolean_t		region, file, relink, arg_present, do_jnlpool_detach, jnlpool_sem_created, jnlpool_rndwn_required;
+	boolean_t		shm_removed = FALSE, anticipatory_freeze_available, is_what;
 	void			*repl_inst_available;
 	tp_region		*rptr, single;
 	replpool_identifier	replpool_id;
@@ -105,23 +108,45 @@ void mupip_rundown(void)
 	exit_status = SS_NORMAL;
 	file = (CLI_PRESENT == cli_present("FILE"));
 	region = (CLI_PRESENT == cli_present("REGION")) || (CLI_PRESENT == cli_present("R"));
+	relink = (CLI_PRESENT == cli_present("RELINK"));
+	if(!relink)
+	{
+		if(1 < TREF(parms_cnt))
+		{
+			util_out_print("%GTM-E-CLIERR, Too many parameters", TRUE);
+			mupip_exit(ERR_MUPCLIERR);
+		} else
+		{
+			arg_present = (0 != TREF(parms_cnt));
+			if ((file == region) && (TRUE == file))
+				mupip_exit(ERR_MUQUALINCOMP);
+			if (arg_present && !file && !region)
+			{
+				util_out_print("MUPIP RUNDOWN only accepts a parameter when -FILE or -REGION is specified.", TRUE);
+				mupip_exit(ERR_MUPCLIERR);
+			}
+			is_what = FALSE;
+		}
+	} else
+	{
+		/* If relink is present, first ensure that mupip_rundown is not called from mu_rndwn_rlnkctl.
+ 		 * If it is, then the region or file takes the first parameter.
+ 		 * The qualifier passed later takes the second param.
+ 		 */
+		in_rundown = TRUE;
+		is_what = !(in_relinkctl || (2 != TREF(parms_cnt)));
+		if (!in_relinkctl)
+			mu_rndwn_rlnkctl();
+	}
 	TREF(skip_file_corrupt_check) = TRUE;	/* rundown the database even if csd->file_corrupt is TRUE */
 	TREF(ok_to_see_statsdb_regs) = TRUE;
 	/* No need to do the following set (like is done in mupip_integ.c) since we call "mu_rndwn_file" (not "gvcst_init")
 	 *	TREF(statshare_opted_in) = NO_STATS_OPTIN;	// Do not open statsdb automatically when basedb is opened
 	 */
-	arg_present = (0 != TREF(parms_cnt));
-	if ((file == region) && (TRUE == file))
-		mupip_exit(ERR_MUQUALINCOMP);
-	if (arg_present && !file && !region)
-	{
-		util_out_print("MUPIP RUNDOWN only accepts a parameter when -FILE or -REGION is specified.", TRUE);
-		mupip_exit(ERR_MUPCLIERR);
-	}
 	if (region)
 	{
 		gvinit();
-		mu_getlst("WHAT", SIZEOF(tp_region));
+		mu_getlst(is_what ? "WHAT" : "R_OR_F_NAME" , SIZEOF(tp_region));
 		rptr = grlist;
 		if (error_mupip)
 			exit_status = ERR_MUNOTALLSEC;
@@ -130,7 +155,7 @@ void mupip_rundown(void)
 		mu_gv_cur_reg_init();
 		seg = gv_cur_region->dyn.addr;
 		seg->fname_len = MAX_FN_LEN;
-		if (!cli_get_str("WHAT",  (char *)&seg->fname[0], &seg->fname_len))
+		if (!cli_get_str(is_what ? "WHAT" : "R_OR_F_NAME",  (char *)&seg->fname[0], &seg->fname_len))
 			mupip_exit(ERR_MUNODBNAME);
 		seg->fname[seg->fname_len] = '\0';
 		rptr = &single;		/* a dummy value that permits one trip through the loop */
@@ -315,7 +340,8 @@ void mupip_rundown(void)
 				mupip_exit(ERR_MUNOTALLSEC);
 			}
 		}
-	} else
+	}
+	if (!region && !file && !relink)
 	{
 		argumentless_rundown = TRUE;
 		/* Both "mu_rndwn_all" and "mu_rndwn_sem_all" do POPEN which opens an input stream (of type "FILE *").

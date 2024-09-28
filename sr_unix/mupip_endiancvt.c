@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2023 Fidelity National Information	*
+ * Copyright (c) 2006-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -908,9 +908,7 @@ void endian_header(sgmnt_data *new, sgmnt_data *old, boolean_t new_is_native)
 	/************* SECSHR_DB_CLNUP RELATED FIELDS (now moved to node_local) ***********/
 	/* "secshr_ops_index_filler" and "secshr_ops_array_filler" need not be converted (they are fillers) */
 	/********************************************************/
-	/* "next_upgrd_warn" isn't valid since the database is fully_upgraded and the latch values differ by platform
-	 * and since we don't know where the db will be used, we will ignore it.
-	 */
+	/* "next_upgrd_warn" is unused and need not be converted */
 	SWAP_SD4(is_encrypted);
 	SWAP_SD4(db_trigger_cycle);
 	/************* SUPPLEMENTARY REPLICATION INSTANCE RELATED FIELDS ****************/
@@ -1151,9 +1149,7 @@ void	v6_endian_header(v6_sgmnt_data *new, v6_sgmnt_data *old, boolean_t new_is_n
 	/************* SECSHR_DB_CLNUP RELATED FIELDS (now moved to node_local) ***********/
 	/* "secshr_ops_index_filler" and "secshr_ops_array_filler" need not be converted (they are fillers) */
 	/********************************************************/
-	/* "next_upgrd_warn" isn't valid since the database is fully_upgraded and the latch values differ by platform
-	 * and since we don't know where the db will be used, we will ignore it.
-	 */
+	/* "next_upgrd_warn" is unused and need not be converted */
 	SWAP_SD4(is_encrypted);
 	SWAP_SD4(db_trigger_cycle);
 	/************* SUPPLEMENTARY REPLICATION INSTANCE RELATED FIELDS ****************/

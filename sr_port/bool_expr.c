@@ -1,6 +1,6 @@
 /****************************************************************
  *                                                              *
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *                                                              *
  *      This source code contains the intellectual property     *
@@ -18,7 +18,10 @@
 #include "opcode.h"
 #include "stringpool.h"
 #include "fullbool.h"
+#include <rtnhdr.h>
+#include "stack_frame.h"
 
+GBLREF	stack_frame	*frame_pointer;
 LITREF	octabstruct	oc_tab[];
 
 int bool_expr(boolean_t sense, oprtype *addr)
@@ -72,7 +75,7 @@ int bool_expr(boolean_t sense, oprtype *addr)
 		CONVERT_TO_SE(x.oprval.tref);
 	for (t1 = x.oprval.tref; OCT_UNARY & oc_tab[t1->opcode].octype; t1 = t1->operand[0].oprval.tref)
 		;
-	if (OCT_BOOL & oc_tab[t1->opcode].octype)
+	if ((OCT_BOOL & oc_tab[t1->opcode].octype) && !(SFT_DM & frame_pointer->type))
 		bx_boollit(t1);
 	for (t1 = x.oprval.tref; OC_NOOP == t1->opcode; t1 = t1->exorder.bl)
 		;

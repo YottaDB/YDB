@@ -50,6 +50,7 @@
 #include "min_max.h"
 
 GBLREF	bool		out_of_time, remlkreq;
+GBLREF	intrpt_state_t	intrpt_ok_state;
 GBLREF	mlk_pvtblk	*mlk_pvt_root;
 GBLREF	mlk_stats_t	mlk_stats;			/* Process-private M-lock statistics */
 GBLREF	mv_stent	*mv_chain;
@@ -197,6 +198,7 @@ int	op_lock2(mval *timeout, unsigned char laflag)	/* timeout is in milliseconds 
 			if (!gotit)
 			{	/* only REQIMMED returns false */
 				blocked = TRUE;
+				assert(INTRPT_IN_MLK_SHM_MODIFY != intrpt_ok_state);
 				break;
 			}
 		}
@@ -238,7 +240,10 @@ int	op_lock2(mval *timeout, unsigned char laflag)	/* timeout is in milliseconds 
 		}
 		/* If we did not get blocked, we are all done */
 		if (!blocked)
+		{
+			assert(INTRPT_IN_MLK_SHM_MODIFY != intrpt_ok_state);
 			break;
+		}
 		/* We got blocked and need to keep retrying after some time interval */
 		if (remlkreq)
 			gvcmx_susremlk(cm_action);
@@ -300,6 +305,7 @@ int	op_lock2(mval *timeout, unsigned char laflag)	/* timeout is in milliseconds 
 							if (0 >= msec_timeout)
 							{
 								out_of_time = TRUE;
+								assert(INTRPT_IN_MLK_SHM_MODIFY != intrpt_ok_state);
 								break;
 							}
 							if ((tptimeout != outofband) && (ctrlc != outofband))
@@ -326,6 +332,7 @@ int	op_lock2(mval *timeout, unsigned char laflag)	/* timeout is in milliseconds 
 						lks_this_cmd = 0;	/* no return - clear flag that we're in LOCK processing */
 						async_action(FALSE);
 					}
+					assert(INTRPT_IN_MLK_SHM_MODIFY != intrpt_ok_state);
 					break;
 				}
 			}
@@ -368,13 +375,17 @@ int	op_lock2(mval *timeout, unsigned char laflag)	/* timeout is in milliseconds 
 					already_locked = NULL;
 				} else
 					already_locked = pvt_ptr1;
+				assert(INTRPT_IN_MLK_SHM_MODIFY != intrpt_ok_state);
 				break;
 			}
 			if (pvt_ptr1->nodptr)
 				mlk_check_own(pvt_ptr1);		/* clear an abandoned owner */
 		}
 		if (blocked && out_of_time)
+		{
+			assert(INTRPT_IN_MLK_SHM_MODIFY != intrpt_ok_state);
 			break;
+		}
 		if (locks_bckout)
 			TREF(mlk_yield_pid) = MLK_FAIRNESS_DISABLED; /* Disable fairness to avoid livelocks */
 	}

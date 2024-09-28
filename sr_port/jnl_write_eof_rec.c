@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2017 Fidelity National Information	*
+ * Copyright (c) 2003-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -54,13 +54,8 @@ void	jnl_write_eof_rec(sgmnt_addrs *csa, struct_jrec_eof *eof_record)
 	if (csa->jnlpool && (csa->jnlpool == jnlpool))
 		jnlpool = csa->jnlpool;
 	ASSERT_JNL_SEQNO_FILEHDR_JNLPOOL(csa, jnlpool); /* debug-only sanity check between seqno of csa->hdr and jnlpool */
-	/* In UNIX, mur_close_files, at the beginning sets both jgbl.mur_jrec_seqno and csa->hdr->reg_seqno to
-	 * murgbl.consist_jnl_seqno. Assert that this is indeed the case. However, csa->hdr->reg_seqno is NOT
-	 * maintained by rollback during forward phase of recovery and is set only at mur_close_files whereas
-	 * jgbl.mur_jrec_seqno is maintained all along. So, unless we are called from mur_close_files, we cannot
-	 * rely csa->hdr->reg_seqno and so we can do the equality check only if we are called from mur_close_files
-	 */
-	assert(!jgbl.forw_phase_recovery || !jgbl.mur_rollback || (jgbl.mur_jrec_seqno == csa->hdr->reg_seqno) || !process_exiting);
+	/* mur_output_record maintains csa->hdr->reg_seqno during forward phase of recovery */
+	assert(!jgbl.forw_phase_recovery || !jgbl.mur_rollback || (jgbl.mur_jrec_seqno == csa->hdr->reg_seqno));
 	/* If caller is MUPIP JOURNAL ROLLBACK, it cannot be FORWARD rollback since that runs with journaling turned off
 	 * and we are writing journal records here. Assert accordingly.
 	 */

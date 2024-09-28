@@ -669,7 +669,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* REORGINC */
 	   0,	/* ASC2EBCDICCONV */
 	   0,	/* GTMSECSHRSTART */
-	   0,	/* DBVERPERFWARN1 */
+	   0,	/* UNUSEDMSG840 */
 	   0,	/* FILEIDGBLSEC */
 	   0,	/* GBLSECNOTGDS */
 	   0,	/* BADGBLSECVER */
@@ -786,7 +786,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* MUPIPSET2SML */
 	   0,	/* DBREADBM */
 	   0,	/* DBCOMPTOOLRG */
-	   0,	/* DBVERPERFWARN2 */
+	   0,	/* UNUSEDMSG957 */
 	   0,	/* DBRBNTOOLRG */
 	   0,	/* DBRBNLBMN */
 	   0,	/* DBRBNNEG */
@@ -1042,9 +1042,9 @@ const static readonly int error_ansi[] = {
 	   0,	/* DBBTUFIXED */
 	   0,	/* DBMAXREC2BIG */
 	   0,	/* SOCKHANGUP */
-	   0,	/* UNUSEDMSG1213 */
-	   0,	/* UNUSEDMSG1214 */
-	   0,	/* UNUSEDMSG1215 */
+	   0,	/* REPLINSTRECR */
+	   0,	/* SEMUNDOOVERFLOW */
+	   0,	/* ENCODING */
 	   0,	/* DBMINRESBYTES */
 	   0,	/* UNUSEDMSG1217 */
 	   0,	/* UNUSEDMSG1218 */

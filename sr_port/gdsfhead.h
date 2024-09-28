@@ -69,130 +69,59 @@ error_def(ERR_UNIMPLOP);
 #define FULL_DATABASE_WRITE 2
 
 /* Cache record */
+typedef struct {
+	sm_off_t	fl;
+	sm_off_t	bl;
+} cr_que_struct;
+
+typedef union {
+	short	semaphore;
+	volatile int4	latch;		/* int required for atomic swap on Unix */
+	/* volatile required as this value is referenced outside of the lock in db_csh_getn() */
+} cr_interlock;
+
+#define SIZEOF_FIRST_HALF_CR (SIZEOF(cr_que_struct) + SIZEOF(block_id) + (3 * SIZEOF(int4)) + SIZEOF(enum db_ver)\
+		+ SIZEOF(sm_off_t) + SIZEOF(struct aiocb) + SIZEOF(uint4))
+#define SIZEOF_SECOND_HALF_CR (SIZEOF(cr_que_struct) + SIZEOF(cr_interlock) + SIZEOF(off_jnl_t) + (3 * SIZEOF(trans_num))\
+		+ SIZEOF(boolean_t) + (4 * SIZEOF(int4)) + (2 * SIZEOF(sm_off_t)) + (4 * SIZEOF(bool)) + SIZEOF(global_latch_t))
 typedef struct cache_rec_struct
 {
-	struct
-	{
-		sm_off_t	fl;
-		sm_off_t	bl;
-	}
-			blkque,		/* cache records whose block numbers hash to the same location */
-			state_que;	/* cache records in same state (either wip or active) */
-	union
-	{
-		short	semaphore;
-		volatile int4	latch;		/* int required for atomic swap on Unix */
-			/* volatile required as this value is referenced outside of the lock in db_csh_getn() */
-	} interlock;
+	cr_que_struct	blkque; /* cache records whose block numbers hash to the same location */
 	block_id	blk;
-	uint4		refer;		/* reference bit for the clock algorithm */
+	CNTR4DCL(read_in_progress, 10);	/* -1 for normal and 0 for rip used by t_qread and checked by others */
+	int4		cycle;		/* relative stamp indicates changing versions of the block for concurrency checking */
+	int4		r_epid;		/* set by db_csh_getn, cleared by t_qread, bg_update, wcs_recover or secshr_db_clnup
+					 * used to check for process leaving without releasing the buffer */
 	enum db_ver	ondsk_blkver;	/* Actual block version from block header as it exists on disk
 					   (prior to any dynamic conversion that may have occurred when read in).
 					*/
-	/* Keep our 64 bit fields up front */
-	/* this point should be quad-word aligned */
+	sm_off_t	buffaddr;	/* offset to buffer holding actual data */
+	struct aiocb	aiocb;		/* Used for asynchronous I/O if BG access method and csd->asyncio is TRUE */
+	uint4		refer;		/* reference bit for the clock algorithm */
+	CACHELINE_PAD((SIZEOF_FIRST_HALF_CR % CACHELINE_SIZE), 1)
+	/* End cacheline 2 */
+	cr_que_struct	state_que;	/* cache records in same state (either wip or active) */
+	cr_interlock	interlock;
+	off_jnl_t	jnl_addr;	/* offset from bg_update to prevent wcs_wtstart from writing a block ahead of the journal */
 	trans_num	dirty;		/* block has been modified since last written to disk; used by bt_put, db_csh_getn
 					 * mu_rndwn_file wcs_recover, secshr_db_clnup, wr_wrtfin_all and extensively by the ccp */
 	trans_num	flushed_dirty_tn;	/* value of dirty at the time of flushing */
 	trans_num	tn;
-	sm_off_t	bt_index;	/* offset to corresponding bt_rec when this cache-record was last modified (bt->blk
-					 *	and cr->blk would be identical). Maintained as a non-zero value even if cr->dirty
-					 *	becomes non-zero later (due to a flush). Additionally, if this cache-record is a
-					 *	twin, cr->bt_index helps distinguish the OLDER and NEWER twins. bt_index is
-					 *	ZERO for the OLDER twin and NON-ZERO for the newer TWIN.
-					 */
-	sm_off_t	buffaddr;	/* offset to buffer holding actual data */
-	sm_off_t	twin;		/* If non-zero, this points to another cache-record which contains the same block but
-					 * a different state of the block. A twin for a block is created if a
-					 * process holding crit and attempting to commit updates to a block finds that block
-					 * being concurrently written to disk. If asyncio=OFF, this field is mostly zero.
-					 * In addition to the above, this field is also non-zero in an exception case where
-					 * cr->stopped is TRUE in which case the "twin" points to the cache_rec holding the
-					 * before-image for wcs_recover to backup.
-					 */
-	off_jnl_t	jnl_addr;	/* offset from bg_update to prevent wcs_wtstart from writing a block ahead of the journal */
 	boolean_t	stopped;	/* TRUE indicates to wcs_recover that secshr_db_clnup built the block */
-	global_latch_t	rip_latch;	/* for read_in_progress - note contains extra 16 bytes for HPPA. Usage note: this
-					   latch is used on those platforms where read_in_progress is not directly updated
-					   by atomic routines/instructions. As such there needs be no cache line padding between
-					   this field and read_in_progress.
-					 */
+	int4		epid;		/* set by wcs_wtstart to the write initiator's pid; cleared by wcs_wtstart/wcs_wtfini
+					 * used by t_commit_cleanup, secshr_db_clnup and wcs_recover */
 	uint4		data_invalid;	/* non-zero pid from bg_update indicates we are in the middle of a "gvcst_blk_build"
 					 * and so the block contents are not clean. secshr_db_clnup/wcs_recover check this
 					 * field and take appropriate action to recover this cr.
 					 */
-	int4		epid;		/* set by wcs_wtstart to id the write initiator; cleared by wcs_wtstart/wcs_wtfini
-					 * used by t_commit_cleanup, secshr_db_clnup and wcs_recover */
-	int4		cycle;		/* relative stamp indicates changing versions of the block for concurrency checking */
-	int4		r_epid;		/* set by db_csh_getn, cleared by t_qread, bg_update, wcs_recover or secshr_db_clnup
-					 * used to check for process leaving without releasing the buffer
-					 * must be word aligned on the VAX */
-	struct aiocb	aiocb;		/* Used for asynchronous I/O if BG access method and csd->asyncio is TRUE */
-	CNTR4DCL(read_in_progress, 10);	/* -1 for normal and 0 for rip used by t_qread and checked by others */
 	uint4		in_tend;	/* non-zero pid from bg_update indicates secshr_db_clnup should finish update */
-	uint4		in_cw_set;	/* non-zero pid from t_end, tp_tend or bg_update protects block from db_csh_getn;
-					 * returned to 0 by t_end, tp_tend or t_commit_cleanup */
-	bool		wip_is_encr_buf;/* TRUE if cache-record is WIP (write-in-progress) and its encrypted global buffer
-					 * (not unencrypted global buffer) was used to issue the write in "wcs_wtstart".
-					 * Used by "wcs_wtfini" to reissue the write. This field is not maintained
-					 * when the cr is not in WIP status i.e. this is used only by the
-					 * DB_LSEEKWRITEASYNCSTART and DB_LSEEKWRITEASYNCRESTART macros.
-					 */
-	bool		backup_cr_is_twin;	/* TRUE if cr corresponding to the before-image (used by BG_BACKUP_BLOCK)
-						 * is the twin of this cache-record.
-						 */
-	bool		aio_issued;	/* set to TRUE after the asyncio has been issued in wcs_wtstart.
-					 * set to FALSE before cr->epid is set to a non-zero value in wcs_wtstart.
-					 * ONLY if epid is non-zero AND aio_issued is TRUE, can the write be considered
-					 * in progress. This is used by wcs_recover to decide whether to place a cr into
-					 * the active or wip queue.
-					 */
-	bool		needs_first_write;	/* If this block needs to be written to disk for the first time,
-						 *  note it (only applicable for fullblockwrites) */
-} cache_rec;
-
-/* A note about cache line separation of the latches contained in these blocks. Because this block is duplicated
-   many (potentially tens+ of) thousands of times in a running system, we have decided against providing cacheline
-   padding so as to force each cache record into a separate cacheline (due to it containing a latch and/or atomic
-   counter field) to prevent processes from causing interference with each other. We decided that the probability
-   of two processes working on adjacent cache records simultaneously was low enough that the interference was
-   minimal whereas increasing the cache record size to prevent that interference could cause storage problems
-   on some platforms where processes are already running near the edge.
-*/
-
-/* cache_state record */
-typedef struct cache_state_rec_struct
-{
-	struct
-	{
-		sm_off_t	fl;
-		sm_off_t	bl;
-	}
-			state_que;	/* WARNING from this point, this structure must be identical to a cache_rec */
-	union
-	{
-		short	semaphore;
-		volatile int4	latch;		/* int required for atomic swap on Unix */
-			/* volatile required as this value is referenced outside of the lock in db_csh_getn() */
-	} interlock;
-	block_id	blk;
-	uint4		refer;		/* reference bit for the LRU algorithm */
-	enum db_ver	ondsk_blkver;	/* Actual block version from block header as it exists on disk
-					   (prior to any dynamic conversion that may have occurred when read in).
-					*/
-	/* Keep our 64 bit fields up front */
-	/* this point should be quad-word aligned */
-	trans_num	dirty;		/* block has been modified since last written to disk; used by bt_put, db_csh_getn
-					 * mu_rndwn_file wcs_recover, secshr_db_clnup, wr_wrtfin_all and extensively by the ccp */
-	trans_num	flushed_dirty_tn;	/* value of dirty at the time of flushing */
-	trans_num	tn;
+	/* End cacheline 3 on systems with 64-byte cachelines, mid cacheline 3 on other systems */
 	sm_off_t	bt_index;	/* offset to corresponding bt_rec when this cache-record was last modified (bt->blk
 					 *	and cr->blk would be identical). Maintained as a non-zero value even if cr->dirty
 					 *	becomes non-zero later (due to a flush). Additionally, if this cache-record is a
 					 *	twin, cr->bt_index helps distinguish the OLDER and NEWER twins. bt_index is
 					 *	ZERO for the OLDER twin and NON-ZERO for the newer TWIN.
 					 */
-	sm_off_t	buffaddr;	/* offset to buffer holding actual data*/
 	sm_off_t	twin;		/* If non-zero, this points to another cache-record which contains the same block but
 					 * a different state of the block. A twin for a block is created if a
 					 * process holding crit and attempting to commit updates to a block finds that block
@@ -201,23 +130,11 @@ typedef struct cache_state_rec_struct
 					 * cr->stopped is TRUE in which case the "twin" points to the cache_rec holding the
 					 * before-image for wcs_recover to backup.
 					 */
-	off_jnl_t	jnl_addr;	/* offset from bg_update to prevent wcs_wtstart from writing a block ahead of the journal */
-	boolean_t	stopped;	/* TRUE indicates to wcs_recover that secshr_db_clnup built the block */
 	global_latch_t	rip_latch;	/* for read_in_progress - note contains extra 16 bytes for HPPA. Usage note: this
 					   latch is used on those platforms where read_in_progress is not directly updated
 					   by atomic routines/instructions. As such there needs be no cache line padding between
 					   this field and read_in_progress.
 					 */
-	uint4		data_invalid;	/* non-zero pid from bg_update indicates t_commit_cleanup/wcs_recover should invalidate */
-	int4		epid;		/* set by wcs_start to id the write initiator; cleared by wcs_wtstart/wcs_wtfini
-					 * used by t_commit_cleanup, secshr_db_clnup and wcs_recover */
-	int4		cycle;		/* relative stamp indicates changing versions of the block for concurrency checking */
-	int4		r_epid;		/* set by db_csh_getn, cleared by t_qread, bg_update, wcs_recover or secshr_db_clnup
-					 * used to check for process leaving without releasing the buffer
-					 * must be word aligned on the VAX */
-	struct aiocb	aiocb;		/* Used for asynchronous I/O if BG access method and csd->asyncio is TRUE */
-	CNTR4DCL(read_in_progress, 10);	/* -1 for normal and 0 for rip used by t_qread and checked by others */
-	uint4		in_tend;	/* non-zero pid from bg_update indicates secshr_db_clnup should finish update */
 	uint4		in_cw_set;	/* non-zero pid from t_end, tp_tend or bg_update protects block from db_csh_getn;
 					 * returned to 0 by t_end, tp_tend or t_commit_cleanup */
 	bool		wip_is_encr_buf;/* TRUE if cache-record is WIP (write-in-progress) and its encrypted global buffer
@@ -237,7 +154,80 @@ typedef struct cache_state_rec_struct
 					 */
 	bool		needs_first_write;	/* If this block needs to be written to disk for the first time,
 						 *  note it (only applicable for fullblockwrites) */
+	CACHELINE_PAD((SIZEOF_SECOND_HALF_CR % CACHELINE_SIZE), 2)
+} cache_rec;
+
+/* cache_state record */
+typedef struct cache_state_rec_struct
+{
+	/*
+	 * In a cache_rec (but missing from this structure):
+	 * cr_que_struct blkque;
+	 * block_id	blk;
+	 * CNTR4DCL(read_in_progress, 10);
+	 * int4		cycle;
+	 * int4		r_epid;
+	 * enum db_ver	ondsk_blkver;
+	 * sm_off_t	buffaddr;
+	 * struct aiocb	aiocb;
+	 * uint4		refer;
+	 * char		fill_cacheline1;
+	 */
+	cr_que_struct	state_que;	/* WARNING from this point, this structure must be identical to a cache_rec */
+	cr_interlock	interlock;
+	off_jnl_t	jnl_addr;	/* offset from bg_update to prevent wcs_wtstart from writing a block ahead of the journal */
+	trans_num	dirty;		/* block has been modified since last written to disk; used by bt_put, db_csh_getn
+					 * mu_rndwn_file wcs_recover, secshr_db_clnup, wr_wrtfin_all and extensively by the ccp */
+	trans_num	flushed_dirty_tn;	/* value of dirty at the time of flushing */
+	trans_num	tn;
+	boolean_t	stopped;	/* TRUE indicates to wcs_recover that secshr_db_clnup built the block */
+	int4		epid;		/* set by wcs_wtstart to id the write initiator; cleared by wcs_wtstart/wcs_wtfini
+					 * used by t_commit_cleanup, secshr_db_clnup and wcs_recover */
+	uint4		data_invalid;	/* non-zero pid from bg_update indicates t_commit_cleanup/wcs_recover should invalidate */
+	uint4		in_tend;	/* non-zero pid from bg_update indicates secshr_db_clnup should finish update */
+	sm_off_t	bt_index;	/* offset to corresponding bt_rec when this cache-record was last modified (bt->blk
+					 *	and cr->blk would be identical). Maintained as a non-zero value even if cr->dirty
+					 *	becomes non-zero later (due to a flush). Additionally, if this cache-record is a
+					 *	twin, cr->bt_index helps distinguish the OLDER and NEWER twins. bt_index is
+					 *	ZERO for the OLDER twin and NON-ZERO for the newer TWIN.
+					 */
+	sm_off_t	twin;		/* If non-zero, this points to another cache-record which contains the same block but
+					 * a different state of the block. A twin for a block is created if a
+					 * process holding crit and attempting to commit updates to a block finds that block
+					 * being concurrently written to disk. If asyncio=OFF, this field is mostly zero.
+					 * In addition to the above, this field is also non-zero in an exception case where
+					 * cr->stopped is TRUE in which case the "twin" points to the cache_rec holding the
+					 * before-image for wcs_recover to backup.
+					 */
+	global_latch_t	rip_latch;	/* for read_in_progress - note contains extra 16 bytes for HPPA. Usage note: this
+					   latch is used on those platforms where read_in_progress is not directly updated
+					   by atomic routines/instructions. As such there needs be no cache line padding between
+					   this field and read_in_progress.
+					 */
+	uint4		in_cw_set;	/* non-zero pid from t_end, tp_tend or bg_update protects block from db_csh_getn;
+					 * returned to 0 by t_end, tp_tend or t_commit_cleanup */
+	bool		wip_is_encr_buf;/* TRUE if cache-record is WIP (write-in-progress) and its encrypted global buffer
+					 * (not unencrypted global buffer) was used to issue the write in "wcs_wtstart".
+					 * Used by "wcs_wtfini" to reissue the write. This field is not maintained
+					 * when the cr is not in WIP status i.e. this is used only by the
+					 * DB_LSEEKWRITEASYNCSTART and DB_LSEEKWRITEASYNCRESTART macros.
+					 */
+	bool		backup_cr_is_twin;	/* TRUE if cr corresponding to the before-image (used by BG_BACKUP_BLOCK)
+						 * is the twin of this cache-record.
+						 */
+	bool		aio_issued;	/* set to TRUE after the asyncio has been issued in wcs_wtstart.
+					 * set to FALSE before cr->epid is set to a non-zero value in wcs_wtstart.
+					 * ONLY if epid is non-zero AND aio_issued is TRUE, can the write be considered
+					 * in progress. This is used by wcs_recover to decide whether to place a cr into
+					 * the active or wip queue.
+					 */
+	bool		needs_first_write;	/* If this block needs to be written to disk for the first time,
+						 *  note it (only applicable for fullblockwrites) */
+	CACHELINE_PAD((SIZEOF_SECOND_HALF_CR % CACHELINE_SIZE), 2)
 } cache_state_rec;
+
+static_assert((OFFSETOF(cache_rec, fill_cacheline1) == SIZEOF_FIRST_HALF_CR), "Cache_rec misalignment");
+static_assert((OFFSETOF(cache_state_rec, fill_cacheline2) == SIZEOF_SECOND_HALF_CR), "Cache_rec misalignment");
 
 #define		CR_BLKEMPTY		-1
 #define		MBR_BLKEMPTY		-1
@@ -249,6 +239,7 @@ typedef struct
 {
 	cache_que_head	cacheq_wip,	/* write-in-progress queue */
 			cacheq_active;	/* active queue */
+	CACHELINE_PAD((2 * SIZEOF(cache_que_head)), 1)
 	cache_rec	cache_array[1];	/*the first cache record*/
 } cache_que_heads;
 
@@ -268,6 +259,9 @@ typedef cache_rec	*cache_rec_ptr_t;
 typedef cache_rec	**cache_rec_ptr_ptr_t;
 typedef cache_state_rec	*cache_state_rec_ptr_t;
 typedef cache_que_heads	*cache_que_heads_ptr_t;
+
+#define		CSR2CR(CSR) ((cache_rec_ptr_t)((sm_uc_ptr_t)CSR - OFFSETOF(cache_rec, state_que)))
+#define		CR2CSR(CR) ((cache_state_rec_ptr_t)((sm_uc_ptr_t)CR + OFFSETOF(cache_rec, state_que)))
 
 gtm_uint64_t verify_queue(que_head_ptr_t qhdr);
 
@@ -1159,14 +1153,13 @@ MBSTART {									\
 																\
 	GBLREF	uint4		process_id;											\
 																\
-	if (CR->backup_cr_is_twin)												\
+	if (TWINNING_ON(CSD) && CR->backup_cr_is_twin)										\
 	{	/* We created a twin in "bg_update_phase1". If we had pinned the older twin (Note: it is possible in some cases	\
 		 * that we do not pin the older twin (e.g. in tp_tend if cse->new_buff is non-NULL), let us unpin the older twin\
 		 * before unpinning the newer twin. Not doing so could cause "db_csh_getn" to identify the new twin as a buffer	\
 		 * ready for replacement but "wcs_get_space/wcs_wtstart_fini/wcs_wtstart/wcs_wtfini" would not be able to flush	\
 		 * the new twin until the old twin has its "in_cw_set" cleared resulting in a livelock.				\
 		 */														\
-		assert(TWINNING_ON(CSD));											\
 		cr_old = (cache_rec_ptr_t)GDS_ANY_REL2ABS(CSA, CR->twin);	/* get old twin */				\
 		DEBUG_ONLY(lcl_cr_old = *cr_old);	/* In case the following assert trips capture the CR contents */	\
 		DEBUG_ONLY(lcl_cr_curr = *CR);											\
@@ -1734,7 +1727,13 @@ MBSTART {											\
 	gvstats_rec_csd2cnl(CSA);	/* we update gvstats in cnl */				\
 } MBEND
 
-#if defined(DEBUG) || defined(DEBUG_DB_CSH_COUNTER)
+#if defined(DEBUG) && !defined(DEBUG_DB_CSH_COUNTER)
+#	define DEBUG_DB_CSH_COUNTER
+#endif
+/* DEBUG_DB_CSH_COUNTER can either be defined in compilation independently of DEBUG to produce a production build that tracks the
+ * DB_CSH counters or is automatically defined on any DEBUG build.
+ */
+#if defined(DEBUG_DB_CSH_COUNTER)
 #	define	INCR_DB_CSH_COUNTER(csa, counter, increment)				\
 			if (csa->read_write || dba_bg == csa->hdr->acc_meth)		\
 				csa->hdr->counter.curr_count += increment;
@@ -1803,8 +1802,6 @@ enum bg_trc_rec_type
 n_bg_trc_rec_types
 };
 #undef TAB_BG_TRC_REC
-
-#define UPGRD_WARN_INTERVAL (60 * 60 * 24)	/* Once every 24 hrs */
 
 /* The following structure is used to determine
    the endianess of a database header.
@@ -2190,7 +2187,7 @@ typedef struct sgmnt_data_struct
 	int4		secshr_ops_index_filler;
 	int4		secshr_ops_array_filler[255];	/* taking up 1k */
 	/********************************************************/
-	compswap_time_field next_upgrd_warn;	/* Time when we can send the next upgrade warning to the operator log */
+	compswap_time_field next_upgrd_warn;	/* Formerly used for DBVERPERFWARN warnings running in compatibility mode */
 	uint4		is_encrypted;		/* Encryption state of the database as a superimposition of IS_ENCRYPTED and
 						 * TO_BE_ENCRYPTED flags. */
 	uint4		db_trigger_cycle;	/* incremented every MUPIP TRIGGER command that changes ^#t global contents */
@@ -3747,7 +3744,10 @@ MBSTART {												\
 	 * changing it waited for all phase2 commits to complete.							\
 	 */														\
 	/* Fully upgraded DBs use the desired DB format. In transition, block writer should have done the right thing */\
-	cr->ondsk_blkver = (csd->fully_upgraded) ? csd->desired_db_format : cs->ondsk_blkver;				\
+	if (csd->fully_upgraded && (cr->ondsk_blkver != csd->desired_db_format))					\
+		cr->ondsk_blkver = csd->desired_db_format;								\
+	else if (cr->ondsk_blkver != cs->ondsk_blkver)									\
+		cr->ondsk_blkver = cs->ondsk_blkver;									\
 	assert(GDSV4 < cs->ondsk_blkver);										\
 }
 
@@ -5193,6 +5193,33 @@ MBSTART {											\
 #define	IS_AIO_DBGLDMISMATCH(SEG, TSD)	(SEG->asyncio != TSD->asyncio)
 /* This macro is invoked to avoid a DBGLDMISMATCH error. Main purpose is to copy the asyncio setting */
 #define	COPY_AIO_SETTINGS(DST, SRC)	DST->asyncio = SRC->asyncio
+
+/* OPTIMIZE_FOR_NOAIO is a macro which, when defined, lets us inform the branch predictor to assume a given expression will
+ * evaluate to the value it will have if AIO is disabled. This helps us speed up the typical case where aio is not in use.
+ */
+#define OPTIMIZE_FOR_NOAIO
+#ifdef OPTIMIZE_FOR_NOAIO
+#	ifdef DEBUG
+/* DEBUG macro verifies that we're only using this for relationships which hold if aio is off. Use a statement expression
+ * to 'return' the correct value and use in conditionals without commas and evaluating things twice.
+ */
+#		define EXPECT_NOAIO(CSD, EXP, VAL) 									\
+		({													\
+		/* We only want to evaluate EXP once. VAL must be a constant literal anyway. */				\
+	 	__typeof__(VAL) exp = __builtin_expect(EXP, VAL);							\
+	 	/* If exp == val, aio can be on or off (we correcly informed branch predictor). But if exp != val then	\
+	  	* aio must be on. Use __builtin_expect again here so that this branch is also predicted away and 	\
+		* minimize perf hit in debug so as to allow branch predictor to predict entire condtiion as true.	\
+		*/ 													\
+	 	assert(__builtin_expect((exp == VAL), TRUE) || IS_AIO_ON(CSD));						\
+	 	exp;													\
+	 	})
+#	else
+#		define EXPECT_NOAIO(CSD, EXP, VAL) __builtin_expect(EXP, VAL)
+#	endif
+#else
+#define EXPECT_NOAIO(CSD, EXP, VAL) EXP
+#endif
 
 /* Wait a max of 1 minute for pending async ios on a FD (e.g. database file) to be cleared.
  * Set TIMEDOUT variable to TRUE if we timed out. If not (i.e. async io cancellation is success) set it to FALSE.

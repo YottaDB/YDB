@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -27,13 +27,13 @@ void mlk_shr_init(sm_uc_ptr_t base,
 		  sgmnt_addrs *csa,
 		  boolean_t read_write)
 {
-	int			i, nr_blocks, nr_procs, shr_size, nr_buckets;
+	int			i, nr_blocks, nr_buckets, nr_procs, shr_size;
 	float			shrblk_adj, shrhash_adj;
-	sm_uc_ptr_t		cp;
-	mlk_shrhash_ptr_t	sh;
-	mlk_shrblk_ptr_t	sb;
-	mlk_prcblk_ptr_t	pb;
 	mlk_ctldata_ptr_t	ctl;
+	mlk_prcblk_ptr_t        pb;
+	mlk_shrblk_ptr_t	sb;
+	mlk_shrhash_ptr_t	sh;
+	sm_uc_ptr_t		cp;
 
 	/* there are four sections with the following approximate sizes
 	 *  mlk_ctldata	--> SIZEOF(mlk_ctldata)
@@ -64,6 +64,7 @@ void mlk_shr_init(sm_uc_ptr_t base,
 	sb = (mlk_shrblk_ptr_t)(sh + nr_buckets);
 	A2R(ctl->blkbase, sb);
 	A2R(ctl->blkfree, sb);
+	assert(ctl->blkbase - sizeof(ctl->blkbase) == ctl->blkfree);
 	ctl->blkcnt = nr_blocks;
 	ctl->max_blkcnt = nr_blocks;
 	for (i = 1; i < nr_blocks ; i++, sb++)

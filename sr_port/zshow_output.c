@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -71,6 +71,19 @@ LITREF mval literal_null;
 error_def(ERR_STACKOFLOW);
 error_def(ERR_STACKCRIT);
 error_def(ERR_MAXNRSUBSCRIPTS);
+
+static int gv_sbs_depth(gv_key *key)
+{
+	int i, depth;
+	
+	depth = 0;
+	for (i = 0; i < key->end; ++i)
+	{
+		if (key->base[i] == KEY_DELIMITER)
+			++depth;
+	}
+	return depth;
+}
 
 void zshow_output(zshow_out *out, const mstr *str)
 {
@@ -350,7 +363,7 @@ void zshow_output(zshow_out *out, const mstr *str)
 			gvnh_reg = TREF(gd_targ_gvnh_reg);	/* set by op_gvname/op_gvextnam/op_gvnaked at start of ZSHOW cmd */
 			gv_currkey->end = out->out_var.gv.end;
 			gv_currkey->prev = out->out_var.gv.prev;
-			gv_currkey->base[gv_currkey->end] = 0;
+			gv_currkey->base[gv_currkey->end] = KEY_DELIMITER;
 			/* add the "code" subscript */
 			mval2subsc(mv_child, gv_currkey, gv_cur_region->std_null_coll);
 			/* ensure this subscript "code" does not exist by deleting it*/
@@ -397,6 +410,9 @@ void zshow_output(zshow_out *out, const mstr *str)
 			mv->str.len = 1;
 			mv->str.addr = &buff;
 			*mv->str.addr = out->code;
+			sbs_depth = gv_sbs_depth(gv_currkey);
+			if (MAX_GVSUBSCRIPTS <= (sbs_depth + 1))
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_MAXNRSUBSCRIPTS);
 			mval2subsc(mv, gv_currkey, gv_cur_region->std_null_coll);
 			/* If gvnh_reg corresponds to a spanning global, then determine
 			 * gv_cur_region/gv_target/gd_targ_* variables based on updated gv_currkey.

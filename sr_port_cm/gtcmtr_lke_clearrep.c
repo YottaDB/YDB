@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -40,23 +40,26 @@
 #include "interlock.h"
 #include "rel_quant.h"
 #include "do_shmat.h"
+#include "have_crit.h"
 
 #define RESET		2
 
 GBLREF	connection_struct	*curr_entry;
 GBLREF	gd_region		*gv_cur_region;
+GBLREF	intrpt_state_t		intrpt_ok_state;
 GBLREF	short			crash_count;
 
 char gtcmtr_lke_clearrep(struct CLB *lnk, clear_request	*creq)
 {
+	boolean_t		was_crit;
 	gd_region		*cur_region;
-	sgmnt_addrs		*csa;
+	intrpt_state_t		prev_intrpt_state;
 	mlk_ctldata_ptr_t	lke_ctl;
+	mlk_pvtctl		pctl;
 	mstr			dnode;
+	sgmnt_addrs		*csa;
 	show_reply		srep;
 	uint4			status;
-	boolean_t		was_crit;
-	mlk_pvtctl		pctl;
 
 	cur_region = gv_cur_region = gtcm_find_region(curr_entry, creq->rnum)->reghead->reg;
 	if (IS_REG_BG_OR_MM(cur_region))
@@ -67,12 +70,14 @@ char gtcmtr_lke_clearrep(struct CLB *lnk, clear_request	*creq)
 		dnode.len = creq->nodelength;
 		dnode.addr = creq->node;
 		MLK_PVTCTL_INIT(pctl, cur_region);
-		GRAB_LOCK_CRIT_AND_SYNC(pctl, was_crit);
+		GRAB_LOCK_CRIT_AND_SYNC(&pctl, was_crit);
+		DEFER_INTERRUPTS(INTRPT_IN_MLK_SHM_MODIFY, prev_intrpt_state);
 		if (lke_ctl->blkroot != 0)
 			/* Remote lock clears are not supported, so LKE CLEAR -EXACT qualifier will not be supported on GT.CM.*/
 			lke_cleartree(&pctl, lnk, (mlk_shrblk_ptr_t)R2A(lke_ctl->blkroot), creq->all,
-				      creq->interactive, creq->pid, dnode, FALSE);
-		REL_LOCK_CRIT(pctl, was_crit);
+				      creq->interactive, creq->pid, dnode, FALSE, &prev_intrpt_state);
+		REL_LOCK_CRIT(&pctl, was_crit);
+		ENABLE_INTERRUPTS(INTRPT_IN_MLK_SHM_MODIFY, prev_intrpt_state);
 	}
 	srep.code = CMMS_U_LKEDELETE;
 	lnk->cbl = SIZEOF(srep.code);

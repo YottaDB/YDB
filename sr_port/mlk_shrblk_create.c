@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -25,15 +25,18 @@
 #include "filestruct.h"
 #include "mlk_ops.h"
 #include "mlk_shrhash_add.h"
+#include "have_crit.h"
 
+GBLREF	intrpt_state_t	intrpt_ok_state;
+GBLREF	uint4		process_id;
+#ifdef	DEBUG
+GBLREF	mval		dollar_ztwormhole;
+#endif
 #ifdef MLK_SHRHASH_DEBUG
+void mlk_shrhash_validate(mlk_ctldata_ptr_t ctl);
 #define SHRHASH_DEBUG_ONLY(x) x
 #else
 #define SHRHASH_DEBUG_ONLY(x)
-#endif
-
-#ifdef MLK_SHRHASH_DEBUG
-void mlk_shrhash_validate(mlk_ctldata_ptr_t ctl);
 #endif
 
 #define MAX_TRIES 4
@@ -45,20 +48,23 @@ mlk_shrblk_ptr_t mlk_shrblk_create(mlk_pvtblk *p,
 				   ptroff_t *ptr,		/* parent's pointer to us (zero if we are not the eldest child) */
 				   int nshrs)			/* number of shrblks remaining to be created for this operation */
 {
+	intrpt_state_t		prev_intrpt_state;
 	mlk_ctldata_ptr_t	ctl;
 	mlk_shrblk_ptr_t	ret, shr1;
 	mlk_shrsub_ptr_t	subptr;
-	ptroff_t		n;
+	ptroff_t		offset;
 
+	assert(LOCK_CRIT_HELD(p->pvtctl.csa) && (INTRPT_IN_MLK_SHM_MODIFY == intrpt_ok_state));
 	ctl = p->pvtctl.ctl;
+	assert(ctl->subtop > ctl->subfree);
 	if ((ctl->subtop - ctl->subfree) < (MLK_PVTBLK_SHRSUB_SIZE(p, nshrs) - (val - p->value)) || ctl->blkcnt < nshrs)
 		return NULL; /* There is not enough substring or shared block space */
 	CHECK_SHRBLKPTR(ctl->blkfree, p->pvtctl);
-	assert(ctl->blkfree != 0);
+	assert(0 != ctl->blkfree);
 	ret = (mlk_shrblk_ptr_t)R2A(ctl->blkfree);
 	ctl->blkcnt--;
 	CHECK_SHRBLKPTR(ret->rsib, p->pvtctl);
-	if (ret->rsib == 0)
+	if (0 == ret->rsib)
 		ctl->blkfree = 0;
 	else
 	{
@@ -78,13 +84,15 @@ mlk_shrblk_ptr_t mlk_shrblk_create(mlk_pvtblk *p,
 		assert(0 == *ptr);
 		A2R(*ptr, ret);
 	}
-	n = (ptroff_t)ROUND_UP(OFFSETOF(mlk_shrsub, data[0]) + len, SIZEOF(ptroff_t));
+	offset = (ptroff_t)ROUND_UP(OFFSETOF(mlk_shrsub, data[0]) + len, SIZEOF(ptroff_t));
+	assert(offset <= (MLK_PVTBLK_SHRSUB_SIZE(p, nshrs) - (val - p->value)));
 	subptr = (mlk_shrsub_ptr_t)R2A(ctl->subfree);
-	ctl->subfree += n;
+	ctl->subfree += offset;
 	A2R(ret->value, subptr);
 	A2R(subptr->backpointer, ret);
 	assert(subptr->backpointer < 0);
 	subptr->length = len;
+	assert((subptr->data + subptr->length) <= R2A(ctl->subtop));
 	memcpy(subptr->data, val, (size_t)subptr->length);
 	assert(p->hash_seed == ctl->hash_seed);
 	ret->hash = MLK_PVTBLK_SUBHASH(p, p->subscript_cnt - nshrs);
@@ -92,7 +100,7 @@ mlk_shrblk_ptr_t mlk_shrblk_create(mlk_pvtblk *p,
 		return ret;
 	/* We failed to add the block; return the shrblk and shrsub to the free lists */
 	memset(subptr, 0, SIZEOF(mlk_shrsub));
-	ctl->subfree -= n;
+	ctl->subfree -= offset;
 	memset(ret, 0, SIZEOF(mlk_shrblk));
 	if (ctl->blkfree)
 		A2R(ret->rsib, R2A(ctl->blkfree));
@@ -107,12 +115,9 @@ mlk_shrblk_ptr_t mlk_shrblk_create(mlk_pvtblk *p,
 
 boolean_t mlk_shrhash_add(mlk_pvtctl *pctl, mlk_shrblk_ptr_t shr)
 {
-	int			bi, fi, si, mi, loop_cnt, tries = 0;
+	int			bi, fi;
+	mlk_shrhash_ptr_t	bucket, shrhash;
 	uint4			hash, num_buckets, usedmap;
-	mlk_shrhash_ptr_t	shrhash, bucket, free_bucket, search_bucket, move_bucket;
-	mlk_shrblk_ptr_t	move_shrblk;
-	char			*str_ptr;
-	mlk_shrsub_ptr_t	sub;
 
 	SHRHASH_DEBUG_ONLY(mlk_shrhash_validate(p->ctlptr));
 	shrhash = pctl->shrhash;
@@ -124,8 +129,6 @@ boolean_t mlk_shrhash_add(mlk_pvtctl *pctl, mlk_shrblk_ptr_t shr)
 #	ifdef DEBUG
 	if (WBTEST_ENABLED(WBTEST_LOCK_HASH_ZTW))
 	{
-		GBLREF mval dollar_ztwormhole;
-
 		i2mval(&dollar_ztwormhole, bi);
 		MV_FORCE_STRD(&dollar_ztwormhole);
 	}

@@ -973,7 +973,8 @@ boolean_t	tp_tend()
 				 * mur_output_record would have already set this.
 				 */
 				assert(jgbl.gbl_jrec_time);
-				jnl_status = jnl_ensure_open(gv_cur_region, csa);
+				assert((NOJNL != jpc->channel) || JNL_FILE_SWITCHED2(jpc, jbp));
+				jnl_status = (!JNL_FILE_SWITCHED2(jpc, jbp) ? 0 : jnl_ensure_open(gv_cur_region, csa));
 				GTM_WHITE_BOX_TEST(WBTEST_TP_TEND_JNLFILOPN, jnl_status, ERR_JNLFILOPN);
 				if (0 != jnl_status)
 				{

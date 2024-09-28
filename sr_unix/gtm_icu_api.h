@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2008 Fidelity Information Services, Inc	*
+ * Copyright (c) 2006-2024 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -52,10 +53,10 @@
 
 LITREF UChar32 		u32_line_term[];
 
-void gtm_icu_init(void);
+boolean_t gtm_icu_init(boolean_t called_by_zconvert);
 void gtm_conv_init(void);
 
 GBLREF	boolean_t	is_gtm_chset_utf8;
-#define	GTM_ICU_INIT_IF_NEEDED	if (is_gtm_chset_utf8) gtm_icu_init();
+#define	GTM_ICU_INIT_IF_NEEDED	if (is_gtm_chset_utf8) gtm_icu_init(FALSE);
 
 #endif /* ICU_API_H */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -49,24 +49,24 @@ void clean_pids(mlk_shrblk_ptr_t d, pid_t *pid_table, char *dead_table, mlk_pvtc
  */
 void mlk_shrclean(mlk_pvtctl_ptr_t pctl)
 {
-	pid_t pid_table[PROC_TABLE_SIZE];
-	char dead_table[PROC_TABLE_SIZE];
 	boolean_t	was_crit;
+	char		dead_table[PROC_TABLE_SIZE];
+	pid_t		pid_table[PROC_TABLE_SIZE];
 
 	was_crit = LOCK_CRIT_HELD(pctl->csa);
-	assert(was_crit);
+	assert(was_crit && (INTRPT_IN_MLK_SHM_MODIFY == intrpt_ok_state));
 	assert(pctl->ctl->lock_gc_in_progress.u.parts.latch_pid == process_id);
 	memset(pid_table, 0, SIZEOF(pid_t) * PROC_TABLE_SIZE);
 	memset(dead_table, 0, SIZEOF(char) * PROC_TABLE_SIZE);
 	if (!pctl->ctl->blkroot)
 		return;
 	fill_pid_table((mlk_shrblk_ptr_t)R2A(pctl->ctl->blkroot), pid_table, pctl);
-	REL_LOCK_CRIT(*pctl, was_crit);
+	REL_LOCK_CRIT(pctl, was_crit);
 	check_pids(pid_table, dead_table, pctl->csa);
-	GRAB_LOCK_CRIT_AND_SYNC(*pctl, was_crit);
+	GRAB_LOCK_CRIT_AND_SYNC(pctl, was_crit);
 	if (pctl->ctl->blkroot)
 		clean_pids((mlk_shrblk_ptr_t)R2A(pctl->ctl->blkroot), pid_table, dead_table, pctl);
-	assert(LOCK_CRIT_HELD(pctl->csa));
+	assert(LOCK_CRIT_HELD(pctl->csa) && (INTRPT_IN_MLK_SHM_MODIFY == intrpt_ok_state));
 	return;
 }
 
@@ -79,10 +79,12 @@ void mlk_shrclean(mlk_pvtctl_ptr_t pctl)
  */
 void fill_pid_table(mlk_shrblk_ptr_t d, pid_t *table, mlk_pvtctl_ptr_t pctl)
 {
+	int4			index;
 	mlk_prcblk_ptr_t	p;
-	mlk_shrblk_ptr_t	d2 = d;
-	int4			index, i, cur;
+	mlk_shrblk_ptr_t	d2;
 
+	assert(LOCK_CRIT_HELD(pctl->csa) && (INTRPT_IN_MLK_SHM_MODIFY == intrpt_ok_state));
+	d2 = d;
 	if (d2->rsib)
 		d2 = (mlk_shrblk_ptr_t)R2A(d2->rsib);
 	do {
@@ -124,9 +126,9 @@ void fill_pid_table(mlk_shrblk_ptr_t d, pid_t *table, mlk_pvtctl_ptr_t pctl)
 */
 void check_pids(pid_t *pid_table, char *dead_table, sgmnt_addrs *csa)
 {
-	uint4 i, crash_count;
+	uint4	i;
 
-	assert(!LOCK_CRIT_HELD(csa));
+	assert(INTRPT_IN_MLK_SHM_MODIFY == intrpt_ok_state);
 	for (i = 0; i < PROC_TABLE_SIZE; i++)
 	{
 		if (pid_table[i] != 0)
@@ -139,11 +141,12 @@ void check_pids(pid_t *pid_table, char *dead_table, sgmnt_addrs *csa)
 
 void clean_pids(mlk_shrblk_ptr_t d, pid_t *pid_table, char *dead_table, mlk_pvtctl_ptr_t pctl)
 {
-	mlk_shrblk_ptr_t	cur, first, next;
-	mlk_prcblk_ptr_t	p;
-	int4			index;
 	boolean_t		deleted;
+	int4			index;
+	mlk_prcblk_ptr_t	p;
+	mlk_shrblk_ptr_t	cur, first, next;
 
+	assert(LOCK_CRIT_HELD(pctl->csa) && (INTRPT_IN_MLK_SHM_MODIFY == intrpt_ok_state));
 	cur = first = d;
 	do {
 		assertpro(cur->rsib != 0);

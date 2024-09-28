@@ -837,7 +837,7 @@ EXCLUDEREORG	<Global: !AD is present in the EXCLUDE option.  REORG will skip the
 REORGINC	<Reorg was incomplete.  Not all globals were reorged.>/warning/fao=0!/ansi=0
 ASC2EBCDICCONV	<ASCII/EBCDIC conversion failed when calling !AD>/error/fao=2!/ansi=0
 GTMSECSHRSTART	<!AD - !UL : gtmsecshr failed to startup>/error/fao=3!/ansi=0
-DBVERPERFWARN1	<Performance warning: Database !AD is running in compatibility mode which degrades performance. Run MUPIP REORG UPGRADE for best overall performance>/warning/fao=2!/ansi=0
+UNUSEDMSG840	<DBVERPERFWARN1 removed from code in V7.1-004 Sep 2024>/error/fao=0!/ansi=0
 FILEIDGBLSEC	<File ID in global section does not match with the database file !AD>/error/fao=2!/ansi=0
 GBLSECNOTGDS	<Global Section !AD is not a GT.M global section>/error/fao=2!/ansi=0
 BADGBLSECVER	<Global Section !AD does not match the current database version>/error/fao=2!/ansi=0
@@ -954,7 +954,7 @@ REPLAHEAD	<Replicating instance is ahead of the originating instance.!AD>/error/
 MUPIPSET2SML	<!UL too small, minimum !AD allowed is !UL>/warning/fao=4!/ansi=0
 DBREADBM	<!AD Read error on bit map>/error/fao=2!/ansi=0/D
 DBCOMPTOOLRG	<!AD Record has too large compression count>/error/fao=2!/ansi=0/I
-DBVERPERFWARN2	<Peformance warning: Database !AD is not fully upgraded. Run MUPIP REORG UPGRADE for best overall performance>/warning/fao=2!/ansi=0
+UNUSEDMSG957	<DBVERPERFWARN2 removed from code in V7.1-004 Sep 2024>/error/fao=0!/ansi=0
 DBRBNTOOLRG	<!AD Root block number greater than last block number in file>/error/fao=2!/ansi=0/D
 DBRBNLBMN	<!AD Root block number is a local bit map number>/error/fao=2!/ansi=0/D
 DBRBNNEG	<!AD Root block number negative>/error/fao=2!/ansi=0/D
@@ -1210,9 +1210,9 @@ DBBTUWRNG	<The blocks-to-upgrade file-header field is incorrect. Expected 0x!16@
 DBBTUFIXED	<The blocks-to-upgrade file-header field has been changed to the correct value>/info/fao=0!/ansi=0
 DBMAXREC2BIG	<Maximum record size (!UL) is too large for this block size (!UL) - Maximum is !UL>/error/fao=3!/ansi=0
 SOCKHANGUP	<Socket has disconnected>/error/fao=0!/ansi=0
-UNUSEDMSG1213	<DBCBADFILE removed from code in V7.0-000 Nov 2020>/error/fao=0!/ansi=0
-UNUSEDMSG1214	<DBCNOEXTND removed from code in V7.0-000 Nov 2020>/error/fao=0!/ansi=0
-UNUSEDMSG1215	<DBCINTEGERR removed from code in V7.0-000 Nov 2020>/error/fao=0!/ansi=0
+REPLINSTRECR	<Error recreating replication instance file !AD>/error/fao=2!/ansi=0
+SEMUNDOOVERFLOW	<The operating system per-process SEM_UNDO table is full and region !AD cannot be opened.>/error/fao=2!/ansi=0//1
+ENCODING	<M or W-1252 code designation for character set encoding, might return unexpected results when "UTF-8"=$ZCHSET>/warning/fao=0!/ansi=0
 DBMINRESBYTES	<Minimum RESERVED BYTES value required for certification/upgrade is !UL - Currently is !UL>/error/fao=2!/ansi=0
 UNUSEDMSG1217	<DBCNOTSAMEDB removed from code in V7.0-000 Nov 2020>/error/fao=0!/ansi=0
 UNUSEDMSG1218	<DBCDBCERTIFIED removed from code in V7.0-000 Nov 2020>/info/fao=0!/ansi=0
@@ -1668,8 +1668,8 @@ MUCREFILERR	<Error in/at !AD creating database !AD (region !AD)>/error/fao=6!/an
 JNLBUFFPHS2SALVAGE	<Salvaged journal records from process !UL for database file !AD at transaction number [0x!16@XQ] and journal-sequence-number/unique-token [0x!16@XQ] with journal file starting offset [0x!XL] and length [0x!XL]>/info/fao=7!/ansi=0
 JNLPOOLPHS2SALVAGE	<Salvaged journal records from process !UL for replication instance file !AD at journal sequence number [0x!16@XQ] with journal pool starting offset [0x!16@XQ] and length [0x!XL]>/info/fao=6!/ansi=0
 MURNDWNARGLESS	<Argumentless MUPIP RUNDOWN started with process id !UL by userid !UL from directory !AD>/info/fao=4!/ansi=0
-DBFREEZEON	<Region !AD is FROZEN (!AZOVERRIDE !AZONLINE !AZAUTOREL)>/info/fao=5!/ansi=0
-DBFREEZEOFF	<Region !AD is UNFROZEN (!AZOVERRIDE !AZAUTOREL)>/info/fao=4!/ansi=0
+DBFREEZEON	<Region !AD (!AD) is FROZEN (!AZOVERRIDE !AZONLINE !AZAUTOREL)>/info/fao=7!/ansi=0
+DBFREEZEOFF	<Region !AD (!AD) is UNFROZEN (!AZOVERRIDE !AZAUTOREL)>/info/fao=6!/ansi=0
 STPCRIT		<String pool space critical>/error/fao=0!/ansi=0
 STPOFLOW	<String pool space overflow>/fatal/fao=0!/ansi=0
 SYSUTILCONF	<Error determining the path for system utility. !AD>/error/fao=2!/ansi=0

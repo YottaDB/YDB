@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2007-2019 Fidelity National Information	*
+ * Copyright (c) 2007-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -167,8 +167,7 @@ void finish_object_file(void)
 	 * We need to read it back and wrap inside the ELF object and
 	 * write a native ELF object file.
 	 */
-	lseek(object_file_des, 0, SEEK_SET);
-	DOREADRL(object_file_des, gtm_obj_code, bufSize, actualSize);
+	DOPREADRL(object_file_des, gtm_obj_code, bufSize, 0, actualSize);
 	/* Reset the pointer back for writing an ELF object. */
 	lseek(object_file_des, 0, SEEK_SET);
 	/* Generate ELF64 header */

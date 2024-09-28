@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -38,21 +38,24 @@
 #include "rel_quant.h"
 #include "do_shmat.h"
 
-GBLREF	uint4 		process_id;
+GBLREF	intrpt_state_t	intrpt_ok_state;
 GBLREF	short		crash_count;
-GBLREF	uint4		dollar_tlevel;
-GBLREF	unsigned int	t_tries;
 GBLREF	tp_region	*tp_reg_free_list;	/* Ptr to list of tp_regions that are unused */
 GBLREF  tp_region	*tp_reg_list;		/* Ptr to list of tp_regions for this transaction */
+GBLREF	uint4 		process_id;
+GBLREF	uint4		dollar_tlevel;
+#ifdef	DEBUG
+GBLREF	unsigned int	t_tries;
+#endif
 
 void mlk_unlock(mlk_pvtblk *p)
 {
-	int			status;
+	boolean_t		stop_waking, was_crit;
+	float			ls_free;	/* Free space in bottleneck subspace */
+	intrpt_state_t		prev_intrpt_state;
 	mlk_shrblk_ptr_t	d, pnt;
 	mlk_ctldata_ptr_t	ctl;
-	boolean_t		stop_waking, was_crit;
 	sgmnt_addrs		*csa;
-	float			ls_free;	/* Free space in bottleneck subspace */
 
 	if (p->pvtctl.region->dyn.addr->acc_meth != dba_usr)
 	{
@@ -66,7 +69,8 @@ void mlk_unlock(mlk_pvtblk *p)
 			/* make sure this region is in the list in case we end up retrying */
 			insert_region(p->pvtctl.region, &tp_reg_list, &tp_reg_free_list, SIZEOF(tp_region));
 		}
-		GRAB_LOCK_CRIT_AND_SYNC(p->pvtctl, was_crit);
+		GRAB_LOCK_CRIT_AND_SYNC(&p->pvtctl, was_crit);
+		DEFER_INTERRUPTS(INTRPT_IN_MLK_SHM_MODIFY, prev_intrpt_state);
 		if (d->owner == process_id && p->sequence == d->sequence)
 		{
 			d->owner = 0;
@@ -93,7 +97,8 @@ void mlk_unlock(mlk_pvtblk *p)
 		ls_free = MIN(((float)ctl->blkcnt) / ctl->max_blkcnt, ((float)ctl->prccnt) / ctl->max_prccnt);
 		if (ls_free >= LOCK_SPACE_FULL_SYSLOG_THRESHOLD)
 			ctl->lockspacefull_logged = FALSE; /* Allow syslog writes if enough free space is established. */
-		REL_LOCK_CRIT(p->pvtctl, was_crit);
+		REL_LOCK_CRIT(&p->pvtctl, was_crit);
+		ENABLE_INTERRUPTS(INTRPT_IN_MLK_SHM_MODIFY, prev_intrpt_state);
 	} else	/* acc_meth == dba_usr */
 		gvusr_unlock(p->nref_length, &p->value[0], p->pvtctl.region);
 	return;

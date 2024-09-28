@@ -1,6 +1,6 @@
 /****************************************************************
  *                                                              *
- * Copyright (c) 2006-2018 Fidelity National Information	*
+ * Copyright (c) 2006-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *                                                              *
  *      This source code contains the intellectual property     *
@@ -19,10 +19,13 @@
 #include "opcode.h"
 #include "advancewindow.h"
 #include "gtm_conv.h"
+#include "gtm_ctype.h"
+#include "gtm_string.h"
 
 error_def(ERR_BADCASECODE);
 error_def(ERR_BADCHSET);
 error_def(ERR_COMMA);
+error_def(ERR_ENCODING);
 
 /* $ZCONVERT(): 3 parameters (3rd optional) - all are string expressions.
  * For 2 argument $ZCONVERT, if 2nd argument is a literal, must be one of
@@ -35,6 +38,7 @@ int f_zconvert(oprtype *a, opctype op)
 {
 	triple	*r, *mode, *mode2;
 	mstr	*tmpstr;
+	int	i;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -55,8 +59,8 @@ int f_zconvert(oprtype *a, opctype op)
 	/* Check for 3rd parameter */
 	if (TK_COMMA != TREF(window_token))
 	{	/* 3rd parameter does not exist. Do checks for 2 arument $zconvert */
-		if (mode->operand[0].oprval.tref->opcode == OC_LIT &&
-		    -1 == verify_case((tmpstr = &mode->operand[0].oprval.tref->operand[0].oprval.mlit->v.str)))
+		if ((OC_LIT == mode->operand[0].oprval.tref->opcode) &&
+		    (-1 == verify_case((tmpstr = &mode->operand[0].oprval.tref->operand[0].oprval.mlit->v.str))))
 		{
 			stx_error(ERR_BADCASECODE, 2, tmpstr->len, tmpstr->addr);
 			return FALSE;
@@ -64,22 +68,32 @@ int f_zconvert(oprtype *a, opctype op)
 	} else
 	{	/* 3rd parameter exists .. reel it in after error checking 2nd parm */
 		r->opcode = OC_FNZCONVERT3;
-		if (mode->operand[0].oprval.tref->opcode == OC_LIT &&
-		    0 >= verify_chset((tmpstr = &mode->operand[0].oprval.tref->operand[0].oprval.mlit->v.str)))
-		{
-			stx_error(ERR_BADCHSET, 2, tmpstr->len, tmpstr->addr);
-			return FALSE;
+		if ((OC_LIT == mode->operand[0].oprval.tref->opcode) &&
+		    (0 >= verify_chset((tmpstr = &mode->operand[0].oprval.tref->operand[0].oprval.mlit->v.str))))
+		{	/* Convert extended ascii to a different encoding */
+			if (CHSET_M != check_w1252(tmpstr))
+			{
+				stx_error(ERR_BADCHSET, 2, tmpstr->len, tmpstr->addr);
+				return FALSE;
+			}
+			if (gtm_utf8_mode)
+				dec_err(VARLSTCNT(1) ERR_ENCODING);
 		}
 		advancewindow();
 		mode2 = newtriple(OC_PARAMETER);
 		mode->operand[1] = put_tref(mode2);
 		if (EXPR_FAIL == expr(&(mode2->operand[0]), MUMPS_STR))
 			return FALSE;
-		if (mode2->operand[0].oprval.tref->opcode == OC_LIT &&
-		    0 >= verify_chset((tmpstr = &mode2->operand[0].oprval.tref->operand[0].oprval.mlit->v.str)))
-		{
-			stx_error(ERR_BADCHSET, 2, tmpstr->len, tmpstr->addr);
-			return FALSE;
+		if ((OC_LIT == mode2->operand[0].oprval.tref->opcode) &&
+		    (0 >= verify_chset((tmpstr = &mode2->operand[0].oprval.tref->operand[0].oprval.mlit->v.str))))
+		{	/* Convert UTF8/UTF16 to an extended ascii encoding */
+			if (CHSET_M != check_w1252(tmpstr))
+			{
+				stx_error(ERR_BADCHSET, 2, tmpstr->len, tmpstr->addr);
+				return FALSE;
+			}
+			if (gtm_utf8_mode)
+				dec_err(VARLSTCNT(1) ERR_ENCODING);
 		}
 	}
 	ins_triple(r);
@@ -90,6 +104,7 @@ int f_zconvert(oprtype *a, opctype op)
 #else /* UTF8 is not supported */
 int f_zconvert(oprtype *a, opctype op)
 {
-	GTMASSERT;
+	assert(FALSE);
+	rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_TEXT, 2, LEN_AND_LIT("Error: UTF8 is not supported"), errno);
 }
 #endif

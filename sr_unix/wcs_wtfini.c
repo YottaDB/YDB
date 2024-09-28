@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2016-2023 Fidelity National Information	*
+ * Copyright (c) 2016-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -139,7 +139,7 @@ int	wcs_wtfini(gd_region *reg, boolean_t do_is_proc_alive_check, cache_rec_ptr_t
 				if (grab_latch(&whead->latch, WT_LATCH_TIMEOUT_SEC, WS_25, csa))
 				{
 					cr = cr2flush;
-					csr = (cache_state_rec_ptr_t)((sm_uc_ptr_t)cr + SIZEOF(cr->blkque));
+					csr = CR2CSR(cr);
 					/* now that we have the wip queue header lock ensure cr2flush is still on the wip queue */
 					if (cr2flush->dirty && cr2flush->epid && cr2flush->state_que.fl)
 					{	/* the entry is in the wip queue */
@@ -203,12 +203,12 @@ int	wcs_wtfini(gd_region *reg, boolean_t do_is_proc_alive_check, cache_rec_ptr_t
 			}
 			break;		/* looped the queue */
 		}
-		cr = (cache_rec_ptr_t)((sm_uc_ptr_t)csr - SIZEOF(cr->blkque));
+		cr = CSR2CR(csr);
 		assert(cr >= cr_lo);
 		assert(cr < cr_hi);
-		assert(csr->dirty);
-		assert(CR_BLKEMPTY != csr->blk);
-		AIO_SHIM_ERROR(&(csr->aiocb), aio_errno);
+		assert(cr->dirty);
+		assert(CR_BLKEMPTY != cr->blk);
+		AIO_SHIM_ERROR(&(cr->aiocb), aio_errno);
 		assert(EBADF != aio_errno);
 		if ((ENOSYS == aio_errno) || (EINVAL == aio_errno))
 		{
@@ -218,7 +218,7 @@ int	wcs_wtfini(gd_region *reg, boolean_t do_is_proc_alive_check, cache_rec_ptr_t
 		}
 		restart_errno = 0;
 		requeue = REQUEUE_TO_WIP;
-		epid = csr->epid;
+		epid = cr->epid;
 		if (EINPROGRESS == aio_errno)
 		{
 			if (do_is_proc_alive_check && (process_id != epid))
@@ -252,7 +252,7 @@ int	wcs_wtfini(gd_region *reg, boolean_t do_is_proc_alive_check, cache_rec_ptr_t
 				{
 					WCS_OPS_TRACE(csa, process_id, wcs_ops_wtfini1, cr->blk, GDS_ANY_ABS2REL(csa,cr),
 							cr->dirty, dbg_wtfini_lcnt, epid);
-					if (!csr->bt_index && !csr->in_cw_set)
+					if (!cr->bt_index && !cr->in_cw_set)
 					{	/* This is an older twin so we do not need the update anymore.
 						 * For comment on why "csr->in_cw_set" needs to be additionally checked,
 						 * see usage of "csr->in_cw_set" a little later for a descriptive comment.
@@ -262,7 +262,7 @@ int	wcs_wtfini(gd_region *reg, boolean_t do_is_proc_alive_check, cache_rec_ptr_t
 					} else
 					{
 						requeue = REQUEUE_TO_ACTIVE;
-						csr->epid = 0;	/* Clear this since the process that issued the write is dead */
+						cr->epid = 0;	/* Clear this since the process that issued the write is dead */
 					}
 				}
 			}
@@ -274,7 +274,7 @@ int	wcs_wtfini(gd_region *reg, boolean_t do_is_proc_alive_check, cache_rec_ptr_t
 			 *	case of the corresponding synchronous "write()" call.
 			 */
 			assert(EINTR != aio_errno);
-			AIO_SHIM_RETURN(&(csr->aiocb), aio_retval); /* get the return value of the i/o */
+			AIO_SHIM_RETURN(&(cr->aiocb), aio_retval); /* get the return value of the i/o */
 #			ifdef DEBUG
 			/* Fake an error once in a while. But do not do that in AIX if we are inside "wcs_flu" as we
 			 * have seen a lot of test failures because "wcs_flu" takes more than 1 minute to reflush
@@ -293,7 +293,7 @@ int	wcs_wtfini(gd_region *reg, boolean_t do_is_proc_alive_check, cache_rec_ptr_t
 			{	/* async IO completed successfully with no errors */
 				assert(0 == aio_errno);
 				/* Mark this block as written */
-				csr->needs_first_write = FALSE;
+				cr->needs_first_write = FALSE;
 				/* We can move this csr from the WIP queue to the FREE queue now that the write is complete.
 				 * There is one exception though. If the write of an OLDER twin completes fine (0 == csr->bt_index)
 				 * AND if csr->in_cw_set is still non-zero, it implies PHASE2 commit is in progress for this csr
@@ -306,9 +306,9 @@ int	wcs_wtfini(gd_region *reg, boolean_t do_is_proc_alive_check, cache_rec_ptr_t
 				 * We need to see whether the update process is still alive. If not, reset in_cw_set.
 				 */
 				assert(REQUEUE_TO_WIP == requeue);
-				if (!csr->bt_index && csr->in_cw_set && !is_proc_alive(csr->in_cw_set, 0))
-					csr->in_cw_set = 0;
-				if (csr->bt_index || !csr->in_cw_set)
+				if (!cr->bt_index && cr->in_cw_set && !is_proc_alive(cr->in_cw_set, 0))
+					cr->in_cw_set = 0;
+				if (cr->bt_index || !cr->in_cw_set)
 					requeue = REQUEUE_TO_FREE;
 			} else
 			{	/* aio_errno can be 0 if we faked an aio error (by setting "aio_retval = 0" above) OR
@@ -338,10 +338,10 @@ int	wcs_wtfini(gd_region *reg, boolean_t do_is_proc_alive_check, cache_rec_ptr_t
 				 * in the WIP queue until its write completes.
 				 */
 				/* Reissue the IO */
-				restart_errno = wcs_wt_restart(udi, csr);	/* sets "csr->epid" */
+				restart_errno = wcs_wt_restart(udi, cr);	/* sets "csr->epid" */
 				if (SYNCIO_MORPH_SUCCESS == restart_errno)
 					requeue = REQUEUE_TO_FREE;
-				else if (!restart_errno && !csr->epid)
+				else if (!restart_errno && !cr->epid)
 				{	/* Case where IO was not reissued (either because we did not have crit or because we did
 					 * not have read-write access to db. Put it back in active queue.
 					 */
@@ -364,19 +364,19 @@ int	wcs_wtfini(gd_region *reg, boolean_t do_is_proc_alive_check, cache_rec_ptr_t
 				start_csr = csr;
 		} else if (REQUEUE_TO_FREE == requeue)
 		{
-			csr->flushed_dirty_tn = csr->dirty;
-			csr->dirty = 0;
+			cr->flushed_dirty_tn = cr->dirty;
+			cr->dirty = 0;
 			cnl->wcs_buffs_freed++;
-			csr->epid = 0;
+			cr->epid = 0;
 			SUB_ENT_FROM_WIP_QUE_CNT(cnl);
 			ADD_ENT_TO_FREE_QUE_CNT(cnl);
-			if (csr->twin)
-				BREAK_TWIN(csr, csa);
-			CLEAR_BUFF_UPDATE_LOCK(csr, &cnl->db_latch);
+			if (cr->twin)
+				BREAK_TWIN(cr, csa);
+			CLEAR_BUFF_UPDATE_LOCK(cr, &cnl->db_latch);
 		} else
 		{
 			assert(REQUEUE_TO_ACTIVE == requeue);
-			CLEAR_BUFF_UPDATE_LOCK(csr, &cnl->db_latch);
+			CLEAR_BUFF_UPDATE_LOCK(cr, &cnl->db_latch);
 			ahead = &csa->acc_meth.bg.cache_state->cacheq_active;
 			REINSERT_CR_AT_TAIL(csr, ahead, n, csa, csd, wcb_wtfini_lckfail4);
 			if (INTERLOCK_FAIL == n)

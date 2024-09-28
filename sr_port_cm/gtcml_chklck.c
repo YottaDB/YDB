@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -33,26 +33,28 @@
 #include "interlock.h"
 #include "rel_quant.h"
 #include "do_shmat.h"
+#include "have_crit.h"
 
-GBLREF gd_region	*gv_cur_region;
-GBLREF uint4            process_id;
-GBLREF short		crash_count;
+GBLREF	gd_region	*gv_cur_region;
+GBLREF	intrpt_state_t  intrpt_ok_state;
+// GBLREF	short		crash_count;
+GBLREF	uint4            process_id;
 
 void gtcml_chklck(cm_lckblkreg *reg, bool timed)
 {
+	boolean_t	stop_waking, timeout, was_crit;
 	cm_lckblklck	*lck, *lckroot, *lcktofree;
 	cm_lckblkprc 	*prc, *prc1;
-	mlk_shrblk_ptr_t d;
-	boolean_t	stop_waking, timeout, was_crit;
-	sgmnt_addrs	*csa;
 	int4		icount, status, time[2];
+	intrpt_state_t  prev_intrpt_state;
 	mlk_pvtctl	pctl;
+	mlk_shrblk_ptr_t d;
+	sgmnt_addrs	*csa;
 
 	timeout = TRUE;
 	lckroot = reg->lock;
 	lck = lckroot->next;
 	lcktofree = NULL;
-
 	/* it appears that the design assumes that lck should never be null, but we have empirical that it happens.
 	 * because we do not (at the moment of writing) have resources to pursue the discrepancy, we simply protect
 	 * against it, and hope that we don't encounter other symptoms
@@ -78,7 +80,8 @@ void gtcml_chklck(cm_lckblkreg *reg, bool timed)
 						{	/* Blocking process shrblk exists. Check it under crit lock */
 							csa = &FILE_INFO(gv_cur_region)->s_addrs;
 							MLK_PVTCTL_INIT(pctl, gv_cur_region);
-							GRAB_LOCK_CRIT_AND_SYNC(pctl, was_crit);
+							GRAB_LOCK_CRIT_AND_SYNC(&pctl, was_crit);
+							DEFER_INTERRUPTS(INTRPT_IN_MLK_SHM_MODIFY, prev_intrpt_state);
 							if (d->sequence != prc1->blk_sequence)
 							{	/* Blocking structure no longer ours - do artificial wakeup */
 								lck->sequence = csa->hdr->trans_hist.lock_sequence++;
@@ -93,7 +96,8 @@ void gtcml_chklck(cm_lckblkreg *reg, bool timed)
 							{	/* No longer any owner (lke stole?). Wake up */
 								lck->sequence = csa->hdr->trans_hist.lock_sequence++;
 							}
-							REL_LOCK_CRIT(pctl, was_crit);
+							REL_LOCK_CRIT(&pctl, was_crit);
+							ENABLE_INTERRUPTS(INTRPT_IN_MLK_SHM_MODIFY, prev_intrpt_state);
 						}
 						prc1 = prc1->next;
 					} while (prc1 != prc);

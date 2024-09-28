@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2023 Fidelity National Information	*
+ * Copyright (c) 2006-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -18,6 +18,7 @@
 #include "gtm_conv.h"
 #include "gtm_utf8.h"
 #include "have_crit.h"
+#include "ebc_xlat.h"
 
 GBLREF	boolean_t	badchar_inhibit;
 GBLREF	boolean_t	gtm_utf8_mode;
@@ -170,23 +171,52 @@ void	op_fnzconvert3(mval *src, mval* ichset, mval* ochset, mval* dst)
 {
 	UConverter	*from, *to;
 	int		dstlen;
+	intrpt_state_t	prev_intrpt_state;
+	gtm_chset_t	ichset_w1252, ochset_w1252, valid_utf;
 
 	MV_FORCE_STR(src);
-	if (!gtm_utf8_mode)
-	{ /* UTF8 not enabled, report error rather than silently ignoring the conversion */
-		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_INVFCN, 0, ERR_TEXT, 2,
-			LEN_AND_LIT("Three-argument form of $ZCONVERT() is not allowed in the current $ZCHSET"));
-	}
 	MV_FORCE_STR(ichset);
 	MV_FORCE_STR(ochset);
-	/* The only supported names are: "UTF-8", "UTF-16", "UTF-16LE" and "UTF-16BE */
-	if (NULL == (from = get_chset_desc(&ichset->str)))
-		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_BADCHSET, 2, ichset->str.len, ichset->str.addr);
-	if (NULL == (to = get_chset_desc(&ochset->str)))
-		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_BADCHSET, 2, ochset->str.len, ochset->str.addr);
-
-	dstlen = gtm_conv(from, to, &src->str, NULL, NULL);
-	assert(-1 != dstlen);
+	ichset_w1252 = check_w1252(&ichset->str);
+	ochset_w1252 = check_w1252(&ochset->str);
+	if ((CHSET_M == ichset_w1252) && (CHSET_M == ochset_w1252))
+	{
+		DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
+		dstlen = no_conversion(&src->str);
+		ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
+	} else if (CHSET_M == ichset_w1252)
+	{	/* Conversion from M/W-1252 to UTF8/UTF16 encoding */
+		if (CHSET_MAX_IDX_ALL == (valid_utf = check_valid_utf(&ochset->str)))
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_BADCHSET, 2, ochset->str.len, ochset->str.addr);
+		DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
+		if (CHSET_UTF8 == valid_utf)
+			dstlen = w1252_to_utf8(&src->str);
+		else 	/* CHSET_UTF16 */
+			dstlen = w1252_to_utf16(&src->str);
+		ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
+	} else if (CHSET_M == ochset_w1252)
+	{	/* Conversion from UTF8/UTF16 to M/W-1252 encoding */
+		if (CHSET_MAX_IDX_ALL == (valid_utf = check_valid_utf(&ichset->str)))
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_BADCHSET, 2, ichset->str.len, ichset->str.addr);
+		DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
+		if (CHSET_UTF8 == valid_utf)
+			dstlen = utf8_to_w1252(&src->str);
+		else 	/* CHSET_UTF16 */
+			dstlen = utf16_to_w1252(&src->str);
+		ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
+	} else
+	{
+		if (!gtm_utf8_mode && !gtm_icu_init(TRUE))
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_INVFCN, 0, ERR_TEXT, 2,
+				LEN_AND_LIT("ZCONVERT couldn't install ICU, try to define the $gtm_icu_version env variable"));
+		/* The only supported names are: "UTF-8", "UTF-16", "UTF-16LE" and "UTF-16BE */
+		if (NULL == (from = get_chset_desc(&ichset->str)))
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_BADCHSET, 2, ichset->str.len, ichset->str.addr);
+		if (NULL == (to = get_chset_desc(&ochset->str)))
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_BADCHSET, 2, ochset->str.len, ochset->str.addr);
+		dstlen = gtm_conv(from, to, &src->str, NULL, NULL);
+		assert(-1 != dstlen);
+	}
 	MV_INIT_STRING(dst, dstlen, stringpool.free);
 	stringpool.free += dst->str.len;
 }

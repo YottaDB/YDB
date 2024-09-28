@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2009-2023 Fidelity National Information	*
+ * Copyright (c) 2009-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -83,9 +83,6 @@ gtm_status_t gtmcrypt_init(gtm_int_t flags)
 		return 0;
 	if (0 != gc_load_gtmshr_symbols())
 		return -1;
-#	ifdef USE_GCRYPT
-	gcry_set_log_handler(gtm_gcry_log_handler, NULL);
-#	endif
 	IS_FIPS_MODE_REQUESTED(fips_requested);
 	if (fips_requested)
 	{

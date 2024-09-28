@@ -140,8 +140,6 @@ TAB_GVSTATS_REC(ms_flu_critsleeps    , "WFCS", "ms of sleep time for wcs_flu in 
 TAB_GVSTATS_REC(ms_getn_critsleeps   , "GCS",  "ms of sleep time for csh_getn in crit ")
 /* Cacheline border (128-byte and 64-byte) */
 TAB_GVSTATS_REC(n_increment          , "INC",  "# of INCREMENT operations             ")
-TAB_GVSTATS_REC(n_idxblk_csh_hit     , "IDXH",  "# of index block cache hits          ")
-TAB_GVSTATS_REC(n_idxblk_csh_miss    , "IDXM",  "# of index block cache misses        ")
 /* If new stats are added beyond this point, edit gvstats_rec_cnl2csd in gvstats_rec.c */
 
 /*

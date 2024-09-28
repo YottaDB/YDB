@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2014-2023 Fidelity National Information	*
+ * Copyright (c) 2014-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -29,6 +29,11 @@
 #include "gtmmsg.h"
 #endif
 #include "mu_rndwn_rlnkctl.h"	/* for mupip_rctldump prototype */
+#include "mupip_rundown.h"
+#include "mupip_exit.h"
+
+GBLDEF	boolean_t	in_relinkctl;
+GBLREF	boolean_t	in_rundown;
 
 #ifdef AUTORELINK_SUPPORTED
 error_def(ERR_FILEPARSE);
@@ -46,10 +51,11 @@ void mu_rndwn_rlnkctl(void)
 	relinkctl_data		*hdr;
 	rtnobjshm_hdr_t		*rtnobj_shm_hdr;
 	char			objdir[GTM_PATH_MAX];
-	int			i, j, recnum, n_records, shmid, shm_stat, save_errno, objcnt, stat_res;
+	int			i, j, recnum, n_records, shmid, shm_stat, save_errno, objcnt, stat_res, params_cnt;
 	unsigned short		param_len;
 	mstr			dir;
 	zro_ent			*op;
+	boolean_t		region, file, relink_dir, file_or_region, is_what;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -58,11 +64,28 @@ void mu_rndwn_rlnkctl(void)
 						 * this is invoked from MUPIP RUNDOWN -RELINKCTL which is the only action
 						 * that the calling process will do in its lifetime.
 						 */
-	if (TREF(parms_cnt))
+	file = (CLI_PRESENT == cli_present("FILE"));
+	region = (CLI_PRESENT == cli_present("REGION")) || (CLI_PRESENT == cli_present("R"));
+	relink_dir = FALSE;
+	file_or_region = (file || region);
+	params_cnt = TREF(parms_cnt);
+	in_relinkctl = TRUE;
+	/* relink_dir is set to true when two parameters are present,
+	 * or when one parameter is passed to the relinkctl function only.
+	 * If a region or file qualifier is present, and there is only one parameter, used it as region or file.
+	 */
+	if (2 == params_cnt || (1 == params_cnt && !file_or_region))
+    	relink_dir = TRUE;
+	if (!file_or_region && (1 < params_cnt))
 	{
-		assert(1 == TREF(parms_cnt));
+		util_out_print("%GTM-E-CLIERR, Too many parameters", TRUE);
+		mupip_exit(ERR_MUPCLIERR);
+	}
+	if (relink_dir)
+	{
 		param_len = SIZEOF(objdir) - 1;
-		if (!cli_get_str("WHAT", objdir, &param_len))
+		is_what = (TREF(parms_cnt) == 2 && !in_rundown);
+		if (!cli_get_str(is_what ? "WHAT": "R_OR_F_NAME", objdir, &param_len))
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_MUPCLIERR);
 		objdir[param_len] = '\0';
 		dir.addr = objdir;
@@ -127,6 +150,8 @@ void mu_rndwn_rlnkctl(void)
 			op++;
 		}
 	}
+	if (in_relinkctl && !in_rundown)
+		mupip_rundown();
 	TREF(is_mu_rndwn_rlnkctl) = FALSE;
 #	endif	/* AUTORELINK_SUPPORTED */
 }

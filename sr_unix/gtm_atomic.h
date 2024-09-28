@@ -140,6 +140,8 @@ typedef atomic_size_t gtm_atomic_size_t;
 typedef atomic_ptrdiff_t gtm_atomic_ptrdiff_t;
 typedef atomic_intmax_t gtm_atomic_intmax_t;
 typedef atomic_uintmax_t gtm_atomic_uintmax_t;
+#define DEFINE_ATOMIC_OP(...)
+#define DEFINE_ALL_ATOMIC_OPS(TYPE)
 /* Operations for use with pointers to gtm_atomic types; most of the standard C11 operations are covered. */
 #define COMPILER_FENCE(ORD) atomic_signal_fence(ORD)
 #define ATOMIC_FETCH_ADD(OBJ_PTR, VAL, ORD) atomic_fetch_add_explicit((volatile __typeof__(OBJ_PTR))OBJ_PTR, VAL, ORD)
@@ -210,6 +212,9 @@ enum gtm_memory_order {
 	memory_order_acq_rel = __ATOMIC_ACQ_REL,
 	memory_order_seq_cst = __ATOMIC_SEQ_CST
 };
+#define DEFINE_ATOMIC_OP(...)
+#define DEFINE_ALL_ATOMIC_OPS(TYPE)
+
 #define COMPILER_FENCE(ORD) __atomic_signal_fence(ORD)
 #define ATOMIC_FETCH_ADD(OBJ_PTR, VAL, ORD) __atomic_fetch_add((volatile __typeof__(OBJ_PTR))OBJ_PTR, VAL, ORD)
 #define ATOMIC_FETCH_SUB(OBJ_PTR, VAL, ORD) __atomic_fetch_sub((volatile __typeof__(OBJ_PTR))OBJ_PTR, VAL, ORD)
@@ -384,28 +389,28 @@ _Static_assert(sizeof(gtm_atomic_ulong) == sizeof(gtm_atomic_uintmax_t),
 		gtm_atomic_llong *: OP##__gtm_atomic_llong__##ORD,			\
 		gtm_atomic_ullong *: OP##__gtm_atomic_ullong__##ORD)
 /* Powerpc assembly for stores, for each supported type-width. */
-#define PPC_ASM_ST__gtm_atomic_char__(OBJ_PTR, VAL)		\
+#define PPC_ASM_ST__gtm_atomic_char__(OBJ_PTR, VAL, PRE_BARRIER, POST_BARRIER)		\
 	asm volatile (	"0:"PRE_BARRIER				\
 			"\tstb %[value],%[obj]\n"		\
 			POST_BARRIER				\
 			: [obj]		"=m" 	(*OBJ_PTR)	\
 			: [value]	"r"	(VAL)		\
 			:)
-#define PPC_ASM_ST__gtm_atomic_short__(OBJ_PTR, VAL)		\
+#define PPC_ASM_ST__gtm_atomic_short__(OBJ_PTR, VAL, PRE_BARRIER, POST_BARRIER)		\
 	asm volatile (	"0:"PRE_BARRIER				\
 			"\tsth %[value],%[obj]\n"		\
 			POST_BARRIER				\
 			: [obj]		"=m" 	(*OBJ_PTR)	\
 			: [value]	"r"	(VAL)		\
 			:)
-#define PPC_ASM_ST__gtm_atomic_int__(OBJ_PTR, VAL)		\
+#define PPC_ASM_ST__gtm_atomic_int__(OBJ_PTR, VAL, PRE_BARRIER, POST_BARRIER)		\
 	asm volatile (	"0:"PRE_BARRIER				\
 			"\tstw %[value],%[obj]\n"		\
 			POST_BARRIER				\
 			: [obj]		"=m" 	(*OBJ_PTR)	\
 			: [value]	"r"	(VAL)		\
 			:)
-#define PPC_ASM_ST__gtm_atomic_long__(OBJ_PTR, VAL)		\
+#define PPC_ASM_ST__gtm_atomic_long__(OBJ_PTR, VAL, PRE_BARRIER, POST_BARRIER)		\
 	asm volatile (	"0:"PRE_BARRIER				\
 			"\tstd %[value],%[obj]\n"		\
 			POST_BARRIER				\
@@ -421,14 +426,14 @@ _Static_assert(sizeof(gtm_atomic_ulong) == sizeof(gtm_atomic_uintmax_t),
 #define PPC_ASM_ST__gtm_atomic_llong__ PPC_ASM_ST__gtm_atomic_long__
 #define PPC_ASM_ST__gtm_atomic_ullong__ PPC_ASM_ST__gtm_atomic_long__
 /* Powerpc assembly for loads, for each supported sign/type-width combination. */
-#define PPC_ASM_LD__gtm_atomic_uchar__(OBJ_PTR, RET) 		\
+#define PPC_ASM_LD__gtm_atomic_uchar__(OBJ_PTR, RET, PRE_BARRIER, POST_BARRIER) 		\
 	asm volatile ( 	"0:"PRE_BARRIER				\
 			"\tlbz %[retval],%[obj]\n"		\
 			POST_BARRIER				\
 			: [retval]	"=r"	(RET)		\
 			: [obj]		"m"	(*OBJ_PTR)	\
 			:)
-#define PPC_ASM_LD__gtm_atomic_schar__(OBJ_PTR, RET) 		\
+#define PPC_ASM_LD__gtm_atomic_schar__(OBJ_PTR, RET, PRE_BARRIER, POST_BARRIER) 		\
 	asm volatile ( 	"0:"PRE_BARRIER				\
 			"\tlbz %[retval],%[obj]\n"		\
 			"\textsb %[retval],%[retval]\n"		\
@@ -436,35 +441,35 @@ _Static_assert(sizeof(gtm_atomic_ulong) == sizeof(gtm_atomic_uintmax_t),
 			: [retval]	"=r"	(RET)		\
 			: [obj]		"m"	(*OBJ_PTR)	\
 			:)
-#define PPC_ASM_LD__gtm_atomic_ushort__(OBJ_PTR, RET) 		\
+#define PPC_ASM_LD__gtm_atomic_ushort__(OBJ_PTR, RET, PRE_BARRIER, POST_BARRIER) 		\
 	asm volatile ( 	"0:"PRE_BARRIER				\
 			"\tlhz %[retval],%[obj]\n"		\
 			POST_BARRIER				\
 			: [retval]	"=r"	(RET)		\
 			: [obj]		"m"	(*OBJ_PTR)	\
 			:)
-#define PPC_ASM_LD__gtm_atomic_short__(OBJ_PTR, RET) 		\
+#define PPC_ASM_LD__gtm_atomic_short__(OBJ_PTR, RET, PRE_BARRIER, POST_BARRIER) 		\
 	asm volatile ( 	"0:"PRE_BARRIER				\
 			"\tlha %[retval],%[obj]\n"		\
 			POST_BARRIER				\
 			: [retval]	"=r"	(RET)		\
 			: [obj]		"m"	(*OBJ_PTR)	\
 			:)
-#define PPC_ASM_LD__gtm_atomic_uint__(OBJ_PTR, RET) 		\
+#define PPC_ASM_LD__gtm_atomic_uint__(OBJ_PTR, RET, PRE_BARRIER, POST_BARRIER) 		\
 	asm volatile ( 	"0:"PRE_BARRIER				\
 			"\tlwz %[retval],%[obj]\n"		\
 			POST_BARRIER				\
 			: [retval]	"=r"	(RET)		\
 			: [obj]		"m"	(*OBJ_PTR)	\
 			:)
-#define PPC_ASM_LD__gtm_atomic_int__(OBJ_PTR, RET) 		\
+#define PPC_ASM_LD__gtm_atomic_int__(OBJ_PTR, RET, PRE_BARRIER, POST_BARRIER) 		\
 	asm volatile ( 	"0:"PRE_BARRIER				\
 			"\tlwa %[retval],%[obj]\n"		\
 			POST_BARRIER				\
 			: [retval]	"=r"	(RET)		\
 			: [obj]		"m"	(*OBJ_PTR)	\
 			:)
-#define PPC_ASM_LD__gtm_atomic_long__(OBJ_PTR, RET) 		\
+#define PPC_ASM_LD__gtm_atomic_long__(OBJ_PTR, RET, PRE_BARRIER, POST_BARRIER) 		\
 	asm volatile ( 	"0:"PRE_BARRIER				\
 			"\tld %[retval],%[obj]\n"		\
 			POST_BARRIER				\
@@ -481,7 +486,7 @@ _Static_assert(sizeof(gtm_atomic_ulong) == sizeof(gtm_atomic_uintmax_t),
 #define PPC_ASM_LD__gtm_atomic_llong__ PPC_ASM_LD__gtm_atomic_long__
 #define PPC_ASM_LD__gtm_atomic_ullong__ PPC_ASM_LD__gtm_atomic_long__
 /* Powerpc assembly for loads with trailing branch-conditionals, for each supported sign/type-width combination. */
-#define PPC_ASM_LDCMP__gtm_atomic_uchar__(OBJ_PTR, RET) 	\
+#define PPC_ASM_LDCMP__gtm_atomic_uchar__(OBJ_PTR, RET, PRE_BARRIER, POST_BARRIER) 	\
 	asm volatile ( 	"0:"PRE_BARRIER				\
 			"\tlbz %[retval],%[obj]\n"		\
 			"\tcmp 0,0,%[retval],%[retval]\n"	\
@@ -490,7 +495,7 @@ _Static_assert(sizeof(gtm_atomic_ulong) == sizeof(gtm_atomic_uintmax_t),
 			: [retval]	"=r"	(RET)		\
 			: [obj]		"m"	(*OBJ_PTR)	\
 			: "cr0")
-#define PPC_ASM_LDCMP__gtm_atomic_schar__(OBJ_PTR, RET) 	\
+#define PPC_ASM_LDCMP__gtm_atomic_schar__(OBJ_PTR, RET, PRE_BARRIER, POST_BARRIER) 	\
 	asm volatile ( 	"0:"PRE_BARRIER				\
 			"\tlbz %[retval],%[obj]\n"		\
 			"\textsb %[retval],%[retval]\n"		\
@@ -500,7 +505,7 @@ _Static_assert(sizeof(gtm_atomic_ulong) == sizeof(gtm_atomic_uintmax_t),
 			: [retval]	"=r"	(RET)		\
 			: [obj]		"m"	(*OBJ_PTR)	\
 			: "cr0")
-#define PPC_ASM_LDCMP__gtm_atomic_ushort__(OBJ_PTR, RET) 	\
+#define PPC_ASM_LDCMP__gtm_atomic_ushort__(OBJ_PTR, RET, PRE_BARRIER, POST_BARRIER) 	\
 	asm volatile ( 	"0:"PRE_BARRIER				\
 			"\tlha %[retval],%[obj]\n"		\
 			"\tcmp 0,0,%[retval],%[retval]\n"	\
@@ -509,7 +514,7 @@ _Static_assert(sizeof(gtm_atomic_ulong) == sizeof(gtm_atomic_uintmax_t),
 			: [retval]	"=r"	(RET)		\
 			: [obj]		"m"	(*OBJ_PTR)	\
 			: "cr0")
-#define PPC_ASM_LDCMP__gtm_atomic_short__(OBJ_PTR, RET) 	\
+#define PPC_ASM_LDCMP__gtm_atomic_short__(OBJ_PTR, RET, PRE_BARRIER, POST_BARRIER) 	\
 	asm volatile ( 	"0:"PRE_BARRIER				\
 			"\tlhz %[retval],%[obj]\n"		\
 			"\tcmp 0,0,%[retval],%[retval]\n"	\
@@ -518,7 +523,7 @@ _Static_assert(sizeof(gtm_atomic_ulong) == sizeof(gtm_atomic_uintmax_t),
 			: [retval]	"=r"	(RET)		\
 			: [obj]		"m"	(*OBJ_PTR)	\
 			: "cr0")
-#define PPC_ASM_LDCMP__gtm_atomic_uint__(OBJ_PTR, RET) 		\
+#define PPC_ASM_LDCMP__gtm_atomic_uint__(OBJ_PTR, RET, PRE_BARRIER, POST_BARRIER) 		\
 	asm volatile ( 	"0:"PRE_BARRIER				\
 			"\tlwz %[retval],%[obj]\n"		\
 			"\tcmp 0,0,%[retval],%[retval]\n"	\
@@ -527,7 +532,7 @@ _Static_assert(sizeof(gtm_atomic_ulong) == sizeof(gtm_atomic_uintmax_t),
 			: [retval]	"=r"	(RET)		\
 			: [obj]		"m"	(*OBJ_PTR)	\
 			: "cr0")
-#define PPC_ASM_LDCMP__gtm_atomic_int__(OBJ_PTR, RET) 		\
+#define PPC_ASM_LDCMP__gtm_atomic_int__(OBJ_PTR, RET, PRE_BARRIER, POST_BARRIER) 		\
 	asm volatile ( 	"0:"PRE_BARRIER				\
 			"\tlwa %[retval],%[obj]\n"		\
 			"\tcmp 0,0,%[retval],%[retval]\n"	\
@@ -536,7 +541,7 @@ _Static_assert(sizeof(gtm_atomic_ulong) == sizeof(gtm_atomic_uintmax_t),
 			: [retval]	"=r"	(RET)		\
 			: [obj]		"m"	(*OBJ_PTR)	\
 			: "cr0")
-#define PPC_ASM_LDCMP__gtm_atomic_long__(OBJ_PTR, RET) 		\
+#define PPC_ASM_LDCMP__gtm_atomic_long__(OBJ_PTR, RET, PRE_BARRIER, POST_BARRIER) 		\
 	asm volatile ( 	"0:"PRE_BARRIER				\
 			"\tld %[retval],%[obj]\n"		\
 			"\tcmp 0,1,%[retval],%[retval]\n"	\
@@ -559,7 +564,7 @@ _Static_assert(sizeof(gtm_atomic_ulong) == sizeof(gtm_atomic_uintmax_t),
  * will be sign-or-zero-extended.
  */
 #ifdef _ARCH_PWR8
-#define PPC_ASM_XCHG__gtm_atomic_uchar__(OBJ_PTR, VAL, RET)			\
+#define PPC_ASM_XCHG__gtm_atomic_uchar__(OBJ_PTR, VAL, RET, PRE_BARRIER, POST_BARRIER)		\
 	asm volatile ( 	PRE_BARRIER						\
 			"0:\tlbarx %[retval],0,%[obj_ptr]\n"			\
 			"\tstbcx. %[val],0,%[obj_ptr]\n"			\
@@ -570,7 +575,7 @@ _Static_assert(sizeof(gtm_atomic_ulong) == sizeof(gtm_atomic_uintmax_t),
 			: [val]		"r"	(VAL),				\
 			  [obj_ptr]	"r"	(OBJ_PTR)			\
 			: "cr0")
-#define PPC_ASM_LLSC__gtm_atomic_uchar__(OBJ_PTR, VAL, RET, ASM_OP)		\
+#define PPC_ASM_LLSC__gtm_atomic_uchar__(OBJ_PTR, VAL, RET, ASM_OP, PRE_BARRIER, POST_BARRIER)		\
 	asm volatile ( 	PRE_BARRIER						\
 			"0:\tlbarx %[retval],0,%[obj_ptr]\n"			\
 			ASM_OP							\
@@ -583,7 +588,7 @@ _Static_assert(sizeof(gtm_atomic_ulong) == sizeof(gtm_atomic_uintmax_t),
 			: [val]		"r"	(VAL),				\
 			  [obj_ptr]	"r"	(OBJ_PTR)			\
 			: "cr0")
-#define PPC_ASM_XCHG__gtm_atomic_schar__(OBJ_PTR, VAL, RET)			\
+#define PPC_ASM_XCHG__gtm_atomic_schar__(OBJ_PTR, VAL, RET, PRE_BARRIER, POST_BARRIER)		\
 	asm volatile ( 	PRE_BARRIER						\
 			"0:\tlbarx %[retval],0,%[obj_ptr]\n"			\
 			"\tstbcx. %[val],0,%[obj_ptr]\n"			\
@@ -595,7 +600,7 @@ _Static_assert(sizeof(gtm_atomic_ulong) == sizeof(gtm_atomic_uintmax_t),
 			: [val]		"r"	(VAL),				\
 			  [obj_ptr]	"r"	(OBJ_PTR)			\
 			: "cr0")
-#define PPC_ASM_LLSC__gtm_atomic_schar__(OBJ_PTR, VAL, RET, ASM_OP)		\
+#define PPC_ASM_LLSC__gtm_atomic_schar__(OBJ_PTR, VAL, RET, ASM_OP, PRE_BARRIER, POST_BARRIER)		\
 	asm volatile ( 	PRE_BARRIER						\
 			"0:\tlbarx %[retval],0,%[obj_ptr]\n"			\
 			"\textsb %[retval],%[retval]\n"				\
@@ -609,7 +614,7 @@ _Static_assert(sizeof(gtm_atomic_ulong) == sizeof(gtm_atomic_uintmax_t),
 			: [val]		"r"	(VAL),				\
 			  [obj_ptr]	"r"	(OBJ_PTR)			\
 			: "cr0")
-#define PPC_ASM_XCHG__gtm_atomic_ushort__(OBJ_PTR, VAL, RET)			\
+#define PPC_ASM_XCHG__gtm_atomic_ushort__(OBJ_PTR, VAL, RET, PRE_BARRIER, POST_BARRIER)		\
 	asm volatile ( 	PRE_BARRIER						\
 			"0:\tlharx %[retval],0,%[obj_ptr]\n"			\
 			"\tsthcx. %[val],0,%[obj_ptr]\n"			\
@@ -620,7 +625,7 @@ _Static_assert(sizeof(gtm_atomic_ulong) == sizeof(gtm_atomic_uintmax_t),
 			: [val]		"r"	(VAL),				\
 			  [obj_ptr]	"r"	(OBJ_PTR)			\
 			: "cr0")
-#define PPC_ASM_LLSC__gtm_atomic_ushort__(OBJ_PTR, VAL, RET, ASM_OP)		\
+#define PPC_ASM_LLSC__gtm_atomic_ushort__(OBJ_PTR, VAL, RET, ASM_OP, PRE_BARRIER, POST_BARRIER)		\
 	asm volatile ( 	PRE_BARRIER						\
 			"0:\tlharx %[retval],0,%[obj_ptr]\n"			\
 			ASM_OP							\
@@ -633,7 +638,7 @@ _Static_assert(sizeof(gtm_atomic_ulong) == sizeof(gtm_atomic_uintmax_t),
 			: [val]		"r"	(VAL),				\
 			  [obj_ptr]	"r"	(OBJ_PTR)			\
 			: "cr0")
-#define PPC_ASM_XCHG__gtm_atomic_short__(OBJ_PTR, VAL, RET)			\
+#define PPC_ASM_XCHG__gtm_atomic_short__(OBJ_PTR, VAL, RET, PRE_BARRIER, POST_BARRIER)		\
 	asm volatile ( 	PRE_BARRIER						\
 			"0:\tlharx %[retval],0,%[obj_ptr]\n"			\
 			"\tsthcx. %[val],0,%[obj_ptr]\n"			\
@@ -645,7 +650,7 @@ _Static_assert(sizeof(gtm_atomic_ulong) == sizeof(gtm_atomic_uintmax_t),
 			: [val]		"r"	(VAL),				\
 			  [obj_ptr]	"r"	(OBJ_PTR)			\
 			: "cr0")
-#define PPC_ASM_LLSC__gtm_atomic_short__(OBJ_PTR, VAL, RET, ASM_OP)		\
+#define PPC_ASM_LLSC__gtm_atomic_short__(OBJ_PTR, VAL, RET, ASM_OP, PRE_BARRIER, POST_BARRIER)		\
 	asm volatile ( 	PRE_BARRIER						\
 			"0:\tlharx %[retval],0,%[obj_ptr]\n"			\
 			"\textsh %[retval],%[retval]\n"				\
@@ -660,7 +665,7 @@ _Static_assert(sizeof(gtm_atomic_ulong) == sizeof(gtm_atomic_uintmax_t),
 			  [obj_ptr]	"r"	(OBJ_PTR)			\
 			: "cr0")
 #endif
-#define PPC_ASM_XCHG__gtm_atomic_uint__(OBJ_PTR, VAL, RET)			\
+#define PPC_ASM_XCHG__gtm_atomic_uint__(OBJ_PTR, VAL, RET, PRE_BARRIER, POST_BARRIER)		\
 	asm volatile ( 	PRE_BARRIER						\
 			"0:\tlwarx %[retval],0,%[obj_ptr]\n"			\
 			"\tstwcx. %[val],0,%[obj_ptr]\n"			\
@@ -671,7 +676,7 @@ _Static_assert(sizeof(gtm_atomic_ulong) == sizeof(gtm_atomic_uintmax_t),
 			: [val]		"r"	(VAL),				\
 			  [obj_ptr]	"r"	(OBJ_PTR)			\
 			: "cr0")
-#define PPC_ASM_LLSC__gtm_atomic_uint__(OBJ_PTR, VAL, RET, ASM_OP)		\
+#define PPC_ASM_LLSC__gtm_atomic_uint__(OBJ_PTR, VAL, RET, ASM_OP, PRE_BARRIER, POST_BARRIER)		\
 	asm volatile ( 	PRE_BARRIER						\
 			"0:\tlwarx %[retval],0,%[obj_ptr]\n"			\
 			ASM_OP							\
@@ -684,7 +689,7 @@ _Static_assert(sizeof(gtm_atomic_ulong) == sizeof(gtm_atomic_uintmax_t),
 			: [val]		"r"	(VAL),				\
 			  [obj_ptr]	"r"	(OBJ_PTR)			\
 			: "cr0")
-#define PPC_ASM_XCHG__gtm_atomic_int__(OBJ_PTR, VAL, RET)			\
+#define PPC_ASM_XCHG__gtm_atomic_int__(OBJ_PTR, VAL, RET, PRE_BARRIER, POST_BARRIER)		\
 	asm volatile ( 	PRE_BARRIER						\
 			"0:\tlwarx %[retval],0,%[obj_ptr]\n"			\
 			"\tstwcx. %[val],0,%[obj_ptr]\n"			\
@@ -696,7 +701,7 @@ _Static_assert(sizeof(gtm_atomic_ulong) == sizeof(gtm_atomic_uintmax_t),
 			: [val]		"r"	(VAL),				\
 			  [obj_ptr]	"r"	(OBJ_PTR)			\
 			: "cr0")
-#define PPC_ASM_LLSC__gtm_atomic_int__(OBJ_PTR, VAL, RET, ASM_OP)		\
+#define PPC_ASM_LLSC__gtm_atomic_int__(OBJ_PTR, VAL, RET, ASM_OP, PRE_BARRIER, POST_BARRIER)		\
 	asm volatile ( 	PRE_BARRIER						\
 			"0:\tlwarx %[retval],0,%[obj_ptr]\n"			\
 			"\textsw %[retval],%[retval]\n"				\
@@ -710,7 +715,7 @@ _Static_assert(sizeof(gtm_atomic_ulong) == sizeof(gtm_atomic_uintmax_t),
 			: [val]		"r"	(VAL),				\
 			  [obj_ptr]	"r"	(OBJ_PTR)			\
 			: "cr0")
-#define PPC_ASM_XCHG__gtm_atomic_long__(OBJ_PTR, VAL, RET)			\
+#define PPC_ASM_XCHG__gtm_atomic_long__(OBJ_PTR, VAL, RET, PRE_BARRIER, POST_BARRIER)		\
 	asm volatile ( 	PRE_BARRIER						\
 			"0:\tldarx %[retval],0,%[obj_ptr]\n"			\
 			"\tstdcx. %[val],0,%[obj_ptr]\n"			\
@@ -721,7 +726,7 @@ _Static_assert(sizeof(gtm_atomic_ulong) == sizeof(gtm_atomic_uintmax_t),
 			: [val]		"r"	(VAL),				\
 			  [obj_ptr]	"r"	(OBJ_PTR)			\
 			: "cr0")
-#define PPC_ASM_LLSC__gtm_atomic_long__(OBJ_PTR, VAL, RET, ASM_OP)		\
+#define PPC_ASM_LLSC__gtm_atomic_long__(OBJ_PTR, VAL, RET, ASM_OP, PRE_BARRIER, POST_BARRIER)		\
 	asm volatile ( 	PRE_BARRIER						\
 			"0:\tldarx %[retval],0,%[obj_ptr]\n"			\
 			ASM_OP							\
@@ -761,140 +766,140 @@ _Static_assert(sizeof(gtm_atomic_ulong) == sizeof(gtm_atomic_uintmax_t),
  * thinks the register is still valid, we also reset it with an extsh or extsb as appropriate at the end.
  */
 #ifdef _ARCH_PWR8
-#define PPC_ASM_CMPSWAP__gtm_atomic_uchar__(OBJ_PTR, EXP_PTR, VAL, RET)				\
-	asm volatile (	"\tli %[retval],1\n"							\
-			PRE_BARRIER								\
-			"0:\tlbarx %[scratch],0,%[obj_ptr]\n"					\
-			"\tcmp 0,0,%[scratch],%[exp_reg]\n"					\
-			"\tbne- 1f\n"								\
-			"\tstbcx. %[val],0,%[obj_ptr]\n"					\
-			"\tbne- 0b\n"								\
-			SUCCESS_BARRIER								\
-			"\tb 2f\n"								\
-			"1:"FAIL_BARRIER							\
-			"\tli %[retval],0\n"							\
-			"\tstb %[scratch],%[exp]\n"						\
-			"2:\t\n"								\
-			: [exp]		"=m"	(*EXP_PTR),					\
-			  [obj]		"+m"	(*OBJ_PTR),					\
-			  [scratch]	"=&r"	(((__typeof__(VAL)){ 0 })),			\
-			  [retval]	"=&r"	(RET)						\
-			: [exp_reg]	"r"	(*(volatile __typeof__(EXP_PTR))EXP_PTR),	\
-			  [val]		"r"	(VAL),						\
-			  [obj_ptr]	"r"	(OBJ_PTR)					\
+#define PPC_ASM_CMPSWAP__gtm_atomic_uchar__(OBJ_PTR, EXP_PTR, VAL, RET, PRE_BARRIER, SUCCESS_BARRIER, FAIL_BARRIER)	\
+	asm volatile (	"\tli %[retval],1\n"										\
+			PRE_BARRIER											\
+			"0:\tlbarx %[scratch],0,%[obj_ptr]\n"								\
+			"\tcmp 0,0,%[scratch],%[exp_reg]\n"								\
+			"\tbne- 1f\n"											\
+			"\tstbcx. %[val],0,%[obj_ptr]\n"								\
+			"\tbne- 0b\n"											\
+			SUCCESS_BARRIER											\
+			"\tb 2f\n"											\
+			"1:"FAIL_BARRIER										\
+			"\tli %[retval],0\n"										\
+			"\tstb %[scratch],%[exp]\n"									\
+			"2:\t\n"											\
+			: [exp]		"=m"	(*EXP_PTR),								\
+			  [obj]		"+m"	(*OBJ_PTR),								\
+			  [scratch]	"=&r"	(((__typeof__(VAL)){ 0 })),						\
+			  [retval]	"=&r"	(RET)									\
+			: [exp_reg]	"r"	(*(volatile __typeof__(EXP_PTR))EXP_PTR),				\
+			  [val]		"r"	(VAL),									\
+			  [obj_ptr]	"r"	(OBJ_PTR)								\
 			: "cr0")
-#define PPC_ASM_CMPSWAP__gtm_atomic_schar__(OBJ_PTR, EXP_PTR, VAL, RET)				\
-	asm volatile (	"\tli %[retval],1\n"							\
-			"\tclrldi %[exp_reg],%[exp_reg],56\n"					\
-			PRE_BARRIER								\
-			"0:\tlbarx %[scratch],0,%[obj_ptr]\n"					\
-			"\tcmp 0,0,%[scratch],%[exp_reg]\n"					\
-			"\tbne- 1f\n"								\
-			"\tstbcx. %[val],0,%[obj_ptr]\n"					\
-			"\tbne- 0b\n"								\
-			SUCCESS_BARRIER								\
-			"\tb 2f\n"								\
-			"1:"FAIL_BARRIER							\
-			"\tli %[retval],0\n"							\
-			"\tstb %[scratch],%[exp]\n"						\
-			"2:\textsb %[exp_reg],%[exp_reg]\n"					\
-			: [exp_reg]	"+&r"	(*(volatile __typeof__(EXP_PTR))EXP_PTR),	\
-			  [exp]		"=m"	(*EXP_PTR),					\
-			  [obj]		"+m"	(*OBJ_PTR),					\
-			  [scratch]	"=&r"	(((__typeof__(VAL)){ 0 })),			\
-			  [retval]	"=&r"	(RET)						\
-			: [val]		"r"	(VAL),						\
-			  [obj_ptr]	"r"	(OBJ_PTR)					\
+#define PPC_ASM_CMPSWAP__gtm_atomic_schar__(OBJ_PTR, EXP_PTR, VAL, RET, PRE_BARRIER, SUCCESS_BARRIER, FAIL_BARRIER)	\
+	asm volatile (	"\tli %[retval],1\n"										\
+			"\tclrldi %[exp_reg],%[exp_reg],56\n"								\
+			PRE_BARRIER											\
+			"0:\tlbarx %[scratch],0,%[obj_ptr]\n"								\
+			"\tcmp 0,0,%[scratch],%[exp_reg]\n"								\
+			"\tbne- 1f\n"											\
+			"\tstbcx. %[val],0,%[obj_ptr]\n"								\
+			"\tbne- 0b\n"											\
+			SUCCESS_BARRIER											\
+			"\tb 2f\n"											\
+			"1:"FAIL_BARRIER										\
+			"\tli %[retval],0\n"										\
+			"\tstb %[scratch],%[exp]\n"									\
+			"2:\textsb %[exp_reg],%[exp_reg]\n"								\
+			: [exp_reg]	"+&r"	(*(volatile __typeof__(EXP_PTR))EXP_PTR),				\
+			  [exp]		"=m"	(*EXP_PTR),								\
+			  [obj]		"+m"	(*OBJ_PTR),								\
+			  [scratch]	"=&r"	(((__typeof__(VAL)){ 0 })),						\
+			  [retval]	"=&r"	(RET)									\
+			: [val]		"r"	(VAL),									\
+			  [obj_ptr]	"r"	(OBJ_PTR)								\
 			: "cr0")
-#define PPC_ASM_CMPSWAP__gtm_atomic_ushort__(OBJ_PTR, EXP_PTR, VAL, RET)			\
-	asm volatile (	"\tli %[retval],1\n"							\
-			PRE_BARRIER								\
-			"0:\tlharx %[scratch],0,%[obj_ptr]\n"					\
-			"\tcmp 0,0,%[scratch],%[exp_reg]\n"					\
-			"\tbne- 1f\n"								\
-			"\tsthcx. %[val],0,%[obj_ptr]\n"					\
-			"\tbne- 0b\n"								\
-			SUCCESS_BARRIER								\
-			"\tb 2f\n"								\
-			"1:"FAIL_BARRIER							\
-			"\tli %[retval],0\n"							\
-			"\tsth %[scratch],%[exp]\n"						\
-			"2:\t\n"								\
-			: [exp]		"=m"	(*EXP_PTR),					\
-			  [obj]		"+m"	(*OBJ_PTR),					\
-			  [scratch]	"=&r"	(((__typeof__(VAL)){ 0 })),			\
-			  [retval]	"=&r"	(RET)						\
-			: [exp_reg]	"r"	(*(volatile __typeof__(EXP_PTR))EXP_PTR),	\
-			  [val]		"r"	(VAL),						\
-			  [obj_ptr]	"r"	(OBJ_PTR)					\
+#define PPC_ASM_CMPSWAP__gtm_atomic_ushort__(OBJ_PTR, EXP_PTR, VAL, RET, PRE_BARRIER, SUCCESS_BARRIER, FAIL_BARRER)	\
+	asm volatile (	"\tli %[retval],1\n"										\
+			PRE_BARRIER											\
+			"0:\tlharx %[scratch],0,%[obj_ptr]\n"								\
+			"\tcmp 0,0,%[scratch],%[exp_reg]\n"								\
+			"\tbne- 1f\n"											\
+			"\tsthcx. %[val],0,%[obj_ptr]\n"								\
+			"\tbne- 0b\n"											\
+			SUCCESS_BARRIER											\
+			"\tb 2f\n"											\
+			"1:"FAIL_BARRIER										\
+			"\tli %[retval],0\n"										\
+			"\tsth %[scratch],%[exp]\n"									\
+			"2:\t\n"											\
+			: [exp]		"=m"	(*EXP_PTR),								\
+			  [obj]		"+m"	(*OBJ_PTR),								\
+			  [scratch]	"=&r"	(((__typeof__(VAL)){ 0 })),						\
+			  [retval]	"=&r"	(RET)									\
+			: [exp_reg]	"r"	(*(volatile __typeof__(EXP_PTR))EXP_PTR),				\
+			  [val]		"r"	(VAL),									\
+			  [obj_ptr]	"r"	(OBJ_PTR)								\
 			: "cr0")
-#define PPC_ASM_CMPSWAP__gtm_atomic_short__(OBJ_PTR, EXP_PTR, VAL, RET)				\
-	asm volatile (	"\tli %[retval],1\n"							\
-			"\tclrldi %[exp_reg],%[exp_reg],48\n"					\
-			PRE_BARRIER								\
-			"0:\tlharx %[scratch],0,%[obj_ptr]\n"					\
-			"\tcmp 0,0,%[scratch],%[exp_reg]\n"					\
-			"\tbne- 1f\n"								\
-			"\tsthcx. %[val],0,%[obj_ptr]\n"					\
-			"\tbne- 0b\n"								\
-			SUCCESS_BARRIER								\
-			"\tb 2f\n"								\
-			"1:"FAIL_BARRIER							\
-			"\tli %[retval],0\n"							\
-			"\tsth %[scratch],%[exp]\n"						\
-			"2:\textsh %[exp_reg],%[exp_reg]\n"					\
-			: [exp_reg]	"+&r"	(*(volatile __typeof__(EXP_PTR))EXP_PTR),	\
-			  [exp]		"=m"	(*EXP_PTR),					\
-			  [obj]		"+m"	(*OBJ_PTR),					\
-			  [scratch]	"=&r"	(((__typeof__(VAL)){ 0 })),			\
-			  [retval]	"=&r"	(RET)						\
-			: [val]		"r"	(VAL),						\
-			  [obj_ptr]	"r"	(OBJ_PTR)					\
+#define PPC_ASM_CMPSWAP__gtm_atomic_short__(OBJ_PTR, EXP_PTR, VAL, RET, PRE_BARRIER, SUCCESS_BARRIER, FAIL_BARRIER)	\
+	asm volatile (	"\tli %[retval],1\n"										\
+			"\tclrldi %[exp_reg],%[exp_reg],48\n"								\
+			PRE_BARRIER											\
+			"0:\tlharx %[scratch],0,%[obj_ptr]\n"								\
+			"\tcmp 0,0,%[scratch],%[exp_reg]\n"								\
+			"\tbne- 1f\n"											\
+			"\tsthcx. %[val],0,%[obj_ptr]\n"								\
+			"\tbne- 0b\n"											\
+			SUCCESS_BARRIER											\
+			"\tb 2f\n"											\
+			"1:"FAIL_BARRIER										\
+			"\tli %[retval],0\n"										\
+			"\tsth %[scratch],%[exp]\n"									\
+			"2:\textsh %[exp_reg],%[exp_reg]\n"								\
+			: [exp_reg]	"+&r"	(*(volatile __typeof__(EXP_PTR))EXP_PTR),				\
+			  [exp]		"=m"	(*EXP_PTR),								\
+			  [obj]		"+m"	(*OBJ_PTR),								\
+			  [scratch]	"=&r"	(((__typeof__(VAL)){ 0 })),						\
+			  [retval]	"=&r"	(RET)									\
+			: [val]		"r"	(VAL),									\
+			  [obj_ptr]	"r"	(OBJ_PTR)								\
 			: "cr0")
 #endif
-#define PPC_ASM_CMPSWAP__gtm_atomic_int__(OBJ_PTR, EXP_PTR, VAL, RET)				\
-	asm volatile (	"\tli %[retval],1\n"							\
-			PRE_BARRIER								\
-			"0:\tlwarx %[scratch],0,%[obj_ptr]\n"					\
-			"\tcmp 0,0,%[scratch],%[exp_reg]\n"					\
-			"\tbne- 1f\n"								\
-			"\tstwcx. %[val],0,%[obj_ptr]\n"					\
-			"\tbne- 0b\n"								\
-			SUCCESS_BARRIER								\
-			"\tb 2f\n"								\
-			"1:"FAIL_BARRIER							\
-			"\tli %[retval],0\n"							\
-			"\tstw %[scratch],%[exp]\n"						\
-			"2:\t\n"								\
-			: [exp]		"=m"	(*EXP_PTR),					\
-			  [obj]		"+m"	(*OBJ_PTR),					\
-			  [scratch]	"=&r"	(((__typeof__(VAL)){ 0 })),			\
-			  [retval]	"=&r"	(RET)						\
-			: [exp_reg]	"r"	(*(volatile __typeof__(EXP_PTR))EXP_PTR),	\
-			  [val]		"r"	(VAL),						\
-			  [obj_ptr]	"r"	(OBJ_PTR)					\
+#define PPC_ASM_CMPSWAP__gtm_atomic_int__(OBJ_PTR, EXP_PTR, VAL, RET, PRE_BARRIER, SUCCESS_BARRIER, FAIL_BARRIER)	\
+	asm volatile (	"\tli %[retval],1\n"										\
+			PRE_BARRIER											\
+			"0:\tlwarx %[scratch],0,%[obj_ptr]\n"								\
+			"\tcmp 0,0,%[scratch],%[exp_reg]\n"								\
+			"\tbne- 1f\n"											\
+			"\tstwcx. %[val],0,%[obj_ptr]\n"								\
+			"\tbne- 0b\n"											\
+			SUCCESS_BARRIER											\
+			"\tb 2f\n"											\
+			"1:"FAIL_BARRIER										\
+			"\tli %[retval],0\n"										\
+			"\tstw %[scratch],%[exp]\n"									\
+			"2:\t\n"											\
+			: [exp]		"=m"	(*EXP_PTR),								\
+			  [obj]		"+m"	(*OBJ_PTR),								\
+			  [scratch]	"=&r"	(((__typeof__(VAL)){ 0 })),						\
+			  [retval]	"=&r"	(RET)									\
+			: [exp_reg]	"r"	(*(volatile __typeof__(EXP_PTR))EXP_PTR),				\
+			  [val]		"r"	(VAL),									\
+			  [obj_ptr]	"r"	(OBJ_PTR)								\
 			: "cr0")
-#define PPC_ASM_CMPSWAP__gtm_atomic_long__(OBJ_PTR, EXP_PTR, VAL, RET)				\
-	asm volatile (	"\tli %[retval],1\n"							\
-			PRE_BARRIER								\
-			"0:\tldarx %[scratch],0,%[obj_ptr]\n"					\
-			"\tcmp 0,1,%[scratch],%[exp_reg]\n"					\
-			"\tbne- 1f\n"								\
-			"\tstdcx. %[val],0,%[obj_ptr]\n"					\
-			"\tbne- 0b\n"								\
-			SUCCESS_BARRIER								\
-			"\tb 2f\n"								\
-			"1:"FAIL_BARRIER							\
-			"\tli %[retval],0\n"							\
-			"\tstd %[scratch],%[exp]\n"						\
-			"2:\t\n"								\
-			: [exp]		"=m"	(*EXP_PTR),					\
-			  [obj]		"+m"	(*OBJ_PTR),					\
-			  [scratch]	"=&r"	(((__typeof__(VAL)){ 0 })),			\
-			  [retval]	"=&r"	(RET)						\
-			: [exp_reg]	"r"	(*(volatile __typeof__(EXP_PTR))EXP_PTR),	\
-			  [val]		"r"	(VAL),						\
-			  [obj_ptr]	"r"	(OBJ_PTR)					\
+#define PPC_ASM_CMPSWAP__gtm_atomic_long__(OBJ_PTR, EXP_PTR, VAL, RET, PRE_BARRIER, SUCCESS_BARRIER, FAIL_BARRIER)	\
+	asm volatile (	"\tli %[retval],1\n"										\
+			PRE_BARRIER											\
+			"0:\tldarx %[scratch],0,%[obj_ptr]\n"								\
+			"\tcmp 0,1,%[scratch],%[exp_reg]\n"								\
+			"\tbne- 1f\n"											\
+			"\tstdcx. %[val],0,%[obj_ptr]\n"								\
+			"\tbne- 0b\n"											\
+			SUCCESS_BARRIER											\
+			"\tb 2f\n"											\
+			"1:"FAIL_BARRIER										\
+			"\tli %[retval],0\n"										\
+			"\tstd %[scratch],%[exp]\n"									\
+			"2:\t\n"											\
+			: [exp]		"=m"	(*EXP_PTR),								\
+			  [obj]		"+m"	(*OBJ_PTR),								\
+			  [scratch]	"=&r"	(((__typeof__(VAL)){ 0 })),						\
+			  [retval]	"=&r"	(RET)									\
+			: [exp_reg]	"r"	(*(volatile __typeof__(EXP_PTR))EXP_PTR),				\
+			  [val]		"r"	(VAL),									\
+			  [obj_ptr]	"r"	(OBJ_PTR)								\
 			: "cr0")
 #ifdef _ARCH_PWR8
 #define PPC_ASM_CMPSWAP__gtm_atomic_bool__ PPC_ASM_CMPSWAP__gtm_atomic_uchar__
@@ -915,467 +920,216 @@ _Static_assert(sizeof(gtm_atomic_ulong) == sizeof(gtm_atomic_uintmax_t),
 #define PPC_ASMSTR_OR	"\tor %[scratch],%[val],%[retval]\n"
 #define PPC_ASMSTR_XOR	"\txor %[scratch],%[val],%[retval]\n"
 /* Utility macros to define the inline functions which map to the ATOMIC_* macros, necessary because some of them return a value. */
-#define DEFINE_ATOMIC_LOAD(OBJ_TYPE, ORD)						\
+#define DEFINE_ATOMIC_LOAD(OBJ_TYPE, ORD, PRE_BARRIER, POST_BARRIER)			\
 static inline OBJ_TYPE atomic_load__##OBJ_TYPE##__##ORD(const volatile OBJ_TYPE *p)	\
 {											\
 	OBJ_TYPE ret;									\
-	PPC_ASM_LD##__##OBJ_TYPE##__(p, ret);						\
+	PPC_ASM_LD##__##OBJ_TYPE##__(p, ret, PRE_BARRIER, POST_BARRIER);		\
 	return ret;									\
 }
-#define DEFINE_CMP_ATOMIC_LOAD(OBJ_TYPE, ORD)						\
+#define DEFINE_CMP_ATOMIC_LOAD(OBJ_TYPE, ORD, PRE_BARRIER, POST_BARRIER)		\
 static inline OBJ_TYPE atomic_load__##OBJ_TYPE##__##ORD(const volatile OBJ_TYPE *p)	\
 {											\
 	OBJ_TYPE ret;									\
-	PPC_ASM_LDCMP##__##OBJ_TYPE##__(p, ret);					\
+	PPC_ASM_LDCMP##__##OBJ_TYPE##__(p, ret, PRE_BARRIER, POST_BARRIER);		\
 	return ret;									\
 }
-#define DEFINE_ATOMIC_STORE(OBJ_TYPE, ORD)						\
+#define DEFINE_ATOMIC_STORE(OBJ_TYPE, ORD, PRE_BARRIER, POST_BARRIER)			\
 static inline void atomic_store__##OBJ_TYPE##__##ORD(volatile OBJ_TYPE *p, OBJ_TYPE v)	\
 {											\
-	PPC_ASM_ST##__##OBJ_TYPE##__(p, v);						\
+	PPC_ASM_ST##__##OBJ_TYPE##__(p, v, PRE_BARRIER, POST_BARRIER);			\
 	return;										\
 }
-#define DEFINE_ATOMIC_LL_SC_OP(OBJ_TYPE, ORD, OPNAME, ASM)					\
+#define DEFINE_ATOMIC_LL_SC_OP(OBJ_TYPE, ORD, OPNAME, ASM, PRE_BARRIER, POST_BARRIER)		\
 static inline OBJ_TYPE OPNAME##OBJ_TYPE##__##ORD(volatile OBJ_TYPE *p, OBJ_TYPE v)		\
 {												\
 	OBJ_TYPE ret;										\
-	PPC_ASM_LLSC##__##OBJ_TYPE##__(p, v, ret, ASM);						\
+	PPC_ASM_LLSC##__##OBJ_TYPE##__(p, v, ret, ASM, PRE_BARRIER, POST_BARRIER);		\
 	return ret;										\
 }
-#define DEFINE_ATOMIC_XCHG(OBJ_TYPE, ORD)							\
+#define DEFINE_ATOMIC_XCHG(OBJ_TYPE, ORD, PRE_BARRIER, POST_BARRIER)				\
 static inline OBJ_TYPE atomic_exchange__##OBJ_TYPE##__##ORD(volatile OBJ_TYPE *p, OBJ_TYPE v)	\
 {												\
 	OBJ_TYPE ret;										\
-	PPC_ASM_XCHG##__##OBJ_TYPE##__(p, v, ret);						\
+	PPC_ASM_XCHG##__##OBJ_TYPE##__(p, v, ret, PRE_BARRIER, POST_BARRIER);			\
 	return ret;										\
 }
-#define DEFINE_ATOMIC_COMPARE_EXCHANGE(OBJ_TYPE, SUCCESS_ORD, FAIL_ORD)								\
+#define DEFINE_ATOMIC_COMPARE_EXCHANGE(OBJ_TYPE, SUCCESS_ORD, FAIL_ORD, PRE_BARRIER, SUCCESS_BARRIER, FAIL_BARRIER)		\
 static inline bool atomic_compare_exchange__##OBJ_TYPE##__##SUCCESS_ORD##__##FAIL_ORD(volatile OBJ_TYPE *p, OBJ_TYPE *e,	\
 		OBJ_TYPE d)													\
 {																\
 	bool ret;														\
-	PPC_ASM_CMPSWAP##__##OBJ_TYPE##__(p, e, d, ret);									\
+	PPC_ASM_CMPSWAP##__##OBJ_TYPE##__(p, e, d, ret, PRE_BARRIER, SUCCESS_BARRIER, FAIL_BARRIER);				\
 	return ret;														\
 }
-#define DEFINE_ATOMIC_FETCH_ADD(OBJ_TYPE, ORD) DEFINE_ATOMIC_LL_SC_OP(OBJ_TYPE, ORD, atomic_fetch_add__, PPC_ASMSTR_ADD)
-#define DEFINE_ATOMIC_FETCH_SUB(OBJ_TYPE, ORD) DEFINE_ATOMIC_LL_SC_OP(OBJ_TYPE, ORD, atomic_fetch_sub__, PPC_ASMSTR_SUB)
-#define DEFINE_ATOMIC_FETCH_OR(OBJ_TYPE, ORD) DEFINE_ATOMIC_LL_SC_OP(OBJ_TYPE, ORD, atomic_fetch_or__, PPC_ASMSTR_OR)
-#define DEFINE_ATOMIC_FETCH_XOR(OBJ_TYPE, ORD) DEFINE_ATOMIC_LL_SC_OP(OBJ_TYPE, ORD, atomic_fetch_xor__, PPC_ASMSTR_XOR)
-#define DEFINE_ATOMIC_FETCH_AND(OBJ_TYPE, ORD) DEFINE_ATOMIC_LL_SC_OP(OBJ_TYPE, ORD, atomic_fetch_and__, PPC_ASMSTR_AND)
-#define DEFINE_ALL_LL_SC_OPS(OBJ_TYPE, ORD)	\
-DEFINE_ATOMIC_FETCH_ADD(OBJ_TYPE, ORD)		\
-DEFINE_ATOMIC_FETCH_SUB(OBJ_TYPE, ORD)		\
-DEFINE_ATOMIC_FETCH_OR(OBJ_TYPE, ORD) 		\
-DEFINE_ATOMIC_FETCH_XOR(OBJ_TYPE, ORD)		\
-DEFINE_ATOMIC_FETCH_AND(OBJ_TYPE, ORD)		\
-DEFINE_ATOMIC_XCHG(OBJ_TYPE, ORD)
+#define DEFINE_ATOMIC_FETCH_ADD(OBJ_TYPE, ORD, PRE_BARRIER, POST_BARRIER) DEFINE_ATOMIC_LL_SC_OP(OBJ_TYPE, ORD, \
+		atomic_fetch_add__, PPC_ASMSTR_ADD, PRE_BARRIER, POST_BARRIER)
+#define DEFINE_ATOMIC_FETCH_SUB(OBJ_TYPE, ORD, PRE_BARRIER, POST_BARRIER) DEFINE_ATOMIC_LL_SC_OP(OBJ_TYPE, ORD, \
+		atomic_fetch_sub__, PPC_ASMSTR_SUB, PRE_BARRIER, POST_BARRIER)
+#define DEFINE_ATOMIC_FETCH_OR(OBJ_TYPE, ORD, PRE_BARRIER, POST_BARRIER) DEFINE_ATOMIC_LL_SC_OP(OBJ_TYPE, ORD, \
+		atomic_fetch_or__, PPC_ASMSTR_OR, PRE_BARRIER, POST_BARRIER)
+#define DEFINE_ATOMIC_FETCH_XOR(OBJ_TYPE, ORD, PRE_BARRIER, POST_BARRIER) DEFINE_ATOMIC_LL_SC_OP(OBJ_TYPE, ORD, \
+		atomic_fetch_xor__, PPC_ASMSTR_XOR, PRE_BARRIER, POST_BARRIER)
+#define DEFINE_ATOMIC_FETCH_AND(OBJ_TYPE, ORD, PRE_BARRIER, POST_BARRIER) DEFINE_ATOMIC_LL_SC_OP(OBJ_TYPE, ORD, \
+		atomic_fetch_and__, PPC_ASMSTR_AND, PRE_BARRIER, POST_BARRIER)
+#define DEFINE_ALL_LL_SC_OPS(OBJ_TYPE, ORD, PRE_BARRIER, POST_BARRIER)	\
+DEFINE_ATOMIC_FETCH_ADD(OBJ_TYPE, ORD, PRE_BARRIER, POST_BARRIER)		\
+DEFINE_ATOMIC_FETCH_SUB(OBJ_TYPE, ORD, PRE_BARRIER, POST_BARRIER)		\
+DEFINE_ATOMIC_FETCH_OR(OBJ_TYPE, ORD, PRE_BARRIER, POST_BARRIER) 		\
+DEFINE_ATOMIC_FETCH_XOR(OBJ_TYPE, ORD, PRE_BARRIER, POST_BARRIER)		\
+DEFINE_ATOMIC_FETCH_AND(OBJ_TYPE, ORD, PRE_BARRIER, POST_BARRIER)		\
+DEFINE_ATOMIC_XCHG(OBJ_TYPE, ORD, PRE_BARRIER, POST_BARRIER)
 /* What follows is the definitions themselves. The PRE_BARRIER and POST_BARRIER are generally powerpc memory ordering primitives
  * used to create the various ordering constraints.
  */
-#define PRE_BARRIER "\tnop\n"
-#define POST_BARRIER "\tnop\n"
-DEFINE_ATOMIC_STORE(gtm_atomic_bool, memory_order_relaxed)
-DEFINE_ATOMIC_STORE(gtm_atomic_char, memory_order_relaxed)
-DEFINE_ATOMIC_STORE(gtm_atomic_uchar, memory_order_relaxed)
-DEFINE_ATOMIC_STORE(gtm_atomic_schar, memory_order_relaxed)
-DEFINE_ATOMIC_STORE(gtm_atomic_ushort, memory_order_relaxed)
-DEFINE_ATOMIC_STORE(gtm_atomic_short, memory_order_relaxed)
-DEFINE_ATOMIC_STORE(gtm_atomic_ullong, memory_order_relaxed)
-DEFINE_ATOMIC_STORE(gtm_atomic_llong, memory_order_relaxed)
-DEFINE_ATOMIC_STORE(gtm_atomic_uint, memory_order_relaxed)
-DEFINE_ATOMIC_STORE(gtm_atomic_int, memory_order_relaxed)
-DEFINE_ATOMIC_STORE(gtm_atomic_ulong, memory_order_relaxed)
-DEFINE_ATOMIC_STORE(gtm_atomic_long, memory_order_relaxed)
-#undef PRE_BARRIER
-#undef POST_BARRIER
-#define PRE_BARRIER "\tlwsync\n"
-#define POST_BARRIER "\tnop\n"
-DEFINE_ATOMIC_STORE(gtm_atomic_bool, memory_order_release)
-DEFINE_ATOMIC_STORE(gtm_atomic_char, memory_order_release)
-DEFINE_ATOMIC_STORE(gtm_atomic_uchar, memory_order_release)
-DEFINE_ATOMIC_STORE(gtm_atomic_schar, memory_order_release)
-DEFINE_ATOMIC_STORE(gtm_atomic_ushort, memory_order_release)
-DEFINE_ATOMIC_STORE(gtm_atomic_short, memory_order_release)
-DEFINE_ATOMIC_STORE(gtm_atomic_ullong, memory_order_release)
-DEFINE_ATOMIC_STORE(gtm_atomic_llong, memory_order_release)
-DEFINE_ATOMIC_STORE(gtm_atomic_uint, memory_order_release)
-DEFINE_ATOMIC_STORE(gtm_atomic_int, memory_order_release)
-DEFINE_ATOMIC_STORE(gtm_atomic_ulong, memory_order_release)
-DEFINE_ATOMIC_STORE(gtm_atomic_long, memory_order_release)
-#undef PRE_BARRIER
-#undef POST_BARRIER
-#define PRE_BARRIER "\tsync\n"
-#define POST_BARRIER "\tnop\n"
-DEFINE_ATOMIC_STORE(gtm_atomic_bool, memory_order_seq_cst)
-DEFINE_ATOMIC_STORE(gtm_atomic_char, memory_order_seq_cst)
-DEFINE_ATOMIC_STORE(gtm_atomic_uchar, memory_order_seq_cst)
-DEFINE_ATOMIC_STORE(gtm_atomic_schar, memory_order_seq_cst)
-DEFINE_ATOMIC_STORE(gtm_atomic_ushort, memory_order_seq_cst)
-DEFINE_ATOMIC_STORE(gtm_atomic_short, memory_order_seq_cst)
-DEFINE_ATOMIC_STORE(gtm_atomic_ullong, memory_order_seq_cst)
-DEFINE_ATOMIC_STORE(gtm_atomic_llong, memory_order_seq_cst)
-DEFINE_ATOMIC_STORE(gtm_atomic_uint, memory_order_seq_cst)
-DEFINE_ATOMIC_STORE(gtm_atomic_int, memory_order_seq_cst)
-DEFINE_ATOMIC_STORE(gtm_atomic_ulong, memory_order_seq_cst)
-DEFINE_ATOMIC_STORE(gtm_atomic_long, memory_order_seq_cst)
-#undef PRE_BARRIER
-#undef POST_BARRIER
-#undef DEFINE_ATOMIC_STORE
-#define PRE_BARRIER "\tnop\n"
-#define POST_BARRIER "\tnop\n"
-DEFINE_ATOMIC_LOAD(gtm_atomic_bool, memory_order_relaxed)
-DEFINE_ATOMIC_LOAD(gtm_atomic_char, memory_order_relaxed)
-DEFINE_ATOMIC_LOAD(gtm_atomic_uchar, memory_order_relaxed)
-DEFINE_ATOMIC_LOAD(gtm_atomic_schar, memory_order_relaxed)
-DEFINE_ATOMIC_LOAD(gtm_atomic_ushort, memory_order_relaxed)
-DEFINE_ATOMIC_LOAD(gtm_atomic_short, memory_order_relaxed)
-DEFINE_ATOMIC_LOAD(gtm_atomic_ullong, memory_order_relaxed)
-DEFINE_ATOMIC_LOAD(gtm_atomic_llong, memory_order_relaxed)
-DEFINE_ATOMIC_LOAD(gtm_atomic_uint, memory_order_relaxed)
-DEFINE_ATOMIC_LOAD(gtm_atomic_int, memory_order_relaxed)
-DEFINE_ATOMIC_LOAD(gtm_atomic_ulong, memory_order_relaxed)
-DEFINE_ATOMIC_LOAD(gtm_atomic_long, memory_order_relaxed)
-#undef PRE_BARRIER
-#undef POST_BARRIER
-#undef DEFINE_ATOMIC_LOAD
-#define PRE_BARRIER "\tnop\n"
-#define POST_BARRIER "\tisync\n"
-DEFINE_CMP_ATOMIC_LOAD(gtm_atomic_bool, memory_order_acquire)
-DEFINE_CMP_ATOMIC_LOAD(gtm_atomic_char, memory_order_acquire)
-DEFINE_CMP_ATOMIC_LOAD(gtm_atomic_uchar, memory_order_acquire)
-DEFINE_CMP_ATOMIC_LOAD(gtm_atomic_schar, memory_order_acquire)
-DEFINE_CMP_ATOMIC_LOAD(gtm_atomic_ushort, memory_order_acquire)
-DEFINE_CMP_ATOMIC_LOAD(gtm_atomic_short, memory_order_acquire)
-DEFINE_CMP_ATOMIC_LOAD(gtm_atomic_bool, memory_order_consume)
-DEFINE_CMP_ATOMIC_LOAD(gtm_atomic_char, memory_order_consume)
-DEFINE_CMP_ATOMIC_LOAD(gtm_atomic_uchar, memory_order_consume)
-DEFINE_CMP_ATOMIC_LOAD(gtm_atomic_schar, memory_order_consume)
-DEFINE_CMP_ATOMIC_LOAD(gtm_atomic_ushort, memory_order_consume)
-DEFINE_CMP_ATOMIC_LOAD(gtm_atomic_short, memory_order_consume)
-DEFINE_CMP_ATOMIC_LOAD(gtm_atomic_ullong, memory_order_acquire)
-DEFINE_CMP_ATOMIC_LOAD(gtm_atomic_llong, memory_order_acquire)
-DEFINE_CMP_ATOMIC_LOAD(gtm_atomic_uint, memory_order_acquire)
-DEFINE_CMP_ATOMIC_LOAD(gtm_atomic_int, memory_order_acquire)
-DEFINE_CMP_ATOMIC_LOAD(gtm_atomic_ulong, memory_order_acquire)
-DEFINE_CMP_ATOMIC_LOAD(gtm_atomic_long, memory_order_acquire)
-DEFINE_CMP_ATOMIC_LOAD(gtm_atomic_ullong, memory_order_consume)
-DEFINE_CMP_ATOMIC_LOAD(gtm_atomic_llong, memory_order_consume)
-DEFINE_CMP_ATOMIC_LOAD(gtm_atomic_uint, memory_order_consume)
-DEFINE_CMP_ATOMIC_LOAD(gtm_atomic_int, memory_order_consume)
-DEFINE_CMP_ATOMIC_LOAD(gtm_atomic_ulong, memory_order_consume)
-DEFINE_CMP_ATOMIC_LOAD(gtm_atomic_long, memory_order_consume)
-#undef PRE_BARRIER
-#undef POST_BARRIER
-#define PRE_BARRIER "\tsync\n"
-#define POST_BARRIER "\tnop\n"
-DEFINE_CMP_ATOMIC_LOAD(gtm_atomic_bool, memory_order_seq_cst)
-DEFINE_CMP_ATOMIC_LOAD(gtm_atomic_char, memory_order_seq_cst)
-DEFINE_CMP_ATOMIC_LOAD(gtm_atomic_uchar, memory_order_seq_cst)
-DEFINE_CMP_ATOMIC_LOAD(gtm_atomic_schar, memory_order_seq_cst)
-DEFINE_CMP_ATOMIC_LOAD(gtm_atomic_ushort, memory_order_seq_cst)
-DEFINE_CMP_ATOMIC_LOAD(gtm_atomic_short, memory_order_seq_cst)
-DEFINE_CMP_ATOMIC_LOAD(gtm_atomic_ullong, memory_order_seq_cst)
-DEFINE_CMP_ATOMIC_LOAD(gtm_atomic_llong, memory_order_seq_cst)
-DEFINE_CMP_ATOMIC_LOAD(gtm_atomic_uint, memory_order_seq_cst)
-DEFINE_CMP_ATOMIC_LOAD(gtm_atomic_int, memory_order_seq_cst)
-DEFINE_CMP_ATOMIC_LOAD(gtm_atomic_ulong, memory_order_seq_cst)
-DEFINE_CMP_ATOMIC_LOAD(gtm_atomic_long, memory_order_seq_cst)
-#undef PRE_BARRIER
-#undef POST_BARRIER
-#undef DEFINE_CMP_ATOMIC_LOAD
-#define PRE_BARRIER "\tnop\n"
-#define POST_BARRIER "\tnop\n"
-#ifdef _ARCH_PWR8
-DEFINE_ALL_LL_SC_OPS(gtm_atomic_bool, memory_order_relaxed)
-DEFINE_ALL_LL_SC_OPS(gtm_atomic_char, memory_order_relaxed)
-DEFINE_ALL_LL_SC_OPS(gtm_atomic_uchar, memory_order_relaxed)
-DEFINE_ALL_LL_SC_OPS(gtm_atomic_schar, memory_order_relaxed)
-DEFINE_ALL_LL_SC_OPS(gtm_atomic_ushort, memory_order_relaxed)
-DEFINE_ALL_LL_SC_OPS(gtm_atomic_short, memory_order_relaxed)
-#endif
-DEFINE_ALL_LL_SC_OPS(gtm_atomic_ullong, memory_order_relaxed)
-DEFINE_ALL_LL_SC_OPS(gtm_atomic_llong, memory_order_relaxed)
-DEFINE_ALL_LL_SC_OPS(gtm_atomic_uint, memory_order_relaxed)
-DEFINE_ALL_LL_SC_OPS(gtm_atomic_int, memory_order_relaxed)
-DEFINE_ALL_LL_SC_OPS(gtm_atomic_ulong, memory_order_relaxed)
-DEFINE_ALL_LL_SC_OPS(gtm_atomic_long, memory_order_relaxed)
-#undef PRE_BARRIER
-#undef POST_BARRIER
-#define PRE_BARRIER "\tnop\n"
-#define POST_BARRIER "\tisync\n"
-#ifdef _ARCH_PWR8
-DEFINE_ALL_LL_SC_OPS(gtm_atomic_bool, memory_order_acquire)
-DEFINE_ALL_LL_SC_OPS(gtm_atomic_char, memory_order_acquire)
-DEFINE_ALL_LL_SC_OPS(gtm_atomic_uchar, memory_order_acquire)
-DEFINE_ALL_LL_SC_OPS(gtm_atomic_schar, memory_order_acquire)
-DEFINE_ALL_LL_SC_OPS(gtm_atomic_ushort, memory_order_acquire)
-DEFINE_ALL_LL_SC_OPS(gtm_atomic_short, memory_order_acquire)
-DEFINE_ALL_LL_SC_OPS(gtm_atomic_bool, memory_order_consume)
-DEFINE_ALL_LL_SC_OPS(gtm_atomic_char, memory_order_consume)
-DEFINE_ALL_LL_SC_OPS(gtm_atomic_uchar, memory_order_consume)
-DEFINE_ALL_LL_SC_OPS(gtm_atomic_schar, memory_order_consume)
-DEFINE_ALL_LL_SC_OPS(gtm_atomic_ushort, memory_order_consume)
-DEFINE_ALL_LL_SC_OPS(gtm_atomic_short, memory_order_consume)
-#endif
-DEFINE_ALL_LL_SC_OPS(gtm_atomic_ullong, memory_order_acquire)
-DEFINE_ALL_LL_SC_OPS(gtm_atomic_llong, memory_order_acquire)
-DEFINE_ALL_LL_SC_OPS(gtm_atomic_uint, memory_order_acquire)
-DEFINE_ALL_LL_SC_OPS(gtm_atomic_int, memory_order_acquire)
-DEFINE_ALL_LL_SC_OPS(gtm_atomic_ulong, memory_order_acquire)
-DEFINE_ALL_LL_SC_OPS(gtm_atomic_long, memory_order_acquire)
-DEFINE_ALL_LL_SC_OPS(gtm_atomic_ullong, memory_order_consume)
-DEFINE_ALL_LL_SC_OPS(gtm_atomic_llong, memory_order_consume)
-DEFINE_ALL_LL_SC_OPS(gtm_atomic_uint, memory_order_consume)
-DEFINE_ALL_LL_SC_OPS(gtm_atomic_int, memory_order_consume)
-DEFINE_ALL_LL_SC_OPS(gtm_atomic_ulong, memory_order_consume)
-DEFINE_ALL_LL_SC_OPS(gtm_atomic_long, memory_order_consume)
-#undef PRE_BARRIER
-#undef POST_BARRIER
-#define PRE_BARRIER "\tlwsync\n"
-#define POST_BARRIER "\tnop\n"
-#ifdef _ARCH_PWR8
-DEFINE_ALL_LL_SC_OPS(gtm_atomic_bool, memory_order_release)
-DEFINE_ALL_LL_SC_OPS(gtm_atomic_char, memory_order_release)
-DEFINE_ALL_LL_SC_OPS(gtm_atomic_uchar, memory_order_release)
-DEFINE_ALL_LL_SC_OPS(gtm_atomic_schar, memory_order_release)
-DEFINE_ALL_LL_SC_OPS(gtm_atomic_ushort, memory_order_release)
-DEFINE_ALL_LL_SC_OPS(gtm_atomic_short, memory_order_release)
-#endif
-DEFINE_ALL_LL_SC_OPS(gtm_atomic_ullong, memory_order_release)
-DEFINE_ALL_LL_SC_OPS(gtm_atomic_llong, memory_order_release)
-DEFINE_ALL_LL_SC_OPS(gtm_atomic_uint, memory_order_release)
-DEFINE_ALL_LL_SC_OPS(gtm_atomic_int, memory_order_release)
-DEFINE_ALL_LL_SC_OPS(gtm_atomic_ulong, memory_order_release)
-DEFINE_ALL_LL_SC_OPS(gtm_atomic_long, memory_order_release)
-#undef PRE_BARRIER
-#undef POST_BARRIER
-#define PRE_BARRIER "\tlwsync\n"
-#define POST_BARRIER "\tisync\n"
-#ifdef _ARCH_PWR8
-DEFINE_ALL_LL_SC_OPS(gtm_atomic_bool, memory_order_acq_rel)
-DEFINE_ALL_LL_SC_OPS(gtm_atomic_char, memory_order_acq_rel)
-DEFINE_ALL_LL_SC_OPS(gtm_atomic_uchar, memory_order_acq_rel)
-DEFINE_ALL_LL_SC_OPS(gtm_atomic_schar, memory_order_acq_rel)
-DEFINE_ALL_LL_SC_OPS(gtm_atomic_ushort, memory_order_acq_rel)
-DEFINE_ALL_LL_SC_OPS(gtm_atomic_short, memory_order_acq_rel)
-#endif
-DEFINE_ALL_LL_SC_OPS(gtm_atomic_ullong, memory_order_acq_rel)
-DEFINE_ALL_LL_SC_OPS(gtm_atomic_llong, memory_order_acq_rel)
-DEFINE_ALL_LL_SC_OPS(gtm_atomic_uint, memory_order_acq_rel)
-DEFINE_ALL_LL_SC_OPS(gtm_atomic_int, memory_order_acq_rel)
-DEFINE_ALL_LL_SC_OPS(gtm_atomic_ulong, memory_order_acq_rel)
-DEFINE_ALL_LL_SC_OPS(gtm_atomic_long, memory_order_acq_rel)
-#undef PRE_BARRIER
-#undef POST_BARRIER
-#define PRE_BARRIER "\tsync\n"
-#define POST_BARRIER "\tisync\n"
-#ifdef _ARCH_PWR8
-DEFINE_ALL_LL_SC_OPS(gtm_atomic_bool, memory_order_seq_cst)
-DEFINE_ALL_LL_SC_OPS(gtm_atomic_char, memory_order_seq_cst)
-DEFINE_ALL_LL_SC_OPS(gtm_atomic_uchar, memory_order_seq_cst)
-DEFINE_ALL_LL_SC_OPS(gtm_atomic_schar, memory_order_seq_cst)
-DEFINE_ALL_LL_SC_OPS(gtm_atomic_ushort, memory_order_seq_cst)
-DEFINE_ALL_LL_SC_OPS(gtm_atomic_short, memory_order_seq_cst)
-#endif
-DEFINE_ALL_LL_SC_OPS(gtm_atomic_ullong, memory_order_seq_cst)
-DEFINE_ALL_LL_SC_OPS(gtm_atomic_llong, memory_order_seq_cst)
-DEFINE_ALL_LL_SC_OPS(gtm_atomic_uint, memory_order_seq_cst)
-DEFINE_ALL_LL_SC_OPS(gtm_atomic_int, memory_order_seq_cst)
-DEFINE_ALL_LL_SC_OPS(gtm_atomic_ulong, memory_order_seq_cst)
-DEFINE_ALL_LL_SC_OPS(gtm_atomic_long, memory_order_seq_cst)
-#undef PRE_BARRIER
-#undef POST_BARRIER
-#undef DEFINE_ALL_LL_SC_OPS
-#define PRE_BARRIER "\tnop\n"
-#define FAIL_BARRIER "\tnop\n"
-#define SUCCESS_BARRIER "\tnop\n"
-#ifdef _ARCH_PWR8
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_bool, memory_order_relaxed, memory_order_relaxed)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_char, memory_order_relaxed, memory_order_relaxed)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_uchar, memory_order_relaxed, memory_order_relaxed)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_schar, memory_order_relaxed, memory_order_relaxed)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_ushort, memory_order_relaxed, memory_order_relaxed)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_short, memory_order_relaxed, memory_order_relaxed)
-#endif
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_ullong, memory_order_relaxed, memory_order_relaxed)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_llong, memory_order_relaxed, memory_order_relaxed)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_uint, memory_order_relaxed, memory_order_relaxed)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_int, memory_order_relaxed, memory_order_relaxed)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_ulong, memory_order_relaxed, memory_order_relaxed)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_long, memory_order_relaxed, memory_order_relaxed)
-#undef FAIL_BARRIER
-#define FAIL_BARRIER "\tisync\n"
-#ifdef _ARCH_PWR8
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_bool, memory_order_relaxed, memory_order_acquire)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_char, memory_order_relaxed, memory_order_acquire)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_uchar, memory_order_relaxed, memory_order_acquire)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_schar, memory_order_relaxed, memory_order_acquire)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_ushort, memory_order_relaxed, memory_order_acquire)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_short, memory_order_relaxed, memory_order_acquire)
-#endif
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_ullong, memory_order_relaxed, memory_order_acquire)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_llong, memory_order_relaxed, memory_order_acquire)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_uint, memory_order_relaxed, memory_order_acquire)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_int, memory_order_relaxed, memory_order_acquire)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_ulong, memory_order_relaxed, memory_order_acquire)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_long, memory_order_relaxed, memory_order_acquire)
-#undef PRE_BARRIER
-#undef FAIL_BARRIER
-#undef SUCCESS_BARRIER
-#define PRE_BARRIER "\tnop\n"
-#define FAIL_BARRIER "\tnop\n"
-#define SUCCESS_BARRIER "\tisync\n"
-#ifdef _ARCH_PWR8
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_bool, memory_order_acquire, memory_order_relaxed)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_char, memory_order_acquire, memory_order_relaxed)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_uchar, memory_order_acquire, memory_order_relaxed)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_schar, memory_order_acquire, memory_order_relaxed)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_ushort, memory_order_acquire, memory_order_relaxed)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_short, memory_order_acquire, memory_order_relaxed)
-#endif
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_ullong, memory_order_acquire, memory_order_relaxed)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_llong, memory_order_acquire, memory_order_relaxed)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_uint, memory_order_acquire, memory_order_relaxed)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_int, memory_order_acquire, memory_order_relaxed)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_ulong, memory_order_acquire, memory_order_relaxed)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_long, memory_order_acquire, memory_order_relaxed)
-#undef FAIL_BARRIER
-#define FAIL_BARRIER "\tisync\n"
-#ifdef _ARCH_PWR8
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_bool, memory_order_acquire, memory_order_acquire)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_char, memory_order_acquire, memory_order_acquire)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_uchar, memory_order_acquire, memory_order_acquire)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_schar, memory_order_acquire, memory_order_acquire)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_ushort, memory_order_acquire, memory_order_acquire)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_short, memory_order_acquire, memory_order_acquire)
-#endif
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_ullong, memory_order_acquire, memory_order_acquire)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_llong, memory_order_acquire, memory_order_acquire)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_uint, memory_order_acquire, memory_order_acquire)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_int, memory_order_acquire, memory_order_acquire)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_ulong, memory_order_acquire, memory_order_acquire)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_long, memory_order_acquire, memory_order_acquire)
-#undef PRE_BARRIER
-#undef FAIL_BARRIER
-#undef SUCCESS_BARRIER
-#define PRE_BARRIER "\tlwsync\n"
-#define FAIL_BARRIER "\tnop\n"
-#define SUCCESS_BARRIER "\tnop\n"
-#ifdef _ARCH_PWR8
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_bool, memory_order_release, memory_order_relaxed)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_char, memory_order_release, memory_order_relaxed)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_uchar, memory_order_release, memory_order_relaxed)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_schar, memory_order_release, memory_order_relaxed)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_ushort, memory_order_release, memory_order_relaxed)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_short, memory_order_release, memory_order_relaxed)
-#endif
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_ullong, memory_order_release, memory_order_relaxed)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_llong, memory_order_release, memory_order_relaxed)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_uint, memory_order_release, memory_order_relaxed)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_int, memory_order_release, memory_order_relaxed)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_ulong, memory_order_release, memory_order_relaxed)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_long, memory_order_release, memory_order_relaxed)
-#undef FAIL_BARRIER
-#define FAIL_BARRIER "\tisync\n"
-#ifdef _ARCH_PWR8
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_bool, memory_order_release, memory_order_acquire)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_char, memory_order_release, memory_order_acquire)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_uchar, memory_order_release, memory_order_acquire)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_schar, memory_order_release, memory_order_acquire)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_ushort, memory_order_release, memory_order_acquire)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_short, memory_order_release, memory_order_acquire)
-#endif
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_ullong, memory_order_release, memory_order_acquire)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_llong, memory_order_release, memory_order_acquire)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_uint, memory_order_release, memory_order_acquire)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_int, memory_order_release, memory_order_acquire)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_ulong, memory_order_release, memory_order_acquire)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_long, memory_order_release, memory_order_acquire)
-#undef PRE_BARRIER
-#undef FAIL_BARRIER
-#undef SUCCESS_BARRIER
-#define PRE_BARRIER "\tlwsync\n"
-#define FAIL_BARRIER "\tnop\n"
-#define SUCCESS_BARRIER "\tisync\n"
-#ifdef _ARCH_PWR8
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_bool, memory_order_acq_rel, memory_order_relaxed)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_char, memory_order_acq_rel, memory_order_relaxed)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_uchar, memory_order_acq_rel, memory_order_relaxed)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_schar, memory_order_acq_rel, memory_order_relaxed)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_ushort, memory_order_acq_rel, memory_order_relaxed)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_short, memory_order_acq_rel, memory_order_relaxed)
-#endif
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_ullong, memory_order_acq_rel, memory_order_relaxed)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_llong, memory_order_acq_rel, memory_order_relaxed)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_uint, memory_order_acq_rel, memory_order_relaxed)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_int, memory_order_acq_rel, memory_order_relaxed)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_ulong, memory_order_acq_rel, memory_order_relaxed)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_long, memory_order_acq_rel, memory_order_relaxed)
-#undef FAIL_BARRIER
-#define FAIL_BARRIER "\tisync\n"
-#ifdef _ARCH_PWR8
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_bool, memory_order_acq_rel, memory_order_acquire)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_char, memory_order_acq_rel, memory_order_acquire)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_uchar, memory_order_acq_rel, memory_order_acquire)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_schar, memory_order_acq_rel, memory_order_acquire)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_ushort, memory_order_acq_rel, memory_order_acquire)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_short, memory_order_acq_rel, memory_order_acquire)
-#endif
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_ullong, memory_order_acq_rel, memory_order_acquire)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_llong, memory_order_acq_rel, memory_order_acquire)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_uint, memory_order_acq_rel, memory_order_acquire)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_int, memory_order_acq_rel, memory_order_acquire)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_ulong, memory_order_acq_rel, memory_order_acquire)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_long, memory_order_acq_rel, memory_order_acquire)
-#undef PRE_BARRIER
-#undef FAIL_BARRIER
-#undef SUCCESS_BARRIER
-#define PRE_BARRIER "\tsync\n"
-#define FAIL_BARRIER "\tnop\n"
-#define SUCCESS_BARRIER "\tisync\n"
-#ifdef _ARCH_PWR8
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_bool, memory_order_seq_cst, memory_order_relaxed)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_char, memory_order_seq_cst, memory_order_relaxed)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_uchar, memory_order_seq_cst, memory_order_relaxed)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_schar, memory_order_seq_cst, memory_order_relaxed)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_ushort, memory_order_seq_cst, memory_order_relaxed)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_short, memory_order_seq_cst, memory_order_relaxed)
-#endif
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_ullong, memory_order_seq_cst, memory_order_relaxed)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_llong, memory_order_seq_cst, memory_order_relaxed)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_uint, memory_order_seq_cst, memory_order_relaxed)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_int, memory_order_seq_cst, memory_order_relaxed)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_ulong, memory_order_seq_cst, memory_order_relaxed)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_long, memory_order_seq_cst, memory_order_relaxed)
-#undef FAIL_BARRIER
-#define FAIL_BARRIER "\tisync\n"
-#ifdef _ARCH_PWR8
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_bool, memory_order_seq_cst, memory_order_acquire)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_char, memory_order_seq_cst, memory_order_acquire)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_uchar, memory_order_seq_cst, memory_order_acquire)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_schar, memory_order_seq_cst, memory_order_acquire)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_ushort, memory_order_seq_cst, memory_order_acquire)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_short, memory_order_seq_cst, memory_order_acquire)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_bool, memory_order_seq_cst, memory_order_seq_cst)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_char, memory_order_seq_cst, memory_order_seq_cst)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_uchar, memory_order_seq_cst, memory_order_seq_cst)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_schar, memory_order_seq_cst, memory_order_seq_cst)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_ushort, memory_order_seq_cst, memory_order_seq_cst)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_short, memory_order_seq_cst, memory_order_seq_cst)
-#endif
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_ullong, memory_order_seq_cst, memory_order_acquire)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_llong, memory_order_seq_cst, memory_order_acquire)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_uint, memory_order_seq_cst, memory_order_acquire)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_int, memory_order_seq_cst, memory_order_acquire)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_ulong, memory_order_seq_cst, memory_order_acquire)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_long, memory_order_seq_cst, memory_order_acquire)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_uint, memory_order_seq_cst, memory_order_seq_cst)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_int, memory_order_seq_cst, memory_order_seq_cst)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_ulong, memory_order_seq_cst, memory_order_seq_cst)
-DEFINE_ATOMIC_COMPARE_EXCHANGE(gtm_atomic_long, memory_order_seq_cst, memory_order_seq_cst)
-#undef PRE_BARRIER
-#undef FAIL_BARRIER
-#undef SUCCESS_BARRIER
+#define DEFINE_memory_order_relaxed_ATOMIC_STORE(TYPE)	\
+	DEFINE_ATOMIC_STORE(TYPE, memory_order_relaxed, "\tnop\n", "\tnop\n")
+#define DEFINE_memory_order_release_ATOMIC_STORE(TYPE)	\
+	DEFINE_ATOMIC_STORE(TYPE, memory_order_release, "\tlwsync\n", "\tnop\n")
+#define DEFINE_memory_order_seq_cst_ATOMIC_STORE(TYPE)	\
+	DEFINE_ATOMIC_STORE(TYPE, memory_order_seq_cst, "\tsync\n", "\tnop\n")
+#define DEFINE_memory_order_relaxed_ATOMIC_LOAD(TYPE)	\
+	DEFINE_ATOMIC_LOAD(TYPE, memory_order_relaxed, "\tnop\n", "\tnop\n")
+#define DEFINE_memory_order_acquire_ATOMIC_LOAD(TYPE)	\
+	DEFINE_CMP_ATOMIC_LOAD(TYPE, memory_order_acquire, "\tnop\n", "\tisync\n")
+#define DEFINE_memory_order_seq_cst_ATOMIC_LOAD(TYPE)	\
+	DEFINE_CMP_ATOMIC_LOAD(TYPE, memory_order_seq_cst, "\tsync\n", "\tisync\n")
+#define DEFINE_memory_order_relaxed_ATOMIC_XCHG(TYPE)	\
+	DEFINE_ATOMIC_XCHG(TYPE, memory_order_relaxed, "\tnop\n", "\tnop\n")
+#define DEFINE_memory_order_acquire_ATOMIC_XCHG(TYPE)	\
+	DEFINE_ATOMIC_XCHG(TYPE, memory_order_acquire, "\tnop\n", "\tisync\n")
+#define DEFINE_memory_order_release_ATOMIC_XCHG(TYPE)	\
+	DEFINE_ATOMIC_XCHG(TYPE, memory_order_release, "\tlwsync\n", "\tnop\n")
+#define DEFINE_memory_order_acq_rel_ATOMIC_XCHG(TYPE)	\
+	DEFINE_ATOMIC_XCHG(TYPE, memory_order_acq_rel, "\tlwsync\n", "\tisync\n")
+#define DEFINE_memory_order_seq_cst_ATOMIC_XCHG(TYPE)	\
+	DEFINE_ATOMIC_XCHG(TYPE, memory_order_seq_cst, "\tsync\n", "\tisync\n")
+#define DEFINE_memory_order_relaxed_ATOMIC_FETCH_ADD(TYPE)	\
+	DEFINE_ATOMIC_FETCH_ADD(TYPE, memory_order_relaxed, "\tnop\n", "\tnop\n")
+#define DEFINE_memory_order_acquire_ATOMIC_FETCH_ADD(TYPE)	\
+	DEFINE_ATOMIC_FETCH_ADD(TYPE, memory_order_acquire, "\tnop\n", "\tisync\n")
+#define DEFINE_memory_order_release_ATOMIC_FETCH_ADD(TYPE)	\
+	DEFINE_ATOMIC_FETCH_ADD(TYPE, memory_order_release, "\tlwsync\n", "\tnop\n")
+#define DEFINE_memory_order_acq_rel_ATOMIC_FETCH_ADD(TYPE)	\
+	DEFINE_ATOMIC_FETCH_ADD(TYPE, memory_order_acq_rel, "\tlwsync\n", "\tisync\n")
+#define DEFINE_memory_order_seq_cst_ATOMIC_FETCH_ADD(TYPE)	\
+	DEFINE_ATOMIC_FETCH_ADD(TYPE, memory_order_seq_cst, "\tsync\n", "\tisync\n")
+#define DEFINE_memory_order_relaxed_ATOMIC_FETCH_SUB(TYPE)	\
+	DEFINE_ATOMIC_FETCH_SUB(TYPE, memory_order_relaxed, "\tnop\n", "\tnop\n")
+#define DEFINE_memory_order_acquire_ATOMIC_FETCH_SUB(TYPE)	\
+	DEFINE_ATOMIC_FETCH_SUB(TYPE, memory_order_acquire, "\tnop\n", "\tisync\n")
+#define DEFINE_memory_order_release_ATOMIC_FETCH_SUB(TYPE)	\
+	DEFINE_ATOMIC_FETCH_SUB(TYPE, memory_order_release, "\tlwsync\n", "\tnop\n")
+#define DEFINE_memory_order_acq_rel_ATOMIC_FETCH_SUB(TYPE)	\
+	DEFINE_ATOMIC_FETCH_SUB(TYPE, memory_order_acq_rel, "\tlwsync\n", "\tisync\n")
+#define DEFINE_memory_order_seq_cst_ATOMIC_FETCH_SUB(TYPE)	\
+	DEFINE_ATOMIC_FETCH_SUB(TYPE, memory_order_seq_cst, "\tsync\n", "\tisync\n")
+#define DEFINE_memory_order_relaxed_ATOMIC_FETCH_OR(TYPE)	\
+	DEFINE_ATOMIC_FETCH_OR(TYPE, memory_order_relaxed, "\tnop\n", "\tnop\n")
+#define DEFINE_memory_order_acquire_ATOMIC_FETCH_OR(TYPE)	\
+	DEFINE_ATOMIC_FETCH_OR(TYPE, memory_order_acquire, "\tnop\n", "\tisync\n")
+#define DEFINE_memory_order_release_ATOMIC_FETCH_OR(TYPE)	\
+	DEFINE_ATOMIC_FETCH_OR(TYPE, memory_order_release, "\tlwsync\n", "\tnop\n")
+#define DEFINE_memory_order_acq_rel_ATOMIC_FETCH_OR(TYPE)	\
+	DEFINE_ATOMIC_FETCH_OR(TYPE, memory_order_acq_rel, "\tlwsync\n", "\tisync\n")
+#define DEFINE_memory_order_seq_cst_ATOMIC_FETCH_OR(TYPE)	\
+	DEFINE_ATOMIC_FETCH_OR(TYPE, memory_order_seq_cst, "\tsync\n", "\tisync\n")
+#define DEFINE_memory_order_relaxed_ATOMIC_FETCH_XOR(TYPE)	\
+	DEFINE_ATOMIC_FETCH_XOR(TYPE, memory_order_relaxed, "\tnop\n", "\tnop\n")
+#define DEFINE_memory_order_acquire_ATOMIC_FETCH_XOR(TYPE)	\
+	DEFINE_ATOMIC_FETCH_XOR(TYPE, memory_order_acquire, "\tnop\n", "\tisync\n")
+#define DEFINE_memory_order_release_ATOMIC_FETCH_XOR(TYPE)	\
+	DEFINE_ATOMIC_FETCH_XOR(TYPE, memory_order_release, "\tlwsync\n", "\tnop\n")
+#define DEFINE_memory_order_acq_rel_ATOMIC_FETCH_XOR(TYPE)	\
+	DEFINE_ATOMIC_FETCH_XOR(TYPE, memory_order_acq_rel, "\tlwsync\n", "\tisync\n")
+#define DEFINE_memory_order_seq_cst_ATOMIC_FETCH_XOR(TYPE)	\
+	DEFINE_ATOMIC_FETCH_XOR(TYPE, memory_order_seq_cst, "\tsync\n", "\tisync\n")
+#define DEFINE_memory_order_relaxed_ATOMIC_FETCH_AND(TYPE)	\
+	DEFINE_ATOMIC_FETCH_AND(TYPE, memory_order_relaxed, "\tnop\n", "\tnop\n")
+#define DEFINE_memory_order_acquire_ATOMIC_FETCH_AND(TYPE)	\
+	DEFINE_ATOMIC_FETCH_AND(TYPE, memory_order_acquire, "\tnop\n", "\tisync\n")
+#define DEFINE_memory_order_release_ATOMIC_FETCH_AND(TYPE)	\
+	DEFINE_ATOMIC_FETCH_AND(TYPE, memory_order_release, "\tlwsync\n", "\tnop\n")
+#define DEFINE_memory_order_acq_rel_ATOMIC_FETCH_AND(TYPE)	\
+	DEFINE_ATOMIC_FETCH_AND(TYPE, memory_order_acq_rel, "\tlwsync\n", "\tisync\n")
+#define DEFINE_memory_order_seq_cst_ATOMIC_FETCH_AND(TYPE)	\
+	DEFINE_ATOMIC_FETCH_AND(TYPE, memory_order_seq_cst, "\tsync\n", "\tisync\n")
+#define DEFINE_memory_order_relaxed_memory_order_relaxed_ATOMIC_COMPARE_EXCHANGE(TYPE)	\
+	DEFINE_ATOMIC_COMPARE_EXCHANGE(TYPE, memory_order_relaxed, memory_order_relaxed, "\tnop\n", "\tnop\n", "\tnop\n")
+#define DEFINE_memory_order_relaxed_memory_order_acquire_ATOMIC_COMPARE_EXCHANGE(TYPE)	\
+	DEFINE_ATOMIC_COMPARE_EXCHANGE(TYPE, memory_order_relaxed, memory_order_acquire, "\tnop\n", "\tnop\n", "\tisync\n")
+#define DEFINE_memory_order_acquire_memory_order_relaxed_ATOMIC_COMPARE_EXCHANGE(TYPE)	\
+	DEFINE_ATOMIC_COMPARE_EXCHANGE(TYPE, memory_order_acquire, memory_order_relaxed, "\tnop\n", "\tisync\n", "\tnop\n")
+#define DEFINE_memory_order_acquire_memory_order_acquire_ATOMIC_COMPARE_EXCHANGE(TYPE)	\
+	DEFINE_ATOMIC_COMPARE_EXCHANGE(TYPE, memory_order_acquire, memory_order_acquire, "\tnop\n", "\tisync\n", "\tnop\n")
+#define DEFINE_memory_order_release_memory_order_relaxed_ATOMIC_COMPARE_EXCHANGE(TYPE)	\
+	DEFINE_ATOMIC_COMPARE_EXCHANGE(TYPE, memory_order_release, memory_order_relaxed, "\tlwsync\n", "\tnop\n", "\tnop\n")
+#define DEFINE_memory_order_release_memory_order_acquire_ATOMIC_COMPARE_EXCHANGE(TYPE)	\
+	DEFINE_ATOMIC_COMPARE_EXCHANGE(TYPE, memory_order_release, memory_order_acquire, "\tlwsync\n", "\tnop\n", "\tisync\n")
+#define DEFINE_memory_order_acq_rel_memory_order_relaxed_ATOMIC_COMPARE_EXCHANGE(TYPE)	\
+	DEFINE_ATOMIC_COMPARE_EXCHANGE(TYPE, memory_order_acq_rel, memory_order_relaxed, "\tlwsync\n", "\tisync\n", "\tnop\n")
+#define DEFINE_memory_order_acq_rel_memory_order_acquire_ATOMIC_COMPARE_EXCHANGE(TYPE)	\
+	DEFINE_ATOMIC_COMPARE_EXCHANGE(TYPE, memory_order_acq_rel, memory_order_acquire, "\tlwsync\n", "\tisync\n", "\tisync\n")
+#define DEFINE_memory_order_seq_cst_memory_order_relaxed_ATOMIC_COMPARE_EXCHANGE(TYPE)	\
+	DEFINE_ATOMIC_COMPARE_EXCHANGE(TYPE, memory_order_seq_cst, memory_order_relaxed, "\tsync\n", "\tisync\n", "\tnop\n")
+#define DEFINE_memory_order_seq_cst_memory_order_acquire_ATOMIC_COMPARE_EXCHANGE(TYPE)	\
+	DEFINE_ATOMIC_COMPARE_EXCHANGE(TYPE, memory_order_seq_cst, memory_order_acquire, "\tsync\n", "\tisync\n", "\tisync\n")
+#define DEFINE_memory_order_seq_cst_memory_order_seq_cst_ATOMIC_COMPARE_EXCHANGE(TYPE)	\
+	DEFINE_ATOMIC_COMPARE_EXCHANGE(TYPE, memory_order_seq_cst, memory_order_seq_cst, "\tsync\n", "\tisync\n", "\tisync\n")
+#define DEFINE_REGULAR_ATOMIC_OP(TYPE, OPERATION, MEM_ORDER) DEFINE_##MEM_ORDER##_##OPERATION(TYPE)
+#define DEFINE_CE_ATOMIC_OP(TYPE, OPERATION, MEM_ORDER_1, MEM_ORDER_2) \
+	DEFINE_##MEM_ORDER_1##MEM_ORDER_2##_##ATOMIC_COMPARE_EXCHANGE(TYPE)
+#define GET_OPDEF_TYPE(_1, _2, _3, _4, OPNAME, ...) DEFINE_##OPNAME##_ATOMIC_OP
+#define DEFINE_ATOMIC_OP(...) GET_OPDEF_TYPE(__VA_ARGS__, CE, REGULAR)(__VA_ARGS__)
+#define DEFINE_ALL_ATOMIC_OPS(TYPE)		\
+DEFINE_memory_order_relaxed_ATOMIC_STORE(TYPE) 		\
+DEFINE_memory_order_release_ATOMIC_STORE(TYPE) 		\
+DEFINE_memory_order_seq_cst_ATOMIC_STORE(TYPE)		\
+DEFINE_memory_order_relaxed_ATOMIC_LOAD(TYPE)		\
+DEFINE_memory_order_acquire_ATOMIC_LOAD(TYPE)		\
+DEFINE_memory_order_seq_cst_ATOMIC_LOAD(TYPE)		\
+DEFINE_memory_order_relaxed_ATOMIC_XCHG(TYPE)		\
+DEFINE_memory_order_acquire_ATOMIC_XCHG(TYPE)		\
+DEFINE_memory_order_release_ATOMIC_XCHG(TYPE)		\
+DEFINE_memory_order_acq_rel_ATOMIC_XCHG(TYPE)		\
+DEFINE_memory_order_seq_cst_ATOMIC_XCHG(TYPE)		\
+DEFINE_memory_order_relaxed_ATOMIC_FETCH_ADD(TYPE)		\
+DEFINE_memory_order_acquire_ATOMIC_FETCH_ADD(TYPE)		\
+DEFINE_memory_order_release_ATOMIC_FETCH_ADD(TYPE)		\
+DEFINE_memory_order_acq_rel_ATOMIC_FETCH_ADD(TYPE)		\
+DEFINE_memory_order_seq_cst_ATOMIC_FETCH_ADD(TYPE)		\
+DEFINE_memory_order_relaxed_ATOMIC_FETCH_SUB(TYPE)		\
+DEFINE_memory_order_acquire_ATOMIC_FETCH_SUB(TYPE)		\
+DEFINE_memory_order_release_ATOMIC_FETCH_SUB(TYPE)		\
+DEFINE_memory_order_acq_rel_ATOMIC_FETCH_SUB(TYPE)		\
+DEFINE_memory_order_seq_cst_ATOMIC_FETCH_SUB(TYPE)		\
+DEFINE_memory_order_relaxed_ATOMIC_FETCH_OR(TYPE)		\
+DEFINE_memory_order_acquire_ATOMIC_FETCH_OR(TYPE)		\
+DEFINE_memory_order_release_ATOMIC_FETCH_OR(TYPE)		\
+DEFINE_memory_order_acq_rel_ATOMIC_FETCH_OR(TYPE)		\
+DEFINE_memory_order_seq_cst_ATOMIC_FETCH_OR(TYPE)		\
+DEFINE_memory_order_relaxed_ATOMIC_FETCH_XOR(TYPE)		\
+DEFINE_memory_order_acquire_ATOMIC_FETCH_XOR(TYPE)		\
+DEFINE_memory_order_release_ATOMIC_FETCH_XOR(TYPE)		\
+DEFINE_memory_order_acq_rel_ATOMIC_FETCH_XOR(TYPE)		\
+DEFINE_memory_order_seq_cst_ATOMIC_FETCH_XOR(TYPE)		\
+DEFINE_memory_order_relaxed_ATOMIC_FETCH_AND(TYPE)		\
+DEFINE_memory_order_acquire_ATOMIC_FETCH_AND(TYPE)		\
+DEFINE_memory_order_release_ATOMIC_FETCH_AND(TYPE)		\
+DEFINE_memory_order_acq_rel_ATOMIC_FETCH_AND(TYPE)		\
+DEFINE_memory_order_seq_cst_ATOMIC_FETCH_AND(TYPE)		\
+DEFINE_memory_order_relaxed_memory_order_relaxed_ATOMIC_COMPARE_EXCHANGE(TYPE)	\
+DEFINE_memory_order_relaxed_memory_order_acquire_ATOMIC_COMPARE_EXCHANGE(TYPE)	\
+DEFINE_memory_order_acquire_memory_order_relaxed_ATOMIC_COMPARE_EXCHANGE(TYPE)	\
+DEFINE_memory_order_acquire_memory_order_acquire_ATOMIC_COMPARE_EXCHANGE(TYPE)	\
+DEFINE_memory_order_release_memory_order_relaxed_ATOMIC_COMPARE_EXCHANGE(TYPE)	\
+DEFINE_memory_order_release_memory_order_acquire_ATOMIC_COMPARE_EXCHANGE(TYPE)	\
+DEFINE_memory_order_acq_rel_memory_order_relaxed_ATOMIC_COMPARE_EXCHANGE(TYPE)	\
+DEFINE_memory_order_acq_rel_memory_order_acquire_ATOMIC_COMPARE_EXCHANGE(TYPE)	\
+DEFINE_memory_order_seq_cst_memory_order_relaxed_ATOMIC_COMPARE_EXCHANGE(TYPE)	\
+DEFINE_memory_order_seq_cst_memory_order_acquire_ATOMIC_COMPARE_EXCHANGE(TYPE)	\
+DEFINE_memory_order_seq_cst_memory_order_seq_cst_ATOMIC_COMPARE_EXCHANGE(TYPE)
+
 /* Mapping of ATOMIC_* macros to inline functions defined above. */
 #define COMPILER_FENCE(ORD) __fence()
 #define ATOMIC_LOAD(OBJ_PTR, ORD) OP_TYPE_ORD_MNEMONIC(atomic_load, OBJ_PTR, ORD)(OBJ_PTR)

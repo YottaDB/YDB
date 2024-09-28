@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -22,7 +22,7 @@ enum
 	EREPL_RECV,				/* 258 */
 	EREPL_SEND,				/* 259 */
 	EREPL_SEC_AHEAD,			/* 260 */
-	EREPL_JNLFILESEEK,			/* 261 */
+	EREPL_JNLFILESEEK_UNUSED,		/* 261 */
 	EREPL_JNLFILEREAD,			/* 262 */
 	EREPL_JNLRECINCMPL,			/* 263 */
 	EREPL_JNLRECFMT,			/* 264 */

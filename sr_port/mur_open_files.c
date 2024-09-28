@@ -146,6 +146,8 @@ GBLREF	uint4			process_id;
 #ifdef DEBUG
 GBLREF	bool			only_usr_jnlpool_flush;
 #endif
+GBLREF int			in_rlbk;
+GBLREF boolean_t		repl_inst_rlbk_fd;
 
 error_def(ERR_CRITSEMFAIL);
 error_def(ERR_DBFILOPERR);
@@ -305,6 +307,8 @@ int4 mur_open_files(boolean_t retry)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	repl_inst_rlbk_fd = FD_INVALID;
+	in_rlbk = RLBKACTIVE;
 	jnlpool_init_needed = !mur_options.update;
 	if (!retry)
 	{

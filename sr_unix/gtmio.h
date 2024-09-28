@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -316,13 +316,12 @@ MBSTART {											\
 		if (-1 != (gtmioStatus = pread(FDESC, gtmioBuff, gtmioBuffLen, gtmioPtr)))	\
 		{										\
 			gtmioBuffLen -= gtmioStatus;						\
-			if (0 == gtmioBuffLen || 0 == gtmioStatus)				\
+			if ((0 == gtmioBuffLen) || (0 == gtmioStatus))				\
 				break;								\
 			gtmioBuff += gtmioStatus;						\
 			gtmioPtr += gtmioStatus;						\
-			continue;								\
 		}										\
-		if (EINTR != errno)								\
+		else if (EINTR != errno)							\
 			break;									\
 	}											\
 	if (0 == gtmioBuffLen)									\
@@ -357,7 +356,7 @@ MBSTART {											\
 		if (-1 != (gtmioStatus = pread(FDESC, gtmioBuff, gtmioBuffLen, gtmioPtr)))	\
 		{										\
 			gtmioBuffLen -= gtmioStatus;						\
-			if (0 == gtmioBuffLen || 0 == gtmioStatus)				\
+			if ((0 == gtmioBuffLen) || (0 == gtmioStatus))				\
 				break;								\
 			gtmioBuff += gtmioStatus;						\
 			gtmioPtr += gtmioStatus;						\
@@ -451,9 +450,39 @@ MBSTART {											\
 		if (-1 != (gtmioStatus = read(FDESC, gtmioBuff, gtmioBuffLen)))			\
 		{										\
 			gtmioBuffLen -= gtmioStatus;						\
-			if (0 == gtmioBuffLen || 0 == gtmioStatus)				\
+			if ((0 == gtmioBuffLen) || (0 == gtmioStatus))				\
 				break;								\
 			gtmioBuff += gtmioStatus;						\
+		}										\
+		else if (EINTR != errno)							\
+			break;									\
+	}											\
+	if (-1 == gtmioStatus)		/* Had legitimate error - return it */			\
+		RC = errno;									\
+	else if (0 == gtmioBuffLen)								\
+		RC = 0;										\
+	else											\
+		RC = -1;		/* Something kept us from reading what we wanted */	\
+} MBEND
+
+#define DOPREADRC(FDESC, FBUFF, FBUFF_LEN, FPTR, RC)						\
+MBSTART {											\
+	ssize_t		gtmioStatus;								\
+	size_t		gtmioBuffLen;								\
+	off_t		gtmioPtr;								\
+	sm_uc_ptr_t	gtmioBuff;								\
+	gtmioBuffLen = FBUFF_LEN;								\
+	gtmioBuff = (sm_uc_ptr_t)(FBUFF);							\
+	gtmioPtr = (off_t)(FPTR);								\
+	for (;;)										\
+	{											\
+		if (-1 != (gtmioStatus = pread(FDESC, gtmioBuff, gtmioBuffLen, gtmioPtr)))	\
+		{										\
+			gtmioBuffLen -= gtmioStatus;						\
+			if ((0 == gtmioBuffLen) || (0 == gtmioStatus))				\
+				break;								\
+			gtmioBuff += gtmioStatus;						\
+			gtmioPtr += gtmioStatus;						\
 		}										\
 		else if (EINTR != errno)							\
 			break;									\
@@ -478,12 +507,40 @@ MBSTART {											\
 		if (-1 != (gtmioStatus = read(FDESC, gtmioBuff, gtmioBuffLen)))			\
 		{										\
 			gtmioBuffLen -= gtmioStatus;						\
-			if (0 == gtmioBuffLen || 0 == gtmioStatus)				\
+			if ((0 == gtmioBuffLen) || (0 == gtmioStatus))				\
 				break;								\
 			gtmioBuff += gtmioStatus;						\
 		}										\
 		else if (EINTR != errno)							\
-		  break;									\
+			break;									\
+	}											\
+	if (-1 != gtmioStatus)									\
+		RLEN = (int)(FBUFF_LEN - gtmioBuffLen); /* Return length actually read */	\
+	else						/* Had legitimate error - return it */	\
+		RLEN = -1;									\
+} MBEND
+
+#define DOPREADRL(FDESC, FBUFF, FBUFF_LEN, FPTR, RLEN)						\
+MBSTART {											\
+	ssize_t		gtmioStatus;								\
+	size_t		gtmioBuffLen;								\
+	off_t		gtmioPtr;								\
+	sm_uc_ptr_t	gtmioBuff;								\
+	gtmioBuffLen = FBUFF_LEN;								\
+	gtmioBuff = (sm_uc_ptr_t)(FBUFF);							\
+	gtmioPtr = (off_t)(FPTR);								\
+	for (;;)										\
+	{											\
+		if (-1 != (gtmioStatus = pread(FDESC, gtmioBuff, gtmioBuffLen, gtmioPtr)))	\
+		{										\
+			gtmioBuffLen -= gtmioStatus;						\
+			if ((0 == gtmioBuffLen) || (0 == gtmioStatus))				\
+				break;								\
+			gtmioBuff += gtmioStatus;						\
+			gtmioPtr += gtmioStatus;						\
+		}										\
+		else if (EINTR != errno)							\
+			break;									\
 	}											\
 	if (-1 != gtmioStatus)									\
 		RLEN = (int)(FBUFF_LEN - gtmioBuffLen); /* Return length actually read */	\
@@ -551,7 +608,7 @@ MBSTART {													\
 		if (-1 != (gtmioStatus = read(FDESC, gtmioBuff, gtmioBuffLen)))					\
 		{												\
 			gtmioBuffLen -= gtmioStatus;								\
-			if (0 == gtmioBuffLen || 0 == gtmioStatus)						\
+			if ((0 == gtmioBuffLen) || (0 == gtmioStatus))						\
 				break;										\
 			gtmioBuff += gtmioStatus;								\
 		/* If it is pipe or fifo, read data that is currently available. If pipe contains data less than 		\

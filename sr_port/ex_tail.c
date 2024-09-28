@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -21,6 +21,9 @@
 #include "stringpool.h"
 #include "toktyp.h"
 #include "flt_mod.h"
+#include "stack_frame.h"
+
+GBLREF stack_frame	*frame_pointer;
 
 LITREF mval		literal_minusone, literal_one, literal_zero;
 LITREF octabstruct	oc_tab[];
@@ -85,8 +88,11 @@ void ex_tail(oprtype *opr, boolean_t is_boolchild, boolean_t parent_comval)
 		{
 			if (EXT_BOOL == TREF(gtm_fullbool))
 				CONVERT_TO_SE(t);
-			bx_boollit(t);
-			RETURN_IF_RTS_ERROR;
+			if (!(SFT_DM & frame_pointer->type))
+			{
+				bx_boollit(t);
+				RETURN_IF_RTS_ERROR;
+			}
 			c = t->opcode;
 			oct = oc_tab[c].octype;
 		}

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -308,8 +308,8 @@ freeze_status	region_freeze_main(gd_region *region, boolean_t freeze, boolean_t 
 		SEND_FREEZEID("FREEZE", csa);
 #		endif
 		rel_latch(&cnl->freeze_latch);
-		send_msg_csa(CSA_ARG(csa) VARLSTCNT(7) ERR_DBFREEZEON, 5, REG_LEN_STR(region), NEG_STR(override), NEG_STR(online),
-								NEG_STR(online & CHILLED_AUTORELEASE_MASK));
+		send_msg_csa(CSA_ARG(csa) VARLSTCNT(9) ERR_DBFREEZEON, 7, REG_LEN_STR(region), DB_LEN_STR(region),
+						NEG_STR(override), NEG_STR(online), NEG_STR(online & CHILLED_AUTORELEASE_MASK));
 		return rval;
 	}
 	/* !freeze */
@@ -344,8 +344,8 @@ freeze_status	region_freeze_main(gd_region *region, boolean_t freeze, boolean_t 
 		{
 			csa->needs_post_freeze_flushsync = TRUE;
 		}
-		send_msg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_DBFREEZEOFF, 4, REG_LEN_STR(region), NEG_STR(override),
-								NEG_STR(cleanup_autorelease));
+		send_msg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_DBFREEZEOFF, 6, REG_LEN_STR(region),DB_LEN_STR(region),
+						NEG_STR(override), NEG_STR(cleanup_autorelease));
 		return rval;
 	} else
 		rel_latch(&cnl->freeze_latch);

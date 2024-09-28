@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -703,10 +703,8 @@ boolean_t	mubfilcpy (backup_reg_list *list, boolean_t showprogress, int attemptc
 			/* Do not use LSEEKREAD macro here because of dependence on setting filepointer for
 			 * subsequent reads.
 			 */
-			if (-1 != (status = (ssize_t)lseek(list->backup_fd, 0, SEEK_SET)))
-			{
-				DOREADRC(list->backup_fd, (sm_uc_ptr_t)sblkh_p, rsize, status);
-			} else
+			DOPREADRC(list->backup_fd, (sm_uc_ptr_t)sblkh_p, rsize, 0, status);
+			if (-1 == status)
 				status = errno;
 			if (0 != status)
 			{

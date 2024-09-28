@@ -637,6 +637,9 @@ void gtm_assert(int file_name_len, char file_name[], int line_no)				CLANG_SCA_A
 void gtm_assert2(int condlen, char *condtext, int file_name_len, char file_name[], int line_no)	__attribute__((noreturn));
 #define GTMASSERT	(gtm_assert(CALLFROM))
 #define assertpro(x) ((x) ? 1 : (gtm_assert2((SIZEOF(#x) - 1), (#x), CALLFROM), 0))
+#ifndef static_assert
+#define static_assert _Static_assert
+#endif
 #ifdef UNIX
 #ifdef DEBUG
 /* The below debug only macros are always used in pairs to indicate a window where the code doesn't expect rts_errors to happen.
@@ -1889,5 +1892,10 @@ enum
 #else
 # define DBG_VERIFY_ACCESS(PTR)
 #endif
+
+/* Defines used with in_rlbk */
+#define RLBKNOTACTIVE	0	/* Not actively performing a rollback */
+#define RLBKACTIVE	1	/* Performing a rollback */
+#define RLBKEXITING	2	/* Performing a rollback and about to finish */
 
 #endif /* MDEF_included */
