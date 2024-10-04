@@ -983,7 +983,7 @@ RNDWNSEMFAIL	<Attempting to acquire gds_rundown semaphore when it is already own
 GTMSECSHRSHUTDN	<gtmsecshr process has received a shutdown request -- shutting down>/info/fao=0!/ansi=0
 NOSPACECRE	<Not enough space to create database file !AD.  !@ZQ blocks are needed, only !@ZQ available.>/error/fao=4!/ansi=0
 LOWSPACECRE	<Disk space for database file !AD is not enough for !UL future extensions.  !@ZQ !UL-byte blocks are needed, only !@ZQ available.>/warning/fao=6!/ansi=0
-WAITDSKSPACE	<Process 0x!XL will wait !UL seconds for necessary disk space to become available for !AD >/info/fao=4!/ansi=0
+WAITDSKSPACE	<Process 0x!XL will wait !UL seconds for necessary disk space to become available for !AD>/info/fao=4!/ansi=0
 OUTOFSPACE	<Database file !AD ran out of disk space.  Detected by process !UL.  !/Exit without clearing shared memory due to the disk space constraints.  !/Make space and then perform mupip rundown to ensure database integrity.>/fatal/fao=3!/ansi=0
 JNLPVTINFO	<Pid 0x!XL cycle 0x!XL fd_mismatch 0x!XL channel 0x!XL sync_io 0x!XL pini_addr 0x!XL qio_active 0x!XL old_channel 0x!XL>/info/fao=8!/ansi=0
 NOSPACEEXT	<Not enough disk space for file !AD to extend.  !@UQ blocks needed.  !@UQ blocks available.>/error/fao=4!/ansi=0
@@ -1418,7 +1418,7 @@ NOSUPPLSUPPL	<Instance !AD is configured to perform local updates so it cannot r
 REPL2OLD	<Instance !AD uses a GT.M/YottaDB version that does not support connection with the current version on instance !AD>/error/fao=4!/ansi=0
 EXTRFILEXISTS	<Error opening output file: !AD -- File exists>/error/fao=2!/ansi=0
 MUUSERECOV	<Abnormal shutdown of journaled database !AD detected>/error/fao=2!/ansi=0
-SECNOTSUPPLEMENTARY	<!AD is a Supplementary Instance and so cannot act as a source to non-Supplementary Instance !AD >/error/fao=4!/ansi=0
+SECNOTSUPPLEMENTARY	<!AD is a Supplementary Instance and so cannot act as a source to non-Supplementary Instance !AD>/error/fao=4!/ansi=0
 SUPRCVRNEEDSSUPSRC	<Instance !AD is not configured to perform local updates so it cannot act as a receiver for non-Supplementary Instance !AD>/error/fao=4!/ansi=0
 PEERPIDMISMATCH	<Local socket peer with PID=!UL does not match specified PID=!UL>/error/fao=2!/ansi=0
 SETITIMERFAILED	<A setitimer() call returned an error status of !UL>/fatal/fao=1!/ansi=0
@@ -1453,7 +1453,7 @@ MUTRUNCBACKINPROG	<Truncate detected concurrent backup in progress for region !A
 MUTRUNCERROR	<Truncate of region !AD encountered service error !AD>/error/fao=4!/ansi=0
 MUTRUNCFAIL	<Truncate failed after reorg>/error/fao=0!/ansi=0
 MUTRUNCNOSPACE	<Region !AD has insufficient space to meet truncate target percentage of !UL>/info/fao=3!/ansi=0
-MUTRUNCNOTBG	<Region !AD does not have access method BG >/error/fao=2!/ansi=0
+MUTRUNCNOTBG	<Region !AD does not have access method BG>/error/fao=2!/ansi=0
 MUTRUNCNOV4	<Region !AD is not fully upgraded from V4 format.>/fatal/fao=2!/ansi=0
 MUTRUNCPERCENT	<Truncate threshold percentage should be from 0 to 99>/error/fao=0!/ansi=0
 MUTRUNCSSINPROG	<Truncate detected concurrent snapshot in progress for region !AD>/info/fao=2!/ansi=0
