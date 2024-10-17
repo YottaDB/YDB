@@ -2,6 +2,9 @@
  *								*
  *	Copyright 2014 Fidelity Information Services, Inc	*
  *								*
+ * Copyright (c) 2024 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -17,7 +20,7 @@
 
 error_def(ERR_MAXARGCNT);
 
-#define MAX_ZSOCKET_ARGS	6	/* argc, dst, device, keyword, arg1, arg2 */
+#define MAX_ZSOCKET_ARGS	4	/* device, keyword, arg1, arg2 */
 
 int f_zsocket(oprtype *a, opctype op)
 {
@@ -52,6 +55,11 @@ int f_zsocket(oprtype *a, opctype op)
 	{
 		if (TK_COMMA != TREF(window_token))
 			break;
+		if (MAX_ZSOCKET_ARGS <= argc)
+		{
+			stx_error(ERR_MAXARGCNT, 1, MAX_ZSOCKET_ARGS);
+			return FALSE;
+		}
 		advancewindow();
 		tok_temp = TREF(window_token);
 		if ((2 == argc) && ((TK_COMMA == tok_temp) || (TK_RPAREN == tok_temp)))
@@ -63,11 +71,6 @@ int f_zsocket(oprtype *a, opctype op)
 		assert(TRIP_REF == argp->oprclass);
 		argc++;
 		argp++;
-		if (MAX_ZSOCKET_ARGS < argc)
-		{
-			stx_error(ERR_MAXARGCNT, 1, MAX_ZSOCKET_ARGS);
-			return FALSE;
-		}
 	}
 	root = last = maketriple(op);
 	root->operand[0] = put_ilit(argc + 1);
