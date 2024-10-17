@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -69,13 +69,16 @@ int m_xecute(void)
 		 * M commands following the XECUTE in the same M line. This is because if the XECUTE string has a FOR loop
 		 * or IF check in it, those would affect the M commands following the XECUTE if the XECUTE command is removed
 		 * and the string pased to XECUTE is instead compiled. Hence the TK_EOL check of the window_token below.
+		 * Also if TREF(discard) is TRUE, it means we are compiling a "XECUTE:0 <string-literal>" and so don't bother
+		 * compiling the <string-literal> since anyways we are going to discard all those triples anyways in the caller.
 		 */
 		for (ref0 = tmpchain.exorder.bl, ref1 = ref0->exorder.bl; OC_NOOP == ref1->opcode; ref1 = ref1->exorder.bl)
  			;	/*  WARNING very evil violations of information hiding above and below */
 		if (!run_time
 			&& (TK_EOL == TREF(window_token))
 			&& (OC_LIT == ref0->opcode)
-			&& (&tmpchain == ref1))
+			&& (&tmpchain == ref1)
+			&& !TREF(discard))
 		{	/* Just found a literal, and only one, and we are not already at run time.
 			 * Can't drive the parsing with the source because there may be emedded quotes, rather must use the literal
 			 * The code in this block sorta/kinda does things like comp_init and op_commarg between a save and restore
