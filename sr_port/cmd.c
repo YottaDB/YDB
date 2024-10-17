@@ -220,6 +220,7 @@ int cmd(void)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	assert(!TREF(discard));	/* make sure this global is not set from a previous cmd() call that had a parse error */
 	assert((SIZEOF(cmd_names) / SIZEOF(nametabent)) == cmd_index[26]);
 	while (TREF(expr_depth))
 		DECREMENT_EXPR_DEPTH;				/* in case of prior errors */

@@ -116,6 +116,9 @@ void stx_error_va(int in_error, va_list args)
 		}
 		if (TREF(for_stack_ptr) > (oprtype **)TADR(for_stack))
 			FOR_POP(BLOWN_FOR);
+		TREF(discard) = FALSE;	/* We are about to issue a runtime error. Clear this global variable to reset state of
+					 * current command (in cmd.c) with error before we move on to parsing another command.
+					 */
 		if (&(TREF(dollar_etrap)) == TREF(ind_source))
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) in_error, 0,
 				ERR_TEXT, 2, RTS_ERROR_TEXT("in $ydb_etrap/$gtm_etrap" ));
