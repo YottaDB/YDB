@@ -142,6 +142,7 @@ int	iosocket_readfl(mval *v, int4 width, uint8 nsec_timeout)
 	socket_interrupt *sockintr;
 	boolean_t	result;
 	boolean_t	ch_set;
+	boolean_t	reset_nonblocking;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -351,27 +352,32 @@ int	iosocket_readfl(mval *v, int4 width, uint8 nsec_timeout)
 		if (0 < nsec_timeout)
 		{	/* There is time to wait */
 			/* Set blocking I/O */
-			FCNTL2(socketptr->sd, F_GETFL, flags);
-			if (flags < 0)
+			reset_nonblocking = FALSE;
+			if (socketptr->nonblocking)
 			{
-				iod->dollar.za = ZA_IO_ERR;
-				save_errno = errno;
-				errptr = (char *)STRERROR(errno);
-				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_GETSOCKOPTERR, 5,
-					LEN_AND_LIT("F_GETFL FOR NON BLOCKING I/O"),
-					save_errno, LEN_AND_STR(errptr));
+				FCNTL2(socketptr->sd, F_GETFL, flags);
+				if (flags < 0)
+				{
+					iod->dollar.za = ZA_IO_ERR;
+					save_errno = errno;
+					errptr = (char *)STRERROR(errno);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_GETSOCKOPTERR, 5,
+						LEN_AND_LIT("F_GETFL FOR NON BLOCKING I/O"),
+						save_errno, LEN_AND_STR(errptr));
+				}
+				FCNTL3(socketptr->sd, F_SETFL, flags & (~(O_NDELAY | O_NONBLOCK)), fcntl_res);
+				if (fcntl_res < 0)
+				{
+					iod->dollar.za = ZA_IO_ERR;
+					save_errno = errno;
+					errptr = (char *)STRERROR(errno);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_SETSOCKOPTERR, 5,
+						LEN_AND_LIT("F_SETFL FOR NON BLOCKING I/O"),
+						save_errno, LEN_AND_STR(errptr));
+				}
+				socketptr->nonblocking = FALSE;
+				reset_nonblocking = TRUE;
 			}
-			FCNTL3(socketptr->sd, F_SETFL, flags & (~(O_NDELAY | O_NONBLOCK)), fcntl_res);
-			if (fcntl_res < 0)
-			{
-				iod->dollar.za = ZA_IO_ERR;
-				save_errno = errno;
-				errptr = (char *)STRERROR(errno);
-				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_SETSOCKOPTERR, 5,
-					LEN_AND_LIT("F_SETFL FOR NON BLOCKING I/O"),
-					save_errno, LEN_AND_STR(errptr));
-			}
-			socketptr->nonblocking = FALSE;
 			sys_get_curr_time(&cur_time);
 			if (!sockintr->end_time_valid)
 				add_uint8_to_abs_time(&cur_time, nsec_timeout, &end_time);
@@ -398,7 +404,6 @@ int	iosocket_readfl(mval *v, int4 width, uint8 nsec_timeout)
 	sockintr->end_time_valid = FALSE;
 	iod->dollar.key[0] = '\0';
 	iod->dollar.zb[0] = '\0';
-	more_data = TRUE;
 	real_errno = 0;
 	requeue_done = FALSE;
 	DBGSOCK((stdout, "socrfl: ##################### Entering read loop ######################\n"));
@@ -670,11 +675,10 @@ int	iosocket_readfl(mval *v, int4 width, uint8 nsec_timeout)
 				if (terminator)
 					DBGSOCK((stdout, "socrfl: Delimiter found - match_delim: %d\n", match_delim));
 				else
-				        DBGSOCK((stdout, "socrfl: Delimiter not found\n"));
+					DBGSOCK((stdout, "socrfl: Delimiter not found\n"));
 				);
 			}
-			if (!terminator)
-				more_data = TRUE;
+			more_data = (!terminator && (has_delimiter || timed || (0 == bytes_read)));
 		} else if ((EINTR == errno) && !out_of_time)	/* Unrelated timer/signal popped */
 		{
 			eintr_handling_check();
@@ -816,18 +820,21 @@ int	iosocket_readfl(mval *v, int4 width, uint8 nsec_timeout)
 	{
 		if (0 < nsec_timeout)
 		{
-			FCNTL3(socketptr->sd, F_SETFL, flags, fcntl_res);
-			if (fcntl_res < 0)
+			if (reset_nonblocking)
 			{
-				iod->dollar.za = ZA_IO_ERR;
-				save_errno = errno;
-				errptr = (char *)STRERROR(errno);
-				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_SETSOCKOPTERR, 5,
-					LEN_AND_LIT("F_SETFL FOR RESTORING SOCKET OPTIONS"),
-					save_errno, LEN_AND_STR(errptr));
+				FCNTL3(socketptr->sd, F_SETFL, flags, fcntl_res);
+				if (fcntl_res < 0)
+				{
+					iod->dollar.za = ZA_IO_ERR;
+					save_errno = errno;
+					errptr = (char *)STRERROR(errno);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_SETSOCKOPTERR, 5,
+						LEN_AND_LIT("F_SETFL FOR RESTORING SOCKET OPTIONS"),
+						save_errno, LEN_AND_STR(errptr));
+				}
+				if ((O_NDELAY | O_NONBLOCK) & flags)
+					socketptr->nonblocking = TRUE;
 			}
-			if ((O_NDELAY | O_NONBLOCK) & flags)
-				socketptr->nonblocking = TRUE;
 			if (out_of_time)
 			{
 				ret = FALSE;
