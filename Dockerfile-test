@@ -26,6 +26,6 @@ COPY sr_unix_nsb ./sr_unix_nsb/
 COPY sr_x86_64 ./sr_x86_64/
 COPY sr_x86_regs ./sr_x86_regs/
 COPY .git ./.git/
-SHELL ["/bin/tcsh"]
-RUN /usr/library/gtm_test/T999/docker/build_and_install_yottadb.csh
+SHELL ["/bin/tcsh", "-c"]
+RUN /usr/library/gtm_test/T999/docker/build_and_install_yottadb.csh V999_R999 master dbg
 WORKDIR /home/gtmtest
