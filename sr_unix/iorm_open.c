@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -50,6 +50,8 @@ error_def(ERR_CRYPTNOAPPEND);
 error_def(ERR_DEVOPENFAIL);
 error_def(ERR_TEXT);
 error_def(ERR_IOERROR);
+
+#define PROCPATH_PREFIX	"/proc/"
 
 LITREF	mstr		chset_names[];
 LITREF unsigned char	io_params_size[];
@@ -228,9 +230,17 @@ short	iorm_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, uint8 tim
 					}
 				}
 			}
-			/* Note that for /proc files, statbuf.st_size is 0. We should not incorrectly set $ZEOF=1 in that case. */
-			if ((size == statbuf.st_size) && size)
+			/* Note that for /proc files, statbuf.st_size is 0. We should not incorrectly set $ZEOF=1 in that case.
+			 * But it is also possible for a non-/proc regular file to be empty in which case too statbuf.st_size
+			 * would be 0. Unfortunately, there is no accurate way to differentiate a 0-byte regular file vs
+			 * a /proc file. Therefore, we check for /proc in the file name and if so we skip setting $ZEOF.
+			 */
+			if ((size == statbuf.st_size)
+				&& (size || (STR_LIT_LEN(PROCPATH_PREFIX) > dev_name->len)
+					|| MEMCMP_LIT(dev_name->dollar_io, PROCPATH_PREFIX)))
+			{
 				iod->dollar.zeof = TRUE;
+			}
 		} else
 		{
 			pipe_buff_size = fpathconf(fd, _PC_PIPE_BUF);
