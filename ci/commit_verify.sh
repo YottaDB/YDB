@@ -36,9 +36,10 @@ echo "# Check for a commit that was not gpg-signed"
 # You can find your key ID with `gpg -K`;
 # upload all keys that you will use to sign commits.
 GPG_KEYS=(
-    # Joshua Nelson
+    # Jynn Nelson
     "A7AC371F484CB10A0EC1CAE1964534138B7FB42E"
     "A833B01B44BDDA1EE80E261CE655823D8D8B1088"
+    "A463388F6BD7260BDB9C043D9C545D04A0181688"
     # Jon Badiali
     "58FE3050D9F48C46FC506C68C5C2A5A682CB4DDF"
     # Brad Westhafer
