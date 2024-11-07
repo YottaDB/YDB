@@ -242,6 +242,7 @@ typedef enum {
 	WBTEST_YDB_SETSTATSOFF,			/* 404 : Reset all the gvstats to be the same as their offset in gvstats_rec_t */
 	WBTEST_YDB_MAXSECSHRRETRY,		/* 405 : Cause loop gated by MAX_COMM_ATTEMPTs in secshr_client.c to fail */
 	WBTEST_YDB_RLSIGLONGJMP,                /* 406 : Slow down processing of SIGALRM timers to illustrate multiple signal processing issues with readline */
+	WBTEST_YDB_ENCR_ENV_TOOLONG,            /* 407 : Encryption env vars are set to too long values (v53003/D9I10002703 subtest) */
 } wbtest_code_t;
 
 #if defined (DEBUG) && !defined (STATIC_ANALYSIS)
