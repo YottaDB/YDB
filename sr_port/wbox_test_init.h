@@ -235,13 +235,13 @@ typedef enum {
 	/* Start section for YDB-only white-box test cases with a higher number so we do not interfere with
 	 * GT.M additions to the above list of cases.
 	 */
-	WBTEST_YDB_KILL_TERMINAL = 200,		/* 200 : Terminal is killed so accept errors due to this */
-	WBTEST_YDB_FILEDELFAIL,			/* 201 : Exercise FILEDELFAIL error codepath in "cre_jnl_file_intrpt_rename" */
-	WBTEST_YDB_RENAMEFAIL,			/* 202 : Exercise RENAMEFAIL error codepath in "cre_jnl_file_intrpt_rename" */
-	WBTEST_YDB_STATICPID,			/* 203 : Set pid to a static number for predictable test output */
-	WBTEST_YDB_SETSTATSOFF,			/* 204 : Reset all the gvstats to be the same as their offset in gvstats_rec_t */
-	WBTEST_YDB_MAXSECSHRRETRY,		/* 205 : Cause loop gated by MAX_COMM_ATTEMPTs in secshr_client.c to fail */
-	WBTEST_YDB_RLSIGLONGJMP,                /* 206 : Slow down processing of SIGALRM timers to illustrate multiple signal processing issues with readline */
+	WBTEST_YDB_KILL_TERMINAL = 400,		/* 400 : Terminal is killed so accept errors due to this */
+	WBTEST_YDB_FILEDELFAIL,			/* 401 : Exercise FILEDELFAIL error codepath in "cre_jnl_file_intrpt_rename" */
+	WBTEST_YDB_RENAMEFAIL,			/* 402 : Exercise RENAMEFAIL error codepath in "cre_jnl_file_intrpt_rename" */
+	WBTEST_YDB_STATICPID,			/* 403 : Set pid to a static number for predictable test output */
+	WBTEST_YDB_SETSTATSOFF,			/* 404 : Reset all the gvstats to be the same as their offset in gvstats_rec_t */
+	WBTEST_YDB_MAXSECSHRRETRY,		/* 405 : Cause loop gated by MAX_COMM_ATTEMPTs in secshr_client.c to fail */
+	WBTEST_YDB_RLSIGLONGJMP,                /* 406 : Slow down processing of SIGALRM timers to illustrate multiple signal processing issues with readline */
 } wbtest_code_t;
 
 #if defined (DEBUG) && !defined (STATIC_ANALYSIS)
