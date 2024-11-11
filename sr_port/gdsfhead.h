@@ -2488,8 +2488,8 @@ MBSTART {														\
 		assert(UDI->grabbed_ftok_sem || UDI->grabbed_access_sem || IS_DSE_IMAGE || IS_LKE_IMAGE);		\
 		if (!(DEFER_COPY))											\
 		{													\
-			COPY_ENC_INFO(CSD, CSA->encr_ptr, CSA->nl->reorg_encrypt_cycle);				\
 			CSA->encr_ptr->issued_db_init_crypt_warning = CRYPT_WARNING;					\
+			COPY_ENC_INFO(CSD, CSA->encr_ptr, CSA->nl->reorg_encrypt_cycle);				\
 		} else													\
 		{	/* Defer the copy until needed later, as detected by a mismatch in reorg_encrypt_cycle.	*/	\
 			memset(CSA->encr_ptr, 0, SIZEOF(enc_info_t));							\
