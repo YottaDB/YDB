@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2024 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -27,7 +30,7 @@ int repl_log_fd2fp(FILE **fp, int fd);
 int repl_log(FILE *fp, boolean_t stamptime, boolean_t flush, char *fmt, ...);
 int repl_log_init(repl_log_file_t log_type, int *log_fd, char *log);
 
-#define LOGTRNUM_INTERVAL 1000	/* default interval (jnlseqno count) at which source/receiver/upd log */
+#define LOGTRNUM_INTERVAL 10000	/* default interval (jnlseqno count) at which source/receiver/upd log */
 
 #ifndef GTMRECV_LOGSTATS_INTERVAL /* so we can re-default GTMRECV_LOGSTATS_INTERVAL while building without changing this file */
 #define GTMRECV_LOGSTATS_INTERVAL 300 /* sec; time period at which statistics are printed by receiver (can't be changed by user) */

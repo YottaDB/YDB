@@ -7279,7 +7279,7 @@
 
    Specifies the number of transactions for which the Source Server should
    leave between writing progress to the log file. The default logging
-   interval is 1000 transactions.
+   interval is 10000 transactions.
 
    -log_interval=0 sets the logging interval to the default value.
 
@@ -8165,7 +8165,7 @@
    integer1 specifies the number of transactions the Receiver Server should
    process between updates to its log file. integer2 specifies the number of
    transactions the Update Process should process between updates to its log
-   file. The default logging interval is 1000 transactions.
+   file. The default logging interval is 10000 transactions.
 
    If integer1 or integer2 is 0, the logging interval is set to the default
    value.
@@ -8449,7 +8449,7 @@
    integer1 specifies the number of transactions for which the Receiver
    Server should wait before writing to the log file. integer2 specifies the
    number of transactions for which the Update Process should wait before
-   writing to the log file. The default logging interval is 1000
+   writing to the log file. The default logging interval is 10000
    transactions.
 
    If integer1 or integer2 is 0, the logging interval reverts to the prior
@@ -8468,7 +8468,7 @@
    integer1 specifies the number of transactions for which the Receiver
    Server should wait before writing to the log file. integer2 specifies the
    number of transactions for which the Update Process should wait before
-   writing to the log file. The default logging interval is 1000
+   writing to the log file. The default logging interval is 10000
    transactions.
 
    If integer1 or integer2 is 0, the logging interval reverts to the prior
