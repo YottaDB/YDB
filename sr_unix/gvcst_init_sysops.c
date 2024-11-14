@@ -102,6 +102,8 @@
 #include "tp_change_reg.h"
 #include "mu_gv_cur_reg_init.h"
 #include "mlkdef.h"
+#include "ydb_getenv.h"
+#include "ydb_logicals.h"
 
 #define REQRUNDOWN_TEXT		"semid is invalid but shmid is valid or at least one of sem_ctime or shm_ctime are non-zero"
 #define MAX_ACCESS_SEM_RETRIES	2	/* see comment below where this macro is used for why it needs to be 2 */
@@ -782,6 +784,7 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 	node_local_ptr_t	baseDBnl;
 	int			slp_cnt = 0;
 	boolean_t		is_logged = FALSE;
+	char			*ydb_hostname_ptr;
 #	ifdef DEBUG
 	int			i;
 	char			*ptr;
@@ -803,7 +806,10 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 		mutex_per_process_init();
 	/* Since "gethostname" does not ensure null termination, do it ourselves by passing in 1 lesser size */
 	machine_name[MAX_MCNAMELEN - 1] = '\0';
-	if (GETHOSTNAME(machine_name, MAX_MCNAMELEN - 1, gethostname_res))
+	ydb_hostname_ptr = ydb_getenv(YDBENVINDX_HOSTNAME, NULL_SUFFIX, NULL_IS_YDB_ENV_MATCH);
+	if (NULL != ydb_hostname_ptr)
+		STRNCPY_STR(machine_name, ydb_hostname_ptr, MAX_MCNAMELEN - 1);
+	else if (GETHOSTNAME(machine_name, MAX_MCNAMELEN - 1, gethostname_res))
 		RTS_ERROR(VARLSTCNT(5) ERR_TEXT, 2, LEN_AND_LIT("Unable to get the hostname"), errno);
 	if (WBTEST_ENABLED(WBTEST_TAMPER_HOSTNAME))
 		STRCPY(machine_name, "s_i_l_l_y");

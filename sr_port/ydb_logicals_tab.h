@@ -78,6 +78,7 @@ YDBENVINDX_TABLE_ENTRY (YDBENVINDX_CUR_GBLDIR,                 "$ydb_cur_gbldir"
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_GBLDIR,                     "$ydb_gbldir",                     "$gtmgbldir")
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_GBLDIR_TRANSLATE,           "$ydb_gbldir_translate",           "")
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_GDSCERT,                    "$ydb_gdscert",                    "$gtm_gdscert")
+YDBENVINDX_TABLE_ENTRY (YDBENVINDX_HOSTNAME,                   "$ydb_hostname",                   "")
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_HUGETLB_SHM,                "$ydb_hugetlb_shm",                "$gtm_hugetlb_shm")
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_HUPENABLE,                  "$ydb_hupenable",                  "$gtm_hupenable")
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_ICU_VERSION,                "$ydb_icu_version",                "$gtm_icu_version")
