@@ -314,7 +314,7 @@ install_plugins()
 			cd YDBSupport-master
 			cp ydb_support.sh ${ydb_installdir}/plugin
 			chmod +x ${ydb_installdir}/plugin/ydb_support.sh
-			git log --max-count=1 --pretty=oneline >${ydb_installdir}/plugin/version/YDBSupport.log
+			git log --max-count=1 --pretty=oneline >${ydb_installdir}/plugin/version/YDBSupport_${timestamp}.log
 			cd ../..
 			\rm -R ydbsupport_tmp
 		else
@@ -334,7 +334,7 @@ install_plugins()
 			if make -j `grep -c ^processor /proc/cpuinfo` 2>>../enc.err 1>>../enc.out && make install 2>>../enc.err 1>>../enc.out; then
 				# Save the build directory if the make install command returns a non-zero exit code. Otherwise, remove it.
 				if [ "Y" = "$gtm_verbose" ] ; then cat ../enc.err ../enc.out ; fi
-				git log --max-count=1 --pretty=oneline >${ydb_installdir}/plugin/version/YDBEncrypt.log
+				git log --max-count=1 --pretty=oneline >${ydb_installdir}/plugin/version/YDBEncrypt_${timestamp}.log
 				cd ../..
 				\rm -R enc_tmp
 				# rename gtmcrypt to ydbcrypt and create a symbolic link for backward compatibility
@@ -375,7 +375,7 @@ install_plugins()
 				fi
 				${ydb_installdir}/mumps ${ydb_installdir}/plugin/r/_ZLIB
 				cp _ZLIB.o ${ydb_installdir}/plugin/o
-				git log --max-count=1 --pretty=oneline >${ydb_installdir}/plugin/version/YDBZlib.log
+				git log --max-count=1 --pretty=oneline >${ydb_installdir}/plugin/version/YDBZlib_${timestamp}.log
 				cd ../..
 				\rm -R zlib_tmp
 			else
@@ -411,7 +411,7 @@ install_std_plugin()
 		mkdir ${2}-master/build && cd ${2}-master/build
 		# Build the plugin, saving the directory if the build fails
 		if ( ${cmakecmd} .. && ${cmakecmd} --build . -j $(getconf _NPROCESSORS_ONLN) && ${cmakecmd} --install . ) 2>>${2}.err 1>>${2}.out ; then
-			git log --max-count=1 --pretty=oneline >${ydb_dist}/plugin/version/${2}.log
+			git log --max-count=1 --pretty=oneline >${ydb_dist}/plugin/version/${2}_${timestamp}.log
 			if [ "Y" = "$gtm_verbose" ] ; then cat ${2}.out ; fi
 			cd ../../../.. ; \rm -rf ${2}_tmp
 		else
