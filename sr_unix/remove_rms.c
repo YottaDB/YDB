@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -51,30 +51,41 @@ void remove_rms (io_desc *ciod)
 	 * from the list of devices in io_root_log_name.  This means rm_ptr may be zero so don't use it if it is.
 	 */
 	/* if this is the stderr device being closed directly by user then let the close of the pipe handle it */
-	if (rm_ptr && rm_ptr->stderr_parent)
-		return;
-	if (rm_ptr && (0 < rm_ptr->fildes))
-		CLOSEFILE_RESET(rm_ptr->fildes, rc);	/* resets "rm_ptr->fildes" to FD_INVALID */
-	if (rm_ptr && (NULL != rm_ptr->filstr))
-		FCLOSE(rm_ptr->filstr, fclose_res);
-	if (rm_ptr && (0 < rm_ptr->read_fildes))
-		CLOSEFILE_RESET(rm_ptr->read_fildes, rc);	/* resets "rm_ptr->read_fildes" to FD_INVALID */
-	if (rm_ptr && (rm_ptr->read_filstr != NULL))
-		FCLOSE(rm_ptr->read_filstr, fclose_res);
-	if (rm_ptr && rm_ptr->input_encrypted && (GTMCRYPT_INVALID_KEY_HANDLE != rm_ptr->input_cipher_handle))
+	if (NULL != rm_ptr)
 	{
-		GTMCRYPT_REMOVE_CIPHER_CONTEXT(rm_ptr->input_cipher_handle, rc);
-		if (0 != rc)
-			GTMCRYPT_REPORT_ERROR(rc, rts_error, ciod->trans_name->len, ciod->trans_name->dollar_io);
+		if (rm_ptr->stderr_parent)
+			return;
+		if (0 < rm_ptr->fildes)
+			CLOSEFILE_RESET(rm_ptr->fildes, rc);	/* resets "rm_ptr->fildes" to FD_INVALID */
+		if (NULL != rm_ptr->filstr)
+			FCLOSE(rm_ptr->filstr, fclose_res);
+		if (0 < rm_ptr->read_fildes)
+			CLOSEFILE_RESET(rm_ptr->read_fildes, rc);	/* resets "rm_ptr->read_fildes" to FD_INVALID */
+		if (rm_ptr->read_filstr != NULL)
+			FCLOSE(rm_ptr->read_filstr, fclose_res);
+		if (rm_ptr->input_encrypted && (GTMCRYPT_INVALID_KEY_HANDLE != rm_ptr->input_cipher_handle))
+		{
+			GTMCRYPT_REMOVE_CIPHER_CONTEXT(rm_ptr->input_cipher_handle, rc);
+			if (0 != rc)
+				GTMCRYPT_REPORT_ERROR(rc, rts_error, ciod->trans_name->len, ciod->trans_name->dollar_io);
+		}
+		if (rm_ptr->output_encrypted && (GTMCRYPT_INVALID_KEY_HANDLE != rm_ptr->output_cipher_handle))
+		{
+			GTMCRYPT_REMOVE_CIPHER_CONTEXT(rm_ptr->output_cipher_handle, rc);
+			if (0 != rc)
+				GTMCRYPT_REPORT_ERROR(rc, rts_error, ciod->trans_name->len, ciod->trans_name->dollar_io);
+		}
+		if (NULL != rm_ptr->fsblock_buffer)
+			free(rm_ptr->fsblock_buffer);
+		if (NULL != rm_ptr->inbuf)
+			free(rm_ptr->inbuf);
+		if (NULL != rm_ptr->outbuf)
+			free(rm_ptr->outbuf);
+		if (NULL != rm_ptr->tmp_buffer)
+			free(rm_ptr->tmp_buffer);
+		if (NULL != ciod->dollar.devicebuffer)
+			free(ciod->dollar.devicebuffer);
 	}
-	if (rm_ptr && rm_ptr->output_encrypted && (GTMCRYPT_INVALID_KEY_HANDLE != rm_ptr->output_cipher_handle))
-	{
-		GTMCRYPT_REMOVE_CIPHER_CONTEXT(rm_ptr->output_cipher_handle, rc);
-		if (0 != rc)
-			GTMCRYPT_REPORT_ERROR(rc, rts_error, ciod->trans_name->len, ciod->trans_name->dollar_io);
-	}
-	if (rm_ptr && (NULL != rm_ptr->fsblock_buffer))
-		free(rm_ptr->fsblock_buffer);
 	if ((n_io_dev_types != ciod->type) && ciod->newly_created)
 	{
 		if (((rm == ciod->type) && ((NULL == rm_ptr) || !rm_ptr->is_pipe)) || (ff == ciod->type))
