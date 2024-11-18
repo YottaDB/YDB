@@ -3,7 +3,7 @@
  * Copyright (c) 2015-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -86,6 +86,10 @@ GBLREF unsigned char	cw_map_depth;
 GBLREF unsigned char	cw_set_depth;
 GBLREF unsigned char	rdfail_detail;
 GBLREF sgmnt_addrs	*reorg_encrypt_restart_csa;
+
+#ifdef DEBUG
+GBLREF	block_id	ydb_skip_bml_num;
+#endif
 
 error_def(ERR_BUFFLUFAILED);
 error_def(ERR_BUFRDTIMEOUT);
@@ -448,6 +452,10 @@ void mupip_reorg_encrypt(void)
 		last_bmp = ROUND_DOWN2(total_blks - 1, BLKS_PER_LMAP);
 		for (curbmp = start_bmp; curbmp <= last_bmp; curbmp += BLKS_PER_LMAP)
 		{
+#			ifdef DEBUG
+			if ((0 != ydb_skip_bml_num) && (0 < curbmp) && (curbmp < ydb_skip_bml_num))
+				curbmp = ydb_skip_bml_num;
+#			endif
 			if (mu_ctrly_occurred || mu_ctrlc_occurred)
 			{
 				reg_status = ERR_MUNOFINISH;
