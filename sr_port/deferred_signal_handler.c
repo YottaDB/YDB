@@ -84,7 +84,7 @@ void	deferred_signal_handler(void)
 	 */
 	if (forced_exit)
 	{
-		if (mu_reorg_process && cs_data->kill_in_prog)
+		if (mu_reorg_process && (NULL != cs_data) && cs_data->kill_in_prog)
 		{	/* This is a MUPIP REORG process and the database has a kill-in-progress.
 			 * Avoid KILLABANDONED state of the database by deferring handling of the MUPIP STOP
 			 * till a later DEFERRED_EXIT_REORG_CHECK call.
