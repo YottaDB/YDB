@@ -1285,7 +1285,7 @@ LITDEF	err_msg merrors[] = {
 	{ "MUTRUNC1ATIME", "Process with PID !UL already performing truncate in region !AD", 3, 0 },
 	{ "MUTRUNCBACKINPROG", "Truncate detected concurrent backup in progress for region !AD", 2, 0 },
 	{ "MUTRUNCERROR", "Truncate of region !AD encountered service error !AD", 4, 0 },
-	{ "MUTRUNCFAIL", "Truncate failed after reorg", 0, 0 },
+	{ "MUTRUNCFAIL", "Truncate failed after reorg.  Failure code: !AD.", 2, 0 },
 	{ "MUTRUNCNOSPACE", "Region !AD has insufficient space to meet truncate target percentage of !UL", 3, 0 },
 	{ "MUTRUNCNOTBG", "Region !AD does not have access method BG", 2, 0 },
 	{ "MUTRUNCNOV4", "Region !AD is not fully upgraded from V4 format.", 2, 0 },
