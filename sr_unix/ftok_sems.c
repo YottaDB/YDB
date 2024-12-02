@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -74,17 +74,6 @@ error_def(ERR_SEMKEYINUSE);
 error_def(ERR_SEMWT2LONG);
 error_def(ERR_SYSCALL);
 
-#define	MAX_SEM_DSE_WT	((uint8)NANOSECS_IN_SEC * (30 / 2)) /* Actually 30 seconds before giving up - two semops with 15 second */
-#define	MAX_SEM_WT	((uint8)NANOSECS_IN_SEC * (60 / 2)) /* Actually 60 seconds before giving up - two semops with 30 second */
-
-/* If running in-house we want to debug live semop hangs. So, we will be continuing to hang until we get a successful semop with
- * stack traces taken every MAX_SEM_DSE_WT/MAX_SEM_WT seconds.
- */
-#define MAX_SEMOP_TRYCNT	2	/* effective wait time - 30 seconds for DSE and 1 minute for other images */
-#define MAX_SEMOP_DBG_TRYCNT	604800	/* effective wait time - 3.5 days for DSE and 1 week for other images */
-
-#define	OLD_VERSION_SEM_PER_SET 2
-
 #define ISSUE_CRITSEMFAIL_AND_RETURN(REG, FAILED_OP, ERRNO)									\
 {																\
 	gtm_putmsg_csa(CSA_ARG(REG2CSA(REG)) VARLSTCNT(4) ERR_CRITSEMFAIL, 2, DB_LEN_STR(REG));					\
@@ -124,10 +113,13 @@ boolean_t ftok_sem_get2(gd_region *reg, boolean_t *stacktrace_time, boolean_t *t
  */
 boolean_t ftok_sem_get(gd_region *reg, boolean_t incr_cnt, int project_id, boolean_t immediate, boolean_t *ftok_counter_halted)
 {
-	uint8			semop_wait_time;
 	unix_db_info		*udi;
-	boolean_t		stacktrace_time = FALSE, sem_timeout, bypass = FALSE, result;
+	boolean_t		stacktrace_time = FALSE, bypass = FALSE, result;
 	semwait_status_t	retstat;
+	uint4			max_hrtbt_delta;
+	boolean_t		sem_timedout, *sem_timedoutp = NULL,
+				sem_stacktrace_time, *sem_stacktrace_timep = NULL,
+				indefinite_wait = TRUE;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -143,11 +135,22 @@ boolean_t ftok_sem_get(gd_region *reg, boolean_t incr_cnt, int project_id, boole
 	udi = FILE_INFO(reg);
 	assert(!udi->grabbed_ftok_sem && !udi->grabbed_access_sem);
 	assert(NULL == ftok_sem_reg);
-	semop_wait_time = !IS_DSE_IMAGE ? MAX_SEM_WT : MAX_SEM_DSE_WT;
-	TIMEOUT_INIT(sem_timeout, semop_wait_time);
-	result = ftok_sem_get_common(reg, incr_cnt, project_id, immediate, &stacktrace_time, &sem_timeout, &retstat, &bypass,
-						ftok_counter_halted);
-	TIMEOUT_DONE(sem_timeout);
+	max_hrtbt_delta = TREF(dbinit_max_delta_secs);
+	indefinite_wait = (INDEFINITE_WAIT_ON_EAGAIN == max_hrtbt_delta);
+	if (!indefinite_wait)
+	{
+		TIMEOUT_INIT(sem_timedout, max_hrtbt_delta * (uint8)NANOSECS_IN_SEC);
+		TIMEOUT_INIT(sem_stacktrace_time, max_hrtbt_delta * (uint8)NANOSECS_IN_SEC / 2);
+		sem_timedoutp = &sem_timedout;
+		sem_stacktrace_timep = &sem_stacktrace_time;
+	}
+	result = ftok_sem_get_common(reg, incr_cnt, project_id, immediate, sem_stacktrace_timep, sem_timedoutp,
+					&retstat, &bypass, ftok_counter_halted);
+	if (!indefinite_wait)
+	{
+		TIMEOUT_DONE(sem_timedout);
+		TIMEOUT_DONE(sem_stacktrace_time);
+	}
 	assert(!bypass);
 	if (!result)
 	{
