@@ -3,7 +3,7 @@
  * Copyright (c) 2007-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -46,7 +46,7 @@ error_def (ERR_WRITEWAITPID);
 
 /* Waits for a concurrently running write (of a global buffer to disk) to complete.
  *
- * Returns TRUE if write completes within timeout of approx. 1 minute.
+ * Returns TRUE if writer pid is alive and write completes (it waits without any timeout as long as the pid is still alive).
  * Returns FALSE otherwise.
  */
 boolean_t	wcs_write_in_progress_wait(node_local_ptr_t cnl, cache_rec_ptr_t cr, wbtest_code_t wbox_test_code)
@@ -68,18 +68,14 @@ boolean_t	wcs_write_in_progress_wait(node_local_ptr_t cnl, cache_rec_ptr_t cr, w
 			break;
 		else
 		{
-			GTM_WHITE_BOX_TEST(wbox_test_code, lcnt, (2 * BUF_OWNER_STUCK));
+			GTM_WHITE_BOX_TEST(wbox_test_code, lcnt, BUF_OWNER_STUCK);
 			/* We have noticed the below assert to fail occasionally on some platforms
 			 * We suspect it is because of waiting for another writer that is in jnl_fsync
 			 * (as part of flushing a global buffer) which takes more than a minute to finish.
 			 * To avoid false failures (where the other writer finishes its job in a little over
 			 * a minute) we wait for twice the time in the debug version.
 			 */
-#			ifdef DEBUG
-			if ((BUF_OWNER_STUCK == lcnt) && cr->epid)
-				GET_C_STACK_FROM_SCRIPT("WRITEWAITPID", process_id, cr->epid, ONCE);
-#			endif
-			if (0 == lcnt % (BUF_OWNER_STUCK DEBUG_ONLY( * 2)))
+			if (0 == (lcnt % BUF_OWNER_STUCK))
 			{	/* sick of waiting */
 				if (0 == cr->dirty)
 				{	/* someone dropped something; assume it was the writer and go on */
@@ -91,17 +87,15 @@ boolean_t	wcs_write_in_progress_wait(node_local_ptr_t cnl, cache_rec_ptr_t cr, w
 					{	/* Getting the stack can take some time, so send to the syslog first and check
 						 * that we are still in the same state after.
 						 */
+						int	minutes;
+
+						minutes = lcnt / BUF_OWNER_STUCK;
 						send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_WRITEWAITPID, 6, process_id,
-								DEBUG_ONLY(TWICE) PRO_ONLY(ONCE),
-								cr->epid, &(cr->blk), DB_LEN_STR(gv_cur_region));
-						GET_C_STACK_FROM_SCRIPT("WRITEWAITPID", process_id, cr->epid,
-									DEBUG_ONLY(TWICE) PRO_ONLY(ONCE));
+							minutes, cr->epid, &(cr->blk), DB_LEN_STR(gv_cur_region));
+						GET_C_STACK_FROM_SCRIPT("WRITEWAITPID", process_id, cr->epid, minutes);
 						if (cr->dirty && cr->epid && !is_proc_alive(cr->epid, 0))
 							return FALSE;
 					}
-					assert((WBTEST_DB_WRITE_HANG == ydb_white_box_test_case_number)
-						|| (WBTEST_EXPECT_IO_HANG == ydb_white_box_test_case_number));
-					return FALSE;
 				}
 			}
 			if (WRITER_STILL_OWNS_BUFF(cr, n))
