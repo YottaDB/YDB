@@ -3,7 +3,7 @@
  * Copyright (c) 2012-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -39,7 +39,7 @@ void *gtm_memcpy_validate_and_execute(void *target, const void *src, size_t len)
 	assert(((char *)(target) > (char *)(src))
 	       ? ((char *)(target) >= ((char *)(src) + (len)))
 	       : ((char *)(src) >= ((char *)(target) + (len))));
-	assert(((unsigned char *)target < stringpool.base) || ((unsigned char *)target > stringpool.top)
+	assert(((unsigned char *)target < stringpool.base) || ((unsigned char *)target >= stringpool.top)
 		|| (((unsigned char *)target + len) <= stringpool.top));
 	return memcpy(target, src, len);
 }
