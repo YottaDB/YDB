@@ -586,7 +586,7 @@ JNLREADEOF	<End of journal file encountered>/error/fao=0!/ansi=0
 JNLRECFMT	<Journal file record format error encountered>/error/fao=0!/ansi=0
 BLKTOODEEP	<Block level too deep>/warning/fao=0!/ansi=0
 NESTFORMP	<Formal parameter list cannot be combined with nested line>/error/fao=0!/ansi=0
-BINHDR		<!AD!/!/Date: !AD!/Time: !AD!/Extract Region Characteristics!/!_Blk Size: !AD!/!_Rec Size: !AD!/!_Key Size: !AD!/!_Std Null Coll: !AD!/!AD!/>/info/fao=16!/ansi=0
+UNUSEDMSG589	<BINHDR error nixed in YottaDB r2.02 but never used in the past>/error/fao=16!/ansi=0
 GOQPREC		<Numeric precision in key error:  Blk #!UL, Key #!UL.  Record not loaded.>/info/fao=2!/ansi=0
 LDGOQFMT	<Corrupt GOQ format header information!/>/error/fao=0!/ansi=0
 BEGINST		<Beginning LOAD at record number: !UL>/info/fao=1!/ansi=0

@@ -422,7 +422,7 @@ LITDEF	err_msg merrors[] = {
 	{ "JNLRECFMT", "Journal file record format error encountered", 0, 0 },
 	{ "BLKTOODEEP", "Block level too deep", 0, 0 },
 	{ "NESTFORMP", "Formal parameter list cannot be combined with nested line", 0, 0 },
-	{ "BINHDR", "!AD!/!/Date: !AD!/Time: !AD!/Extract Region Characteristics!/!_Blk Size: !AD!/!_Rec Size: !AD!/!_Key Size: !AD!/!_Std Null Coll: !AD!/!AD!/", 16, 0 },
+	{ "UNUSEDMSG589", "BINHDR error nixed in YottaDB r2.02 but never used in the past", 16, 0 },
 	{ "GOQPREC", "Numeric precision in key error:  Blk #!UL, Key #!UL.  Record not loaded.", 2, 0 },
 	{ "LDGOQFMT", "Corrupt GOQ format header information!/", 0, 0 },
 	{ "BEGINST", "Beginning LOAD at record number: !UL", 1, 0 },

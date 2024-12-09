@@ -420,7 +420,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* JNLRECFMT */
 	   0,	/* BLKTOODEEP */
 	   0,	/* NESTFORMP */
-	   0,	/* BINHDR */
+	   0,	/* UNUSEDMSG589 */
 	   0,	/* GOQPREC */
 	   0,	/* LDGOQFMT */
 	   0,	/* BEGINST */
