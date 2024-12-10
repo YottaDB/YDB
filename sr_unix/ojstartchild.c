@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -845,7 +845,10 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 		argv[2] = cmdbuff;
 		argv[3] = (char *)0;
 		/* Ignore all SIGHUPs until sig_init() is called. On AIX we have seen SIGHUP from middlechild to grandchild */
-		signal(SIGHUP, SIG_IGN);
+		sigemptyset(&act.sa_mask);
+		act.sa_flags = 0;
+		act.sa_handler = SIG_IGN;
+		sigaction(SIGHUP, &act, 0);	/* downstream process will restore the SIGHUP handler */
 		EXECVE(tbuff, argv, env_ary);
 		/* if we got here, error starting the Job */
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_JOBFAIL, 0, ERR_TEXT, 2, LEN_AND_LIT("Exec error in Job"), errno);

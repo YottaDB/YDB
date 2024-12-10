@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2013, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2013-2024 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,6 +12,7 @@
 
 #include "mdef.h"
 #include "error.h"
+#include "gtm_threadgbl.h"
 
 GBLREF	boolean_t	created_core, need_core, dont_want_core;
 #ifdef DEBUG
@@ -34,6 +36,3 @@ CONDITION_HANDLER(gds_rundown_ch)
 	DEBUG_ONLY(ok_to_UNWIND_in_exit_handling = TRUE);
 	UNWIND(NULL, NULL);
 }
-
-
-

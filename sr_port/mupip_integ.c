@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -23,6 +23,7 @@
 #include "error.h"
 #include "cli.h"
 #include "iosp.h"
+#include "interlock.h"
 #include "gdscc.h"
 #include "gdskill.h"
 #include "filestruct.h"
@@ -179,6 +180,7 @@ void mupip_integ(void)
 	boolean_t		full, muint_all_index_blocks, retvalue_mu_int_reg, region_was_frozen;
 	boolean_t		update_filehdr, update_header_tn;
 	boolean_t		online_integ = FALSE, stats_specified;
+	boolean_t		found_file;
 	char			*temp, util_buff[MAX_UTIL_LEN];
 	unsigned char		dummy;
 	unsigned char		key_buff[2048];
@@ -206,6 +208,8 @@ void mupip_integ(void)
 	char 			*db_file_name;
 	usr_reg_que		*usr_spec_regions_integ;
 	usr_reg_que		*region_que_entry;
+	uint4			statsdb_fname_len = 0;
+	char 			statsdb_fname[MAX_FN_LEN + 1];
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -447,20 +451,37 @@ void mupip_integ(void)
 					baseDBcsa = &FILE_INFO(baseDBreg)->s_addrs;
 					baseDBnl = baseDBcsa->nl;
 					BASEDBREG_TO_STATSDBREG(baseDBreg, reg);
-					if (0 == baseDBnl->statsdb_fname_len)
-					{
-						/* Initialize cnl->statsdb_fname from the basedb name */
-						baseDBnl->statsdb_fname_len = ARRAYSIZE(baseDBnl->statsdb_fname);
-						gvcst_set_statsdb_fname(baseDBcsa->hdr, baseDBreg, baseDBnl->statsdb_fname,
-									&baseDBnl->statsdb_fname_len);
-					}
-					COPY_STATSDB_FNAME_INTO_STATSREG(reg, baseDBnl->statsdb_fname, baseDBnl->statsdb_fname_len);
-					if (!mupfndfil(reg, NULL, LOG_ERROR_FALSE))
+					do {
+
+						grab_latch(&baseDBnl->statsdb_field_latch, GRAB_LATCH_INDEFINITE_WAIT,
+								NOT_APPLICABLE, NULL);
+						reg->statsdb_init_cycle = baseDBnl->statsdb_init_cycle;
+						if (0 == baseDBnl->statsdb_fname_len)
+						{
+							assert(!baseDBnl->statsdb_created);
+							rel_latch(&baseDBnl->statsdb_field_latch);
+							/* Initialize cnl->statsdb_fname from the basedb name */
+							statsdb_fname_len = ARRAYSIZE(statsdb_fname);
+							gvcst_set_statsdb_fname(baseDBcsa->hdr, baseDBreg, statsdb_fname,
+									&statsdb_fname_len);
+							COPY_STATSDB_FNAME_INTO_STATSREG(reg, statsdb_fname, statsdb_fname_len);
+						} else
+						{
+							assert(baseDBnl->statsdb_created);
+							COPY_STATSDB_FNAME_INTO_STATSREG(reg, baseDBnl->statsdb_fname,
+									baseDBnl->statsdb_fname_len);
+							rel_latch(&baseDBnl->statsdb_field_latch);
+						}
+						found_file = mupfndfil(reg, NULL, LOG_ERROR_FALSE);
+						SHM_READ_MEMORY_BARRIER;
+					} while (reg->statsdb_init_cycle != *(volatile uint4 *)&baseDBnl->statsdb_init_cycle);
+					if (!found_file)
 					{	/* statsDB does not exist. Print an info message and skip to next region */
 						gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REGFILENOTFOUND, 4,
 							       DB_LEN_STR(reg), REG_LEN_STR(baseDBreg));
 						retvalue_mu_int_reg = FALSE;
 					}
+
 				}
 			} else
 				retvalue_mu_int_reg = TRUE;

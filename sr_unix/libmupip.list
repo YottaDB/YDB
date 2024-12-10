@@ -55,7 +55,6 @@ jnlext_write
 jnlpool_hasnt_overflowed
 mu_all_version_standalone
 mu_clsce
-mu_cre_structs
 mu_decrypt
 mu_extr_gblout
 mu_extr_getblk

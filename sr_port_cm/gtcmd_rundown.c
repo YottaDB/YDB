@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -104,7 +104,7 @@ void gtcmd_rundown(connection_struct *cnx, bool clean_exit)
 			assert(region->head.fl == region->head.bl);
 			if (JNL_ALLOWED(cs_data))
 				jpc->pini_addr = 0;
-			rundown_status |= gds_rundown(CLEANUP_UDI_FALSE);
+			rundown_status |= gds_rundown(CLEANUP_UDI_FALSE, FALSE);
 			gd_ht_kill(region->reg_hash, TRUE);	/* TRUE to free up the table and the gv_targets it holds too */
 			FREE_CSA_DIR_TREE(cs_addrs);
 			cm_del_gdr_ptr(gv_cur_region);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2020-2023 Fidelity National Information	*
+ * Copyright (c) 2020-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -174,7 +174,8 @@ typedef struct v6_sgmnt_data_struct
 	gtm_time8	gt_shm_ctime;		/* time of creation of shared memory */
 	uint4           problksplit;            /* Split db blocks due to restarts - */
 						/* 0: don't; >0: don't if records in block are <= */
-	char		filler_unixonly[36];	/* to ensure this section has 64-byte multiple size */
+	uint4		nobitmap_prepin;	/* 0: use the new mechanism; positive values disable it */
+	char		filler_unixonly[32];	/* to ensure this section has 64-byte multiple size */
 	/************* ACCOUNTING INFORMATION ********************************/
 	int4		filler_n_retries[CDB_MAX_TRIES];	/* Now moved to TAB_GVSTATS_REC section */
 	int4		filler_n_puts;				/* Now moved to TAB_GVSTATS_REC section */

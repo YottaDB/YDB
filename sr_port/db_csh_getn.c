@@ -46,6 +46,7 @@
 #include "gtm_c_stack_trace.h"
 #include "anticipatory_freeze.h"
 #include "wcs_wt.h"
+#include "inline_atomic_pid.h"
 
 GBLREF sgmnt_addrs		*cs_addrs;
 GBLREF gd_region		*gv_cur_region;
@@ -436,6 +437,7 @@ cache_rec_ptr_t	db_csh_getn(block_id block)
 		TREF(block_now_locked) = cr;
 		cr->r_epid = process_id;	/* establish ownership */
 		cr->blk = block;
+		BML_RSRV_RESET(cr);
 		/* We want cr->read_in_progress to be locked BEFORE cr->cycle is incremented. t_qread relies on this order.
 		 * Enforce this order with a write memory barrier. Not doing so might cause the incremented cr->cycle to be
 		 * seen by another process even though it sees the unlocked state of cr->read_in_progress. This could cause

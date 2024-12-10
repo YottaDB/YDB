@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2023 Fidelity National Information	*
+ * Copyright (c) 2012-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -236,6 +236,7 @@ boolean_t mu_truncate(int4 truncate_percent, mval *keep_mval)
 				curr_tn = csd->trans_hist.curr_tn;
 				/* Read the nth local bitmap into memory */
 				bmphist.blk_num = lmap_blk_num;
+				/* Freeing bitmap space; Skip tqread_grab_bml since reallocate_bitmap resolves conflicts */
 				bmphist.buffaddr = t_qread(bmphist.blk_num, &bmphist.cycle, &bmphist.cr);
 				lmap_blk_hdr = (blk_hdr_ptr_t)bmphist.buffaddr;
 				if (NULL == bmphist.buffaddr)
@@ -278,6 +279,7 @@ boolean_t mu_truncate(int4 truncate_percent, mval *keep_mval)
 					alt_hist.h[0].cse = NULL;
 					alt_hist.h[0].tn = curr_tn;
 					alt_hist.h[0].blk_num = lmap_blk_num + blk;
+					/* Freeing bitmap space; Skip tqread_grab_bml since reallocate_bitmap resolves conflicts */
 					alt_hist.h[0].buffaddr = t_qread(alt_hist.h[0].blk_num,
 							&alt_hist.h[0].cycle, &alt_hist.h[0].cr);
 					if (!alt_hist.h[0].buffaddr)
@@ -323,6 +325,7 @@ boolean_t mu_truncate(int4 truncate_percent, mval *keep_mval)
 			blkhist->tn = curr_tn;
 			blkhist->cse = NULL; /* start afresh (do not use value from previous retry) */
 			/* Read the nth local bitmap into memory */
+			/* Incrementing bitmap TN; Skip tqread_grab_bml since reallocate_bitmap resolves conflicts */
 			blkhist->buffaddr = t_qread(lmap_blk_num, (sm_int_ptr_t)&blkhist->cycle, &blkhist->cr);
 			lmap_blk_hdr = (blk_hdr_ptr_t)blkhist->buffaddr;
 			if (NULL == blkhist->buffaddr)

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2017-2023 Fidelity National Information	*
+ * Copyright (c) 2017-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -34,6 +34,7 @@
 #include "caller_id.h"
 #include "db_snapshot.h"
 #include "gdsbgtr.h"
+#include "inline_atomic_pid.h"
 
 GBLREF	cw_set_element		cw_set[];
 GBLREF	unsigned char		cw_set_depth;

@@ -38,6 +38,7 @@
 #include "gdsbt.h"
 #include "gdsfhead.h"
 #include "db_header_conversion.h"
+#include "mu_cre_file.h"
 #include "gdsblk.h"
 #include "gdscc.h"
 #include "min_max.h"
@@ -68,6 +69,7 @@
 #include "eintr_wrapper_semop.h"
 #include "is_file_identical.h"
 #include "repl_instance.h"
+#include "tpnotacid_chk_inline.h"
 
 #include "util.h"
 #include "dbfilop.h"
@@ -97,6 +99,8 @@
 #include "tp_change_reg.h"
 #include "mu_gv_cur_reg_init.h"
 #include "mlkdef.h"
+#include "is_proc_alive.h"
+#include "inline_atomic_pid.h"
 
 #define REQRUNDOWN_TEXT		"semid is invalid but shmid is valid or at least one of sem_ctime or shm_ctime are non-zero"
 #define MAX_ACCESS_SEM_RETRIES	2	/* see comment below where this macro is used for why it needs to be 2 */
@@ -242,56 +246,6 @@ MBSTART {														\
 	}														\
 } MBEND
 
-#define READ_DB_FILE_HEADER(REG, TSD, ERR_RET)								\
-MBSTART {												\
-	file_control    	*fc;									\
-	gd_segment		*seg;									\
-	mstr			*gld_str;								\
-	unix_db_info    	*udi;									\
-	uint4			fsb_size;								\
-	gd_region		*baseDBreg;								\
-													\
-	seg = REG->dyn.addr;										\
-	fc = seg->file_cntl;										\
-	fc->op = FC_READ;										\
-	fc->op_buff = (sm_uc_ptr_t)TSD;									\
-	fc->op_pos = 1;											\
-	fc->op_len = SGMNT_HDR_LEN;									\
-	dbfilop(fc);											\
-	ERR_RET = 0;											\
-	if (IS_AIO_DBGLDMISMATCH(seg, TSD))								\
-	{	/* Copy tsd setting for asyncio into seg and retry "dbfilopn"/"db_init"			\
-		 * sequence in caller "gvcst_init" by returning with an error.				\
-		 */											\
-		COPY_AIO_SETTINGS(seg, TSD);	/* copies from TSD to seg */				\
-		ERR_RET = ERR_DBGLDMISMATCH;								\
-	}												\
-	if (IS_RDBF_STATSDB(TSD) && !IS_STATSDB_REGNAME(REG))						\
-	{	/* This is a case where the file header says it is a statsDB but the region		\
-		 * name is not lower case as it should be for a statsDB. Not supported.			\
-		 */											\
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_STATSDBNOTSUPP, 2, DB_LEN_STR(REG));	\
-	}												\
-	if (!IS_RDBF_STATSDB(TSD) && IS_STATSDB_REGNAME(REG))						\
-	{	/* This is a case where the file header does NOT say it is a statsDB but the region	\
-		 * name is lower case as it should be for a statsDB. This is also an illegal		\
-		 * combination so give an appropriate error.						\
-		 */											\
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_INVSTATSDB, 4, DB_LEN_STR(REG),		\
-		 	      REG_LEN_STR(REG));							\
-	}												\
-	if (TSD->asyncio)										\
-	{	/* AIO = ON, implies we need to use O_DIRECT.						\
-		 * Check for db vs fs blksize alignment issues.						\
-		 */											\
-		udi = FC2UDI(fc);									\
-		fsb_size = get_fs_block_size(udi->fd);							\
-		if (0 != (TSD->blk_size % fsb_size))							\
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_DBBLKSIZEALIGN, 4,			\
-						DB_LEN_STR(REG), TSD->blk_size, fsb_size);		\
-	}												\
-} MBEND
-
 #define READ_DB_FILE_MASTERMAP(REG, CSD)		\
 MBSTART {						\
 	file_control    	*fc;			\
@@ -360,7 +314,7 @@ MBSTART {											\
 
 GBLREF	boolean_t		is_src_server;
 GBLREF  boolean_t               mupip_jnl_recover;
-GBLREF	gd_region		*gv_cur_region, *db_init_region;
+GBLREF	gd_region		*gv_cur_region, *db_init_region, *ftok_sem_reg;
 GBLREF	ipcs_mesg		db_ipcs;
 GBLREF	gd_addr			*gd_header;
 GBLREF	jnlpool_addrs_ptr_t	jnlpool;
@@ -374,6 +328,7 @@ GBLREF	int			pool_init;
 GBLREF	boolean_t		jnlpool_init_needed;
 GBLREF	mstr			extnam_str;
 GBLREF	mval			dollar_zgbldir;
+GBLREF	int4			pre_drvlongjmp_error_condition;
 #ifndef MUTEX_MSEM_WAKE
 GBLREF	int 	mutex_sock_fd;
 #endif
@@ -384,6 +339,7 @@ LITREF  int4                    gtm_release_name_len;
 OS_PAGE_SIZE_DECLARE
 
 error_def(ERR_DBFILNOFULLWRT);
+error_def(ERR_DBPRIVERR);
 error_def(ERR_BADDBVER);
 error_def(ERR_CRITSEMFAIL);
 error_def(ERR_DBBLKSIZEALIGN);
@@ -403,6 +359,7 @@ error_def(ERR_INVSTATSDB);
 error_def(ERR_JNLBUFFREGUPD);
 error_def(ERR_NLMISMATCHCALC);
 error_def(ERR_NLRESTORE);
+error_def(ERR_PIDRESET);
 error_def(ERR_REQRECOV);
 error_def(ERR_REQROLLBACK);
 error_def(ERR_REQRUNDOWN);
@@ -411,6 +368,54 @@ error_def(ERR_SYSCALL);
 error_def(ERR_TEXT);
 error_def(ERR_VERMISMATCH);
 error_def(ERR_SEMUNDOOVERFLOW);
+error_def(ERR_DBOPNERR);
+error_def(ERR_DRVLONGJMP);	/* Generic internal only error used to drive longjump() in a queued condition handler */
+error_def(ERR_ENCRYPTCONFLT2);
+error_def(ERR_REGOPENFAIL);
+error_def(ERR_STATSDBFNERR);
+error_def(ERR_STATSDBINUSE);
+
+
+typedef enum {
+	AUTODB_NOERR = 0,
+	AUTODB_OPNERR,
+	AUTODB_PRIVERR,
+	AUTODB_INVALIDERR,
+	AUTODB_CREERR,
+	AUTODB_INITERR,
+} autodb_recreate_errors;
+
+
+CONDITION_HANDLER(gvcst_set_statsDB_fname_ch)
+{
+	gd_region	*reg;
+	unix_db_info	*udi;
+	node_local_ptr_t	cnl;
+
+	START_CH(TRUE);
+	if (IS_STATSDB_REG(db_init_region))
+		STATSDBREG_TO_BASEDBREG(db_init_region, reg);
+	else
+		reg = db_init_region;
+	udi = FILE_INFO(reg);
+	cnl = FILE_INFO(reg)->s_addrs.nl;
+	if ((SUCCESS == SEVERITY) || (INFO == SEVERITY))
+	{
+		assert(FALSE);	/* don't know of any possible INFO/SUCCESS errors */
+		if (GLOBAL_LATCH_HELD_BY_US(&cnl->statsdb_field_latch))
+			rel_latch(&cnl->statsdb_field_latch);
+		CONTINUE;	/* Keep going for non-error issues */
+	}
+	if (GLOBAL_LATCH_HELD_BY_US(&cnl->statsdb_field_latch))
+		rel_latch(&cnl->statsdb_field_latch);
+	/* Enable interrupts in case we are here with intrpt_ok_state == INTRPT_IN_GVCST_INIT due to an rts error.
+	 * Normally we would have the new state stored in "prev_intrpt_state" but that is not possible here because
+	 * the corresponding DEFER_INTERRUPTS happened in "gvcst_init" (a different function) so we have an assert
+	 * there that the previous state was INTRPT_OK_TO_INTERRUPT and use that instead of prev_intrpt_state here.
+	 */
+	ENABLE_INTERRUPTS(INTRPT_IN_GVCST_INIT, INTRPT_OK_TO_INTERRUPT);
+	NEXTCH;
+}
 
 gd_region *dbfilopn(gd_region *reg)
 {
@@ -418,25 +423,145 @@ gd_region *dbfilopn(gd_region *reg)
 	parse_blk		pblk;
 	mstr			file;
 	char			*fnptr, fbuff[MAX_FN_LEN + 1], tmpbuff[MAX_FN_LEN + 1];
+	char			*errrsn_text;
 	struct stat		buf;
 	gd_region		*prev_reg, *save_gv_cur_region, *tmp_reg;
 	gd_segment		*seg;
-	int			status;
-	boolean_t		raw;
+	gd_region		*baseDBreg = NULL;
+	sgmnt_addrs		*baseDBcsa = NULL;
+	node_local_ptr_t	baseDBnl = NULL;
+	int			status, errrsn_text_len;
+	boolean_t		raw, is_statsDB;
 	boolean_t		open_read_only;
+	boolean_t		init_complete = FALSE;
 	int			stat_res, rc, save_errno = 0;
 	sgmnt_addrs		*csa;
 	sgmnt_data		tsdbuff;
-	sgmnt_data_ptr_t        tsd;
+	sgmnt_data_ptr_t        tsd = NULL;
 	file_control    	*fc;
 	unsigned char		cstatus;
-	boolean_t		ftok_counter_halted;
+	boolean_t		ftok_counter_halted, did_one_loop = FALSE;
+	intrpt_state_t		prev_intrpt_state = intrpt_ok_state;
+	autodb_recreate_errors	autodb_rcerr;
+	enum db_validity	db_invalid = DB_VALID;
+	uint4			statsdb_fname_len = 0;
+	char 			statsdb_fname[MAX_FN_LEN + 1];
 	ZOS_ONLY(int		realfiletag;)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	db_init_region = reg;
+	assert(!reg->open);
+	is_statsDB = IS_STATSDB_REG(reg);
 	seg = reg->dyn.addr;
+	DBGRDB((stderr, "%s:%d:%s: process id %d trying to open file %s for region %s\n", __FILE__, __LINE__, __func__, process_id,
+				reg->dyn.addr->fname, reg->rname));
+	db_init_region = reg;
+	if (is_statsDB)
+	{
+		STATSDBREG_TO_BASEDBREG(reg, baseDBreg);
+		assert(baseDBreg->open);
+		baseDBcsa = &FILE_INFO(baseDBreg)->s_addrs;
+		baseDBnl = baseDBcsa->nl;
+
+		DEFER_INTERRUPTS(INTRPT_IN_GVCST_INIT, prev_intrpt_state);
+		assert(INTRPT_OK_TO_INTERRUPT == prev_intrpt_state);
+		ESTABLISH_NOUNWIND(gvcst_set_statsDB_fname_ch);
+		grab_latch(&baseDBnl->statsdb_field_latch, GRAB_LATCH_INDEFINITE_WAIT, NOT_APPLICABLE, NULL);
+		reg->statsdb_init_cycle = baseDBnl->statsdb_init_cycle;
+		if (!baseDBnl->statsdb_created || !baseDBnl->statsdb_fname_len)
+		{
+			assert(!baseDBnl->statsdb_fname_len && !baseDBnl->statsdb_created);
+			DBGRDB((stderr, "%s:%d:%s: process id %d found that !baseDBnl->statsdb_created for file %s for region %s, "
+						"base region %s\n", __FILE__, __LINE__, __func__, process_id, reg->dyn.addr->fname,
+						reg->rname, baseDBreg->rname));
+			/* This latch shall only protect against inconsistent reading of and/or writing to the statsdb fields in
+			 * the basedb shared memory. It is not meant to be broader auto-create/initialize concurrency control
+			 */
+			if ((IS_DSE_IMAGE || IS_LKE_IMAGE) && TREF(ok_to_leave_statsdb_unopened))
+			{
+				rel_latch(&baseDBnl->statsdb_field_latch);
+				ENABLE_INTERRUPTS(INTRPT_IN_GVCST_INIT, prev_intrpt_state);
+				REVERT;
+				/* Should never create a statsdb file or map a statsdb file to a base region */
+				return (gd_region *)NULL;
+			}
+			statsdb_fname_len = ARRAYSIZE(statsdb_fname);
+			gvcst_set_statsdb_fname(baseDBcsa->hdr, baseDBreg, statsdb_fname, &statsdb_fname_len);
+			if (0 == statsdb_fname_len)
+			{	/* only true if gvcst_set_statsdb_fname had a problem and set it that way in */
+				switch(TREF(statsdb_fnerr_reason))
+				{	/* turn the reason from gvcst_set_statsdb_fname into a useful error message */
+					case FNERR_NOSTATS:
+						errrsn_text = FNERR_NOSTATS_TEXT;
+						errrsn_text_len = SIZEOF(FNERR_NOSTATS_TEXT) - 1;
+						break;
+					case FNERR_STATSDIR_TRNFAIL:
+						errrsn_text = FNERR_STATSDIR_TRNFAIL_TEXT;
+						errrsn_text_len = SIZEOF(FNERR_STATSDIR_TRNFAIL_TEXT) - 1;
+						break;
+					case FNERR_STATSDIR_TRN2LONG:
+						errrsn_text = FNERR_STATSDIR_TRN2LONG_TEXT;
+						errrsn_text_len = SIZEOF(FNERR_STATSDIR_TRN2LONG_TEXT) - 1;
+						break;
+					case FNERR_INV_BASEDBFN:
+						errrsn_text = FNERR_INV_BASEDBFN_TEXT;
+						errrsn_text_len = SIZEOF(FNERR_INV_BASEDBFN_TEXT) - 1;
+						break;
+					case FNERR_FTOK_FAIL:
+						errrsn_text = FNERR_FTOK_FAIL_TEXT;
+						errrsn_text_len = SIZEOF(FNERR_FTOK_FAIL_TEXT) - 1;
+						break;
+					case FNERR_FNAMEBUF_OVERFLOW:
+						errrsn_text = FNERR_FNAMEBUF_OVERFLOW_TEXT;
+						errrsn_text_len = SIZEOF(FNERR_FNAMEBUF_OVERFLOW_TEXT) - 1;
+						break;
+					default:
+						assertpro(FALSE);
+				}
+				assert(TREF(gvcst_statsDB_open_ch_active));	/* below error goes to syslog and not to user */
+				baseDBreg->reservedDBFlags |= RDBF_NOSTATS;	/* Disable STATS in base DB */
+				baseDBcsa->reservedDBFlags |= RDBF_NOSTATS;
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_DBFILERR, 2, DB_LEN_STR(baseDBreg), ERR_STATSDBFNERR,
+						2, errrsn_text_len, errrsn_text);
+			}
+		} else
+		{
+			statsdb_fname_len = baseDBnl->statsdb_fname_len;
+			assert(statsdb_fname_len);
+			memcpy(statsdb_fname, baseDBnl->statsdb_fname, statsdb_fname_len);
+			assert(SIZEOF(statsdb_fname) > statsdb_fname_len);
+			statsdb_fname[statsdb_fname_len] = '\0';
+		}
+		rel_latch(&baseDBnl->statsdb_field_latch);
+		ENABLE_INTERRUPTS(INTRPT_IN_GVCST_INIT, prev_intrpt_state);
+		REVERT;
+		COPY_STATSDB_FNAME_INTO_STATSREG(reg, statsdb_fname, statsdb_fname_len);
+		DBGRDB((stderr, "%s:%d:%s: process id %d copied statsdb fname from local into statsdbreg for file %s for region %s,"
+					" base region %s\n", __FILE__, __LINE__, __func__, process_id, reg->dyn.addr->fname,
+					reg->rname, baseDBreg->rname));
+		if (!seg->blk_size)
+		{	/* Region/segment created by "mu_gv_cur_reg_init" (which sets most of reg/seg fields to 0).
+			 * Now that we need a non-zero blk_size, do what GDE did to calculate the statsdb block-size.
+			 * But since we cannot duplicate that code here, we set this to the same value effectively but
+			 * add an assert that the two are the same in "gd_load" function.
+			 * Take this opportunity to initialize other seg/reg fields for statsdbs as GDE would have done.
+			 */
+			seg->blk_size = STATSDB_BLK_SIZE;
+			/* Similar code for a few other critical fields that need initialization before "mu_cre_file" */
+			seg->allocation = STATSDB_ALLOCATION;
+			reg->max_key_size = STATSDB_MAX_KEY_SIZE;
+			reg->max_rec_size = STATSDB_MAX_REC_SIZE;
+			/* The below is directly inherited from the base db so no macro/assert like above fields */
+			seg->mutex_slots = NUM_CRIT_ENTRY(baseDBcsa->hdr);
+			reg->mumps_can_bypass = TRUE;
+		}
+		if (0 != baseDBcsa->hdr->statsdb_allocation)
+		{	/* The statsdb allocation for this region has been extended before.
+			 * Use the extended allocation size from the file header.
+			 */
+			seg->allocation = baseDBcsa->hdr->statsdb_allocation;
+		}
+	}
 	assert(IS_ACC_METH_BG_OR_MM(seg->acc_meth));
 	FILE_CNTL_INIT_IF_NULL(seg);
 	udi = FILE_INFO(reg);
@@ -483,6 +608,7 @@ gd_region *dbfilopn(gd_region *reg)
 	{	/* Remote node specification given */
 		assert(pblk.b_node && pblk.l_node[pblk.b_node - 1] == ':');
 		gvcmy_open(reg, &pblk);
+		assert(!is_statsDB);
 		return (gd_region *)-1L;
 	}
 	fnptr = (char *)seg->fname + pblk.b_node;
@@ -492,104 +618,142 @@ gd_region *dbfilopn(gd_region *reg)
 	 * in journal file header as part of gds_rundown because we have the db open in read_write mode (GTM-8483).
 	 */
 	open_read_only = (jgbl.mur_extract && !jgbl.mur_update);
+	autodb_rcerr = AUTODB_NOERR;
+	/* This helps consolidate autodb creation and open error handling. OPNERR will track when the error came from a bare open
+	 * (and it's therefore worth trying the open as read-only for non-STATSDB regions). CREERR happened in mu_cre_file. INITERR
+	 * happened in mu_init_file.
+	 */
+	TREF(mu_cre_file_openrc) = 0;
+	assert(!is_statsDB || !open_read_only);
 	for ( ; ; )
 	{
 		if (!open_read_only)
 		{
+			DBGRDB((stderr, "%s:%d:%s: process id %d trying to open non-read-only file %s for region %s\n", __FILE__,
+						__LINE__, __func__, process_id, reg->dyn.addr->fname, reg->rname));
+			/* First, try to open the database file. If we can't open it, we'll need to create it if this is an AUTODB.
+			*/
 #ifdef DEBUG
-			if (WBTEST_ENABLED(WBTEST_OPENFILE_DB))
+			if (!IS_STATSDB_REG(reg) && WBTEST_ENABLED(WBTEST_OPENFILE_DB))
 			{
 				udi->fd = FD_INVALID;
 				errno = gtm_white_box_test_case_count ? gtm_white_box_test_case_count : EPERM;
 			} else
 #endif
-			OPENFILE_DB(fnptr, O_RDWR, udi, seg);
-			save_errno = errno;
-			/* When opening an auto-create type of reservedDB database file, it is possible
-			 * that it does not (yet) exist. In that case, make a call out to create it. Note that
-			 * a statsdb (which is also an autodb) gets created in "gvcst_init" so skip that here.
-			 */
-			if ((FD_INVALID == udi->fd) && (ENOENT == errno) && IS_AUTODB_REG(reg) && !IS_STATSDB_REG(reg))
-			{	/* We want to get a lock to ensure only one process does the create. But the lock needs to be
-				 * based on an existing file ("ftok_sem_get" relies on that). So use "/" directory. That is
-				 * guaranteed to exist on any system and will serve as a sync point for ANY/ALL autodb creates.
-				 */
-				/* First check if we have enough space to do ".new" suffix addition (done a little later) */
-				if (ARRAYSIZE(seg->fname) <= seg->fname_len + STR_LIT_LEN(EXT_NEW))
-					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_DBFILERR, 2, DB_LEN_STR(reg));
-				save_gv_cur_region = gv_cur_region;
-				mu_gv_cur_reg_init();
-				tmp_reg = gv_cur_region;
-				gv_cur_region = save_gv_cur_region;
-				tmp_reg->dyn.addr->fname[0] = '/';
-				tmp_reg->dyn.addr->fname[1] = '\0';
-				tmp_reg->dyn.addr->fname_len = 1;
-				tmp_udi = FILE_INFO(tmp_reg);
-				tmp_udi->fn = (char *)tmp_reg->dyn.addr->fname;
-				if (!ftok_sem_get(tmp_reg, FALSE, GTM_ID, FALSE, &ftok_counter_halted))
-				{
-					MU_GV_CUR_REG_FREE(tmp_reg, save_gv_cur_region);
-					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_DBFILERR, 2, DB_LEN_STR(reg));
-				}
-				assert(!ftok_counter_halted);	/* since we specified FALSE as the 2nd parameter ("incr_cnt") */
-				/* Now that we got the ftok lock, check if the file exists. If so skip the create. */
 				OPENFILE_DB(fnptr, O_RDWR, udi, seg);
-				if ((FD_INVALID == udi->fd) && (ENOENT == errno))
-				{	/* File still does not exist. Create it. */
-					/* If autodb file name is say "tmp.dat", point region to a temporary filename
-					 * "tmp.dat_%YGTM" (suffix EXT_NEW). This is similar to the logic used in "cre_jnl_file"
-					 * with ".mjl" and ".mjl_%YGTM" files. Create database "tmp.dat_%YGTM" and initialize it.
-					 * And finally rename it to "tmp.dat". If we instead create "tmp.dat" and then fill it
-					 * with GT.M db file header content, it is possible while this is happening, other
-					 * processes see the file exist (OPENFILE_DB returns TRUE above) and proceed assuming the
-					 * file is a valid GT.M database file when actually the creation is not yet done.
+			save_errno = errno;
+			/* If we didn't open, and we didn't open because it doesn't exist, and we are allowed to create, try to
+			 * create it.
+			 */
+			if ((FD_INVALID == udi->fd) && (ENOENT == save_errno) && IS_AUTODB_REG(reg))
+			{
+				assert(!did_one_loop);
+				if (is_statsDB && ((IS_DSE_IMAGE || IS_LKE_IMAGE) && TREF(ok_to_leave_statsdb_unopened)))
+				{
+					/* Should never create a statsdb file */
+					return (gd_region *)NULL;
+				}
+				DBGRDB((stderr, "%s:%d:%s: process id %d decided to perform mu_cre_file of file %s for region %s\n",
+							__FILE__, __LINE__, __func__, process_id, reg->dyn.addr->fname,
+							reg->rname));
+				assert(0 == TREF(mu_cre_file_openrc));
+				cstatus = mu_cre_file(reg);
+				/* cstatus == EXIT_NRM means we created it.
+				 * cstatus != EXIT_NRM means we didn't create it
+				 * 	TREF(mu_cre_file_openrc) == EEXIST means that we didn't create it because it already existed
+				 * 	TREF(mu_cre_file_openrc) != EEXIST means that we didn't create it for some other reason
+				 */
+				save_errno = TREF(mu_cre_file_openrc);
+				assert(!udi->grabbed_ftok_sem);
+				if (EXIT_NRM == cstatus)
+				{
+					DBGRDB((stderr, "%s:%d:%s: process id %d succeeded in performing mu_cre_file of file %s "
+								"for region %s\n", __FILE__, __LINE__, __func__, process_id,
+								reg->dyn.addr->fname, reg->rname));
+					assert(!reg->file_initialized);
+					reg->file_initialized = FALSE;
+					assert(!save_errno);
+					/* Created it, so also try to initialize it. Everyone but the file creator will do this in
+					 * db_init instead (if the file needs initialization, such as when a kill happens on this
+					 * line)
 					 */
-					MEMCPY_LIT(seg->fname + seg->fname_len, EXT_NEW);
-					seg->fname_len += STR_LIT_LEN(EXT_NEW);
-					seg->fname[seg->fname_len] = '\0';
-					cstatus = gvcst_cre_autoDB(reg);
-					if (EXIT_NRM != cstatus)
+					TREF(mu_cre_file_openrc) = save_errno = 0;
+					cstatus = mu_init_file(reg, false);
+					save_errno = TREF(mu_cre_file_openrc);
+					if (!reg->file_initialized)
 					{
-						ftok_sem_release(tmp_reg, FALSE, FALSE);
-						MU_GV_CUR_REG_FREE(tmp_reg, save_gv_cur_region);
-						save_errno = TREF(mu_cre_file_openrc);
-						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_DBFILERR, 2, DB_LEN_STR(reg));
+						assert(EEXIST != save_errno);
+						autodb_rcerr = AUTODB_INITERR;
+						break;
 					}
-					memcpy(tmpbuff, seg->fname, seg->fname_len + 1); /* + 1 to include terminating '\0' */
-					seg->fname_len -= STR_LIT_LEN(EXT_NEW);
-					seg->fname[seg->fname_len] = '\0';
-					/* Rename "tmp.dat_%YGTM" to "tmp.dat" */
-					if (-1 == RENAME(tmpbuff, (char *)seg->fname))
+					did_one_loop = TRUE;
+					continue;
+				} else if (EEXIST != save_errno)
+				{
+					DBGRDB((stderr, "%s:%d:%s: process id %d failed in performing mu_cre_file of file %s for "
+								"region %s\n", __FILE__, __LINE__, __func__, process_id,
+								reg->dyn.addr->fname, reg->rname));
+					autodb_rcerr = (EACCES == TREF(mu_cre_file_openrc)) ? AUTODB_OPNERR : AUTODB_CREERR;
+					break;
+				} else
+				{
+					DBGRDB((stderr, "%s:%d:%s: process id %d found that db file already existed when "
+								"performing mu_cre_file of file %s for region %s\n", __FILE__,
+								__LINE__, __func__, process_id, reg->dyn.addr->fname, reg->rname));
+					/* we found the database existent, so continue with the open and validation of the database
+					* as if the first attempted open had succeeded.
+					*/
+				}
+				/* If not in autodb error handling, try the open now */
+				assert(((void *)seg->fname == (void *)fnptr) && ((void *)fnptr == (void *)udi->fn));
+				if (AUTODB_NOERR == autodb_rcerr)
+				{
+					OPENFILE_DB(fnptr, O_RDWR, udi, seg);
+					if (FD_INVALID == udi->fd)
 					{
 						save_errno = errno;
-						ftok_sem_release(tmp_reg, FALSE, FALSE);
-						MU_GV_CUR_REG_FREE(tmp_reg, save_gv_cur_region);
-						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg),
-							save_errno);
+						autodb_rcerr = AUTODB_OPNERR;
+						break;
 					}
 				}
-				ftok_sem_release(tmp_reg, FALSE, FALSE);
-				MU_GV_CUR_REG_FREE(tmp_reg, save_gv_cur_region);
-				/* DB file exists now - retry the open */
-				OPENFILE_DB(fnptr, O_RDWR, udi, seg);
-			}
+			} else
+				DBGRDB((stderr, "%s:%d:%s: process id %d decided not to perform mu_cre_file of file %s for region "
+							"%s\n", __FILE__, __LINE__, __func__, process_id, reg->dyn.addr->fname,
+							reg->rname));
+			/* Else if FD_INVALID == udi->fd then fall through to the attempt to open it read-only */
 			if (!udi->grabbed_access_sem)
-			{	/* If the process already has standalone access, these fields are initialized in mu_rndwn_file */
+			{
 				udi->ftok_semid = INVALID_SEMID;
 				udi->semid = INVALID_SEMID;
 				udi->shmid = INVALID_SHMID;
 				udi->gt_sem_ctime = 0;
 				udi->gt_shm_ctime = 0;
+
 			}
-			reg->read_only = FALSE;		/* maintain csa->read_write simultaneously */
-			csa->read_write = TRUE;		/* maintain reg->read_only simultaneously */
+			reg->read_only = FALSE;
+			csa->read_write = TRUE;
 			csa->orig_read_write = TRUE;
 		}
-		if (open_read_only || (FD_INVALID == udi->fd))
+		/* Try again as a readonly database, only if
+		 * 	- Not actually trying again, but trying for the first time OR
+		 *	- udi->fd still invalid
+		 *	AND
+		 *		- Not a statsdb (only worth opening as read-write).
+		 *		- Either not an autodb or the autodb error was explicitly on the open (and not with more complex
+		 *		logic in cre/init file)
+		 */
+		if ((open_read_only || (FD_INVALID == udi->fd)))
 		{
+
+			DBGRDB((stderr, "%s:%d:%s: process id %d trying to open read-only file %s for region %s\n", __FILE__,
+						__LINE__, __func__, process_id, reg->dyn.addr->fname, reg->rname));
+			assert(AUTODB_NOERR == autodb_rcerr);
 			OPENFILE_DB(fnptr, O_RDONLY, udi, seg);
 			if (FD_INVALID == udi->fd)
 			{
+				DBGRDB((stderr, "%s:%d:%s: process id %d could not open read-only file %s for region %s\n",
+							__FILE__, __LINE__, __func__, process_id, reg->dyn.addr->fname,
+							reg->rname));
 				save_errno = errno;
 				if (!IS_GTCM_GNP_SERVER_IMAGE)
 				{
@@ -597,41 +761,113 @@ gd_region *dbfilopn(gd_region *reg)
 					free(seg->file_cntl);
 					seg->file_cntl = NULL;
 				}
-				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), save_errno);
-			}
-			reg->read_only = TRUE;		/* maintain csa->read_write simultaneously */
-			csa->read_write = FALSE;	/* maintain reg->read_only simultaneously */
-			csa->orig_read_write = FALSE;
-			if (!open_read_only && !((EPERM == save_errno) || (EACCES == save_errno)))
+				if (!IS_AUTODB_REG(reg))
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), save_errno);
+				else
+				{
+					autodb_rcerr = AUTODB_OPNERR;
+					break;
+				}
+			} else
 			{
-				if (!IS_GTM_IMAGE)
-					gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_DBFILERDONLY, 3,
-							DB_LEN_STR(reg), (int)0, save_errno);
-				send_msg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_DBFILERDONLY, 3, DB_LEN_STR(reg), (int)0, save_errno);
+				DBGRDB((stderr, "%s:%d:%s: process id %d succeeded in opening read-only file %s for region %s\n",
+							__FILE__, __LINE__, __func__, process_id, reg->dyn.addr->fname,
+							reg->rname));
+				reg->read_only = TRUE;		/* maintain csa->read_write simultaneously */
+				csa->read_write = FALSE;	/* maintain reg->read_only simultaneously */
+				csa->orig_read_write = FALSE;
+				if (!open_read_only && !((EPERM == save_errno) || (EACCES == save_errno)))
+				{
+					if (!IS_GTM_IMAGE)
+						gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_DBFILERDONLY, 3,
+								DB_LEN_STR(reg), (int)0, save_errno);
+					send_msg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_DBFILERDONLY, 3, DB_LEN_STR(reg), (int)0,
+							save_errno);
+				}
 			}
 		}
-		if (!reg->owning_gd->is_dummy_gbldir && (pool_init || !jnlpool_init_needed || !CUSTOM_ERRORS_AVAILABLE))
+		if (!IS_STATSDB_REG(reg) && (!reg->owning_gd->is_dummy_gbldir && (pool_init || !jnlpool_init_needed
+						|| !CUSTOM_ERRORS_AVAILABLE)))
 			break;
-		/* Caller created a dummy region (not a region from a gld). So determine asyncio & acc_meth setting
-		 * from db file header and copy that to segment to avoid DBGLDMISMATCH error later in "db_init".
-		 * Or need to check replication state to decide if an early call to jnlpool_init is needed in gvcst_init
-		 */
 		tsd = udi->fd_opened_with_o_direct ? (sgmnt_data_ptr_t)(TREF(dio_buff)).aligned : &tsdbuff;
+		DBGRDB((stderr, "%s:%d:%s: process id %d needs to read_db_file_header after opening file %s for region %s\n",
+					__FILE__, __LINE__, __func__, process_id, reg->dyn.addr->fname, reg->rname));
 		/* If O_DIRECT, use aligned buffer */
-		fc = seg->file_cntl;
-		fc->op = FC_READ;
-		fc->op_buff = (sm_uc_ptr_t)tsd;
-		fc->op_pos = 1;
-		fc->op_len = SGMNT_HDR_LEN;
-		dbfilop(fc);
+		db_invalid = read_db_file_header(udi, reg, tsd);
+		save_errno = errno;
+		if (DB_INVALID_STATSDBNOTSUPP == db_invalid)
+		{
+			db_invalid = DB_POTENTIALLY_VALID;
+		}
+		if (DB_POTENTIALLY_VALID < db_invalid)
+		{
+			DBGRDB((stderr, "%s:%d:%s: process id %d found invalid header of file %s for region %s\n", __FILE__,
+						__LINE__, __func__, process_id, reg->dyn.addr->fname, reg->rname));
+			error_on_db_invalidity(csa, reg, tsd, db_invalid, save_errno);
+		}
 		if (!pool_init && jnlpool_init_needed && CUSTOM_ERRORS_AVAILABLE)
 			csa->repl_state = tsd->repl_state;	/* needed in gvcst_init */
 		if (!reg->owning_gd->is_dummy_gbldir)
 			break;
-		if (!IS_AIO_DBGLDMISMATCH(seg, tsd))
+		if (db_invalid != DB_VALID_DBGLDMISMATCH)
 			break;
+
+		DBGRDB((stderr, "%s:%d:%s: process id %d closing and reopening file %s for region %s in order to correct aio "
+					"settings\n", __FILE__, __LINE__, __func__, process_id, reg->dyn.addr->fname, reg->rname));
 		CLOSEFILE_RESET(udi->fd, rc);	/* close file and reopen it with correct asyncio setting */
-		COPY_AIO_SETTINGS(seg, tsd);	/* copies from tsd to seg */
+		udi->fd_opened_with_o_direct = FALSE;
+		did_one_loop = TRUE;
+	}
+	if (AUTODB_NOERR != autodb_rcerr)
+	{
+		DBGRDB((stderr, "%s:%d:%s: process id %d handling autodb error on file %s for region %s\n", __FILE__, __LINE__,
+					__func__, process_id, reg->dyn.addr->fname, reg->rname));
+		if (is_statsDB)
+		{
+			DBGRDB((stderr, "%s:%d:%s: process id %d turned off stats due to error encountered in file %s for region "
+						"%s, base region %s\n", __FILE__, __LINE__, __func__, process_id,
+						reg->dyn.addr->fname, reg->rname, baseDBreg->rname));
+			assert(TREF(gvcst_statsDB_open_ch_active));
+			baseDBreg->reservedDBFlags |= RDBF_NOSTATS;
+			baseDBcsa->reservedDBFlags |= RDBF_NOSTATS;
+		}
+		assert(!reg->file_initialized);
+		switch (autodb_rcerr)
+		{
+			case AUTODB_OPNERR:
+				assert(TREF(mu_cre_file_openrc));
+				RTS_ERROR_CSA_ABT(csa, VARLSTCNT(5) ERR_DBOPNERR, 2,
+						DB_LEN_STR(reg), TREF(mu_cre_file_openrc));
+				break;			/* For the compiler */
+			case AUTODB_INITERR:
+			case AUTODB_CREERR:
+				if (TREF(gvcst_statsDB_open_ch_active))
+				{
+					assert(is_statsDB);
+					pre_drvlongjmp_error_condition = error_condition;
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_DRVLONGJMP);
+					break; /* Should never get here */
+				}
+				if (TREF(mu_cre_file_openrc))
+				{
+					RTS_ERROR_CSA_ABT(csa, VARLSTCNT(5) ERR_DBOPNERR, 2,
+							DB_LEN_STR(reg), TREF(mu_cre_file_openrc));
+					break;
+				} else
+				{
+					RTS_ERROR_CSA_ABT(csa, VARLSTCNT(8) ERR_DBFILERR, 2,
+							DB_LEN_STR(reg), ERR_TEXT, 2,
+							RTS_ERROR_TEXT("See preceding errors written to syserr"
+								" and/or syslog for details"));
+					break;
+				}
+				break;
+			case AUTODB_NOERR:
+				break;
+			default:
+				assert(FALSE);  /* Branch only here for sake of analyzer */
+				break;
+		}
 	}
 #	ifdef __MVS__
 	if (-1 == gtm_zos_tag_to_policy(udi->fd, TAG_BINARY, &realfiletag))
@@ -649,6 +885,8 @@ gd_region *dbfilopn(gd_region *reg)
 	set_gdid_from_stat(&udi->fileid, &buf);
 	if ((prev_reg = gv_match(reg)))
 	{
+		DBGRDB((stderr, "%s:%d:%s: process id %d found duplicate reg after dbfilopn of file %s for region %s\n", __FILE__,
+					__LINE__, __func__, process_id, reg->dyn.addr->fname, reg->rname));
 		CLOSEFILE_RESET(udi->fd, rc);	/* resets "udi->fd" to FD_INVALID */
 		free(seg->file_cntl->file_info);
 		free(seg->file_cntl);
@@ -656,6 +894,8 @@ gd_region *dbfilopn(gd_region *reg)
 		return prev_reg;
 	}
 	SYNC_OWNING_GD(reg);
+	DBGRDB((stderr, "%s:%d:%s: process id %d succeeded in dbfilopn of file %s for region %s\n", __FILE__, __LINE__, __func__,
+				process_id, reg->dyn.addr->fname, reg->rname));
 	return reg;
 }
 
@@ -744,7 +984,7 @@ void bg_sync_init(node_local_ptr_t cnl)
 #	endif
 }
 
-int db_init(gd_region *reg, boolean_t ok_to_bypass)
+int db_init(gd_region *reg, boolean_t ok_to_bypass, boolean_t return_file_errs)
 {
 	boolean_t		is_bg, read_only, need_stacktrace, have_standalone_access;
 	boolean_t		shm_setup_ok = FALSE, vermismatch = FALSE, vermismatch_already_printed = FALSE;
@@ -782,7 +1022,7 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 	struct perm_diag_data	pdd;
 	boolean_t		bypassed_ftok = FALSE, bypassed_access = FALSE, dummy_ftok_counter_halted,
 				ftok_counter_halted, access_counter_halted, incr_cnt;
-	int			jnl_buffer_size;
+	int			jnl_buffer_size, gdid_err;
 	char			s[JNLBUFFUPDAPNDX_SIZE];	/* JNLBUFFUPDAPNDX_SIZE is defined in jnl.h */
 	char			*syscall;
 	void			*mmapaddr;
@@ -794,6 +1034,9 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 	int			slp_cnt = 0;
 	boolean_t		is_logged = FALSE;
 	boolean_t		got_undo_overflow = FALSE;
+	unsigned char		cstatus;
+	enum db_validity	db_invalid;
+
 #	ifdef DEBUG
 	int			i;
 	char			*ptr;
@@ -863,19 +1106,163 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 		 */
 		bypassed_ftok = ok_to_bypass;
 		if (!ftok_sem_get2(reg, sem_stacktrace_timep, sem_timedoutp, &retstat, &bypassed_ftok, &ftok_counter_halted, TRUE))
+		{
+			if (IS_AUTODB_REG(reg))
+			{
+				DBGRDB((stderr, "%s:%d:%s: process id %d saw ftok error for file %s for region %s, returning "
+							"error\n", __FILE__, __LINE__, __func__, process_id, reg->dyn.addr->fname,
+							reg->rname));
+				RETURN_IF_ERROR(return_file_errs, DB_UNKNOWN_SEMERR, indefinite_wait, sem_stacktrace_time,
+						sem_timedout);
+			}
 			ISSUE_SEMWAIT_ERROR((&retstat), reg, udi, "ftok");
+		}
 		assert(ok_to_bypass || !bypassed_ftok);
 		assert(udi->grabbed_ftok_sem || bypassed_ftok);
+		assert(!udi->grabbed_ftok_sem || !bypassed_ftok);
 		if (bypassed_ftok)
+		{
+			assert(!IS_AUTODELETE_REG(reg));
 			SEND_MSG(VARLSTCNT(4) ERR_TEXT, 2, LEN_AND_LIT("FTOK bypassed at database initialization"));
+		}
 		/* At this point we have ftok_semid semaphore based on ftok key (exception is if "bypassed_ftok" is TRUE).
 		 * Any ftok conflicted region will block at this point. For example, if a.dat and b.dat both have same ftok
 		 * and process A tries to open or close a.dat and process B tries to open or close b.dat, even though the
 		 * database accesses don't conflict, the first one to control the ftok semaphore blocks (makes wait) the other(s).
 		 */
-		READ_DB_FILE_HEADER(reg, tsd, err_ret); /* file already opened by "dbfilopn" done from "gvcst_init" */
-		RETURN_IF_ERROR(err_ret, err_ret, indefinite_wait, sem_stacktrace_time, sem_timedout);
-		DO_BADDBVER_CHK(reg, tsd); /* need to do BADDBVER check before de-referencing shmid and semid from file header
+		if (IS_AUTODELETE_REG(reg))
+		{
+			gdid_err = 0;
+			if (!is_gdid_file_identical(&udi->fileid, (char *)DB_STR_LEN(reg), &gdid_err))
+			{
+				RETURN_IF_ERROR(return_file_errs, DB_INVALID_NOMATCH, indefinite_wait, sem_stacktrace_time,
+						sem_timedout);
+				if (gdid_err)
+					RTS_ERROR(VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(reg), ERR_TEXT, 2,
+						LEN_AND_LIT("Error in initializing database: stat of file path returned error"),
+							gdid_err);
+				else
+					RTS_ERROR(VARLSTCNT(8) ERR_DBFILERR, 2, DB_LEN_STR(reg), ERR_TEXT, 2,
+					LEN_AND_LIT("Error in initializing database: mismatch between open fd and file at path"));
+			} else
+				DBGRDB((stderr, "%s:%d:%s: process id %d confirmed autodelete file identical to fd of file %s for "
+							"region %s\n", __FILE__, __LINE__, __func__, process_id,
+							reg->dyn.addr->fname, reg->rname));
+
+		}
+		DBGRDB((stderr, "%s:%d:%s: process id %d needed to read_db_file_header of file %s for region %s\n", __FILE__,
+					__LINE__, __func__, process_id, reg->dyn.addr->fname, reg->rname));
+		db_invalid = read_db_file_header(udi, reg, tsd);
+		save_errno = errno;
+		if (return_file_errs && db_invalid && (DB_POTENTIALLY_VALID > db_invalid))
+		{
+			/* Return potentially-invalid errors to parent so that it can repeat the dbfilopn(), but first perform the
+			 * init here if it is called for, since we possess the ftok semaphore. */
+			if (DB_VALID_DBGLDMISMATCH == db_invalid)
+			{
+				DBGRDB((stderr, "%s:%d:%s: process id %d saw DB_VALID_DBGLDMISMATCH for file %s for region %s, "
+							"returning\n", __FILE__, __LINE__, __func__, process_id,
+							reg->dyn.addr->fname, reg->rname));
+				RETURN_IF_ERROR(db_invalid, db_invalid, indefinite_wait, sem_stacktrace_time, sem_timedout);
+			}
+			if (IS_AUTODB_REG(reg))
+			{
+				if (bypassed_ftok)
+				{
+
+					DBGRDB((stderr, "%s:%d:%s: process id %d grabbing ftok on file %s for region %s after "
+								"seeing potentially valid db file\n", __FILE__, __LINE__, __func__,
+								process_id, reg->dyn.addr->fname, reg->rname));
+					bypassed_ftok = FALSE;
+					if (!indefinite_wait)
+					{
+						CANCEL_SEM_TIMERS(sem_stacktrace_time, sem_timedout);
+						START_SEM_TIMERS(sem_stacktrace_time, sem_timedout, max_hrtbt_delta);
+					}
+					if (!ftok_sem_get2(reg, sem_stacktrace_timep, sem_timedoutp, &retstat, &bypassed_ftok,
+								&dummy_ftok_counter_halted, FALSE))
+					{
+						RETURN_IF_ERROR(return_file_errs, DB_UNKNOWN_SEMERR, indefinite_wait,
+								sem_stacktrace_time, sem_timedout);
+						ISSUE_SEMWAIT_ERROR((&retstat), reg, udi, "ftok");
+					}
+					assert(!bypassed_ftok);
+					DBGRDB((stderr, "%s:%d:%s: process id %d needed to read_db_file_header of file %s for "
+								"region %s\n", __FILE__, __LINE__, __func__, process_id,
+								reg->dyn.addr->fname, reg->rname));
+					db_invalid = read_db_file_header(udi, reg, tsd);
+					save_errno = errno;
+				}
+				if (db_invalid && (DB_POTENTIALLY_VALID > db_invalid))
+				{
+					DBGRDB((stderr, "%s:%d:%s: process id %d confirmed potentially-valid status of file %s for "
+								"region %s\n", __FILE__, __LINE__, __func__, process_id,
+								reg->dyn.addr->fname, reg->rname));
+					CLOSEFILE_RESET(udi->fd, status);
+					udi->fd_opened_with_o_direct = FALSE;
+					TREF(mu_cre_file_openrc) = 0;
+					cstatus = mu_init_file(reg, true); /* Performs its own read_db_file_header and only
+									    * proceeds if the db is pre-valid
+									    */
+					if (EXIT_NRM != cstatus)
+					{
+
+						DBGRDB((stderr, "%s:%d:%s: process id %d encountered error in mu_init_file of file "
+									"%s for region %s\n", __FILE__, __LINE__, __func__,
+									process_id, reg->dyn.addr->fname, reg->rname));
+						if (IS_STATSDB_REG(reg))
+						{
+							STATSDBREG_TO_BASEDBREG(reg, baseDBreg);
+							baseDBcsa = &FILE_INFO(baseDBreg)->s_addrs;
+							baseDBreg->reservedDBFlags |= RDBF_NOSTATS;
+							baseDBcsa->reservedDBFlags |= RDBF_NOSTATS;
+						}
+						if (TREF(gvcst_statsDB_open_ch_active))
+						{
+							assert(IS_STATSDB_REG(reg));
+							pre_drvlongjmp_error_condition = error_condition;
+							/* Error already reported inside of cstatus */
+							RTS_ERROR_CSA_ABT(csa, VARLSTCNT(1) ERR_DRVLONGJMP);
+						} else
+							RTS_ERROR_CSA_ABT(csa, VARLSTCNT(8) ERR_DBFILERR, 2, DB_LEN_STR(reg),
+									ERR_TEXT, 2, RTS_ERROR_TEXT("See preceding errors "
+										"written to syserr and/or syslog for details"));
+					} else
+					{
+						DBGRDB((stderr, "%s:%d:%s: process id %d performed successful mu_init_file of file "
+									"%s for region %s\n", __FILE__, __LINE__, __func__,
+									process_id, reg->dyn.addr->fname, reg->rname));
+						assert(reg->file_initialized);
+					}
+					assert(db_invalid); /* Reflects prior status of db, return this so we will loop back
+							     * to dbfilopn()
+							     */
+				} else if (db_invalid)
+				{
+					/* Unusual branch - db became not potentially valid after we got the ftok. Error out here.
+					 */
+					assert(FALSE);
+					error_on_db_invalidity(csa, reg, tsd, db_invalid, save_errno);
+					assert(FALSE);
+				} else
+					DBGRDB((stderr, "%s:%d:%s: process id %d disconfirmed potentiall-valid status of file %s "
+								"for region %s as it had transitioned to validity after ftok sem "
+								"was obtained\n", __FILE__, __LINE__, __func__, process_id,
+								reg->dyn.addr->fname, reg->rname));
+			}
+			DBGRDB((stderr, "%s:%d:%s: process id %d returning to trigger another loop on file %s for region %s\n",
+						__FILE__, __LINE__, __func__, process_id, reg->dyn.addr->fname, reg->rname));
+			RETURN_IF_ERROR(db_invalid, db_invalid, indefinite_wait, sem_stacktrace_time, sem_timedout);
+		} else if (db_invalid)
+		{
+			/* Otherwise, pronounce the error ourselves (this will do an rts_error and not return) */
+			DBGRDB((stderr, "%s:%d:%s: process id %d doing rts_error on db invalidity of file %s for region %s\n",
+						__FILE__, __LINE__, __func__, process_id, reg->dyn.addr->fname, reg->rname));
+			error_on_db_invalidity(csa, reg, tsd, db_invalid, save_errno);
+			assert(FALSE);
+		}
+		/* TODO - incorporate BADDBVER_CHK into read_db_file_header */
+		DO_BADDBVER_CHK(reg, tsd, TRUE); /* need to do BADDBVER check before de-referencing shmid and semid from file header
 					    * as they could be at different offsets if the database is V4-format */
 		db_do_crypt_init = (USES_ENCRYPTION(tsd->is_encrypted) && !IS_LKE_IMAGE);
 		if (gld_do_crypt_init != db_do_crypt_init)
@@ -911,11 +1298,26 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 					SEND_MSG(VARLSTCNT(4) ERR_TEXT, 2,
 						 LEN_AND_LIT("bypassed at database encryption initialization"));
 				/* Re-read now possibly stale file header and redo the above based on the new header info */
-				READ_DB_FILE_HEADER(reg, tsd, err_ret);
-				RETURN_IF_ERROR(err_ret, err_ret, indefinite_wait, sem_stacktrace_time, sem_timedout);
-				DO_BADDBVER_CHK(reg, tsd); /* need to do BADDBVER check before de-referencing shmid and semid from
-							    * file header as they could be at different offsets if the database is
-							    * V4-format
+
+				DBGRDB((stderr, "%s:%d:%s: process id %d needed to read_db_file_header of file %s for region %s\n",
+							__FILE__, __LINE__, __func__, process_id, reg->dyn.addr->fname,
+							reg->rname));
+				db_invalid = read_db_file_header(udi, reg, tsd);
+				save_errno = errno;
+				if (DB_VALID_DBGLDMISMATCH == db_invalid
+						|| (return_file_errs && (DB_POTENTIALLY_VALID > db_invalid)))
+				{
+					/* Don't double up the mu_init_file logic here, even though there's a potential race
+					 * if we bypassed the ftok - instead rely on the next run through the loop
+					 */
+					RETURN_IF_ERROR(db_invalid, db_invalid, indefinite_wait, sem_stacktrace_time, sem_timedout);
+				} else if (db_invalid)
+				{
+					error_on_db_invalidity(csa, reg, tsd, db_invalid, save_errno);
+				}
+				DO_BADDBVER_CHK(reg, tsd, TRUE); /* need to do BADDBVER check before de-referencing shmid and semid
+							    * from file header as they could be at different offsets if the database
+							    * is V4-format
 							    */
 				db_do_crypt_init = (USES_ENCRYPTION(tsd->is_encrypted) && !IS_LKE_IMAGE);
 			} /* else encryption is turned off in the file header. Continue as-is. Any encryption initialization done
@@ -1030,13 +1432,26 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 									    LEN_AND_LIT("Error with database control shmctl"),
 									    errno);
 						/* else */
-						READ_DB_FILE_HEADER(reg, tsd, err_ret);
-						RETURN_IF_ERROR(err_ret, err_ret, indefinite_wait,
-								sem_stacktrace_time, sem_timedout);
+
+						DBGRDB((stderr, "%s:%d:%s: process id %d needed to read_db_file_header of file %s "
+									"for region %s\n", __FILE__, __LINE__, __func__, process_id,
+									reg->dyn.addr->fname, reg->rname));
+						db_invalid = read_db_file_header(udi, reg, tsd);
+						save_errno = errno;
+						if (DB_VALID_DBGLDMISMATCH == db_invalid)
+							RETURN_IF_ERROR(db_invalid, db_invalid, indefinite_wait,
+									sem_stacktrace_time, sem_timedout);
+						else if (db_invalid)
+						{
+							assert(FALSE); /* RETURN_IF_BYPASSED should have ensured a
+									* consistent view of things */
+							error_on_db_invalidity(csa, reg, tsd, db_invalid, save_errno);
+							assert(FALSE);
+						}
 						continue;
 					} else if (shmstat.shm_ctime != tsd->gt_shm_ctime.ctime)
 					{
-						RETURN_IF_BYPASSED(bypassed_ftok, indefinite_wait, sem_stacktrace_time,	\
+						RETURN_IF_BYPASSED(bypassed_ftok, indefinite_wait, sem_stacktrace_time,
 													sem_timedout);
 						GTM_ATTACH_SHM_AND_CHECK_VERS(vermismatch, shm_setup_ok);
 						if (vermismatch)
@@ -1051,13 +1466,13 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 					semarg.buf = &semstat;
 					if (-1 == semctl(udi->semid, DB_CONTROL_SEM, IPC_STAT, semarg))
 					{	/* file header has valid semid but semaphore does not exist */
-						RETURN_IF_BYPASSED(bypassed_ftok, indefinite_wait, sem_stacktrace_time,	\
+						RETURN_IF_BYPASSED(bypassed_ftok, indefinite_wait, sem_stacktrace_time,
 													sem_timedout);
 						PRINT_CRASH_MESSAGE(1, tsd, ERR_TEXT, 2,
 							LEN_AND_LIT("Error with database control semaphore (IPC_STAT)"), errno);
 					} else if (semarg.buf->sem_ctime != tsd->gt_sem_ctime.ctime)
 					{
-						RETURN_IF_BYPASSED(bypassed_ftok, indefinite_wait, sem_stacktrace_time,	\
+						RETURN_IF_BYPASSED(bypassed_ftok, indefinite_wait, sem_stacktrace_time,
 													sem_timedout);
 						GTM_ATTACH_SHM_AND_CHECK_VERS(vermismatch, shm_setup_ok);
 						if (vermismatch)
@@ -1106,7 +1521,7 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 					sem_pid = semctl(udi->semid, DB_CONTROL_SEM, GETPID);
 					if (-1 != sem_pid)
 					{
-						RETURN_IF_BYPASSED(bypassed_ftok, indefinite_wait, sem_stacktrace_time,	\
+						RETURN_IF_BYPASSED(bypassed_ftok, indefinite_wait, sem_stacktrace_time,
 													sem_timedout);
 						RTS_ERROR(VARLSTCNT(13) ERR_DBFILERR, 2, DB_LEN_STR(reg),
 							ERR_SEMWT2LONG, 7, process_id, 0, LEN_AND_LIT("access control"),
@@ -1114,7 +1529,7 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 					} else
 					{
 						save_errno = errno;
-						RETURN_IF_BYPASSED(bypassed_ftok, indefinite_wait, sem_stacktrace_time,	\
+						RETURN_IF_BYPASSED(bypassed_ftok, indefinite_wait, sem_stacktrace_time,
 													sem_timedout);
 						if (!SEM_REMOVED(save_errno))
 							RTS_ERROR(VARLSTCNT(12) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg),
@@ -1130,7 +1545,7 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 					assert(ok_to_bypass || !bypassed_access);
 					if (!semop_success)
 					{
-						RETURN_IF_BYPASSED(bypassed_ftok, indefinite_wait, sem_stacktrace_time,	\
+						RETURN_IF_BYPASSED(bypassed_ftok, indefinite_wait, sem_stacktrace_time,
 													sem_timedout);
 						if (!SEM_REMOVED(retstat.save_errno))
 							ISSUE_SEMWAIT_ERROR((&retstat), reg, udi, "access control");
@@ -1157,7 +1572,7 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 			 * but we log an informative message */
 			if (got_undo_overflow)
 			{
-				RTS_ERROR(VARLSTCNT(12) ERR_SEMUNDOOVERFLOW, 2, DB_LEN_STR(reg), ERR_SYSCALL, 5,  \
+				RTS_ERROR(VARLSTCNT(12) ERR_SEMUNDOOVERFLOW, 2, DB_LEN_STR(reg), ERR_SYSCALL, 5,
 					RTS_ERROR_LITERAL("semop()"), CALLFROM, save_errno);
 			}
 
@@ -1165,8 +1580,21 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 			if ((MAX_ACCESS_SEM_RETRIES - 1) == loopcnt)
 				RTS_ERROR(VARLSTCNT(12) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg), ERR_SYSCALL, 5,
 					RTS_ERROR_LITERAL("semop()"), CALLFROM, save_errno);
-			READ_DB_FILE_HEADER(reg, tsd, err_ret);
-			RETURN_IF_ERROR(err_ret, err_ret, indefinite_wait, sem_stacktrace_time, sem_timedout);
+
+			DBGRDB((stderr, "%s:%d:%s: process id %d needed to read_db_file_header of file %s for region %s\n",
+						__FILE__, __LINE__, __func__, process_id, reg->dyn.addr->fname, reg->rname));
+			db_invalid = read_db_file_header(udi, reg, tsd);
+			save_errno = errno;
+			if (DB_VALID_DBGLDMISMATCH == db_invalid)
+				RETURN_IF_ERROR(db_invalid, db_invalid, indefinite_wait, sem_stacktrace_time, sem_timedout);
+			else if (db_invalid)
+			{
+				assert(!udi->grabbed_ftok_sem);
+				if (db_invalid < DB_POTENTIALLY_VALID)
+					RETURN_IF_ERROR(return_file_errs, db_invalid, indefinite_wait, sem_stacktrace_time,
+							sem_timedout);
+				error_on_db_invalidity(csa, reg, tsd, db_invalid, save_errno);
+			}
 		}
 		assert((-1 != status) || bypassed_access);
 		if (!indefinite_wait)
@@ -1177,8 +1605,21 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 			/* Now that we have the access control semaphore, re-read the file header so we have uptodate information
 			 * in case some of the fields (like access method) were modified concurrently by MUPIP SET -FILE.
 			 */
-			READ_DB_FILE_HEADER(reg, tsd, err_ret);
-			RETURN_IF_ERROR(err_ret, err_ret, indefinite_wait, sem_stacktrace_time, sem_timedout);
+
+			DBGRDB((stderr, "%s:%d:%s: process id %d needed to read_db_file_header of file %s for region %s\n",
+						__FILE__, __LINE__, __func__, process_id, reg->dyn.addr->fname, reg->rname));
+			db_invalid = read_db_file_header(udi, reg, tsd);
+			save_errno = errno;
+			if (DB_VALID_DBGLDMISMATCH == db_invalid)
+				RETURN_IF_ERROR(db_invalid, db_invalid, indefinite_wait, sem_stacktrace_time, sem_timedout);
+			else if (db_invalid)
+			{
+				assert(FALSE);
+				if (db_invalid < DB_POTENTIALLY_VALID)
+					RETURN_IF_ERROR(return_file_errs, db_invalid, indefinite_wait, sem_stacktrace_time,
+							sem_timedout);
+				error_on_db_invalidity(csa, reg, tsd, db_invalid, save_errno);
+			}
 			UDI2CSD(udi, tsd); /* Since we read the file header again, tsd->semid/shmid and corresponding ctime fields
 					    * will not be uptodate. Refresh it with udi copies as they are more uptodate.
 					    */
@@ -1192,8 +1633,21 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 		incr_cnt = !read_only;
 		ftok_counter_halted = FALSE;
 		access_counter_halted = FALSE;
-		READ_DB_FILE_HEADER(reg, tsd, err_ret); /* file already opened by "dbfilopn" done from "gvcst_init" */
-		RETURN_IF_ERROR(err_ret, err_ret, indefinite_wait, sem_stacktrace_time, sem_timedout);
+
+		DBGRDB((stderr, "%s:%d:%s: process id %d needed to read_db_file_header of file %s for region %s\n", __FILE__,
+					__LINE__, __func__, process_id, reg->dyn.addr->fname, reg->rname));
+		db_invalid = read_db_file_header(udi, reg, tsd);
+		save_errno = errno;
+		if (DB_VALID_DBGLDMISMATCH == db_invalid)
+			RETURN_IF_ERROR(db_invalid, db_invalid, indefinite_wait, sem_stacktrace_time, sem_timedout);
+		else if (db_invalid)
+		{
+			assert(FALSE);
+			if (db_invalid < DB_POTENTIALLY_VALID)
+				RETURN_IF_ERROR(return_file_errs, db_invalid, indefinite_wait, sem_stacktrace_time,
+						sem_timedout);
+			error_on_db_invalidity(csa, reg, tsd, db_invalid, save_errno);
+		}
 		db_do_crypt_init = (USES_ENCRYPTION(tsd->is_encrypted) && !IS_LKE_IMAGE);
 		INIT_PROC_ENCRYPTION_IF_NEEDED(db_do_crypt_init, init_status);
 		INIT_DB_ENCRYPTION_IF_NEEDED(db_do_crypt_init, init_status, reg, csa, tsd, crypt_warning);
@@ -1208,7 +1662,7 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 		udi->shm_created = !tsd->read_only;
 	}
 	assert(udi->grabbed_access_sem || bypassed_access);
-	DO_DB_HDR_CHECK(reg, tsd); /* Basic sanity check on the file header fields */
+	DO_DB_HDR_CHECK(reg, tsd);
 	if (udi->fd_opened_with_o_direct)
 	{	/* "tsd" points to dio_buff.aligned, a global variable buffer that will likely be reused by other functions
 		 * inside "db_init" (e.g. "recover_truncate" invoking "db_write_eof_block"). Point it back to tsdbuff
@@ -1506,11 +1960,18 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 		set_gdid_from_stat(&cnl->unique_id.uid, &stat_buf);
 		recover_truncate(csa, csd, reg);
 		cnl->jnlpool_shmid = INVALID_SHMID;
+		DBGRDB((stderr, "%s:%d:%s: process id %d setting statsdb_created to false on file %s for region %s\n", __FILE__,
+					__LINE__, __func__, process_id, reg->dyn.addr->fname, reg->rname));
+
+		assert(INTRPT_OK_TO_INTERRUPT != intrpt_ok_state);
+		grab_latch(&cnl->statsdb_field_latch, GRAB_LATCH_INDEFINITE_WAIT, NOT_APPLICABLE, NULL);
 		assert(0 == cnl->statsdb_fname_len);
 		assert(0 == cnl->statsdb_cur_error);
 		assert(0 == cnl->statsdb_error_cycle);
+		assert(0 == cnl->statsdb_init_cycle);
+		cnl->statsdb_init_cycle++;
 		cnl->statsdb_created = FALSE;
-		cnl->statsdb_rundown_clean = FALSE;
+		rel_latch(&cnl->statsdb_field_latch);
 		if (IS_STATSDB_REGNAME(reg))
 		{	/* Note that in case this region is a statsdb, its baseDBnl->statsdb_rundown_clean would have been set to
 			 * FALSE at baseDB "db_init" time but it is possible the statsdb has been through "gds_rundown" and we
@@ -1521,7 +1982,6 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 			assert(baseDBreg->open);
 			baseDBcsa = &FILE_INFO(baseDBreg)->s_addrs;
 			baseDBnl = baseDBcsa->nl;
-			baseDBnl->statsdb_rundown_clean = FALSE;
 			assert(csd->basedb_fname_len);	/* should have been initialized for statsdb at "mucregini" time */
 		}
 	} else
@@ -1565,6 +2025,20 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 		 * the creation time does not. The only way for this to happen is shared memory corruption in which case we
 		 * have a much bigger problem to deal with -- 2011/03/30 --- nars.
 		 */
+		if (IS_STATSDB_REG(reg))
+		{
+			STATSDBREG_TO_BASEDBREG(reg, baseDBreg);
+			if (baseDBreg && baseDBreg->dyn.addr->file_cntl && FILE_INFO(baseDBreg)->s_addrs.nl
+					&& !FILE_INFO(baseDBreg)->s_addrs.nl->statsdb_created)
+			{
+				if ((baseDBreg->dyn.addr->fname_len != csa->hdr->basedb_fname_len)
+						|| (0 != memcmp(baseDBreg->dyn.addr->fname, csa->hdr->basedb_fname,
+								baseDBreg->dyn.addr->fname_len)))
+				{
+					error_on_db_invalidity(csa, reg, csa->hdr, DB_INVALID_NOTOURSTATSDB, 0);
+				}
+			}
+		}
 		if (FALSE == is_gdid_gdid_identical(&FILE_INFO(reg)->fileid, &cnl->unique_id.uid))
 		{
 			SEND_MSG(VARLSTCNT(12) ERR_REQRUNDOWN, 4, DB_LEN_STR(reg), LEN_AND_STR(cnl->machine_name),
@@ -1724,6 +2198,7 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 	csa->root_search_cycle = cnl->root_search_cycle;
 	csa->onln_rlbk_cycle = cnl->onln_rlbk_cycle;	/* take local copy of the current Online Rollback cycle */
 	csa->db_onln_rlbkd_cycle = cnl->db_onln_rlbkd_cycle; /* take local copy of the current Online Rollback mod cycle */
+	RESET_LIVE_PID_IF_NEEDED(cnl->reorg_upgrade_pid, csa, "MUPIP REORG -UPGRADE");
 	SYNC_RESERVEDDBFLAGS_REG_CSA_CSD(reg, csa, csd, cnl);
 	INITIALIZE_CSA_ENCR_PTR(csa, csd, udi, db_do_crypt_init, crypt_warning, bypassed_ftok);	/* sets csa->encr_ptr */
 	/* Record ftok information as soon as shared memory set up is done */
@@ -1904,11 +2379,17 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 	}
 	/* In case of REORG -ENCRYPT the ftok will be released after it has incremented cnl->reorg_encrypt_cycle. */
 	if (!have_standalone_access && !bypassed_ftok && !mu_reorg_encrypt_in_prog)
-	{	/* Release ftok semaphore lock so that any other ftok conflicted database can continue now */
-		if (!ftok_sem_release(reg, FALSE, FALSE))
-			RTS_ERROR(VARLSTCNT(4) ERR_DBFILERR, 2, DB_LEN_STR(reg));
-		FTOK_TRACE(csa, csd->trans_hist.curr_tn, ftok_ops_release, process_id);
-		udi->grabbed_ftok_sem = FALSE;
+	{	/* Release ftok semaphore lock so that any other ftok conflicted database can continue now,
+		 * Except for if we are a statsdb; If so wait until we've committed the mapping into the base database,
+		 * since we'll want to delete the ftok sem and file if we can't for whatever reason.
+		 */
+		if (!IS_STATSDB_REG(reg))
+		{
+			if (!ftok_sem_release(reg, FALSE, FALSE))
+				RTS_ERROR(VARLSTCNT(4) ERR_DBFILERR, 2, DB_LEN_STR(reg));
+			FTOK_TRACE(csa, csd->trans_hist.curr_tn, ftok_ops_release, process_id);
+			udi->grabbed_ftok_sem = FALSE;
+		}
 	}
 	if (udi->fd_opened_with_o_direct)
 	{	/* When we opened the database file we allocated an aligned buffer to hold SGMNT_HDR_LEN bytes.
@@ -1918,6 +2399,8 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 		 */
 		DIO_BUFF_EXPAND_IF_NEEDED(udi, csd->blk_size, &(TREF(dio_buff)));
 	}
-	REVERT;
-	return 0;
+	/* If this is a statsdb reg, the additional protection of dbinit_ch is needed for longer, so revert in gvcst_init */
+	if (!IS_STATSDB_REG(reg))
+		REVERT;
+	return DB_VALID;
 }

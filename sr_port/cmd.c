@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -78,9 +78,9 @@ LITDEF nametabent cmd_names[] =
 	,{7, "ZATTACH"}
 	,{6, "ZBREAK"}
 	,{2, "ZC"}	/* legacy abbreviation for ZCONTINUE */
-	,{4, "ZCOM"}
-	,{9, "ZCONTINUE"}
+	,{4, "ZCOM"}	/* legacy abbreviation for ZCOMPILE */
 	,{8, "ZCOMPILE"}
+	,{9, "ZCONTINUE"}
 	,{11, "ZDEALLOCATE"}
 	,{5, "ZEDIT"}
 	,{5, "ZGOTO"}
@@ -173,8 +173,8 @@ LITDEF struct
 	,{m_zbreak, 0, 1, ALL_SYS}
 	,{m_zcontinue, 1, 1, ALL_SYS}
 	,{m_zcompile, 0, 1, ALL_SYS}
-	,{m_zcontinue, 1, 1, ALL_SYS}
 	,{m_zcompile, 0, 1, ALL_SYS}
+	,{m_zcontinue, 1, 1, ALL_SYS}
 	,{m_zdeallocate, 1, 1, ALL_SYS}
 	,{m_zedit, 1, 1, ALL_SYS}
 	,{m_zgoto, 1, 1, ALL_SYS}

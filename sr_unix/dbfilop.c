@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -72,10 +72,11 @@ uint4 dbfilop(file_control *fc)
 			if (0 != save_errno)
 			{
 				if (-1 == save_errno)
+				{
 					RTS_ERROR_CSA_ABT(csa, VARLSTCNT(4) ERR_DBPREMATEOF, 2, LEN_AND_STR(udi->fn));
-				else
+				} else
 					RTS_ERROR_CSA_ABT(csa, VARLSTCNT(5) ERR_DBFILOPERR, 2, LEN_AND_STR(udi->fn),
-						save_errno);
+							save_errno);
 			}
 			if (1 == fc->op_pos)
 			{

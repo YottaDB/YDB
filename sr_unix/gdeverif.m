@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-; Copyright (c) 2006-2020 Fidelity National Information		;
+; Copyright (c) 2006-2024 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -162,6 +162,14 @@ segelm:	if s'="FILE_NAME",'$length(tmpseg(am,s)) zmessage $$info(gdeerr("QUALBAD
 	else  if $data(maxseg(am,s)),maxseg(am,s)<squals(s) zmessage gdeerr("VALTOOBIG"):squals(s):maxseg(am,s):s
 	if  set verified=0
 	quit
+rdbflgchk:
+	n pdb,adb,jnl,qn
+	s qn="AUTODELETE",pdb=$select($data(rquals(qn)):rquals(qn),$data(regs(REGION,qn)):regs(REGION,qn),1:tmpreg(qn))
+	s qn="AUTODB",adb=$select($data(rquals(qn)):rquals(qn),$data(regs(REGION,qn)):regs(REGION,qn),1:tmpreg(qn))
+	s qn="JOURNAL",jnl=$select($data(rquals(qn)):rquals(qn),$data(regs(REGION,qn)):regs(REGION,qn),1:tmpreg(qn))
+	if pdb&'adb set verified=0 zmessage gdeerr("INVALIDAUTODELDB")
+	if pdb&jnl set verified=0 zmessage gdeerr("INVALIDAUTODELDB")
+	quit
 key2blk:
 	; the computation below allows for at least 1 max-key record in a data OR index block.
 	; since an index block always contains a *-key, we need to account for that too.
@@ -203,6 +211,7 @@ RQUALS(rquals)
 	set ks="KEY_SIZE",ks=$select($data(rquals(ks)):rquals(ks),$data(regs(REGION,ks)):regs(REGION,ks),1:tmpreg(ks))
 	set x="RECORD_SIZE",x=$select($data(rquals(x)):rquals(x),$data(regs(REGION,x)):regs(REGION,x),1:tmpreg(x))
 	do allocchk(.rquals)
+	do rdbflgchk
 	if REGION="TEMPLATE" set bs=tmpseg(tmpacc,"BLOCK_SIZE"),f=tmpseg(tmpacc,"RESERVED_BYTES")
 	; note "else" used in two consecutive lines intentionally (instead of using a do block inside one else).
 	; this is because we want the QUIT to quit out of RQUALS and the NEW of SEGMENT,am to happen at the RQUALS level.

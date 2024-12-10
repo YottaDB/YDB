@@ -297,6 +297,7 @@ typedef struct
 enum cmt_step
 {
 	CMT00,
+	CMT00a,
 	DECL_CMT01,
 	CMT01,
 	DECL_CMT02,
@@ -774,6 +775,8 @@ typedef struct node_local_struct
 	pthread_mutex_t		read_completed_ctl;	/* Coordinate block read completion in BG */
 	pthread_cond_t		read_completed;
 	uint4			epoch_taper_last_pid;	/* last process to do an epoch taper */
+	global_latch_t		statsdb_field_latch;
+	uint4			statsdb_init_cycle;
 } node_local;
 
 #define	COPY_STATSDB_FNAME_INTO_STATSREG(statsDBreg, statsDBfname, statsDBfname_len)				\
@@ -800,17 +803,58 @@ MBSTART {														\
 	statsDBcsd->basedb_fname_len = fname_len;									\
 } MBEND
 
-#define	UNLINK_STATSDB_AT_BASEDB_RUNDOWN(CNL)										\
-MBSTART {														\
-	if (CNL->statsdb_created && CNL->statsdb_rundown_clean)								\
-	{														\
-		assert(CNL->statsdb_fname_len);	/* "gvcst_init" would not have set CNL->statsdb_created otherwise */	\
-		assert('\0' == CNL->statsdb_fname[CNL->statsdb_fname_len]);						\
-		rc = UNLINK(CNL->statsdb_fname);									\
-		assert(0 == rc);											\
-		/* If error removing statsdb, ignore as we want to continue rundown of basedb (more important) */	\
-		CNL->statsdb_created = FALSE;										\
-	}														\
+#define	AUTODELETE_AT_RUNDOWN(REG, DELETE_STATSDB)										\
+MBSTART {															\
+	unix_db_info *udi, *base_udi;												\
+	sgmnt_addrs *csa, *base_csa;												\
+	int rc;															\
+	node_local_ptr_t cnl, base_cnl;												\
+	gd_region *base_reg;													\
+																\
+	udi = FILE_INFO(REG);													\
+	assert(IS_AUTODELETE_REG(REG));												\
+	assert(udi->grabbed_ftok_sem);												\
+	csa = &udi->s_addrs;													\
+	assert((REG)->dyn.addr->fname_len);											\
+	assert('\0' == (REG)->dyn.addr->fname[(REG)->dyn.addr->fname_len]);							\
+	if (IS_STATSDB_REG((REG)))												\
+	{															\
+		if (DELETE_STATSDB)												\
+		{														\
+			STATSDBREG_TO_BASEDBREG((REG), base_reg);								\
+			base_udi = FILE_INFO(base_reg);										\
+			base_csa = &base_udi->s_addrs;										\
+			base_cnl = base_csa->nl;										\
+			DBGRDB((stderr, "%s:%d:%s: process id %d autodeleting statsdb file %s for region %s, base region %s\n", \
+						__FILE__, __LINE__, __func__, process_id, (REG)->dyn.addr->fname,		\
+						(REG)->rname, base_reg->rname));						\
+			if (base_cnl && base_csa->hdr)										\
+			{													\
+				DBGRDB((stderr,											\
+					"%s:%d:%s: process id %d setting statsdb_created to false on file %s for region %s\n", 	\
+							__FILE__, __LINE__, __func__, process_id, base_reg->dyn.addr->fname,	\
+							base_reg->rname));							\
+				grab_latch(&base_cnl->statsdb_field_latch, GRAB_LATCH_INDEFINITE_WAIT, NOT_APPLICABLE, NULL);	\
+				assert(base_cnl->statsdb_fname_len == (REG)->dyn.addr->fname_len);				\
+				assert('\0' == base_cnl->statsdb_fname[base_cnl->statsdb_fname_len]);				\
+				assert(!memcmp(base_cnl->statsdb_fname, (REG)->dyn.addr->fname,					\
+							(REG)->dyn.addr->fname_len));						\
+				assert((REG)->statsdb_init_cycle == base_cnl->statsdb_init_cycle);				\
+				base_cnl->statsdb_fname_len = 0;								\
+				base_cnl->statsdb_created = FALSE;								\
+				base_cnl->statsdb_init_cycle++;									\
+				rel_latch(&base_cnl->statsdb_field_latch);							\
+			}													\
+			rc = UNLINK((char *)(REG)->dyn.addr->fname);								\
+			assert(0 == rc);											\
+		}														\
+	} else if IS_AUTODELETE_REG((REG))											\
+	{															\
+		DBGRDB((stderr, "%s:%d:%s: process id %d autodeleting autodb file %s for region %s\n", __FILE__,		\
+					__LINE__, __func__, process_id, (REG)->dyn.addr->fname, (REG)->rname));			\
+		rc = UNLINK((char *)(REG)->dyn.addr->fname);									\
+		assert(0 == rc);												\
+	}															\
 } MBEND
 
 #define ADD_ENT_TO_ACTIVE_QUE_CNT(CNL)		(INCR_CNT((sm_int_ptr_t)(&CNL->wcs_active_lvl),			\
@@ -1030,6 +1074,7 @@ MBSTART {								\
 #define NODE_LOCAL_SPACE(CSD)			(ROUND_UP(CRIT_SPACE(NUM_CRIT_ENTRY(CSD)) + NODE_LOCAL_SIZE, OS_PAGE_SIZE))
 #define MIN_NODE_LOCAL_SPACE			(ROUND_UP(CRIT_SPACE(MIN_CRIT_ENTRY) + NODE_LOCAL_SIZE, OS_PAGE_SIZE))
 #define DEFAULT_PROBLKSPLIT     		0 /* Do not proactively split blocks */
+#define DEFAULT_BITMAP_PREPIN     		0 /* Does prepin bitmap blocks */
 /* In order for gtmsecshr not to pull in OTS library, NODE_LOCAL_SIZE_DBS is used in secshr_db_clnup instead of NODE_LOCAL_SIZE */
 #define NODE_LOCAL_SIZE_DBS			(ROUND_UP(SIZEOF(node_local), DISK_BLOCK_SIZE))
 

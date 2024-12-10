@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -16,7 +16,7 @@
 #define	CLEANUP_UDI_FALSE	FALSE
 #define	CLEANUP_UDI_TRUE	TRUE
 
-int4 gds_rundown(boolean_t cleanup_udi);
+int4 gds_rundown(boolean_t cleanup_udi, boolean_t delete_statsdb);
 
 #define CAN_BYPASS(SEMVAL, CSA, INST_IS_FROZEN)											\
 	(INST_IS_FROZEN || FROZEN_CHILLED(CSA)											\

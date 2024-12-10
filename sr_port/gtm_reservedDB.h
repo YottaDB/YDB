@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2016-2023 Fidelity National Information	*
+ * Copyright (c) 2016-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -21,9 +21,10 @@ enum
 {
 	RDBF_AUTODB  = 0x01,			/* This DB is auto-created */
 	RDBF_NOSTATS = 0x02,			/* This DB does not collect global stats so has no statsDB */
-	RDBF_STATSDB = 0x04			/* This is a statsDB (must have AUTODB and NOSTATS also) */
+	RDBF_STATSDB = 0x04,			/* This is a statsDB (must have AUTODB and NOSTATS also) */
+	RDBF_AUTODELETE = 0x08,			/* This is an autodelete region whose db file should be deleted by last user */
 };
-#define RDBF_STATSDB_MASK (RDBF_AUTODB | RDBF_NOSTATS | RDBF_STATSDB)	/* This is a statsDB */
+#define RDBF_STATSDB_MASK (RDBF_AUTODB | RDBF_NOSTATS | RDBF_STATSDB | RDBF_AUTODELETE)	/* This is a statsDB */
 #define STATSDB_ERROR_RATE 99	/* a number of identical statsDB error messages to skip/throttle before the next output */
 /* Possible errors we encounter that prevent us from setting baseDBnl->statsdb_fnname[.len] */
 enum
@@ -67,6 +68,7 @@ enum
 #define	IS_RDBF_STATSDB(X)  (RDBF_STATSDB & (X)->reservedDBFlags)		/* X can be REG or CSA or CSD */
 /* Macroize autoDB identification */
 #define IS_AUTODB_REG(REG)  (RDBF_AUTODB & (REG)->reservedDBFlags)
+#define IS_AUTODELETE_REG(REG) (RDBF_AUTODELETE & (REG)->reservedDBFlags)
 
 /* Identify if a region name is lower-case (and thus for a statsDB) by just checking the first character of the region.
  * No need to check the entire region name as a region name is always all upper or all lower.
@@ -108,7 +110,13 @@ typedef struct statsDB_diqe				/* Deferred init queue element */
 /* To enable debugging macro (output to console) uncomment the following #define */
 /* #define DEBUG_RESERVEDDB */
 #ifdef DEBUG_RESERVEDDB
-# define DBGRDB(x) DBGFPF(x)
+# define DBGRDB(x) 				\
+MBSTART { 					\
+	struct timespec ts;			\
+	clock_gettime(CLOCK_MONOTONIC, &ts);	\
+	DBGFPF((stderr, "%ld.%ld :", ts.tv_sec, ts.tv_nsec));  \
+	DBGFPF(x); 				\
+} MBEND
 # define DBGRDB_ONLY(x) x
 #else
 # define DBGRDB(x)

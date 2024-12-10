@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -101,7 +101,7 @@ boolean_t mu_int_fhead(void)
 	}
 	if (mu_data->file_corrupt)
 		mu_int_err(ERR_DBFLCORRP, 0, 0, 0, 0, 0, 0, 0);
-	if (mu_data->createinprogress)
+	if (CREATE_IN_PROGRESS(mu_data))
 	{
 		mu_int_err(ERR_DBCREINCOMP, 0, 0, 0, 0, 0, 0, 0);
 		return FALSE;

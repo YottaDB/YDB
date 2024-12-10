@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -34,6 +34,11 @@ GBLREF gd_region	*gv_cur_region;
 
 void gv_init_reg (gd_region *reg, gd_addr *addr)
 {
+#ifdef DEBUG
+	DCL_THREADGBL_ACCESS;
+
+	SETUP_THREADGBL_ACCESS;
+#endif
 #	ifdef NOLICENSE
 	licensed = TRUE;
 #	else
@@ -55,6 +60,6 @@ void gv_init_reg (gd_region *reg, gd_addr *addr)
 		default:
 		assertpro(reg->dyn.addr->acc_meth != reg->dyn.addr->acc_meth);
 	}
-	assert(reg->open);
+	assert((reg->open) || (TREF(ok_to_leave_statsdb_unopened) && IS_STATSDB_REG(reg)));
 	return;
 }

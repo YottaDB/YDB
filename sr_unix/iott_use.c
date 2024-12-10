@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -79,14 +79,18 @@ error_def(ERR_TTINVFILTER);
 error_def(ERR_WIDTHTOOSMALL);
 error_def(ERR_ZINTRECURSEIO);
 
+#define	SPLITP_NOT	0
+#define	SPLITP_TTIN	1
+#define	SPLITP_TTOUT	2
+
 void iott_use(io_desc *iod, mval *pp)
 {
 	boolean_t		flush_input, terminator_specified = FALSE;
 	char			dc1, *ttab;
-	d_tt_struct		*temp_ptr, *tt_ptr;
-	int			p_offset, fil_type, save_errno, status;
+	d_tt_struct		*temp_ptr = NULL, *tt_ptr = NULL;
+	int			p_offset, fil_type, save_errno, status, splitp;
 	int4			length, width;
-	io_desc			*d_in, *d_out;
+	io_desc			*d_in, *d_out, *temp_iod;
 	io_termmask		mask_term;
 	struct sigaction	act;
 	struct termios		t;
@@ -94,7 +98,7 @@ void iott_use(io_desc *iod, mval *pp)
 	gtm_chset_t		temp_chset = -1, old_ochset, old_ichset;
 	uint4			mask_in;
 	unsigned char		ch, len;
-	boolean_t		ch_set;
+	boolean_t		ch_set, termios_modified = FALSE;
 	mval			mv;
 	DCL_THREADGBL_ACCESS;
 
@@ -102,6 +106,7 @@ void iott_use(io_desc *iod, mval *pp)
 	p_offset = 0;
 	assert(iod->state == dev_open);
 	ESTABLISH_GTMIO_CH(&iod->pair, ch_set);
+	assert(tt == iod->type);	/* should be even if split $PRINCIPAL */
 	iott_flush(iod);
 	tt_ptr = (d_tt_struct *)iod->dev_sp;
 	if (*(pp->str.addr + p_offset) != iop_eol)
@@ -127,9 +132,21 @@ void iott_use(io_desc *iod, mval *pp)
 		flush_input = FALSE;
 		d_in = iod->pair.in;
 		d_out = iod->pair.out;
-		temp_ptr = (d_tt_struct *)d_in->dev_sp;
-		mask_in = temp_ptr->term_ctrl;
-		mask_term = temp_ptr->mask_term;
+		splitp = 0;	/* 0(not $PRINCIPAL or split) 1(ttin) 2(ttout) */
+		if (d_in != d_out)
+		{
+			if (tt == d_in->type)
+				splitp |= SPLITP_TTIN;
+			if (tt == d_out->type)
+				splitp |= SPLITP_TTOUT;
+			assert((SPLITP_TTIN | SPLITP_TTOUT) != splitp);	/* not different tts */
+		}
+		if (tt == d_in->type)
+		{
+			temp_ptr = (d_tt_struct *)d_in->dev_sp;
+			mask_in = temp_ptr->term_ctrl;
+			mask_term = temp_ptr->mask_term;
+		}
 		old_ochset = iod->ochset;
 		old_ichset = iod->ichset;
 		while (*(pp->str.addr + p_offset) != iop_eol)
@@ -139,50 +156,60 @@ void iott_use(io_desc *iod, mval *pp)
 				case iop_canonical:
 					tt_ptr->canonical = TRUE;
 					t.c_lflag |= ICANON;
+					termios_modified = TRUE;
 					break;
 				case iop_nocanonical:
 					tt_ptr->canonical = FALSE;
 					t.c_lflag &= ~(ICANON);
+					termios_modified = TRUE;
 					break;
 				case iop_empterm:
-					tt_ptr->ext_cap |= TT_EMPTERM;
+					if (SPLITP_TTOUT != splitp)
+						tt_ptr->ext_cap |= TT_EMPTERM;
 					break;
 				case iop_noempterm:
-					tt_ptr->ext_cap &= ~TT_EMPTERM;
+					if (SPLITP_TTOUT != splitp)
+						tt_ptr->ext_cap &= ~TT_EMPTERM;
 					break;
 				case iop_cenable:
-					if (!ctrlc_on && !RESTRICTED(cenable))
+					if (!ctrlc_on && (SPLITP_TTOUT != splitp) && !RESTRICTED(cenable))
 					{	/* if it's already cenable, no need to change */
-						temp_ptr = (d_tt_struct *)io_std_device.in->dev_sp;
-						if (tt_ptr->fildes == temp_ptr->fildes)
-						{	/* if this is $PRINCIPAL make sure the ctrlc_handler is enabled */
-							sigemptyset(&act.sa_mask);
-							act.sa_flags = 0;
-							act.sa_handler = ctrlc_handler_ptr;
-							sigaction(SIGINT, &act, 0);
-							ctrlc_on = TRUE;
+						if (tt == io_std_device.in->type)
+						{
+							temp_ptr = (d_tt_struct *)io_std_device.in->dev_sp;
+							if (tt_ptr->fildes == temp_ptr->fildes)
+							{	/* if this is $PRINCIPAL make sure the ctrlc_handler is enabled */
+								sigemptyset(&act.sa_mask);
+								act.sa_flags = 0;
+								act.sa_handler = ctrlc_handler_ptr;
+								sigaction(SIGINT, &act, 0);
+								ctrlc_on = TRUE;
+							}
 						}
 					}
 					break;
 				case iop_nocenable:
-					if (ctrlc_on && !RESTRICTED(cenable))
+					if (ctrlc_on && (SPLITP_TTOUT != splitp) && !RESTRICTED(cenable))
 					{	/* if it's already nocenable, no need to change */
-						temp_ptr = (d_tt_struct *)io_std_device.in->dev_sp;
-						if (tt_ptr->fildes == temp_ptr->fildes)
-						{	/* if this is $PRINCIPAL may disable the ctrlc_handler */
-							if (0 == (CTRLC_MSK & tt_ptr->enbld_outofbands.mask))
-							{	/* but only if ctrap=$c(3) is not active */
-								sigemptyset(&act.sa_mask);
-								act.sa_flags = 0;
-								act.sa_handler = SIG_IGN;
-								sigaction(SIGINT, &act, 0);
+						if (tt == io_std_device.in->type)
+						{
+							temp_ptr = (d_tt_struct *)io_std_device.in->dev_sp;
+							if (tt_ptr->fildes == temp_ptr->fildes)
+							{	/* if this is $PRINCIPAL may disable the ctrlc_handler */
+								if (0 == (CTRLC_MSK & tt_ptr->enbld_outofbands.mask))
+								{	/* but only if ctrap=$c(3) is not active */
+									sigemptyset(&act.sa_mask);
+									act.sa_flags = 0;
+									act.sa_handler = SIG_IGN;
+									sigaction(SIGINT, &act, 0);
+								}
 							}
 							ctrlc_on = FALSE;
 						}
 					}
 					break;
 				case iop_clearscreen:
-					if (NULL != CLR_EOS)
+					if ((SPLITP_TTIN != splitp) && (NULL != CLR_EOS))
 						gtm_tputs(CLR_EOS, 1, outc);
 					break;
 				case iop_convert:
@@ -192,18 +219,21 @@ void iott_use(io_desc *iod, mval *pp)
 					mask_in &= ~TRM_CONVERT;
 					break;
 				case iop_ctrap:
-					GET_LONG(tt_ptr->enbld_outofbands.mask, pp->str.addr + p_offset);
-					if (!ctrlc_on)
-					{	/* if cenable, ctrlc_handler active anyway, otherwise, depends on ctrap=$c(3) */
-						sigemptyset(&act.sa_mask);
-						act.sa_flags = 0;
-						act.sa_handler = (CTRLC_MSK & tt_ptr->enbld_outofbands.mask)
-							? ctrlc_handler_ptr : SIG_IGN;
-						sigaction(SIGINT, &act, 0);
+					if (SPLITP_TTOUT != splitp)
+					{
+						GET_LONG(tt_ptr->enbld_outofbands.mask, pp->str.addr + p_offset);
+						if (!ctrlc_on && (iod == io_std_device.in))
+						{	/* if cenable, ctrlc_handler active anyway, else depends on ctrap=$c(3) */
+							sigemptyset(&act.sa_mask);
+							act.sa_flags = 0;
+							act.sa_handler = (CTRLC_MSK & tt_ptr->enbld_outofbands.mask)
+								? ctrlc_handler_ptr : SIG_IGN;
+							sigaction(SIGINT, &act, 0);
+						}
 					}
 					break;
 				case iop_downscroll:
-					if (d_out->dollar.y > 0)
+					if ((SPLITP_TTIN != splitp) && (0 < d_out->dollar.y))
 					{
 						d_out->dollar.y--;
 						if (NULL != CURSOR_ADDRESS)
@@ -218,8 +248,8 @@ void iott_use(io_desc *iod, mval *pp)
 					mask_in |= TRM_NOECHO;
 					break;
 				case iop_editing:
-					if (io_curr_device.in == io_std_device.in)
-					{	/* $PRINCIPAL only */
+					if ((SPLITP_TTOUT != splitp) && (iod == io_std_device.in))
+					{	/* $PRINCIPAL only, input and io_std_device.in */
 						tt_ptr->ext_cap |= TT_EDITING;
 						if (!tt_ptr->recall_buff.addr)
 						{
@@ -231,7 +261,7 @@ void iott_use(io_desc *iod, mval *pp)
 					}
 					break;
 				case iop_noediting:
-					if (io_curr_device.in == io_std_device.in)
+					if ((SPLITP_TTOUT != splitp) && (iod == io_std_device.in))
 						tt_ptr->ext_cap &= ~TT_EDITING;	/* $PRINCIPAL only */
 					break;
 				case iop_escape:
@@ -239,55 +269,63 @@ void iott_use(io_desc *iod, mval *pp)
 					break;
 				case iop_noescape:
 					mask_in &= (~TRM_ESCAPE);
-					default:
 					break;
 				case iop_eraseline:
-					if (NULL != CLR_EOL)
+					if ((SPLITP_TTIN != splitp) && (NULL != CLR_EOL))
 						gtm_tputs(CLR_EOL, 1, outc);
 					break;
 				case iop_exception:
 					DEF_EXCEPTION(pp, p_offset, iod);
 					break;
 				case iop_filter:
-					len = *(pp->str.addr + p_offset);
-					ttab = pp->str.addr + p_offset + 1;
-					if ((fil_type = namelook(filter_index, filter_names, ttab, len)) < 0)
+					if (SPLITP_TTIN != splitp)
 					{
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_TTINVFILTER);
-						return;
+						len = *(pp->str.addr + p_offset);
+						ttab = pp->str.addr + p_offset + 1;
+						if ((fil_type = namelook(filter_index, filter_names, ttab, len)) < 0)
+						{
+							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_TTINVFILTER);
+							return;
+						}
+						switch (fil_type)
+						{
+						case 0:
+							iod->write_filter |= CHAR_FILTER;
+							break;
+						case 1:
+							iod->write_filter |= ESC1;
+							break;
+						case 2:
+							iod->write_filter &= ~CHAR_FILTER;
+							break;
+						case 3:
+							iod->write_filter &= ~ESC1;
+							break;
+						}
+						break;
 					}
-					switch (fil_type)
-					{
-					case 0:
-						iod->write_filter |= CHAR_FILTER;
-						break;
-					case 1:
-						iod->write_filter |= ESC1;
-						break;
-					case 2:
-						iod->write_filter &= ~CHAR_FILTER;
-						break;
-					case 3:
-						iod->write_filter &= ~ESC1;
-						break;
-					}
-					break;
 				case iop_nofilter:
-					iod->write_filter = 0;
+					if (SPLITP_TTIN != splitp)
+						iod->write_filter = 0;
 					break;
 				case iop_flush:
-					flush_input = TRUE;
+					if (SPLITP_TTOUT != splitp)
+						flush_input = TRUE;
 					break;
 				case iop_hostsync:
 					t.c_iflag |= IXOFF;
+					termios_modified = TRUE;
 					break;
 				case iop_nohostsync:
 					t.c_iflag &= ~IXOFF;
+					termios_modified = TRUE;
 					break;
 				case iop_hupenable:
-					if (!hup_on)
+					/* both READ and WRITE do if any $PRINCIPAL */
+					if (!hup_on && ((iod == io_std_device.in) || (iod == io_std_device.out)))
 					{	/* if it's already hupenable, no need to change */
-						temp_ptr = (d_tt_struct *)io_std_device.in->dev_sp;
+						temp_ptr = (d_tt_struct *)((tt == io_std_device.in) ? io_std_device.in->dev_sp :
+								io_std_device.out->dev_sp);
 						if (tt_ptr->fildes == temp_ptr->fildes)
 						{	/* if $PRINCIPAL, enable hup_handler; similar code in term_setup.c */
 							sigemptyset(&act.sa_mask);
@@ -299,9 +337,11 @@ void iott_use(io_desc *iod, mval *pp)
 					}
 					break;
 				case iop_nohupenable:
-					if (hup_on)
+					/* both READ and WRITE do if any $PRINCIPAL */
+					if (hup_on && ((iod == io_std_device.in) || (iod == io_std_device.out)))
 					{	/* if it's already nohupenable, no need to change */
-						temp_ptr = (d_tt_struct *)io_std_device.in->dev_sp;
+						temp_ptr = (d_tt_struct *)((tt == io_std_device.in) ? io_std_device.in->dev_sp :
+								io_std_device.out->dev_sp);
 						if (tt_ptr->fildes == temp_ptr->fildes)
 						{	/* if $PRINCIPAL, disable the hup_handler */
 							sigemptyset(&act.sa_mask);
@@ -313,18 +353,18 @@ void iott_use(io_desc *iod, mval *pp)
 					}
 					break;
 				case iop_insert:
-					if (io_curr_device.in == io_std_device.in)
+					if ((SPLITP_TTOUT != splitp) && (io_curr_device.in == io_std_device.in))
 						tt_ptr->ext_cap &= ~TT_NOINSERT;	/* $PRINCIPAL only */
 					break;
 				case iop_noinsert:
-					if (io_curr_device.in == io_std_device.in)
+					if ((SPLITP_TTOUT != splitp) && (io_curr_device.in == io_std_device.in))
 						tt_ptr->ext_cap |= TT_NOINSERT;	/* $PRINCIPAL only */
 					break;
 				case iop_length:
 					GET_LONG(length, pp->str.addr + p_offset);
 					if (0 > length)
 						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_DEVPARMNEG);
-					d_out->length = length;
+					iod->length = length;
 					break;
 				case iop_pasthru:
 					mask_in |= TRM_PASTHRU;
@@ -336,39 +376,50 @@ void iott_use(io_desc *iod, mval *pp)
 					mask_in |= TRM_READSYNC;
 					break;
 				case iop_noreadsync:
-					dc1 = (char)17;
-					temp_ptr = (d_tt_struct *)io_std_device.in->dev_sp;
-					DOWRITERC(temp_ptr->fildes, &dc1, 1, status);
-					if (0 != status)
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
+					if (SPLITP_TTOUT != splitp)
+					{	/* GT.M sends XON/XOFF before and after READ  */
+						dc1 = (char)17;
+						temp_ptr = (d_tt_struct *)io_std_device.in->dev_sp;
+						DOWRITERC(temp_ptr->fildes, &dc1, 1, status);
+						if (0 != status)
+							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
+					}
 					mask_in &= (~TRM_READSYNC);
 					break;
 				case iop_terminator:
-					memcpy(&mask_term.mask[0], (pp->str.addr + p_offset), SIZEOF(io_termmask));
-					terminator_specified = TRUE;
-					temp_ptr = (d_tt_struct *)d_in->dev_sp;
-					if (mask_term.mask[0] == NUL &&
-						mask_term.mask[1] == NUL &&
-						mask_term.mask[2] == NUL &&
-						mask_term.mask[3] == NUL &&
-						mask_term.mask[4] == NUL &&
-						mask_term.mask[5] == NUL &&
-						mask_term.mask[6] == NUL &&
-						mask_term.mask[7] == NUL)
-						temp_ptr->default_mask_term = TRUE;
-					else
-						temp_ptr->default_mask_term = FALSE;
+					if (SPLITP_TTOUT != splitp)
+					{
+						memcpy(&mask_term.mask[0], (pp->str.addr + p_offset), SIZEOF(io_termmask));
+						terminator_specified = TRUE;
+						temp_ptr = (d_tt_struct *)d_in->dev_sp;
+						if (mask_term.mask[0] == NUL &&
+							mask_term.mask[1] == NUL &&
+							mask_term.mask[2] == NUL &&
+							mask_term.mask[3] == NUL &&
+							mask_term.mask[4] == NUL &&
+							mask_term.mask[5] == NUL &&
+							mask_term.mask[6] == NUL &&
+							mask_term.mask[7] == NUL)
+								temp_ptr->default_mask_term = TRUE;
+						else
+							temp_ptr->default_mask_term = FALSE;
+					}
 					break;
 				case iop_noterminator:
-					temp_ptr = (d_tt_struct *)d_in->dev_sp;
-					temp_ptr->default_mask_term = FALSE;
-					memset(&mask_term.mask[0], 0, SIZEOF(io_termmask));
+					if (SPLITP_TTOUT != splitp)
+					{
+						temp_ptr = (d_tt_struct *)d_in->dev_sp;
+						temp_ptr->default_mask_term = FALSE;
+						memset(&mask_term.mask[0], 0, SIZEOF(io_termmask));
+					}
 					break;
 				case iop_ttsync:
 					t.c_iflag |= IXON;
+					termios_modified = TRUE;
 					break;
 				case iop_nottsync:
 					t.c_iflag &= ~IXON;
+					termios_modified = TRUE;
 					break;
 				case iop_typeahead:
 					mask_in &= (~TRM_NOTYPEAHD);
@@ -377,57 +428,69 @@ void iott_use(io_desc *iod, mval *pp)
 					mask_in |= TRM_NOTYPEAHD;
 					break;
 				case iop_upscroll:
-					d_out->dollar.y++;
-					if (d_out->length)
-						d_out->dollar.y %= d_out->length;
-					if (NULL != CURSOR_ADDRESS)
-						gtm_tputs(gtm_tparm(CURSOR_ADDRESS, d_out->dollar.y, d_out->dollar.x), 1, outc);
+					if (SPLITP_TTIN != splitp)
+					{
+						d_out->dollar.y++;
+						if (d_out->length)
+							d_out->dollar.y %= d_out->length;
+						if (NULL != CURSOR_ADDRESS)
+							gtm_tputs(gtm_tparm(CURSOR_ADDRESS, d_out->dollar.y, d_out->dollar.x),
+								1, outc);
+					}
 					break;
 				case iop_width:
 					GET_LONG(width, pp->str.addr + p_offset);
 					if (0 > width)
 						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_DEVPARMNEG);
 					/* Do not allow a WIDTH of 1 if UTF mode (ICHSET or OCHSET is not M) */
-					if ((1 == width) && ((CHSET_M != d_in->ochset) || (CHSET_M != d_in->ichset)))
+					if ((1 == width) && ((CHSET_M != iod->ochset) || (CHSET_M != iod->ichset)))
 						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_WIDTHTOOSMALL);
 					if (0 == width)
 					{
-						d_out->wrap = FALSE;
-						d_out->width = TTDEF_PG_WIDTH;
+						iod->wrap = FALSE;
+						iod->width = TTDEF_PG_WIDTH;
 					} else
 					{
-						d_out->width = width;
-						d_out->wrap = TRUE;
+						iod->width = width;
+						iod->wrap = TRUE;
 					}
 					break;
 				case iop_wrap:
-					d_out->wrap = TRUE;
+					iod->wrap = TRUE;
 					break;
 				case iop_nowrap:
-					d_out->wrap = FALSE;
+					iod->wrap = FALSE;
 					break;
 				case iop_x:
-					GET_LONG(d_out->dollar.x, pp->str.addr + p_offset);
-					if (0 > (int4)d_out->dollar.x)
-						d_out->dollar.x = 0;
-					if (d_out->dollar.x > d_out->width && d_out->wrap)
+					if (SPLITP_TTIN != splitp)
 					{
-						d_out->dollar.y += (d_out->dollar.x / d_out->width);
-						if (d_out->length)
-							d_out->dollar.y %= d_out->length;
-						d_out->dollar.x	%= d_out->width;
+						GET_LONG(d_out->dollar.x, pp->str.addr + p_offset);
+						if (0 > (int4)d_out->dollar.x)
+							d_out->dollar.x = 0;
+						if (d_out->dollar.x > d_out->width && d_out->wrap)
+						{
+							d_out->dollar.y += (d_out->dollar.x / d_out->width);
+							if (d_out->length)
+								d_out->dollar.y %= d_out->length;
+							d_out->dollar.x	%= d_out->width;
+						}
+						if (NULL != CURSOR_ADDRESS)
+							gtm_tputs(gtm_tparm(CURSOR_ADDRESS, d_out->dollar.y, d_out->dollar.x), 1,
+								outc);
 					}
-					if (NULL != CURSOR_ADDRESS)
-						gtm_tputs(gtm_tparm(CURSOR_ADDRESS, d_out->dollar.y, d_out->dollar.x), 1, outc);
 					break;
 				case iop_y:
-					GET_LONG(d_out->dollar.y, pp->str.addr + p_offset);
-					if (0 > (int4)d_out->dollar.y)
-						d_out->dollar.y = 0;
-					if (d_out->length)
-						d_out->dollar.y %= d_out->length;
-					if (NULL != CURSOR_ADDRESS)
-						gtm_tputs(gtm_tparm(CURSOR_ADDRESS, d_out->dollar.y, d_out->dollar.x), 1, outc);
+					if (SPLITP_TTIN != splitp)
+					{
+						GET_LONG(d_out->dollar.y, pp->str.addr + p_offset);
+						if (0 > (int4)d_out->dollar.y)
+							d_out->dollar.y = 0;
+						if (d_out->length)
+							d_out->dollar.y %= d_out->length;
+						if (NULL != CURSOR_ADDRESS)
+							gtm_tputs(gtm_tparm(CURSOR_ADDRESS, d_out->dollar.y, d_out->dollar.x), 1,
+								outc);
+					}
 					break;
 				case iop_ipchset:
 					{
@@ -485,16 +548,21 @@ void iott_use(io_desc *iod, mval *pp)
 						iod->ichset = iod->ochset = temp_chset;
 						break;
 					}
+				default:
+					break;
 			}
 			p_offset += ((IOP_VAR_SIZE == io_params_size[ch]) ?
 				(unsigned char)*(pp->str.addr + p_offset) + 1 : io_params_size[ch]);
 		}
-		temp_ptr = (d_tt_struct *)d_in->dev_sp;
-		Tcsetattr(tt_ptr->fildes, TCSANOW, &t, status, save_errno);
-		if (0 != status)
-			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_TCSETATTR, 1, tt_ptr->fildes, save_errno);
+		if (termios_modified && (tt == iod->type))
+		{
+			Tcsetattr(tt_ptr->fildes, TCSANOW, &t, status, save_errno);
+			if (0 != status)
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_TCSETATTR, 1, tt_ptr->fildes, save_errno);
+		}
 		if (tt == d_in->type)
 		{
+			temp_ptr = (d_tt_struct *)d_in->dev_sp;
 			temp_ptr->term_ctrl = mask_in;
 			/* reset the mask to default if chset was changed without specifying new terminators or Default */
 			if ((!terminator_specified && (old_ichset != iod->ichset)) ||
@@ -511,8 +579,8 @@ void iott_use(io_desc *iod, mval *pp)
 			}
 			memcpy(&temp_ptr->mask_term, &mask_term, SIZEOF(io_termmask));
 		}
-		if (flush_input)
-		{
+		if (flush_input && (SPLITP_TTOUT != splitp))
+		{	/* smw no PG(in VMSPG)? not only */
 			TCFLUSH(tt_ptr->fildes, TCIFLUSH, status);
 			if (0 != status)
 				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5, LIT_AND_LEN("tcflush input"),

@@ -298,15 +298,17 @@ OC_FNTEXT:	pushab	val.0
 		pushab	val.1
 		calls	#4,xfer.xf_fntext
 OC_FNTRANSLATE:	pushab	val.0
+		pushab	val.4
 		pushab	val.3
 		pushab	val.2
 		pushab	val.1
-		calls	#4,xfer.xf_fntranslate
+		calls	#5,xfer.xf_fntranslate
 OC_FNZTRANSLATE: pushab	val.0
+		pushab	val.4
 		pushab	val.3
 		pushab	val.2
 		pushab	val.1
-		calls	#4,xfer.xf_fnztranslate
+		calls	#5,xfer.xf_fnztranslate
 OC_FNZTRIGGER:	pushab	val.0
 		pushab	val.3
 		pushab	val.2
@@ -1043,15 +1045,27 @@ OC_FNZSYSLOG:	pushab	val.0			; /* destination mval */
 		pushab  val.1			; /* string */
 		calls	#2,xfer.xf_fnzsyslog
 OC_FNZTRANSLATE_FAST: pushab   val.0
+		pushab  val.3
 		pushab  val.2
 		pushab  val.1
-		calls   #3,xfer.xf_fnztranslate_fast
+		calls   #4,xfer.xf_fnztranslate_fast
 OC_FNTRANSLATE_FAST: pushab   val.0
+		pushab val.5
 		pushab val.4
 		pushab val.3
 		pushab val.2
 		pushab val.1
-		calls   #5,xfer.xf_fntranslate_fast
+		calls   #6,xfer.xf_fntranslate_fast
 OC_FNZAUDITLOG:	pushab	val.0			; /* destination mval */
 		pushab  val.1			; /* string */
 		calls	#2,xfer.xf_fnzauditlog
+OC_FNREPLACE: pushab   val.0			; /* Destination mval */
+		pushab  val.3			; /* rplc */
+		pushab  val.2			; /* substr */
+		pushab  val.1			; /* src */
+		calls   #4,xfer.xf_fnreplace
+OC_FNZREPLACE: pushab   val.0			; /* Destination mval */
+		pushab  val.3			; /* rplc */
+		pushab  val.2			; /* substr */
+		pushab  val.1			; /* src */
+		calls   #4,xfer.xf_fnzreplace

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -355,5 +355,7 @@ OPCODE_DEF(OC_SNAND, (OCT_BOOL | OCT_NEGATED | OCT_SE))
 OPCODE_DEF(OC_SOR, (OCT_BOOL | OCT_SE))
 OPCODE_DEF(OC_SNOR, (OCT_BOOL | OCT_NEGATED | OCT_SE))
 OPCODE_DEF(OC_SCOBOOL, (OCT_BOOL | OCT_COERCE | OCT_UNARY | OCT_SE))
+OPCODE_DEF(OC_FNREPLACE, (OCT_MVAL | OCT_EXPRLEAF))
+OPCODE_DEF(OC_FNZREPLACE, (OCT_MVAL | OCT_EXPRLEAF))
 OPCODE_DEF(OC_LASTOPCODE, (OCT_CGSKIP))
 /* insert new opcodes before OC_LASTOPCODE */

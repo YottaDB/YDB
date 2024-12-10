@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-; Copyright (c) 2001-2022 Fidelity National Information		;
+; Copyright (c) 2001-2024 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -98,4 +98,5 @@ GDEMSGIN
 	s gdeerr("GBLNAMCOLLVER")=150504098
 	s gdeerr("NOPERCENTY")=150504114
 	s gdeerr("GDELOGFAIL")=150504122
+	s gdeerr("INVALIDAUTODELDB")=150504130
 	q

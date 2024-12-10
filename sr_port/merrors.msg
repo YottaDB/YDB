@@ -954,7 +954,7 @@ REPLAHEAD	<Replicating instance is ahead of the originating instance.!AD>/error/
 MUPIPSET2SML	<!UL too small, minimum !AD allowed is !UL>/warning/fao=4!/ansi=0
 DBREADBM	<!AD Read error on bit map>/error/fao=2!/ansi=0/D
 DBCOMPTOOLRG	<!AD Record has too large compression count>/error/fao=2!/ansi=0/I
-UNUSEDMSG957	<DBVERPERFWARN2 removed from code in V7.1-004 Sep 2024>/error/fao=0!/ansi=0
+PIDRESET	<Region !AD had PID !UL doing !AD but PID did not exist, reset to zero>/warning/fao=5!/ansi=0
 DBRBNTOOLRG	<!AD Root block number greater than last block number in file>/error/fao=2!/ansi=0/D
 DBRBNLBMN	<!AD Root block number is a local bit map number>/error/fao=2!/ansi=0/D
 DBRBNNEG	<!AD Root block number negative>/error/fao=2!/ansi=0/D

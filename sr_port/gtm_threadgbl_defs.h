@@ -226,6 +226,7 @@ THREADGBLDEF(max_lcl_coll_xform_bufsiz,		int)				/* max size of local collation 
 THREADGBLDEF(replgbl,				replgbl_t)			/* set of global variables needed by the source
 										 * server */
 THREADGBLDEF(tqread_nowait,			boolean_t)			/* avoid sleeping in t_qread if TRUE */
+THREADGBLDEF(tqread_grab_bml,			boolean_t)			/* in t_qread skip owned BMLs */
 /* Auditing related global variables */
 THREADGBLDEF(dollar_zaudit, 			boolean_t)			/* Intrinsic that indicates whether direct mode
 										 * auditing (i.e. APD) is enabled.
@@ -517,6 +518,10 @@ THREADGBLDEF(defer_instance_freeze,		uint4)		/* system for deferring recognition
 								 * while a commit is in-flight so long as the commit does not
 								 * cause the freeze.
 								 */
+THREADGBLDEF(in_bm_getfree_gdsfilext,           boolean_t)	/* bm_getfree() did a preemptive crit grab before doing a
+								 * file extension.
+								 */
+THREADGBLDEF(ok_to_leave_statsdb_unopened,	boolean_t)	/* Whether or not it is okay to leave a statsdb unopened */
 /* Debug values */
 #ifdef DEBUG
 THREADGBLDEF(donot_commit,			boolean_t)			/* debug-only - see gdsfhead.h for purpose */
@@ -556,9 +561,6 @@ THREADGBLDEF(in_trigger_upgrade,		boolean_t)	/* caller is MUPIP TRIGGER -UPGRADE
 THREADGBLDEF(gtm_test_autorelink_always,	boolean_t)	/*  DEBUG-only option to enable/disable autorelink always */
 THREADGBLDEF(fork_without_child_wait,		boolean_t)	/*  we did a FORK but did not wait for child to detach from
 								 *  inherited shm so shm_nattch could be higher than we expect.
-								 */
-THREADGBLDEF(in_bm_getfree_gdsfilext,           boolean_t)	/* bm_getfree() did a preemptive crit grab before doing a
-								 * file extension.
 								 */
 THREADGBLDEF(cur_cmt_step,			enum cmt_step)	/* Current step of commit. Intended to validate t_commit_cleanup */
 #endif	/* #ifdef DEBUG */

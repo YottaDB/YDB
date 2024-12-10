@@ -91,6 +91,7 @@ typedef enum
 	INTRPT_IN_RIP_NOTIFY,		/* Deferring interrupts while notifying read waiters of completion */
 	INTRPT_IN_JNL_CLEANUP,		/* Deferring interrupts while holding the phase2 latch */
 	INTRPT_IN_MLK_SHM_MODIFY,	/* Deferring interrupts while grabbing a LOCK and initializing a node */
+	INTRPT_HAVE_STATSDB_LATCH,	/* Deferring interrupts while posessing a latch on statsdb fields in basedb */
 	INTRPT_NUM_STATES		/* Should be the *last* one in the enum. */
 } intrpt_state_t;
 

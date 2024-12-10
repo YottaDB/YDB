@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -215,7 +215,7 @@ MBSTART {												\
  * In that case, some static variables (relied upon by mu_rndwn_file_ch to handle errors in current
  * "mu_rndwn_file" frame level) are saved off in the stack and restored once the call returns.
  */
-#define	NESTED_MU_RNDWN_FILE_CALL(REG, STANDALONE, STATUS)		\
+#define	NESTED_MU_RNDWN_FILE_CALL(REG, STANDALONE, DELETE_STATS, STATUS)\
 {									\
 	gd_region		*save_rundown_reg;			\
 	gd_region		*save_temp_region;			\
@@ -235,7 +235,7 @@ MBSTART {												\
 	save_no_shm_exists              = no_shm_exists;		\
 	save_shm_status_confirmed       = shm_status_confirmed;		\
 									\
-	STATUS = mu_rndwn_file(REG, STANDALONE);			\
+	STATUS = mu_rndwn_file(REG, STANDALONE, DELETE_STATS);		\
 									\
 	rundown_reg                = save_rundown_reg;			\
 	temp_region                = save_temp_region;			\
@@ -257,7 +257,9 @@ STATICFNDEF boolean_t mu_rndwn_file_statsdb(gd_region *statsDBreg, boolean_t *st
 	boolean_t	statsDBrundown_status;
 	gd_region	*save_gv_cur_region, *save_ftok_sem_reg;
 	gd_segment	*statsDBseg;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	/* We are in "mu_rndwn_file" of a basedb and are about to do a nested call of "mu_rndwn_file" on a statsdb.
 	 * But we don't want that to in turn call a "mu_rndwn_file" of the basedb (which it can if IS_RDBF_STATSDB
 	 * is TRUE; see NESTED_MU_RNDWN_FILE_CALL usage in "mu_rndwn_file") as that would lead to an indefinite recursion.
@@ -278,7 +280,7 @@ STATICFNDEF boolean_t mu_rndwn_file_statsdb(gd_region *statsDBreg, boolean_t *st
 		 */
 		save_ftok_sem_reg = ftok_sem_reg;
 		ftok_sem_reg = NULL;
-		NESTED_MU_RNDWN_FILE_CALL(statsDBreg, FALSE, statsDBrundown_status);
+		NESTED_MU_RNDWN_FILE_CALL(statsDBreg, FALSE, TRUE, statsDBrundown_status);
 		if (statsDBrundown_status && !standalone)
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_MUFILRNDWNSUC, 2, DB_LEN_STR(statsDBreg));
 		ftok_sem_reg = save_ftok_sem_reg;
@@ -316,7 +318,7 @@ STATICFNDEF boolean_t mu_rndwn_file_statsdb(gd_region *statsDBreg, boolean_t *st
  *	TRUE for success
  *	FALSE for failure
  */
-boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
+boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone, boolean_t delete_statsdb)
 {
 	int			status, save_errno, sopcnt, tsd_size, save_udi_semid = INVALID_SEMID, semop_res, stat_res, rc;
 	int			csd_size;
@@ -342,6 +344,7 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 	gd_segment		*seg, *baseDBseg;
 	int			gtmcrypt_errno;
 	boolean_t		cleanjnl_present, override_present, wcs_flu_success, prevent_mu_rndwn, need_rollback;
+	intrpt_state_t		prev_intrpt_state;
 	unsigned char		*fn;
 	mstr			jnlfile;
 	int			jnl_fd;
@@ -387,6 +390,7 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 	owning_gd = reg->owning_gd;
 	for (iter = 0; ; iter++)
 	{
+		ESTABLISH_RET(mu_rndwn_file_ch, FALSE);
 		fc->op = FC_OPEN;
 		status = dbfilop(fc);
 		udi = FILE_INFO(reg);
@@ -406,9 +410,9 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 				assert(reg == ftok_sem_reg);
 				ftok_sem_release(reg, udi->counter_ftok_incremented, TRUE);
 			}
+			REVERT;
 			return FALSE;
 		}
-		ESTABLISH_RET(mu_rndwn_file_ch, FALSE);
 		if (0 == iter)
 		{	/* Get FTOK lock only once in for loop and do not release it as otherwise it introduces complications
 			 * related to "ftok_counter_halted" maintenance across all iterations and how much to finally
@@ -500,6 +504,7 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 	 */
 	if (is_statsdb && owning_gd->is_dummy_gbldir && (reg == owning_gd->regions))
 	{	/* Copy basedb file name to local variable before freeing up tsd, releasing ftok lock etc. */
+		assert(!delete_statsdb);
 		assert(tsd->basedb_fname_len);
 		assert(ARRAYSIZE(tsd->basedb_fname) <= ARRAYSIZE(basedb_fname));
 		basedb_fname_len = MIN(tsd->basedb_fname_len, ARRAYSIZE(basedb_fname) - 1);
@@ -535,7 +540,7 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 				FILE_CNTL_INIT(statsDBseg);
 			statsDBudi = FILE_INFO(statsDBreg);
 			memcpy(statsDBudi, udi, SIZEOF(*udi));
-			NESTED_MU_RNDWN_FILE_CALL(gv_cur_region, FALSE, baseDBrundown_status);
+			NESTED_MU_RNDWN_FILE_CALL(gv_cur_region, FALSE, delete_statsdb, baseDBrundown_status);
 			/* If above "mu_rndwn_file" invocation of the basedb did a rundown of the statsdb too, then we would have
 			 * released the ftok lock on the statsdb. But if an error happened in "mu_rndwn_file" of the basedb before
 			 * it even attempted "mu_rndwn_file" of statsdb, then we would still be holding the ftok sem on the statsdb.
@@ -745,11 +750,15 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 				/* If statsDB exists and rundown was successful, remove it. It is okay to do so since
 				 * we hold an ftok on the basedb at this point.
 				 */
+#ifdef DEBUG
 				if (statsDBexists && statsDBrundown_status)
 				{
-					rc = UNLINK(statsdb_fname);
-					assert(0 == rc);
+					STAT_FILE((char *)statsdb_fname, &stat_buf, stat_res);
+					save_errno = errno;
+					assert(-1 == stat_res);
+					assert(ENOENT == save_errno);
 				}
+#endif
 			}
 		}
 		if (prevent_mu_rndwn)
@@ -851,13 +860,15 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 						return FALSE;
 					}
 				}
+				CLOSEFILE_RESET(udi->fd, rc);	/* resets "udi->fd" to FD_INVALID */
+				if (IS_AUTODELETE_REG(reg))
+					AUTODELETE_AT_RUNDOWN(reg, delete_statsdb);
 				if (!ftok_sem_release(reg, FALSE, FALSE))
 				{
 					RNDWN_ERR("!AD -> Error from ftok_sem_release.", reg);
 					MU_RNDWN_FILE_CLNUP(reg, udi, tsd, sem_created, udi->counter_acc_incremented);
 					return FALSE;
 				}
-				CLOSEFILE_RESET(udi->fd, rc);	/* resets "udi->fd" to FD_INVALID */
 				REVERT;
 				free(tsd);
 				assert(udi->grabbed_access_sem);
@@ -910,6 +921,8 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 			return FALSE;
 		}
 		CLOSEFILE_RESET(udi->fd, rc);	/* resets "udi->fd" to FD_INVALID */
+		if (IS_AUTODELETE_REG(reg))
+			AUTODELETE_AT_RUNDOWN(reg, delete_statsdb);
 		free(tsd);
 		REVERT;
 		/* For mupip rundown (standalone = FALSE), we release/remove ftok semaphore here. */
@@ -1138,35 +1151,45 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 			 * shared section is valid, check if there is a statsdb associated with this (that we created
 			 * in this lifetime of the basedb shm or even before) and if so attempt a rundown of that first.
 			 */
-			if (cnl->statsdb_created)
+			DEFER_INTERRUPTS(INTRPT_HAVE_STATSDB_LATCH, prev_intrpt_state);
+			grab_latch(&cnl->statsdb_field_latch, GRAB_LATCH_INDEFINITE_WAIT, NOT_APPLICABLE, NULL);
+			BASEDBREG_TO_STATSDBREG(reg, statsDBreg);
+			if (cnl->statsdb_created && cnl->statsdb_fname_len)
 			{
+				statsDBreg->statsdb_init_cycle = cnl->statsdb_init_cycle;
 				assert(!IS_STATSDB_REG(reg));
 				statsdb_fname_len = cnl->statsdb_fname_len;
 				assert(statsdb_fname_len);
-				statsdb_fname_ptr = cnl->statsdb_fname;
-			} else if (!is_statsdb)
+				memcpy(statsdb_fname, cnl->statsdb_fname, statsdb_fname_len);
+				rel_latch(&cnl->statsdb_field_latch);
+				ENABLE_INTERRUPTS(INTRPT_HAVE_STATSDB_LATCH, prev_intrpt_state);
+				assert(statsdb_fname_len < SIZEOF(statsdb_fname));
+				statsdb_fname[statsdb_fname_len] = '\0';
+				statsdb_fname_ptr = statsdb_fname;
+			} else if (!(RDBF_NOSTATS & tsd->reservedDBFlags))
 			{
+				statsDBreg->statsdb_init_cycle = cnl->statsdb_init_cycle;
 				assert(!IS_STATSDB_REG(reg));
 				assert(udi->fn == (char *)&seg->fname[0]);
+				rel_latch(&cnl->statsdb_field_latch);
+				ENABLE_INTERRUPTS(INTRPT_HAVE_STATSDB_LATCH, prev_intrpt_state);
 				statsdb_fname_len = ARRAYSIZE(statsdb_fname);
 				gvcst_set_statsdb_fname(tsd, reg, statsdb_fname, &statsdb_fname_len);
-				statsdb_fname_ptr = &statsdb_fname[0];
+				statsdb_fname_ptr = statsdb_fname;
 			} else
+			{
+				rel_latch(&cnl->statsdb_field_latch);
+				ENABLE_INTERRUPTS(INTRPT_HAVE_STATSDB_LATCH, prev_intrpt_state);
 				statsdb_fname_len = 0;
+			}
 			if (statsdb_fname_len)
 			{
-				BASEDBREG_TO_STATSDBREG(reg, statsDBreg);
 				COPY_STATSDB_FNAME_INTO_STATSREG(statsDBreg, statsdb_fname_ptr, statsdb_fname_len);
 				/* Note: Error status of statsdb rundown is factored into final basedb rundown status
 				 * by storing the return value in "statsDBrundown_status".
 				 */
 				statsDBrundown_status = mu_rndwn_file_statsdb(statsDBreg, &statsDBexists, standalone);
-				assert(!cnl->statsdb_created || statsDBexists);
 				assert(csa == cs_addrs);	/* cs_addrs should not have changed in above call */
-				if (cnl->statsdb_created)
-				{	/* If basedb shm exists, note statsdb rundown status in basedb shm too */
-					cnl->statsdb_rundown_clean = statsDBrundown_status;
-				}
 			}
 			csa->critical = (CRIT_PTR_T)(csa->db_addrs[0] + NODE_LOCAL_SIZE);
 			assert(((INTPTR_T)csa->critical & 0xf) == 0);	/* critical should be 16-byte aligned */
@@ -1467,12 +1490,6 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 		}
 #		endif
 		IF_LIBAIO(aio_shim_destroy(udi->owning_gd);)
-		/* If this is a BASEDB and we are the last one out, unlink/remove the corresponding STASDB if one exists */
-		/* Note that if "is_statsdb" is TRUE and basedb was not found, we cannot safely delete the statsdb (deletion
-		 * of statsdb requires ftok lock on the basedb). In that case, we leave it as is. And when the basedb is next
-		 * opened, we will remove this statsdb and create a new one.
-		 */
-		UNLINK_STATSDB_AT_BASEDB_RUNDOWN(cnl);
 		break;
 	}
 	/* Detach from shared memory whether it is a GT.M shared memory or not */
@@ -1580,11 +1597,14 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 	 * that way the ftok semaphore gets deleted correctly as part of the counter decrement.
 	 */
 	udi->counter_ftok_incremented = !ftok_counter_halted;
+	CLOSEFILE_RESET(udi->fd, rc);	/* resets "udi->fd" to FD_INVALID */
+	if (IS_AUTODELETE_REG(reg))
+		AUTODELETE_AT_RUNDOWN(reg, delete_statsdb);
+	reg->file_initialized = reg->did_file_initialization = FALSE;
 	if (!ftok_sem_release(reg, udi->counter_ftok_incremented && !standalone, !standalone))
 		return FALSE;
 	/* if "standalone" we better leave this function with standalone access */
 	assert(!standalone || udi->grabbed_access_sem);
-	CLOSEFILE_RESET(udi->fd, rc);	/* resets "udi->fd" to FD_INVALID */
 	DEBUG_ONLY(in_mu_rndwn_file = FALSE);
 	return statsDBrundown_status;
 }
@@ -1619,6 +1639,7 @@ CONDITION_HANDLER(mu_rndwn_file_ch)
 	}
 	RESET_GV_CUR_REGION;
 	rundown_reg->open = FALSE;
+	rundown_reg->file_initialized = rundown_reg->did_file_initialization = FALSE;
 	/* We want to proceed to the next condition handler in case we have stand-alone access, because if an error happens on one
 	 * region, we should signal an issue and not proceed to the next region. Otherwise, we try to rundown the next region.
 	 */

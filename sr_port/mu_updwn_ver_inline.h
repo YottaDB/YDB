@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -12,6 +12,7 @@
 
 #ifndef MU_UPDWN_VER_INLINE_INCLUDED
 #define MU_UPDWN_VER_INLINE_INCLUDED
+#include "gdsfhead.h"
 
 GBLREF	uint4			mu_upgrade_in_prog;		/* non-zero if MUPIP REORG UPGRADE/DOWNGRADE is in progress */
 
@@ -28,7 +29,7 @@ static inline void incr_blks_to_upgrd(sgmnt_addrs *csa, sgmnt_data *csd, int del
 
 	if (0 != csd->blks_to_upgrd_subzero_error)	/* Gone negative, give up counting */
 		return;
-	assert(csd->createinprogress || csa->now_crit);
+	assert(CREATE_IN_PROGRESS(csd) || csa->now_crit);
 	assert(csa->hdr == csd);
 	cur_delta = delta;
 	assert(0 != cur_delta);

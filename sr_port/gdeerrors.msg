@@ -1,6 +1,6 @@
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !								!
-! Copyright (c) 2001-2022 Fidelity National Information		!
+! Copyright (c) 2001-2024 Fidelity National Information		!
 ! Services, Inc. and/or its subsidiaries. All rights reserved.	!
 !								!
 !	This source code contains the intellectual property	!
@@ -103,4 +103,5 @@ GBLNAMCOLLVER	<Global directory indicates GBLNAME !AD has collation sequence #!U
 GDEASYNCIONOMM	<!AD segment has ASYNCIO turned on. Cannot support MM access method.>/error/fao=2
 NOPERCENTY	<^%Y* is a reserved global name in GT.M>/error/fao=0
 GDELOGFAIL	<GDE failed to log command. Check operator log for more information>/error/fao=0
+INVALIDAUTODELDB	<Autodelete DB must be specified as non-journaled autodb>/error/fao=0
 	.end

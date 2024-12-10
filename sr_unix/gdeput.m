@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-; Copyright (c) 2006-2023 Fidelity National Information		;
+; Copyright (c) 2006-2024 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -97,11 +97,15 @@ GDEPUT()
 	s rec=rec_$tr($j($l(tmpacc),3)," ",0)
 	s rec=rec_tmpacc
 ; templates
-	new x
-	s x=tmpreg("STATS"),tmpreg("AUTODB")='x*2+tmpreg("AUTODB") k tmpreg("STATS")	;combine items for bit mask - restore below
+	new x,y
+	s x=tmpreg("STATS"),y=tmpreg("AUTODELETE")
+	s tmpreg("AUTODB")=(y*8)+('x*2)+tmpreg("AUTODB")
+	k tmpreg("STATS"),tmpreg("AUTODELETE")	;combine items for bit mask - restore below
 	s tmpreg("LOCK_CRIT")='tmpreg("LOCK_CRIT")					; again an adjustment before and after
 	f  s s=$o(tmpreg(s)) q:'$l(s)  s rec=rec_$tr($j($l(tmpreg(s)),3)," ",0) s rec=rec_tmpreg(s)
-	s tmpreg("STATS")=x,tmpreg("AUTODB")=tmpreg("AUTODB")#2				; save/restore cheaper than checking in loop
+	s tmpreg("STATS")=x
+	s tmpreg("AUTODELETE")=y
+	s tmpreg("AUTODB")=tmpreg("AUTODB")#2
 	s tmpreg("LOCK_CRIT")='tmpreg("LOCK_CRIT")					; restore GDE representation
 	f i=2:1:$l(accmeth,"\") s am=$p(accmeth,"\",i) s s="" d
 	. f  s s=$o(tmpseg(am,s)) q:'$l(s)  s rec=rec_$tr($j($l(tmpseg(am,s)),3)," ",0),rec=rec_tmpseg(am,s)
@@ -131,6 +135,7 @@ gblstatmap:
 	. s xrefstatsreg(ysr)=s,xrefstatsreg(s)=ysr
 	. m regs(ysr)=regs(s)				; copy & then partially override region settings for statsDB regions
 	. s regs(ysr,"AUTODB")=1
+	. s regs(ysr,"AUTODELETE")=1
 	. s regs(ysr,"BEFORE_IMAGE")=0
 	. s regs(ysr,"DYNAMIC_SEGMENT")=ysr
 	. s regs(ysr,"JOURNAL")=0
@@ -236,7 +241,7 @@ cregion:
 	n maxregindex s maxregindex=$get(sreg(s,"STATSDB_REG_INDEX"),TWO(32)-1)
 	s rec=rec_$$num2bin(4,maxregindex)							; statsDB_reg_index
 	s rec=rec_$$num2bin(1,regs(s,"EPOCHTAPER"))						; epoch tapering
-	s rec=rec_$$num2bin(1,((s?1L.E)*4)+(('regs(s,"STATS"))*2)+regs(s,"AUTODB"))		; type of reserved DB
+	s rec=rec_$$num2bin(1,((s?1L.E)*4)+(('regs(s,"STATS"))*2)+regs(s,"AUTODB")+(regs(s,"AUTODELETE")*8))	;type of reserved DB
 	s rec=rec_$$num2bin(1,'regs(s,"LOCK_CRIT"))						; LOCK crit with DB (1) or not (0)
 	s rec=rec_filler45byte									; runtime filler
 	s rec=rec_$tr($j("",SIZEOF("gd_region_padding"))," ",ZERO)				; padding

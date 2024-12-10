@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2017-2023 Fidelity National Information	*
+ * Copyright (c) 2017-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -38,6 +38,8 @@
 #include "mupipbckup.h"
 #include "mu_updwn_ver_inline.h"
 #include "util.h"
+#include "mu_upgrade_bmm.h"	/* for MUPIP_REORG_UPGRADE_NOW_SPLITTING */
+#include "inline_atomic_pid.h"
 
 GBLREF	boolean_t		certify_all_blocks;
 GBLREF	inctn_detail_t		inctn_detail;			/* holds detail to fill in to inctn jnl record */
@@ -156,15 +158,14 @@ int secshr_finish_CMT18(sgmnt_addrs *csa,
 		return -1;	/* commit failed for this cse; move on to next cse */
 	if (0 > cs->reference_cnt)
 	{	/* blocks were freed up */
-		assert(!dollar_tlevel);
+		assert(!dollar_tlevel);	/* KILL cleanup done as non-TP */
 		assert((inctn_bmp_mark_free_gtm == inctn_opcode) || (inctn_bmp_mark_free_mu_reorg == inctn_opcode)
 				|| (inctn_blkmarkfree == inctn_opcode) || dse_running);
-		/* Check if we are freeing a V6p format block and if so decrement the
-		 * blks_to_upgrd counter.
-		 */
+		/* When deleting pre-V7m index blocks, decrement blks_to_upgrd */
 		if (((inctn_bmp_mark_free_gtm == inctn_opcode) || (inctn_bmp_mark_free_mu_reorg == inctn_opcode))
-				&& !mu_upgrade_in_prog && (0 != inctn_detail.blknum_struct.blknum)
-					&& (GDSV7m != cs->ondsk_blkver))
+				&& (MUPIP_REORG_UPGRADE_NOW_SPLITTING >= mu_upgrade_in_prog)
+				&& (0 != inctn_detail.blknum_struct.blknum)
+				&& (GDSV7m > (cs-1)->ondsk_blkver) && !(cs-1)->done) /* Prior cse has block info */
 			{
 				DECR_BLKS_TO_UPGRD(csa, csd, 1);
 #ifdef				DEBUG_BLKS_TO_UPGRD

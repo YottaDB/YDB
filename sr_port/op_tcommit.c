@@ -69,6 +69,7 @@
 #include "db_snapshot.h"
 #include "jnl_file_close_timer.h"
 #include "gtm_time.h"			/* for clock_gettime */
+#include "inline_atomic_pid.h"
 
 #ifdef GTM_TRIGGER
 #include <rtnhdr.h>		/* for rtn_tabent in gv_trigger.h */
@@ -107,9 +108,6 @@ error_def(ERR_TLVLZERO);
 error_def(ERR_TRIGTCOMMIT);
 error_def(ERR_TCOMMITDISALLOW);
 #endif
-
-#define bml_wide	9	/* 2**9 = 0x200 */
-#define bml_adj_span	0xF	/* up to 16 bit maps away */
 
 STATICFNDCL void fix_updarray_and_oldblock_ptrs(sm_uc_ptr_t old_db_addrs[2], sgm_info *si);
 
@@ -178,10 +176,11 @@ enum cdb_sc	op_tcommit(void)
 	blk_hdr_ptr_t		old_block;
 	block_id		new_blk;
 	boolean_t		before_image_needed, blk_used, is_mm, skip_invoke_restart;
+	boolean_t		lcl_tqread_grab_bml;
 	boolean_t		read_before_image; /* TRUE if before-image journaling or online backup in progress
 						    * This is used to read before-images of blocks whose cs->mode is gds_t_create
 						    */
-	cw_set_element		*cse = NULL, *last_cw_set_before_maps, *csetemp, *first_cse;
+	cw_set_element		*cse = NULL, *last_cw_set_before_maps, *csetemp, *first_cse, *last_lmap_cse;
 	enum cdb_sc		status;
 	gd_region		*save_cur_region;	/* saved copy of gv_cur_region before TP_CHANGE_REG modifies it */
 	int			cw_depth, old_cw_depth;
@@ -193,7 +192,6 @@ enum cdb_sc	op_tcommit(void)
 	sgmnt_data_ptr_t	csd;
 	sgm_info		*si, *temp_si;
 	sm_uc_ptr_t		old_db_addrs[2];	/* for MM extend */
-	struct timespec		ts;
 	tp_region		*tr;
 	unsigned int		bsiz;
 #	ifdef DEBUG
@@ -336,6 +334,9 @@ enum cdb_sc	op_tcommit(void)
 						last_cw_set_before_maps = si->last_cw_set;
 					} else
 						last_cw_set_before_maps = NULL;
+					last_lmap_cse = NULL;
+					lcl_tqread_grab_bml = (dba_bg == si->tp_csa->hdr->acc_meth)
+						&& (DEFAULT_BITMAP_PREPIN == si->tp_csa->hdr->nobitmap_prepin);
 					for (cse = si->first_cw_set;  NULL != cse;  cse = cse->next_cw_set)
 					{	/* assert to ensure we haven't missed out on resetting jnl_freeaddr for any cse
 						 * in t_write/t_create/t_write_map/t_write_root/mu_write_map [D9B11-001991] */
@@ -354,19 +355,10 @@ enum cdb_sc	op_tcommit(void)
 							 * in non-TP. We assign the hints in op_tcommit just before we grab crit to
 							 * maximize chances that the blocks we assign remain available in tp_tend.
 							 */
+							TREF(tqread_grab_bml) = lcl_tqread_grab_bml;
 							cse->blk = ++csa->tp_hint; /* bm_getfree increments, but +2 seems better */
-							if (t_tries && (cdb_sc_bmlmod == t_fail_hist[t_tries - 1]))
-							{	/* This seems like a place to try minimzing cdb_sc_blkmod; balance:
-								 * adjacency, computational cost & conflict frequency; this uses
-								 * time & pid for dispersion within a 16 bit map range
-								 */
-								clock_gettime(CLOCK_REALTIME, &ts);
-								cse->blk = (cse->blk & ~(-(block_id)BLKS_PER_LMAP))
-									+ (((uint4)(process_id * ts.tv_nsec) & bml_adj_span)
-									<< bml_wide);
-							}
 							while (FILE_EXTENDED == (new_blk = bm_getfree(cse->blk, &blk_used,
-								cw_depth, first_cse, &si->cw_set_depth)))
+								cw_depth, first_cse, &si->cw_set_depth, &last_lmap_cse)))
 							{
 								assert(is_mm);
 								MM_DBFILEXT_REMAP_IF_NEEDED(csa, si->gv_cur_region);
@@ -386,6 +378,11 @@ enum cdb_sc	op_tcommit(void)
 								blk_used ? BIT_CLEAR_FREE(cse->blk_prior_state)
 									 : BIT_SET_FREE(cse->blk_prior_state);
 							csa->tp_hint = new_blk;		/* remember for next time in this region */
+							if (NULL == si->first_cw_bitmap)
+							{	/* First new block adds first bitmap cw entry used for BML reset */
+								assert(last_cw_set_before_maps);
+								si->first_cw_bitmap = last_cw_set_before_maps->next_cw_set;
+							}
 							BEFORE_IMAGE_NEEDED(read_before_image, cse, csa, csd, new_blk,
 										before_image_needed);
 							if (!before_image_needed)
@@ -429,12 +426,7 @@ enum cdb_sc	op_tcommit(void)
 							assert((CDB_STAGNATE > t_tries) || (cse->blk < csa->ti->total_blks));
 						}	/* if (gds_t_create == cse->mode) */
 					}	/* for (all cw_set_elements) */
-					if (NULL == si->first_cw_bitmap)
-					{
-						assert(last_cw_set_before_maps);
-						si->first_cw_bitmap = last_cw_set_before_maps->next_cw_set;
-					}
-					if ((cdb_sc_normal == status) && 0 != csd->dsid)
+					if ((cdb_sc_normal == status) && (0 != csd->dsid))
 					{
 						for (ks = si->kill_set_head; NULL != ks; ks = ks->next_kill_set)
 						{
@@ -475,6 +467,18 @@ enum cdb_sc	op_tcommit(void)
 					for (si = first_sgm_info; si != temp_si; si = si->next_sgm_info)
 						assert(NULL == si->kip_csa);
 				)
+				for (si = first_sgm_info; NULL != si; si = si->next_sgm_info)
+				{
+					is_mm = (dba_mm == si->tp_csa->hdr->acc_meth);
+					for (csetemp = si->first_cw_bitmap; !is_mm && (NULL != csetemp);
+							csetemp = csetemp->next_cw_set) /* cse in assert below; don't reuse */
+					{	/* Release BMLs if blocks added and still owned */
+						if (gds_t_writemap != csetemp->mode)
+							continue;
+						assert(IS_BITMAP_BLK(csetemp->blk));
+						BML_RSRV_IF_EXP(csetemp->cr, CR_BLKEMPTY, process_id, 0);
+					}
+				}
 				if (cdb_sc_gbloflow == status)
 				{
 					assert(cse);

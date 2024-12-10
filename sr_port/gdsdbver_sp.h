@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2015-2023 Fidelity National Information	*
+ * Copyright (c) 2015-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -44,4 +44,5 @@ ENUM_ENTRY(GDSMV70002),		/* 27 - GTM-9426 - Automatically split database blocks 
 ENUM_ENTRY(GDSMV71001),		/* 28 - Change default proactive block split threshhold */
 ENUM_ENTRY(GDSMV71002),		/* 29 - Make full use of the index reserved bytes field */
 ENUM_ENTRY(GDSMV71003),		/* 30 - Error messages should NOT trigger a freeze if it's a statsDB region */
+ENUM_ENTRY(GDSMV71006),		/* 31 - introduce createcomplete with opposite significance of createinprogress */
 ENUM_ENTRY(GDSMVLAST)

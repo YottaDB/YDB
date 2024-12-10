@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -192,7 +192,7 @@ void dse_dmp_fhead (void)
 			util_out_print("  Default Collation             !19UL", FALSE, csd->def_coll);
 			util_out_print("  Collation Version             !12UL", TRUE, csd->def_coll_ver);
 		}
-		util_out_print("  Create in progress                   !AD", FALSE, 12, (csd->createinprogress) ?
+		util_out_print("  Create in progress                   !AD", FALSE, 12, CREATE_IN_PROGRESS(csd) ?
 			"        TRUE" : "       FALSE");
 		util_out_print("  Modified cache blocks         !12UL", TRUE, activeque_cnt);
 		util_out_print("  Reference count               !19UL", FALSE, cnl->ref_cnt);
@@ -245,17 +245,19 @@ void dse_dmp_fhead (void)
 		util_out_print("  WIP queue cache blocks        !12UL", TRUE, wipque_cnt);
 		util_out_print("  DB is auto-created                          !AD", FALSE, 5,
 				  (RDBF_AUTODB & csd->reservedDBFlags) ? " TRUE" : "FALSE");
+		util_out_print("  Auto-delete DB                       !AD", TRUE, 5,
+				  (RDBF_AUTODELETE & csd->reservedDBFlags) ? " TRUE" : "FALSE");
 		db_shares_gvstats = ! (RDBF_NOSTATS & csd->reservedDBFlags);
-		util_out_print("  DB shares gvstats                    !AD", TRUE, 5,
-				  db_shares_gvstats ? " TRUE" : "FALSE");
 		util_out_print("  LOCK shares DB critical section             !AD", FALSE, 5,
 				csd->lock_crit_with_db ? " TRUE" : "FALSE");
 		util_out_print("  Read Only                              !AD", TRUE, 3, csd->read_only ? " ON" : "OFF");
 		util_out_print("  Recover interrupted                         !AD", FALSE, 5,
 				(csd->recov_interrupted ? " TRUE" : "FALSE"));
 		util_out_print("  Full Block Write                         !UL", TRUE, csd->write_fullblk);
+		util_out_print("  DB shares gvstats                           !AD", !db_shares_gvstats, 5,
+				  db_shares_gvstats ? " TRUE" : "FALSE");
 		if(db_shares_gvstats)
-			util_out_print("  StatsDB Allocation            !19UL", TRUE, csd->statsdb_allocation);
+			util_out_print("  StatsDB Allocation     !19UL", TRUE, csd->statsdb_allocation);
 		util_out_print("  Data Reserved Bytes           !19UL", FALSE, csd->reserved_bytes);
 		util_out_print("  Index Reserved Bytes          !12UL", TRUE, csd->i_reserved_bytes);
 	}

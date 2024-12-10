@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -27,6 +27,13 @@
 /* Definitions for mystery numbers in op_fnztranslate and f_translate */
 #define NO_VALUE -1
 #define DELETE_VALUE -2
+typedef enum
+{
+	NO_DIR,
+	LEFT_DIR,
+	RIGHT_DIR,
+	BOTH_DIR
+} translate_direction;
 
 void	op_add(mval *u, mval *v, mval *s);
 void	add_mvals(mval *u, mval *v, int subtraction, mval *result);	/* function defined in op_add.c */
@@ -79,11 +86,12 @@ void	op_fnqlength(mval *name, mval *subscripts);
 void	op_fnqsubscript(mval *name, int seq, mval *subscript);
 void	op_fnquery(UNIX_ONLY_COMMA(int sbscnt) mval *dst, ...);
 void	op_fnrandom(int4 interval, mval *ret);
+void	op_fnreplace(mval *src, mval *substr, mval *rplc, mval *dst);
 void	op_fnreverse(mval *src, mval *dst);
 void	op_fnstack1(int level, mval *result);
 void	op_fnstack2(int level, mval *info, mval *result);
 void	op_fntext(mval *label, int int_exp, mval *rtn, mval *ret);
-void	op_fntranslate(mval *src, mval *in_str, mval *out_str, mval *dst);
+void	op_fntranslate(mval *src, mval *in_str, mval *out_str, mval *dir, mval *dst);
 void	op_fnview(UNIX_ONLY_COMMA(int numarg) mval *dst, ...);
 void	op_fnzascii(int4 num, mval *in, mval *out);
 void	op_fnzauditlog(mval *src, mval *dst);
@@ -121,6 +129,8 @@ void	op_fnzpiece(mval *src, mval *del, int first, int last, UNIX1_VMS2(mval *dst
 void	op_fnzpopulation(mval *arg1, mval *arg2, mval *dst);
 void	op_fnzpriv(mval *prv, mval *ret);
 void	op_fnzqgblmod(mval *v);
+void	op_fnzreplace(mval *src, mval *substr, mval *rplc, mval *dst);
+void	op_fnzreplace_common(mval *src, mval* substr, mval* rplc, mval* dst);
 void	op_fnzreverse(mval *src, mval *dst);
 int	op_fnzsearch(mval *file, mint indx, mint mfunc, mval *ret);		/***type int added***/
 void	op_fnzsetprv(mval *prv, mval *ret);
@@ -130,11 +140,11 @@ void	op_fnzsqlexpr(mval *value, mval *target);
 void	op_fnzsqlfield(int findex, mval *target);
 void	op_fnzsubstr(mval *src, int start, int bytelen, mval *dest);
 void	op_fnzsyslog(mval *src, mval *dst);
-void	op_fnztranslate(mval *src, mval *in_str , mval *out_str, mval *dst);
-void	op_fnztranslate_fast(mval *src, mval *m_xlate, mval *dst);
-void	op_fntranslate_fast(mval *src, mval *rplc, mval *xlate, mval *m_xlate_hash, mval *dst);
-void	op_fntranslate_common(mval *src, mval *dst, mval *rplc, int4 *xlate, hash_table_int4 *xlate_hash);
-void	op_fnztranslate_common(mval *src, mval *dst, int *xlate);
+void	op_fnztranslate(mval *src, mval *in_str , mval *out_str, mval *dir, mval *dst);
+void	op_fnztranslate_fast(mval *src, mval *m_xlate, mval *dir, mval *dst);
+void	op_fntranslate_fast(mval *src, mval *rplc, mval *xlate, mval *dir, mval *m_xlate_hash, mval *dst);
+void	op_fntranslate_common(mval *src, mval *dst, mval *rplc, int4 *xlate, hash_table_int4 *xlate_hash, translate_direction dir);
+void	op_fnztranslate_common(mval *src, mval *dst, int *xlate, translate_direction dir);
 void	create_byte_xlate_table(mval *srch, mval *rplc, int4 *xlate);
 hash_table_int4	*create_utf8_xlate_table(mval *srch, mval *rplc, mstr *m_xlate);
 void	op_fnztrigger(mval *func, mval *arg1, mval *arg2, mval *dst);

@@ -131,7 +131,7 @@ error_def(ERR_STACKOFLOW);
 error_def(ERR_TEXT);
 error_def(ERR_WCBLOCKED);
 
-int4 gds_rundown(boolean_t cleanup_udi)
+int4 gds_rundown(boolean_t cleanup_udi, boolean_t delete_statsdb)
 {
 	boolean_t		canceled_dbsync_timer, do_jnlwait, ok_to_write_pfin, wrote_pfin;
 	boolean_t		have_standalone_access, ipc_deleted, err_caught, aiocancel_timedout;
@@ -226,7 +226,7 @@ int4 gds_rundown(boolean_t cleanup_udi)
 			csa->gvstats_rec_p = &csa->gvstats_rec;
 			gv_cur_region = statsDBreg;	/* Switch "gv_cur_region" to do rundown of statsDB */
 			tp_change_reg();
-			gds_rundown(cleanup_udi); /* Ignore errors in statsdb rundown. Continue with baseDB rundown. */
+			gds_rundown(cleanup_udi, TRUE); /* Ignore errors in statsdb rundown. Continue with baseDB rundown. */
 			gv_cur_region = reg;	/* Restore "gv_cur_region" back to continue rundown of baseDB */
 			tp_change_reg();
 		}
@@ -254,6 +254,7 @@ int4 gds_rundown(boolean_t cleanup_udi)
 		 * Defer rundown of this "csa" until the last region corresponding to this csa is called for rundown.
 		 */
 		reg->open = FALSE;
+		reg->file_initialized = reg->did_file_initialization = FALSE;
 		return EXIT_NRM;
 	}
 	/* If the process has standalone access, it has udi->grabbed_access_sem set to TRUE at this point. Note that down in a local
@@ -371,6 +372,9 @@ int4 gds_rundown(boolean_t cleanup_udi)
 				if ((EINVAL == save_errno) && (cleanup_udi))
 				{
 					REVERT;
+					ENABLE_INTERRUPTS(INTRPT_IN_GDS_RUNDOWN, prev_intrpt_state);
+					send_msg_csa(csa, VARLSTCNT(12) MAKE_MSG_WARNING(ERR_CRITSEMFAIL), 2, DB_LEN_STR(reg),
+						ERR_SYSCALL, 5, RTS_ERROR_TEXT("gds_rundown semid invalid"), CALLFROM, save_errno);
 					return EXIT_NRM;
 				}
 				assert(FALSE);
@@ -394,8 +398,8 @@ int4 gds_rundown(boolean_t cleanup_udi)
 			{	/* We couldn't get it in one shot-- see if we already have it */
 				if (holder_pid == process_id)
 				{
-					send_msg_csa(CSA_ARG(csa) VARLSTCNT(5) MAKE_MSG_INFO(ERR_CRITSEMFAIL), 2, DB_LEN_STR(reg),
-						     ERR_RNDWNSEMFAIL);
+					send_msg_csa(CSA_ARG(csa) VARLSTCNT(5) MAKE_MSG_WARNING(ERR_CRITSEMFAIL), 2,
+							DB_LEN_STR(reg), ERR_RNDWNSEMFAIL);
 					REVERT;
 					ENABLE_INTERRUPTS(INTRPT_IN_GDS_RUNDOWN, prev_intrpt_state);
 					assert(FALSE);
@@ -862,9 +866,9 @@ int4 gds_rundown(boolean_t cleanup_udi)
 			assert(0 == status);
 #			endif
 		}
-		/* If this is a BASEDB and we are the last one out, prepare to unlink/remove the corresponding STATSDB */
-		if (we_are_last_user)
-			UNLINK_STATSDB_AT_BASEDB_RUNDOWN(cnl);
+		/* If this is a autodelete region and we are the last one out, unlink/remove it */
+		if (we_are_last_user && IS_AUTODELETE_REG(reg))
+			AUTODELETE_AT_RUNDOWN(reg, delete_statsdb);
 	}
 	/* Detach our shared memory while still under lock so reference counts will be correct for the next process to run down
 	 * this region. In the process also get the remove_shm status from node_local before detaching.
@@ -916,6 +920,7 @@ int4 gds_rundown(boolean_t cleanup_udi)
 	 * code, e.g. signal handlers, can test before a dereference the occurs in the middle of a detach. */
 	csa->nl = NULL;
 	cs_data = csd = csa->hdr = NULL;
+	csa->ti = NULL;
 	status = SHMDT((caddr_t)cnl);
 	/* Note that although csa->nl is NULL, we use CSA_ARG(csa) below (not CSA_ARG(NULL)) to be consistent with similar
 	 * usages before csa->nl became NULL. The "is_anticipatory_freeze_needed" function (which is in turn called by the
@@ -926,7 +931,8 @@ int4 gds_rundown(boolean_t cleanup_udi)
 		send_msg_csa(CSA_ARG(csa) VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(reg), ERR_TEXT, 2,
 			     LEN_AND_LIT("Error during shmdt"), errno);
 	REMOVE_CSA_FROM_CSADDRSLIST(csa);	/* remove "csa" from list of open regions (cs_addrs_list) */
-	reg->open = FALSE;
+	reg->open = reg->was_open = FALSE;
+	reg->file_initialized = reg->did_file_initialization = FALSE;
 	assert(!is_statsDB || process_exiting || IS_GTCM_GNP_SERVER_IMAGE);
 	/* If file is still not in good shape, die here and now before we get rid of our storage */
 	assertpro(0 == csa->wbuf_dqd);
@@ -935,6 +941,7 @@ int4 gds_rundown(boolean_t cleanup_udi)
 	if (we_are_last_user)
 	{	/* remove shared storage, only if last writer to rundown did a successful "wcs_flu" */
 		assert(!vermismatch);
+		assert(!bypassed_ftok);
 		if (remove_shm)
 		{
 			ipc_deleted = TRUE;
@@ -966,7 +973,6 @@ int4 gds_rundown(boolean_t cleanup_udi)
 				STATSDBREG_TO_BASEDBREG(reg, baseDBreg);
 				baseDBcsa = &FILE_INFO(baseDBreg)->s_addrs;
 				baseDBnl = baseDBcsa->nl;
-				baseDBnl->statsdb_rundown_clean = TRUE;
 			}
 		} else if (is_src_server || is_updproc)
 		{
@@ -1014,7 +1020,6 @@ int4 gds_rundown(boolean_t cleanup_udi)
 					RTS_ERROR_CSA_ABT(csa, VARLSTCNT(4) ERR_DBFILERR, 2, DB_LEN_STR(reg));
 		} else if (!ftok_sem_release(reg, !ftok_counter_halted, FALSE))
 		{
-			FTOK_TRACE(csa, csa->ti->curr_tn, ftok_ops_release, process_id);
 			RTS_ERROR_CSA_ABT(csa, VARLSTCNT(4) ERR_DBFILERR, 2, DB_LEN_STR(reg));
 		}
 		udi->grabbed_ftok_sem = FALSE;

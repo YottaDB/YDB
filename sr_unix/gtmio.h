@@ -320,16 +320,15 @@ MBSTART {											\
 				break;								\
 			gtmioBuff += gtmioStatus;						\
 			gtmioPtr += gtmioStatus;						\
-		}										\
-		else if (EINTR != errno)							\
+		} else if (EINTR != errno)							\
 			break;									\
 	}											\
 	if (0 == gtmioBuffLen)									\
-		RC = 0;										\
+		(RC) = 0;									\
 	else if (-1 == gtmioStatus)	/* Had legitimate error - return it */			\
-		RC = errno;									\
+		(RC) = errno;									\
 	else											\
-		RC = -1;		/* Something kept us from reading what we wanted */	\
+		(RC) = -1;		/* Something kept us from reading what we wanted */	\
 } MBEND
 
 #define	DB_LSEEKREAD(UDI, FD, OFFSET, BUFF, SIZE, STATUS)		\
@@ -367,11 +366,11 @@ MBSTART {											\
 	}											\
 	(ACTUAL_READLEN) = (FBUFF_LEN) - gtmioBuffLen;						\
 	if (0 == gtmioBuffLen)									\
-		RC = 0;										\
+		(RC) = 0;									\
 	else if (-1 == gtmioStatus)	/* Had legitimate error - return it */			\
-		RC = errno;									\
+		(RC) = errno;									\
 	else											\
-		RC = -1;		/* Something kept us from reading what we wanted */	\
+		(RC) = -1;		/* Something kept us from reading what we wanted */	\
 } MBEND
 
 #define LSEEKWRITEASYNCSTART(CSA, FDESC, FPTR, FBUFF, FBUFF_LEN, CR, RC)			\

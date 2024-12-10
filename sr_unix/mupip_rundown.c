@@ -217,7 +217,7 @@ void mupip_rundown(void)
 				if (NULL == seg->file_cntl)
 					FILE_CNTL_INIT(seg);
 			}
-			if (mu_rndwn_file(gv_cur_region, FALSE))
+			if (mu_rndwn_file(gv_cur_region, FALSE, FALSE))
 			{
 				if (!IS_RDBF_STATSDB(gv_cur_region))	/* See comment in "mu_rndwn_all" for why this is needed */
 					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_MUFILRNDWNSUC, 2, DB_LEN_STR(gv_cur_region));

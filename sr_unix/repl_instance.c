@@ -1532,7 +1532,7 @@ int4	repl_inst_reset_zqgblmod_seqno_and_tn(void)
 		assert(reg->open);
 		TP_CHANGE_REG(reg);
 		assert(!cs_addrs->now_crit);
-		ret |= gds_rundown(CLEANUP_UDI_TRUE);
+		ret |= gds_rundown(CLEANUP_UDI_TRUE, FALSE);
 	}
 	assert(!repl_csa->now_crit);
 	return ret;

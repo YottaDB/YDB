@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -312,4 +312,6 @@ XFER(xf_fnzcollate, op_fnzcollate),
 XFER(xf_fnzatransform, op_fnzatransform),
 XFER(xf_fnztranslate_fast, op_fnztranslate_fast),
 XFER(xf_fntranslate_fast, op_fntranslate_fast),
-XFER(xf_fnzauditlog, op_fnzauditlog)
+XFER(xf_fnzauditlog, op_fnzauditlog),
+XFER(xf_fnreplace, op_fnreplace),
+XFER(xf_fnzreplace, op_fnzreplace)

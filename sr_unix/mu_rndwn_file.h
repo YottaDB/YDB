@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -75,5 +75,5 @@ typedef struct shm_parms_struct
 }
 
 STATICFNDCL boolean_t	mu_rndwn_file_statsdb(gd_region *statsDBreg, boolean_t *statsdb_exists, boolean_t standalone);
-boolean_t		mu_rndwn_file(gd_region *reg, boolean_t standalone);
+boolean_t		mu_rndwn_file(gd_region *reg, boolean_t standalone, boolean_t delete_statsdb);
 #endif

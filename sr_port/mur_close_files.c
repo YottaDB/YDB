@@ -266,7 +266,7 @@ boolean_t mur_close_files(void)
 			 * so pass CLEANUP_UDI_FALSE as the parameter.
 			 */
 			if (mur_options.forward)
-				rundown_status = gds_rundown(CLEANUP_UDI_FALSE);
+				rundown_status = gds_rundown(CLEANUP_UDI_FALSE, FALSE);
 			if (EXIT_NRM != rundown_status)
 			{
 				wrn_count++;
@@ -830,7 +830,7 @@ boolean_t mur_close_files(void)
 			/* Note: udi/csa is used a little later after the "gds_rundown" call to determine if "db_ipcs_reset"
 			 * can be called so pass CLEANUP_UDI_FALSE as the parameter.
 			 */
-			rundown_status = gds_rundown(CLEANUP_UDI_FALSE); /* does the final rel_crit */
+			rundown_status = gds_rundown(CLEANUP_UDI_FALSE, FALSE); /* does the final rel_crit */
 			if (EXIT_NRM != rundown_status)
 				wrn_count++;
 			assert((EXIT_NRM != rundown_status) || !rctl->standalone

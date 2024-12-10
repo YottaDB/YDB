@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2021-2023 Fidelity National Information	*
+ * Copyright (c) 2021-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -22,8 +22,9 @@ int4		mu_upgrade_bmm(gd_region *reg, size_t blocks_needed);
 int4		move_root_block(block_id new_blk_num, block_id old_blk_num, gvnh_reg_t *gvnh_reg, kill_set *kill_set_list);
 int4		upgrade_extend(gtm_int8 extension, gd_region *reg);
 
-#define	MUPIP_UPGRADE_OFF		0
-#define	MUPIP_UPGRADE_IN_PROGRESS	1
-#define	MUPIP_REORG_UPGRADE_IN_PROGRESS	2
+#define	MUPIP_UPGRADE_OFF			0	/* No UPGRADE in progress */
+#define	MUPIP_REORG_UPGRADE_NOW_SPLITTING	1	/* REORG -UPGRADE splitting blocks, skip blks_to_upgrd book-keeping */
+#define	MUPIP_UPGRADE_IN_PROGRESS		2	/* UPGRADE in progress */
+#define	MUPIP_REORG_UPGRADE_IN_PROGRESS		3	/* REORG -UPGRADE in progress */
 
 #endif

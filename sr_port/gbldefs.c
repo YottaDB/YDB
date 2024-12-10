@@ -761,7 +761,6 @@ GBLDEF	sm_uc_ptr_t	reformat_buffer;
 GBLDEF	int		reformat_buffer_len;
 GBLDEF	volatile int	reformat_buffer_in_use;	/* used only in DEBUG mode */
 GBLDEF	boolean_t	mu_reorg_nosafejnl;		/* TRUE if NOSAFEJNL explicitly specified */
-GBLDEF	trans_num	mu_reorg_upgrd_dwngrd_blktn;	/* tn in blkhdr of current block processed by MUPIP REORG {UP,DOWN}GRADE */
 GBLDEF	uint4		mu_upgrade_in_prog;		/* non-zero when DB upgrade is in progress: 1=UPGRADE, 2=REORG -UPGRADE */
 GBLDEF	enum db_ver	upgrade_block_split_format;	/* MUPIP REORG -UPGRADE started;retain block format in mu_split/gvcst_put */
 GBLDEF	inctn_opcode_t	inctn_opcode = inctn_invalid_op;
@@ -879,6 +878,8 @@ GBLDEF	cache_rec	pin_fail_twin_cr_contents;	/* Contents of twin of the cache-rec
 GBLDEF	bt_rec_ptr_t	pin_fail_bt;			/* Pointer to bt of the cache-record that we failed to pin */
 GBLDEF	bt_rec		pin_fail_bt_contents;		/* Contents of bt of the cache-record that we failed to pin */
 GBLDEF	int4		pin_fail_in_crit;		/* Holder of crit at the time we failed to pin */
+GBLDEF	uint4		pin_fail_in_tend;		/* Holder of in_tend at the time we failed to pin */
+GBLDEF	uint4		pin_fail_in_cw_set;		/* Holder of in_cw_set at the time we failed to pin */
 GBLDEF	int4		pin_fail_wc_in_free;		/* Number of write cache records in free queue when we failed to pin */
 GBLDEF	int4		pin_fail_wcs_active_lvl;	/* Number of entries in active queue when we failed to pin */
 GBLDEF	int4		pin_fail_ref_cnt;		/* Reference count when we failed to pin */
@@ -1182,7 +1183,7 @@ GBLDEF	boolean_t	forw_recov_lgtrig_only;		/* TRUE if jgbl.forw_phase_recovery is
 							 * being played consists of only *LGTRIG* records (no SET/KILL etc.)
 							 * Used by an assert in op_tcommit.
 							 */
-GBLDEF	boolean_t	in_mu_cre_file;			/* TRUE only if inside "mu_cre_file" function (used by an assert).
+GBLDEF	boolean_t	in_mu_init_file;		/* TRUE only if inside "mu_init_file" function (used by an assert).
 							 * This is MUPIP CREATE only (db does not exist at that point and so
 							 * threads are unlikely there) AND is dbg-only and hence okay to be a
 							 * gbldef instead of a threadgbldef.

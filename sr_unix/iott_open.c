@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -56,7 +56,7 @@ short iott_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 	int		p_offset;
 	mstr		chset_mstr;
 	gtm_chset_t	temp_chset, old_ichset, old_ochset;
-	boolean_t	empt = FALSE;
+	boolean_t	empt = FALSE, wrap_specified = FALSE, wrap_parm;
 	boolean_t	ch_set;
 	DCL_THREADGBL_ACCESS;
 
@@ -76,6 +76,7 @@ short iott_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 		tt_ptr->default_mask_term = TRUE;
 		ioptr->ichset = ioptr->ochset = gtm_utf8_mode ? CHSET_UTF8 : CHSET_M;	/* default */
 	}
+	assert(tt == dev_name->iod->type);
 	tt_ptr = (d_tt_struct *)dev_name->iod->dev_sp;
 	if (tt_ptr->mupintr)
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_ZINTRECURSEIO);
@@ -100,6 +101,14 @@ short iott_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 			break;
 		case iop_noempterm:
 			empt = FALSE;
+			break;
+		case iop_wrap:
+			wrap_specified = TRUE;
+			wrap_parm = TRUE;
+			break;
+		case iop_nowrap:
+			wrap_specified = TRUE;
+			wrap_parm = FALSE;
 			break;
 		case iop_m:
 			ioptr->ichset = ioptr->ochset = CHSET_M;
@@ -166,8 +175,11 @@ short iott_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 		}
 		ioptr->width = COLUMNS;
 		ioptr->length = GTM_LINES;
-		ioptr->wrap = (0 == AUTO_RIGHT_MARGIN) ? FALSE : TRUE; /* defensive programming; till we are absolutely, positively
-									* certain that there are no uses of wrap == TRUE */
+		if (!wrap_specified)
+			ioptr->wrap = (0 == AUTO_RIGHT_MARGIN) ? FALSE : TRUE; /* defensive programming; till we are absolutely,
+									* positively certain there are no uses of wrap == TRUE */
+		else
+			ioptr->wrap = wrap_parm;
 		tt_ptr->tbuffp = tt_ptr->ttybuff;	/* Buffer is now empty */
 		tt_ptr->discard_lf = FALSE;
 		if (!io_std_device.in || io_std_device.in == ioptr->pair.in)	/* io_std_device.in not set yet in io_init */
@@ -176,7 +188,7 @@ short iott_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 			ioptr->ichset = ioptr->ochset = gtm_utf8_mode ? CHSET_UTF8 : CHSET_M;	/* default */
 		} else
 			tt_ptr->ext_cap = 0;
-		if (empt)
+		if (empt && (ioptr == ioptr->pair.in))
 			tt_ptr->ext_cap |= TT_EMPTERM;
 		/* Set terminal mask on the terminal not open, if default_term or if CHSET changes */
 		if (tt_ptr->default_mask_term || (old_ichset != ioptr->ichset))

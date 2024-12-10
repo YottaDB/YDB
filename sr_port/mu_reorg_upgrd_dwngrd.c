@@ -72,6 +72,7 @@
 
 #include "repl_msg.h"		/* for gtmsource.h */
 #include "gtmsource.h"		/* for jnlpool_addrs_ptr_t */
+#include "inline_atomic_pid.h"
 
 #define	MAX_TRIES	600	/* arbitrary value */
 #define	MAX_BLK_TRIES	10	/* Times to repeatedly try a GVT root */
@@ -100,7 +101,6 @@ GBLREF	jnl_gbls_t		jgbl;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	tp_region		*grlist;
-GBLREF	trans_num		mu_reorg_upgrd_dwngrd_blktn;	/* tn in blkhdr of current block processed by REORG UP/DOWNGRADE */
 GBLREF	trans_num		start_tn;
 GBLREF	uint4			mu_upgrade_in_prog;			/* 2 if MUPIP REORG UPGRADE/DOWNGRADE is in progress */
 GBLREF	uint4			update_array_size, update_trans, process_id;
@@ -271,7 +271,7 @@ void	mu_reorg_upgrd_dwngrd(void)
 		}
 		mu_upgrade_in_prog = MUPIP_REORG_UPGRADE_IN_PROGRESS;
 		mu_reorg_more_tries = TRUE;
-		csa->nl->reorg_upgrade_pid = process_id;
+		inline_atomic_pid_set(&csa->nl->reorg_upgrade_pid, process_id);
 		util_out_print("!/Region !AD : MUPIP REORG -UPGRADE of !AD started (!UL of !UL)", TRUE,
 					REG_LEN_STR(reg), DB_LEN_STR(reg), csd->blks_to_upgrd, csd->trans_hist.total_blks);
 		gvname.var_name.addr = (char *)gname;
@@ -430,7 +430,7 @@ void	mu_reorg_upgrd_dwngrd(void)
 					RTS_ERROR_LITERAL("V7"), &csd->blks_to_upgrd);
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TEXT, 2, LEN_AND_STR(errtext));
 		}
-		error |= gds_rundown(CLEANUP_UDI_TRUE);		/* Rundown region and cleanup */
+		error |= gds_rundown(CLEANUP_UDI_TRUE, FALSE);		/* Rundown region and cleanup */
 		mu_upgrade_in_prog = MUPIP_UPGRADE_OFF;
 		mu_reorg_more_tries = FALSE;
 	}
@@ -854,15 +854,14 @@ enum cdb_sc upgrade_idx_block(block_id *curr_blk, gd_region *reg, mname_entry *g
 				t_abort(gv_cur_region, csa);					/* do crit and other cleanup */
 				return status;
 			}
-			mu_upgrade_in_prog = MUPIP_UPGRADE_OFF;	/* Splits can affect blocks_to_upgrd, temporarily disable */
 			inctn_opcode = inctn_blkupgrd;
 			inctn_detail.blknum_struct.blknum = *curr_blk;
-			mu_reorg_upgrd_dwngrd_blktn = lcl_tn;
 			if (IS_ONLNRLBK_ACTIVE(csa))
 			{
 				t_abort(gv_cur_region, csa);					/* do crit and other cleanup */
 				return cdb_sc_onln_rlbk1;
 			}
+			mu_upgrade_in_prog = MUPIP_REORG_UPGRADE_NOW_SPLITTING;	/* Splits can affect blks_to_upgrd; Stop it */
 			if ((trans_num)0 == t_end(&(gv_target->hist), NULL, TN_NOT_SPECIFIED))
 			{	/* failed to commit the split */
 				mu_upgrade_in_prog = MUPIP_REORG_UPGRADE_IN_PROGRESS;
@@ -1011,7 +1010,6 @@ enum cdb_sc upgrade_idx_block(block_id *curr_blk, gd_region *reg, mname_entry *g
 			alt_hist.h[0].cr = curr_blk_hist_ptr->cse->cr = *cr;
 		inctn_opcode = inctn_blkupgrd;
 		inctn_detail.blknum_struct.blknum = *curr_blk;
-		mu_reorg_upgrd_dwngrd_blktn = ((blk_hdr_ptr_t)blkBase)->tn;
 		if (IS_ONLNRLBK_ACTIVE(csa))
 		{
 			t_abort(gv_cur_region, csa);					/* do crit and other cleanup */

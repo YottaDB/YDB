@@ -22,14 +22,14 @@
 
 void		db_auto_upgrade(gd_region *reg);
 void		v6_db_auto_upgrade(gd_region *reg);
-int		db_init(gd_region *reg, boolean_t ok_to_bypass);
+int		db_init(gd_region *reg, boolean_t ok_to_bypass, boolean_t return_ftok_errs);
 void		db_init_err_cleanup(boolean_t retry_dbinit);
 void		gvcst_redo_root_search(void);
 gd_region	*dbfilopn (gd_region *reg);
 void		dbsecspc(gd_region *reg, sgmnt_data_ptr_t csd, gtm_uint64_t *sec_size);
 void		bg_sync_init(node_local_ptr_t cnl);
 
-unsigned char	gvcst_cre_autoDB(gd_region *reg);
+unsigned char	gvcst_cre_statsDB(gd_region *reg);
 mint		gvcst_data(void);
 mint		gvcst_data2(void);
 enum cdb_sc	gvcst_dataget(mint *dollar_data, mval *val);

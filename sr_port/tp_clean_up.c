@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -38,6 +38,7 @@
 #include "gtm_trigger_trc.h"
 #include "gv_trigger.h"		/* for TP_INVALIDATE_TRIGGER_CYCLES_IF_NEEDED macro */
 #include "util.h"		/* for TP_ZTRIGBUFF_PRINT macro */
+#include "inline_atomic_pid.h"
 
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	sgmnt_addrs		*cs_addrs;
@@ -58,6 +59,7 @@ GBLREF	char			*update_array, *update_array_ptr;
 GBLREF	uint4			update_array_size, cumul_update_array_size;
 GBLREF	tp_frame		*tp_pointer;
 GBLREF	uint4			update_trans;
+GBLREF	uint4			process_id;
 #ifdef DEBUG
 GBLREF	unsigned int		t_tries;
 #endif
@@ -112,6 +114,18 @@ void	tp_clean_up(tp_cleanup_state clnup_state)
 	 * handled across commit, rollback and restarts.
 	 */
 	TP_INVALIDATE_TRIGGER_CYCLES_IF_NEEDED(clnup_state);
+	for (si = first_sgm_info; NULL != si; si = si->next_sgm_info)
+	{	/* Release BMLs as needed */
+		if  (dba_mm == si->tp_csa->hdr->acc_meth)
+			continue;
+		for (cse = si->first_cw_bitmap; NULL != cse; cse = cse->next_cw_set)
+		{	/* Release BMLs if blocks added and still owned */
+			if (gds_t_writemap != cse->mode)
+				continue;
+			assert(IS_BITMAP_BLK(cse->blk));
+			BML_RSRV_IF_EXP(cse->cr, CR_BLKEMPTY, process_id, 0);
+		}
+	}
 	if (NULL != first_sgm_info)
 	{	/* It is possible that first_ua is NULL at this point due to a prior call to tp_clean_up() that failed in
 		 * malloc() of tmp_ua->update_array. This is possible because we might have originally had two chunks of
@@ -221,10 +235,10 @@ void	tp_clean_up(tp_cleanup_state clnup_state)
 				 * inctn_tp_upd_no_logical_rec) was written. So reset cs_addrs->next_fenced unconditionally.
 				 */
 				cs_addrs->next_fenced = NULL;
+				is_mm = (dba_mm == gv_cur_region->dyn.addr->acc_meth);
 				if (TP_COMMIT == clnup_state)
 				{	/* Non-rollback case (op_tcommit) validates clues in the targets we are updating */
 					sgm_info_ptr = si;	/* for tp_get_cw to work */
-					is_mm = (dba_mm == gv_cur_region->dyn.addr->acc_meth);
 					for (cse = si->first_cw_set; cse != si->first_cw_bitmap; cse = cse->next_cw_set)
 					{
 						assert(0 < cse->old_mode); /* assert that phase2 is complete on this block */

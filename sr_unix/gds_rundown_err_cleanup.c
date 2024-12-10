@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2013-2016 Fidelity National Information	*
+ * Copyright (c) 2013-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -90,7 +90,8 @@ void gds_rundown_err_cleanup(boolean_t have_standalone_access)
 				     ERR_TEXT, 2, RTS_ERROR_TEXT("Error decreasing ftok semaphore counter"), semop_res);
 		udi->counter_ftok_incremented = FALSE;
 	}
-	gv_cur_region->open = FALSE;
+	gv_cur_region->open = gv_cur_region->was_open = FALSE;
+	gv_cur_region->file_initialized = gv_cur_region->did_file_initialization = FALSE;
 	csa->nl = NULL;
 	REMOVE_CSA_FROM_CSADDRSLIST(csa); /* remove "csa" from list of open regions (cs_addrs_list) */
 	send_msg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_DBRNDWN, 2, REG_LEN_STR(gv_cur_region));

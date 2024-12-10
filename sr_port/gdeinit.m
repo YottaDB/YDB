@@ -139,6 +139,7 @@ GDEINIT
 	s minreg("ALIGNSIZE")=4096,maxreg("ALIGNSIZE")=4194304			; geq RECORD_SIZE
 	s minreg("ALLOCATION")=2048,maxreg("ALLOCATION")=8388607
 	s minreg("AUTODB")=0,maxreg("AUTODB")=1
+	s minreg("AUTODELETE")=0,maxreg("AUTODELETE")=1
 	s minreg("AUTOSWITCHLIMIT")=16384,maxreg("AUTOSWITCHLIMIT")=8388607
 	s minreg("BEFORE_IMAGE")=0,maxreg("BEFORE_IMAGE")=1
 	s minreg("BUFFER_SIZE")=2307,maxreg("BUFFER_SIZE")=1048576
@@ -212,6 +213,7 @@ syntabi:
 	s syntab("ADD","NAME","REGION","TYPE")="TREGION"
 	s syntab("ADD","REGION")=""
 	s syntab("ADD","REGION","AUTODB")="NEGATABLE"
+	s syntab("ADD","REGION","AUTODELETE")="NEGATABLE"
 	s syntab("ADD","REGION","COLLATION_DEFAULT")="REQUIRED"
 	s syntab("ADD","REGION","COLLATION_DEFAULT","TYPE")="TNUMBER"
 	s syntab("ADD","REGION","DYNAMIC_SEGMENT")="REQUIRED"
@@ -280,6 +282,7 @@ syntabi:
 	s syntab("CHANGE","NAME","REGION","TYPE")="TREGION"
 	s syntab("CHANGE","REGION")=""
 	s syntab("CHANGE","REGION","AUTODB")="NEGATABLE"
+	s syntab("CHANGE","REGION","AUTODELETE")="NEGATABLE"
 	s syntab("CHANGE","REGION","COLLATION_DEFAULT")="REQUIRED"
 	s syntab("CHANGE","REGION","COLLATION_DEFAULT","TYPE")="TNUMBER"
 	s syntab("CHANGE","REGION","DYNAMIC_SEGMENT")="REQUIRED"
@@ -339,6 +342,7 @@ syntabi:
 	s syntab("CHANGE","SEGMENT","WINDOW_SIZE","TYPE")="TNUMBER"
 	s syntab("TEMPLATE","REGION")=""
 	s syntab("TEMPLATE","REGION","AUTODB")="NEGATABLE"
+	s syntab("TEMPLATE","REGION","AUTODELETE")="NEGATABLE"
 	s syntab("TEMPLATE","REGION","COLLATION_DEFAULT")="REQUIRED"
 	s syntab("TEMPLATE","REGION","COLLATION_DEFAULT","TYPE")="TNUMBER"
 	s syntab("TEMPLATE","REGION","DYNAMIC_SEGMENT")="REQUIRED"
@@ -439,8 +443,8 @@ syntabi:
 	s syntab("VERIFY","TEMPLATE")=""
 	q
 UNIX:
-	s hdrlab="GTCGBDUNX015"         ; must be concurrently maintained in gbldirnam.h!!!
-	i (gtm64=TRUE) s hdrlab="GTCGBDUNX115" ; the high order digit is a 64-bit flag
+	s hdrlab="GTCGBDUNX016"         ; must be concurrently maintained in gbldirnam.h!!!
+	i (gtm64=TRUE) s hdrlab="GTCGBDUNX116" ; the high order digit is a 64-bit flag
 	s tfile="$gtmgbldir"
 	s accmeth="\BG\MM"
 	s helpfile="$gtm_dist/gdehelp.gld"

@@ -60,9 +60,6 @@ MBSTART {						\
 		rts_error_csa MSGPARMS;			\
 } MBEND
 
-GBLREF 	gd_region		*gv_cur_region;
-GBLREF 	sgmnt_data_ptr_t	cs_data;
-GBLREF 	sgmnt_addrs		*cs_addrs;
 GBLREF	void			(*mupip_exit_fp)(int4 errnum);
 
 error_def(ERR_COLLATIONUNDEF);
@@ -74,7 +71,7 @@ error_def(ERR_JNLALLOCGROW);
 error_def(ERR_MUNOACTION);
 error_def(ERR_TEXT);
 
-void mucregini(block_id blk_init_size, enum db_ver desired_db_ver)
+void mucregini(gd_region *reg, sgmnt_data_ptr_t csd, enum db_ver desired_db_ver)
 {
 	int4			status;
 	block_id		i;
@@ -85,14 +82,14 @@ void mucregini(block_id blk_init_size, enum db_ver desired_db_ver)
 	time_t			ctime;
 	gd_region		*baseDBreg;
 	gd_segment		*seg;
-	sgmnt_data_ptr_t	csd;
+	unix_db_info		*udi;
+	sgmnt_addrs		*csa;
 	char			*label;
 	enum db_ver		majorver;
 	enum mdb_ver		minorver;
 	trans_num		max_tn_default;
 	gtm_int8		master_map_size;
 
-	csd = cs_data;
 	if (GDSVCURR == desired_db_ver)
 	{	/* Current version defaults */
 		label		= GDS_LABEL;
@@ -108,6 +105,9 @@ void mucregini(block_id blk_init_size, enum db_ver desired_db_ver)
 		master_map_size	= MASTER_MAP_SIZE_V6;
 		max_tn_default	= MAX_TN_V6;
 	}
+	seg = reg->dyn.addr;
+	udi = FILE_INFO(reg);
+	csa = &udi->s_addrs;
 	memcpy(csd->label, label, strnlen(label, sizeof(csd->label)));
 	csd->desired_db_format = majorver;
 	csd->fully_upgraded = TRUE;
@@ -118,28 +118,27 @@ void mucregini(block_id blk_init_size, enum db_ver desired_db_ver)
 	csd->creation_mdb_ver = minorver;
 	csd->master_map_len = master_map_size;
 	csd->bplmap = BLKS_PER_LMAP;
-	seg = gv_cur_region->dyn.addr;
 	assert(seg->blk_size <= MAX_DB_BLK_SIZE);
 	csd->blk_size = seg->blk_size;
 	i = csd->trans_hist.total_blks;
 	csd->trans_hist.free_blocks = i - DIVIDE_ROUND_UP(i, BLKS_PER_LMAP) - 2;
-	csd->max_rec_size = gv_cur_region->max_rec_size;
-	csd->max_key_size = gv_cur_region->max_key_size;
-	csd->null_subs = gv_cur_region->null_subs;
-	csd->std_null_coll = gv_cur_region->std_null_coll;
-	if (IS_STATSDB_REGNAME(gv_cur_region))
+	csd->max_rec_size = reg->max_rec_size;
+	csd->max_key_size = reg->max_key_size;
+	csd->null_subs = reg->null_subs;
+	csd->std_null_coll = reg->std_null_coll;
+	if (IS_STATSDB_REGNAME(reg))
 		csd->freeze_on_fail = FALSE;
 	else
-		csd->freeze_on_fail = gv_cur_region->freeze_on_fail;
-	csd->mumps_can_bypass = gv_cur_region->mumps_can_bypass;
-	csd->epoch_taper = gv_cur_region->epoch_taper;
+		csd->freeze_on_fail = reg->freeze_on_fail;
+	csd->mumps_can_bypass = reg->mumps_can_bypass;
+	csd->epoch_taper = reg->epoch_taper;
 	csd->epoch_taper_time_pct = EPOCH_TAPER_TIME_PCT_DEFAULT;
 	csd->epoch_taper_jnl_pct = EPOCH_TAPER_JNL_PCT_DEFAULT;
 	csd->asyncio = IS_AIO_ON_SEG(seg);
 	csd->reserved_bytes = seg->reserved_bytes;
 	csd->i_reserved_bytes = seg->reserved_bytes;
 	csd->clustered = FALSE;
-	csd->lock_crit_with_db = gv_cur_region->lock_crit_with_db;
+	csd->lock_crit_with_db = reg->lock_crit_with_db;
 	csd->file_corrupt = 0;
 	if (seg->lock_space)
 		csd->lock_space_size = seg->lock_space * OS_PAGELET_SIZE;
@@ -157,22 +156,22 @@ void mucregini(block_id blk_init_size, enum db_ver desired_db_ver)
 	csd->last_inc_backup = 1;
 	csd->last_rec_backup = 1;
 	csd->defer_time = seg->defer_time;
-	csd->jnl_alq = gv_cur_region->jnl_alq;
+	csd->jnl_alq = reg->jnl_alq;
 	if (csd->jnl_state && !csd->jnl_alq)
 		csd->jnl_alq = JNL_ALLOC_DEF;
-	csd->jnl_deq = gv_cur_region->jnl_deq;
-	csd->jnl_before_image = gv_cur_region->jnl_before_image;
-	csd->jnl_state = gv_cur_region->jnl_state;
+	csd->jnl_deq = reg->jnl_deq;
+	csd->jnl_before_image = reg->jnl_before_image;
+	csd->jnl_state = reg->jnl_state;
 	csd->epoch_interval = JNL_ALLOWED(csd) ? DEFAULT_EPOCH_INTERVAL : 0;
 	csd->alignsize = JNL_ALLOWED(csd) ? (DISK_BLOCK_SIZE * JNL_DEF_ALIGNSIZE) : 0;
-	ROUND_UP_JNL_BUFF_SIZE(csd->jnl_buffer_size, gv_cur_region->jnl_buffer_size, csd);
+	ROUND_UP_JNL_BUFF_SIZE(csd->jnl_buffer_size, reg->jnl_buffer_size, csd);
 	if (JNL_ALLOWED(csd))
 	{
-		reg_autoswitch = gv_cur_region->jnl_autoswitchlimit;
+		reg_autoswitch = reg->jnl_autoswitchlimit;
 		if (csd->jnl_alq + csd->jnl_deq > reg_autoswitch)
 		{
-			PUTMSG_WARN_CSA((CSA_ARG(cs_addrs) VARLSTCNT(8) ERR_JNLALLOCGROW, 6, csd->jnl_alq,
-					 gv_cur_region->jnl_autoswitchlimit, "database file", DB_LEN_STR(gv_cur_region)));
+			PUTMSG_WARN_CSA((CSA_ARG(csa) VARLSTCNT(8) ERR_JNLALLOCGROW, 6, csd->jnl_alq,
+					 reg->jnl_autoswitchlimit, "database file", DB_LEN_STR(reg)));
 			csd->autoswitchlimit = reg_autoswitch;
 			csd->jnl_alq = csd->autoswitchlimit;
 		} else
@@ -184,8 +183,8 @@ void mucregini(block_id blk_init_size, enum db_ver desired_db_ver)
 			 */
 			if (JNL_AUTOSWITCHLIMIT_MIN > csd->autoswitchlimit)
 			{
-				PUTMSG_WARN_CSA((CSA_ARG(cs_addrs) VARLSTCNT(8) ERR_JNLALLOCGROW, 6, csd->jnl_alq,
-						 reg_autoswitch, "database file", DB_LEN_STR(gv_cur_region)));
+				PUTMSG_WARN_CSA((CSA_ARG(csa) VARLSTCNT(8) ERR_JNLALLOCGROW, 6, csd->jnl_alq,
+						 reg_autoswitch, "database file", DB_LEN_STR(reg)));
 				csd->jnl_alq = reg_autoswitch;
 				csd->autoswitchlimit = reg_autoswitch;
 			}
@@ -207,7 +206,7 @@ void mucregini(block_id blk_init_size, enum db_ver desired_db_ver)
 			ROUND_DOWN_MAX_JNL_BUFF_SIZE(csd->jnl_buffer_size, csd);
 		}
 	}
-	csd->def_coll = gv_cur_region->def_coll;
+	csd->def_coll = reg->def_coll;
 	if (csd->def_coll)
 	{
 		if ((csp = ready_collseq((int)(csd->def_coll))))
@@ -215,22 +214,22 @@ void mucregini(block_id blk_init_size, enum db_ver desired_db_ver)
 			csd->def_coll_ver = (csp->version)();
 			if (!do_verify(csp, csd->def_coll, csd->def_coll_ver))
 			{
-				PUTMSG_ERROR_CSA((CSA_ARG(cs_addrs)
+				PUTMSG_ERROR_CSA((CSA_ARG(csa)
 						  VARLSTCNT(4) ERR_COLLTYPVERSION, 2, csd->def_coll, csd->def_coll_ver));
 				assert(IS_MUPIP_IMAGE);
 				(*mupip_exit_fp)(ERR_MUNOACTION);
 			}
 		} else
 		{
-			PUTMSG_ERROR_CSA((CSA_ARG(cs_addrs) VARLSTCNT(3) ERR_COLLATIONUNDEF, 1, csd->def_coll));
+			PUTMSG_ERROR_CSA((CSA_ARG(csa) VARLSTCNT(3) ERR_COLLATIONUNDEF, 1, csd->def_coll));
 			assert(IS_MUPIP_IMAGE);
 			(*mupip_exit_fp)(ERR_MUNOACTION);
 		}
 	}
 	/* mupip_set_journal() relies on csd->jnl_file_len being 0 if csd->jnl_state is jnl_notallowed.
-	 * Note that even though gv_cur_region->jnl_state is jnl_notallowed, gv_cur_region->jnl_file_len can be non-zero
+	 * Note that even though reg->jnl_state is jnl_notallowed, reg->jnl_file_len can be non-zero
 	 */
-	csd->jnl_file_len = JNL_ALLOWED(csd) ? gv_cur_region->jnl_file_len : 0;
+	csd->jnl_file_len = JNL_ALLOWED(csd) ? reg->jnl_file_len : 0;
 	csd->reg_seqno = 1;
 	/* zqgblmod_seqno is initialized to 0 at db creation time (to ensure that $ZQGBLMOD will unconditionally return
 	 * the safe value of TRUE by default). This default value of 0 is also relied upon by the source server logic
@@ -245,13 +244,13 @@ void mucregini(block_id blk_init_size, enum db_ver desired_db_ver)
 	{
 		tmpjnlfile.addr = (char *)csd->jnl_file_name;
 		tmpjnlfile.len = SIZEOF(csd->jnl_file_name);
-		jnlfile.addr = (char *)gv_cur_region->jnl_file_name;
-		jnlfile.len = gv_cur_region->jnl_file_len;
+		jnlfile.addr = (char *)reg->jnl_file_name;
+		jnlfile.len = reg->jnl_file_len;
 		jnldef.addr = JNL_EXT_DEF;
 		jnldef.len = SIZEOF(JNL_EXT_DEF) - 1;
 		if (FILE_STAT_ERROR == gtm_file_stat(&jnlfile, &jnldef, &tmpjnlfile, TRUE, &ustatus))
 		{
-			PUTMSG_ERROR_CSA((CSA_ARG(cs_addrs) VARLSTCNT(5) ERR_FILEPARSE, 2, JNL_LEN_STR(gv_cur_region), ustatus));
+			PUTMSG_ERROR_CSA((CSA_ARG(csa) VARLSTCNT(5) ERR_FILEPARSE, 2, JNL_LEN_STR(reg), ustatus));
 			assert(IS_MUPIP_IMAGE);
 			(*mupip_exit_fp)(ERR_MUNOACTION);
 		}
@@ -262,9 +261,9 @@ void mucregini(block_id blk_init_size, enum db_ver desired_db_ver)
 	csd->pre_read_trigger_factor = PRE_READ_TRIGGER_FACTOR;
 	csd->writer_trigger_factor = UPD_WRITER_TRIGGER_FACTOR;
 	csd->db_trigger_cycle = 0;
-	cs_addrs->hdr = csd;
-	cs_addrs->ti = &csd->trans_hist;
-	th = cs_addrs->ti;
+	csa->hdr = csd;
+	csa->ti = &csd->trans_hist;
+	th = csa->ti;
 	th->lock_sequence = 0;
 	th->ccp_jnl_filesize = 0;
 	csd->max_bts = GTM64_ONLY(GTM64_WC_MAX_BUFFS) NON_GTM64_ONLY(WC_MAX_BUFFS);
@@ -277,8 +276,8 @@ void mucregini(block_id blk_init_size, enum db_ver desired_db_ver)
 	csd->max_update_array_size = csd->max_non_bm_update_array_size
 					= (int4)ROUND_UP2(MAX_NON_BITMAP_UPDATE_ARRAY_SIZE(csd), UPDATE_ARRAY_ALIGN_SIZE);
 	csd->max_update_array_size += (int4)ROUND_UP2(MAX_BITMAP_UPDATE_ARRAY_SIZE(csd), UPDATE_ARRAY_ALIGN_SIZE);
-	/* bt_malloc(cs_addrs) Done by db_init at file open time -- not needed here */
-	if (dba_bg == REG_ACC_METH(gv_cur_region))
+	/* bt_malloc(csa) Done by db_init at file open time -- not needed here */
+	if (dba_bg == REG_ACC_METH(reg))
 		csd->flush_time[0] = TIM_FLU_MOD_BG;
 	else
 		csd->flush_time[0] = TIM_FLU_MOD_MM;
@@ -295,28 +294,17 @@ void mucregini(block_id blk_init_size, enum db_ver desired_db_ver)
 	assert(SIZEOF(ctime) >= SIZEOF(int4));
 	csd->creation_time4 = (int4)ctime;	/* Need only lower order 4-bytes of current time (in case system time is 8-bytes) */
 	csd->statsdb_allocation = STATSDB_ALLOCATION;
-	if (IS_STATSDB_REG(gv_cur_region))
+	if (IS_STATSDB_REG(reg))
 	{	/* Copy basedb fname into statsdb file header (needed by MUPIP RUNDOWN -FILE statsdb-file-name) */
-		STATSDBREG_TO_BASEDBREG(gv_cur_region, baseDBreg);
-		COPY_BASEDB_FNAME_INTO_STATSDB_HDR(gv_cur_region, baseDBreg, csd);
+		STATSDBREG_TO_BASEDBREG(reg, baseDBreg);
+		COPY_BASEDB_FNAME_INTO_STATSDB_HDR(reg, baseDBreg, csd);
 		/* Assert that we never create a statsdb with NOSTATS in corresponding baseDB */
 		assert(baseDBreg->open);
 		assert(!(RDBF_NOSTATS & baseDBreg->reservedDBFlags));
 	}
-	csd->reservedDBFlags = gv_cur_region->reservedDBFlags;
-	cs_addrs->bmm = MM_ADDR(csd);
-	bmm_init();
-	for (i = 0; i < blk_init_size ; i += csd->bplmap)
-	{
-		status = bml_init(i);
-		if (status != SS_NORMAL)
-		{
-			PUTMSG_ERROR_CSA((CSA_ARG(cs_addrs) VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(gv_cur_region), status));
-			assert(IS_MUPIP_IMAGE);
-			(*mupip_exit_fp)(ERR_MUNOACTION);
-		}
-	}
-	mucblkini(desired_db_ver);
+	csd->reservedDBFlags = reg->reservedDBFlags;
+	csa->bmm = MM_ADDR(csd);
+	bmm_init(csd);
 	th->mm_tn = 0;
 	th->early_tn = 1;
 	th->curr_tn = 1;	/* in order to use INCREMENT_CURR_TN macro here, the logic has to be made complicated.

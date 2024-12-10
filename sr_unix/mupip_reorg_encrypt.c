@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2015-2023 Fidelity National Information	*
+ * Copyright (c) 2015-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -595,6 +595,7 @@ void mupip_reorg_encrypt(void)
 						lcnt = mapsize;	/* to break out of 2nd level (outer) for-loop */
 						break;
 					}
+					/* Increment bitmap TN; Skip tqread_grab_bml since reallocate_bitmap resolves conflicts */
 					blkBase = t_qread(curblk, (sm_int_ptr_t)&blkhist->cycle, &blkhist->cr);
 					if (NULL == blkBase)
 					{
@@ -628,7 +629,8 @@ void mupip_reorg_encrypt(void)
 						 * (re)encrypt. Because of t_end currently not being able to validate a bitmap
 						 * without that simultaneously having a cse, we need to create a cse for the
 						 * bitmap that is used only for bitmap history validation, but should not be
-						 * used to update the contents of the bitmap block in bg_update.
+						 * used to update the contents of the bitmap block in bg_update. Operation does
+						 * not change bitmap; Skip tqread_grab_bml reallocate_bitmap resolves conflicts
 						 */
 						bmlhist.buffaddr = t_qread(curbmp, (sm_int_ptr_t)&bmlhist.cycle, &bmlhist.cr);
 						if (NULL == bmlhist.buffaddr)

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -79,7 +79,6 @@ boolean_t region_init(bool cm_regions)
 		{
 			baseDBcsa = &FILE_INFO(baseDBreg)->s_addrs;
 			baseDBnl = baseDBcsa->nl;
-			COPY_STATSDB_FNAME_INTO_STATSREG(reg, baseDBnl->statsdb_fname, baseDBnl->statsdb_fname_len);
 			/* If a statsdb has already been created (by some other process), then we (DSE or LKE are the only
 			 * ones that can reach here) will open the statsdb too. Otherwise we will not.
 			 */
@@ -88,7 +87,7 @@ boolean_t region_init(bool cm_regions)
 			{
 				gv_cur_region = reg;
 				region_open();
-				assert(reg->open);
+				/* DSE/LKE will not create the statsdb file if it does not exist */
 			}
 		}
 	}
@@ -99,10 +98,17 @@ boolean_t region_init(bool cm_regions)
 
 void region_open(void)
 {
+	DCL_THREADGBL_ACCESS;
 	ESTABLISH(region_init_ch);
+
+	SETUP_THREADGBL_ACCESS;
+	assert(!TREF(ok_to_leave_statsdb_unopened));
+	TREF(ok_to_leave_statsdb_unopened) = TRUE;
 #ifdef UNIX
 	gv_cur_region->node = -1;
 #endif
 	gv_init_reg(gv_cur_region, NULL);
+
+	TREF(ok_to_leave_statsdb_unopened) = FALSE;
 	REVERT;
 }

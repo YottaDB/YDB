@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -57,6 +57,7 @@
 #include "repl_msg.h"
 #include "gtmsource.h"
 #endif
+#include "inline_atomic_pid.h"
 
 /* In mu_reorg if we are in gvcst_bmp_mark_free, we actually have a valid gv_target. Find its root before the next iteration
  * in mu_reorg.
@@ -76,12 +77,14 @@ GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	short			crash_count;
 GBLREF	uint4			dollar_tlevel;
+GBLREF	uint4			process_id;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	gv_key			*gv_currkey;
 GBLREF	gv_namehead		*gv_target;
 GBLREF	tp_frame		*tp_pointer;
 GBLREF	trans_num		start_tn;
 GBLREF	unsigned char		cw_set_depth, cw_map_depth, t_fail_hist[CDB_MAX_TRIES];
+GBLREF	cw_set_element		cw_set[];
 GBLREF	boolean_t		mu_reorg_process;
 GBLREF	uint4			mu_reorg_encrypt_in_prog;
 GBLREF	uint4			mu_upgrade_in_prog;
@@ -101,7 +104,6 @@ GBLDEF	unsigned char		t_fail_hist_dbg[T_FAIL_HIST_DBG_SIZE];
 GBLDEF	unsigned int		t_tries_dbg;
 GBLREF	sgm_info		*sgm_info_ptr;
 GBLREF	boolean_t		mupip_jnl_recover;
-GBLREF	uint4			process_id;
 #endif
 
 GBLREF	boolean_t		is_updproc;
@@ -118,6 +120,23 @@ error_def(ERR_GVIS);
 error_def(ERR_GVPUTFAIL);
 error_def(ERR_TPRETRY);
 error_def(ERR_NONTPRESTART);
+
+#define UNPIN_BMLS_IF_NEEDED												\
+MBSTART {														\
+	unsigned char depth;												\
+															\
+	depth = (cw_map_depth) ? cw_map_depth : cw_set_depth;								\
+	if (depth)													\
+	{														\
+		for (cse = &cw_set[depth - 1]; (dba_bg == csa->hdr->acc_meth) && (cw_set <= cse); cse--)		\
+		{	/* Release BMLs if blocks added and still owned */						\
+			if (gds_t_writemap != cse->mode)								\
+				break; /* Done with bitmaps */								\
+			assert(IS_BITMAP_BLK(cse->blk));								\
+			BML_RSRV_IF_EXP(cse->cr, CR_BLKEMPTY, process_id, 0);						\
+		}													\
+	}														\
+} MBEND
 
 void t_retry(enum cdb_sc failure)
 {
@@ -137,6 +156,7 @@ void t_retry(enum cdb_sc failure)
 	gd_region		*restart_reg;
 	mval			t_restart_entryref;
 	jnlpool_addrs_ptr_t	save_jnlpool;
+	cw_set_element		*cse;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -302,7 +322,7 @@ void t_retry(enum cdb_sc failure)
 			 * (e) cdb_sc_onln_rlbk[1,2] : See comment below as to why we allow online rollback related restarts even
 			 *     in the final retry.
 			 * (f) cdb_sc_instancefreeze : Instance freeze detected while crit held.
-			 * (g) cdb_sc_gvtrootmod2 : Similar to (e).
+			 * (g) cdb_sc_gvtrootmod2 : Similar to (e), but can be caused by MUPIP TRUNCATE as well
 			 * (h) cdb_sc_reorg_encrypt : Concurrent update of encryption settings due to MUPIP REORG -ENCRYPT.
 			 * (i) cdb_sc_gvtrootnonzero : It is possible that a GVT gets created just before we get crit in the
 			 *	final retry inside "gvcst_put2". In that case a cdb_sc_gvtrootnonzero restart is possible while in
@@ -389,8 +409,8 @@ void t_retry(enum cdb_sc failure)
 				 * on the next restart.
 				 */
 			}
-			if (MISMATCH_ROOT_CYCLES(csa, cnl))
-			{	/* We came in to handle a different restart code in the penultimate retry and grab_crit before going
+			if ((MISMATCH_ROOT_CYCLES(csa, cnl)) && (failure != cdb_sc_gvtrootmod2))
+			{	/* Came to handle a restart code !cdb_sc_gvtrootmod2 in the final retry and grab_crit before going
 				 * to final retry. As part of grabbing crit, we detected an online rollback. Although we could treat
 				 * this as just an online rollback restart and handle it by syncing cycles, but by doing so, we will
 				 * loose the information that an online rollback happened when we go back to gvcst_{put,kill}. This
@@ -403,6 +423,7 @@ void t_retry(enum cdb_sc failure)
 				 * proceeds smoothly.
 				 */
 				RESET_ALL_GVT_CLUES;
+				UNPIN_BMLS_IF_NEEDED;
 				cw_set_depth = 0;
 				cw_map_depth = 0;
 				if (WANT_REDO_ROOT_SEARCH)
@@ -464,6 +485,7 @@ void t_retry(enum cdb_sc failure)
 			CCP_FID_MSG(gv_cur_region, CCTR_FLUSHLK);
 			ccp_userwait(gv_cur_region, CCST_MASK_HAVE_DIRTY_BUFFERS, 0, 0);
 		}
+		UNPIN_BMLS_IF_NEEDED;
 		cw_set_depth = 0;
 		cw_map_depth = 0;
 		/* In case triggers are supported, make sure we start with latest copy of file header's db_trigger_cycle

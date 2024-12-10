@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -178,7 +178,7 @@ trans_num gvcst_bmp_mark_free(kill_set *ks)
 					if (NULL == (alt_hist.h[0].buffaddr = t_qread(alt_hist.h[0].blk_num,
 								      (sm_int_ptr_t)&alt_hist.h[0].cycle,
 								      &alt_hist.h[0].cr)))
-					{
+					{	/* WARNING: assigment above */
 						t_retry((enum cdb_sc)rdfail_detail);
 						continue;
 					}
@@ -191,6 +191,7 @@ trans_num gvcst_bmp_mark_free(kill_set *ks)
 				} else
 					mark_level_as_special = FALSE;
 				bmphist.blk_num = bit_map;
+				/* KILL frees bitmap space; Skip tqread_grab_bml since reallocate_bitmap resolves conflicts */
 				if (NULL == (bmphist.buffaddr = t_qread(bmphist.blk_num, (sm_int_ptr_t)&bmphist.cycle,
 									&bmphist.cr)))
 				{
@@ -295,6 +296,7 @@ trans_num gvcst_bmp_mark_free(kill_set *ks)
 			else
 				inctn_detail.blknum_struct.blknum = 0; /* i.e. no adjustment to "blks_to_upgrd" necessary */
 			bmphist.blk_num = bit_map;
+			/* KILL frees bitmap space; Skip tqread_grab_bml since reallocate_bitmap resolves conflicts */
 			if (NULL == (bmphist.buffaddr = t_qread(bmphist.blk_num, (sm_int_ptr_t)&bmphist.cycle,
 								&bmphist.cr)))
 			{

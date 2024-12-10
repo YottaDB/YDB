@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -37,7 +37,7 @@
  * we are about to create the database file (note that UPGRADE takes some liberties with an otherwise empty database)
  * AND we should not have opened the fd with O_DIRECT. Take that into account.
  */
-#define	ASSERT_NO_DIO_ALIGN_NEEDED(UDI)	assert((in_mu_cre_file || mu_upgrade_in_prog) && !(UDI)->fd_opened_with_o_direct)
+#define	ASSERT_NO_DIO_ALIGN_NEEDED(UDI)	assert((in_mu_init_file || mu_upgrade_in_prog) && !(UDI)->fd_opened_with_o_direct)
 
 #define	DBG_CHECK_DIO_ALIGNMENT(udi, offset, buff, size)							\
 MBSTART {													\
@@ -64,7 +64,7 @@ typedef struct
 } dio_buff_t;
 
 #ifdef DEBUG
-GBLREF	boolean_t		in_mu_cre_file;
+GBLREF	boolean_t		in_mu_init_file;
 GBLREF	volatile boolean_t	timer_in_handler;
 GBLREF	boolean_t		multi_thread_in_use;
 #endif

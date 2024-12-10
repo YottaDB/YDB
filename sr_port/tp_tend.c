@@ -82,6 +82,7 @@
 #include "error_trap.h"
 #include "ztimeout_routines.h"
 #include "gtmdbglvl.h"		/* for GDL_UnconditionalEpoch */
+#include "inline_atomic_pid.h"
 
 GBLREF	uint4			dollar_tlevel;
 GBLREF	uint4			dollar_trestart;
@@ -1075,7 +1076,7 @@ boolean_t	tp_tend()
 					tp_blk = cse->blk;
 					bt = bt_get(tp_blk);
 					if (NULL != bt)
-					{
+					{	/* BG method pins BMLs for only block acquisition not block frees */
 						if ((cse->tn <= bt->tn) && (status = reallocate_bitmap(si, cse)))
 						{	/* WARNING assignment above */
 							assert(CDB_STAGNATE > t_tries);
@@ -1153,14 +1154,13 @@ boolean_t	tp_tend()
 							BG_TRACE_PRO_ANY(csa, wc_blocked_tp_tend_jnl_cwset);
 							goto failed;
 						}
-						/* It is possible that cr->in_cw_set is non-zero in case a concurrent MUPIP REORG
-						 * UPGRADE/DOWNGRADE is in PHASE2 touching this very same block. In that case,
-						 * we cannot reuse this block so we restart. We could try finding a different block
-						 * to acquire instead and avoid a restart (tracked as part of C9E11-002651).
-						 * Note that in_cw_set is set to 0 ahead of in_tend in bg_update_phase2. Therefore
-						 * it is possible that we see in_cw_set 0 but in_tend is still non-zero. In that
-						 * case, we cannot proceed with pinning this cache-record as the cr is still locked
-						 * by the other process. We can choose to wait here but instead decide to restart.
+						/* It is possible that cr->in_cw_set is non-zero in case a concurrent process
+						 * evicts the newly acquired block. Cannot use this cache record, so restart.
+						 * Note that in_cw_set is set to 0 ahead of in_tend in "bg_update_phase2".
+						 * Therefore it is possible that we see in_cw_set 0 but in_tend is still non-zero.
+						 * In that case, we cannot proceed with pinning this cache-record as the cr is
+						 * still locked by the other process. We can choose to wait here but instead
+						 * decide to restart.
 						 */
 						if ((NULL == cr) || (0 <= cr->read_in_progress)
 							|| (0 != cr->in_cw_set) || (0 != cr->in_tend))
@@ -1179,6 +1179,8 @@ boolean_t	tp_tend()
 									 && (old_block_tn < jbp->epoch_tn));
 						if ((cse->cr != cr) || (cse->cycle != cr->cycle))
 						{	/* Block has relocated in the cache. Adjust pointers to new location. */
+							assert((process_id != cr->bml_pin)
+									&& (!cse->cr || (process_id != cse->cr->bml_pin)));
 							cse->cr = cr;
 							cse->cycle = cr->cycle;
 							cse->old_block = (sm_uc_ptr_t)old_block;
@@ -1796,9 +1798,7 @@ boolean_t	tp_tend()
 						 * while holding crit so the next process to use this bitmap will see a
 						 * consistent copy of this bitmap when it gets crit for commit. This avoids
 						 * the reallocate_bitmap routine from restarting or having to wait for a
-						 * concurrent phase2 construction to finish. When the change request C9E11-002651
-						 * (to reduce restarts due to bitmap collisions) is addressed, we can reexamine
-						 * whether it makes sense to move bitmap block builds back to phase2.
+						 * concurrent phase2 construction to finish.
 						 * 2) If the block has a recompute update array. This means it is a global that
 						 * has NOISOLATION turned on. In this case, we have seen that deferring the
 						 * updates to phase2 can cause lots of restarts in the "recompute_upd_array"
@@ -1861,7 +1861,10 @@ boolean_t	tp_tend()
 											&& (CMT11b > TREF(cur_cmt_step))),
 										TREF(cur_cmt_step), CMT11b);
 								if (cdb_sc_normal == status)
+								{
 									cse->mode = gds_t_committed;
+									assert(cse->cr->bml_pin != process_id);	/* BML available */
+								}
 							}
 						}
 						if (cdb_sc_normal != status)
@@ -2132,7 +2135,6 @@ failed:
 		else
 			valid_thru = si->start_tn;
 		assert(valid_thru <= si->tp_csd->trans_hist.curr_tn);
-		is_mm = (dba_mm == si->tp_csd->acc_meth);
 		bmp_begin_cse = si->first_cw_bitmap;
 		prev_target = NULL;
 		for (cse = si->first_cw_set; bmp_begin_cse != cse; cse = cse->next_cw_set)
@@ -2205,7 +2207,7 @@ enum cdb_sc	reallocate_bitmap(sgm_info *si, cw_set_element *bml_cse)
 	blk_hdr_ptr_t		old_block;
 	block_id		bml, total_blks;
 	block_id_ptr_t		b_ptr;
-	boolean_t		before_image_needed, blk_used, is_mm;
+	boolean_t		before_image_needed, blk_used, reduce_bitmap_restarts, is_mm;
 	boolean_t		read_before_image;		/* TRUE if before-image journaling or online backup in progress */
 	cache_rec_ptr_t		cr;
 	cw_set_element		*cse, *bmp_begin_cse;
@@ -2221,15 +2223,16 @@ enum cdb_sc	reallocate_bitmap(sgm_info *si, cw_set_element *bml_cse)
 	csa = cs_addrs;
 	csd = csa->hdr;
 	is_mm = (dba_mm == csd->acc_meth);
+	reduce_bitmap_restarts = (!is_mm) && (DEFAULT_BITMAP_PREPIN == csd->nobitmap_prepin);
 	/* This optimization should only be used if blocks are being allocated (not if freed) in this bitmap. */
 	assert(0 <= bml_cse->reference_cnt);
 	bml = bml_cse->blk;
-	if (!is_mm && bml_cse->cr->in_tend)
-	{	/* Possible if this cache-record no longer contains the bitmap block we think it does. In this case restart.
-		 * Since we hold crit at this point, the block that currently resides should not be a bitmap block since
-		 * all updates to the bitmap (both phase1 and phase) happen inside of crit.
-		 */
-		assert(csa->now_crit && (bml != bml_cse->cr->blk) && (bml_cse->cr->blk % csd->bplmap));
+	/* BG it is possible for another KILL operation to modify the CR. We don't care about those modifications because
+	 * they free bits in the bitmap and do not mark bits as busy. Below BG only valdiates target blocks in the bitmap
+	 */
+	if (!is_mm && (bml_cse->cr->in_tend || (reduce_bitmap_restarts && (process_id != bml_cse->cr->bml_pin))))
+	{	/* Possible if this cache-record no longer contains the bitmap block we think it does; Restart */
+		assert(CDB_STAGNATE > t_tries);
 		return cdb_sc_lostbmlcr;
 	}
 	assert(is_mm || (FALSE == bml_cse->cr->in_tend));
@@ -2253,6 +2256,9 @@ enum cdb_sc	reallocate_bitmap(sgm_info *si, cw_set_element *bml_cse)
 		assert((BLK_ID_32_VER < cse->ondsk_blkver) /* Block is either V7m+ or has 32bit limits, Why? */
 			|| ((bml == (block_id_32)bml) && (total_blks == (block_id_32)total_blks)));
 		assert(*b_ptr == (cse->blk - bml));
+		/* BML pinning checks only the allocated block's offset, MM and BG without BML pinning start from zero */
+		if (reduce_bitmap_restarts)
+			offset = cse->blk - bml;
 		do
 		{
 			/* If "bm_find_blk" is passed a hint (first arg) it assumes it is less than map_size and gives invalid
@@ -2260,13 +2266,24 @@ enum cdb_sc	reallocate_bitmap(sgm_info *si, cw_set_element *bml_cse)
 			 * that "hint" < "map_size" in "bm_find_blk".
 			 */
 			if (offset >= map_size)
+			{
+				assert(!reduce_bitmap_restarts);	/* CR pinning should avoid this */
 				return cdb_sc_bmlmod;
+			}
 			free_bit = bm_find_blk(offset, (sm_uc_ptr_t)bml_cse->old_block + SIZEOF(blk_hdr), map_size, &blk_used);
 			if (NO_FREE_SPACE == free_bit)
+			{
+				assert(!reduce_bitmap_restarts);	/* CR pinning should avoid this */
 				return cdb_sc_bmlmod;
-			cse->blk = bml + free_bit;
+			}
+			if (!reduce_bitmap_restarts) /* MM or disabled BG uses the next free block */
+				cse->blk = bml + free_bit;
+			DEBUG_ONLY(else assert(cse->blk == bml + free_bit)); /* BG should end up at the same block */
 			if (cse->blk >= total_blks)
+			{
+				assert(!reduce_bitmap_restarts);	/* CR pinning should avoid this */
 				return cdb_sc_lostbmlcr;
+			}
 			/* Re-point before-images into cse->old_block if necessary; if not available: restart.
 			 * Set cse->blk_prior_state before invoking BEFORE_IMAGE_NEEDED macro (as it needs this field set).
 			 */
@@ -2285,6 +2302,8 @@ enum cdb_sc	reallocate_bitmap(sgm_info *si, cw_set_element *bml_cse)
 				assert(CR_NOTVALID != (sm_long_t)cr);
 				if ((NULL == cr) || (CR_NOTVALID == (sm_long_t)cr) || (0 <= cr->read_in_progress))
 				{	/* if this before image is not at hand don't wait for it in crit */
+					if (reduce_bitmap_restarts)
+						return cdb_sc_lostcr;
 					offset = free_bit + 1;		/* try further in this bitmap */
 					continue;
 				}
@@ -2302,6 +2321,7 @@ enum cdb_sc	reallocate_bitmap(sgm_info *si, cw_set_element *bml_cse)
 					/* Note: cse->cr needs to be set BEFORE the JNL_GET_CHECKSUM_ACQUIRED macro call
 					 * as the macro relies on this.
 					 */
+					assert((process_id != cr->bml_pin) && (!cse->cr || (process_id != cse->cr->bml_pin)));
 					cse->cr = cr;
 					cse->cycle = cr->cycle;
 					if (!WAS_FREE(cse->blk_prior_state) && (NULL != jbp))
@@ -2312,7 +2332,9 @@ enum cdb_sc	reallocate_bitmap(sgm_info *si, cw_set_element *bml_cse)
 							 */
 							bsiz = old_block->bsiz;
 							if (bsiz > csd->blk_size)
-							{	/* if this before image is not valid don't wait for it in crit */
+							{	/* if this before image is not at hand don't wait for it in crit */
+								if (reduce_bitmap_restarts)
+									return cdb_sc_lostcr;
 								offset = free_bit + 1;		/* try further in this bitmap */
 								continue;
 							}
@@ -2351,7 +2373,10 @@ enum cdb_sc	reallocate_bitmap(sgm_info *si, cw_set_element *bml_cse)
 			bsiz = old_block->bsiz;
 			/* See comment before similar check in "gvincr_recompute_upd_array" for why this check is needed */
 			if (bsiz > csd->blk_size)
+			{
+				assert(!reduce_bitmap_restarts);
 				return cdb_sc_lostbmlcr;	/* This is a restartable condition, so restart */
+			}
 			bml_cse->blk_checksum = jnl_get_checksum(old_block, csa, bsiz);
 		} else
 			bml_cse->blk_checksum = 0;

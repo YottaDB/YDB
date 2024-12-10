@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -32,6 +32,8 @@ GBLREF	boolean_t	badchar_inhibit, gtm_utf8_mode;
 
 LITREF mval literal_null;
 
+#define	MAX_TRANSLATE_ARGS	4
+
 int f_translate(oprtype *a, opctype op)
 {
 	boolean_t	more_args;
@@ -39,14 +41,14 @@ int f_translate(oprtype *a, opctype op)
 	int4		i, maxLengthString;
 	mval		dst_mval, *rplc_mval, *srch_mval, *xlateTable[2];
 	sm_uc_ptr_t	nextptr;
-	triple		*args[4];
+	triple		*args[MAX_TRANSLATE_ARGS + 1];
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	args[0] = maketriple(op);
 	if (EXPR_FAIL == expr(&(args[0]->operand[0]), MUMPS_EXPR))
 		return FALSE;
-	for (i = 1 , more_args = TRUE ; i < 3 ; i++)
+	for (i = 1, more_args = TRUE; i < MAX_TRANSLATE_ARGS; i++)
 	{
 		args[i] = newtriple(OC_PARAMETER);
 		if (more_args)
@@ -66,8 +68,9 @@ int f_translate(oprtype *a, opctype op)
 	}
 	assert((TRIP_REF == args[0]->operand[1].oprclass) && (TRIP_REF == args[0]->operand[1].oprval.tref->operand[0].oprclass)
 			&& (TRIP_REF == args[0]->operand[1].oprval.tref->operand[1].oprclass));
-	/* If the second and third parameters are literals, pre-calculate the translation table and store it in the stringpool */
-	if ((OC_LIT == args[1]->operand[0].oprval.tref->opcode) && (OC_LIT == args[2]->operand[0].oprval.tref->opcode))
+	/* If the second, third, and fourth args are literals, pre-calculate the translation table and store it in the stringpool */
+	if ((OC_LIT == args[1]->operand[0].oprval.tref->opcode) && (OC_LIT == args[2]->operand[0].oprval.tref->opcode) &&
+			(OC_LIT == args[3]->operand[0].oprval.tref->opcode))
 	{	/* we only do this if we have search and reolace literals */
 		srch_mval = &args[1]->operand[0].oprval.tref->operand[0].oprval.mlit->v;
 		rplc_mval = &args[2]->operand[0].oprval.tref->operand[0].oprval.mlit->v;
@@ -88,24 +91,31 @@ int f_translate(oprtype *a, opctype op)
 			create_byte_xlate_table(srch_mval, rplc_mval, (int *)xlateTable[0]->str.addr);
 			if (OC_LIT == args[0]->operand[0].oprval.tref->opcode)
 			{	/* the source is a literal too - lets do it all at compile time */
-				op_fnztranslate_fast(&args[0]->operand[0].oprval.tref->operand[0].oprval.mlit->v, xlateTable[0],
-					&dst_mval);
+				op_fnztranslate_fast(&args[0]->operand[0].oprval.tref->operand[0].oprval.mlit->v,
+					xlateTable[0], &args[3]->operand[0].oprval.tref->operand[0].oprval.mlit->v, &dst_mval);
 				unuse_literal(&args[0]->operand[0].oprval.tref->operand[0].oprval.mlit->v);
 				dqdel(args[0]->operand[0].oprval.tref, exorder);
 				args[0]->opcode = OC_LIT;
 				put_lit_s(&dst_mval, args[0]);
 				args[0]->operand[1].oprclass = NO_REF;
+				unuse_literal(&args[1]->operand[0].oprval.tref->operand[0].oprval.mlit->v);
+				unuse_literal(&args[2]->operand[0].oprval.tref->operand[0].oprval.mlit->v);
+				unuse_literal(&args[3]->operand[0].oprval.tref->operand[0].oprval.mlit->v);
+				dqdel(args[1]->operand[0].oprval.tref, exorder);
+				dqdel(args[2]->operand[0].oprval.tref, exorder);
+				dqdel(args[3]->operand[0].oprval.tref, exorder);
+				dqdel(args[1], exorder);
+				dqdel(args[2], exorder);
+				dqdel(args[3], exorder);
 			} else
 			{
 				args[0]->opcode = OC_FNZTRANSLATE_FAST;
-				args[0]->operand[1] = put_lit(xlateTable[0]);
+				args[1]->operand[0] = put_lit(xlateTable[0]);
+				args[2]->operand[0] = args[3]->operand[0];
+				/* bind up triple structure */
+				args[0]->operand[1] = put_tref(args[1]);
+				args[1]->operand[1] = put_tref(args[2]);
 			}
-			unuse_literal(&args[1]->operand[0].oprval.tref->operand[0].oprval.mlit->v);
-			unuse_literal(&args[2]->operand[0].oprval.tref->operand[0].oprval.mlit->v);
-			dqdel(args[1]->operand[0].oprval.tref, exorder);
-			dqdel(args[2]->operand[0].oprval.tref, exorder);
-			dqdel(args[1], exorder);
-			dqdel(args[2], exorder);
 		} else if (gtm_utf8_mode && valid_utf_string(&srch_mval->str) && valid_utf_string(&rplc_mval->str))
 		{	/* actual UTF-8 characters, so need hashtable rather than just than code table */
 			unuse_literal(&args[1]->operand[0].oprval.tref->operand[0].oprval.mlit->v);
@@ -135,31 +145,37 @@ int f_translate(oprtype *a, opctype op)
 			if ((OC_LIT == args[0]->operand[0].oprval.tref->opcode)
 				&& valid_utf_string(&args[0]->operand[0].oprval.tref->operand[0].oprval.mlit->v.str))
 			{	/* the source is a literal too - lets do it all at compile time */
-				op_fntranslate_fast(&args[0]->operand[0].oprval.tref->operand[0].oprval.mlit->v,
-						    rplc_mval, xlateTable[0], xlateTable[1], &dst_mval);
+				op_fntranslate_fast(&args[0]->operand[0].oprval.tref->operand[0].oprval.mlit->v, rplc_mval,
+						xlateTable[0], &args[3]->operand[0].oprval.tref->operand[0].oprval.mlit->v,
+							xlateTable[1], &dst_mval);
 				unuse_literal(&args[0]->operand[0].oprval.tref->operand[0].oprval.mlit->v);
 				dqdel(args[0]->operand[0].oprval.tref, exorder);
 				args[0]->opcode = OC_LIT;
 				put_lit_s(&dst_mval, args[0]);
 				args[0]->operand[1].oprclass = NO_REF;
 				unuse_literal(&args[2]->operand[0].oprval.tref->operand[0].oprval.mlit->v);
+				unuse_literal(&args[3]->operand[0].oprval.tref->operand[0].oprval.mlit->v);
 				dqdel(args[1]->operand[0].oprval.tref, exorder);
 				dqdel(args[2]->operand[0].oprval.tref, exorder);
+				dqdel(args[3]->operand[0].oprval.tref, exorder);
 				dqdel(args[1], exorder);
 				dqdel(args[2], exorder);
+				dqdel(args[3], exorder);
 			} else
-			{	/* op_fntranslate_fast arguments; src, rplc, m_xlate, xlate_hash, so need one more triple */
+			{	/* op_fntranslate_fast arguments; src, rplc, m_xlate, dir, xlate_hash, so need one more triple */
 				args[0]->opcode = OC_FNTRANSLATE_FAST;		/* note no Z */
 				assert(OC_PARAMETER == args[1]->opcode);
 				args[1]->operand[0] = args[2]->operand[0];	/* Promote the rplc string to the second argument */
 				assert(OC_PARAMETER == args[2]->opcode);
 				args[2]->operand[0] = put_lit(xlateTable[0]);
-				args[3] = newtriple(OC_PARAMETER);
-				args[3]->operand[0] = put_lit(xlateTable[1]);
+				/* args[3]->operand[0] = args[3]->operand[0]; - NO OP */
+				args[4] = newtriple(OC_PARAMETER);
+				args[4]->operand[0] = put_lit(xlateTable[1]);
 				/* bind up triple structure */
 				args[0]->operand[1] = put_tref(args[1]);
 				args[1]->operand[1] = put_tref(args[2]);
 				args[2]->operand[1] = put_tref(args[3]);
+				args[3]->operand[1] = put_tref(args[4]);
 			}
 		}
 	}

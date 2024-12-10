@@ -1,6 +1,6 @@
 /***************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -458,7 +458,8 @@ void mupip_reorg(void)
 			gv_target->root = 0; /* Recompute gv_target->root in case mu_reorg changed things around */
 			inctn_opcode = inctn_invalid_op;	/* needed for GVCST_ROOT_SEARCH */
 			GVCST_ROOT_SEARCH;			/* set gv_target->root */
-			if ((0 == gv_target->root) || (0 != cnl->reorg_upgrade_pid))
+			if ((0 == gv_target->root)
+					|| ((0 != cnl->reorg_upgrade_pid) && (is_proc_alive(cnl->reorg_upgrade_pid, 0))))
 				continue;
 			hasht_gl.reg = gv_cur_region;
 			hasht_gl.gvt = gv_target;

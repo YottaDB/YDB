@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -60,6 +60,7 @@
 #include "db_write_eof_block.h"
 #include "interlock.h"
 #include "warn_db_sz.h"
+#include "inline_atomic_pid.h"
 
 #define	GDSFILEXT_CLNUP						\
 MBSTART {							\
@@ -76,7 +77,8 @@ MBSTART {															\
 			2, LEN_AND_LIT("Please make more disk space available or shutdown GT.M to avoid data loss"), ENOSPC);	\
 } MBEND
 
-#define SUSPICIOUS_EXTEND 	(2 * (dollar_tlevel ? sgm_info_ptr->cw_set_depth : cw_set_depth) < cs_addrs->ti->free_blocks)
+#define SUSPICIOUS_EXTEND 	((2 * (dollar_tlevel ? sgm_info_ptr->cw_set_depth : cw_set_depth) < cs_addrs->ti->free_blocks)	\
+				&& (!TREF(in_bm_getfree_gdsfilext)))
 
 GBLREF	sigset_t		blockalrm;
 GBLREF	sgmnt_addrs		*cs_addrs;
@@ -139,7 +141,7 @@ int4 gdsfilext(block_id blocks, block_id filesize, boolean_t trans_in_prog)
 	uint4			jnl_status;
 	gtm_uint64_t		avail_blocks, mmap_sz;
 	off_t			new_eof, new_size, old_size;
-	trans_num		curr_tn;
+	trans_num		curr_tn, blktn;
 	unix_db_info		*udi;
 	inctn_opcode_t		save_inctn_opcode;
 	block_id		prev_extend_blks_to_upgrd;
@@ -471,10 +473,28 @@ int4 gdsfilext(block_id blocks, block_id filesize, boolean_t trans_in_prog)
 	}
 	if (new_bit_maps)
 	{
+		/* We are about to create a local bitmap. Setting its block transaction number to the current database transaction
+		 * number gives us a clear history of when this bitmap got created. There are two exceptions.
+		 * 1) If before-image journaling, it implies the possibility of using backward recovery/rollback both of which can
+		 *    take the database to a transaction number MUCH BEFORE the current database transaction number. In that case,
+		 *    the recovered database will have DBTNTOOLG integrity errors since the bitmap block's transaction number will
+		 *    be greater than the post-recovery database transaction number. Since we have no control over what transaction
+		 *    number backward recovery can take the database to, we set the bitmap block transaction number to 0 (the least
+		 *    possible) for the before-image journaling case.
+		 * 2) If in forward recovery, then the database current transaction number is not incremented in gdsfilext (the
+		 *    caller of this function) so we have to create the local bitmap blocks with curr_tn-1 in order to avoid a
+		 *    DBTNTOOLG error.
+		 */
+		if (JNL_ENABLED(cs_data) && cs_addrs->jnl && cs_addrs->jnl->jnl_buff && cs_addrs->jnl->jnl_buff->before_images)
+			blktn = 0;
+		else if (jgbl.forw_phase_recovery && !JNL_ENABLED(cs_data))     /* forward recovery */
+			blktn = cs_data->trans_hist.curr_tn - 1;
+		else
+			blktn = cs_data->trans_hist.curr_tn;
 		for (map = ROUND_UP(old_total, bplmap); map < new_total; map += bplmap)
 		{
 			DEBUG_ONLY(new_bit_maps--;)
-			if (SS_NORMAL != (status = bml_init(map)))
+			if (SS_NORMAL != (status = bml_init(gv_cur_region, map, blktn)))
 			{
 				GDSFILEXT_CLNUP;
 				send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(gv_cur_region), status);

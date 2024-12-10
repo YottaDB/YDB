@@ -788,7 +788,7 @@ LITDEF	err_msg merrors[] = {
 	{ "MUPIPSET2SML", "!UL too small, minimum !AD allowed is !UL", 4, 0 },
 	{ "DBREADBM", "!AD Read error on bit map", 2, 3 },
 	{ "DBCOMPTOOLRG", "!AD Record has too large compression count", 2, 4 },
-	{ "UNUSEDMSG957", "DBVERPERFWARN2 removed from code in V7.1-004 Sep 2024", 0, 0 },
+	{ "PIDRESET", "Region !AD had PID !UL doing !AD but PID did not exist, reset to zero", 5, 0 },
 	{ "DBRBNTOOLRG", "!AD Root block number greater than last block number in file", 2, 3 },
 	{ "DBRBNLBMN", "!AD Root block number is a local bit map number", 2, 3 },
 	{ "DBRBNNEG", "!AD Root block number negative", 2, 3 },
@@ -2342,7 +2342,7 @@ LITDEF	int ERR_REPLAHEAD = 150378530;
 LITDEF	int ERR_MUPIPSET2SML = 150378536;
 LITDEF	int ERR_DBREADBM = 150378546;
 LITDEF	int ERR_DBCOMPTOOLRG = 150378554;
-LITDEF	int ERR_UNUSEDMSG957 = 150378562;
+LITDEF	int ERR_PIDRESET = 150378560;
 LITDEF	int ERR_DBRBNTOOLRG = 150378570;
 LITDEF	int ERR_DBRBNLBMN = 150378578;
 LITDEF	int ERR_DBRBNNEG = 150378586;

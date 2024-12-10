@@ -57,6 +57,7 @@
 #include "wcs_wt.h"
 #include "wcs_recover.h"
 #include "util.h"
+#include "inline_atomic_pid.h"
 
 GBLDEF srch_blk_status	*first_tp_srch_status;	/* the first srch_blk_status for this block in this transaction */
 GBLDEF unsigned char	rdfail_detail;	/* t_qread uses a 0 return to indicate a failure (no buffer filled) and the real
@@ -246,7 +247,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 	trans_num		dirty, blkhdrtn;
 	sm_uc_ptr_t		buffaddr;
 	uint4			stuck_cnt = 0;
-	boolean_t		lcl_blk_free;
+	boolean_t		lcl_blk_free, lcl_tqread_grab_bml;
 	node_local_ptr_t	cnl;
 	gd_segment		*seg;
 	uint4			buffs_per_flush, flush_target;
@@ -254,6 +255,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 	boolean_t		twinning_on;
 #	ifdef DEBUG
 	cache_rec_ptr_t		cr_lo, bt_cr;
+	uint4			lcl_bml_pin;
 #	endif
 	unsigned char		tmp_levl;
 	DCL_THREADGBL_ACCESS;
@@ -267,6 +269,13 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 	csd = csa->hdr;
 	INCR_DB_CSH_COUNTER(csa, n_t_qreads, 1);
 	is_mm = (dba_mm == csd->acc_meth);
+	if ((IS_BITMAP_BLK(blk)) && (TRUE == TREF(tqread_grab_bml)))
+	{
+		lcl_tqread_grab_bml = TRUE;
+		TREF(tqread_grab_bml) = FALSE;
+	} else
+		lcl_tqread_grab_bml = FALSE;
+	assert(FALSE == TREF(tqread_grab_bml));
 	twinning_on = TWINNING_ON(csd);
 	/* We better hold crit in the final retry (TP & non-TP). Only exception is journal recovery */
 #	ifdef DEBUG
@@ -397,6 +406,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 				*cycle = first_tp_srch_status->cycle;
 				*cr_out = cr;
 				cr->refer = TRUE;
+				assert(!IS_BITMAP_BLK(blk));
 				if (CDB_STAGNATE <= t_tries)	/* mu_reorg doesn't use TP else should have an || for that */
 					CWS_INSERT(blk);
 				return (sm_uc_ptr_t)first_tp_srch_status->buffaddr;
@@ -616,6 +626,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 					cr->cycle++;	/* increment cycle for blk number changes (for tp_hist and others) */
 					cr->blk = CR_BLKEMPTY;
 					cr->r_epid = 0;
+					BML_RSRV_RESET(cr);
 					RELEASE_BUFF_READ_LOCK(cr);
 					TREF(block_now_locked) = NULL;
 					assert(-1 <= cr->read_in_progress);
@@ -655,6 +666,17 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 				/* Only set in cache if read was success */
 				cr->ondsk_blkver = ondsk_blkver;
 				cr->r_epid = 0;
+				if ((IS_BITMAP_BLK(blk)) && lcl_tqread_grab_bml)
+				{	/* Grab BML block's CR which this process owns */
+					assert(IS_BITMAP_BLK(blk));
+					SHM_WRITE_MEMORY_BARRIER;
+					BML_RSRV_SET(cr, blk, process_id);
+				}
+#ifdef DEBUG_BML_PIN
+				else if (!IS_BITMAP_BLK(blk)) /* Clear possible pinning, but drop a core cor analysis */
+					if (BML_RSRV_IF_EXP(cr, CR_BLKEMPTY, process_id, 0))
+						gtm_fork_n_core();
+#endif
 				RELEASE_BUFF_READ_LOCK(cr);
 				TREF(block_now_locked) = NULL;
 				assert(-1 <= cr->read_in_progress);
@@ -707,6 +729,8 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 				{	/* can't rely on the buffer */
 					cr->cycle++;	/* increment cycle whenever blk number changes (tp_hist depends on this) */
 					cr->blk = CR_BLKEMPTY;
+					BML_RSRV_RESET(cr);
+					assert(FALSE);
 					break;
 				}
 				*cr_out = cr;
@@ -747,6 +771,26 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 				 */
 				SHM_READ_MEMORY_BARRIER;
 				blocking_pid = cr->in_tend;
+				if ((IS_BITMAP_BLK(blk)) && lcl_tqread_grab_bml)
+				{	/* Grabbing a BML */
+					assert(IS_BITMAP_BLK(blk));
+					assert(blocking_pid != process_id);
+					if (cr->bml_pin == process_id)
+					{	/* Already pinned, let PRO through */
+						assert((lcl_bml_pin = cr->bml_pin) != process_id); /* WARNING assignment */
+						BML_RSRV_IF_EXP(cr, CR_BLKEMPTY, process_id, 0);
+					}
+					if (blocking_pid || !inline_atomic_pid_set_if_exp(&cr->bml_pin, 0, process_id))
+					{	/* Don't bother with held BMLs, even in the final retry */
+						assert((process_id != cr->r_epid) && (cr->bml_pin != process_id));
+						*cr_out = cr;	/* Let bm_getfree deal with dead processes */
+						rdfail_detail = cdb_sc_tqreadnowait;
+						return (sm_uc_ptr_t)NULL;
+					}
+#if DEBUG_BML_PIN
+					if (cr->bml_pin == process_id) cr->bml_pin_blk = blk;
+#endif
+				}
 				if (blocking_pid)
 				{	/* Wait for cr->in_tend to be non-zero. But in the case we are doing a TP transaction and
 					 * the global has NOISOLATION turned ON and this is a leaf level block and this is a SET
@@ -757,6 +801,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 					 * final retry in which case it is better to wait here as we don't want to end up in a
 					 * situation where "recompute_upd_array" indicates that a restart is necessary.
 					 */
+					assert(!lcl_tqread_grab_bml);
 					if (dollar_tlevel && (gv_target && gv_target->noisolation) && (ERR_GVPUTFAIL == t_err)
 						&& (CDB_STAGNATE > t_tries))	/* do not skip wait in case of final retry */
 					{	/* We know that the only caller in this case would be the function "gvcst_search".
@@ -786,6 +831,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 						if (TREF(tqread_nowait) && ((sm_int_ptr_t)&gv_target->hist.h[0].cycle == cycle))
 						{	/* We're an update helper. Don't waste time waiting on a leaf blk */
 							rdfail_detail = cdb_sc_tqreadnowait;
+							assert(cr->bml_pin != process_id);
 							return (sm_uc_ptr_t)NULL;
 						}
 						if (!wcs_phase2_commit_wait(csa, cr))
@@ -808,6 +854,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 								rel_crit(gv_cur_region);
 							}
 							rdfail_detail = cdb_sc_phase2waitfail;
+							assert(cr->bml_pin != process_id);
 							return (sm_uc_ptr_t)NULL;
 						}
 					}
@@ -869,6 +916,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 							}
 							cr->cycle++;	/* increment cycle for blk number changes (for tp_hist) */
 							cr->blk = CR_BLKEMPTY;
+							BML_RSRV_RESET(cr);
 							cr->r_epid = 0;
 							RELEASE_BUFF_READ_LOCK(cr);
 						} else
@@ -906,6 +954,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 						cr->cycle++;	/* increment cycle for blk number changes (for tp_hist) */
 						cr->blk = CR_BLKEMPTY;
 						cr->r_epid = 0; /* If the process itself is lock holder, r_epid is non-zero */
+						BML_RSRV_RESET(cr);
 						RELEASE_BUFF_READ_LOCK(cr);
 						if (cr->read_in_progress < -1)	/* race: process released since if r_epid */
 							LOCK_BUFF_FOR_READ(cr, dummy);
@@ -949,7 +998,11 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 		assertpro((BAD_LUCK_ABOUNDS - was_crit) >= ocnt);
 		if (!csa->now_crit && !hold_onto_crit)
 			grab_crit_encr_cycle_sync(gv_cur_region, WS_18);
+		if ((CR_NOTVALID != (sm_long_t)cr) && cr)
+			BML_RSRV_IF_EXP(cr, CR_BLKEMPTY, process_id, 0);
 	} while (TRUE);
+	if ((CR_NOTVALID != (sm_long_t)cr) && cr)
+		BML_RSRV_IF_EXP(cr, CR_BLKEMPTY, process_id, 0);
 	assert(set_wc_blocked && (cnl->wc_blocked || !csa->now_crit));
 	SET_CACHE_FAIL_STATUS(rdfail_detail, csd);
 	REL_CRIT_IF_NEEDED(csa, gv_cur_region, was_crit, hold_onto_crit);

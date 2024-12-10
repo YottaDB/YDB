@@ -239,7 +239,8 @@ void release_all_locks(unix_db_info *udi, gtmsource_local_ptr_t gtmsourcelocal_p
 			/* Below requires csa->nl to be NULL */
 			REMOVE_CSA_FROM_CSADDRSLIST(csa); /* List of open csa modified in gvcst_init */
 		}
-		rctl->gd->open = FALSE;
+		rctl->gd->open = rctl->gd->was_open = FALSE;
+		rctl->gd->file_initialized = rctl->gd->did_file_initialization = FALSE;
 	}
 	/* Before this point the access semaphore for DB has been released in mur_close_files too*/
 	/* We would have attached to the journal pool, grabbed the JNLPOOL and RECVPOOL segment locks,

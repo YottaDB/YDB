@@ -37,6 +37,7 @@
 #include "have_crit.h"
 #include "aswp.h"
 #include "mutexsp.h"
+#include "inline_atomic_pid.h"
 
 GBLREF	cache_rec_ptr_t		cr_array[]; /* Maximum number of blocks that can be in transaction */
 GBLREF	unsigned int		cr_array_index;
@@ -162,8 +163,9 @@ MBSTART {															\
 
 boolean_t t_commit_cleanup(enum cdb_sc status, int signal)
 {
-	boolean_t			update_underway, reg_seqno_reset = FALSE, release_crit, was_crit;
+	boolean_t			update_underway, reg_seqno_reset = FALSE, release_crit, was_crit, is_mm;
 	cache_rec_ptr_t			cr;
+	cw_set_element			*cse;
 	sgm_info			*si, *jnlpool_si = NULL;
 	sgmnt_addrs			*csa, *jpl_csa = NULL, *jnlpool_csa = NULL;
 	jnlpool_addrs_ptr_t		save_jnlpool, save2_jnlpool, update_jnlpool = NULL;
@@ -228,6 +230,17 @@ boolean_t t_commit_cleanup(enum cdb_sc status, int signal)
 				break;
 			}
 		}
+		for (si = first_sgm_info; NULL != si; si = si->next_sgm_info)
+		{
+			is_mm = (dba_mm == si->tp_csa->hdr->acc_meth);
+			for (cse = si->first_cw_bitmap; !is_mm && (NULL != cse); cse = cse->next_cw_set)
+			{	/* Release BMLs if blocks added and still owned */
+				if (gds_t_writemap != cse->mode)
+					continue;
+				assert(IS_BITMAP_BLK(cse->blk));
+				BML_RSRV_IF_EXP(cse->cr, CR_BLKEMPTY, process_id, 0);
+			}
+		}
 	} else
 	{
 		trstr = "NON-TP";
@@ -252,6 +265,14 @@ boolean_t t_commit_cleanup(enum cdb_sc status, int signal)
 		if (NULL != gv_target)			/* gv_target can be NULL in case of DSE MAPS command etc. */
 			gv_target->clue.end = 0;	/* in case t_end() had set history's tn to be "valid_thru++", undo it */
 		update_jnlpool = cs_addrs->jnlpool ? cs_addrs->jnlpool : jnlpool;
+		is_mm = (dba_mm == cs_addrs->hdr->acc_meth);
+		for (cse = cw_set + cw_set_depth - 1; !is_mm && (cw_set <= cse); cse--)
+		{	/* Release BMLs if blocks added and still owned */
+			if (gds_t_writemap != cse->mode)
+				break; /* Done with bitmaps */
+			assert(IS_BITMAP_BLK(cse->blk));
+			BML_RSRV_IF_EXP(cse->cr, CR_BLKEMPTY, process_id, 0);
+		}
 	}
 	if (!update_underway)
 	{	/* Rollback (undo) the transaction. the comments below refer to CMTxx step numbers described in secshr_db_clnup.

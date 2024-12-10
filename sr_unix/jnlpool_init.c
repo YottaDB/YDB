@@ -94,10 +94,12 @@ LITREF	int4			gtm_release_name_len;
 error_def(ERR_ACTIVATEFAIL);
 error_def(ERR_JNLPOOLBADSLOT);
 error_def(ERR_JNLPOOLSETUP);
+error_def(ERR_MUNOFINISH);
 error_def(ERR_NOJNLPOOL);
 error_def(ERR_PRIMARYISROOT);
 error_def(ERR_PRIMARYNOTROOT);
 error_def(ERR_REPLINSTACC);
+error_def(ERR_REPLINSTFMT);
 error_def(ERR_REPLINSTNMSAME);
 error_def(ERR_REPLINSTNOHIST);
 error_def(ERR_REPLINSTSECNONE);
@@ -655,6 +657,19 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 	jnlpool->gtmsrc_lcl_array = (gtmsrc_lcl_ptr_t)((sm_uc_ptr_t)jnlpool->repl_inst_filehdr + REPL_INST_HDR_SIZE);
 	jnlpool->gtmsource_local_array = (gtmsource_local_ptr_t)((sm_uc_ptr_t)jnlpool->gtmsrc_lcl_array + GTMSRC_LCL_SIZE);
 	jnlpool->jnldata_base = (sm_uc_ptr_t)jnlpool->jnlpool_ctl + JNLDATA_BASE_OFF;
+	if (gtmsource_options.shut_down || gtmrecv_options.shut_down)
+		if (memcmp(jnlpool->repl_inst_filehdr, GDS_REPL_INST_LABEL, GDS_REPL_INST_LABEL_SZ - 1))
+		{	/* Prevent replication instance file corruption on version mismatch */
+			if (udi->grabbed_access_sem)
+				rel_sem_immediate(SOURCE, JNL_POOL_ACCESS_SEM);
+			udi->grabbed_access_sem = FALSE;
+			udi->counter_acc_incremented = FALSE;
+			ftok_sem_release(jnlpool->jnlpool_dummy_reg, udi->counter_ftok_incremented, TRUE);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_REPLINSTFMT, 6, LEN_AND_STR(udi->fn),
+				GDS_REPL_INST_LABEL_SZ - 1, GDS_REPL_INST_LABEL, GDS_REPL_INST_LABEL_SZ - 1,
+					jnlpool->repl_inst_filehdr);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_MUNOFINISH);
+		}
 	assert(!mutex_per_process_init_pid || mutex_per_process_init_pid == process_id);
 	if (!mutex_per_process_init_pid)
 		mutex_per_process_init();

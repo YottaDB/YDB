@@ -984,6 +984,11 @@ enum cdb_sc gtm_mutex_lock(gd_region *reg,
 						break;
 					if (0 != cnl->onln_rlbk_pid)
 					{
+						if (mu_upgrade_in_prog)	/* REORG UPGRADE must exit out of this conflict */
+							RTS_ERROR_CSA_ABT(CSA_ARG(NULL) VARLSTCNT(7) ERR_REORGUPCNFLCT, 5,
+									LEN_AND_LIT("REORG -UPGRADE"),
+									LEN_AND_LIT("MUPIP ROLLBACK -ONLINE in progress"),
+									csa->nl->onln_rlbk_pid);
 						send_msg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_ORLBKINPROG, 3,
 								cnl->onln_rlbk_pid, DB_LEN_STR(reg));
 						assert(cnl->in_crit == cnl->onln_rlbk_pid);
@@ -1116,6 +1121,11 @@ enum cdb_sc gtm_mutex_lock(gd_region *reg,
 						/* If the holding PID belongs to online rollback which holds crit on database and
 						 * journal pool for its entire duration, use a different message
 						 */
+						if (mu_upgrade_in_prog)	/* REORG UPGRADE must exit out of this conflict */
+							RTS_ERROR_CSA_ABT(CSA_ARG(NULL) VARLSTCNT(7) ERR_REORGUPCNFLCT, 5,
+									LEN_AND_LIT("REORG -UPGRADE"),
+									LEN_AND_LIT("MUPIP ROLLBACK -ONLINE in progress"),
+									csa->nl->onln_rlbk_pid);
 						send_msg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_ORLBKINPROG, 3,
 								cnl->onln_rlbk_pid, DB_LEN_STR(reg));
 						assert(cnl->in_crit == cnl->onln_rlbk_pid);

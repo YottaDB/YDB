@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2023 Fidelity National Information	*
+ * Copyright (c) 2012-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -170,7 +170,7 @@ error_def(ERR_TEXT);
  * 	the specified database.
  * INST_FREEZE_ON_NOSPC_ENABLED() determines whether an out-of-space condition associated with the specified database should
  * 	trigger an instance freeze.
- * Note that it is possible for these macros to be invoked while in "gvcst_cre_autoDB" in which case CSA->nl would be NULL
+ * Note that it is possible for these macros to be invoked while in "gvcst_cre_statsDB" in which case CSA->nl would be NULL
  *	hence the check for NULL before trying to access onln_rlbk_pid.
  *	These macros set LCL_JNLPOOL to the assocaited jnlpool if TRUE otherwise to NULL
  */

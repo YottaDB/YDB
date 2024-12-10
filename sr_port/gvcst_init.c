@@ -33,6 +33,7 @@
 #include "gdsblkops.h"
 #include "filestruct.h"
 #include "iosp.h"
+#include "interlock.h"
 #include "jnl.h"
 #include "buddy_list.h"		/* needed for tp.h */
 #include "tp.h"
@@ -72,6 +73,7 @@
 #include "gtm_ipc.h"
 #include "gtm_semutils.h"
 #include "gtm_sem.h"
+#include "mu_cre_file.h"
 #include "is_file_identical.h"
 #include "gvt_inline.h"
 
@@ -170,6 +172,7 @@ GBLREF	int4			pre_drvlongjmp_error_condition;
 
 #define MAX_DBINIT_RETRY	3
 #define MAX_DBFILOPN_RETRY_CNT	4
+#define MAX_DBFILOPN_RETRY_CNT_AUTODB 12
 
 /* In code below to (re)create a statsDB file, we are doing a number of operations under lock. Rather than deal with
  * getting out of the lock before the error, handle the possible errors after we are out from under the lock. These
@@ -285,35 +288,6 @@ void	assert_jrec_member_offsets(void)
 	assert(SIZEOF(token_split_t) == SIZEOF(token_build));   /* Required for TOKEN_SET macro */
 }
 
-CONDITION_HANDLER(gvcst_init_autoDB_ch)
-{
-	gd_region	*reg;
-	unix_db_info	*udi;
-
-	START_CH(TRUE);
-	if ((SUCCESS == SEVERITY) || (INFO == SEVERITY))
-	{
-		assert(FALSE);	/* don't know of any possible INFO/SUCCESS errors */
-		CONTINUE;	/* Keep going for non-error issues */
-	}
-	if (IS_STATSDB_REG(db_init_region))
-		STATSDBREG_TO_BASEDBREG(db_init_region, reg);
-	else
-		reg = db_init_region;
-	udi = FILE_INFO(reg);
-	if (udi->grabbed_ftok_sem && !ftok_sem_release(reg, FALSE, FALSE))	/* release ftok lock on the base region */
-		assert(FALSE);
-	if (ftok_sem_reg == reg)
-		ftok_sem_reg = NULL;
-	/* Enable interrupts in case we are here with intrpt_ok_state == INTRPT_IN_GVCST_INIT due to an rts error.
-	 * Normally we would have the new state stored in "prev_intrpt_state" but that is not possible here because
-	 * the corresponding DEFER_INTERRUPTS happened in "gvcst_init" (a different function) so we have an assert
-	 * there that the previous state was INTRPT_OK_TO_INTERRUPT and use that instead of prev_intrpt_state here.
-	 */
-	ENABLE_INTERRUPTS(INTRPT_IN_GVCST_INIT, INTRPT_OK_TO_INTERRUPT);
-	NEXTCH;
-}
-
 void gvcst_init(gd_region *reg, gd_addr *addr)
 {
 	gd_segment		*seg;
@@ -325,13 +299,14 @@ void gvcst_init(gd_region *reg, gd_addr *addr)
 	int4			bsize;
 	boolean_t		is_statsDB, realloc_alt_buff, retry_dbinit;
 	file_control		*fc;
-	gd_region		*prev_reg, *baseDBreg, *statsDBreg;
+	gd_region		*prev_reg, *baseDBreg = NULL, *statsDBreg = NULL;
 #	ifdef DEBUG
 	cache_rec_ptr_t		cr;
 	bt_rec_ptr_t		bt;
 	blk_ident		tmp_blk;
 #	endif
-	int			db_init_ret, loopcnt, max_fid_index, fd, rc, save_errno, errrsn_text_len, status;
+	int			db_init_ret = 1, loopcnt, max_fid_index, fd, rc, save_errno, errrsn_text_len, status;
+	int			max_dbfilopn_retry_cnt;
 	char			statsdb_path[MAX_FN_LEN + 1], *errrsn_text;
 	unique_file_id		*reg_fid, *tmp_reg_fid;
 	gd_id			replfile_gdid, *tmp_gdid;
@@ -341,11 +316,12 @@ void gvcst_init(gd_region *reg, gd_addr *addr)
 	enum db_acc_method	reg_acc_meth;
 	boolean_t		onln_rlbk_cycle_mismatch = FALSE;
 	boolean_t		replpool_valid = FALSE, replfilegdid_valid = FALSE, jnlpool_found = FALSE;
+	boolean_t		is_final_dbinit, not_our_statsdb;
 	replpool_identifier	replpool_id;
 	unsigned int		full_len;
 	int4			db_init_retry;
 	srch_blk_status		*bh;
-	node_local_ptr_t	baseDBnl;
+	node_local_ptr_t	baseDBnl = NULL;
 	unsigned char		cstatus;
 	statsdb_recreate_errors	statsdb_rcerr;
 	jbuf_rsrv_struct_t	*nontp_jbuf_rsrv_lcl;
@@ -361,6 +337,7 @@ void gvcst_init(gd_region *reg, gd_addr *addr)
 	 */
 	assert(!reg->open);
 	is_statsDB = IS_STATSDB_REG(reg);
+	max_dbfilopn_retry_cnt = IS_AUTODB_REG(reg) ? MAX_DBFILOPN_RETRY_CNT_AUTODB : MAX_DBFILOPN_RETRY_CNT;
 	if (is_statsDB)
 	{
 		STATSDBREG_TO_BASEDBREG(reg, baseDBreg);
@@ -400,367 +377,6 @@ void gvcst_init(gd_region *reg, gd_addr *addr)
 		}
 		baseDBcsa = &FILE_INFO(baseDBreg)->s_addrs;
 		baseDBnl = baseDBcsa->nl;
-		if (!baseDBnl->statsdb_created)
-		{	/* Before "dbfilopn" of a statsdb, check if it has been created. If not, create it (as it is an autodb).*/
-			/* Disable interrupts for the time we hold the ftok lock as it is otherwise possible we get a SIG-15
-			 * and go to exit handling and try a nested "ftok_sem_lock" on the same basedb and that could pose
-			 * multiple issues (e.g. ftok_sem_lock starts a timer while waiting in the "semop" call and we will
-			 * have the same timer-id added twice due to the nested call).
-			 */
-			DBGRDB((stderr, "gvcst_init: !baseDBnl->statsdb_created\n"));
-			if (IS_TP_AND_FINAL_RETRY && baseDBcsa->now_crit)
-			{	/* If this is a TP transaction and in the final retry, we are about to request the ftok
-				 * sem lock on baseDBreg while already holding crit on baseDBReg. That is an out-of-order
-				 * request which can lead to crit/ftok deadlocks so release crit before requesting it.
-				 * This code is similar to the TPNOTACID_CHECK macro with the below exceptions.
-				 *	a) We do not want to issue the TPNOTACID syslog message since there is no ACID
-				 *		violation here AND
-				 *	b) We have to check for baseDBcsa->now_crit in addition to IS_TP_AND_FINAL_RETRY
-				 *		as it is possible this call comes from "tp_restart -> gv_init_reg -> gvcst_init"
-				 *		AND t_tries is still 3 but we do not hold crit on any region at that point
-				 *		(i.e. "tp_crit_all_regions" call is not yet done) and in that case we should
-				 *		not decrement t_tries (TP_FINAL_RETRY_DECREMENT_T_TRIES_IF_OK call below)
-				 *		as it would result in we later starting the final retry with t_tries = 2 but
-				 *		holding crit on all regions which is an out-of-design situation.
-				 */
-				TP_REL_CRIT_ALL_REG;
-				assert(!baseDBcsa->now_crit);
-				assert(!mupip_jnl_recover);
-				TP_FINAL_RETRY_DECREMENT_T_TRIES_IF_OK;
-			}
-			db_init_region = baseDBreg;				/* gvcst_init_autoDB_ch needs reg 4 ftok_sem_lock */
-			DEFER_INTERRUPTS(INTRPT_IN_GVCST_INIT, prev_intrpt_state);
-			assert(INTRPT_OK_TO_INTERRUPT == prev_intrpt_state);	/* relied upon by ENABLE_INTERRUPTS
-										 * in "gvcst_init_autoDB_ch".
-										 */
-			if (!ftok_sem_lock(baseDBreg, FALSE))
-			{	/* Use FTOK of the base db as a lock, the same lock obtained when statsdb is auto deleted */
-				assert(FALSE);
-				RTS_ERROR_CSA_ABT(baseDBcsa, VARLSTCNT(4) ERR_DBFILERR, 2, DB_LEN_STR(baseDBreg));
-			}
-			ESTABLISH(gvcst_init_autoDB_ch);	/* ch reverses the DEFER and lock in the opposite order */
-			if (0 == baseDBnl->statsdb_fname_len)
-			{	/* Initialize cnl->statsdb_fname from the basedb name */
-				baseDBnl->statsdb_fname_len = ARRAYSIZE(baseDBnl->statsdb_fname);
-				gvcst_set_statsdb_fname(baseDBcsa->hdr, baseDBreg, baseDBnl->statsdb_fname,
-					&baseDBnl->statsdb_fname_len);
-			}
-			if (0 == baseDBnl->statsdb_fname_len)
-			{	/* only true if gvcst_set_statsdb_fname had a problem and set it that way in */
-				switch(TREF(statsdb_fnerr_reason))
-				{	/* turn the reason from gvcst_set_statsdb_fname into a useful error message */
-					case FNERR_NOSTATS:
-						errrsn_text = FNERR_NOSTATS_TEXT;
-						errrsn_text_len = SIZEOF(FNERR_NOSTATS_TEXT) - 1;
-						break;
-					case FNERR_STATSDIR_TRNFAIL:
-						errrsn_text = FNERR_STATSDIR_TRNFAIL_TEXT;
-						errrsn_text_len = SIZEOF(FNERR_STATSDIR_TRNFAIL_TEXT) - 1;
-						break;
-					case FNERR_STATSDIR_TRN2LONG:
-						errrsn_text = FNERR_STATSDIR_TRN2LONG_TEXT;
-						errrsn_text_len = SIZEOF(FNERR_STATSDIR_TRN2LONG_TEXT) - 1;
-						break;
-					case FNERR_INV_BASEDBFN:
-						errrsn_text = FNERR_INV_BASEDBFN_TEXT;
-						errrsn_text_len = SIZEOF(FNERR_INV_BASEDBFN_TEXT) - 1;
-						break;
-					case FNERR_FTOK_FAIL:
-						errrsn_text = FNERR_FTOK_FAIL_TEXT;
-						errrsn_text_len = SIZEOF(FNERR_FTOK_FAIL_TEXT) - 1;
-						break;
-					case FNERR_FNAMEBUF_OVERFLOW:
-						errrsn_text = FNERR_FNAMEBUF_OVERFLOW_TEXT;
-						errrsn_text_len = SIZEOF(FNERR_FNAMEBUF_OVERFLOW_TEXT) - 1;
-						break;
-					default:
-						assertpro(FALSE);
-				}
-				assert(TREF(gvcst_statsDB_open_ch_active));	/* below error goes to syslog and not to user */
-				baseDBreg->reservedDBFlags |= RDBF_NOSTATS;	/* Disable STATS in base DB */
-				baseDBcsa->reservedDBFlags |= RDBF_NOSTATS;
-				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_DBFILERR, 2, DB_LEN_STR(baseDBreg), ERR_STATSDBFNERR,
-					2, errrsn_text_len, errrsn_text);
-			}
-			COPY_STATSDB_FNAME_INTO_STATSREG(reg, baseDBnl->statsdb_fname, baseDBnl->statsdb_fname_len);
-			seg = reg->dyn.addr;
-			if (!seg->blk_size)
-			{	/* Region/segment created by "mu_gv_cur_reg_init" (which sets most of reg/seg fields to 0).
-				* Now that we need a non-zero blk_size, do what GDE did to calculate the statsdb block-size.
-				* But since we cannot duplicate that code here, we set this to the same value effectively but
-				* add an assert that the two are the same in "gd_load" function.
-				* Take this opportunity to initialize other seg/reg fields for statsdbs as GDE would have done.
-				*/
-				seg->blk_size = STATSDB_BLK_SIZE;
-				/* Similar code for a few other critical fields that need initialization before "mu_cre_file" */
-				seg->allocation = STATSDB_ALLOCATION;
-				reg->max_key_size = STATSDB_MAX_KEY_SIZE;
-				reg->max_rec_size = STATSDB_MAX_REC_SIZE;
-				/* The below is directly inherited from the base db so no macro/assert like above fields */
-				seg->mutex_slots = NUM_CRIT_ENTRY(baseDBcsa->hdr);
-				reg->mumps_can_bypass = TRUE;
-			}
-			if (0 != baseDBcsa->hdr->statsdb_allocation)
-			{	/* The statsdb allocation for this region has been extended before.
-				 * Use the extended allocation size from the file header.
-				 */
-				seg->allocation = baseDBcsa->hdr->statsdb_allocation;
-			}
-			for ( ; ; )     /* for loop only to let us break from error cases without having a deep if-then-else */
-			{	/* with the ftok lock in place, check if the db is already created */
-				if (baseDBnl->statsdb_created)
-					break;
-				/* File still not created. Do it now under the ftok lock. */
-				DBGRDB((stderr, "gvcst_init: !baseDBnl->statsdb_created (under lock)\n"));
-				cstatus = gvcst_cre_autoDB(reg);
-				if (EXIT_NRM == cstatus)
-				{
-					baseDBnl->statsdb_created = TRUE;
-					break;
-				}
-				/* File failed to create - if this is a case where the file exists (but was not supposed
-				 * to exist), we should remove/recreate the file. Otherwise, we have a real error -
-				 * probably a missing directory or permissions or some such. In that case, turn off stats
-				 * and unwind the failed open.
-				 */
-				statsdb_rcerr = STATSDB_NOERR;		/* Assume no error to occur */
-				save_errno = TREF(mu_cre_file_openrc);	/* Save the errno that stopped our recreate */
-				DBGRDB((stderr, "gvcst_init: Create of statsDB failed - rc = %d\n", save_errno));
-				for ( ; ; )     /* for loop only to handle error cases without having a deep if-then-else */
-				{
-					if (EACCES == TREF(mu_cre_file_openrc))
-					{
-						statsdb_rcerr = STATSDB_OPNERR;
-						save_errno = errno;
-						break;
-					}
-					if (EEXIST != TREF(mu_cre_file_openrc))
-					{
-						statsdb_rcerr = STATSDB_NOTEEXIST;
-						break;
-					}
-					/* See if this statsdb file is really supposed to be linked to the baseDB we
-					 * also just opened. To do this, we need to open the statsdb temporarily, read
-					 * its fileheader and then close it to get the file-header field we want. Note
-					 * this is a very quick operation so we don't use the normal DB utilities on it.
-					 * We just want to read the file header and get out. Since we have the lock, no
-					 * other processes will have this database open unless we are illegitimately
-					 * opening it. This is an infrequent issue so the overhead is not relevant.
-					 */
-					DBGRDB((stderr, "gvcst_init: Test to see if file is 'ours'\n"));
-					memcpy(statsdb_path, reg->dyn.addr->fname, reg->dyn.addr->fname_len);
-					statsdb_path[reg->dyn.addr->fname_len] = '\0';	/* Rebuffer fn to include null */
-					fd = OPEN(statsdb_path, O_RDONLY);
-					if (0 > fd)
-					{	/* Some sort of open error occurred */
-						statsdb_rcerr = STATSDB_OPNERR;
-						save_errno = errno;
-						break;
-					}
-					/* Open worked - read file header from it*/
-					LSEEKREAD(fd, 0, (char *)&statsDBcsd, SIZEOF(sgmnt_data), rc);
-					if (0 == memcmp(statsDBcsd.label, V6_GDS_LABEL, GDS_LABEL_SZ - 1))
-						db_header_upconv(&statsDBcsd);
-					if (0 > rc)
-					{	/* Wasn't enough data to be a file header - not a statsDB */
-						statsdb_rcerr = STATSDB_NOTSTATSDB;
-						CLOSEFILE(fd, rc);
-						break;
-					}
-					if (0 < rc)
-					{	/* Unknown error while doing read */
-						statsdb_rcerr = STATSDB_READERR;
-						save_errno = rc;
-						CLOSEFILE(fd, rc);
-						break;
-					}
-					/* This is the case (0 == rc) */
-					/* Read worked - check if these two files are a proper pair */
-					if ((baseDBreg->dyn.addr->fname_len != statsDBcsd.basedb_fname_len)
-						|| (0 != memcmp(baseDBreg->dyn.addr->fname,
-							statsDBcsd.basedb_fname, statsDBcsd.basedb_fname_len)))
-					{	/* This file is in use by another database */
-						statsdb_rcerr = STATSDB_NOTOURS;
-						CLOSEFILE(fd, rc);
-						break;
-					}
-					/* This file was for us - unlink and recreate */
-					DBGRDB((stderr, "gvcst_init: File is ours - unlink and recreate it\n"));
-#					ifdef BYPASS_UNLINK_RECREATE_STATSDB
-					baseDBnl->statsdb_created = TRUE;
-#					else
-					/* Before removing a leftover statsdb file, check if it has corresponding private
-					 * semid/shmid or ftok_semid. If so, remove them too.
-					 */
-					if ((INVALID_SHMID != statsDBcsd.shmid) && (0 != shm_rmid(statsDBcsd.shmid)))
-					{
-						statsdb_rcerr = STATSDB_SHMRMIDERR;
-						save_errno = errno;
-						CLOSEFILE(fd, rc);
-						break;
-					}
-					if ((INVALID_SEMID != statsDBcsd.semid) && (0 != sem_rmid(statsDBcsd.semid)))
-					{
-						statsdb_rcerr = STATSDB_SEMRMIDERR;
-						save_errno = errno;
-						CLOSEFILE(fd, rc);
-						break;
-					}
-					if ((-1 != (ftok_key = FTOK(statsdb_path, GTM_ID)))
-						&& (INVALID_SEMID
-							!= (ftok_semid = semget(ftok_key, FTOK_SEM_PER_ID, RWDALL | IPC_CREAT)))
-						&& (0 == semctl(ftok_semid, DB_COUNTER_SEM, GETVAL))
-						&& (0 != sem_rmid(ftok_semid)))
-					{
-						statsdb_rcerr = STATSDB_FTOKSEMRMIDERR;
-						save_errno = errno;
-						CLOSEFILE(fd, rc);
-						break;
-					}
-					rc = UNLINK(statsdb_path);
-					if (0 > rc)
-					{	/* Unlink failed - may not have permissions */
-						statsdb_rcerr = STATSDB_UNLINKERR;
-						save_errno = errno;
-						CLOSEFILE(fd, rc);
-						break;
-					}
-					/* Unlink succeeded - recreate now */
-					cstatus = gvcst_cre_autoDB(reg);
-					if (EXIT_NRM != cstatus)
-					{	/* Recreate failed */
-						statsdb_rcerr = STATSDB_RECREATEERR;
-						save_errno = TREF(mu_cre_file_openrc);
-						CLOSEFILE(fd, rc);
-						break;
-					}
-					baseDBnl->statsdb_created = TRUE;
-#					endif
-					CLOSEFILE(fd, rc);
-					if (0 < rc)
-					{	/* Close failed */
-						statsdb_rcerr = STATSDB_CLOSEERR;
-						save_errno = rc;
-					}
-					break;
-				}
-				if (STATSDB_NOERR != statsdb_rcerr)
-				{	/* If we could not create or recreate the file, finish our error processing here */
-					assert(TREF(gvcst_statsDB_open_ch_active));	/* so the below rts_error_csa calls
-											 * go to syslog and not to user.
-											 */
-					baseDBreg->reservedDBFlags |= RDBF_NOSTATS;	/* Disable STATS in base DB */
-					baseDBcsa->reservedDBFlags |= RDBF_NOSTATS;
-					baseDBnl->statsdb_fname_len = 0;
-					if (!ftok_sem_release(baseDBreg, FALSE, FALSE))
-					{	/* Release the lock before unwinding back */
-						assert(FALSE);
-						RTS_ERROR_CSA_ABT(baseDBcsa, VARLSTCNT(4) ERR_DBFILERR, 2,
-							DB_LEN_STR(baseDBreg));
-					}
-					/* For those errors that need a special error message, take care of that here
-					 * now that we've released the lock.
-					 */
-					switch(statsdb_rcerr)
-					{
-						case STATSDB_NOTEEXIST:		/* Some error occurred handled elsewhere */
-							break;
-						case STATSDB_NOTOURS:		/* This statsdb already in use elsewhere */
-							/* We are trying to attach a statsDB to our baseDB should not be
-							 * associated with that baseDB. First check if this IS a statsdb.
-							 */
-							if (IS_RDBF_STATSDB(&statsDBcsd))
-								RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_STATSDBINUSE,
-									6, DB_LEN_STR(reg),
-									statsDBcsd.basedb_fname_len,
-									statsDBcsd.basedb_fname,
-									DB_LEN_STR(baseDBreg));
-							else
-								RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_INVSTATSDB,
-									4, DB_LEN_STR(reg), REG_LEN_STR(reg));
-							break;			/* For the compiler */
-						case STATSDB_OPNERR:
-							RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_DBOPNERR, 2,
-								DB_LEN_STR(reg), save_errno);
-							break;			/* For the compiler */
-						case STATSDB_READERR:
-							RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_DBFILERR, 2,
-								DB_LEN_STR(reg), save_errno);
-							break;			/* For the compiler */
-						case STATSDB_NOTSTATSDB:
-							RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_INVSTATSDB, 4,
-								DB_LEN_STR(reg), REG_LEN_STR(reg));
-							break;			/* For the compiler */
-						case STATSDB_UNLINKERR:
-							RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5,
-								LEN_AND_LIT("unlink()"), CALLFROM, save_errno);
-							break;			/* For the compiler */
-						case STATSDB_RECREATEERR:
-							RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_DBOPNERR, 2,
-								DB_LEN_STR(reg), save_errno);
-							break;			/* For the compiler */
-						case STATSDB_CLOSEERR:
-							RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5,
-								LEN_AND_LIT("close()"), CALLFROM, save_errno);
-							break;			/* For the compiler */
-						case STATSDB_SHMRMIDERR:
-							RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5,
-								LEN_AND_LIT("shm_rmid()"), CALLFROM, save_errno);
-							break;			/* For the compiler */
-						case STATSDB_SEMRMIDERR:
-							RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5,
-								LEN_AND_LIT("sem_rmid()"), CALLFROM, save_errno);
-							break;			/* For the compiler */
-						case STATSDB_FTOKSEMRMIDERR:
-							RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5,
-								LEN_AND_LIT("ftok sem_rmid()"), CALLFROM, save_errno);
-							break;			/* For the compiler */
-						default:
-							assertpro(FALSE);
-					}
-					if (TREF(gvcst_statsDB_open_ch_active))
-					{	/* Unwind back to ESTABLISH_NORET where did gvcst_init() call to open this
-						 * statsDB which now won't open.
-						 */
-						pre_drvlongjmp_error_condition = error_condition;
-						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_DRVLONGJMP);
-					} else
-					{	/* We are not nested so can give the appropriate error ourselves */
-						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_DBFILERR, 2,
-							DB_LEN_STR(reg), ERR_TEXT, 2,
-							RTS_ERROR_TEXT("See preceding errors written to syserr"
-							" and/or syslog for details"));
-					}
-				}
-				break;
-			}
-			REVERT;
-			if (!ftok_sem_release(baseDBreg, FALSE, FALSE))
-			{
-				assert(FALSE);
-				RTS_ERROR_CSA_ABT(baseDBcsa, VARLSTCNT(4) ERR_DBFILERR, 2, DB_LEN_STR(baseDBreg));
-			}
-			ENABLE_INTERRUPTS(INTRPT_IN_GVCST_INIT, prev_intrpt_state);
-		} else
-		{
-			COPY_STATSDB_FNAME_INTO_STATSREG(reg, baseDBnl->statsdb_fname, baseDBnl->statsdb_fname_len);
-			seg = reg->dyn.addr;
-			if (!seg->blk_size)
-			{	/* see comment above on why we this initialization for a statsDB */
-				seg->blk_size = STATSDB_BLK_SIZE;
-				seg->allocation = STATSDB_ALLOCATION;
-				reg->max_key_size = STATSDB_MAX_KEY_SIZE;
-				reg->max_rec_size = STATSDB_MAX_REC_SIZE;
-				seg->mutex_slots = NUM_CRIT_ENTRY(baseDBcsa->hdr);
-				reg->mumps_can_bypass = TRUE;
-			}
-			if (0 != baseDBcsa->hdr->statsdb_allocation)
-			{	/* The statsdb allocation for this region has been extended before.
-				 * Use the extended allocation size from the file header.
-				 */
-				seg->allocation = baseDBcsa->hdr->statsdb_allocation;
-			}
-		}
 	}
 #	ifdef DEBUG
 	else
@@ -856,15 +472,154 @@ void gvcst_init(gd_region *reg, gd_addr *addr)
 	assert(268 == OFFSETOF(node_local, now_running[0]));
  	assert(36 == SIZEOF(((node_local *)NULL)->now_running));
 	assert(36 == MAX_REL_NAME);
-	for (loopcnt = 0; loopcnt < MAX_DBFILOPN_RETRY_CNT; loopcnt++)
+	for (loopcnt = 0; loopcnt < max_dbfilopn_retry_cnt; loopcnt++)
 	{
+		DBGRDB((stderr, "%s:%d:%s: process id %d doing dbfilopn number %d of file %s for region %s\n", __FILE__, __LINE__,
+					__func__, process_id, loopcnt, reg->dyn.addr->fname, reg->rname));
 		prev_reg = dbfilopn(reg);
 		if (prev_reg != reg)
 		{	/* (gd_region *)-1 == prev_reg => cm region open attempted */
 			if (NULL == prev_reg || (gd_region *)-1L == prev_reg)
+			{
+				DBGRDB((stderr, "%s:%d:%s: process id %d returning after dbfilopn number %d of file %s for region "
+							"%s returned NULL or -1\n", __FILE__, __LINE__, __func__, process_id,
+							loopcnt, reg->dyn.addr->fname, reg->rname));
 				return;
+			} else
+				DBGRDB((stderr, "%s:%d:%s: process id %d returning after dbfilopn number %d of file %s for region "
+							"%s returned different matching region\n", __FILE__, __LINE__, __func__,
+							process_id, loopcnt, reg->dyn.addr->fname, reg->rname));
+			/* We're about to return an open/was_open region to the parent. If we're opening a statsdb,
+			 * we need to finish committing the connection to the basedb before returning, or restart
+			 * if the cycle has changed.
+			 */
+			db_init_ret = DB_VALID;
+			if (is_statsDB)
+			{
+				/* Some fields, like rname, will continue to use 'reg', others, like ->dyn.addr.fname,
+				 * will use prev_reg. This is intentional and due to the fact that successful cases will
+				 * overwrite these fields in reg with prev_reg but we can't do that overwriting to start
+				 * with because the error cases will restart without the overwriting assignment.
+				 */
+				DBGRDB((stderr, "%s:%d:%s: process id %d grabbing statsdb latch to initialize shm in "
+							"dbfilopn loop number %d of file %s for region %s\n", __FILE__, __LINE__,
+							__func__, process_id, loopcnt, prev_reg->dyn.addr->fname, reg->rname));
+				assert(INTRPT_IN_GVCST_INIT != intrpt_ok_state);
+				DEFER_INTERRUPTS(INTRPT_IN_GVCST_INIT, prev_intrpt_state);
+				grab_latch(&baseDBnl->statsdb_field_latch, GRAB_LATCH_INDEFINITE_WAIT, NOT_APPLICABLE, NULL);
+				if (baseDBnl->statsdb_created)
+				{
+					DBGRDB((stderr, "%s:%d:%s: process id %d found baseDBnl->statsdb_created in "
+								"dbfilopn loop number %d of fiile %s for region %s\n", __FILE__,
+								__LINE__, __func__, process_id, loopcnt, prev_reg->dyn.addr->fname,
+								reg->rname));
+					if (baseDBnl->statsdb_init_cycle == reg->statsdb_init_cycle)
+					{
+						DBGRDB((stderr, "%s:%d:%s: process id %d found cycle match in dbfilopn loop "
+									"number %d of file %s for region %s\n", __FILE__, __LINE__,
+									__func__, process_id, loopcnt, prev_reg->dyn.addr->fname,
+									reg->rname));
+						/* Cycle matches and the parent region's shm has already recognized the statsdb.
+						 * Determination of was_open is valid, so allow logic to proceed.
+						 */
+						rel_latch(&baseDBnl->statsdb_field_latch);
+						ENABLE_INTERRUPTS(INTRPT_IN_GVCST_INIT, prev_intrpt_state);
+					} else
+					{
+						DBGRDB((stderr, "%s:%d:%s: process id %d found cycle not matching in dbfilopn loop "
+									"number %d of file %s for region %s\n", __FILE__, __LINE__,
+									__func__, process_id, loopcnt, reg->dyn.addr->fname,
+									reg->rname));
+						if ((reg->dyn.addr->fname_len != baseDBnl->statsdb_fname_len) ||
+								memcmp(reg->dyn.addr->fname, baseDBnl->statsdb_fname,
+									reg->dyn.addr->fname_len))
+						{
+							DBGRDB((stderr, "%s:%d:%s: process id %d found file name not matching in "
+										"dbfilopn loop number %d of file %s for region "
+										"%s\n", __FILE__, __LINE__, __func__, process_id,
+										loopcnt, reg->dyn.addr->fname, reg->rname));
+							/* This is a tricky case that's worth explaining. First: this case is the
+							 * canonical "concurrent change" case that requires a restart due to being
+							 * unable to commit the basedb-statsdb mapping into the basedb shared mem.
+							 * The cycle has changed, and statsdb_created is true, meaning that at
+							 * least one successful mapping has occurred since when we generated our
+							 * own version of the statsdb_fname or picked it up from shared memory.
+							 * The question this clause asks is: if we redid the loop, would we
+							 * alight on a different statsdb location? If not, let's keep going.
+							 * Why do we use 'reg' here rather than 'prev_reg' in most other places?
+							 * Even though we will overwrite reg->dyn.addr->fname, we do not guarantee
+							 * that this is already identical to prev_reg->dyn.addr->fname, just that
+							 * the underlying files are identical. Therefore using prev_reg would not
+							 * really ask the question of whether reg->dyn.addr->fname would stay the
+							 * same if we repeat.
+							 * When we need to restart after a db_init, we tend to want to delete
+							 * any autodeletable files unless we are only restarting the db_init.
+							 * Here, since this section of the code is handling a was_open case, we
+							 * can be confident that we did not create any file and should not take
+							 * any special measure to delete it.
+							 */
+							db_init_ret = DB_INVALID_SHORT;
+							rel_latch(&baseDBnl->statsdb_field_latch);
+							ENABLE_INTERRUPTS(INTRPT_IN_GVCST_INIT, prev_intrpt_state);
+						} else
+						{
+							DBGRDB((stderr, "%s:%d:%s: process id %d found file name matching in "
+										"dbfilopn loop number %d of file %s for "
+										"region %s\n", __FILE__, __LINE__, __func__,
+										process_id, loopcnt, reg->dyn.addr->fname,
+										reg->rname));
+							/* Cycle invalid, but the region matches what's in the parent shm.
+							 * Retry not needed - just fixup the cycle in reg.
+							 */
+							reg->statsdb_init_cycle = baseDBnl->statsdb_init_cycle;
+							rel_latch(&baseDBnl->statsdb_field_latch);
+							ENABLE_INTERRUPTS(INTRPT_IN_GVCST_INIT, prev_intrpt_state);
+						}
+					}
+				} else
+				{
+					if ((baseDBreg->dyn.addr->fname_len != FILE_INFO(prev_reg)->s_addrs.hdr->basedb_fname_len)
+							|| (0 != memcmp(baseDBreg->dyn.addr->fname,
+									FILE_INFO(prev_reg)->s_addrs.hdr->basedb_fname,
+									baseDBreg->dyn.addr->fname_len)))
+					{
+						rel_latch(&baseDBnl->statsdb_field_latch);
+						ENABLE_INTERRUPTS(INTRPT_IN_GVCST_INIT, prev_intrpt_state);
+						/* Following call does not return. Don't REVERT beforehand because we want
+						 * dbinit_ch to do the dbinit_err_cleanup call
+						 */
+						error_on_db_invalidity(NULL, reg, FILE_INFO(prev_reg)->s_addrs.hdr,
+								DB_INVALID_NOTOURSTATSDB, 0);
+						assert(FALSE);
+					}
+					/* Copy from reg since although we are about to overwrite anyway, reg is guaranteed to have
+					 * correct statsdb_fname formatting [ftok_hash].[basename].dat.gst.
+					 */
+					memcpy(baseDBnl->statsdb_fname, reg->dyn.addr->fname, reg->dyn.addr->fname_len);
+					assert(SIZEOF(baseDBnl->statsdb_fname) > reg->dyn.addr->fname_len);
+					assert((!IS_DSE_IMAGE && !IS_LKE_IMAGE) || !TREF(ok_to_leave_statsdb_unopened));
+					baseDBnl->statsdb_fname[reg->dyn.addr->fname_len] = '\0';
+					baseDBnl->statsdb_fname_len = reg->dyn.addr->fname_len;
+					baseDBnl->statsdb_created = TRUE;
+					reg->statsdb_init_cycle = ++baseDBnl->statsdb_init_cycle;
+					rel_latch(&baseDBnl->statsdb_field_latch);
+					ENABLE_INTERRUPTS(INTRPT_IN_GVCST_INIT, prev_intrpt_state);
+				}
+			}
+			if (DB_VALID != db_init_ret)
+			{
+				/* Try another dbfilopn */
+				if (DB_POTENTIALLY_VALID > db_init_ret)
+					continue;
+				assert(FALSE);
+				error_on_db_invalidity(&FILE_INFO(prev_reg)->s_addrs, reg, FILE_INFO(prev_reg)->s_addrs.hdr,
+						db_init_ret, 0);
+			}
 			/* Found same database already open - prev_reg contains addr of originally opened region */
 			FILE_CNTL(reg) = FILE_CNTL(prev_reg);
+			/* Do not change or prevent the overwriting of reg->dyn.addr->fname by prev_reg->dyn.addr->fname without
+			 * corresponding changes to the DBGRDB and non-DBGRDB code above which assumes this overwriting will occur.
+			 */
 			memcpy(reg->dyn.addr->fname, prev_reg->dyn.addr->fname, prev_reg->dyn.addr->fname_len);
 			reg->dyn.addr->fname_len = prev_reg->dyn.addr->fname_len;
 			csa = (sgmnt_addrs *)&FILE_INFO(reg)->s_addrs;
@@ -892,7 +647,10 @@ void gvcst_init(gd_region *reg, gd_addr *addr)
 			assert(1 <= csa->regcnt);
 			csa->regcnt++;	/* Increment # of regions that point to this csa */
 			return;
-		}
+		} else
+			DBGRDB((stderr, "%s:%d:%s: process id %d continuing in loop after dbfilopn number %d of file %s for region "
+						"%s succeeded\n", __FILE__, __LINE__, __func__, process_id, loopcnt,
+						reg->dyn.addr->fname, reg->rname));
 		/* Note that if we are opening a statsDB, it is possible baseDBreg->was_open is TRUE at this point. */
 		reg->was_open = FALSE;
 		/* We shouldn't have crit on any region unless we are in TP and in the final retry or we are in mupip_set_journal
@@ -907,6 +665,9 @@ void gvcst_init(gd_region *reg, gd_addr *addr)
 			 * we should insert this region in the tp_reg_list and tp_restart should do the gvcst_init after
 			 * having released crit on all regions.
 			 */
+			DBGRDB((stderr, "%s:%d:%s: process id %d doing t_retry after dbfilopn number %d of file %s for region %s "
+						"occurred while holding crits\n", __FILE__, __LINE__, __func__, process_id,
+						loopcnt, reg->dyn.addr->fname, reg->rname));
 			insert_region(reg, &tp_reg_list, &tp_reg_free_list, SIZEOF(tp_region));
 			t_retry(cdb_sc_needcrit);
 			assert(FALSE);	/* should never reach here since t_retry should have unwound the M-stack and restarted TP */
@@ -918,6 +679,7 @@ void gvcst_init(gd_region *reg, gd_addr *addr)
 		CRYPT_CHKSYSTEM;
 #		endif
 		csa->hdr = NULL;
+		csa->ti = NULL;
 		csa->nl = NULL;
 		csa->jnl = NULL;
 		csa->gbuff_limit = 0;
@@ -966,11 +728,148 @@ void gvcst_init(gd_region *reg, gd_addr *addr)
 		GTM_WHITE_BOX_TEST(WBTEST_HOLD_FTOK_UNTIL_BYPASS, db_init_retry, MAX_DBINIT_RETRY);
 		do
 		{
-			db_init_ret = db_init(reg, (MAX_DBINIT_RETRY == db_init_retry) ? OK_TO_BYPASS_FALSE : OK_TO_BYPASS_TRUE);
-			if (0 == db_init_ret)
-				break;
-			if (-1 == db_init_ret)
+			is_final_dbinit = (MAX_DBINIT_RETRY == db_init_retry) && ((loopcnt + 1) == max_dbfilopn_retry_cnt);
+			DBGRDB((stderr, "%s:%d:%s: process id %d trying db_init number %d in dbfilopn loop number %d of file %s "
+						"for region %s\n", __FILE__, __LINE__, __func__, process_id, db_init_retry,
+						loopcnt, reg->dyn.addr->fname, reg->rname));
+			db_init_ret = db_init(reg,
+					((MAX_DBINIT_RETRY == db_init_retry) || IS_AUTODELETE_REG(reg)) ? OK_TO_BYPASS_FALSE :
+					OK_TO_BYPASS_TRUE, !is_final_dbinit);
+			if (DB_VALID == db_init_ret)
 			{
+				DBGRDB((stderr, "%s:%d:%s: process id %d succeeded in db_init number %d in dbfilopn loop number %d "
+							"of file %s for region %s\n", __FILE__, __LINE__, __func__, process_id,
+							db_init_retry, loopcnt, reg->dyn.addr->fname, reg->rname));
+				assert(is_statsDB == IS_STATSDB_REG(reg));
+				if (is_statsDB)
+				{
+					DBGRDB((stderr, "%s:%d:%s: process id %d grabbing statsdb latch to initialize shm in "
+								"db_init number %d in dbfilopn loop number %d of file %s for "
+								"region %s\n", __FILE__, __LINE__, __func__, process_id,
+								db_init_retry, loopcnt, reg->dyn.addr->fname, reg->rname));
+					grab_latch(&baseDBnl->statsdb_field_latch, GRAB_LATCH_INDEFINITE_WAIT,
+							NOT_APPLICABLE, NULL);
+					if (baseDBnl->statsdb_created)
+					{
+
+						DBGRDB((stderr, "%s:%d:%s: process id %d found baseDBnl->statsdb_created in "
+									"db_init number %d in dbfilopn loop number %d of file "
+									"%s for region %s\n", __FILE__, __LINE__, __func__,
+									process_id, db_init_retry, loopcnt, reg->dyn.addr->fname,
+									reg->rname));
+						if (baseDBnl->statsdb_init_cycle == reg->statsdb_init_cycle)
+						{
+							DBGRDB((stderr, "%s:%d:%s: process id %d found cycle match in db_init "
+										"number %d in dbfilopn loop number %d of file "
+										"%s for region %s\n", __FILE__, __LINE__,
+										__func__, process_id, db_init_retry, loopcnt,
+										reg->dyn.addr->fname, reg->rname));
+							rel_latch(&baseDBnl->statsdb_field_latch);
+							if (!ftok_sem_release(reg, FALSE, FALSE))
+								RTS_ERROR_CSA_ABT(CSA_ARG(csa) VARLSTCNT(4) ERR_DBFILERR, 2,
+										DB_LEN_STR(reg));
+							FTOK_TRACE(csa, csa->hdr->trans_hist.curr_tn, ftok_ops_release, process_id);
+							FILE_INFO(reg)->grabbed_ftok_sem = FALSE;
+							REVERT;
+							break;
+						} else
+						{
+							DBGRDB((stderr, "%s:%d:%s: process id %d found cycle not matching in "
+										"db_init number %d in dbfilopn loop number %d "
+										"of file %s for region %s\n", __FILE__,
+										__LINE__, __func__, process_id, db_init_retry,
+										loopcnt, reg->dyn.addr->fname, reg->rname));
+							if ((reg->dyn.addr->fname_len != baseDBnl->statsdb_fname_len) ||
+									memcmp(reg->dyn.addr->fname, baseDBnl->statsdb_fname,
+										reg->dyn.addr->fname_len))
+							{
+								DBGRDB((stderr, "%s:%d:%s: process id %d found file name not "
+											"matching in db_init number %d in "
+											"dbfilopn loop number %d of file %s for "
+											"region %s\n", __FILE__, __LINE__, __func__,
+											process_id, db_init_retry, loopcnt,
+											reg->dyn.addr->fname, reg->rname));
+								db_init_ret = DB_INVALID_SHORT;
+								rel_latch(&baseDBnl->statsdb_field_latch);
+								REVERT;
+							} else
+							{
+								DBGRDB((stderr, "%s:%d:%s: process id %d found file name matching "
+											"in db_init number %d in dbfilopn loop "
+											"number %d of file %s for region %s\n",
+											__FILE__, __LINE__, __func__, process_id,
+											db_init_retry, loopcnt,
+											reg->dyn.addr->fname, reg->rname));
+								reg->statsdb_init_cycle = baseDBnl->statsdb_init_cycle;
+								rel_latch(&baseDBnl->statsdb_field_latch);
+								if (!ftok_sem_release(reg, FALSE, FALSE))
+									RTS_ERROR_CSA_ABT(CSA_ARG(csa) VARLSTCNT(4) ERR_DBFILERR, 2,
+											DB_LEN_STR(reg));
+								FTOK_TRACE(csa, csa->hdr->trans_hist.curr_tn, ftok_ops_release,
+										process_id);
+								FILE_INFO(reg)->grabbed_ftok_sem = FALSE;
+								REVERT;
+								break;
+							}
+						}
+					} else
+					{
+						if ((baseDBreg->dyn.addr->fname_len != csa->hdr->basedb_fname_len)
+								|| (0 != memcmp(baseDBreg->dyn.addr->fname, csa->hdr->basedb_fname,
+										baseDBreg->dyn.addr->fname_len)))
+						{
+							rel_latch(&baseDBnl->statsdb_field_latch);
+							/* The following asserts check that we do not delete the database */
+							assert(reg == db_init_region);
+							assert(reg->dyn.addr->file_cntl);
+							assert(FILE_INFO(reg));
+							assert(FILE_INFO(reg)->grabbed_ftok_sem);
+							assert(csa == &FILE_INFO(reg)->s_addrs);
+							if (!ftok_sem_release(reg, FALSE, FALSE))
+								RTS_ERROR_CSA_ABT(CSA_ARG(csa) VARLSTCNT(4) ERR_DBFILERR, 2,
+										DB_LEN_STR(reg));
+							assert(!FILE_INFO(reg)->grabbed_ftok_sem);
+							assert(!FILE_INFO(reg)->shm_created);
+							/* Following call does not return. Don't REVERT beforehand because we want
+							 * dbinit_ch to do the dbinit_err_cleanup call */
+							error_on_db_invalidity(csa, reg, csa->hdr, DB_INVALID_NOTOURSTATSDB, 0);
+							assert(FALSE);
+						}
+						/* Why don't we need to check for a cycle match here? Because statsdb_created is
+						 * false, we can just go ahead and toggle it and commit the connection between the
+						 * stats and base db regardless. There is a case where we get a statsdb path from
+						 * shared memory, someone deletes the statsdb and disables it in base shm, we
+						 * recreate and re-initialize it, and then we arrive here. Checking for cycle match
+						 * would allow us to restart in that case and have a chance of imposing our will
+						 * on the path of the statsdb rather than taking what was in shm for granted. But
+						 * this is not obviously better than simply recreating the first path, especially
+						 * since this would have to occur close together in time.
+						 */
+						memcpy(baseDBnl->statsdb_fname, reg->dyn.addr->fname, reg->dyn.addr->fname_len);
+						assert(SIZEOF(baseDBnl->statsdb_fname) > reg->dyn.addr->fname_len);
+						assert((!IS_DSE_IMAGE && !IS_LKE_IMAGE) || !TREF(ok_to_leave_statsdb_unopened));
+						baseDBnl->statsdb_fname[reg->dyn.addr->fname_len] = '\0';
+						baseDBnl->statsdb_fname_len = reg->dyn.addr->fname_len;
+						baseDBnl->statsdb_created = TRUE;
+						reg->statsdb_init_cycle = ++baseDBnl->statsdb_init_cycle;
+						rel_latch(&baseDBnl->statsdb_field_latch);
+						if (!ftok_sem_release(reg, FALSE, FALSE))
+							RTS_ERROR_CSA_ABT(CSA_ARG(csa) VARLSTCNT(4) ERR_DBFILERR, 2,
+									DB_LEN_STR(reg));
+						FTOK_TRACE(csa, csa->hdr->trans_hist.curr_tn, ftok_ops_release, process_id);
+						FILE_INFO(reg)->grabbed_ftok_sem = FALSE;
+						REVERT;
+						break;
+					}
+				} else
+					break;
+			}
+			if ((-1 == db_init_ret) && (MAX_DBINIT_RETRY > db_init_retry))
+			{
+				DBGRDB((stderr, "%s:%d:%s: process id %d to retry db_init after db_init number %d in dbfilopn loop "
+							"number %d of file %s for region %s returned -1\n", __FILE__, __LINE__,
+							__func__, process_id, db_init_retry, loopcnt, reg->dyn.addr->fname,
+							reg->rname));
 				assert(MAX_DBINIT_RETRY > db_init_retry);
 				retry_dbinit = TRUE;
 			} else
@@ -978,6 +877,10 @@ void gvcst_init(gd_region *reg, gd_addr *addr)
 				 * closing udi->fd opened in "dbfilopn" call early in this iteration. This avoids fd leak
 				 * since another call to "dbfilopn" in the next iteration would not know about the previous fd.
 				 */
+				DBGRDB((stderr, "%s:%d:%s: process id %d to *not* retry db_init after db_init number %d in "
+							"dbfilopn loop number %d of file %s for region %s returned something "
+							"other than -1 or 0\n", __FILE__, __LINE__, __func__, process_id,
+							db_init_retry, loopcnt, reg->dyn.addr->fname, reg->rname));
 				retry_dbinit = FALSE;
 			}
 			db_init_err_cleanup(retry_dbinit);
@@ -987,7 +890,7 @@ void gvcst_init(gd_region *reg, gd_addr *addr)
 		assert(-1 != db_init_ret);
 		if (0 == db_init_ret)
 			break;
-		if (ERR_DBGLDMISMATCH == db_init_ret)
+		if (DB_VALID_DBGLDMISMATCH == db_init_ret)
 		{	/* "db_init" would have adjusted seg->asyncio to reflect the db file header's asyncio settings.
 			 * Retry but do not count this try towards the total tries as otherwise it is theoretically possible
 			 * for the db fileheader to be recreated with just the opposite asyncio setting in each try and
@@ -996,14 +899,25 @@ void gvcst_init(gd_region *reg, gd_addr *addr)
 			 * issued, the user should never expect to see this and hence this error is not documented.
 			 */
 			loopcnt--;
+		} else if (DB_POTENTIALLY_VALID < db_init_ret)
+		{
+			DBGRDB((stderr, "%s:%d:%s: process id %d saw db invalidity in db_init number %d in dbfilopn loop number "
+						"%d of file %s for region %s\n", __FILE__, __LINE__, __func__, process_id,
+						db_init_retry, loopcnt, reg->dyn.addr->fname, reg->rname));
+			error_on_db_invalidity(csa, reg, NULL, db_init_ret, 0);
 		}
+		DBGRDB((stderr, "%s:%d:%s: process id %d continuing with loop after db_init number %d in dbfilopn loop number %d "
+					"of file %s for region %s\n", __FILE__, __LINE__, __func__, process_id, db_init_retry,
+					loopcnt, reg->dyn.addr->fname, reg->rname));
 	}
 	if (db_init_ret)
 	{
 		assert(FALSE);	/* we don't know of a practical way to get errors in each of the for-loop attempts above */
 		/* "db_init" returned with an unexpected error. Issue a generic error to note this out-of-design state */
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_REGOPENFAIL, 4, REG_LEN_STR(reg), DB_LEN_STR(reg));
-	}
+	} else
+		DBGRDB((stderr, "%s:%d:%s: process id %d finished db_init of file %s for region %s\n", __FILE__, __LINE__, __func__,
+					process_id, reg->dyn.addr->fname, reg->rname));
 	/* At this point, we have initialized the database, but haven't yet set reg->open to TRUE. If any rts_errors happen in
 	 * the meantime, there are no condition handlers established to handle the rts_error. More importantly, it is non-trivial
 	 * to add logic to such a condition handler to undo the effects of db_init. Also, in some cases, the rts_error can can

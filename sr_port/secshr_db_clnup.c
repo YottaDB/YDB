@@ -63,9 +63,11 @@
 #include "t_abort.h"
 #include "have_crit.h"
 #include "gtmsource_inline.h"
+#include "inline_atomic_pid.h"
 
 #define FLUSH 1
 
+GBLREF	cw_set_element		cw_set[];
 GBLREF	gd_region		*gv_cur_region;		/* for the LOCK_HIST macro in the RELEASE_BUFF_UPDATE_LOCK macro */
 GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	jnlpool_addrs_ptr_t	jnlpool_head;
@@ -73,6 +75,7 @@ GBLREF	sgm_info		*first_sgm_info;	/* List of all regions (unsorted) in TP transa
 GBLREF	sgm_info		*first_tp_si_by_ftok;	/* List of READ or UPDATED regions sorted on ftok order */
 GBLREF	sgmnt_addrs 		*kip_csa;
 GBLREF	uint4			process_id;
+GBLREF	unsigned char		cw_set_depth;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	jnl_gbls_t		jgbl;
 
@@ -116,6 +119,7 @@ error_def(ERR_WCBLOCKED);
  *	b) All jnlpool steps below apply only if replication is turned ON.
  *	c) For MM, the jnl and db commits happen inside crit i.e. no phase2 outside crit like BG.
  *
+ * (CMT00a) When allocating new blocks (and enabled), sieze BMLs by setting bml_pin
  * (CMT01)  Get crit on all regions (UPDATED || NON-UPDATED)
  *          For each UPDATED region
  *          {
@@ -186,6 +190,7 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 	cache_que_heads_ptr_t	cache_state;
 	cache_rec_ptr_t		cr;
 	char			*wcblocked_ptr;
+	cw_set_element		*cse;
 	gd_addr			*gd_hdr;
 	gd_region		*reg, *reg_top, *save_gv_cur_region, *repl_reg = NULL;
 	gtm_uint64_t		argarray[SECSHR_ACCOUNTING_MAX_ARGS];
@@ -272,6 +277,31 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 		if (T_UPDATE_UNDERWAY(cs_addrs))
 			update_underway = TRUE;
 		update_jnlpool = (cs_addrs && cs_addrs->jnlpool) ? cs_addrs->jnlpool : jnlpool;
+	}
+	/* Release BML reservations */
+	if (dollar_tlevel)
+	{	/* TP starts from first_cw_bitmap to release BMLs */
+		for (si = first_sgm_info; NULL != si; si = si->next_sgm_info)
+		{
+			is_bg = (dba_bg == si->tp_csa->hdr->acc_meth);
+			for (cse = si->first_cw_bitmap; is_bg && (NULL != cse); cse = cse->next_cw_set)
+			{	/* Release BMLs if blocks added and still owned */
+				if (gds_t_writemap != cse->mode)
+					continue;
+				assert(IS_BITMAP_BLK(cse->blk));
+				BML_RSRV_IF_EXP(cse->cr, CR_BLKEMPTY, process_id, 0);
+			}
+		}
+	} else if ((NULL != cs_addrs) && (0 < cw_set_depth))
+	{	/* Non-TP should search from the back of the cw_set and loop while cse->mode == gds_t_writemap */
+		is_bg = (dba_bg == cs_addrs->hdr->acc_meth);
+		for (cse = cw_set + cw_set_depth - 1; is_bg && (cw_set <= cse);  --cse)
+		{	/* Release BMLs if blocks added and still owned */
+			if (gds_t_writemap != cse->mode)
+				break; /* Done with bitmaps */
+			assert(IS_BITMAP_BLK(cse->blk));
+			BML_RSRV_IF_EXP(cse->cr, CR_BLKEMPTY, process_id, 0);
+		}
 	}
 	assert(is_exiting || update_underway);
 	if (update_underway)

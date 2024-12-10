@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -9,6 +9,8 @@
  *	the license, please stop and do not read further.	*
  *								*
  ****************************************************************/
+
+#include "gdsfhead.h"
 
 #define SIXTEEN_BLKS_FREE	0x55555555
 #define FOUR_BLKS_FREE		0x55
@@ -132,7 +134,7 @@ MBSTART {															\
 } MBEND
 
 int4 bml_find_free(block_id hint, uchar_ptr_t base_addr, block_id total_bits);
-int4 bml_init(block_id bml);
+int4 bml_init(gd_region *reg, block_id bml, trans_num blktn);
 uint4 bml_busy(block_id setbusy, sm_uc_ptr_t map);
 uint4 bml_free(block_id setfree, sm_uc_ptr_t map);
 uint4 bml_recycled(block_id setfree, sm_uc_ptr_t map);

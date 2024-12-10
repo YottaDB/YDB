@@ -40,6 +40,7 @@
 #include "gtm_c_stack_trace.h"
 #include "copy.h"
 #include "relqop.h"
+#include "inline_atomic_pid.h"
 
 #define	REQUEUE_TO_FREE		0
 #define	REQUEUE_TO_WIP		1

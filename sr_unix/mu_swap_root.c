@@ -54,6 +54,7 @@
 #include "t_write.h"
 #include "util.h"
 #include "wcs_sleep.h"
+#include "inline_atomic_pid.h"
 
 GBLREF	boolean_t		mu_reorg_process;
 GBLREF	boolean_t		need_kip_incr;
@@ -69,6 +70,7 @@ GBLREF	kill_set		*kill_set_tail;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_addrs		*kip_csa;
 GBLREF	sgmnt_data_ptr_t	cs_data;
+GBLREF	uint4			process_id;
 GBLREF	uint4			t_err;
 GBLREF	uint4			update_trans;
 GBLREF	uint4			update_array_size;
@@ -331,7 +333,7 @@ block_id swap_root_or_directory_block(int parent_blk_lvl, int child_blk_lvl, src
 	int			parent_blk_size, child_blk_size, bsiz;
 	int			rec_size1, curr_offset, bpntr_end, hdr_len;
 	int			tmp_cmpc, child_blk_id_sz, parent_blk_id_sz;
-	int4			hint_bit, maxbitsthismap;
+	int4			hint_bit, lcnt, maxbitsthismap;
 	jnl_buffer_ptr_t	jbbp; /* jbbp is non-NULL only if before-image journaling */
 	node_local_ptr_t	cnl;
 	sgmnt_data_ptr_t	csd;
@@ -349,21 +351,35 @@ block_id swap_root_or_directory_block(int parent_blk_lvl, int child_blk_lvl, src
 	blk_size = csd->blk_size;
 	child_long_blk_id = IS_64_BLK_ID(child_blk_ptr);
 	child_blk_id_sz = SIZEOF_BLK_ID(child_long_blk_id);
-	/* Find a free/recycled block for new block location. */
-	hint_blk_num = upg_mv_block;
 	total_blks = csa->ti->total_blks;
 	num_local_maps = DIVIDE_ROUND_UP(total_blks, BLKS_PER_LMAP);
-	master_bit = bmm_find_free((hint_blk_num / BLKS_PER_LMAP), csa->bmm, num_local_maps);
-	if ((NO_FREE_SPACE == master_bit))
+	hint_blk_num = upg_mv_block;
+	lcnt = ((CDB_STAGNATE > t_tries) ? num_local_maps : 0) + 1 ;
+	do
 	{
-		assert(0 == upg_mv_block);
-		t_abort(gv_cur_region, csa);
-		return ABORT_SWAP;
-	}
-	bmlhist.blk_num = master_bit * BLKS_PER_LMAP;
-	if (NULL == (bmlhist.buffaddr = t_qread(bmlhist.blk_num, (sm_int_ptr_t)&bmlhist.cycle, &bmlhist.cr)))
-	{	/* WARNING: assignment above */
-		assert(0 == upg_mv_block);
+		/* Find a free/recycled block for new block location. */
+		master_bit = bmm_find_free((hint_blk_num / BLKS_PER_LMAP), csa->bmm, num_local_maps);
+		if ((NO_FREE_SPACE == master_bit))
+		{
+			assert(0 == upg_mv_block);
+			t_abort(gv_cur_region, csa);
+			return ABORT_SWAP;
+		}
+		/* Find free BML */
+		bmlhist.blk_num = master_bit * BLKS_PER_LMAP;
+		TREF(tqread_grab_bml) = ((0 == upg_mv_block) && (dba_bg == csd->acc_meth)
+				& (DEFAULT_BITMAP_PREPIN == csd->nobitmap_prepin));
+		bmlhist.buffaddr = t_qread(bmlhist.blk_num, (sm_int_ptr_t)&bmlhist.cycle, &bmlhist.cr);
+		if (0 == upg_mv_block) /* Blk not for upgrade; advance hint */
+			hint_blk_num = (total_blks > hint_blk_num) ? MIN(bmlhist.blk_num + BLKS_PER_LMAP, total_blks) : 0;
+	} while ((0 < lcnt--) && (NULL == bmlhist.buffaddr) && (cdb_sc_tqreadnowait == (enum cdb_sc)rdfail_detail));
+	if (NULL == bmlhist.buffaddr)
+	{
+		if (CDB_STAGNATE <= t_tries)
+		{	/* Too much contention, give up on trying this block */
+			t_abort(gv_cur_region, csa);
+			return ABORT_SWAP;
+		}
 		assert((0 == upg_mv_block) && (t_tries < CDB_STAGNATE));
 		t_retry((enum cdb_sc)rdfail_detail);
 		return RETRY_SWAP;
@@ -377,8 +393,9 @@ block_id swap_root_or_directory_block(int parent_blk_lvl, int child_blk_lvl, src
 	assert((0 == upg_mv_block) || (upg_mv_block <= free_blk_id));
 	if (DIR_ROOT >= free_blk_id)
 	{	/* Bitmap block 0 and directory tree root block 1 should always be marked busy. */
-		assert(0 == upg_mv_block);
 		assert((0 == upg_mv_block) && (t_tries < CDB_STAGNATE));
+		if (bmlhist.cr)
+			BML_RSRV_IF_EXP(bmlhist.cr, CR_BLKEMPTY, process_id, 0);
 		t_retry(cdb_sc_badbitmap);
 		return RETRY_SWAP;
 	}
@@ -386,6 +403,8 @@ block_id swap_root_or_directory_block(int parent_blk_lvl, int child_blk_lvl, src
 	{	/* stop swapping root or DT blocks once the database is truncated well enough. A good heuristic for this is
 		* to check if the block is to be swapped into a higher block number and if so do not swap
 		*/
+		if (bmlhist.cr)
+			BML_RSRV_IF_EXP(bmlhist.cr, CR_BLKEMPTY, process_id, 0);
 		t_abort(gv_cur_region, csa);
 		return ABORT_SWAP;
 	}
@@ -403,6 +422,8 @@ block_id swap_root_or_directory_block(int parent_blk_lvl, int child_blk_lvl, src
 		if (NULL == (freeblkhist.buffaddr = t_qread(free_blk_id, (sm_int_ptr_t)&freeblkhist.cycle, &freeblkhist.cr)))
 		{
 			assert((0 == upg_mv_block) && (t_tries < CDB_STAGNATE));
+			if (bmlhist.cr)
+				BML_RSRV_IF_EXP(bmlhist.cr, CR_BLKEMPTY, process_id, 0);
 			t_retry((enum cdb_sc)rdfail_detail);
 			return RETRY_SWAP;
 		}
@@ -416,6 +437,8 @@ block_id swap_root_or_directory_block(int parent_blk_lvl, int child_blk_lvl, src
 	if (!BLK_FINI(bs_ptr, bs1))
 	{
 		assert((0 == upg_mv_block) && (t_tries < CDB_STAGNATE));
+		if (bmlhist.cr)
+			BML_RSRV_IF_EXP(bmlhist.cr, CR_BLKEMPTY, process_id, 0);
 		t_retry(cdb_sc_blkmod);
 		return RETRY_SWAP;
 	}
@@ -439,6 +462,8 @@ block_id swap_root_or_directory_block(int parent_blk_lvl, int child_blk_lvl, src
 			if (bsiz > blk_size)
 			{
 				assert(CDB_STAGNATE > t_tries);
+				if (bmlhist.cr)
+					BML_RSRV_IF_EXP(bmlhist.cr, CR_BLKEMPTY, process_id, 0);
 				t_retry(cdb_sc_lostbmlcr);
 				return RETRY_SWAP;
 			}
@@ -458,6 +483,8 @@ block_id swap_root_or_directory_block(int parent_blk_lvl, int child_blk_lvl, src
 		if ((parent_blk_size < rec_size1 + curr_offset) || (bstar_rec_size(parent_long_blk_id) > rec_size1))
 		{
 			assert((0 == upg_mv_block) && (t_tries < CDB_STAGNATE));
+			if (bmlhist.cr)
+				BML_RSRV_IF_EXP(bmlhist.cr, CR_BLKEMPTY, process_id, 0);
 			t_retry(cdb_sc_blkmod);
 			return RETRY_SWAP;
 		}
@@ -477,6 +504,8 @@ block_id swap_root_or_directory_block(int parent_blk_lvl, int child_blk_lvl, src
 		if (!BLK_FINI(bs_ptr, bs1))
 		{
 			assert((0 == upg_mv_block) && (t_tries < CDB_STAGNATE));
+			if (bmlhist.cr)
+				BML_RSRV_IF_EXP(bmlhist.cr, CR_BLKEMPTY, process_id, 0);
 			t_retry(cdb_sc_blkmod);
 			return RETRY_SWAP;
 		}

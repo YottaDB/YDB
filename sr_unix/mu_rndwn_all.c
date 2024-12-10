@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -153,7 +153,7 @@ STATICFNDEF void mu_rndwn_all_helper(shm_parms *parm_buff, char *fname, int *exi
 			STRNLEN(fname, MAX_FN_LEN, gv_cur_region->dyn.addr->fname_len);
 			STRNCPY_STR(gv_cur_region->dyn.addr->fname, fname, gv_cur_region->dyn.addr->fname_len);
 			gv_cur_region->dyn.addr->fname[gv_cur_region->dyn.addr->fname_len] = '\0';
-			if (mu_rndwn_file(gv_cur_region, FALSE))
+			if (mu_rndwn_file(gv_cur_region, FALSE, FALSE))
 			{	/* If this is a statsdb, "mu_rundwn_file" would have invoked rundown on basedb which would
 				 * in turn invoke rundown on the statsdb. The basedb rundown would print the MUFILRNDWNSUC
 				 * message if needed. So skip double-printing it here.

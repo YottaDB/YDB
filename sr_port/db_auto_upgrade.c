@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -143,13 +143,14 @@ void db_auto_upgrade(gd_region *reg)
 			case GDSMV71001:
 				/* GT.M V7.1-002 implemented index reserved bytes and changed default to zero */
 				csd->i_reserved_bytes = 0;
-				break; /* so a new "case" needs to be added BEFORE the assert. */
 			case GDSMV71002:
 				/* GT.M V7.1-003 changed freeze on fail default for statsDBs to FALSE */
 				if (IS_STATSDB_REGNAME(reg))
 					csd->freeze_on_fail = FALSE;
-				break;
 			case GDSMV71003:
+				csd->createcomplete = TRUE;
+				break;
+			case GDSMV71006:
 				assert(FALSE);
 				break;
 			default:
@@ -336,8 +337,11 @@ void v6_db_auto_upgrade(gd_region *reg)
 				assert(((file_size * DISK_BLOCK_SIZE) == (new_eof + DISK_BLOCK_SIZE))
 						|| ((DISK_BLOCK_SIZE << 3) > csd->blk_size));
 				db_write_eof_block(udi, udi->fd, csd->blk_size, new_eof, &TREF(dio_buff));
-				/* GT.M V63001 introduced reservedDBFlags */
-				csd->reservedDBFlags = 0; /* RDBF_AUTODB = FALSE, RDBF_NOSTATS = FALSE, RDBF_STATSDB = FALSE */
+				/* GT.M V63001 introduced reservedDBFlags
+				 * RDBF_AUTODB = FALSE, RDBF_NOSTATS = FALSE, RDBF_STATSDB = FALSE,
+				 * RDBF_AUTODELETE = FALSE.
+				 */
+				csd->reservedDBFlags = 0;
 			case GDSMV63001:
 				/* GT.M V63003 introduced read-only databases */
 				csd->read_only = 0;
@@ -375,6 +379,8 @@ void v6_db_auto_upgrade(gd_region *reg)
 					csd->i_reserved_bytes = 0;
 				if ((csd->last_mdb_ver < GDSMV71003) && IS_STATSDB_REGNAME(reg))
 					csd->freeze_on_fail = FALSE;
+				if (csd->last_mdb_ver < GDSMV71006)
+					csd->createcomplete = TRUE;
 				break;
 			case GDSMV63015:
 				assert(FALSE);	/* if this should come to pass, add appropriate code above the assert */

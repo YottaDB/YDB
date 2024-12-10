@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -59,6 +59,7 @@ void bm_setmap(block_id bml, block_id blk, int4 busy)
 
 	t_begin_crit(ERR_DSEFAIL);
 	ctn = cs_addrs->ti->curr_tn;
+	/* Callers of bm_setmap set tqread_grab_bml when marking blocks as busy. Frees are resolved by reallocate_bitmap */
 	if (!(bmp = t_qread(bml, &blkhist.cycle, &blkhist.cr)))
 		t_retry((enum cdb_sc)rdfail_detail);
 	blkhist.blk_num = bml;

@@ -17,6 +17,10 @@
 /* this requires gdsroot.h gtm_facility.h fileinfo.h gdsbt.h */
 
 #include <sys/types.h>
+#include "gtm_common_defs.h"
+#include "mdef.h"
+#include "gdsroot.h"
+#include "gdsbt.h"
 #include "gdsdbver.h"
 #include "gtm_unistd.h"
 #include "gtm_limits.h"
@@ -80,10 +84,16 @@ typedef union {
 	/* volatile required as this value is referenced outside of the lock in db_csh_getn() */
 } cr_interlock;
 
+#ifdef	DEBUG_BML_PIN
+#define BMLBLKSZ sizeof(block_id)
+#else
+#define BMLBLKSZ 0
+#endif
 #define SIZEOF_FIRST_HALF_CR (SIZEOF(cr_que_struct) + SIZEOF(block_id) + (3 * SIZEOF(int4)) + SIZEOF(enum db_ver)\
 		+ SIZEOF(sm_off_t) + SIZEOF(struct aiocb) + SIZEOF(uint4))
 #define SIZEOF_SECOND_HALF_CR (SIZEOF(cr_que_struct) + SIZEOF(cr_interlock) + SIZEOF(off_jnl_t) + (3 * SIZEOF(trans_num))\
-		+ SIZEOF(boolean_t) + (4 * SIZEOF(int4)) + (2 * SIZEOF(sm_off_t)) + (4 * SIZEOF(bool)) + SIZEOF(global_latch_t))
+		+ SIZEOF(boolean_t) + (4 * SIZEOF(int4)) + (2 * SIZEOF(sm_off_t)) + (4 * SIZEOF(bool)) + SIZEOF(global_latch_t)\
+		+ SIZEOF(uint4) + BMLBLKSZ)
 typedef struct cache_rec_struct
 {
 	cr_que_struct	blkque; /* cache records whose block numbers hash to the same location */
@@ -154,6 +164,10 @@ typedef struct cache_rec_struct
 					 */
 	bool		needs_first_write;	/* If this block needs to be written to disk for the first time,
 						 *  note it (only applicable for fullblockwrites) */
+	uint4		bml_pin;	/* PID of "holder" set in t_qread on behalf of callers */
+#ifdef	DEBUG_BML_PIN
+	block_id	bml_pin_blk;	/* PID of "holder" set in t_qread on behalf of callers */
+#endif
 	CACHELINE_PAD((SIZEOF_SECOND_HALF_CR % CACHELINE_SIZE), 2)
 } cache_rec;
 
@@ -223,6 +237,10 @@ typedef struct cache_state_rec_struct
 					 */
 	bool		needs_first_write;	/* If this block needs to be written to disk for the first time,
 						 *  note it (only applicable for fullblockwrites) */
+	uint4		bml_pin;	/* PID of "holder" set in t_qread on behalf of callers */
+#ifdef	DEBUG_BML_PIN
+	block_id	bml_pin_blk;	/* PID of "holder" set in t_qread on behalf of callers */
+#endif
 	CACHELINE_PAD((SIZEOF_SECOND_HALF_CR % CACHELINE_SIZE), 2)
 } cache_state_rec;
 
@@ -761,6 +779,40 @@ MBSTART {											\
 #define	ASSERT_IS_WITHIN_SHM_BOUNDS(ptr, csa)											\
 	assert((NULL == (ptr)) || (((ptr) >= csa->db_addrs[0]) && ((0 == csa->db_addrs[1]) || ((ptr) < csa->db_addrs[1]))))
 
+#ifdef DEBUG_BML_PIN
+#define BML_RSRV_IF_EXP(CR, BLK, EXPECT, PID)						\
+MBSTART {										\
+	if ((CR)->bml_pin == EXPECT)							\
+	{										\
+		(CR)->bml_pin_blk = BLK;						\
+		inline_atomic_pid_set_if_exp(&(CR)->bml_pin, EXPECT, PID);		\
+	}										\
+} MBEND
+#define BML_RSRV_SET(CR, BLK, PID)							\
+MBSTART {										\
+	(CR)->bml_pin_blk = BLK;							\
+	inline_atomic_pid_set(&(CR)->bml_pin, PID);					\
+} MBEND
+#define BML_RSRV_RESET(CR)								\
+MBSTART {										\
+	(CR)->bml_pin_blk = CR_BLKEMPTY;						\
+	inline_atomic_pid_set(&(CR)->bml_pin, 0);					\
+} MBEND
+#else
+#define BML_RSRV_IF_EXP(CR, BLK, EXPECT, PID)	inline_atomic_pid_set_if_exp(&(CR)->bml_pin, EXPECT, PID);
+#define BML_RSRV_SET(CR, BLK, PID)		inline_atomic_pid_set(&(CR)->bml_pin, PID);
+#define BML_RSRV_RESET(CR)			inline_atomic_pid_set(&(CR)->bml_pin, 0);
+#endif
+
+/* Reset PID if no longer alive. Use atomic function to ensure the PID is the same before resetting */
+#define RESET_LIVE_PID_IF_NEEDED(PID, CSA, MSG)											\
+MBSTART {															\
+	uint4 lcl_pid;														\
+																\
+	if ((0 != (lcl_pid = (PID))) && !is_proc_alive(lcl_pid, 0) && inline_atomic_pid_set_if_exp(&(PID), lcl_pid, 0))		\
+		send_msg_csa(CSA_ARG(CSA) VARLSTCNT(7) ERR_PIDRESET, 5, REG_LEN_STR((CSA)->region), lcl_pid, LEN_AND_LIT(MSG));	\
+} MBEND
+
 #ifdef DEBUG
 #define DBG_ENSURE_PTR_IS_VALID_GLOBUFF(CSA, CSD, PTR)					\
 MBSTART {										\
@@ -1056,6 +1108,8 @@ GBLREF	cache_rec	pin_fail_twin_cr_contents;	/* Contents of twin of the cache-rec
 GBLREF	bt_rec_ptr_t	pin_fail_bt;			/* Pointer to bt of the cache-record that we failed to pin */
 GBLREF	bt_rec		pin_fail_bt_contents;		/* Contents of bt of the cache-record that we failed to pin */
 GBLREF	int4		pin_fail_in_crit;		/* Holder of crit at the time we failed to pin */
+GBLREF	uint4		pin_fail_in_tend;		/* Holder of in_tend at the time we failed to pin */
+GBLREF	uint4		pin_fail_in_cw_set;		/* Holder of in_cw_set at the time we failed to pin */
 GBLREF	int4		pin_fail_wc_in_free;		/* Number of write cache records in free queue when we failed to pin */
 GBLREF	int4		pin_fail_wcs_active_lvl;	/* Number of entries in active queue when we failed to pin */
 GBLREF	int4		pin_fail_ref_cnt;		/* Reference count when we failed to pin */
@@ -1064,14 +1118,14 @@ GBLREF	int4		pin_fail_phase2_commit_pidcnt;	/* Number of processes in phase2 com
 /* Macro to be used whenever cr->in_cw_set needs to be set (PIN) outside of a TP transaction */
 #define	PIN_CACHE_RECORD(cr, crarray, crarrayindex)							\
 MBSTART {												\
-	uint4	in_tend, data_invalid, in_cw_set;							\
+	uint4	data_invalid;										\
 													\
-	DEBUG_ONLY(in_tend = cr->in_tend);								\
+	DEBUG_ONLY(pin_fail_in_tend = cr->in_tend);							\
 	DEBUG_ONLY(data_invalid = cr->data_invalid);							\
-	assert((process_id == in_tend) || (0 == in_tend));						\
+	assert((process_id == pin_fail_in_tend) || (0 == pin_fail_in_tend));				\
 	assert((process_id == data_invalid) || (0 == data_invalid));					\
-	in_cw_set = cr->in_cw_set;									\
-	if (0 != in_cw_set)										\
+	pin_fail_in_cw_set = cr->in_cw_set;								\
+	if (0 != pin_fail_in_cw_set)									\
 	{												\
 		pin_fail_cr = cr;									\
 		pin_fail_cr_contents = *cr;								\
@@ -1091,7 +1145,8 @@ MBSTART {												\
 		pin_fail_ref_cnt		= cs_addrs->nl->ref_cnt;				\
 		pin_fail_in_wtstart		= cs_addrs->nl->in_wtstart;				\
 		pin_fail_phase2_commit_pidcnt	= cs_addrs->nl->wcs_phase2_commit_pidcnt;		\
-		assertpro(0 == in_cw_set);								\
+		assertpro(0 == pin_fail_in_cw_set);							\
+		assert(0 == cr->in_tend);								\
 	}												\
 	/* If twinning, we should never set in_cw_set on an OLDER twin. Assert that. */			\
 	assert(!cr->twin || cr->bt_index);								\
@@ -1106,6 +1161,13 @@ MBSTART {												\
 MBSTART {										\
 	uint4	in_tend, data_invalid, in_cw_set;					\
 											\
+	/* Release BML pin ahead of in_cw_set; Invert IF/assert for testing */		\
+	DEBUG_ONLY(pin_fail_cr_contents = *cr);						\
+	if (cr->bml_pin == process_id)							\
+	{										\
+		BML_RSRV_IF_EXP(cr, CR_BLKEMPTY, process_id, 0);			\
+		assert(IS_BITMAP_BLK(cr->blk));	/* had better be a bml */		\
+	}										\
 	in_cw_set = cr->in_cw_set;							\
 	if (process_id == cr->in_cw_set) /* reset in_cw_set only if we hold it */	\
 	{										\
@@ -1688,14 +1750,14 @@ MBSTART {														\
 															\
 	if (TREF(ok_to_see_statsdb_regs))										\
 	{														\
-		reservedDBFlags = CSD->reservedDBFlags;	/* sgmnt_data is flag authority */				\
+		reservedDBFlags = (CSD)->reservedDBFlags;	/* sgmnt_data is flag authority */			\
 		/* If this is a base DB (i.e. not a statsdb), but we could not successfully create the statsdb		\
 		 * (e.g. $gtm_statsdir issues etc.) then disable RDBF_STATSDB in the region. So this db continues	\
 		 * without statistics gathering.									\
 		 */													\
-		if (!IS_RDBF_STATSDB(CSD) && (NULL != CNL) && !CNL->statsdb_fname_len)					\
+		if (!IS_RDBF_STATSDB(CSD) && (NULL != (CNL)) && !(CNL)->statsdb_fname_len)				\
 			reservedDBFlags &= (~RDBF_STATSDB);								\
-		REG->reservedDBFlags = CSA->reservedDBFlags = reservedDBFlags;						\
+		(REG)->reservedDBFlags = (CSA)->reservedDBFlags = reservedDBFlags;					\
 	}														\
 	/* else : "gd_load" would have already set RDBF_NOSTATS etc. so don't override that */				\
 } MBEND
@@ -1920,8 +1982,9 @@ typedef struct sgmnt_data_struct
 						 */
 	/* The structure is 128-bytes in size at this point */
 	/************* FIELDS SET AT CREATION TIME ********************************/
-	char		filler_created[52];	/* Now unused .. was "file_info created" */
-	boolean_t	createinprogress;	/* TRUE only if MUPIP CREATE is in progress. FALSE otherwise */
+	char		filler_created[48];	/* Now unused .. was "file_info created" */
+	boolean_t	createcomplete;
+	boolean_t	createinprogress;	/* now unused. Was TRUE only if MUPIP CREATE has finished. FALSE otherwise */
 	int4		creation_time4;		/* Lower order 4-bytes of time when the database file was created */
 	uint4		reservedDBFlags;	/* Bit mask field containing the reserved DB flags (field copied from gd_region) */
 
@@ -2019,7 +2082,8 @@ typedef struct sgmnt_data_struct
 	gtm_time8	gt_shm_ctime;		/* time of creation of shared memory */
 	uint4 		problksplit; 		/* Split db blocks due to restarts - */
 						/* 0: don't; >0: don't if records in block are <= */
-	char		filler_unixonly[36];	/* to ensure this section has 64-byte multiple size */
+	uint4		nobitmap_prepin;	/* 0: use the new mechanism; positive values disable it */
+	char		filler_unixonly[32];	/* to ensure this section has 64-byte multiple size */
 	/************* ACCOUNTING INFORMATION ********************************/
 	int4		filler_n_retries[CDB_MAX_TRIES];/* Now moved to TAB_GVSTATS_REC section */
 	int4		filler_n_puts;			/* Now moved to TAB_GVSTATS_REC section */
@@ -2290,7 +2354,7 @@ typedef struct
 #define FC_OPEN 2
 #define FC_CLOSE 3
 
-#define DO_BADDBVER_CHK(REG, TSD)									\
+#define DO_BADDBVER_CHK(REG, TSD, AST)								\
 MBSTART {												\
 	LITREF char		*gtm_dbversion_table[];							\
 	error_def(ERR_DBUPGRDREQ);	/* BYPASSOK */							\
@@ -2298,6 +2362,7 @@ MBSTART {												\
 													\
 	if (MEMCMP_LIT(TSD->label, GDS_LABEL) && MEMCMP_LIT(TSD->label, V6_GDS_LABEL))			\
 	{												\
+		assert(!(AST));										\
 		if (memcmp(TSD->label, GDS_LABEL, GDS_LABEL_SZ - 3))					\
 			rts_error_csa(CSA_ARG(REG2CSA(REG)) VARLSTCNT(4) ERR_DBNOTGDS, 2,		\
 					DB_LEN_STR(REG));						\
@@ -2314,6 +2379,8 @@ MBSTART {												\
 	}												\
 } MBEND
 
+#define CREATE_IN_PROGRESS(CSD) (((CSD)->last_mdb_ver >= GDSMV71006) || ((CSD)->minor_dbver >= GDSMV71006) ? \
+		!(CSD)->createcomplete : ((0 != (CSD)->creation_time4) ? (CSD)->createinprogress : 1))
 /* one thing to watch out for is if online rollback is in progress, file_corrupt may be set
  * between mur_open_files() & mur_close_files().  In this case, we overload the TRUE (1) value
  * of "file_corrupt" to '2' (TRUE + 1) to indicate a temporary situation and spin for a bit,
@@ -2327,13 +2394,15 @@ MBSTART {											\
 	int			slp_cnt = 0;							\
 	int			err = 0;							\
 	boolean_t		is_logged = FALSE;						\
+	enum db_validity	db_valid;							\
 												\
-	if (TSD->createinprogress)								\
+	assert(!CREATE_IN_PROGRESS(TSD));							\
+	if (CREATE_IN_PROGRESS(TSD))								\
 		gtm_errcode = ERR_DBCREINCOMP;							\
-	if (TSD->file_corrupt && !mupip_jnl_recover && !TREF(in_mupip_integ) &&			\
+	if ((TSD)->file_corrupt && !mupip_jnl_recover && !TREF(in_mupip_integ) &&		\
 			!(IS_MUPIP_IMAGE && TREF(skip_file_corrupt_check)))			\
 	{											\
-		while (TSD->file_corrupt == (TRUE + 1)) /* temp condition during onl rlbck */	\
+		while ((TSD)->file_corrupt == (TRUE + 1)) /* temp condition during onl rlbck */	\
 		{										\
 			if (!is_logged)								\
 			{									\
@@ -2349,14 +2418,18 @@ MBSTART {											\
 					LEN_AND_LIT("Spin wait for clean DB header failed"));	\
 				break;								\
 			}									\
-			READ_DB_FILE_HEADER(REG, TSD, err);					\
-			if (err)								\
+			db_valid = read_db_file_header(FILE_INFO(REG), REG, TSD);		\
+			err = errno;								\
+			if (DB_INVALID < db_valid)						\
+				error_on_db_invalidity(REG2CSA(REG), REG, TSD, db_valid, err);	\
+			if (DB_VALID_DBGLDMISMATCH == db_valid)					\
 			{									\
 				REVERT;								\
 				return -1;							\
 			}									\
+			assert(DB_VALID == db_valid);						\
 		}										\
-		if (TSD->file_corrupt) /* Didn't clear (or wasn't temporary) */			\
+		if ((TSD)->file_corrupt) /* Didn't clear (or wasn't temporary) */		\
 		{										\
 			gtm_errcode = ERR_DBFLCORRP;						\
 		}										\
@@ -2645,7 +2718,11 @@ typedef struct	gd_region_struct
 	bool			statsDB_setup_started;
 	gd_addr			*owning_gd;
 	bool			statsDB_setup_completed;
-	char			filler[39];	/* filler to store runtime structures without changing gdeget/gdeput.m */
+	bool			privateDB_rename_completed;
+	bool			file_initialized;
+	bool			did_file_initialization;
+	unsigned int		statsdb_init_cycle;
+	char			filler[32];	/* filler to store runtime structures without changing gdeget/gdeput.m */
 } gd_region;
 
 typedef struct	sgmnt_addrs_struct
@@ -4111,7 +4188,7 @@ MBSTART {												\
 	assert(0 <= db_fsync_in_prog);									\
 } MBEND
 
-#define STANDALONE(x) mu_rndwn_file(x, TRUE)
+#define STANDALONE(x) mu_rndwn_file(x, TRUE, FALSE)
 #define DBFILOP_FAIL_MSG(status, msg)	gtm_putmsg_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(5) msg, 2,			\
 							DB_LEN_STR(gv_cur_region), status);
 
@@ -4153,6 +4230,7 @@ MBSTART {											\
 MBSTART {											\
 	file_control	*lcl_fc;								\
 	sgmnt_addrs	*csa;									\
+	unix_db_info	*udi;									\
 												\
 	lcl_fc = SEG->file_cntl;								\
 	if (NULL == lcl_fc)									\
@@ -4166,6 +4244,8 @@ MBSTART {											\
 		SEG->file_cntl->file_info = lcl_fc->file_info;					\
 		csa = &((unix_db_info *)(lcl_fc->file_info))->s_addrs;				\
 		csa->gvstats_rec_p = &csa->gvstats_rec;						\
+		udi = (unix_db_info *)lcl_fc->file_info;					\
+		udi->fd = FD_INVALID;								\
 	}											\
 } MBEND
 
@@ -4173,12 +4253,15 @@ MBSTART {											\
 MBSTART {								\
 	file_control	*lcl_fc;					\
 	sgmnt_addrs	*csa;						\
+	unix_db_info	*udi;						\
 									\
 	MALLOC_INIT(lcl_fc, SIZEOF(file_control));			\
 	MALLOC_INIT(lcl_fc->file_info, SIZEOF(unix_db_info));		\
 	SEG->file_cntl = lcl_fc;					\
 	csa = &((unix_db_info *)(lcl_fc->file_info))->s_addrs;		\
 	csa->gvstats_rec_p = &csa->gvstats_rec;				\
+	udi = (unix_db_info *)lcl_fc->file_info;			\
+	udi->fd = FD_INVALID;						\
 } MBEND
 
 #define	FILE_CNTL_FREE(SEG)						\
@@ -5285,7 +5368,7 @@ void		rel_lock(gd_region *reg);
 boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_is_wcs_recover);
 void		wcs_stale(TID tid, int4 hd_len, gd_region **region);
 
-void bmm_init(void);
+void bmm_init(sgmnt_data_ptr_t csd);
 block_id bmm_find_free(block_id hint, uchar_ptr_t base_addr, block_id total_bits);
 
 bool reg_cmcheck(gd_region *reg);

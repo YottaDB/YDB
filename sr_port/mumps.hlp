@@ -8554,6 +8554,30 @@
    then shifts with addition, and scales with multiplication to create a
    value between .01 and 1.
 
+2 $REPLACE()
+   $REPLACE()
+
+   Returns a string that results from replacing or dropping a substring in
+   the first of its arguments as specified by the patterns of its other
+   arguments.
+
+   The format for the $REPLACE function is:
+
+   $REPLACE(expr1[,expr2[,expr3]])
+
+3 Examples
+   Examples
+
+   Example:
+
+   GTM>write $replace("********","***","ABE")
+   ****ABE*
+   GTM>
+
+   $REPLACE() searches for the second expression "***" in the first
+   expression "********". Since "***" exists in the first expression, it
+   replaces the occurrence with the third expression "ABE".
+
 2 $REverse()
    $REverse()
 
@@ -8789,7 +8813,7 @@
 
    The format for the $TRANSLATE function is:
 
-   $TR[ANSLATE](expr1[,expr2[,expr3]])
+   $TR[ANSLATE](expr1[,expr2[,expr3[,expr4]]])
 
    The $TRANSLATE() algorithm can be understood as follows:
 
@@ -8840,6 +8864,21 @@
    Because the $TRANSLATE() has only two parameters in this example, it finds
    the characters in the first expression that also exist in the second
    expression and deletes them from the result.
+
+   Example:
+
+   GTM>write $translate("ENCYCLOPEDIA","AEIOU","","L")
+   NCYCLOPEDIA
+   GTM>write $translate("ENCYCLOPEDIA","AEIOU","","R")
+   ENCYCLOPED
+   GTM>write $translate("ENCYCLOPEDIA","AEIOU","","B")
+   NCYCLOPED
+   GTM>
+
+   This $TRANSLATE() example has four parameters, it finds the first
+   occurrence of 'E' from the left and first occurrence of 'I' and 'A' from
+   the right, and deletes(because the third parameter is null/empty) them
+   from the result.
 
 2 $View()
    $View()
@@ -10647,6 +10686,30 @@
 
    $ZPREVIOUS() is equivalent to $ORDER() with a second argument of -1.
 
+2 $ZREPLACE()
+   $ZREPLACE()
+
+   Returns a string that results from replacing or dropping byte substrings
+   in the first of its arguments as specified by the patterns of its other
+   arguments.
+
+   The format for the $ZREPLACE function is:
+
+   $ZREPLACE(expr1[,expr2[,expr3]])
+
+3 Examples
+   Examples
+
+   Example:
+
+   GTM>write $zreplace("ABCABCABCABC","AB","xyz")
+   xyzCxyzCxyzCxyzC
+   GTM>
+
+   $ZREPLACE() searches for the second expression "AB" in the first
+   expression "ABCABCABCABC". Since "AB" exists in the first expression(four
+   times), it replaces all four occurrences with the third expression "xyz".
+
 2 $ZSOCKET()
    $ZSOCKET()
 
@@ -11117,9 +11180,8 @@
 2 $ZTRNLNM()
    $ZTRNLNM()
 
-   The $ZTRNLNM function returns the value of an environment variable.The
-   $ZTRNLNM function is analogous to the DCL Lexical function F$TRNLNM on
-   OpenVMS.
+   The $ZTRNLNM() function returns the value of an environment variable.The
+   $ZTRNLNM() function is analogous to the getenv() function on Unix.
 
    **Note**
 
@@ -11131,11 +11193,8 @@
 
    expr1 specifies the environment variable whose value needs to be returned.
 
-   expr2 to expr5 are OpenVMS-related expressions that specify logical name
-   table(s), index (numbered from 0), initial mode of the look-up, and a
-   value indicating whether the look-up is case sensitive. To ensure
-   interoperability between UNIX and OpenVMS versions, $ZTRNLNM() on UNIX
-   accepts these expressions and ignores them.
+   expr2 to expr5 are optional and currently accepted, but ignored, by
+   $ZTRNLNM().
 
    The optional expr6 specifies any one of the following keywords:
 
@@ -11148,6 +11207,9 @@
    |--------------+--------------------------------------|
    | VALUE        | Returns the translation.             |
    +-----------------------------------------------------+
+
+   On Unix, if the specified environment variable does not exist, $ZTRNLMN()
+   returns an empty string for all operations including LENGTH.
 
 3 Examples
    Examples
@@ -12570,11 +12632,11 @@
 2 $ZMAXTPTIme
    $ZMAXTPTIme
 
-   $ZMAXTPTI[ME] contains a value between zero (0) and 60 in seconds with
-   millisecond precision indicating the time duration GT.M should wait for
-   the completion of all activities fenced by the current transaction's
-   outermost TSTART/TCOMMIT pair. Values outside the accepted range leave the
-   current value unchanged.
+   $ZMAXTPTI[ME] contains a value in seconds with millisecond precision
+   indicating the time duration GT.M should wait for the completion of all
+   activities fenced by the current transaction's outermost TSTART/TCOMMIT
+   pair. A SET to a value outside the accepted range of zero (0) and 60
+   leaves the current value unchanged.
 
    $ZMAXTPTIME can be SET but cannot be NEWed.
 
@@ -16493,8 +16555,8 @@
    The INDEPENDENT deviceparameter specifies that the newly created process
    will not be terminated by the CLOSE of the device. The input and output of
    INDEPENDENT processes should be handled in such a way that it runs
-   independently even after the CLOSE of the device. By default, CLOSE
-   terminates the process associated with the PIPE device.
+   independently even after the CLOSE of the device. By default, CLOSE waits
+   for the termination of the process associated with the PIPE device.
 
 5 IKEY
    IKEY
@@ -16981,9 +17043,7 @@
 5 REWIND
    REWIND
 
-   REWIND Applies to: SD FIFO PIPE
-
-   REWIND Applies to: Sequential Files, FIFO, PIPE
+   REWIND Applies to: FIFO PIPE SD
 
    REWIND positions the file pointer of a sequential disk.
 
@@ -18107,7 +18167,7 @@
 5 INREWIND
    INREWIND
 
-   Applies to: SD FIFO PIPE
+   Applies to: FIFO PIPE SD
 
    Performs a REWIND on input when $PRINCIPAL identifies a device that
    supports REWIND. Use this deviceparameter with $PRINCIPAL when redirected
@@ -18283,7 +18343,7 @@
 5 OUTREWIND
    OUTREWIND
 
-   Applies to: SD FIFO PIPE
+   Applies to: FIFO PIPE SD
 
    Performs a REWIND on output when $PRINCIPAL identifies a device that
    supports REWIND. Use this deviceparameter with $PRINCIPAL when redirected
@@ -18331,7 +18391,7 @@
 5 REWIND
    REWIND
 
-   REWIND Applies to: SD FIFO PIPE
+   REWIND Applies to: FIFO PIPE SD
 
    REWIND places the file pointer to the beginning of the file.
 

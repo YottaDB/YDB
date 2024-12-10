@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -101,6 +101,7 @@ void	gvcmz_neterr(INTPTR_T *err)
 					{
 						/* If it's a CM-accessed region via the current (error-generating) link: */
 						region->open = FALSE;
+						region->file_initialized = region->did_file_initialization = FALSE;
 						region->dyn.addr->acc_meth = dba_bg;
 					}
 		}

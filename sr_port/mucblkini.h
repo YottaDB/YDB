@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -13,6 +13,6 @@
 #ifndef MUCBLKINI_INCLUDED
 #define MUCBLKINI_INCLUDED
 
-void mucblkini(enum db_ver desired_db_ver);
+unsigned char mucblkini(gd_region *reg, enum db_ver desired_db_ver);
 
 #endif /* MUCBLKINI_INCLUDED */

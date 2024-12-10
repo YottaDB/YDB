@@ -132,10 +132,10 @@
 
                                      *** TEMPLATES ***
                                                                              Std      Inst
-                                                Def      Rec   Key Null      Null     Freeze Qdb   Epoch              LOCK
-    Region                                     Coll     Size  Size Subs      Coll Jnl on Err Rndwn Taper AutoDB Stats Crit
-    ----------------------------------------------------------------------------------------------------------------------
-    <default>                                     0      256    64 NEVER     N    N   N      N     Y     N      Y     Sep
+                                                Def      Rec   Key Null      Null     Freeze Qdb   Epoch              LOCK Auto
+    Region                                     Coll     Size  Size Subs      Coll Jnl on Err Rndwn Taper AutoDB Stats Crit Del
+    ---------------------------------------------------------------------------------------------------------------------------
+    <default>                                     0      256    64 NEVER     N    N   N      N     Y     N      Y     Sep  N
     Segment          Active              Acc Typ Block      Alloc Exten    Options
     ------------------------------------------------------------------------------
     <default>          *                 BG  DYN  4096        100   100    GLOB =1024
@@ -157,10 +157,10 @@
     *                                  DEFAULT
                                    *** REGIONS ***
                                                                                                   Std      Inst
-                                    Dynamic                          Def      Rec   Key Null      Null     Freeze Qdb   Epoch              LOCK
-    Region                          Segment                         Coll     Size  Size Subs      Coll Jnl on Err Rndwn Taper AutoDB Stats Crit
-    -------------------------------------------------------------------------------------------------------------------------------------------
-    DEFAULT                         DEFAULT                            0      256    64 NEVER     N    N   N      N     Y     N      Y     Sep
+                                    Dynamic                          Def      Rec   Key Null      Null     Freeze Qdb   Epoch              LOCK Auto
+    Region                          Segment                         Coll     Size  Size Subs      Coll Jnl on Err Rndwn Taper AutoDB Stats Crit Del
+    ------------------------------------------------------------------------------------------------------------------------------------------------
+    DEFAULT                         DEFAULT                            0      256    64 NEVER     N    N   N      N     Y     N      Y     Sep  N
                                    *** SEGMENTS ***
     Segment                         File (def ext: .dat)Acc Typ Block      Alloc Exten     Options
     ----------------------------------------------------------------------------------------------
@@ -261,6 +261,7 @@
    AIO                    -[NO]ASYNCIO
    Alloc                  -ALLOCATION
    AutoDB                 -[NO]AUTODB
+   AutoDel                -[NO]AUTODELETE
    AutoSwitch             -AUTOSWITCHLIMIT
    Block                  -BLOCK_SIZE
    Buff                   -BUFFER_SIZE
@@ -1200,7 +1201,7 @@
    The following -REGION qualifiers can be used with the ADD, CHANGE, or
    TEMPLATE commands.
 
-   -[NO]AU[TODB]
+   -[NO]AUTODB
 
    Specifies whether GT.M should implicitly create a database file for the
    region if none exists when a process attempts to access it. Because it
@@ -1211,6 +1212,20 @@
    operation procedures.
 
    The default is NOAUTODB.
+
+   -[NO]AUTODE[LETE]
+
+   Specifies whether GT.M should automatically delete the database file
+   associated with an -AUTODB region when the last process accessing the file
+   exits or, in case of a semaphore overflow, when the region is rundown with
+   a MUPIP rundown. AUTODELETE regions may not have journaling enabled.
+   STATSDBs are a special case of AUTODELETE databases. An AUTODELETE region,
+   except in case of semaphore overflow or requiring rundown for other reason
+   (which will be noted in the syslog), will be promptly deleted by the last
+   GT.M process accessing the database to exit; users should take care not to
+   use such a database for persistent data.
+
+   The default is NOAUTODELETE.
 
    -C[OLLATION_DEFAULT]=number
 

@@ -260,6 +260,7 @@ LITDEF nametabent fun_names[] =
 	,{2, "QS"}, {10, "QSUBSCRIPT"}
 	,{5, "QUERY"}
 	,{1, "R"}, {6, "RANDOM"}
+	,{7, "REPLACE"}
 	,{2, "RE"}, {7, "REVERSE"}
 	,{1, "S"}, {6, "SELECT"}
 	,{2, "ST"}, {5, "STACK"}
@@ -303,6 +304,7 @@ LITDEF nametabent fun_names[] =
 	,{6, "ZPIECE"}
 	,{9, "ZPREVIOUS"}
 	,{8, "ZQGBLMOD"}
+	,{8, "ZREPLACE"}
 	,{7, "ZSEARCH"}
 	,{8, "ZSIGPROC"}
 	,{7, "ZSOCKET"}
@@ -320,7 +322,7 @@ LITDEF unsigned char fun_index[27] =
 {
 	 0,  2,  2,  4,  6,  8, 12, 14, 14,	/* a b c d e f g h i */
 	17, 19, 19, 21, 21, 25, 27, 29, 35,	/* j k l m n o p q r */
-	39, 43, 47, 47, 49, 49, 49, 49, 96	/* s t u v w x y z ~ */
+	40, 44, 48, 48, 50, 50, 50, 50, 98	/* s t u v w x y z ~ */
 };
 
 /* Each entry corresponds to an entry in fun_names */
@@ -346,6 +348,7 @@ LITDEF fun_data_type fun_data[] =
 	,{ OC_FNQSUBSCR, ALL_SYS }, { OC_FNQSUBSCR, ALL_SYS }
 	,{ OC_FNQUERY, ALL_SYS }
 	,{ OC_FNRANDOM, ALL_SYS }, { OC_FNRANDOM, ALL_SYS }
+	,{ OC_FNREPLACE, ALL_SYS }
 	,{ OC_FNREVERSE, ALL_SYS }, { OC_FNREVERSE, ALL_SYS }
 	,{ OC_PASSTHRU, ALL_SYS }, { OC_PASSTHRU, ALL_SYS }	/* f_select creates a STOTEMP and STOs anchored by a PASSTHRU */
 	,{ OC_FNSTACK1, ALL_SYS }, { OC_FNSTACK1, ALL_SYS }
@@ -389,6 +392,7 @@ LITDEF fun_data_type fun_data[] =
 	,{ OC_FNZPIECE, ALL_SYS }
 	,{ OC_FNZPREVIOUS, ALL_SYS }
 	,{ OC_FNZQGBLMOD, ALL_SYS }
+	,{ OC_FNZREPLACE, ALL_SYS }
 	,{ OC_FNZSEA, ALL_SYS }
 	,{ OC_FNZSIGPROC, ALL_SYS }
 	,{ OC_FNZSOCKET, ALL_SYS }
@@ -424,6 +428,7 @@ GBLDEF int (*fun_parse[])(oprtype *, opctype) =		/* contains addresses so can't 
 	f_qsubscript, f_qsubscript,
 	f_query,
 	f_mint, f_mint,
+	f_replace,
 	f_reverse, f_reverse,
 	f_select, f_select,
 	f_stack, f_stack,
@@ -467,6 +472,7 @@ GBLDEF int (*fun_parse[])(oprtype *, opctype) =		/* contains addresses so can't 
 	f_piece,
 	f_zprevious,
 	f_zqgblmod,
+	f_replace,
 	f_zsearch,
 	f_zsigproc,
 	f_zsocket,
@@ -583,6 +589,9 @@ int expritem(oprtype *a)
 						break;
 					case OC_FNPIECE:
 						index = namelook(fun_index, fun_names, "zpiece", 6);
+						break;
+					case OC_FNREPLACE:
+						index = namelook(fun_index, fun_names, "zreplace", 8);
 						break;
 					case OC_FNTRANSLATE:
 						index = namelook(fun_index, fun_names, "ztranslate", 10);

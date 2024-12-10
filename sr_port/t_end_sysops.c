@@ -90,6 +90,8 @@
 #include "shmpool.h"		/* Needed for the shmpool structures */
 #include "db_snapshot.h"
 #include "wcs_wt.h"
+#include "mu_upgrade_bmm.h"	/* for MUPIP_REORG_UPGRADE_NOW_SPLITTING */
+#include "inline_atomic_pid.h"
 
 error_def(ERR_DBFILERR);
 error_def(ERR_FREEBLKSLOW);
@@ -270,7 +272,7 @@ void bm_update(cw_set_element *cs, sm_uc_ptr_t lclmap, boolean_t is_mm)
 			assert((1 == cw_set_depth)
 				|| ((2 == cw_set_depth) && (gds_t_busy2free == (cs-1)->old_mode)));
 			/* When deleting pre-V7m index blocks, decrement blks_to_upgrd */
-			if (!mu_upgrade_in_prog && (0 != inctn_detail.blknum_struct.blknum)
+			if ((MUPIP_REORG_UPGRADE_NOW_SPLITTING >= mu_upgrade_in_prog) && (0 != inctn_detail.blknum_struct.blknum)
 					&& (!cs_data->fully_upgraded && (GDSV6 < cs_data->desired_db_format))
 					&& (GDSV7m > (cs-1)->ondsk_blkver) && !(cs-1)->done)
 			{
@@ -379,8 +381,9 @@ enum cdb_sc mm_update(cw_set_element *cs, trans_num ctn, trans_num effective_tn,
 							REG_LEN_STR(gv_cur_region), &cs->blk, cs->ondsk_blkver,
 							cs->level, cs->mode);
 #endif
-				} else if (!mu_upgrade_in_prog && (0 == cs->level) && (GDSV6 == cs->ondsk_blkver)
-						&& (gds_t_write_recycled != cs->mode) && !cs->done)
+				} else if ((MUPIP_REORG_UPGRADE_NOW_SPLITTING >= mu_upgrade_in_prog) && (0 == cs->level)
+						&& !cs->done && (GDSV6 == cs->ondsk_blkver)
+						&& (gds_t_write_recycled != cs->mode))
 				{	/* Level zero block, update the header and decrement blks_to_upgrd */
 					DECR_BLKS_TO_UPGRD(cs_addrs, cs_data, 1);
 #ifdef					DEBUG_BLKS_TO_UPGRD
@@ -390,7 +393,7 @@ enum cdb_sc mm_update(cw_set_element *cs, trans_num ctn, trans_num effective_tn,
 #endif
 					cs->ondsk_blkver = cs_data->desired_db_format;
 				}
-			} else if ((GDSV7m == cs->ondsk_blkver) && mu_upgrade_in_prog)
+			} else if ((GDSV7m == cs->ondsk_blkver) && (MUPIP_REORG_UPGRADE_NOW_SPLITTING < mu_upgrade_in_prog))
 			{					/* Decrement blks_to_upgrd for new V7m blocks */
 				DECR_BLKS_TO_UPGRD(cs_addrs, cs_data, 1);
 #ifdef				DEBUG_BLKS_TO_UPGRD
@@ -603,6 +606,8 @@ enum cdb_sc bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 		 * new cr with cr->stopped=TRUE got created).
 		 */
 		cr->in_tend = process_id;
+		if (gds_t_writemap == mode)
+			BML_RSRV_SET(cr, blkid, process_id);
 		assert(0 == cr->dirty);
 		/* Even though the buffer is not in the active (or wip queue if csd->asyncio is ON) and we are in crit, it is
 		 * possible for the cache-record to have the write interlock still set. This is because in wcs_wtstart
@@ -626,6 +631,8 @@ enum cdb_sc bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 				send_msg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_WCBLOCKED,
 						6, LEN_AND_LIT("wcb_t_end_sysops_dirtystuck1"), process_id, &ctn,
 						DB_LEN_STR(gv_cur_region));
+				if (gds_t_writemap == mode)
+					BML_RSRV_IF_EXP(cr, CR_BLKEMPTY, process_id, 0);
 				cr->in_tend = 0;
 				return cdb_sc_cacheprob;
 			}
@@ -670,6 +677,8 @@ enum cdb_sc bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 		assert(0 == cr->in_tend);
 		assert(0 == cr->data_invalid);
 		cr->in_tend = process_id;
+		if (gds_t_writemap == mode)
+			BML_RSRV_SET(cr, blkid, process_id);
 		wait_for_rip = FALSE;
 		/* If we find the buffer we intend to update is concurrently being flushed to disk,
 		 *	a) If asyncio=OFF, writes are to the filesystem cache (which are relatively fast) so wait for the
@@ -692,6 +701,8 @@ enum cdb_sc bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 					send_msg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_WCBLOCKED,
 							6, LEN_AND_LIT("wcb_t_end_sysops_dirtystuck2"),
 							process_id, &ctn, DB_LEN_STR(gv_cur_region));
+					if (gds_t_writemap == mode)
+						BML_RSRV_IF_EXP(cr, CR_BLKEMPTY, process_id, 0);
 					cr->in_tend = 0;
 					return cdb_sc_cacheprob;
 				}
@@ -748,6 +759,8 @@ enum cdb_sc bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 					send_msg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_WCBLOCKED, 6,
 							LEN_AND_LIT("wcb_t_end_sysops_dirty_invcr"),
 							process_id, &ctn, DB_LEN_STR(gv_cur_region));
+					if (gds_t_writemap == mode)
+						BML_RSRV_IF_EXP(cr, CR_BLKEMPTY, process_id, 0);
 					cr->in_tend = 0;
 					return cdb_sc_cacheprob;
 				}
@@ -774,6 +787,8 @@ enum cdb_sc bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 							PIN_CACHE_RECORD(cr_new, cr_array, cr_array_index);
 						} else
 							TP_PIN_CACHE_RECORD(cr_new, si);
+						if (gds_t_writemap == mode)
+							BML_RSRV_IF_EXP(cr, CR_BLKEMPTY, process_id, 0);
 						assert(process_id == cr->in_tend);
 						cr->in_tend = 0;
 						cr_new->in_tend = process_id;
@@ -782,6 +797,7 @@ enum cdb_sc bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 						{	/* gvcst_map_build doesn't do first_copy */
 							memcpy(GDS_REL2ABS(cr_new->buffaddr), GDS_REL2ABS(cr->buffaddr),
 													BM_SIZE(csd->bplmap));
+							BML_RSRV_SET(cr_new, blkid, process_id);
 						}
 						/* form twin*/
 						cr_new->twin = GDS_ABS2REL(cr);
@@ -892,6 +908,8 @@ enum cdb_sc bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 				send_msg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_WCBLOCKED, 6,
 					LEN_AND_LIT("wcb_t_end_sysops_dirtyripwait"),
 					process_id, &ctn, DB_LEN_STR(gv_cur_region));
+				if (gds_t_writemap == mode)
+					BML_RSRV_IF_EXP(cr, CR_BLKEMPTY, process_id, 0);
 				cr->in_tend = 0;
 				return cdb_sc_cacheprob;
 			}
@@ -948,8 +966,8 @@ enum cdb_sc bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 				util_out_print("!UL + 0x!@XQ !AD:0x!@XQ:!UL:!UL:!UL", TRUE, cs_data->blks_to_upgrd, &ctn,
 						REG_LEN_STR(gv_cur_region), &cs->blk, cs->ondsk_blkver, cs->level, cs->mode);
 #endif
-			} else if (!mu_upgrade_in_prog && (0 == cs->level) && (GDSV6 == cs->ondsk_blkver)
-					&& (gds_t_write_recycled != cs->mode) && !cs->done)
+			} else if ((MUPIP_REORG_UPGRADE_NOW_SPLITTING >= mu_upgrade_in_prog) && (0 == cs->level)
+					&& (GDSV6 == cs->ondsk_blkver) && (gds_t_write_recycled != cs->mode) && !cs->done)
 			{	/* Level zero block, update the header and decrement blks_to_upgrd */
 				DECR_BLKS_TO_UPGRD(cs_addrs, cs_data, 1);
 #ifdef				DEBUG_BLKS_TO_UPGRD
@@ -958,7 +976,7 @@ enum cdb_sc bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 #endif
 				cr->ondsk_blkver = cs->ondsk_blkver = cs_data->desired_db_format;
 			}
-		} else if ((GDSV7m == cs->ondsk_blkver) && mu_upgrade_in_prog)
+		} else if ((GDSV7m == cs->ondsk_blkver) && (MUPIP_REORG_UPGRADE_NOW_SPLITTING < mu_upgrade_in_prog))
 		{
 			DECR_BLKS_TO_UPGRD(csa, csd, 1);	/* Decrement in transition block */
 #ifdef			DEBUG_BLKS_TO_UPGRD

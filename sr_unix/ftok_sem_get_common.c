@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -102,16 +102,11 @@ boolean_t ftok_sem_get_common(gd_region *reg, boolean_t incr_cnt, int project_id
 {
 	int			status = SS_NORMAL, save_errno;
 	int			ftok_sopcnt, sem_pid;
-	uint4			lcnt, loopcnt;
+	uint4			lcnt;
 	unix_db_info		*udi;
-	union semun		semarg;
-	sgmnt_addrs             *csa;
-	node_local_ptr_t        cnl;
-	boolean_t		shared_mem_available, sem_known_removed;
-	int4			lcl_ftok_ops_index;
+	boolean_t		sem_known_removed;
 	key_t			ftokid;
 	struct sembuf		ftok_sop[3];
-	char			*msgstr;
 
 	DCL_THREADGBL_ACCESS;
 

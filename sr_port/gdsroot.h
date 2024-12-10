@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -134,8 +134,6 @@ enum db_acc_method
 	n_dba,
 	dba_dummy = 0x0ffffff	/* to ensure an int on S390 */
 };
-
-#define CREATE_IN_PROGRESS n_dba
 
 /* the following definitions are warped by history, but cleanup is fraught because they are embedded in files */
 typedef struct

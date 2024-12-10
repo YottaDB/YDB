@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -38,6 +38,7 @@
 #include "have_crit.h"
 
 GBLREF gd_region		*db_init_region;
+GBLREF uint4			process_id;
 
 error_def(ERR_VERMISMATCH);
 
@@ -53,8 +54,10 @@ void db_init_err_cleanup(boolean_t retry_dbinit)
 	unix_db_info		*udi;
 	gd_segment		*seg;
 	sgmnt_addrs		*csa;
+	DEBUG_ONLY(struct shmid_ds		shm_buf;)
 	int			rc, lcl_new_dbinit_ipc;
 	boolean_t		ftok_counter_halted, access_counter_halted, decrement_ftok_counter;
+	boolean_t		shm_owner, have_access, have_ftok, we_are_last_user;
 
 	/* Here, we can not rely on the validity of csa->hdr because this function can be triggered anywhere in db_init().Because
 	 * we don't have access to file header, we can not know if counters are disabled so we go by our best guess, not disabled,
@@ -67,9 +70,6 @@ void db_init_err_cleanup(boolean_t retry_dbinit)
 		udi = FILE_INFO(db_init_region);
 	if (NULL != udi)
 	{
-		if (FD_INVALID != udi->fd && !retry_dbinit)
-			CLOSEFILE_RESET(udi->fd, rc);	/* resets "udi->fd" to FD_INVALID */
-		assert(FD_INVALID == udi->fd || retry_dbinit);
 		csa = &udi->s_addrs;
 #		ifdef _AIX
 		if ((NULL != csa->hdr) && (dba_mm == db_init_region->dyn.addr->acc_meth))
@@ -105,10 +105,29 @@ void db_init_err_cleanup(boolean_t retry_dbinit)
 		}
 		if (udi->shm_created && (INVALID_SHMID != udi->shmid))
 		{
+			assert((-1 != shmctl(udi->shmid, IPC_STAT, &shm_buf)) && (0 == shm_buf.shm_nattch));
+			shm_owner = TRUE;
 			assert(INVALID_SHMID == csa->mlkhash_shmid);
 			shm_rmid(udi->shmid);
 			udi->shmid = INVALID_SHMID;
 			udi->shm_created = FALSE;
+		} else
+			shm_owner = FALSE;
+		/* The following code along with the shm_owner logic above should be maintained in concert with the safe_mode
+		 * and we_are_last_user variables in gds_rundown.
+		 */
+		have_ftok = udi->grabbed_ftok_sem;
+		/* Since we_are_last_user only happens if we created the shm, vermismatch not possible. Ignore inst frozen since
+		 * this is deleting a database file that only this process has ever used (and only abortively during
+		 * initialization).
+		 */
+		we_are_last_user = shm_owner && have_ftok && !ftok_counter_halted;
+		if (we_are_last_user && IS_AUTODELETE_REG(db_init_region) && !retry_dbinit)
+		{
+			DBGRDB((stderr, "%s:%d:%s: process id %d autodeleting autodb file %s for region %s\n", __FILE__, __LINE__,
+						__func__, process_id, (db_init_region)->dyn.addr->fname, (db_init_region)->rname));
+			rc = UNLINK((char *)(db_init_region)->dyn.addr->fname);
+			assert(0 == rc);
 		}
 		if (udi->sem_created && (INVALID_SEMID != udi->semid))
 		{
@@ -117,7 +136,8 @@ void db_init_err_cleanup(boolean_t retry_dbinit)
 			udi->sem_created = FALSE;
 			udi->grabbed_access_sem = FALSE;
 			udi->counter_acc_incremented = FALSE;
-		}
+		} else
+			assert(!we_are_last_user);
 		if (udi->counter_acc_incremented && !access_counter_halted)
 		{
 			assert((INVALID_SEMID != udi->semid) && !db_init_region->read_only);
@@ -130,6 +150,10 @@ void db_init_err_cleanup(boolean_t retry_dbinit)
 			do_semop(udi->semid, DB_CONTROL_SEM, -1, SEM_UNDO | IPC_NOWAIT); /* release the startup-shutdown sem */
 			udi->grabbed_access_sem = FALSE;
 		}
+		if (FD_INVALID != udi->fd && !retry_dbinit)
+			CLOSEFILE_RESET(udi->fd, rc);	/* resets "udi->fd" to FD_INVALID */
+		assert(FD_INVALID == udi->fd || retry_dbinit);
+
 		decrement_ftok_counter = udi->counter_ftok_incremented
 						? (ftok_counter_halted ? DECR_CNT_SAFE : DECR_CNT_TRUE)
 						: DECR_CNT_FALSE;
@@ -148,6 +172,7 @@ void db_init_err_cleanup(boolean_t retry_dbinit)
 			free(seg->file_cntl);
 			seg->file_cntl = NULL;
 		}
+
 	}
 	/* Enable interrupts in case we are here with intrpt_ok_state == INTRPT_IN_GVCST_INIT due to an rts error.
 	 * Normally we would have the new state stored in "prev_intrpt_state" but that is not possible here because
@@ -155,5 +180,8 @@ void db_init_err_cleanup(boolean_t retry_dbinit)
 	 * there that the previous state was INTRPT_OK_TO_INTERRUPT and use that instead of prev_intrpt_state here.
 	 */
 	if (!retry_dbinit)
+	{
+		db_init_region->did_file_initialization = db_init_region->file_initialized = FALSE;
 		ENABLE_INTERRUPTS(INTRPT_IN_GVCST_INIT, INTRPT_OK_TO_INTERRUPT);
+	}
 }

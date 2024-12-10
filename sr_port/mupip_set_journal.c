@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -217,7 +217,7 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 			 */
 			gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_OFRZACTIVE, 2, DB_LEN_STR(gv_cur_region));
 			exit_status |= EXIT_WRN;
-			gds_rundown_status = gds_rundown(CLEANUP_UDI_TRUE);
+			gds_rundown_status = gds_rundown(CLEANUP_UDI_TRUE, FALSE);
 			exit_status |= gds_rundown_status;
 			rptr->sd = NULL;
 			rptr->state = NONALLOCATED;	/* This means do not call "gds_rundown" again for this region
@@ -230,7 +230,7 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 		if (EXIT_NRM != (status = mupip_set_journal_newstate(&jnl_options, &jnl_info, rptr)))
 		{
 			exit_status |= status;
-			gds_rundown_status = gds_rundown(CLEANUP_UDI_TRUE);
+			gds_rundown_status = gds_rundown(CLEANUP_UDI_TRUE, FALSE);
 			exit_status |= gds_rundown_status;
 			rptr->sd = NULL;
 			rptr->state = NONALLOCATED;	/* This means do not call "gds_rundown" again for this region
@@ -269,7 +269,7 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 			/* Rundown the database file since we did "gvcst_init" and now will call "mu_rndwn_file".
 			 * Since we are going to reuse the udi etc. that was allocated, use CLEANUP_UDI_FALSE.
 			 */
-			gds_rundown_status = gds_rundown(CLEANUP_UDI_FALSE);
+			gds_rundown_status = gds_rundown(CLEANUP_UDI_FALSE, FALSE);
 			exit_status |= gds_rundown_status;
 			rptr->state = NONALLOCATED;
 			rptr->sd = csd = NULL;

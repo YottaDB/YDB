@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -778,7 +778,7 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 			{
 				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
 				exit_stat |= EXIT_ERR;
-				gds_rundown(CLEANUP_UDI_TRUE);
+				gds_rundown(CLEANUP_UDI_TRUE, FALSE);
 				mu_gv_cur_reg_free();
 				continue;
 			}
@@ -790,7 +790,7 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 				gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_OFRZACTIVE, 2,
 							DB_LEN_STR(gv_cur_region));
 				exit_stat |= EXIT_WRN;
-				exit_stat |= gds_rundown(CLEANUP_UDI_TRUE);
+				exit_stat |= gds_rundown(CLEANUP_UDI_TRUE, FALSE);
 				mu_gv_cur_reg_free();
 				continue;
 			}
@@ -1116,7 +1116,7 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 		} else
 		{
 			rel_crit(gv_cur_region);
-			exit_stat |= gds_rundown(CLEANUP_UDI_TRUE);
+			exit_stat |= gds_rundown(CLEANUP_UDI_TRUE, FALSE);
 		}
 		mu_gv_cur_reg_free();
 	}

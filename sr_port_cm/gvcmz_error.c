@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,6 +23,16 @@
 #include "gtm_string.h"
 #include "gvcmz.h"
 
+error_def(ERR_GVDATAFAIL);
+error_def(ERR_GVGETFAIL);
+error_def(ERR_GVKILLFAIL);
+error_def(ERR_GVORDERFAIL);
+error_def(ERR_GVQUERYFAIL);
+error_def(ERR_GVPUTFAIL);
+error_def(ERR_GVZPREVFAIL);
+error_def(ERR_NETLCKFAIL);
+error_def(ERR_NETFAIL);
+
 GBLREF gd_region *gv_cur_region;
 GBLREF gv_key *gv_currkey;
 
@@ -30,15 +41,6 @@ void gvcmz_error(char code, uint4 status)
 	INTPTR_T	err[6], *ptr;
 	bool		gv_error;
 
-	error_def(ERR_GVDATAFAIL);
-	error_def(ERR_GVGETFAIL);
-	error_def(ERR_GVKILLFAIL);
-	error_def(ERR_GVORDERFAIL);
-	error_def(ERR_GVQUERYFAIL);
-	error_def(ERR_GVPUTFAIL);
-	error_def(ERR_GVZPREVFAIL);
-	error_def(ERR_NETLCKFAIL);
-	error_def(ERR_NETFAIL);
 
 	switch(code)
 	{
@@ -56,6 +58,7 @@ void gvcmz_error(char code, uint4 status)
 			break;
 		default:
 			gv_cur_region->open = FALSE;
+			gv_cur_region->file_initialized = gv_cur_region->did_file_initialization = FALSE;
 			gv_cur_region->dyn.addr->acc_meth = dba_bg;
 			memset(gv_currkey->base,0,gv_currkey->end + 1);
 			break;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -62,6 +62,7 @@
 #include "recover_truncate.h"
 #include "repl_msg.h"		/* for gtmsource.h */
 #include "gtmsource.h"		/* for jnlpool_addrs_ptr_t */
+#include "inline_atomic_pid.h"
 
 GBLREF	boolean_t		is_src_server;
 GBLREF	boolean_t		mupip_jnl_recover;
@@ -453,6 +454,7 @@ void wcs_recover(gd_region *reg)
 					cr->twin = cr_alt->twin;		/* existing cache record may have a twin */
 					cr_alt->cycle++; /* increment cycle whenever blk number changes (tp_hist depends on this) */
 					cr_alt->blk = CR_BLKEMPTY;
+					BML_RSRV_RESET(cr_alt);
 					cr_alt->dirty = 0;
 					cr_alt->flushed_dirty_tn = 0;
 					cr_alt->in_tend = 0;
@@ -481,6 +483,7 @@ void wcs_recover(gd_region *reg)
 			cr->bt_index = GDS_ANY_ABS2REL(csa, bt);
 			cr->dirty = csd->trans_hist.curr_tn;
 			cr->flushed_dirty_tn = 0;	/* need to be less than cr->dirty. we choose 0. */
+			BML_RSRV_RESET(cr);
 			cr->epid = 0;
 			cr->in_tend = 0;
 			cr->data_invalid = 0;
@@ -516,6 +519,7 @@ void wcs_recover(gd_region *reg)
 		{	/* cache record has no valid buffer attached, or its contents are in the database */
 			cr->cycle++;	/* increment cycle whenever blk number changes (tp_hist depends on this) */
 			cr->blk = CR_BLKEMPTY;
+			BML_RSRV_RESET(cr);
 			cr->bt_index = 0;
 			cr->data_invalid = 0;
 			cr->dirty = 0;

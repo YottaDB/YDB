@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -62,6 +62,7 @@ mu_swap_blk.c:
 #include "mupip_reorg.h"
 #include "gvcst_protos.h"	/* for gvcst_search prototype */
 #include "jnl_get_checksum.h"
+#include "inline_atomic_pid.h"
 
 GBLREF gv_namehead	*gv_target;
 GBLREF gv_namehead	*reset_gv_target;
@@ -69,6 +70,7 @@ GBLREF gv_namehead	*reorg_gv_target;
 GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF sgmnt_data_ptr_t	cs_data;
 GBLREF char		*update_array, *update_array_ptr;
+GBLREF uint4		process_id;
 GBLREF uint4		update_array_size;	/* for the BLK_* macros */
 GBLREF uint4		t_err;
 GBLREF cw_set_element	cw_set[];
@@ -101,7 +103,7 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 	enum cdb_sc		status;
 	enum db_ver		dest_blk_ver, work_blk_ver;
 	gv_namehead		*save_targ;
-	int			blk_seg_cnt, blk_size, first_offset, key_len, key_len_dir, nslevel, piece_len1, piece_len2,
+	int			blk_seg_cnt, blk_size, first_offset, key_len, key_len_dir, lcnt, nslevel, piece_len1, piece_len2,
 				rec_size1, rec_size2, second_offset, wlevel;
 	int			dest_blk_id_sz = 0, dest_blk_level = -1, dest_blk_size, dest_child_cycle;
 	int			dest_parent_id_sz, dest_parent_size = 0;
@@ -111,7 +113,7 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 	sgmnt_addrs		*csa;
 	sm_uc_ptr_t		bmp_buff, bn_ptr, dest_blk_ptr = NULL, dest_parent_ptr = NULL, key_base, rec_base, saved_blk,
 				tblk_ptr, work_blk_ptr, work_parent_ptr;
-	srch_blk_status		bmlhist, destblkhist, *hist_ptr, *work_blk_stat;
+	srch_blk_status		bmlhist, bmlhist2, destblkhist, *hist_ptr, *work_blk_stat;
 	srch_hist		*dest_hist_ptr, *dir_hist_ptr;
 	trans_num		ctn;
 	unsigned char		save_cw_set_depth, x_blk_lmap;
@@ -198,6 +200,7 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 		 * if bitmap indicates block is free, we will not read the destination block
 		 */
 		bmp_buff = get_lmap(dest_blk_id, &x_blk_lmap, (sm_int_ptr_t)&bmlhist.cycle, &bmlhist.cr);
+		assert((!bmlhist.cr) || (process_id != bmlhist.cr->bml_pin));
 		if (!bmp_buff || BLK_MAPINVALID == x_blk_lmap ||
 			((blk_hdr_ptr_t)bmp_buff)->bsiz != BM_SIZE(BLKS_PER_LMAP) ||
 			((blk_hdr_ptr_t)bmp_buff)->levl != LCL_MAP_LEVL)
@@ -650,6 +653,31 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 		 * kill_set_ptr will save the block which will become free.
 		 */
 		child1 = ROUND_DOWN2(dest_blk_id, BLKS_PER_LMAP); /* bit map block */
+		if (bmlhist.cr && (0 == upg_mv_block) && (dba_bg == cs_data->acc_meth))
+		{	/* Pre-pin the BML's CR if there is one to pin */
+			lcnt = ((CDB_STAGNATE > t_tries) ? DIVIDE_ROUND_UP(cs_data->trans_hist.total_blks, BLKS_PER_LMAP) : 0) + 1;
+			do
+			{
+				assert((!bmlhist.cr) || (process_id != bmlhist.cr->bml_pin));
+				TREF(tqread_grab_bml) = (dba_bg == cs_data->acc_meth)
+					&& (DEFAULT_BITMAP_PREPIN == cs_data->nobitmap_prepin);
+				bmp_buff = get_lmap(child1, &x_blk_lmap, (sm_int_ptr_t)&bmlhist2.cycle, &bmlhist2.cr);
+				assert((!bmlhist2.cr) || (bmp_buff) || (process_id != bmlhist2.cr->bml_pin));
+			} while ((0 < lcnt--) && (NULL == bmp_buff) && (cdb_sc_tqreadnowait == (enum cdb_sc)rdfail_detail));
+			if (!bmp_buff || (BLK_BUSY != x_blk_lmap) || (bmlhist.cr != bmlhist2.cr)
+				|| ((blk_hdr_ptr_t)bmp_buff)->bsiz != BM_SIZE(BLKS_PER_LMAP)
+				|| ((blk_hdr_ptr_t)bmp_buff)->levl != LCL_MAP_LEVL)
+			{	/* BML CR grab failure, dest block is no longer available or CR lost*/
+				if (bmlhist2.cr)	/* Leaving or going to the next bml, release this one */
+					BML_RSRV_IF_EXP(bmlhist2.cr, bml, process_id, 0);
+				if (bmlhist.cr != bmlhist2.cr)	/* Leaving or going to the next bml, release this one */
+					BML_RSRV_IF_EXP(bmlhist.cr, bml, process_id, 0);
+				if (CDB_STAGNATE <= t_tries)	/* Give up on trying this block */
+					return cdb_sc_oprnotneeded;
+				assert(CDB_STAGNATE > t_tries);
+				return cdb_sc_badbitmap;
+			}
+		}
 		bmlhist.buffaddr = bmp_buff;
 		bmlhist.blk_num = child1;
 		child1 = dest_blk_id - child1;

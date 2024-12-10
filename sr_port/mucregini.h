@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -15,6 +15,6 @@
 
 #include "gdsroot.h"
 
-void mucregini(block_id blk_init_size, enum db_ver desired_db_ver);
+void mucregini(gd_region *reg, sgmnt_data_ptr_t csd, enum db_ver desired_db_ver);
 
 #endif /* MUCREGINI_INCLUDED */

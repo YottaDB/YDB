@@ -367,7 +367,8 @@ int repl_recv(int sock_fd, unsigned char *buff, int *recv_len, int timeout GTMTL
 								gtm_wbox_input_test_case_count);
 				GTM_WHITE_BOX_TEST(WBTEST_FETCHCOMM_ERR, bytes_recvd, -1);
 				GTM_WHITE_BOX_TEST(WBTEST_FETCHCOMM_HISTINFO, bytes_recvd, -1);
-				LONG_SLEEP(5);
+				if (0 == gtm_wbox_input_test_case_count)
+					LONG_SLEEP(30);
 				repl_log(stdout, TRUE, TRUE, "bytes_recvd: %d\n",bytes_recvd);
 			}
 #endif

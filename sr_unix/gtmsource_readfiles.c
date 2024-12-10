@@ -74,18 +74,22 @@
 #define	DO_EOF_ADDR_CHECK		FALSE
 #define	SKIP_EOF_ADDR_CHECK		TRUE
 
+#define	DO_OTHER_CHECKS			FALSE
+#define	SKIP_OTHER_CHECKS		TRUE
+
 /* Callers of this macro ensure that the maximum seqno which can be found until offset MAX_SEQNO_EOF_ADDR is MAX_SEQNO. */
-#define	CTL_SET_MAX_SEQNO(CTL, MAX_SEQNO, MAX_SEQNO_ADDR, MAX_SEQNO_EOF_ADDR, SKIP_EOF_ADDR_CHECK)		\
-MBSTART {													\
-	assert(MAX_SEQNO_ADDR <= MAX_SEQNO_EOF_ADDR);								\
-	assert(SKIP_EOF_ADDR_CHECK || (MAX_SEQNO_EOF_ADDR <= CTL->repl_buff->fc->eof_addr));			\
-	assert(MAX_SEQNO >= CTL->max_seqno);									\
-	CTL->max_seqno = MAX_SEQNO;										\
-	assert(MAX_SEQNO_ADDR >= CTL->max_seqno_dskaddr);							\
-	CTL->max_seqno_dskaddr = MAX_SEQNO_ADDR;								\
-	assert(MAX_SEQNO_EOF_ADDR >= MAX_SEQNO_ADDR);								\
-	assert(MAX_SEQNO_EOF_ADDR >= CTL->max_seqno_eof_addr);							\
-	CTL->max_seqno_eof_addr = MAX_SEQNO_EOF_ADDR;								\
+/* Except, if SKIP_EOF_ADDR_CHECK and/or SKIP_OTHER_CHECKS are TRUE.							*/
+#define	CTL_SET_MAX_SEQNO(CTL, MAX_SEQNO, MAX_SEQNO_ADDR, MAX_SEQNO_EOF_ADDR, SKIP_EOF_ADDR_CHECK, SKIP_OTHER_CHECKS)	\
+MBSTART {														\
+	assert(SKIP_OTHER_CHECKS || (MAX_SEQNO_ADDR <= MAX_SEQNO_EOF_ADDR));						\
+	assert(SKIP_EOF_ADDR_CHECK || (MAX_SEQNO_EOF_ADDR <= CTL->repl_buff->fc->eof_addr));				\
+	assert(SKIP_OTHER_CHECKS || (MAX_SEQNO >= CTL->max_seqno));							\
+	CTL->max_seqno = MAX_SEQNO;											\
+	assert(SKIP_OTHER_CHECKS || (MAX_SEQNO_ADDR >= CTL->max_seqno_dskaddr));					\
+	CTL->max_seqno_dskaddr = MAX_SEQNO_ADDR;									\
+	assert(SKIP_OTHER_CHECKS || (MAX_SEQNO_EOF_ADDR >= MAX_SEQNO_ADDR));						\
+	assert(SKIP_OTHER_CHECKS || (MAX_SEQNO_EOF_ADDR >= CTL->max_seqno_eof_addr));					\
+	CTL->max_seqno_eof_addr = MAX_SEQNO_EOF_ADDR;									\
 } MBEND
 
 #define BUNCHING_TIME	(8 * MILLISECS_IN_SEC)
@@ -117,6 +121,8 @@ MBSTART {														\
 		jpc->cycle = saved_jpc_cycle; /* do not want cycle to be changed by our flushing so restore it */	\
 	}														\
 } MBEND
+
+#define MAX_TRIES 5
 
 GBLREF	unsigned char		*gtmsource_tcombuff_start;
 GBLREF	jnlpool_addrs_ptr_t	jnlpool;
@@ -418,7 +424,7 @@ static	int open_newer_gener_jnlfiles(gd_region *reg, repl_ctl_element *reg_ctl_e
 	repl_ctl_element	*new_ctl, *ctl;
 	int			jnl_fn_len;
 	char			jnl_fn[JNL_NAME_SIZE];
-	int			nopen, n;
+	int			nopen, n, gdid_err;
 	boolean_t		do_jnl_ensure_open;
 	gd_id_ptr_t		reg_ctl_end_id;
 	gtmsource_state_t	gtmsource_state_sav;
@@ -471,7 +477,8 @@ static	int open_newer_gener_jnlfiles(gd_region *reg, repl_ctl_element *reg_ctl_e
 		{ /* prev link has been cut, can't follow path back from latest generation jnlfile to the latest we had opened */
 			RTS_ERROR_CSA_ABT(csa, VARLSTCNT(4) ERR_NOPREVLINK, 2, new_ctl->jnl_fn_len, new_ctl->jnl_fn);
 		}
-		if (is_gdid_file_identical(reg_ctl_end_id, jnl_fn, jnl_fn_len))
+		gdid_err = 0;
+		if (is_gdid_file_identical(reg_ctl_end_id, jnl_fn, jnl_fn_len, &gdid_err))
 			break;
 	}
 	/* Name of the journal file corresponding to reg_ctl_end might have changed. Update the name.
@@ -634,6 +641,7 @@ static	int update_max_seqno_info(repl_ctl_element *ctl)
 	sgmnt_addrs		*csa;
 	int			wait_for_jnl = 0;
 	gtmsource_state_t	gtmsource_state_sav;
+	DEBUG_ONLY(static int	tries_cnt = 0;)
 
 	assert(ctl->file_state == JNL_FILE_OPEN);
 
@@ -782,10 +790,22 @@ static	int update_max_seqno_info(repl_ctl_element *ctl)
 	} while (TRUE);
 	rb->buffindex = REPL_MAINBUFF;	/* reset back to the main buffer */
 	if (max_seqno_found)
-	{	/* Assert that there is some progress in this call to "update_max_seqno_info" compared to the previous call */
+        {       /* Assert that there is some progress in this call to "update_max_seqno_info" after a series of calls.
+                 * We need to be patient due to possible freezes, etc. Since multiple processes are involved we just
+                 * ensure we don't wait too long. Remember the source server is trying to keep up with the journal
+                 * file gyrations (so give it a little leeway).
+                 */
+#		ifdef DEBUG
+		if (((max_seqno_eof_addr > ctl->max_seqno_eof_addr) || (max_seqno_addr > ctl->max_seqno_dskaddr)
+			|| (max_seqno > ctl->max_seqno)))
+			tries_cnt = 0;
+		else
+			tries_cnt++; /* if at first you don't succeed ... */
+#		endif
 		assert((max_seqno_eof_addr > ctl->max_seqno_eof_addr) || (max_seqno_addr > ctl->max_seqno_dskaddr)
-			|| (max_seqno > ctl->max_seqno));
-		CTL_SET_MAX_SEQNO(ctl, max_seqno, max_seqno_addr, max_seqno_eof_addr, DO_EOF_ADDR_CHECK);
+			|| (max_seqno > ctl->max_seqno) || (MAX_TRIES > tries_cnt));
+		/* Above assert would have caught it if there was a real issue so skip all checks */
+		CTL_SET_MAX_SEQNO(ctl, max_seqno, max_seqno_addr, max_seqno_eof_addr, SKIP_EOF_ADDR_CHECK, SKIP_OTHER_CHECKS);
 		if (eof_addr_final)
 		{	/* Do not use ctl->eof_addr_final in the check above since it could have changed inside this function.
 			 * We want to set all max_seqno* fields based on fc->eof_addr after update_eof_addr
@@ -873,7 +893,8 @@ static	int first_read(repl_ctl_element *ctl)
 				/* Since update_eof_addr has not yet been called (will be done as part of "update_max_seqno_info"
 				 * at the end of this function), skip the fc->eof_addr check inside the below macro.
 				 */
-				CTL_SET_MAX_SEQNO(ctl, ctl->min_seqno, b->recaddr, b->recaddr, SKIP_EOF_ADDR_CHECK);
+				CTL_SET_MAX_SEQNO(ctl, ctl->min_seqno, b->recaddr, b->recaddr, SKIP_EOF_ADDR_CHECK,
+					DO_OTHER_CHECKS);
 				ctl->file_state = JNL_FILE_OPEN;
 				min_seqno_found = TRUE;
 			} else if (rectype == JRT_EOF)
@@ -983,7 +1004,7 @@ static	int read_transaction(repl_ctl_element *ctl, unsigned char **buff, int *bu
 	rec_jnl_seqno = GET_REPL_JNL_SEQNO(b->recbuff);
 	assert(QWEQ(rec_jnl_seqno, ctl->seqno));
 	if (rec_jnl_seqno > ctl->max_seqno)
-		CTL_SET_MAX_SEQNO(ctl, rec_jnl_seqno, b->recaddr, b->recaddr, DO_EOF_ADDR_CHECK);
+		CTL_SET_MAX_SEQNO(ctl, rec_jnl_seqno, b->recaddr, b->recaddr, DO_EOF_ADDR_CHECK, DO_OTHER_CHECKS);
 	ctl->tn = ((jrec_prefix *)b->recbuff)->tn;
 	if (!IS_FENCED(rectype) || JRT_NULL == rectype)
 	{	/* Entire transaction done */
@@ -1030,7 +1051,8 @@ static	int read_transaction(repl_ctl_element *ctl, unsigned char **buff, int *bu
 				rec_jnl_seqno = GET_JNL_SEQNO(b->recbuff);
 				assert(rec_jnl_seqno == ctl->seqno);
 				if (rec_jnl_seqno > ctl->max_seqno)
-					CTL_SET_MAX_SEQNO(ctl, rec_jnl_seqno, b->recaddr, b->recaddr, DO_EOF_ADDR_CHECK);
+					CTL_SET_MAX_SEQNO(ctl, rec_jnl_seqno, b->recaddr, b->recaddr, DO_EOF_ADDR_CHECK,
+						DO_OTHER_CHECKS);
 				ctl->tn = ((jrec_prefix *)b->recbuff)->tn;
 			} else if (rectype == JRT_EOF)
 			{
@@ -1140,7 +1162,8 @@ static	tr_search_state_t do_linear_search(repl_ctl_element *ctl, uint4 lo_addr, 
 					srch_status->seqno = rec_jnl_seqno;
 				}
 				if (ctl->max_seqno < rec_jnl_seqno)
-					CTL_SET_MAX_SEQNO(ctl, rec_jnl_seqno, b->recaddr, b->recaddr, SKIP_EOF_ADDR_CHECK);
+					CTL_SET_MAX_SEQNO(ctl, rec_jnl_seqno, b->recaddr, b->recaddr, SKIP_EOF_ADDR_CHECK,
+						DO_OTHER_CHECKS);
 				QWASSIGN(ctl->seqno, rec_jnl_seqno);
 				ctl->tn = ((jrec_prefix *)b->recbuff)->tn;
 				if (QWEQ(rec_jnl_seqno, read_seqno))

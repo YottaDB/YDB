@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2005-2023 Fidelity National Information	*
+ * Copyright (c) 2005-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -92,7 +92,7 @@ MBSTART {													\
 				ERR_SYSCALL, 5, RTS_ERROR_LITERAL("semop()"), CALLFROM, save_errno);		\
 	}													\
 	udi->grabbed_access_sem = FALSE;									\
-	ERR |= gds_rundown(CLEANUP_UDI_TRUE); /* Rundown stops times for prior regions */			\
+	ERR |= gds_rundown(CLEANUP_UDI_TRUE, FALSE); /* Rundown stops times for prior regions */			\
 } MBEND
 
 GBLREF	bool			error_mupip;
@@ -212,7 +212,7 @@ void mupip_upgrade(void)
 			error = TRUE;
 			util_out_print("Region !AD : Region is read-only, skipping database !AD",
 			       TRUE, REG_LEN_STR(reg), DB_LEN_STR(reg));
-			if (EXIT_NRM != gds_rundown(CLEANUP_UDI_TRUE))
+			if (EXIT_NRM != gds_rundown(CLEANUP_UDI_TRUE, FALSE))
 			{	/* Failed to rundown the DB */
 				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_DBRNDWN, 2, DB_LEN_STR(gv_cur_region));
 				util_out_print(
@@ -229,7 +229,7 @@ void mupip_upgrade(void)
 		} else
 			fn_len = 0;
 		/* Obtain standalone access */
-		if (EXIT_NRM != gds_rundown(CLEANUP_UDI_FALSE))
+		if (EXIT_NRM != gds_rundown(CLEANUP_UDI_FALSE, FALSE))
 		{	/* Failed to rundown the DB, so we can't get standalone access */
 			error = TRUE;
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_DBRNDWN, 2, DB_LEN_STR(gv_cur_region));
@@ -314,6 +314,7 @@ void mupip_upgrade(void)
 			RELEASE_ACCESS_SEMAPHORE_AND_RUNDOWN(gv_cur_region, error);
 			continue;
 		}
+		v6_db_auto_upgrade(reg);
 		csd = cs_data;
 		assert(!csd->asyncio);
 		blk_size = csd->blk_size;
@@ -413,7 +414,7 @@ void mupip_upgrade(void)
 			free(bml_buff);								/* A little early in case of err */
 			/* Establish new root blocks */
 			csd->desired_db_format = GDSV7m;
-			mucblkini(GDSV7m);			/* Recreate the DB with V7m directory tree */
+			mucblkini(reg, GDSV7m);			/* Recreate the DB with V7m directory tree */
 			/* At this point the file header claims all V6ish settings such that there is a V6p database
 			 * certified for upgrade to V7m in spite of there being no actual datablocks. Emit a warning
 			 * about the wastage of space for no good reason

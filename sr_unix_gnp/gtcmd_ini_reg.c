@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -128,6 +128,5 @@ cm_region_head *gtcmd_ini_reg(connection_struct *cnx)
 		gtcmd_cst_init(ptr);
 	} else
 		gv_cur_region = ptr->reg;
-
 	return ptr;
 }

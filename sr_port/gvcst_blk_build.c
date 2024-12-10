@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -55,6 +55,8 @@ void gvcst_blk_build(cw_set_element *cse, sm_uc_ptr_t base_addr, trans_num ctn)
 	sm_uc_ptr_t	ptr, ptrtop, c;
 	sm_ulong_t	n;
 	trans_num	blktn;
+	boolean_t	saw_rollback = FALSE;
+	boolean_t	reset_ctn = FALSE;
 #	ifdef DEBUG
 	boolean_t	integ_error_found;
 	rec_hdr_ptr_t	rp;
@@ -105,6 +107,11 @@ void gvcst_blk_build(cw_set_element *cse, sm_uc_ptr_t base_addr, trans_num ctn)
 	 *     block-transaction-number-updation in those places.
 	 * Note that a similar change is not needed in gvcst_map_build() because that will never be in the
 	 *     search history for any key.
+	 *
+	 * Note, if we came in with ctn == 0 and are in a transaction, we reset ctn explicitly to one
+	 * less than curr_tn.  However, if online rollback is in progress the assert on ctn below may
+	 * fail if transactions rolled back to before the value set here.  We keep track of if we
+	 * reset a 0 ctn and if rollback was in progress at the time (or when the assert is actually checked)
 	 */
 	if (!ctn && dollar_tlevel)
 	{	/* Subtract one so will pass concurrency control for mm databases.
@@ -112,7 +119,10 @@ void gvcst_blk_build(cw_set_element *cse, sm_uc_ptr_t base_addr, trans_num ctn)
 		 * so this history is superfluous for concurrency control.
 		 * The correct tn is put in the block in mm_update or bg_update when the block is copied to the database.
 		 */
+		if (cs_addrs->nl->onln_rlbk_pid)
+			saw_rollback = TRUE;
 		ctn = cs_addrs->ti->curr_tn - 1;
+		reset_ctn = TRUE;
 	}
 	/* Assert that the block's transaction number is LESS than the transaction number corresponding to the blk build.
 	 * i.e. no one else should have touched the block contents in shared memory from the time we locked this in phase1
@@ -137,8 +147,11 @@ void gvcst_blk_build(cw_set_element *cse, sm_uc_ptr_t base_addr, trans_num ctn)
 	/* With memory instruction reordering (currently possible only on AIX with the POWER architecture) it is possible
 	 * the early_tn we read in the assert below gets executed BEFORE the curr_tn read that happens a few lines above.
 	 * That could then fail this assert (GTM-8523). Account for that with the AIX_ONLY condition below.
+	 *
+	 * Also, if online rollback is or was in progress, early_tn may have decremented
 	 */
-	assert((ctn < cs_addrs->ti->early_tn) || write_after_image AIX_ONLY(|| (cs_data->acc_meth == dba_mm)));
+	assert(((ctn < cs_addrs->ti->early_tn) || (reset_ctn && (saw_rollback || (cs_addrs->nl->onln_rlbk_pid)))) ||
+		write_after_image AIX_ONLY(|| (cs_data->acc_meth == dba_mm)));
 	((blk_hdr_ptr_t)base_addr)->bver = cse->ondsk_blkver;
 	((blk_hdr_ptr_t)base_addr)->tn = ctn;
 	((blk_hdr_ptr_t)base_addr)->bsiz = UINTCAST(array->len);

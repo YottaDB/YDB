@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -30,6 +30,7 @@
 #include "hashtab_int4.h"	/* needed for muprec.h */
 #include "hashtab_int8.h"	/* needed for muprec.h */
 #include "hashtab_mname.h"	/* needed for muprec.h */
+#include "is_proc_alive.h"
 #include "muprec.h"
 #include "iosp.h"
 #include "copy.h"
@@ -172,7 +173,7 @@ void	mupip_recover(void)
 	boolean_t		all_gen_properly_closed, apply_pblk, cannot_proceed, ztp_broken, intrrupted_recov_processing;
 	char			histdetail[HIST_LEN];
 	enum jnl_record_type	rectype;
-	int			last_regno, lcnt, regno, reg_total, sleep_count, status;
+	int			regno, reg_total, sleepcnt, status;
 	jnl_ctl_list		*jctl;
 	jnl_tm_t		min_broken_time;
 	reg_ctl_list		*rctl = NULL;
@@ -242,7 +243,7 @@ void	mupip_recover(void)
 	}
 	all_gen_properly_closed = TRUE;
 	intrrupted_recov_processing = murgbl.intrpt_recovery = FALSE;
-	for (last_regno = -1, regno = 0; regno < reg_total;)
+	for (regno = 0; regno < reg_total;)
 	{
 		rctl = &mur_ctl[regno];
 		jctl = rctl->jctl;
@@ -267,24 +268,17 @@ void	mupip_recover(void)
 			murgbl.intrpt_recovery = TRUE; /* Recovery was interrupted at some point */
 			rctl->csa->hdr->turn_around_point = FALSE; /* Reset turn around point field */
 		}
-		if (jgbl.onlnrlbk && (0 != rctl->csa->nl->reorg_upgrade_pid))
+		for (sleepcnt = SLEEP_ONE_MIN; (jgbl.onlnrlbk && (0 <= sleepcnt) && (0 != rctl->csa->nl->reorg_upgrade_pid)
+				&& (is_proc_alive(rctl->csa->nl->reorg_upgrade_pid, 0)));)
 		{	/* At this point, the DB and instance file have corrupt set. Wait for the REORG -UPGRADE to exit */
-			if (last_regno != regno)
-			{
+			if (SLEEP_ONE_MIN == sleepcnt)
 				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) MAKE_MSG_INFO(ERR_REORGUPCNFLCT), 5,
 						LEN_AND_LIT("ROLLBACK -ONLINE"),
 						LEN_AND_LIT("MUPIP REORG -UPGRADE in progress"),
 						rctl->csa->nl->reorg_upgrade_pid);
-				lcnt = SLEEP_ONE_MIN;
-				last_regno = regno;	/* Signal to not repeat the message */
-			}
-			wcs_sleep(lcnt--);
-			if (!lcnt)
-			{	/* Print the message once more to indicate why this process is stalled */
-				assert(FALSE);	/* We really don't think we should get here since REORG -UPGRADE should exit */
-				last_regno = -1;
-			}
-			continue;
+			wcs_sleep(sleepcnt--);
+			if (0 == sleepcnt) /* Prolong the wait, reprinting the message to indicate why this process is stalled */
+				sleepcnt = SLEEP_ONE_MIN;
 		}
 		regno++;
 	}

@@ -116,8 +116,7 @@ boolean_t	grab_gtmsource_srv_latch(sm_global_latch_ptr_t latch, uint4 max_timeou
 	DUMP_LOCKHIST();
 	assert(FALSE);
 	assert(jnlpool->gtmsource_local && jnlpool->gtmsource_local->gtmsource_pid);
-	rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_SRVLCKWT2LNG, 2, jnlpool->gtmsource_local->gtmsource_pid,
-			max_timeout_in_secs);
+	rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_SRVLCKWT2LNG, 2, latch->u.parts.latch_pid, max_timeout_in_secs);
 	return FALSE; /* to keep the compiler happy */
 }
 

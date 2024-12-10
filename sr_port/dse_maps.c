@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -76,7 +76,9 @@ void dse_maps(void)
 	srch_blk_status		blkhist;
 	uchar_ptr_t		blk_ptr;
 	unsigned char		*bml_list;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	csa = cs_addrs;
 	DSE_DB_IS_TOO_OLD(cs_addrs, cs_data, gv_cur_region);
 	if (CLI_PRESENT == cli_present("BUSY") || CLI_PRESENT == cli_present("FREE") ||
@@ -177,6 +179,8 @@ void dse_maps(void)
 	if (CLI_PRESENT == cli_present("BUSY"))
 	{
 		bml_blk = blk / bplmap * bplmap;
+		TREF(tqread_grab_bml) = (dba_bg == csd->acc_meth)	/* Marking block as busy; avoid restarts */
+			&& (DEFAULT_BITMAP_PREPIN == csd->nobitmap_prepin);
 		bm_setmap(bml_blk, blk, TRUE);
 		return;
 	}

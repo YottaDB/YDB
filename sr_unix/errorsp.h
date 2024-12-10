@@ -283,7 +283,7 @@ void ch_trace_point() {return;}
 # define ESTABLISH_NORET(x, did_long_jump)									\
 				{										\
 					intrpt_state_t		prev_intrpt_state_estnr;				\
-					\
+															\
 					DEFER_INTERRUPTS(INTRPT_IN_CONDSTK, prev_intrpt_state_estnr);			\
 					did_long_jump = FALSE;								\
 					ESTABLISH_NOJMP(x);								\
@@ -574,11 +574,11 @@ CONDITION_HANDLER(dbopen_ch);
 CONDITION_HANDLER(gtmci_ch);
 CONDITION_HANDLER(gtmci_init_ch);
 CONDITION_HANDLER(gtmsecshr_cond_hndlr);
-CONDITION_HANDLER(gvcst_init_autoDB_ch);
+CONDITION_HANDLER(gvcst_set_statsDB_fname_ch);
 CONDITION_HANDLER(gvtr_tpwrap_ch);
 CONDITION_HANDLER(iob_io_error1);
 CONDITION_HANDLER(iob_io_error2);
-CONDITION_HANDLER(mu_cre_file_ch);
+CONDITION_HANDLER(mu_init_file_ch);
 CONDITION_HANDLER(mu_extract_handler);
 CONDITION_HANDLER(mu_extract_handler1);
 CONDITION_HANDLER(mu_extract_handler2);

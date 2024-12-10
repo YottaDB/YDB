@@ -68,7 +68,7 @@
 #include "sleep_cnt.h"
 #include "gtm_c_stack_trace.h"
 #include "relqop.h"
-
+#include "inline_atomic_pid.h"
 
 #ifdef DEBUG
 GBLREF		int4		exit_state;

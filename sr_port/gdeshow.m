@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-; Copyright (c) 2001-2020 Fidelity National Information		;
+; Copyright (c) 2001-2024 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -153,6 +153,7 @@ onereg:
 	w ?x(12),$s(regs(s,"AUTODB"):"Y",1:"N")
 	w ?x(13),$s(regs(s,"STATS"):"Y",1:"N")
 	w ?x(14),$s(regs(s,"LOCK_CRIT"):"Sep",1:"DB")
+	w ?x(15),$s(regs(s,"AUTODELETE"):"Y",1:"N")
 	q
 onejnl:
 	w !,BOL,?x(1),s,?x(2),$s($zl(regs(s,"FILE_NAME")):$$namedisp(regs(s,"FILE_NAME"),1),1:"<based on DB file-spec>")
@@ -321,6 +322,7 @@ t1:	d tmpreghd
 	w ?x(12),$s(tmpreg("AUTODB"):"Y",1:"N")
 	w ?x(13),$s(tmpreg("STATS"):"Y",1:"N")
 	w ?x(14),$s(tmpreg("LOCK_CRIT"):"Sep",1:"DB")
+	w ?x(15),$s(tmpreg("AUTODELETE"):"Y",1:"N")
 	i tmpreg("JOURNAL") d tmpjnlhd,tmpjnlbd
 	d tmpseghd
 	w !,BOL,?x(1),"<default>"
@@ -372,6 +374,7 @@ templatec:
 	. . s freqx(q,freq)=val
 	f  s q=$o(tmpreg(q)) q:'$l(q)  d
 	. i tmpreg(q)="" q  ; if this qualifier has a "" template value, then skip processing it (e.g. "FILE_NAME")
+	. i "AUTODELETE"=q q
 	. s freq=$o(freqx(q,""),-1)
 	. s val=freqx(q,freq)
 	. s tmpreg(q)=val
@@ -482,6 +485,7 @@ regionhd:
 	w ?x(10),"Qdb"
 	w ?x(11),"Epoch"
 	w ?x(14),"LOCK"
+	w ?x(15),"Auto"
 	w !,BOL
 	w ?x(1),"Region"
 	w ?x(2),"Segment"
@@ -497,7 +501,8 @@ regionhd:
 	w ?x(12),"AutoDB"
 	w ?x(13),"Stats"
 	w ?x(14),"Crit"
-	w !,BOL,?x(1),$tr($j("",139)," ","-")
+	w ?x(15),"Del"
+	w !,BOL,?x(1),$tr($j("",144)," ","-")
 	q
 jnlhd:
 	s x(0)=26,x(1)=1,x(2)=33,x(3)=59,x(4)=65,x(5)=71,x(6)=82,x(7)=91
@@ -539,6 +544,7 @@ tmpreghd:
 	w ?x(10),"Qdb"
 	w ?x(11),"Epoch"
 	w ?x(14),"LOCK"
+	w ?x(15),"Auto"
 	w !,BOL,?x(1),"Region"
 	w ?x(3),$j("Coll",4)
 	w ?x(4),$j("Size",7)
@@ -552,7 +558,8 @@ tmpreghd:
 	w ?x(12),"AutoDB"
 	w ?x(13),"Stats"
 	w ?x(14),"Crit"
-	w !,BOL,?x(1),$tr($j("",118)," ","-")
+	w ?x(15),"Del"
+	w !,BOL,?x(1),$tr($j("",123)," ","-")
 	q
 tmpjnlhd:
 	s x(0)=26,x(1)=1,x(2)=18,x(3)=44,x(4)=51,x(5)=57,x(6)=68,x(7)=74

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2016-2023 Fidelity National Information	*
+ * Copyright (c) 2016-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -25,6 +25,7 @@
 #include "filestruct.h"
 #include "gvcst_protos.h"
 #include "mvalconv.h"
+#include "interlock.h"
 #include "op.h"
 #include "gdsblk.h"
 #include "gtm_reservedDB.h"
@@ -104,25 +105,23 @@ error_def(ERR_STATSDBERR);
  * Return value:
  *   File creation return code
  */
-unsigned char gvcst_cre_autoDB(gd_region *reg)
+unsigned char gvcst_cre_statsDB(gd_region *reg)
 {
-	gd_region		*save_cur_region;
-	gd_region		cur_region;
-	gd_segment		cur_segment;
-	jnlpool_addrs_ptr_t	save_jnlpool;
 	unsigned char		cstatus;
+#ifdef	DEBUG
+	gd_region	*base_reg;
+	unix_db_info 	*base_udi;
+	STATSDBREG_TO_BASEDBREG(reg, base_reg);
+	base_udi = FILE_INFO(base_reg);
+	assert(base_udi && base_udi->grabbed_ftok_sem);
+#endif
 
 	assert(RDBF_AUTODB & reg->reservedDBFlags);
-	save_cur_region = gv_cur_region;
-	save_jnlpool = jnlpool;
-	memcpy((char *)&cur_region, reg, SIZEOF(gd_region));
-	memcpy((char *)&cur_segment, reg->dyn.addr, SIZEOF(gd_segment));
-	gv_cur_region = &cur_region;
-	gv_cur_region->dyn.addr = &cur_segment;
-	cstatus = mu_cre_file();
-	TP_CHANGE_REG(save_cur_region);
-	jnlpool = save_jnlpool;
-	return cstatus;
+	assert(IS_STATSDB_REG(reg));
+	cstatus = mu_cre_file(reg);
+	if (cstatus != EXIT_NRM)
+		return cstatus;
+	return mu_init_file(reg, TRUE);
 }
 
 /* Initialize a statsDB database. This includes the following steps:
@@ -449,17 +448,23 @@ CONDITION_HANDLER(gvcst_statsDB_open_ch)
 
 	START_CH(TRUE);
 	assert(ERR_DBROLLEDBACK != arg);	/* A statsDB region should never participate in rollback */
+	if (IS_STATSDB_REG(db_init_region))
+		STATSDBREG_TO_BASEDBREG(db_init_region, reg);
+	else
+		reg = db_init_region;
+	cnl = (&FILE_INFO(reg)->s_addrs)->nl;
+	if (GLOBAL_LATCH_HELD_BY_US(&cnl->statsdb_field_latch))
+	{
+		assert(FALSE);
+		rel_latch(&cnl->statsdb_field_latch);
+	}
 	if (DUMPABLE)
 		NEXTCH;				/* Bubble down till handled properly in mdb_condition_handler() */
 	if ((SUCCESS == SEVERITY) || (INFO == SEVERITY))
 		CONTINUE;			/* Keep going for non-error issues */
+
 	if (ERR_DRVLONGJMP != arg)
 	{	/* Need to reflect the current error to the syslog - 1st check whether to throttle because it's a repeat */
-		if (IS_STATSDB_REG(db_init_region))
-			STATSDBREG_TO_BASEDBREG(db_init_region, reg);
-		else
-			reg = db_init_region;
-		cnl = (&FILE_INFO(reg)->s_addrs)->nl;
 		if ((cnl->statsdb_cur_error != SIGNAL) || !cnl->statsdb_error_cycle--)
 		{	/* Not a repeat or we've surpressed STATSDB_ERROR_RATE messages */
 			cnl->statsdb_error_cycle = STATSDB_ERROR_RATE;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -36,13 +36,19 @@
 #include "is_gdid.h"
 #include "iosp.h"		/* for SS_NORMAL */
 
-bool is_gdid_file_identical(gd_id_ptr_t fid, char *filename, int4 filelen)
+bool is_gdid_file_identical(gd_id_ptr_t fid, char *filename, int4 filelen, int *error)
 {
 	int		stat_res;
 	struct stat	stat_buf;
 
 	assert(0 == filename[filelen]);
+	assert(!*error);
 	STAT_FILE(filename, &stat_buf, stat_res);
+	if (-1 == stat_res)
+	{
+		*error = errno;
+		return false;
+	}
 	return is_gdid_stat_identical(fid, &stat_buf);
 }
 bool is_file_identical(char *filename1, char *filename2)

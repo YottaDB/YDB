@@ -786,7 +786,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* MUPIPSET2SML */
 	   0,	/* DBREADBM */
 	   0,	/* DBCOMPTOOLRG */
-	   0,	/* UNUSEDMSG957 */
+	   0,	/* PIDRESET */
 	   0,	/* DBRBNTOOLRG */
 	   0,	/* DBRBNLBMN */
 	   0,	/* DBRBNNEG */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -73,7 +73,7 @@ void mupip_set_jnl_cleanup(void)
  			tp_change_reg();
 			assert(NULL != gv_cur_region->dyn.addr->file_cntl && NULL != rptr->sd);
 			if (NULL != gv_cur_region->dyn.addr->file_cntl && NULL != rptr->sd)
-				rundown_status |= gds_rundown(CLEANUP_UDI_TRUE);
+				rundown_status |= gds_rundown(CLEANUP_UDI_TRUE, FALSE);
 			/* Note: We did not allocate, so we do not deallocate rptr->sd */
 			rptr->sd = NULL;
 		}

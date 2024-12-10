@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2019 Fidelity National Information	*
+ * Copyright (c) 2012-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -50,6 +50,7 @@
 #include "shmpool.h"
 #include "do_semop.h"
 #include "gtm_semutils.h"
+#include "inline_atomic_pid.h"
 
 GBLREF	uint4			process_id;
 
@@ -95,6 +96,7 @@ void clear_cache_array(sgmnt_addrs *csa, sgmnt_data_ptr_t csd, gd_region* reg, b
 				}
 			}
 			cr->blk = CR_BLKEMPTY;
+			BML_RSRV_RESET(cr);
 			/* when cr->blk is empty, ensure no bt points to this cache-record */
 			cr->bt_index = 0;	/* offset to bt_rec */
 			cr->data_invalid = 0;	/* process_id */

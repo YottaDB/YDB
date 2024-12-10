@@ -87,6 +87,7 @@
 #include "ztimeout_routines.h"
 #include "jnl_file_close_timer.h"
 #include "gtmdbglvl.h"		/* for GDL_UnconditionalEpoch */
+#include "inline_atomic_pid.h"
 
 GBLREF	bool			rc_locked;
 GBLREF	unsigned char		t_fail_hist[CDB_MAX_TRIES];
@@ -123,8 +124,6 @@ GBLREF	boolean_t		gvdupsetnoop; /* if TRUE, duplicate SETs update journal but no
 GBLREF	boolean_t		is_dollar_incr;	/* valid only if gvcst_put is in the call-stack.
 						 * is a copy of "in_gvcst_incr" just before it got reset to FALSE */
 GBLREF	boolean_t		mu_reorg_nosafejnl;		/* TRUE if NOSAFEJNL explicitly specified */
-GBLREF	trans_num		mu_reorg_upgrd_dwngrd_blktn;	/* tn in blkhdr of current block processed by
-								 * REORG UPGRADE/DOWNGRADE */
 GBLREF	inctn_opcode_t		inctn_opcode;
 GBLREF	inctn_detail_t		inctn_detail;			/* holds detail to fill in to inctn jnl record */
 GBLREF	boolean_t		block_is_free;
@@ -194,9 +193,10 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 	srch_hist		*hist, tmp_hist;
 	bt_rec_ptr_t		bt;
 	boolean_t		blk_used;
+	boolean_t		lcl_tqread_grab_bml;
 	cache_rec		cr_save;
 	cache_rec_ptr_t		cr, backup_cr;
-	cw_set_element		*cs, *cs_top, *cs1;
+	cw_set_element		*cs, *cs_top, *cs1, *last_lmap_cse;
 	enum cdb_sc		status;
 	int			int_depth, tmpi;
 	uint4			jnl_status;
@@ -510,6 +510,8 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 		csa->backup_in_prog = (BACKUP_NOT_IN_PROGRESS != cnl->nbb);
 		jbbp = (JNL_ENABLED(csa) && csa->jnl_before_image) ? csa->jnl->jnl_buff : NULL;
 		read_before_image = ((NULL != jbbp) || csa->backup_in_prog || lcl_ss_in_prog);
+		last_lmap_cse = NULL;
+		lcl_tqread_grab_bml = (dba_bg == csd->acc_meth) && (DEFAULT_BITMAP_PREPIN == csd->nobitmap_prepin);
 		for (cs = cw_set, cs_top = cs + cw_depth; cs < cs_top; cs++)
 		{
 			assert(0 == cs->jnl_freeaddr);	/* ensure haven't missed out resetting jnl_freeaddr for any cse in
@@ -518,7 +520,8 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 			{
 				assert(0 == cs->blk_checksum);
 				int_depth = (int)cw_set_depth;
-				if (0 > (cs->blk = bm_getfree(cs->blk, &blk_used, cw_depth, cw_set, &int_depth)))
+				TREF(tqread_grab_bml) = lcl_tqread_grab_bml;
+				if (0 > (cs->blk = bm_getfree(cs->blk, &blk_used, cw_depth, cw_set, &int_depth, &last_lmap_cse)))
 				{
 					if (FILE_EXTENDED == cs->blk)
 					{
@@ -546,6 +549,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 				assert((CDB_STAGNATE > t_tries) || (cs->blk < cti->total_blks));
 				blk_used ? BIT_SET_RECYCLED_AND_CLEAR_FREE(cs->blk_prior_state)
 					 : BIT_CLEAR_RECYCLED_AND_SET_FREE(cs->blk_prior_state);
+				SET_CUR_CMT_STEP_IF(TRUE, TREF(cur_cmt_step), CMT00a);
 				BEFORE_IMAGE_NEEDED(read_before_image, cs, csa, csd, cs->blk, before_image_needed);
 				if (!before_image_needed)
 					cs->old_block = NULL;
@@ -1200,14 +1204,13 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 					SET_CACHE_FAIL_STATUS(status, csd);
 					goto failed;
 				}
-				/* It is possible that cr->in_cw_set is non-zero in case a concurrent MUPIP REORG
-				 * UPGRADE/DOWNGRADE is in PHASE2 touching this very same block. In that case,
-				 * we cannot reuse this block so we restart. We could try finding a different block
-				 * to acquire instead and avoid a restart (tracked as part of C9E11-002651).
-				 * Note that in_cw_set is set to 0 ahead of in_tend in "bg_update_phase2". Therefore
-				 * it is possible that we see in_cw_set 0 but in_tend is still non-zero. In that case,
-				 * we cannot proceed with pinning this cache-record as the cr is still locked by
-				 * the other process. We can choose to wait here but instead decide to restart.
+				/* It is possible that cr->in_cw_set is non-zero in case a concurrent process
+				 * evicts the newly acquired block. Cannot use this cache record, so restart.
+				 * Note that in_cw_set is set to 0 ahead of in_tend in "bg_update_phase2".
+				 * Therefore it is possible that we see in_cw_set 0 but in_tend is still non-zero.
+				 * In that case, we cannot proceed with pinning this cache-record as the cr is
+				 * still locked by the other process. We can choose to wait here but instead
+				 * decide to restart.
 				 */
 				if ((NULL == cr) || (0 <= cr->read_in_progress)
 					|| (0 != cr->in_cw_set) || (0 != cr->in_tend))
@@ -1228,6 +1231,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 							&& (old_block_tn < jbbp->epoch_tn));
 				if ((cs->cr != cr) || (cs->cycle != cr->cycle))
 				{	/* Block has relocated in the cache. Adjust pointers to new location. */
+					assert((process_id != cr->bml_pin) && (!cs->cr || (process_id != cs->cr->bml_pin)));
 					cs->cr = cr;
 					cs->cycle = cr->cycle;
 					cs->old_block = (sm_uc_ptr_t)old_block;
@@ -1477,7 +1481,6 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 				{	/* (re)encrypt one block at a time */
 					assert((inctn_blkreencrypt != inctn_opcode) || (1 == cw_set_depth));
 					cs = cw_set;
-					assert((inctn_blkreencrypt != inctn_opcode) || (mu_reorg_upgrd_dwngrd_blktn < dbtn));
 					if (mu_reorg_nosafejnl)
 					{
 						assert(inctn_blkreencrypt != inctn_opcode);
@@ -1848,9 +1851,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 					 * while holding crit so the next process to use this bitmap will see a
 					 * consistent copy of this bitmap when it gets crit for commit. This avoids
 					 * the reallocate_bitmap routine from restarting or having to wait for a
-					 * concurrent phase2 construction to finish. When the change request C9E11-002651
-					 * (to reduce restarts due to bitmap collisions) is addressed, we can reexamine
-					 * whether it makes sense to move bitmap block builds back to phase2.
+					 * concurrent phase2 construction to finish.
 					 */
 					SET_CUR_CMT_STEP_IF((DECL_CMT11 > csa->nl->cur_cmt_step), csa->nl->cur_cmt_step,
 							DECL_CMT11);

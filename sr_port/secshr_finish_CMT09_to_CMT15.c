@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2017-2023 Fidelity National Information	*
+ * Copyright (c) 2017-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -51,6 +51,8 @@
 #include "cert_blk.h"		/* for CERT_BLK_IF_NEEDED macro */
 #include "gdsbgtr.h"
 #include "mu_updwn_ver_inline.h"
+#include "mu_upgrade_bmm.h"	/* for MUPIP_REORG_UPGRADE_NOW_SPLITTING */
+#include "inline_atomic_pid.h"
 
 #ifdef DEBUG
 #include "anticipatory_freeze.h"
@@ -318,6 +320,7 @@ void	secshr_finish_CMT09_to_CMT15(sgmnt_addrs *csa, jnlpool_addrs_ptr_t update_j
 						if (is_bg)
 						{
 							cr = cs->cr;
+							assert((NULL == cr) || (0 == cs->cr->bml_pin));
 							if (gds_t_committed > old_mode)
 								assert(process_id != cr->in_tend);
 							else
@@ -398,6 +401,8 @@ void	secshr_finish_CMT09_to_CMT15(sgmnt_addrs *csa, jnlpool_addrs_ptr_t update_j
 								assert(si);
 								TP_PIN_CACHE_RECORD(cr, si);
 							}
+							if ((gds_t_writemap == cs->mode) && (cs->cr))
+								BML_RSRV_IF_EXP(cs->cr, CR_BLKEMPTY, process_id, 0);
 							cr->backup_cr_is_twin = FALSE;
 							cr->in_tend = process_id;
 							cr->cycle++;	/* increment cycle for blk number changes (for tp_hist) */
@@ -457,7 +462,9 @@ void	secshr_finish_CMT09_to_CMT15(sgmnt_addrs *csa, jnlpool_addrs_ptr_t update_j
 #endif
 										cs->ondsk_blkver = cs_data->desired_db_format;
 									}
-								} else if ((GDSV7m == cs->ondsk_blkver) && mu_upgrade_in_prog)
+								} else if ((GDSV7m == cs->ondsk_blkver)
+										&& (MUPIP_REORG_UPGRADE_NOW_SPLITTING
+											< mu_upgrade_in_prog))
 								{	/* Decrement in transition block */
 									DECR_BLKS_TO_UPGRD(csa, csd, 1);
 #ifdef									DEBUG_BLKS_TO_UPGRD

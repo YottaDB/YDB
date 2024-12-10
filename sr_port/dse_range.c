@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -41,6 +41,7 @@ GBLREF sgmnt_data_ptr_t	cs_data;
 GBLREF VSIG_ATOMIC_T	util_interrupt;
 
 error_def(ERR_CTRLC);
+error_def(ERR_DBRDONLY);
 error_def(ERR_DSEBLKRDFAIL);
 error_def(ERR_DSEINVALBLKID);
 
@@ -58,6 +59,8 @@ void dse_range(void)
 	sm_uc_ptr_t	bp, b_top, key_bot, key_top, key_top1, rp, r_top;
 
 	DSE_DB_IS_TOO_OLD(cs_addrs, cs_data, gv_cur_region);
+	if (gv_cur_region->read_only)
+		RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
 	if (CLI_PRESENT == cli_present("FROM"))
 	{
 		if (BADDSEBLK == (from = dse_getblk("FROM", DSEBMLOK, DSEBLKNOCUR)))	/* WARNING: assignment */

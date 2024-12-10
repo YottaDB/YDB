@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2021-2023 Fidelity National Information	*
+ * Copyright (c) 2021-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -722,7 +722,7 @@ int4	mu_upgrade_bmm(gd_region *reg, size_t blocks_needed)
 	csd->trans_hist.early_tn = csd->trans_hist.curr_tn + 1;
 	INCREMENT_CURR_TN(csd);
 	send_msg_csa(CSA_ARG(NULL) VARLSTCNT(11) ERR_DBDSRDFMTCHNG, 9, DB_LEN_STR(reg),
-		LEN_AND_STR(gtm_dbversion_table[GDSV6p]), LEN_AND_LIT("MUPIP UPGRADE"),
+		LEN_AND_STR(gtm_dbversion_table[GDSV7m]), LEN_AND_LIT("MUPIP UPGRADE"),
 		process_id, process_id, &csd->desired_db_format_tn);
 	CHECK_TN(cs_addrs, csd, csd->trans_hist.curr_tn);	/* can issue rts_error TNTOOLARGE */
 	wcs_flu(WCSFLU_IN_COMMIT | WCSFLU_FLUSH_HDR | WCSFLU_CLEAN_DBSYNC);
@@ -1704,7 +1704,7 @@ enum cdb_sc upgrade_dir_tree(block_id curr_blk, block_id offset, gd_region *reg,
 		{	/* Database is empty - reinitialize DIR_ROOT and its child as if newly created */
 			wcs_recover(reg);
 			csd->desired_db_format = GDSV7m;
-			mucblkini(GDSV7m);			/* Recreate the DB with V7m directory tree */
+			mucblkini(reg, GDSV7m);			/* Recreate the DB with V7m directory tree */
 			csd->fully_upgraded = TRUE;		/* Since it is V7 */
 			MEMCPY_LIT(csd->label, GDS_LABEL);	/* Change to V7 label, fully upgraded */
 			csd->minor_dbver = GDSMVCURR;		/* Raise the DB minor version to current */

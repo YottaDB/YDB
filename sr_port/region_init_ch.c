@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,6 +28,7 @@ error_def(ERR_VMSMEMORY);
 CONDITION_HANDLER(region_init_ch)
 {
 	START_CH(TRUE);
+	TREF(ok_to_leave_statsdb_unopened) = FALSE;
 	if (!(IS_GTM_ERROR(SIGNAL)) || DUMPABLE)
 		NEXTCH;
      	PRN_ERROR;

@@ -33,6 +33,7 @@
 #ifdef DEBUG
 #include "op.h"
 #endif
+#include "inline_atomic_pid.h"
 
 /* global refs/defs */
 
@@ -875,6 +876,7 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 						 */
 						assert(expect_damage);
 						cr->blk = CR_BLKEMPTY;
+						BML_RSRV_RESET(cr);
 					}
 				}
 				(*blkque_array)[cr - cr_lo] = TRUE; /* note: this cr's blkque hash validity is already checked */
@@ -915,6 +917,7 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 				{
 					assert(expect_damage);
 					cr->blk = CR_BLKEMPTY;
+					BML_RSRV_RESET(cr);
 				}
 			}
 		}

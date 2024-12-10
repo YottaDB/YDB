@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -82,6 +82,7 @@ void iott_flush(io_desc *io_ptr)
 	boolean_t	ch_set;
 
 	ESTABLISH_GTMIO_CH(&io_ptr->pair, ch_set);
+	assert(tt == io_ptr->type);
 	tt_ptr = io_ptr->dev_sp;
 	if (tt_ptr->timer_set)
 	{
@@ -107,6 +108,7 @@ void iott_flush_time(TID id, int4 hd_len, io_desc **io_ptr_parm)
 
 	io_ptr = *io_ptr_parm;
 	ESTABLISH_GTMIO_CH(&io_ptr->pair, ch_set);
+	assert(tt == io_ptr->type);
 	tt_ptr = io_ptr->dev_sp;
 	assert(tt_ptr->timer_set);
 	if ((FALSE == tt_ptr->write_active) && !prin_out_dev_failure) /* If not in write code and no failure already, do flush */

@@ -166,7 +166,7 @@ block_id	endian_find_dtblk(endian_info *info, end_gv_key *gv_key);
 void mupip_endiancvt(void)
 {
 	block_id		blk_num;
-	boolean_t		outdb_specified, endian_native, swap_boolean, got_standalone, override_specified;
+	boolean_t		outdb_specified, endian_native, swap_boolean, got_standalone, override_specified, swap_boolean2;
 	char			db_name[MAX_FN_LEN + 1], *t_name;
 	char			outdb[MAX_FN_LEN + 1], conf_buff[MAX_CONF_RESPONSE + 1], *response;
 	char			*errptr, *check_error, *mastermap;
@@ -278,6 +278,15 @@ void mupip_endiancvt(void)
 				check_error = GTCMSERVERACTIVE;
 				GTM_PUTMSG_CSA(VARLSTCNT(6) ERR_NOENDIANCVT, 4, n_len, db_name, LEN_AND_STR(check_error));
 			}
+			swap_boolean = GTM_BYTESWAP_32(old_data->createcomplete);
+			swap_boolean = ((GTM_BYTESWAP_32(old_data->last_mdb_ver) >= GDSMV71003)
+					|| (GTM_BYTESWAP_32(old_data->minor_dbver) >= GDSMV71003)) ?
+				!swap_boolean : GTM_BYTESWAP_32(old_data->createinprogress);
+			if (swap_boolean)
+			{
+				check_error = DBCREATE;
+				GTM_PUTMSG_CSA(VARLSTCNT(6) ERR_NOENDIANCVT, 4, n_len, db_name, LEN_AND_STR(check_error));
+			}
 		}
 		swap_dbver = (enum db_ver)GTM_BYTESWAP_32(old_data->desired_db_format);
 		if ((0 >= swap_dbver) || (GDSV7 < swap_dbver))
@@ -296,12 +305,6 @@ void mupip_endiancvt(void)
 		if (0 != swap_uint4)
 		{
 			check_error = RECOVINTRPT;
-			GTM_PUTMSG_CSA(VARLSTCNT(6) ERR_NOENDIANCVT, 4, n_len, db_name, LEN_AND_STR(check_error));
-		}
-		swap_uint4 = GTM_BYTESWAP_32(old_data->createinprogress);
-		if (0 != swap_uint4)
-		{
-			check_error = DBCREATE;
 			GTM_PUTMSG_CSA(VARLSTCNT(6) ERR_NOENDIANCVT, 4, n_len, db_name, LEN_AND_STR(check_error));
 		}
 		swap_uint4 = GTM_BYTESWAP_32(old_data->file_corrupt);
@@ -395,6 +398,11 @@ void mupip_endiancvt(void)
 				check_error = GTCMSERVERACTIVE;
 				GTM_PUTMSG_CSA(VARLSTCNT(6) ERR_NOENDIANCVT, 4, n_len, db_name, LEN_AND_STR(check_error));
 			}
+			if (CREATE_IN_PROGRESS(old_data))
+			{
+				check_error = DBCREATE;
+				GTM_PUTMSG_CSA(VARLSTCNT(6) ERR_NOENDIANCVT, 4, n_len, db_name, LEN_AND_STR(check_error));
+			}
 		}
 		if ((0 >= old_data->desired_db_format) || (GDSV7 < old_data->desired_db_format))
 		{
@@ -409,11 +417,6 @@ void mupip_endiancvt(void)
 		if (0 != old_data->recov_interrupted)
 		{
 			check_error = RECOVINTRPT;
-			GTM_PUTMSG_CSA(VARLSTCNT(6) ERR_NOENDIANCVT, 4, n_len, db_name, LEN_AND_STR(check_error));
-		}
-		if (0 != old_data->createinprogress)
-		{
-			check_error = DBCREATE;
 			GTM_PUTMSG_CSA(VARLSTCNT(6) ERR_NOENDIANCVT, 4, n_len, db_name, LEN_AND_STR(check_error));
 		}
 		if (0 != old_data->file_corrupt)
@@ -727,7 +730,8 @@ void endian_header(sgmnt_data *new, sgmnt_data *old, boolean_t new_is_native)
 	SWAP_SD4(wcs_phase2_commit_wait_spincnt);
 	SWAP_SD4_CAST(last_mdb_ver, enum mdb_ver);
 	/************* FIELDS SET AT CREATION TIME ********************************/
-	/* SWAP_SD4(createinprogress);	checked above as FALSE so no need */
+	new->createcomplete = TRUE;
+	assert(!old->createinprogress);
 	assert(SIZEOF(int4) == SIZEOF(old->creation_time4));
 	time(&ctime);
 	assert(SIZEOF(ctime) >= SIZEOF(int4));
@@ -924,6 +928,7 @@ void endian_header(sgmnt_data *new, sgmnt_data *old, boolean_t new_is_native)
 	SWAP_SD4(hasht_upgrade_needed);
 	SWAP_SD4(defer_allocate);
 	SWAP_SD4(problksplit);
+	SWAP_SD4(nobitmap_prepin);
 }
 
 void	v6_endian_header(v6_sgmnt_data *new, v6_sgmnt_data *old, boolean_t new_is_native)
@@ -968,7 +973,7 @@ void	v6_endian_header(v6_sgmnt_data *new, v6_sgmnt_data *old, boolean_t new_is_n
 	SWAP_SD4(wcs_phase2_commit_wait_spincnt);
 	SWAP_SD4_CAST(last_mdb_ver, enum mdb_ver);
 	/************* FIELDS SET AT CREATION TIME ********************************/
-	/* SWAP_SD4(createinprogress);	checked above as FALSE so no need */
+	new->createinprogress = FALSE;
 	assert(SIZEOF(int4) == SIZEOF(old->creation_time4));
 	time(&ctime);
 	assert(SIZEOF(ctime) >= SIZEOF(int4));
@@ -1165,7 +1170,7 @@ void	v6_endian_header(v6_sgmnt_data *new, v6_sgmnt_data *old, boolean_t new_is_n
 	SWAP_SD4(hasht_upgrade_needed);
 	SWAP_SD4(defer_allocate);
 	SWAP_SD4(problksplit);
-
+	SWAP_SD4(nobitmap_prepin);
 
 	/* convert the header back up to V7 format  */
 	db_header_upconv((sgmnt_data_ptr_t)old);

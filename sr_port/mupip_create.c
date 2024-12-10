@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -42,7 +42,8 @@ error_def(ERR_NOREGION);
 void mupip_create(void)
 {
 	boolean_t	found;
-	char		buff[MAX_RN_LEN + 1], create_stat, exit_stat;
+	char		buff[MAX_RN_LEN + 1], exit_stat;
+	unsigned char	create_stat;
 	gd_region	*reg, *reg_top;
 	int		i;
 	unsigned short	reglen;
@@ -83,8 +84,13 @@ void mupip_create(void)
 		if (!(RDBF_AUTODB & reg->reservedDBFlags))
 		{	/* Ignore MUPIP CREATE for auto-created DBs */
 			gv_cur_region = reg;
-			create_stat = mu_cre_file();
+			create_stat = mu_cre_file(gv_cur_region);
 			exit_stat |= create_stat;
+			if (EXIT_NRM == create_stat)
+			{
+				create_stat = mu_init_file(gv_cur_region, FALSE);
+				exit_stat |= create_stat;
+			}
 		}
 	} else
 	{
@@ -93,8 +99,13 @@ void mupip_create(void)
 		{
 			if ((RDBF_AUTODB & gv_cur_region->reservedDBFlags))
 				continue;		/* Ignore MUPIP CREATE for auto-created DBs */
-			create_stat = mu_cre_file();
+			create_stat = mu_cre_file(gv_cur_region);
 			exit_stat |= create_stat;
+			if (EXIT_NRM == create_stat)
+			{
+				create_stat = mu_init_file(gv_cur_region, FALSE);
+				exit_stat |= create_stat;
+			}
 	       	}
 		gv_cur_region = NULL;
 	}
