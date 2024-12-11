@@ -1558,9 +1558,9 @@
 
    This command displays an output like the following:
 
-   File    /home/jdoe/.yottadb/r2.00_x86_64/g/yottadb.dat
+   File    /home/jdoe/.yottadb/r2.02_x86_64/g/yottadb.dat
    Region  DEFAULT
-   File            /home/jdoe/.yottadb/r2.00_x86_64/g/yottadb.dat
+   File            /home/jdoe/.yottadb/r2.02_x86_64/g/yottadb.dat
    Region          DEFAULT
    Date/Time       23-MAR-2022 03:54:59 [$H = 66191,14099]
      Access method                           BG  Global Buffers                  1024
@@ -1587,7 +1587,7 @@
      Journal Buffer Size                   2312  Journal Alignsize               4096
      Journal AutoSwitchLimit            8386560  Journal Epoch Interval           300
      Journal Yield Limit                      8  Journal Sync IO                FALSE
-     Journal File: /home/jdoe/.yottadb/r2.00_x86_64/g/gtm.mjl
+     Journal File: /home/jdoe/.yottadb/r2.02_x86_64/g/gtm.mjl
      Mutex Hard Spin Count                  128  Mutex Sleep Spin Count           128
      Mutex Queue Slots                     1024  KILLs in progress                  0
      Replication State                      OFF  Region Seqno      0x0000000000000001
@@ -2974,6 +2974,6 @@
 
    **Note**
 
-   This help file is a concise representation of the revision r2.00 of the
+   This help file is a concise representation of the revision r2.02 of the
    Administration and Operations Guide. To obtain a copy of the current
    revision, go to https://docs.yottadb.com/AdminOpsGuide/index.html.
