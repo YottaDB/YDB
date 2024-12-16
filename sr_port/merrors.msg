@@ -3,7 +3,7 @@
 ! Copyright (c) 2001-2022 Fidelity National Information		!
 ! Services, Inc. and/or its subsidiaries. All rights reserved.	!
 !								!
-! Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries.	!
+! Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries.	!
 ! All rights reserved.						!
 !								!
 !	This source code contains the intellectual property	!
@@ -392,7 +392,8 @@ UNUSEDMSG391	<ZPRIVSYNTAXERR nixed in r1.20 because it is a VMS only error>/erro
 ZPRTLABNOTFND	<Label not found in routine>/error/fao=0!/ansi=13
 VIEWAMBIG	<View parameter !AD is ambiguous>/error/fao=2!/ansi=0
 VIEWNOTFOUND	<View parameter !AD not valid>/error/fao=2!/ansi=0
-UNUSEDMSG395	<ZSETPRVARGBAD nixed in r1.20 because it is a VMS only error>/error/fao=0!/ansi=0
+! Previously ZSETPRVARGBAD, nixed in r1.20 because it is a VMS only error
+ZCPREALLVALSTR	<Pre-allocation allowed only for output or input/output variables of type ydb_buffer_t*, ydb_string_t*, or ydb_char_t*>/error/fao=0!/ansi=0
 INVSPECREC	<!AD Invalid global modifier record>/error/fao=2!/ansi=0
 UNUSEDMSG397	<ZSETPRVSYNTAX nixed in r1.20 because it is a VMS only error>/error/fao=0!/ansi=0
 ZSRCHSTRMCT	<Search stream identifier out of range>/error/fao=0!/ansi=0

@@ -1,9 +1,9 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries.*
+ * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -224,7 +224,7 @@
 #define YDB_ERR_ZPRTLABNOTFND -150374026
 #define YDB_ERR_VIEWAMBIG -150374034
 #define YDB_ERR_VIEWNOTFOUND -150374042
-#define YDB_ERR_UNUSEDMSG395 -150374050
+#define YDB_ERR_ZCPREALLVALSTR -150374050
 #define YDB_ERR_INVSPECREC -150374058
 #define YDB_ERR_UNUSEDMSG397 -150374066
 #define YDB_ERR_ZSRCHSTRMCT -150374074

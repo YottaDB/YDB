@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -1014,7 +1014,7 @@ void op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 ma
 	char		*free_string_pointer, *free_string_pointer_start, *param_list_buff;
 	char		*xtrnl_table_name;
 	int		i, pre_alloc_size, rslt, save_mumps_status;
-	int4 		callintogtm_vectorindex, n, call_buff_size;
+	int4 		callintogtm_vectorindex, n, call_buff_size, str_size;
 	gparam_list	*param_list;
 	ydb_long_t	*free_space_pointer;
 	INTPTR_T	status;
@@ -1101,13 +1101,14 @@ void op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 ma
 	for (i = 0, m1 = entry_ptr->input_mask; i < argcnt; i++, m1 = m1 >> 1)
 	{
 		v = va_arg(var, mval *);
+		str_size = 0;
 		/* For char*, char **, and ydb_string_t * types, add the length. Also a good time to force it into string form. */
 		switch (entry_ptr->parms[i])
 		{
 			case ydb_string_star:	/* CAUTION: Fall-through. */
 			case ydb_buffer_star:	/* CAUTION: Fall-through. */
 			case ydb_char_star:
-				n += (-1 != entry_ptr->param_pre_alloc_size[i]) ? entry_ptr->param_pre_alloc_size[i] : 0;
+				str_size = (-1 != entry_ptr->param_pre_alloc_size[i]) ? entry_ptr->param_pre_alloc_size[i] : 0;
 				/* CAUTION: Fall-through. */
 			case ydb_char_starstar:
 				if (MASK_BIT_ON(m1))
@@ -1115,15 +1116,17 @@ void op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 ma
 					if (MV_DEFINED(v))
 					{
 						MV_FORCE_STR(v);
-						n += v->str.len + 1;	/* Note: ydb_string_star and ydb_buffer_star
-									 * do not really need the extra byte.
-									 */
+						/* Note: ydb_string_star and ydb_buffer_star
+						 * do not really need the extra byte.
+						 */
+						str_size = MAX(str_size, v->str.len + 1);
 					} else
 					{
 						MV_FORCE_DEFINED_UNLESS_SKIPARG(v);
-						n += 1;
+						str_size = MAX(str_size, 1);
 					}
 				}
+				n += str_size;
 				break;
 #			ifndef GTM64
 			case ydb_int64_star:
@@ -1176,6 +1179,9 @@ void op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 ma
 	VAR_START(var, argcnt);
 	for (i = 0, m1 = entry_ptr->input_mask; i < argcnt; i++, m1 = m1 >> 1)
 	{
+		ydb_string_t	*str_ptr;
+		ydb_buffer_t	*buff_ptr;
+
 		v = va_arg(var, mval *);
 		/* Verify that all input values are defined */
 		pre_alloc_size = entry_ptr->param_pre_alloc_size[i];
@@ -1211,12 +1217,19 @@ void op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 ma
 				if (MASK_BIT_ON(m1))
 				{	/* If this is defined and input-enabled, it should have already been forced to string. */
 					assert(!MV_DEFINED(v) || MV_IS_STRING(v));
-					if (MV_DEFINED(v) && v->str.len)
+					/* MV_DEFINED and M_ARG_SKIPPED are the same here because we disallow uninitialized IO parameters. */
+					assert(MV_DEFINED(v) == !M_ARG_SKIPPED(v));
+					if (MV_DEFINED(v))
 					{
 						memcpy(free_string_pointer, v->str.addr, v->str.len);
-						free_string_pointer += v->str.len;
+						free_string_pointer[v->str.len] = '\0';
+						free_string_pointer += MAX(pre_alloc_size, v->str.len + 1);
+					} else {
+						/* NOTE: both here and in the O case below, we pass an empty nul-terminated string if the argument is skipped
+						   or uninitialized. This prevents distinguishing it from an empty M string. Ideally we would pass a NULL pointer
+						   instead, but that would break backwards compatibility. */
+						*free_string_pointer++ = '\0';
 					}
-					*free_string_pointer++ = '\0';
 				} else if (0 < pre_alloc_size)
 				{
 					*free_string_pointer = '\0';
@@ -1288,29 +1301,35 @@ void op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 ma
 				free_space_pointer += (SIZEOF(ydb_uint64_t) / SIZEOF(ydb_long_t)); // increment properly for 32 or 64-bit build
 				break;
 			case ydb_string_star:
-				param_list->arg[i] = free_space_pointer;
+				str_ptr = param_list->arg[i] = free_space_pointer;
 				if (MASK_BIT_ON(m1))
 				{	/* If this is defined and input-enabled, it should have already been forced to string. */
 					assert(!MV_DEFINED(v) || MV_IS_STRING(v));
-					if (MV_DEFINED(v) && v->str.len)
+					/* MV_DEFINED and M_ARG_SKIPPED are the same here because we disallow uninitialized IO parameters. */
+					assert(MV_DEFINED(v) == !M_ARG_SKIPPED(v));
+					if (MV_DEFINED(v))
 					{
-						*free_space_pointer++ = (ydb_long_t)v->str.len;
-						*(char **)free_space_pointer = (char *)free_string_pointer;
+						/* NOTE: unlike the O case, in the IO case we set this to the size of the input string, not the size of the allocation. */
+						str_ptr->length = (ydb_long_t)v->str.len;
+						str_ptr->address = (char *)free_string_pointer;
 						memcpy(free_string_pointer, v->str.addr, v->str.len);
-						free_string_pointer += v->str.len;
-						free_space_pointer++;
+						free_string_pointer += MAX(pre_alloc_size, v->str.len);
 					} else
 					{
-						*free_space_pointer++ = 0;
-						*free_space_pointer++ = 0;	/* Effectively a NULL pointer. */
+						str_ptr->length = 0;
+						str_ptr->address = NULL;
 					}
 				} else if (0 < pre_alloc_size)
 				{
-					*free_space_pointer++ = (ydb_long_t)pre_alloc_size;
-					*(char **)free_space_pointer = (char *)free_string_pointer;
-					*free_string_pointer = '\0';
-					free_space_pointer++;
-					free_string_pointer += pre_alloc_size;
+					if (M_ARG_SKIPPED(v)) {
+						str_ptr->length = 0;
+						str_ptr->address = NULL;
+					} else {
+						str_ptr->length = (ydb_long_t)pre_alloc_size;
+						str_ptr->address = (char *)free_string_pointer;
+						*free_string_pointer = '\0';
+						free_string_pointer += pre_alloc_size;
+					}
 				} else /* Output and no pre-allocation specified */
 				{
 					if (0 == package->str.len)
@@ -1323,37 +1342,38 @@ void op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 ma
 							package->str.len, package->str.addr,
 							extref->str.len, extref->str.addr);
 				}
+                                free_space_pointer += SIZEOF(ydb_string_t) / SIZEOF(ydb_long_t);
 				break;
 			case ydb_buffer_star:
-				param_list->arg[i] = free_space_pointer;
+				buff_ptr = param_list->arg[i] = free_space_pointer;
 				if (MASK_BIT_ON(m1))
 				{	/* If this is defined and input-enabled, it should have already been forced to string. */
-					ydb_buffer_t	*buff_ptr;
-
-					buff_ptr = (ydb_buffer_t *)free_space_pointer;
 					assert(!MV_DEFINED(v) || MV_IS_STRING(v));
-					if (MV_DEFINED(v) && v->str.len)
+					/* MV_DEFINED and M_ARG_SKIPPED are the same here because we disallow uninitialized IO parameters. */
+					assert(MV_DEFINED(v) == !M_ARG_SKIPPED(v));
+					if (MV_DEFINED(v))
 					{
-						buff_ptr->len_alloc = buff_ptr->len_used = v->str.len;
+						buff_ptr->len_used = v->str.len;
 						buff_ptr->buf_addr = (char *)free_string_pointer;
 						memcpy(buff_ptr->buf_addr, v->str.addr, v->str.len);
-						free_string_pointer += v->str.len;
+						buff_ptr->len_alloc = MAX(pre_alloc_size, v->str.len);
+						free_string_pointer += buff_ptr->len_alloc;
 					} else
 					{
 						buff_ptr->len_alloc = buff_ptr->len_used = 0;
 						buff_ptr->buf_addr = NULL;
 					}
-					free_space_pointer = (ydb_long_t *)((char *)free_space_pointer + SIZEOF(ydb_buffer_t));
 				} else if (0 < pre_alloc_size)
 				{
-					ydb_buffer_t	*buff_ptr;
-
-					buff_ptr = (ydb_buffer_t *)free_space_pointer;
-					buff_ptr->len_alloc = pre_alloc_size;
-					buff_ptr->len_used = 0;
-					buff_ptr->buf_addr = (char *)free_string_pointer;
-					free_space_pointer = (ydb_long_t *)((char *)free_space_pointer + SIZEOF(ydb_buffer_t));
-					free_string_pointer += pre_alloc_size;
+					if (M_ARG_SKIPPED(v)) {
+						buff_ptr->buf_addr = NULL;
+						buff_ptr->len_alloc = buff_ptr->len_used = 0;
+					} else {
+						buff_ptr->len_alloc = pre_alloc_size;
+						buff_ptr->len_used = 0;
+						buff_ptr->buf_addr = (char *)free_string_pointer;
+						free_string_pointer += pre_alloc_size;
+					}
 				} else /* Output and no pre-allocation specified */
 				{
 					if (0 == package->str.len)
@@ -1366,6 +1386,7 @@ void op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 ma
 							  package->str.len, package->str.addr,
 							  extref->str.len, extref->str.addr);
 				}
+                                free_space_pointer += SIZEOF(ydb_buffer_t) / SIZEOF(ydb_long_t);
 				break;
 			case ydb_float_star:
 				param_list->arg[i] = free_space_pointer;

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -342,6 +342,7 @@ error_def(ERR_ZCINVALIDKEYWORD);
 error_def(ERR_ZCPREALLNUMEX);
 error_def(ERR_ZCPREALLVALINV);
 error_def(ERR_ZCPREALLVALPAR);
+error_def(ERR_ZCPREALLVALSTR);
 error_def(ERR_ZCRCALLNAME);
 error_def(ERR_ZCRPARMNAME);
 error_def(ERR_ZCRTENOTF);
@@ -630,6 +631,16 @@ STATICFNDEF uint4 array_to_mask(boolean_t ar[MAX_ACTUALS], int n)
 	return mask;
 }
 
+STATICFNDEF bool is_prealloc_allowed(enum ydb_types ty) {
+	switch(ty) {
+		case ydb_buffer_star:
+		case ydb_string_star:
+		case ydb_char_star:
+			return true;
+		default: return false;
+	}
+}
+
 /* Parse external call table for call-outs */
 /* Note: Need condition handler to clean-up allocated structures and close input file in the event of an error */
 struct extcall_package_list *exttab_parse(mval *package)
@@ -843,8 +854,12 @@ struct extcall_package_list *exttab_parse(mval *package)
 			parameter_types[parameter_count] = pr;
 			if ('[' == *tbp)
 			{
-				if (star_found && !is_input[parameter_count])
-					parameter_alloc_values[parameter_count] = scan_array_bound(&tbp, pr, ext_table_file_name);
+				if (star_found)
+					if (is_prealloc_allowed(pr) && is_output[parameter_count])
+						parameter_alloc_values[parameter_count] = scan_array_bound(&tbp, pr, ext_table_file_name);
+					else
+						ext_stx_error(ERR_ZCPREALLVALSTR, ext_table_file_name);
+
 				else
 					ext_stx_error(ERR_ZCPREALLVALPAR, ext_table_file_name);
 				/* We should allow the pre-allocated value upto to the maximum string size (MAX_STRLEN) plus 1 for
