@@ -34,7 +34,7 @@ foreach(lang ${languages})
 endforeach()
 
 # Defaults
-set(version r202)
+set(version r203)
 # If CMAKE_BUILD_TYPE is not defined make it a Release build
 if(NOT CMAKE_CONFIGURATION_TYPES AND NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE "RelWithDebInfo" CACHE STRING "Build type" FORCE)
