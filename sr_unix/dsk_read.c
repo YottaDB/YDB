@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2020-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2020-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -67,15 +67,10 @@ GBLREF	jnl_gbls_t		jgbl;
 GBLREF	uint4			process_id;
 GBLREF	uint4			mu_reorg_encrypt_in_prog;
 
-<<<<<<< HEAD
 #ifdef DEBUG
 GBLREF	block_id		ydb_skip_bml_num;
 #endif
 
-error_def(ERR_DSEBLKRDFAIL);	/* TODO: use more helpful error */
-
-=======
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
 int4	dsk_read (block_id blk, sm_uc_ptr_t buff, enum db_ver *ondsk_blkver, boolean_t blk_free)
 {
 	boolean_t		buff_is_modified_after_lseekread = FALSE, db_is_encrypted, fully_upgraded, use_new_key;

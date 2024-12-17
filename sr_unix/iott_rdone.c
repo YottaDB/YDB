@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -186,14 +186,8 @@ int	iott_rdone (mint *v, uint8 nsec_timeout)	/* timeout in nanoseconds */
 	} else
 	{
 		timed = TRUE;
-<<<<<<< HEAD
-		input_timeval.tv_sec = nsec_timeout / NANOSECS_IN_SEC;
-		input_timeval.tv_usec = (nsec_timeout % NANOSECS_IN_SEC) / NANOSECS_IN_USEC;
+		poll_timeout = DIVIDE_ROUND_UP(nsec_timeout, NANOSECS_IN_MSEC);
 		if (0 == nsec_timeout)
-=======
-		poll_timeout = msec_timeout;
-		if (0 == msec_timeout)
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
 		{
 			if (!zint_restart)
 				iott_mterm(io_ptr);
@@ -267,13 +261,8 @@ int	iott_rdone (mint *v, uint8 nsec_timeout)	/* timeout in nanoseconds */
 						ret = FALSE;
 						break;
 					}
-<<<<<<< HEAD
-					input_timeval.tv_sec = cur_time.tv_sec;
-					input_timeval.tv_usec = (gtm_tv_usec_t)(cur_time.tv_nsec / NANOSECS_IN_USEC);
-=======
-					poll_timeout = (long)((cur_time.at_sec * MILLISECS_IN_SEC) +
-						DIVIDE_ROUND_UP((gtm_tv_usec_t)cur_time.at_usec, MICROSECS_IN_MSEC));
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
+					poll_timeout = (long)((cur_time.tv_sec * MILLISECS_IN_SEC) +
+						DIVIDE_ROUND_UP((gtm_tv_usec_t)cur_time.tv_nsec, NANOSECS_IN_MSEC));
 				}
 			} else
 			{
@@ -284,15 +273,11 @@ int	iott_rdone (mint *v, uint8 nsec_timeout)	/* timeout in nanoseconds */
 		/* the checks for EINTR below are valid and should not be converted to EINTR
 		 * wrapper macros, since the select/read is not retried on EINTR.
 		 */
-<<<<<<< HEAD
-		selstat = select(tt_ptr->fildes + 1, (void *)&input_fd, (void *)NULL, (void *)NULL, &input_timeval);
-		HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
-=======
 		poll_fdlist[0].fd = tt_ptr->fildes;
 		poll_fdlist[0].events = POLLIN;
 		poll_nfds = 1;
 		selstat = poll(&poll_fdlist[0], poll_nfds, poll_timeout);
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
+		HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 		if (0 > selstat)
 		{
 			if (EINTR != errno)
@@ -314,11 +299,7 @@ int	iott_rdone (mint *v, uint8 nsec_timeout)	/* timeout in nanoseconds */
 			continue;	/* select() timeout; try again */
 		} else if ((rdlen = (int)(read(tt_ptr->fildes, &inbyte, 1))) == 1)	/* This read is protected */
 		{
-<<<<<<< HEAD
 			HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
-			assert(FD_ISSET(tt_ptr->fildes, &input_fd) != 0);
-=======
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
 			/* --------------------------------------------------
 			 * set prin_in_dev_failure to FALSE to indicate that
 			 * input device is working now.

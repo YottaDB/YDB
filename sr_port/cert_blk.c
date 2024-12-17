@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -94,10 +94,6 @@ error_def(ERR_DBNONUMSUBS);
 #define TEXT3 " :              LVL=0x"
 #define TEXT4 ","
 
-<<<<<<< HEAD
-#define MAX_UTIL_LEN (STR_LIT_LEN(TEXT0) + BLOCK_WINDOW + STR_LIT_LEN(TEXT3) + LEVEL_WINDOW + STR_LIT_LEN(TEXT4) + 1)
-#define	RTS_ERROR_FUNC(CSA, ERR, BUFF, ERROR_ACTION, REG)	/* for reg in a message, replace NULL in invocation */  \
-=======
 #ifdef DEBUG_BLKS_TO_UPGRD
 #define DEBUG_BLKS_TO_UPGRD_FORK_N_CORE											\
 MBSTART	{														\
@@ -108,9 +104,8 @@ MBSTART	{														\
 #define DEBUG_BLKS_TO_UPGRD_FORK_N_CORE
 #endif
 
-#define MAX_UTIL_LEN (STRLEN(TEXT0) + BLOCK_WINDOW + STRLEN(TEXT3) + LEVEL_WINDOW + STRLEN(TEXT4) + 1)
-#define	RTS_ERROR_FUNC(CSA, ERR, BUFF, ERROR_ACTION, REG)	/* for reg in a message, replace NULL in invocation */	\
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
+#define MAX_UTIL_LEN (STR_LIT_LEN(TEXT0) + BLOCK_WINDOW + STR_LIT_LEN(TEXT3) + LEVEL_WINDOW + STR_LIT_LEN(TEXT4) + 1)
+#define	RTS_ERROR_FUNC(CSA, ERR, BUFF, ERROR_ACTION, REG)	/* for reg in a message, replace NULL in invocation */  \
 {															\
 	switch (ERROR_ACTION)												\
 	{														\

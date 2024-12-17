@@ -777,13 +777,8 @@ CALLERID	<Routine !AD called from 0x!XJ>/info/fao=3!/ansi=0
 KRNLKILL	<Process was terminated by SIGDANGER signal from the system -- System swap space is too low -- Report to System Administrator>/fatal/fao=0!/ansi=0
 MEMORYRECURSIVE	<Memory Subsystem called recursively>/fatal/fao=0!/ansi=0
 FREEZEID	<Cache !AD on !AD by freeze id 0x!XL with match 0x!XL from 0x!XJ>/info/fao=7!/ansi=0
-<<<<<<< HEAD
-UNUSEDMSG780	<BLKWRITERR last used in V6.3-001A May 2017>/error/fao=0!/ansi=0
-DSEINVALBLKID	<Trying to edit DB with 64-bit block IDs using pre-GT.M-V7/pre-YottaDB-r2.00 DSE>/error/fao=0!/ansi=0
-=======
 FORCEDHALT2	<Receipt of 3 MUPIP STOP signals within !UL seconds, process: !UL shutting down with no exit handling like a kill -9>/fatal/fao=2!/ansi=0
-DSEINVALBLKID	<Trying to edit DB with 64-bit block IDs using pre-V7 DSE>/error/fao=0!/ansi=0
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
+DSEINVALBLKID	<Trying to edit DB with 64-bit block IDs using pre-GT.M-V7/pre-YottaDB-r2.00 DSE>/error/fao=0!/ansi=0
 PINENTRYERR	<Custom pinentry program failure>/error/fao=0!/ansi=0
 BCKUPBUFLUSH	<Unable to flush buffer for online backup>/error/fao=0!/ansi=0
 NOFORKCORE	<Unable to fork off process to create core.  Core creation postponed.>/warning/fao=0!/ansi=0
@@ -1229,21 +1224,12 @@ UNUSEDMSG1223	<DBCCMDFAIL removed from code in V7.0-000 Nov 2020>/error/fao=0!/a
 UNUSEDMSG1224	<DBCKILLIP removed from code in V7.0-000 Nov 2020>/error/fao=0!/ansi=0
 UNUSEDMSG1225	<DBCNOFINISH removed from code in V7.0-000 Nov 2020>/error/fao=0!/ansi=0
 DYNUPGRDFAIL	<Unable to dynamically upgrade block 0x!16@XQ in database !AD due to lack of free space in block>/error/fao=3!/ansi=0
-<<<<<<< HEAD
-MMNODYNDWNGRD	<Unable to use dynamic downgrade with MM access method for region !AD. Use BG access method for downgrade>/error/fao=2!/ansi=0
-MMNODYNUPGRD	<Unable to use MM access method for region !AD until all database blocks are upgraded>/error/fao=2!/ansi=0
-MUDWNGRDNRDY	<Database !AD is not ready to downgrade - still !@UQ database blocks to downgrade>/error/fao=3!/ansi=0
-MUDWNGRDTN	<Transaction number 0x!16@XQ in database !AD is too big for MUPIP [REORG] DOWNGRADE. Renew database with MUPIP INTEG TN_RESET>/error/fao=3!/ansi=0
-MUDWNGRDNOTPOS	<Start VBN value is [!UL] while downgraded YottaDB version can support only [!UL]. Downgrade not possible>/error/fao=2!/ansi=0
-MUUPGRDNRDY	<Database !AD has not been certified as being ready to upgrade to !AD format>/error/fao=4!/ansi=0
-=======
-UNUSEDMSG1225	<MMNODYNDWNGRD removed from code in V7.1-000 Feb 2023>/error/fao=0!/ansi=0
-UNUSEDMSG1226	<MMNODYNUPGRD removed from code in V7.1-000 Feb 2023>/error/fao=0!/ansi=0
-UNUSEDMSG1227	<MUDWNGRDNRDY removed from code in V7.1-000 Feb 2023>/error/fao=0!/ansi=0
+UNUSEDMSG1227	<MMNODYNDWNGRD removed from code in V7.1-000 Feb 2023>/error/fao=0!/ansi=0
+UNUSEDMSG1228	<MMNODYNUPGRD removed from code in V7.1-000 Feb 2023>/error/fao=0!/ansi=0
+UNUSEDMSG1229	<MUDWNGRDNRDY removed from code in V7.1-000 Feb 2023>/error/fao=0!/ansi=0
 REORGUPCNFLCT	<MUPIP !AD encountered a conflict due to !AD (PID:!UL)>/error/fao=5!/ansi=0
-MUDWNGRDNOTPOS	<Start VBN value is [!UL] while downgraded GT.M version can support only [!UL]. Downgrade not possible>/error/fao=2!/ansi=0
+MUDWNGRDNOTPOS	<Start VBN value is [!UL] while downgraded YottaDB version can support only [!UL]. Downgrade not possible>/error/fao=2!/ansi=0
 MUUPGRDNRDY	<Database !AD has not been completely upgraded to !AD format - still !@UQ database blocks to upgrade>/error/fao=5!/ansi=0
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
 TNWARN		<Database file !AD has 0x!16@XQ more transactions to go before reaching the transaction number limit (0x!16@XQ). Renew database with MUPIP INTEG TN_RESET>/warning/fao=4!/ansi=0
 TNTOOLARGE	<Database file !AD has reached the transaction number limit (0x!16@XQ). Renew database with MUPIP INTEG TN_RESET>/error/fao=3!/ansi=0
 SHMPLRECOV	<Shared memory pool block recovery invoked for region !AD>/info/fao=2!/ansi=0
@@ -1467,13 +1453,8 @@ MUTRUNCBACKINPROG	<Truncate detected concurrent backup in progress for region !A
 MUTRUNCERROR	<Truncate of region !AD encountered service error !AD>/error/fao=4!/ansi=0
 MUTRUNCFAIL	<Truncate failed after reorg.  Failure code: !AD.>/error/fao=2!/ansi=0
 MUTRUNCNOSPACE	<Region !AD has insufficient space to meet truncate target percentage of !UL>/info/fao=3!/ansi=0
-<<<<<<< HEAD
 MUTRUNCNOTBG	<Region !AD does not have access method BG>/error/fao=2!/ansi=0
-MUTRUNCNOV4	<Region !AD is not fully upgraded from V4 format.>/fatal/fao=2!/ansi=0
-=======
-MUTRUNCNOTBG	<Region !AD does not have access method BG >/error/fao=2!/ansi=0
-UNUSEDMSG1455	<MUTRUNCNOV4 Last used in V7.0-004 Fed 2023>/fatal/fao=0!/ansi=0
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
+UNUSEDMSG1457	<MUTRUNCNOV4 Last used in V7.0-004 Fed 2023>/fatal/fao=0!/ansi=0
 MUTRUNCPERCENT	<Truncate threshold percentage should be from 0 to 99>/error/fao=0!/ansi=0
 MUTRUNCSSINPROG	<Truncate detected concurrent snapshot in progress for region !AD>/info/fao=2!/ansi=0
 MUTRUNCSUCCESS	<Database file !AD truncated from 0x!16@XQ blocks to 0x!16@XQ at transaction 0x!16@XQ>/info/fao=5!/ansi=0
@@ -1543,11 +1524,7 @@ DBMBMINCFREFIXED	<Master bitmap incorrectly marks local bitmap 0x!XL as free. Au
 NULLENTRYREF	<JOB command did not specify entryref>/error/fao=0!/ansi=0
 ZPEEKNORPLINFO	<$ZPEEK() unable to access requested replication structure>/error/fao=0!/ansi=0
 MMREGNOACCESS	<Region !AD (!AD) is no longer accessible. See prior error messages in the operator and application error logs>/error/fao=4!/ansi=0
-<<<<<<< HEAD
-UNUSEDMSG1527	<MALLOCMAXUNIX last used in OpenVMS>/error/fao=0!/ansi=0
-=======
 FDSIZELMT	<Too many (!UL) descriptors needed by GT.CM server>/error/fao=1!/ansi=0
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
 MALLOCCRIT	<Memory allocation critical due to request for !UJ bytes from 0x!XJ>/warning/fao=2!/ansi=0
 HOSTCONFLICT	<Host !AD could not open database file !AD because it is marked as already open on node !AD>/error/fao=6!/ansi=0
 GETADDRINFO	<Error in getting address info>/error/fao=0!/ansi=0

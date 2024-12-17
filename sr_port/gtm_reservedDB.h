@@ -3,7 +3,7 @@
  * Copyright (c) 2016-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -53,13 +53,9 @@ enum
 #define RESERVED_NAMESPACE	"%Y"
 #define RESERVED_NAMESPACE_LEN	(SIZEOF(RESERVED_NAMESPACE) - 1)
 
-<<<<<<< HEAD
-/* The maximum size of $ydb_statsdir is MAX_FN_LEN minus a minimal statsDB fname */
-=======
-/* The maximum size of $gtm_statsdir is MAX_FN_LEN minus a minimal statsDB fname.
- * If the statsdb won't fit in $gtm_statsdir, it uses $gtm_tmp (see gtm_env_init_sp.c)
+/* The maximum size of $ydb_statsdir is MAX_FN_LEN minus a minimal statsDB fname.
+ * If the statsdb won't fit in $ydb_statsdir, it uses $ydb_tmp (see gtm_env_init_sp.c)
  */
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
 #define MAX_STATSDIR_LEN	(MAX_FN_LEN - 8 /* hash */ - STRLEN(".a.dat") - STRLEN(STATSDB_FNAME_SUFFIX))
 
 /* Size of the minimum additional record that can fit in a statsDB block after a record has been added to it. Use this

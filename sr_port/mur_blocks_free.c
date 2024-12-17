@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2023-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -81,8 +81,7 @@ block_id mur_blocks_free(reg_ctl_list *rctl)
 	db_ctl->op_buff = (uchar_ptr_t)disk;
 	db_ctl->op_len = cs_data->blk_size;
 	for (i = 0; i != maps; i++)
-<<<<<<< HEAD
-	{	/* TODO: why mess with anything in bml other than version? */
+	{
 #		ifdef DEBUG
 		if ((0 != ydb_skip_bml_num) && (1 == i))
 		{
@@ -91,9 +90,6 @@ block_id mur_blocks_free(reg_ctl_list *rctl)
 			continue;
 		}
 #		endif
-=======
-	{
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
 		bnum = i * cs_data->bplmap;
 		db_ctl->op = FC_READ;
 		db_ctl->op_pos = cs_data->start_vbn + ((gtm_int64_t)cs_data->blk_size / DISK_BLOCK_SIZE * bnum);

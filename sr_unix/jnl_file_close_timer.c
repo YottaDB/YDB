@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2021-2024 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2021-2025 YottaDB LLC and/or its subsidiaries.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -45,16 +45,12 @@
 
 GBLREF	boolean_t	oldjnlclose_started;
 GBLREF	uint4		process_id;
-<<<<<<< HEAD
 GBLREF	boolean_t	exit_handler_active;
-=======
-GBLREF	int		process_exiting;
 #if defined(CHECKFORMULTIGENMJLS)
 GBLREF	intrpt_state_t	intrpt_ok_state;
 GBLREF	uint4		is_updhelper;
 GBLREF	boolean_t	is_updproc;
 #endif
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
 
 void jnl_file_close_timer(void)
 {

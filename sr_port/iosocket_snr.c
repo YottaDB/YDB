@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -47,23 +47,14 @@
 #include "gtm_time.h"
 #include "gtm_inet.h"
 #include "gtm_string.h"
-#ifdef UNIX
 #include "gtm_fcntl.h"
-static int fcntl_res;
+
 #ifdef DEBUG
 #include <sys/time.h>		/* for gettimeofday */
 #endif
-<<<<<<< HEAD
-#ifdef GTM_USE_POLL_FOR_SUBSECOND_SELECT
-#include "gtm_poll.h"
-#endif
-#endif
-#include "gtm_select.h"
 
-=======
-#endif
 #include "gtm_poll.h"
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
+
 #include "eintr_wrappers.h"
 #include "gt_timer.h"
 #include "io.h"
@@ -189,34 +180,11 @@ ssize_t iosocket_snr_io(socket_struct *socketptr, void *buffer, size_t maxlength
 			pollread = TRUE;
 		if (0 == status)
 		{	/* if TLS cachedbytes available no need to poll */
-<<<<<<< HEAD
-#			ifndef GTM_USE_POLL_FOR_SUBSECOND_SELECT
-			FD_SET(socketptr->sd, &tcp_fd);
-			assert(0 != FD_ISSET(socketptr->sd, &tcp_fd));
-			lcl_time_for_read.tv_sec = time_for_read->tv_sec;
-			lcl_time_for_read.tv_usec = (gtm_tv_usec_t)(time_for_read->tv_nsec / NANOSECS_IN_USEC);
-			if (pollread)
-			{
-				readfds = &tcp_fd;
-				writefds = NULL;
-			} else
-			{
-				writefds = &tcp_fd;
-				readfds = NULL;
-			}
-			status = select(socketptr->sd + 1, readfds, writefds, NULL, &lcl_time_for_read);
-#			else
 			poll_fdlist[0].fd = socketptr->sd;
 			poll_fdlist[0].events = pollread ? POLLIN : POLLOUT;
 			poll_nfds = 1;
+			assert(time_for_read->tv_sec == 0);
 			poll_timeout = DIVIDE_ROUND_UP(time_for_read->tv_nsec, NANOSECS_IN_MSEC);	/* convert to millisecs */
-=======
-			poll_fdlist[0].fd = socketptr->sd;
-			poll_fdlist[0].events = pollread ? POLLIN : POLLOUT;
-			poll_nfds = 1;
-			assert(time_for_read->at_sec == 0);
-			poll_timeout = DIVIDE_ROUND_UP(time_for_read->at_usec, MICROSECS_IN_MSEC);	/* convert to millisecs */
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
 			status = poll(&poll_fdlist[0], poll_nfds, poll_timeout);
 			real_errno = errno;
 			DEBUG_ONLY(clock_gettime(CLOCK_REALTIME, &tsafter);)

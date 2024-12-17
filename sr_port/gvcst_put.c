@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -121,15 +121,10 @@ GBLREF	unsigned char		t_fail_hist[CDB_MAX_TRIES];
 GBLREF	unsigned int		t_tries;
 #ifdef GTM_TRIGGER
 GBLREF	boolean_t		skip_INVOKE_RESTART;
-GBLREF	boolean_t		ztwormhole_used;	/* TRUE if $ztwormhole was used by trigger code */
+GBLREF	boolean_t		write_ztworm_jnl_rec;
 GBLREF	int			tprestart_state;
 GBLREF	int4			gtm_trigger_depth;
 GBLREF	int4			tstart_trigger_depth;
-<<<<<<< HEAD
-GBLREF	boolean_t		skip_INVOKE_RESTART;
-GBLREF	boolean_t		write_ztworm_jnl_rec;
-=======
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
 #endif
 /* Globals that could change in value across nested trigger calls of gvcst_put AND need to be saved/restored */
 GBLREF	boolean_t		is_dollar_incr, span_nodes_disallowed;
@@ -296,12 +291,9 @@ void	gvcst_put(mval *val)
 	int				chunk_size, gblsize, i, oldend, rc, save_dollar_tlevel;
 	mval				*pre_incr_mval, *save_val, val_ctrl, val_dummy, val_piece;
 	span_parms			parms;
-<<<<<<< HEAD
 	unsigned char			fp_flags;
-=======
 	unsigned char			mychars[MAX_NSBCTRL_SZ];
 	unsigned short			numsubs;
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -458,24 +450,11 @@ void	gvcst_put(mval *val)
 void	gvcst_put2(mval *val, span_parms *parms)
 {
 	blk_segment		*bs1, *bs_ptr, *new_blk_bs;
-<<<<<<< HEAD
-	block_id		allocation_clue, tp_root, gvt_for_root, blk_num, last_split_blk_num[MAX_BT_DEPTH];
-	block_id		lcl_root, last_split_bnum, *null_block_id;
-	block_index		left_hand_index, ins_chain_index, root_blk_cw_index, next_blk_index;
-	block_offset		ins_off1, ins_off2, old_curr_chain_next_off;
-	boolean_t		copy_extra_record, level_0, new_rec, no_pointers, succeeded, key_exists;
-	boolean_t		make_it_null, gbl_target_was_set, duplicate_set, new_rec_goes_to_right, need_extra_block_split;
-	boolean_t		write_logical_jnlrecs, blk_match, is_split_dir_left;
-	boolean_t		jnl_format_done, is_dummy, needfmtjnl, fits, lcl_span_status, want_root_search = FALSE;
-	boolean_t		db_long_blk_id, long_blk_id;	/* db_long_blk_id is based on csd->desired_db_format,
-								 * while long_blk_id is based on bp->bver
-								 */
-=======
 	block_id		allocation_clue, blk_num, gvt_for_root, last_split_blk_num[MAX_BT_DEPTH], last_split_bnum;
 	block_id		lcl_root, tp_root;
 	block_index		ins_chain_index, left_hand_index, next_blk_index, root_blk_cw_index;
-	block_offset		first_offset, ins_off1, ins_off2, next_offset, old_curr_chain_next_off;
-	boolean_t		blk_match, can_write_logical_jnlrecs, collhdr = FALSE, copy_extra_record, dont_copy_extra_record = FALSE,
+	block_offset		ins_off1, ins_off2, old_curr_chain_next_off;
+	boolean_t		blk_match, collhdr = FALSE, copy_extra_record, dont_copy_extra_record = FALSE,
 				duplicate_set, fits, gbl_target_was_set, is_dummy, is_split_dir_left, jnl_format_done,
 				lcl_span_status, level_0, key_exists, make_it_null, need_extra_block_split, needfmtjnl,
 				new_rec, new_rec_goes_to_right, no_pointers, preemptive_split, succeeded, write_logical_jnlrecs,
@@ -484,7 +463,6 @@ void	gvcst_put2(mval *val, span_parms *parms)
 								 * while long_blk_id is based on bp->bver
 								 */
 	boolean_t		prev_split_to_right; /* copy of "split_to_right" after child level split (used in parent split) */
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
 	boolean_t		split_to_right;	/* FALSE if a block split creates a new block on the left of the split point.
 						 *	In this case, a "t_create" is needed for the new block on the left
 						 *	and a "t_write" is needed for the current block (right side of split).
@@ -504,24 +482,12 @@ void	gvcst_put2(mval *val, span_parms *parms)
 	static gv_key		*gv_altkey2;
 	gv_namehead		*dir_tree, *save_targ, *split_targ;
 	ht_ent_int8		*tabent;
-<<<<<<< HEAD
-	int			cur_blk_size, blk_seg_cnt, delta, i, j, left_hand_offset, n, ins_chain_offset,
-				new_blk_size_l, new_blk_size_r, new_blk_size_single, new_blk_size, blk_reserved_size,
-				last_possible_left_offset, new_rec_size, next_rec_shrink, next_rec_shrink1, start_len,
-				offset_sum, rec_cmpc, tmp_cmpc, target_key_size, undo_index, cur_val_offset,
-				curr_offset, bh_level, blk_id_sz, off_chain_sz;
-	int			rc;
-	int			split_depth;
-	int4			cse_first_off;
-	int4			data_len;
-=======
 	int			bh_level, blk_id_sz, blk_reserved_size, blk_seg_cnt, cur_blk_size, curr_offset, delta,
 				cur_val_offset, i, ins_chain_offset, is_mm, j, last_possible_left_offset, left_hand_offset, n,
 				new_blk_size, new_blk_size_l, new_blk_size_r, new_blk_size_single, new_rec_size,
 				next_rec_shrink, next_rec_shrink1, off_chain_sz, offset_sum, rc, rec_cmpc, split_depth,
-				start_len, target_key_size, tmp_cmpc, tp_lev, undo_index;
+				start_len, target_key_size, tmp_cmpc, undo_index;
 	int4			blk_size, blk_fill_size, blk_reserved_bytes, cse_first_off, data_len;
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
 	jnl_action		*ja;
 	jnl_format_buffer	*jfb, *ztworm_jfb;
 	key_cum_value		*tempkv;
@@ -540,15 +506,9 @@ void	gvcst_put2(mval *val, span_parms *parms)
 	srch_blk_status		*bh, *bq, *tp_srch_status;
 	srch_hist		*dir_hist;
 	uchar_ptr_t		subrec_ptr;
-<<<<<<< HEAD
-	uint4			segment_update_array_size, bs1_2_len, bs1_3_len;
-	uint4			nodeflags;
-	uint4			no_4byte_collhdr;
-=======
-	uint4			bs1_2_len, bs1_3_len, cp2_len, key_top, nodeflags, segment_update_array_size;
+	uint4			bs1_2_len, bs1_3_len, nodeflags, segment_update_array_size;
 	unsigned char		buff[MAX_ZWR_KEY_SZ], *end, new_ch, old_ch;
 	unsigned int		curr_rec_match, curr_rec_offset, prev_rec_match, prev_rec_offset;
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
 	unsigned short		extra_record_blkid_off, rec_size, tmp_rsiz;
 	v6_off_chain		v6_chain;
 #	ifdef GTM_TRIGGER
@@ -928,21 +888,7 @@ tn_restart:
 		SET_CMPC(curr_rec_hdr, 0);
 		BLK_INIT(bs_ptr, bs1);
 		BLK_SEG(bs_ptr, (sm_uc_ptr_t)curr_rec_hdr, SIZEOF(rec_hdr));
-<<<<<<< HEAD
-		BLK_ADDR(null_block_id, SIZEOF(block_id), block_id);
-		*null_block_id = 0;
-		assert(SIZEOF(*null_block_id) == SIZEOF(block_id_64));
-		assert(SIZEOF(*null_block_id) > SIZEOF(block_id_32));
-		if (db_long_blk_id)
-		{
-			BLK_SEG(bs_ptr, (unsigned char *)null_block_id, SIZEOF(block_id_64));
-		} else
-		{
-			BLK_SEG(bs_ptr, (unsigned char *)null_block_id, SIZEOF(block_id_32));
-		}
-=======
 		BLK_SEG(bs_ptr, (unsigned char *)&zeroes_blkid_collhdr, db_long_blk_id ? SIZEOF(block_id_64) : SIZEOF(block_id_32));
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
 		if (0 == BLK_FINI(bs_ptr, bs1))
 		{
 			assert(CDB_STAGNATE > t_tries);
@@ -988,13 +934,7 @@ tn_restart:
 			 * usually set by tests that rely on a fixed DT leaf block layout and will fail if the layout changes).
 			 * For pro, add the 4-byte collation header even for "act" = 0
 			 */
-<<<<<<< HEAD
-			if (TREF(ydb_dirtree_collhdr_always))
-				no_4byte_collhdr = 0;
-			else
-=======
-			if (!TREF(gtm_dirtree_collhdr_always))
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
+			if (!TREF(ydb_dirtree_collhdr_always))
 			{
 				op_fnrandom(2, random_mval);
 				collhdr = MV_FORCE_INT(random_mval);
@@ -2004,16 +1944,7 @@ tn_restart:
 							memcpy(va, ((sm_uc_ptr_t)rp + rec_size) - value.len, value.len);
 							BLK_SEG(bs_ptr, (unsigned char *)va, value.len);
 						} else
-<<<<<<< HEAD
-						{
-							BLK_ADDR(null_block_id, SIZEOF(block_id), block_id);
-							*null_block_id = 0;
-							assert(SIZEOF(block_id) >= blk_id_sz);
-							BLK_SEG(bs_ptr, (unsigned char *)null_block_id, blk_id_sz);
-						}
-=======
 							BLK_SEG(bs_ptr, (unsigned char *)&zeroes_blkid_collhdr, blk_id_sz);
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
 					} else
 						BLK_SEG(bs_ptr, (sm_uc_ptr_t)rp + rec_size - blk_id_sz, blk_id_sz);
 				}

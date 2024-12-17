@@ -1,14 +1,9 @@
 /****************************************************************
  *								*
-<<<<<<< HEAD
  * Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  * Copyright (c) 2019-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
-=======
- * Copyright (c) 2001-2023 Fidelity National Information	*
- * Services, Inc. and/or its subsidiaries. All rights reserved.	*
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -63,16 +58,6 @@ int name_glvn(boolean_t gblvn, oprtype *a)
 			advancewindow();
 			if (EXPR_FAIL == (vbar ? expr(sb1++, MUMPS_EXPR) : expratom_coerce_mval(sb1++)))
 				return FALSE;
-<<<<<<< HEAD
-=======
-			if (!vbar)
-			{	/* DE257948 - we need to force ex_tail() in a case we have an additional contain/square-bracket.
-				 * Correct the tree and sb1->opcode.tref and prevent an assert failure in emit_code.c
-				 */
-				coerce(sb1, OCT_MVAL);
-				ex_tail(sb1++, FALSE, FALSE);
-			}
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
 			if (TK_COMMA != TREF(window_token))
 				fnname_type |= FNEXTGBL1;
 			else
@@ -81,14 +66,6 @@ int name_glvn(boolean_t gblvn, oprtype *a)
 				advancewindow();
 				if (EXPR_FAIL == (vbar ? expr(sb1++, MUMPS_EXPR) : expratom_coerce_mval(sb1++)))
 					return FALSE;
-<<<<<<< HEAD
-=======
-				if (!vbar)
-				{
-					coerce(sb1, OCT_MVAL);
-					ex_tail(sb1++, FALSE, FALSE);
-				}
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
 			}
 			if ((!vbar && (TK_RBRACKET != TREF(window_token))) || (vbar && (TK_VBAR != TREF(window_token))))
 			{

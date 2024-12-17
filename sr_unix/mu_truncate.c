@@ -3,7 +3,7 @@
  * Copyright (c) 2012-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019-2024 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -375,21 +375,11 @@ boolean_t mu_truncate(int4 truncate_percent, mval *keep_mval)
 		gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_MUTRUNCNOSPACE, 3, REG_LEN_STR(gv_cur_region), truncate_percent);
 		rel_crit(gv_cur_region);
 		return TRUE;
-<<<<<<< HEAD
 	} else if (new_total == old_total) /* If trying to truncate when database is already truncated */
 	{
 		gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_MUTRUNCALREADY, 2, REG_LEN_STR(gv_cur_region));
 		rel_crit(gv_cur_region);
 		return TRUE;
-	} else if (((GDSVCURR != csd->desired_db_format) && !(BLK_ID_32_VER > csd->desired_db_format))
-			|| csd->blks_to_upgrd != 0
-			|| !csd->fully_upgraded)
-	{
-		gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_MUTRUNCNOV4, 2, REG_LEN_STR(gv_cur_region));
-		rel_crit(gv_cur_region);
-		return TRUE;
-=======
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
 	} else if (SNAPSHOTS_IN_PROG(csa->nl))
 	{
 		gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_MUTRUNCSSINPROG, 2, REG_LEN_STR(gv_cur_region));

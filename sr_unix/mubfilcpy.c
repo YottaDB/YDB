@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019-2024 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -43,11 +43,6 @@
 #include "gtmmsg.h"
 #include "wcs_sleep.h"
 #include "gtm_file_stat.h"
-<<<<<<< HEAD
-#include "gds_blk_downgrade.h"
-=======
-#include "gtm_tempnam.h"
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
 #include "shmpool.h"
 #include "wcs_phase2_commit_wait.h"
 #include "wbox_test_init.h"
@@ -99,22 +94,14 @@
 	}					\
 }
 
-<<<<<<< HEAD
 #define	MAX_TMP_CMD_LEN	((MAX_FN_LEN) * 2 + SIZEOF(UNALIAS))	/* SIZEOF includes 1 byte for null terminator too */
 
-#define	CLEANUP_AND_RETURN_FALSE								\
+#define	CLEANUP_AND_RETURN_FALSE(RETRY)								\
 {												\
 	int	rc;										\
 	int4	rv2, tmpcmdlen;									\
 	char	tmpcmd[MAX_TMP_CMD_LEN];							\
 												\
-=======
-#define	CLEANUP_AND_RETURN_FALSE(RETRY)								\
-{												\
-	int	rc;										\
-	int4	rv2, tmpcmdlen;									\
-	int	maxtmpcmdlen = (MAX_FN_LEN) * 2 + STR_LIT_LEN(UNALIAS) + 1;			\
-	char	tmpcmd[maxtmpcmdlen];								\
 	if (CANNOT_RETRY == RETRY)								\
 	{											\
 		if (online)									\
@@ -122,7 +109,6 @@
 		*stopretries = TRUE;								\
 	}											\
 	FREE_COMMAND_STR_IF_NEEDED;								\
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
 	if (FD_INVALID != backup_fd)								\
 		CLOSEFILE_RESET(backup_fd, rc);	/* resets "backup_fd" to FD_INVALID */		\
 	memset(tmpcmd, '\0', SIZEOF(tmpcmd));							\
@@ -153,17 +139,6 @@
 	}											\
 	return FALSE;										\
 }
-
-<<<<<<< HEAD
-#define	ABORTBACKUP						\
-{								\
-	if (online)						\
-		cs_addrs->nl->nbb = BACKUP_NOT_IN_PROGRESS;	\
-	FREE_COMMAND_STR_IF_NEEDED;				\
-	CLEANUP_AND_RETURN_FALSE;				\
-}
-=======
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
 
 GBLREF	bool			file_backed_up;
 GBLREF	gd_region		*gv_cur_region;
@@ -228,13 +203,8 @@ boolean_t	mubfilcpy (backup_reg_list *list, boolean_t showprogress, int attemptc
 	double			progper = 0, progfact = SHOWPERCENT;
 	size_t	 		tmpsize, transfersize, remaining;
 	ssize_t 		ret;
-<<<<<<< HEAD
 	size_t			bytesspliced, currspeed = 0, trans_cnt = 0, start_cnt = 0;
 	time_t			endtm, strtm;
-=======
-	size_t			bytesspliced = 0, currspeed = 0, trans_cnt = 0, start_cnt = 0;
-	time_t			begtm, endtm, strtm;
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
 	char 			sizep[BUF_MAX], progperstr[BUF_MAX], padding[MAX_DIGITS_IN_INT8], fil=' ';
 	boolean_t		sizeGiB = TRUE;
 	char 			*etaptr;
@@ -418,35 +388,19 @@ boolean_t	mubfilcpy (backup_reg_list *list, boolean_t showprogress, int attemptc
 		infd = open(sourcefilepathname, O_RDONLY);
 		if (-1 == infd)
 		{
-<<<<<<< HEAD
 			if (1 == handle_err("Unable to open() the database file", errno))
-				ABORTBACKUP;
+				CLEANUP_AND_RETURN_FALSE(CANNOT_RETRY);
 		}
 		if (-1 == fstat(infd, &stat))
 		{
 			if (1 == handle_err("Error obtaining fstat() from the database file", errno))
-				ABORTBACKUP;
-=======
-			if (1 == (status = handle_err("Unable to open() the database file", errno))) /* WARNING assignment */
 				CLEANUP_AND_RETURN_FALSE(CANNOT_RETRY);
-		}
-		if (-1 == fstat(infd, &stat))
-		{
-			if (1 == (status = handle_err("Error obtaining fstat() from the database file",
-					errno))) /* WARNING assignment */
-				CLEANUP_AND_RETURN_FALSE(CANNOT_RETRY);
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
 		}
 		outfd = open(tempfilepathname, O_CREAT | O_WRONLY | O_TRUNC, 0644);
 		if (-1 == outfd)
 		{
-<<<<<<< HEAD
 			if (1 == handle_err("Unable to open() the backup file/location", errno))
-				ABORTBACKUP;
-=======
-			if (1 == (status = handle_err("Unable to open() the backup file/location", errno))) /* WARNING assignment */
-			CLEANUP_AND_RETURN_FALSE(CANNOT_RETRY);
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
+				CLEANUP_AND_RETURN_FALSE(CANNOT_RETRY);
 		}
 		/* set transfer size as maximum. Full copy-acceleration */
 		remaining = stat.st_size;
@@ -498,7 +452,7 @@ boolean_t	mubfilcpy (backup_reg_list *list, boolean_t showprogress, int attemptc
 							(!is_seek_data ? "SEEK_HOLE" : "SEEK_DATA"));
 						gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8)
 								ERR_SYSCALL, 5, LEN_AND_STR(errstr), CALLFROM, save_errno);
-						ABORTBACKUP;
+						CLEANUP_AND_RETURN_FALSE(CANNOT_RETRY);
 					}
 					/* Note that it is possible for concurrent updates during an online backup to write
 					 * holes/data past the size of the source file at the start of the backup. Therefore
@@ -530,18 +484,12 @@ boolean_t	mubfilcpy (backup_reg_list *list, boolean_t showprogress, int attemptc
 			assert(data_off < stat.st_size);
 			assert(hole_off <= stat.st_size);
 			strtm = time(NULL);
-<<<<<<< HEAD
 			copy_file_range_p = func_ptr;
 
 			size_t	max_cp_len;
 			max_cp_len = hole_off - in_off;
 			assert(max_cp_len <= remaining);
 			ret = copy_file_range_p(infd, (loff_t *)&in_off, outfd, (loff_t *)&out_off, max_cp_len, 0);
-=======
-			tmpsize = remaining;
-			ret = 0;
-			copy_file_range_p = func_ptr;
-			ret = copy_file_range_p(infd, NULL, outfd, NULL, remaining, 0);
 			save_errno = errno;
 			if (1 > ret)
 			{
@@ -551,21 +499,12 @@ boolean_t	mubfilcpy (backup_reg_list *list, boolean_t showprogress, int attemptc
 						save_errno))) /* WARNING assignment */
 					CLEANUP_AND_RETURN_FALSE(CAN_RETRY);
 			}
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
 			if (WBTEST_ENABLED(WBTEST_BACKUP_FORCE_SLEEP))
 			{
 				util_out_print("BACKUP_STARTED", TRUE);
 				LONG_SLEEP(20);
 				showprogress = TRUE;
 			}
-<<<<<<< HEAD
-			if (-1 == ret)
-			{
-				if (1 == handle_err("Error occurred during the copy phase of MUPIP BACKUP", errno))
-					ABORTBACKUP;
-			}
-=======
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
 			endtm = time(NULL);
 			bytesspliced = in_off + (size_t)ret;
 			if ((endtm > strtm) && (0 < ret))

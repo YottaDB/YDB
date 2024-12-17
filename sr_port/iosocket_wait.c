@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -31,10 +31,7 @@
 #include "gtm_string.h"
 #include "gtm_unistd.h"
 #include "gtm_poll.h"
-<<<<<<< HEAD
 
-=======
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
 #ifdef DEBUG_SOCKWAIT
 #include "gtmio.h"
 #include "have_crit.h"		/* DBGSOCKWAIT needs for DBGFPF */
@@ -74,31 +71,18 @@ GBLREF volatile int4		outofband;
 
 boolean_t iosocket_wait(io_desc *iod, uint8 nsec_timeout, mval *whatop, mval *handle)
 {
-<<<<<<< HEAD
 	ABS_TIME		utimeout, *utimeoutptr, cur_time, end_time;
-=======
-	struct 	timeval  	utimeout, *utimeoutptr;
-	ABS_TIME		cur_time, end_time;
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
 	nfds_t			poll_nfds;
 	struct pollfd		*poll_fds;
 	socket_struct		**poll_socketptr;	/* matching poll_fds */
 	size_t			poll_fds_size;
-<<<<<<< HEAD
 	int			poll_timeout;
-=======
-	int			poll_timeout, poll_fd;
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
 	d_socket_struct 	*dsocketptr;
 	socket_struct   	*socketptr, *which_socketptr = NULL, *prev_socketptr;;
 	socket_interrupt	*sockintr;
 	char            	*errptr, *charptr;
 	int4            	errlen, ii, jj, handle_index;
-<<<<<<< HEAD
-	int4			nselect, rlisten, rconnected, rwrite;
-=======
-	int4			npoll, nlisten, nconnected, nwrite, rlisten, rconnected, rwrite;
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
+	int4			npoll, rlisten, rconnected, rwrite;
 	int4			oldestconnectedcycle, oldestconnectedindex;
 	int4			oldestwritecycle, oldestwriteindex;
 	int4			oldestlistencycle, oldestlistenindex;
@@ -209,12 +193,7 @@ boolean_t iosocket_wait(io_desc *iod, uint8 nsec_timeout, mval *whatop, mval *ha
 	{
 		DBGSOCKWAIT((stdout,"wait loop:\n"));
 		poll_nfds = 0;
-<<<<<<< HEAD
-		nselect = rlisten = rconnected = rwrite = 0;
-=======
-		npoll = nlisten = nconnected = nwrite = rlisten = rconnected = rwrite = 0;
-		rv = 0;
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
+		npoll = rlisten = rconnected = rwrite = 0;
 		for (ii = 0; ii < dsocketptr->n_socket; ii++)
 		{
 			if (which_socketptr)
@@ -259,11 +238,7 @@ boolean_t iosocket_wait(io_desc *iod, uint8 nsec_timeout, mval *whatop, mval *ha
 					poll_fds[poll_nfds].events |= POLLOUT;
 				poll_socketptr[poll_nfds] = socketptr;
 				poll_nfds++;
-<<<<<<< HEAD
-				nselect++;
-=======
 				npoll++;
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
 			}
 			if (which_socketptr)
 				break;		/* only check the one socket */
@@ -401,17 +376,12 @@ boolean_t iosocket_wait(io_desc *iod, uint8 nsec_timeout, mval *whatop, mval *ha
 					break;
 			}
 			assertpro((0 == jj) || (jj <= poll_nfds));	/* equal poll_nfds if not polled */
-<<<<<<< HEAD
-			if (nselect && (jj != poll_nfds) && (socketptr->sd == poll_fds[jj].fd) && poll_fds[jj].revents)
+			if (npoll && (jj != poll_nfds) && (socketptr->sd == poll_fds[jj].fd) && poll_fds[jj].revents)
 			{	/* set flag in socketptr and keep going */
 #				ifdef DEBUG
 				if ((POLLERR | POLLHUP) & poll_fds[jj].revents)
 					poll_error = TRUE;
 #				endif
-=======
-			if (npoll && (jj != poll_nfds) && (socketptr->sd == poll_fds[jj].fd) && poll_fds[jj].revents)
-			{	/* set flag in socketptr and keep going */
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
 				if (POLLIN & poll_fds[jj].revents)
 				{
 					socketptr->current_events |= SOCKPEND_READ;
@@ -614,10 +584,6 @@ int iosocket_accept(d_socket_struct *dsocketptr, socket_struct *socketptr, boole
 	int4            	errlen;
 	char			port_buffer[NI_MAXSERV], ipaddr[SA_MAXLEN + 1];
 	struct pollfd		poll_fds;
-<<<<<<< HEAD
-=======
-	int			poll_fd;
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
 	socket_struct		*newsocketptr;
 	struct sockaddr		*peer_sa_ptr;
 	struct sockaddr_storage	peer;           /* socket address + port */
@@ -638,19 +604,12 @@ int iosocket_accept(d_socket_struct *dsocketptr, socket_struct *socketptr, boole
 		poll_fds.events = POLLIN;
 		do
 		{
-<<<<<<< HEAD
 			rv = poll(&poll_fds, 1, 0);
 			if ((0 <= rv) || (EINTR != (save_errno = errno)))	/* inline assigment */
 				break;
 			eintr_handling_check();
 		} while (TRUE);
 		HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
-=======
-			poll_fds.fd = socketptr->sd;
-			poll_fds.events = POLLIN;
-			rv = poll(&poll_fds, 1, 0);
-		} while ((0 > rv) && (EINTR == (save_errno = errno))); /* inline assigment */
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
 		if (0 > rv)
 		{
 			errptr = (char *)STRERROR(save_errno);

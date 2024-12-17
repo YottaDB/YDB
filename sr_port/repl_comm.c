@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -19,10 +19,7 @@
 #include <sys/time.h>
 #include <errno.h>
 #include "gtm_poll.h"
-<<<<<<< HEAD
-=======
 
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
 #include "gtm_stdio.h"
 #include "gtm_string.h"
 #include "gtm_socket.h"
@@ -159,10 +156,6 @@ int fd_ioready(int sock_fd, int poll_direction, int timeout)
 	int		save_errno, status, EAGAIN_cnt = 0, ENOMEM_cnt = 0, REPL_MAXPOLLFAIL_cnt = 0;
 	struct pollfd	fds;
 
-<<<<<<< HEAD
-	assert(timeout < MILLISECS_IN_SEC);
-=======
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
 	assert((timeout >= 0) && (timeout < MILLISECS_IN_SEC));
 	fds.fd = sock_fd;
 	fds.events = (REPL_POLLIN == poll_direction) ? POLLIN : POLLOUT;

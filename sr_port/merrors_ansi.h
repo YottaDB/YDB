@@ -1,14 +1,6 @@
 /****************************************************************
  *								*
-<<<<<<< HEAD
  * Copyright (c) 2001-2025 Fidelity National Information	*
-=======
-<<<<<<< HEAD:sr_port/merrors_ansi.h
- * Copyright (c) 2001-2024 Fidelity National Information	*
-=======
- * Copyright (c) 2001-2023 Fidelity National Information 	*
->>>>>>> f9ca5ad6 (GT.M V7.1-000):sr_x86_64/merrors_ansi.h
->>>>>>> bef5960d ([#1000] [V71000] Merge GT.M V7.1-000 into YottaDB mainline (with conflicts))
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries.*
@@ -619,11 +611,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* KRNLKILL */
 	   0,	/* MEMORYRECURSIVE */
 	   0,	/* FREEZEID */
-<<<<<<< HEAD:sr_port/merrors_ansi.h
-	   0,	/* UNUSEDMSG780 */
-=======
 	   0,	/* FORCEDHALT2 */
->>>>>>> f9ca5ad6 (GT.M V7.1-000):sr_x86_64/merrors_ansi.h
 	   0,	/* DSEINVALBLKID */
 	   0,	/* PINENTRYERR */
 	   0,	/* BCKUPBUFLUSH */
@@ -1070,9 +1058,9 @@ const static readonly int error_ansi[] = {
 	   0,	/* UNUSEDMSG1224 */
 	   0,	/* UNUSEDMSG1225 */
 	   0,	/* DYNUPGRDFAIL */
-	   0,	/* UNUSEDMSG1225 */
-	   0,	/* UNUSEDMSG1226 */
 	   0,	/* UNUSEDMSG1227 */
+	   0,	/* UNUSEDMSG1228 */
+	   0,	/* UNUSEDMSG1229 */
 	   0,	/* REORGUPCNFLCT */
 	   0,	/* MUDWNGRDNOTPOS */
 	   0,	/* MUUPGRDNRDY */
@@ -1298,7 +1286,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* MUTRUNCFAIL */
 	   0,	/* MUTRUNCNOSPACE */
 	   0,	/* MUTRUNCNOTBG */
-	   0,	/* UNUSEDMSG1455 */
+	   0,	/* UNUSEDMSG1457 */
 	   0,	/* MUTRUNCPERCENT */
 	   0,	/* MUTRUNCSSINPROG */
 	   0,	/* MUTRUNCSUCCESS */
@@ -1368,11 +1356,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* NULLENTRYREF */
 	   0,	/* ZPEEKNORPLINFO */
 	   0,	/* MMREGNOACCESS */
-<<<<<<< HEAD:sr_port/merrors_ansi.h
-	   0,	/* UNUSEDMSG1527 */
-=======
 	   0,	/* FDSIZELMT */
->>>>>>> f9ca5ad6 (GT.M V7.1-000):sr_x86_64/merrors_ansi.h
 	   0,	/* MALLOCCRIT */
 	   0,	/* HOSTCONFLICT */
 	   0,	/* GETADDRINFO */

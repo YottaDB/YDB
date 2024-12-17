@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -89,7 +89,7 @@
 
 GBLREF	uint4			dollar_tlevel;
 GBLREF	uint4			dollar_trestart;
-GBLREF	uint4			gtmDebugLevel; 		/* Debug level */
+GBLREF	uint4			ydbDebugLevel; 		/* Debug level */
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
@@ -591,12 +591,8 @@ boolean_t	tp_tend()
 				status = cdb_sc_helpedout;
 				goto failed;
 			}
-<<<<<<< HEAD
-			if (is_mm && ((csa->hdr != csd) || (pvt_total_blks != csd->trans_hist.total_blks)))
-=======
 			CHECK_TN(csa, csd, csd->trans_hist.curr_tn);	/* can issue rts_error TNTOOLARGE */
-			if (is_mm && ((csa->hdr != csd) || (csa->total_blks != csd->trans_hist.total_blks)))
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
+			if (is_mm && ((csa->hdr != csd) || (pvt_total_blks != csd->trans_hist.total_blks)))
 			{       /* If MM, check if wcs_mm_recover was invoked as part of the grab_crit done above OR if
 				 * the file has been extended. If so, restart.
 				 */
@@ -817,15 +813,8 @@ boolean_t	tp_tend()
 						}
 						assert(csd == csa->hdr);	/* If MM, csd shouldn't have been reset */
 					}
-<<<<<<< HEAD
-					if (((jbp->next_epoch_time <= jgbl.gbl_jrec_time) UNCONDITIONAL_EPOCH_ONLY(|| TRUE))
-						&& !FROZEN_CHILLED(csa))
-=======
-					if (MAXUINT4 == jbp->next_epoch_time)
-						jbp->next_epoch_time = (uint4)(jgbl.gbl_jrec_time + jbp->epoch_interval);
-					if (((jbp->next_epoch_time <= jgbl.gbl_jrec_time) ||
-							(gtmDebugLevel & GDL_UnconditionalEpoch)) && !FROZEN_CHILLED(csa))
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
+					if (((jbp->next_epoch_time <= jgbl.gbl_jrec_time)
+						|| (ydbDebugLevel & GDL_UnconditionalEpoch)) && !FROZEN_CHILLED(csa))
 					{	/* Flush the cache. Since we are in crit, defer syncing the epoch */
 						/* Note that at this point, jgbl.gbl_jrec_time has been computed taking into
 						 * account the current system time & the last journal record timestamp of ALL

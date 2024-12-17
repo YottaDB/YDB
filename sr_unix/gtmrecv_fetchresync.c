@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -88,13 +88,9 @@
 					LEN_AND_LIT("Error in send() for " MESSAGE), STATUS);	/* BYPASSOK(send) */		\
 		} else if (EREPL_SELECT == repl_errno)										\
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,					\
-<<<<<<< HEAD
-					LEN_AND_LIT("Error in select() for " MESSAGE), STATUS);					\
+					LEN_AND_LIT("Error in poll() for " MESSAGE), STATUS);					\
 		else														\
 			assert(FALSE);												\
-=======
-					LEN_AND_LIT("Error in poll() for " MESSAGE), STATUS);					\
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
 	}															\
 	if (0 >= WAIT_COUNT)													\
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2,						\
@@ -183,17 +179,11 @@ void gtmrecv_fetchresync_connect(int port)
 	while (TRUE)
 	{
 		t1 = time(NULL);
-<<<<<<< HEAD
-		repl_poll_wait.tv_sec = MAX_WAIT_FOR_FETCHRESYNC_CONN;
-		repl_poll_wait.tv_usec = 0;
-		while ((status = select(gtmrecv_listen_sock_fd + 1, &input_fds, NULL, NULL, &repl_poll_wait)) < 0)
-=======
 		poll_fdlist[0].fd = gtmrecv_listen_sock_fd;
 		poll_fdlist[0].events = POLLIN;
 		poll_nfds = 1;
 		poll_timeout = MAX_WAIT_FOR_FETCHRESYNC_CONN * MILLISECS_IN_SEC;
 		while (0 > (status = poll(&poll_fdlist[0], poll_nfds, poll_timeout)))
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
 		{
 			if ((EINTR == errno)  || (EAGAIN == errno))
 			{
@@ -210,12 +200,8 @@ void gtmrecv_fetchresync_connect(int port)
 			{
 				HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
-<<<<<<< HEAD
-						LEN_AND_LIT("Error in select on listen socket"), errno);
+						LEN_AND_LIT("Error in poll on listen socket"), errno);
 			}
-=======
-					LEN_AND_LIT("Error in poll on listen socket"), errno);
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
 		}
 		HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 		if (status == 0)

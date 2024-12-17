@@ -8874,23 +8874,13 @@
    |                   |              | default is "YottaDB Boolean         |
    |                   |              | short-circuit".                     |
    |                   |              | $VIEW("FULL_BOOLEAN") reports       |
-   |                   |              | "Standard Boolean evaluation side   |
+   | "FULL_BOOLEAN"    | none         | "Standard Boolean evaluation side   |
    |                   |              | effects" when it is not explicitly  |
    |                   |              | set, but that mode of operation is  |
-<<<<<<< HEAD
    |                   |              | required by the setting of          |
    |                   |              | ydb_side_effects, and "Standard     |
-=======
-   | "FULL_BOOLEAN"    | none         | required by the setting of          |
-   |                   |              | gtm_side_effects, and "Standard     |
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
    |                   |              | Boolean side-effect warning" when   |
-   |                   |              | warnings have been specified. The   |
-   |                   |              | function reports "Extended Boolean  |
-   |                   |              | evaluation without                  |
-   |                   |              | short-circuiting" when              |
-   |                   |              | "EXTENDED_BOOLEAN" behavior is      |
-   |                   |              | enabled.                            |
+   |                   |              | warnings have been specified.       |
    |-------------------+--------------+-------------------------------------|
    |                   |              | Truth Value indicating whether      |
    |                   |              | Database block certification is     |

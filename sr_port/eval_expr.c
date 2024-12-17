@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2020-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -52,7 +52,7 @@ GBLREF  spdesc          stringpool;
 int eval_expr(oprtype *a)
 /* process an expression into the operand at *a */
 {
-	boolean_t	ind_pat, saw_local, saw_se, se_warn, replaced, lh_se, rh_se, start_se;
+	boolean_t	ind_pat, saw_local, saw_se, se_warn, replaced;
 	int		op_count, se_handling;
 	opctype		bin_opcode;
 	oprtype		optyp_1, optyp_2, *optyp_ptr;
@@ -60,60 +60,21 @@ int eval_expr(oprtype *a)
 	triple		*argtrip, *parm, *ref, *ref1, *t1, *t2;
 	mliteral	*m1, *m2;
 	mval		tmp_mval;
-<<<<<<< HEAD
 	enum octype_t	type;
-=======
-	unsigned short	type;
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	CHKTCHAIN(TREF(curtchain), exorder, TRUE);	/* defined away in mdq.h except with DEBUG_TRIPLES */
-	/* Using TREF(saw_side_effect) to determine, when that information is available, whether to treat a boolean as needing
-	 * side-effect processing greatly simplifies things on the side of the ex_* and bx_* line-finishing functions. But there
-	 * are some caveats. The code below would ideally only track whether or not side effects occur on the right-hand side by
-	 * setting saw_side_effect to false before processing the rhs. After all, no rhs operand could possibly care what kinds
-	 * of side effects were occurring for its parents' other child branch. Unfortunately, at least one part of the $Select
-	 * logic depends on the saw_side_effect flag that is enabled there to persist down to any global variable references.
-	 * Until $select is revised to juggle fewer pieces of global state, this logic must not alter the *truth value* of
-	 * saw_side_effect, but it can and will alter the *value* to track whether any callees encounter side effectsthemselves.
-	 * The reason for doing this is to see whether or not any logical operands will need to become their side-effect-processing
-	 * counterparts: for this purpose we do not care whether there were any side effects in our left-hand subtree - these will
-	 * be processedanyway. The logic below is intended to gracefully handle (as yet unknown) direct eval_expr recursion.
-	 * It does assume:
-	 * 	- The value is set to 0x1 if and only if it is set outside of eval_expr, and the converse
-	 * 	- Callees that modify the value always do so by setting it to TRUE, except for callee eval_exprs
-	 * 	- TRUE is always identical to 0x1, and 0x1 and 0x10 are always represented by different bits
-	 * 	- Any value other than zero evaluates to TRUE if evalueated as a boolean (0 | value).
-	 * And guarantees:
-	 * 	- It returns with an identical saw_side_effects value as on entry if and only if no callees saw side effects
-	 * 	- It returns with a true saw_side_effects value different from on entry if and only if at least one callee
-	 * 		saw side effects
-	 * */
-	lh_se = FALSE;
-	rh_se = FALSE;
-	assert(TREF(saw_side_effect) == 0x1 || TREF(saw_side_effect) == 0x0 || TREF(saw_side_effect) == 0x10);
-	start_se = TREF(saw_side_effect);
-	if (TREF(saw_side_effect))
-		(TREF(saw_side_effect) = 0x10);
 	if (!expratom(&optyp_1))
 	{	/* If didn't already add an error of our own, do so now to catch all expression errors */
 		if (!ALREADY_RTERROR)
 			stx_error(ERR_EXPR);
 		return EXPR_FAIL;
 	}
-	/* If saw_side_effect was false at the start, bit zero is set if and only if the threadgbl is set by a callee
-	 * (because we don't set it before calling). If saw_side_effect was true at the start, bit zero is set if
-	 * and only if it is set by a callee (because we turn it into 0x10 before calling).
-	 */
-	lh_se = ((TREF(saw_side_effect)) & 0x1);
-	TREF(saw_side_effect) = lh_se ? TRUE : start_se;
 	se_handling = TREF(side_effect_handling);
 	se_warn = SE_WARN_ON;
 	while (bin_opcode = tokentable[TREF(window_token)].bo_type)	/* NOTE assignment NOT condition */
 	{
-		if (TREF(saw_side_effect))
-			(TREF(saw_side_effect)) = 0x10;
 		type = tokentable[TREF(window_token)].opr_type;
 		if (oc_tab[bin_opcode].octype & OCT_BOOL)
 		{
@@ -262,7 +223,6 @@ int eval_expr(oprtype *a)
 					stx_error(ERR_RHMISSING);
 					return EXPR_FAIL;
 				}
-				rh_se = ((TREF(saw_side_effect)) & 0x1);
 				coerce(&optyp_1, type);
 			}
 			if ((MAX_ARGS - 3) < op_count)
@@ -292,7 +252,6 @@ int eval_expr(oprtype *a)
 					return EXPR_FAIL;
 				}
 			}
-			rh_se = ((TREF(saw_side_effect)) & 0x1); /* Same logic as lh, see comment at top of function */
 			CHKTCHAIN(TREF(curtchain), exorder, TRUE);	/* defined away in mdq.h except with DEBUG_TRIPLES */
 			coerce(&optyp_2, type);
 			ref1 = optyp_1.oprval.tref;
@@ -314,21 +273,7 @@ int eval_expr(oprtype *a)
 			ref = newtriple(bin_opcode);
 			ref->operand[0] = optyp_1;
 			ref->operand[1] = optyp_2;
-			if (rh_se && (GTM_BOOL != TREF(gtm_fullbool))
-					&& (oc_tab[ref->opcode].octype & OCT_BOOL) && (ref->opcode != OC_COBOOL))
-				CONVERT_TO_SE(ref);
 		}
-		/* The logic below mirrors the logic at the top and does the following:
-		 * The expression will be the lhs of a new operator if this loop continues,
-		 * so set lh_se to equal whether a new se was encountered in either branch and reset rh_se.
-		 * If there was a side effect in either branch, make sure any caller eval_exprs know it
-		 * (by setting the value to TRUE). Since lh_se can never go from false to true, this function will always
-		 * correctly report any side effects even in early left-branches to its callers, but will still be able
-		 * to detect any novel rh_se for itself so as to adjust boolean handling correctly.
-		 */
-		lh_se = (lh_se || rh_se);
-		rh_se = FALSE;
-		TREF(saw_side_effect) = lh_se ? TRUE : start_se;
 		optyp_1 = put_tref(ref);
 	}
 	*a = optyp_1;

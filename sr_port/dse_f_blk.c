@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -64,11 +64,8 @@ void dse_f_blk(void)
 	sm_uc_ptr_t		blk_id, bp, b_top, key_top, rp, r_top, sp, srp, s_top;
 	DCL_THREADGBL_ACCESS;
 
-<<<<<<< HEAD
 	SETUP_THREADGBL_ACCESS;
-=======
 	DSE_DB_IS_TOO_OLD(cs_addrs, cs_data, gv_cur_region);
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
 	if (BADDSEBLK == (patch_find_blk = dse_getblk("BLOCK", DSENOBML, DSEBLKCUR)))		/* WARNING: assignment */
 		return;
 	patch_find_sibs = (CLI_PRESENT == cli_present("SIBLINGS"));

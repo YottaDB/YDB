@@ -3,7 +3,7 @@
  * Copyright (c) 2005-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -72,7 +72,6 @@
 
 #include "repl_msg.h"		/* for gtmsource.h */
 #include "gtmsource.h"		/* for jnlpool_addrs_ptr_t */
-#include "gvcst_protos.h"	/* for "gvcst_init" */
 
 #define	MAX_TRIES	600	/* arbitrary value */
 #define	MAX_BLK_TRIES	10	/* Times to repeatedly try a GVT root */
@@ -126,24 +125,11 @@ GBLREF	uint4			update_array_size, update_trans, process_id;
 GBLREF	unsigned char		rdfail_detail, t_fail_hist[CDB_MAX_TRIES];
 GBLREF 	unsigned int		t_tries;
 
-<<<<<<< HEAD
-#ifdef DEBUG
-GBLREF	block_id		ydb_skip_bml_num;
-#endif
-
-error_def(ERR_BUFFLUFAILED);
-error_def(ERR_DBBTUWRNG);
-error_def(ERR_DBFILERR);
-error_def(ERR_DBRDONLY);
-error_def(ERR_DSEBLKRDFAIL);
-error_def(ERR_DYNUPGRDFAIL);
-=======
 #define V6TOV7UPGRADEABLE 1
 
 error_def(ERR_COMMITWAITSTUCK);
 error_def(ERR_DBRNDWN);
 #ifndef V6TOV7UPGRADEABLE	/* Reject until upgrades are enabled */
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
 error_def(ERR_GTMCURUNSUPP);
 #endif
 error_def(ERR_MUNOACTION);
@@ -211,7 +197,7 @@ void	mu_reorg_upgrd_dwngrd(void)
 		mupip_exit(ERR_MUQUALINCOMP);
 	else if (region)
 	{
-		mu_getlst("REG_NAME", SIZEOF(tp_region));
+		mu_getlst("REGION", SIZEOF(tp_region));
 		rptr = grlist;	/* setup of grlist down implicitly by insert_region() called in mu_getlst() */
 		if (error_mupip)
 		{
@@ -234,24 +220,7 @@ void	mu_reorg_upgrd_dwngrd(void)
 	}
 	if (!mu_upgrd_dngrd_confirmed())
 	{
-<<<<<<< HEAD
-		reorg_entiredb = FALSE;
-		stopblk_specified = TRUE;
-	}
-	mu_reorg_upgrd_dwngrd_in_prog = TRUE;
-	mu_reorg_nosafejnl = (CLI_NEGATED == cli_present("SAFEJNL")) ? TRUE : FALSE;
-
-	assert(region);
-	status = SS_NORMAL;
-	error_mupip = FALSE;
-	gvinit();	/* initialize gd_header (needed by the later call to mu_getlst) */
-	mu_getlst("REGION", SIZEOF(tp_region)); /* get the parm for the REGION qualifier */
-	if (error_mupip)
-	{
-		util_out_print("!/MUPIP REORG !AD cannot proceed with above errors!/", TRUE, LEN_AND_STR(command));
-=======
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TEXT, 2, LEN_AND_LIT("Upgrade canceled by user"));
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
 		mupip_exit(ERR_MUNOACTION);
 	}
 	TREF(skip_file_corrupt_check) = TRUE;				/* Prevent concurrent ONLINE ROLLBACK causing DBFLCORRP */
@@ -259,29 +228,6 @@ void	mu_reorg_upgrd_dwngrd(void)
 	for (rptr = grlist; !mu_ctrlc_occurred && (NULL != rptr); rptr = rptr->fPtr)
 	{	/* Iterate over regions again to upgrade gvt indices */
 		reg = rptr->reg;
-<<<<<<< HEAD
-		util_out_print("!/Region !AD : MUPIP REORG !AD started", TRUE, REG_LEN_STR(reg), LEN_AND_STR(command));
-		if (reg_cmcheck(reg))
-		{
-			util_out_print("Region !AD : MUPIP REORG !AD cannot run across network",
-				TRUE, REG_LEN_STR(reg), LEN_AND_STR(command));
-			status = ERR_MUNOFINISH;
-			continue;
-		}
-		mu_reorg_process = TRUE;	/* gvcst_init will use this value to use ydb_poollimit settings. */
-		gvcst_init(reg);
-		mu_reorg_process = FALSE;
-		assert(update_array != NULL);
-		/* access method stored in global directory and database file header might be different in which case
-		 * the database setting prevails. therefore, the access method check can be done only after opening
-		 * the database (i.e. after the gvcst_init)
-		 */
-		if (dba_bg != REG_ACC_METH(reg))
-		{
-			util_out_print("Region !AD : MUPIP REORG !AD cannot continue as access method is not BG",
-				TRUE, REG_LEN_STR(reg), LEN_AND_STR(command));
-			status = ERR_MUNOFINISH;
-=======
 		gv_cur_region = reg;
 		tot_data_blks = gv_trees = tot_dt = tot_levl_cnt = tot_splt_cnt = 0;
 		/* Override name map so that all names map to the current region */
@@ -291,7 +237,7 @@ void	mu_reorg_upgrd_dwngrd(void)
 		else
 			gv_currkey_next_reorg->end = 0;
 		assert(DBKEYSIZE(MAX_KEY_SZ) == gv_keysize);		/* gv_keysize was init'ed by gvinit() in the caller */
-		gvcst_init(reg, NULL);
+		gvcst_init(reg);
 		change_reg();
 #ifndef	REORG_UPGRADE_IS_ONLINE
 		/* Obtain standalone access for MUPIP REORG -UPGRADE until ONLINE tests cleanly */
@@ -301,7 +247,6 @@ void	mu_reorg_upgrd_dwngrd(void)
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_DBRNDWN, 2, DB_LEN_STR(gv_cur_region));
 			util_out_print("Region !AD : Failed to rundown the database (!AD) in order to get standalone access.",
 			       TRUE, REG_LEN_STR(reg), DB_LEN_STR(reg));
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
 			continue;
 		}
 		if (!STANDALONE(reg) || !(FILE_INFO(reg)->grabbed_access_sem))
@@ -313,7 +258,7 @@ void	mu_reorg_upgrd_dwngrd(void)
 			continue;
 		}
 		/* Reopen the region now that we have standalone access */
-		gvcst_init(reg, NULL);
+		gvcst_init(reg);
 		change_reg();
 #endif
 		csd = cs_data;
@@ -343,51 +288,6 @@ void	mu_reorg_upgrd_dwngrd(void)
 						REG_LEN_STR(reg), DB_LEN_STR(reg));
 			continue;
 		}
-<<<<<<< HEAD
-		rel_crit(reg);
-		/* Loop through entire database one GDS block at a time and upgrade/downgrade each of them */
-		status1 = SS_NORMAL;
-		start_bmp = ROUND_DOWN2(start_blk, BLKS_PER_LMAP);
-		last_bmp  = ROUND_DOWN2(stop_blk - 1, BLKS_PER_LMAP);
-		curblk = start_blk;	/* curblk is the block to be upgraded/downgraded */
-		util_out_print("Region !AD : Started processing from block number [0x!XL]", TRUE, REG_LEN_STR(reg), curblk);
-		udi = FILE_INFO(reg);
-		if (udi->fd_opened_with_o_direct)
-		{
-			DIO_BUFF_EXPAND_IF_NEEDED(udi, blk_size, &(TREF(dio_buff)));
-		} else if (NULL != bptr)
-		{	/* malloc/free "bptr" for each region as GDS block-size can be different */
-			free(bptr);
-			bptr = NULL;
-		}
-		memset(&reorg_stats, 0, SIZEOF(reorg_stats));	/* initialize statistics for this region */
-		for (curbmp = start_bmp; curbmp <= last_bmp; curbmp += BLKS_PER_LMAP)
-		{
-#			ifdef DEBUG
-			if ((0 != ydb_skip_bml_num) && (BLKS_PER_LMAP <= curbmp) && (curbmp < ydb_skip_bml_num))
-			{
-				curbmp = ydb_skip_bml_num - BLKS_PER_LMAP;
-				continue;
-			}
-#			endif
-			if (mu_ctrly_occurred || mu_ctrlc_occurred)
-			{
-				status1 = ERR_MUNOFINISH;
-				break;
-			}
-			/* --------------------------------------------------------------
-			 *             Read in current bitmap block
-			 * --------------------------------------------------------------
-			 */
-			assert(!csa->now_crit);
-			bml_sm_buff = t_qread(curbmp, (sm_int_ptr_t)&cycle, &cr); /* bring block into the cache outside of crit */
-			reorg_stats.blks_read_from_disk_bmp++;
-			grab_crit_encr_cycle_sync(reg, WS_64); /* needed so t_qread does not return NULL below */
-			if (mu_reorg_upgrd_dwngrd_start_tn != csd->desired_db_format_tn)
-			{	/* csd->desired_db_format changed since reorg started. discontinue the reorg */
-				/* see later comment on "csd->reorg_upgrd_dwngrd_restart_block" for why the assignment
-				 * of this field should be done only if a db format change did not occur.
-=======
 		mu_upgrade_in_prog = MUPIP_REORG_UPGRADE_IN_PROGRESS;
 		mu_reorg_more_tries = TRUE;
 		csa->nl->reorg_upgrade_pid = process_id;
@@ -411,7 +311,6 @@ void	mu_reorg_upgrd_dwngrd(void)
 				 * modified, avaiable for re-use. Doing so ensures that all the CRs being touched as part of the
 				 * REORG UPGRADE do not accumulate creating a situation where "when everything is special, nothing
 				 * is special" resulting in parent blocks being moved around in memory which causes restarts.
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
 				 */
 				child_cr->refer = FALSE;
 			}

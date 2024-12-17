@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -818,14 +818,9 @@ static	CLI_PARM	mup_stop_parm[] = {
 };
 
 static	CLI_ENTRY	mup_upgrade_qual[] = {		/* UPGRADE */
-<<<<<<< HEAD
-{ "MASTERMAP", mupip_upgrade, 0, 0, 0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0},
+{ "DBG",       mupip_upgrade, 0, 0, 0, 0, 0, VAL_DISALLOWED, 2, NON_NEG, VAL_N_A, 0 },
+{ "FILE",      mupip_upgrade, 0, 0, 0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0 },
 { "REGION",    mupip_upgrade, 0, 0, 0, 0, 0, VAL_OR_PARAM,   1, NON_NEG, VAL_N_A, 0},
-=======
-{ "DBG",    mupip_upgrade, 0, 0, 0, 0, 0, VAL_DISALLOWED, 2, NON_NEG, VAL_N_A, 0 },
-{ "FILE",   mupip_upgrade, 0, 0, 0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0 },
-{ "REGION", mupip_upgrade, 0, 0, 0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0 },
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
 { "" }
 };
 

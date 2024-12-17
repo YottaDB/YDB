@@ -3,7 +3,7 @@
  * Copyright (c) 2007-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -419,16 +419,11 @@ enum cdb_sc mm_update(cw_set_element *cs, trans_num ctn, trans_num effective_tn,
 				((blk_hdr_ptr_t)db_addr[0])->tn = ((blk_hdr_ptr_t)cs->new_buff)->tn = ctn;
 			memcpy(db_addr[0], cs->new_buff, ((blk_hdr_ptr_t)cs->new_buff)->bsiz);
 		}
-<<<<<<< HEAD
-		long_blk_id = IS_64_BLK_ID(db_addr[0]);
-		DEBUG_ONLY(blk_id_sz = SIZEOF_BLK_ID(long_blk_id));
-=======
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
 		assert(SIZEOF(blk_hdr) <= ((blk_hdr_ptr_t)db_addr[0])->bsiz);
 		assert((int)(((blk_hdr_ptr_t)db_addr[0])->bsiz) > 0);
 		assert((int)(((blk_hdr_ptr_t)db_addr[0])->bsiz) <= cs_data->blk_size);
 		long_blk_id = IS_64_BLK_ID(db_addr[0]);
-		blk_id_sz = SIZEOF_BLK_ID(long_blk_id);
+		DEBUG_ONLY(blk_id_sz = SIZEOF_BLK_ID(long_blk_id));
 		if (!dollar_tlevel)
 		{
 			if (0 != cs->ins_off)
@@ -494,10 +489,7 @@ enum cdb_sc bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 	bt_rec_ptr_t		bt;
 	cache_rec_ptr_t		cr, cr_new, save_cr;
 	boolean_t		read_finished, wait_for_rip, write_finished, intend_finished;
-	boolean_t		read_before_image, v7_db_mode;
-#	ifdef DEBUG
-	boolean_t		v6_db_mode;
-#	endif
+	boolean_t		read_before_image;
 	block_id		blkid;
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
@@ -513,12 +505,6 @@ enum cdb_sc bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 	SETUP_THREADGBL_ACCESS;
 	csa = cs_addrs;		/* Local access copies */
 	csd = csa->hdr;
-<<<<<<< HEAD
-	v7_db_mode = (0 == MEMCMP_LIT(csd->label, GDS_LABEL));
-	DEBUG_ONLY(v6_db_mode = (0 == MEMCMP_LIT(csd->label, V6_GDS_LABEL)));
-	assert((v7_db_mode || v6_db_mode) && (v7_db_mode != v6_db_mode));
-=======
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
 	cnl = csa->nl;
 	assert(csd == cs_data);
 	mode = cs->mode;
@@ -931,7 +917,6 @@ enum cdb_sc bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 	assert(0 == cr->data_invalid);
 	if (0 != cr->r_epid)
 	{	/* must have got it with a db_csh_getn */
-<<<<<<< HEAD
 #		ifdef DEBUG
 		/* In rare cases (when free buffers are not easy to find), it is possible that "db_csh_getn" returned us a cr
 		 * whose buffer was used as part of a "gvcst_blk_build" of a prior block in the currently committing transaction.
@@ -942,10 +927,7 @@ enum cdb_sc bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 		 */
 		((blk_hdr_ptr_t)GDS_REL2ABS(cr->buffaddr))->tn = (ctn - 1);
 #		endif
-		if (gds_t_acquired != mode)
-=======
 		if ((gds_t_acquired != mode) || mu_upgrade_in_prog)
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
 		{	/* Not a newly created block, yet we have got it with a db_csh_getn. This means we have an in-memory
 			 * copy of the block already built. In that case, cr->ondsk_blkver is uninitialized. Copy it over
 			 * from cs->ondsk_blkver which should hold the correct value.

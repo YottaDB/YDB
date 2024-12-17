@@ -3,7 +3,7 @@
  * Copyright (c) 2004-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -490,16 +490,9 @@ void	gtm_env_init_sp(void)
 	 * here. It need not exist until a database is opened. If ydb_statsdir does not exist, find an appropriate default and
 	 * set it so it is always resolvable.
 	 */
-<<<<<<< HEAD
-	/* Using MAX_FN_LEN below instead of YDB_PATH_MAX because csa->nl->statsdb_fname[] size is MAX_FN_LEN + 1 */
+	/* Using MAX_STATSDIR_LEN because MAX_FN_LEN is reduced by the least required space for a statsdb file name */
 	if ((SS_NORMAL != ydb_trans_log_name(YDBENVINDX_STATSDIR, &trans, buf, MAX_STATSDIR_LEN,
 											IGNORE_ERRORS_TRUE, NULL))
-=======
-	val.addr = GTM_STATSDIR;
-	val.len = SIZEOF(GTM_STATSDIR) - 1;
-	/* Using MAX_STATSDIR_LEN because MAX_FN_LEN is reduced by the least required space for a statsdb file name */
-	if ((SS_NORMAL != (status = TRANS_LOG_NAME(&val, &trans, buf, MAX_STATSDIR_LEN, do_sendmsg_on_log2long)))
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
 			|| (0 == trans.len))
 	{	/* Either no translation for $ydb_statsdir or the current and/or expanded value of $ydb_statsdir exceeds the
 		 * max path length. For either case $ydb_statsdir needs to be (re)set so try to use $ydb_tmp instead - note

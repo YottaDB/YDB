@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -50,12 +50,7 @@
 #include "wcs_recover.h"
 #include "gtm_string.h"
 #include "have_crit.h"
-<<<<<<< HEAD
-#include "gds_blk_downgrade.h"
 #include "deferred_exit_handler.h"
-=======
-#include "deferred_signal_handler.h"
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
 #include "memcoherency.h"
 #include "wbox_test_init.h"
 #include "wcs_clean_dbsync.h"
@@ -492,32 +487,6 @@ int4	wcs_wtstart(gd_region *region, int4 writes, wtstart_cr_list_t *cr_list_ptr,
 					csrfirst = csr;
 				continue;
 			}
-		}
-		if (simpleThreadAPI_active && in_os_signal_handler && IS_GDS_BLK_DOWNGRADE_NEEDED(csr->ondsk_blkver)
-		    && !USING_ALTERNATE_SIGHANDLING)
-		{	/* "IS_GDS_BLK_DOWNGRADE_NEEDED" macro returns TRUE which means there is the potential for a "malloc" call
-			 * below (to allocate/expand the "reformat_buffer"). But since "simpleThreadAPI_active" is also TRUE, the
-			 * PTHREAD_MUTEX_LOCK_IF_NEEDED call in "gtm_malloc"/"gtm_free" will end up doing a "pthread_mutex_lock"
-			 * call which is a no-no since we are inside a signal handler ("in_os_signal_handler" is TRUE implies we
-			 * are in the SIGALRM signal handler). So skip flushing this cache-record. Since this invocation of
-			 * "wcs_wtstart" was from a timer handler, there is no need to flush anything. It is just a nice-to-have
-			 * flush call so it is okay to skip flushing in this case.
-			 *
-			 * Note in the case of alternate signal handling (with Go), the "handlers" are not called from inside
-			 * signal handlers so in this case we can proceed with the flushing and not do this requeue.
-			 */
-			WCS_OPS_TRACE(csa, process_id, wcs_ops_wtstart9, cr->blk, GDS_ANY_ABS2REL(csa,cr), 0, 0, 0);
-			if (keep_buff_lock)
-				CLEAR_BUFF_UPDATE_LOCK(csr, &cnl->db_latch);
-			REINSERT_CR_AT_TAIL(csr, ahead, n, csa, csd, wcb_wtstart_lckfail3);
-			if (INTERLOCK_FAIL == n)
-			{
-				err_status = ERR_DBCCERR;
-				break;
-			}
-			if (NULL == csrfirst)
-				csrfirst = csr;
-			continue;
 		}
 		csr->aio_issued = FALSE;	/* set this to TRUE before csr->epid is set to a non-zero value.
 						 * To avoid out-of-order execution place this BEFORE the LOCK_BUFF_FOR_WRITE.

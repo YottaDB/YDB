@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2020-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -42,13 +42,8 @@ GBLREF	unsigned char		rdfail_detail;
 error_def(ERR_DBFILERDONLY);
 
 sm_uc_ptr_t mm_read(block_id blk)
-<<<<<<< HEAD
-{	/* this is a kissing cousin to code in dsk_read and the two blocks should be maintained in parallel */
-	boolean_t		fully_upgraded;
-=======
 {	/* this is a kissing cousin to code in dsk_read and the two blocs should be maintained in parallel */
 	boolean_t		buff_is_modified_after_read = FALSE, fully_upgraded, read_only, was_crit;
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
 	enum db_ver		tmp_ondskblkver;
 	int			level;
 	sgmnt_addrs		*csa;
@@ -58,16 +53,6 @@ sm_uc_ptr_t mm_read(block_id blk)
 
 	SETUP_THREADGBL_ACCESS;
 	/* --- extended or dse (dse is able to edit any header fields freely) --- */
-<<<<<<< HEAD
-	assert((cs_addrs->total_blks <= cs_addrs->ti->total_blks) || !IS_MCODE_RUNNING);
-	assert(blk >= 0);
-	assert(dba_mm == cs_addrs->hdr->acc_meth);
-	csd = cs_data;
-	fully_upgraded = csd->fully_upgraded;
-	buff = (MM_BASE_ADDR(cs_addrs) + ((off_t)cs_addrs->hdr->blk_size * blk));
-	if (blk < cs_addrs->total_blks)		/* test against process private copy of total_blks */
-	{	/* seems OK - see if block needs to be converted to current version */
-=======
 	csd = cs_data;
 	csa = cs_addrs;
 	assert((csa->total_blks <= csa->ti->total_blks) || !IS_MCODE_RUNNING);
@@ -76,11 +61,10 @@ sm_uc_ptr_t mm_read(block_id blk)
 	fully_upgraded = csd->fully_upgraded;
 	buff = (MM_BASE_ADDR(csa) + ((off_t)csa->hdr->blk_size * blk));
 	read_only = csd->read_only;
-	INCR_GVSTATS_COUNTER(csa, csa->nl, n_dsk_read, 1);
+	assert(dba_mm == csa->hdr->acc_meth);
 	if (blk < csa->total_blks)		/* test against process private copy of total_blks */
 	{	/* see if block needs to be converted to current version. This code block should be maintained in parallel
 		 * with a similar section in mm_read */
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
 		if ((GDSV6p == (tmp_ondskblkver = ((blk_hdr_ptr_t)buff)->bver)) && (GDSMV70000 == csd->creation_mdb_ver))
 		{       /* adjust for shift of GDSV7 id from 2 to 4 */
 			tmp_ondskblkver = GDSV7;
@@ -88,33 +72,9 @@ sm_uc_ptr_t mm_read(block_id blk)
 		}
 		level = (int)((blk_hdr_ptr_t)buff)->levl;	/* Doing this here for the assert below */
 		if (GDSV4 == tmp_ondskblkver)
-<<<<<<< HEAD
-		{	/* but might be uninitialed */
-			/* V6 might not be correct, but any writer should correct it before it goes to a DB file */
-			tmp_ondskblkver = ((blk_hdr_ptr_t)buff)->bver = csd->desired_db_format;
-		} else
-			assert((GDSV7 == tmp_ondskblkver) || (GDSV6 == tmp_ondskblkver)	/* vanilla cases */
-			|| ((GDSV7m == tmp_ondskblkver) && IS_64_BLK_ID(buff)) 	/* block upgrade complete from V6 */
-			|| (!fully_upgraded && (GDSV6p == tmp_ondskblkver)));	/* shuffled & adjusted but still 4 byte ID */
-		if (!fully_upgraded && (GDSV7m != tmp_ondskblkver))		/* !fully_upgraded only during V6 -> V7 upgrade */
-		{	/* block in need of attention */
-			if ((0 == (level = (int)((blk_hdr_ptr_t)buff)->levl)) || (LCL_MAP_LEVL == level)) /* WARNING assignment */
-			{
-				((blk_hdr_ptr_t)buff)->bver = GDSV7m;	/* bit map & data blocks just get version */
-				DEBUG_ONLY(tmp_ondskblkver = GDSV7m);
-			} else if ((csd->offset) && (GDSV6 == tmp_ondskblkver))
-			{	/* This is a pre-V7 index block needing its offset adjusted */
-				assert(MEMCMP_LIT(csd->label, GDS_LABEL));
-				blk_ptr_adjust(buff, csd->offset);
-				((blk_hdr_ptr_t)buff)->bver = GDSV6p;	/* 4 byte block_id with offset applied */
-				DEBUG_ONLY(tmp_ondskblkver = GDSV6p);
-			} else
-				assert(GDSV6p == tmp_ondskblkver);
-=======
 		{	/* but might be uninitialized */
 			tmp_ondskblkver = csd->desired_db_format;
 			buff_is_modified_after_read = TRUE;
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
 		}
 #ifdef	DEBUG_UPGRADE
 		/* The following assert can trip in regular operation when dealing with recycled blocks after the DB becomes

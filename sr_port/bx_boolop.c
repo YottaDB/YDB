@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
@@ -29,7 +29,6 @@ LITREF octabstruct	oc_tab[];
 GBLREF boolean_t		run_time;
 GBLREF command_qualifier	cmd_qlf;
 
-<<<<<<< HEAD
 #define STOTEMP_IF_NEEDED(REF0, I, T1, OPND)											\
 MBSTART {	/* Input:													\
 		 * --- REF0:	a boolean triple, which may have either 1 input (OC_COBOOL) or 2 (other opcodes)		\
@@ -68,8 +67,6 @@ MBSTART {	/* Input:													\
 			break;													\
 	}															\
 } MBEND
-=======
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
 
 void bx_boolop(triple *t, boolean_t jmp_type_one, boolean_t jmp_to_next, boolean_t sense, oprtype *addr,
 		int depth, opctype andor_opcode, boolean_t caller_is_bool_expr, int jmp_depth, boolean_t is_last_bool_operand)
@@ -83,22 +80,17 @@ void bx_boolop(triple *t, boolean_t jmp_type_one, boolean_t jmp_to_next, boolean
  * andor_opcode tells us whether we are inside an AND or OR
  */
 {
-<<<<<<< HEAD
 	boolean_t	expr_fini;
 	opctype		new_andor_opcode;
 	oprtype		*adj_addr, *i, *p;
 	tbp		*tripbp;
 	triple		*bfini, *binit, *ref0, *ref1, *ref2, *ref0_next, *ref_parms, *t0, *t1, *tb, *tj;
 	triple		*leftmost[NUM_TRIPLE_OPERANDS];
-=======
-	oprtype		*p;
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	CHECK_AND_RETURN_IF_BOOLEXPRTOODEEP(depth);
 	assert(OCT_BOOL & oc_tab[t->opcode].octype);
-	assert(!(OCT_SE & oc_tab[t->opcode].octype));
 	assert(((1 & sense) == sense) && ((1 & jmp_to_next) == jmp_to_next) && ((1 & jmp_type_one) == jmp_type_one));
 	assert((TRIP_REF == t->operand[0].oprclass) && (TRIP_REF == t->operand[1].oprclass));
 	if (jmp_to_next)
@@ -107,7 +99,6 @@ void bx_boolop(triple *t, boolean_t jmp_type_one, boolean_t jmp_to_next, boolean
 		*p = put_tjmp(t);
 	} else
 		p = addr;
-<<<<<<< HEAD
 	if (OK_TO_SHORT_CIRCUIT)
 	{	/* nice simple short circuit */
 		assert(NULL == TREF(boolchain_ptr));
@@ -428,13 +419,5 @@ void bx_boolop(triple *t, boolean_t jmp_type_one, boolean_t jmp_to_next, boolean
 		dqins(TREF(expr_start), exorder, ref0);
 		TREF(expr_start) = ref0;
 	}
-=======
-	/* nice simple short circuit */
-	assert(NULL == TREF(boolchain_ptr));
-	bx_tail(t->operand[0].oprval.tref, jmp_type_one, p);
-	bx_tail(t->operand[1].oprval.tref, sense, addr);
-	t->opcode = OC_NOOP;				/* must not delete as this can be a jmp target */
-	t->operand[0].oprclass = t->operand[1].oprclass = NO_REF;
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
 	return;
 }

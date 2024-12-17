@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -400,7 +400,6 @@ void v6_db_auto_upgrade(gd_region *reg)
 				udi = FILE_INFO(reg);
 				new_eof = (off_t)BLK_ZERO_OFF(csd->start_vbn) + (off_t)csd->trans_hist.total_blks * csd->blk_size;
 				DEBUG_ONLY(file_size = gds_file_size(reg->dyn.addr->file_cntl);)
-<<<<<<< HEAD
 				/* Note that the last process to access this database in V63000A could have been in the middle of
 				 * a database file extension after having extended the database file size but before updating
 				 * the total_blks field in the file header etc. In that case, the "new_eof" value would be less
@@ -413,13 +412,7 @@ void v6_db_auto_upgrade(gd_region *reg)
 				 * GT.M V6.3-001. Tests that randomize the block size below 4096 will fail the assert. Therefore
 				 * modify the assert to account for that.
 				 */
-=======
-				 /* About the assert below for the new_eof. It does not work with block sizes under 4096 which
-				  * became the default in V63001. Tests that randomize the block size below 4096 will fail the
-				  * assert.
-				  */
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
-				assert(((file_size * DISK_BLOCK_SIZE) == (new_eof + DISK_BLOCK_SIZE))
+				assert(((file_size * DISK_BLOCK_SIZE) >= (new_eof + DISK_BLOCK_SIZE))
 						|| ((DISK_BLOCK_SIZE << 3) > csd->blk_size));
 				db_write_eof_block(udi, udi->fd, csd->blk_size, new_eof, &TREF(dio_buff));
 				/* GT.M V63001 introduced reservedDBFlags */

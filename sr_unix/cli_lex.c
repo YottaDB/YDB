@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -36,33 +36,25 @@
 #include "cli.h"
 #include "eintr_wrappers.h"
 #include "min_max.h"
-<<<<<<< HEAD
+#include "gtmmsg.h"
+#include "gtmimagename.h"
 #include "readline.h"
 #include "ydb_trans_log_name.h"
 #include "ydb_logical_truth_value.h"
-#include "gtmmsg.h"
 #include "gtmio.h"
-=======
-#include "gtmmsg.h"
-#include "gtmimagename.h"
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
 
 GBLDEF char	cli_token_buf[MAX_LINE + 1];	/* Token buffer */
 GBLREF int	cmd_cnt;
 GBLREF char	**cmd_arg;
 GBLDEF boolean_t gtm_cli_interpret_string = TRUE;
 GBLDEF IN_PARMS *cli_lex_in_ptr;
-<<<<<<< HEAD
+
+GBLREF enum gtmImageTypes	image_type;
 GBLREF char 	cli_err_str[];			/* Parse Error message buffer */
 
-static struct termios   tty_settings;
-=======
-GBLREF enum gtmImageTypes	image_type;
 LITREF gtmImageName		gtmImageNames[];
 
-error_def(ERR_LINETOOLONG);
-error_def(ERR_ARGTRUNC);
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
+static struct termios   tty_settings;
 
 #ifdef UTF8_SUPPORTED
 GBLREF	boolean_t	gtm_utf8_mode;
@@ -675,15 +667,10 @@ char *cli_fgets(char *destbuffer, int buffersize, FILE *fp, boolean_t in_tp)
 
 int	cli_gettoken (int *eof)
 {
-<<<<<<< HEAD
-	char	*ptr, *ptr_top, *eq_pos, *cur_arg;
-	int	arg_no, print_len, token_len, avail, max_space, eq_len;
-
-=======
-	char		*ptr, *ptr_top;
-	int		arg_no, print_len, token_len, avail;
+	char		*ptr, *ptr_top, *eq_pos, *cur_arg;
+	int		arg_no, print_len, token_len, avail, max_space, eq_len;
 	boolean_t	need_null = FALSE;
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
+
 	assert(cli_lex_in_ptr);
 	/* Reading from program argument list */
 	if ((1 < cli_lex_in_ptr->argc) && (NULL == cli_lex_in_ptr->tp))
@@ -693,7 +680,6 @@ int	cli_gettoken (int *eof)
 		avail = cli_lex_in_ptr->buflen - STRLEN(cli_lex_in_ptr->argv[0]);
 		for (ptr_top = ptr + avail, arg_no = 1; (arg_no < cli_lex_in_ptr->argc) && (ptr_top > ptr); arg_no++)
 		{	/* Convert arguments into array */
-<<<<<<< HEAD
 			max_space = (ptr_top - ptr);
 			cur_arg = cli_lex_in_ptr->argv[arg_no];
 			/* If qualifier and value pair is present in command line argument and the value part is
@@ -711,12 +697,8 @@ int	cli_gettoken (int *eof)
 			} else
 				print_len = SNPRINTF(ptr, max_space, "%s%s", (1 < arg_no) ? " " : "", cur_arg);
 			if (max_space <= print_len)
-=======
-			print_len = SNPRINTF(ptr, (ptr_top - ptr), "%s%s", (1 < arg_no) ? " " : "", cli_lex_in_ptr->argv[arg_no]);
-			if ((ptr_top - ptr) <= print_len)
 			{
 				need_null = TRUE;
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
 				break;
 			}
 			ptr += print_len;

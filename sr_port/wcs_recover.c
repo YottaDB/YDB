@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -71,12 +71,8 @@ GBLREF	boolean_t		mupip_jnl_recover;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	uint4			dollar_tlevel;
-<<<<<<< HEAD
 GBLREF	uint4			ydbDebugLevel;
-=======
-GBLREF	uint4			gtmDebugLevel;
 GBLREF	uint4			mu_upgrade_in_prog;
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
 GBLREF	uint4			process_id;
 GBLREF	unsigned int		cr_array_index;
 GBLREF	volatile boolean_t	in_wcs_recover;	/* TRUE if in "wcs_recover" */

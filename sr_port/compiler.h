@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries. *
@@ -186,28 +186,6 @@ typedef struct
 	enum octype_t		octype;
 } octabstruct;
 
-<<<<<<< HEAD
-=======
-/* Values for octype */
-#define OCT_NULL	0
-#define OCT_MVAL	1
-#define OCT_MINT	2
-#define OCT_MVADDR	4
-#define OCT_CDADDR	8
-#define OCT_VALUE	(OCT_MVAL | OCT_MINT | OCT_CDADDR)
-#define OCT_BOOL	16
-#define OCT_JUMP	32
-#define OCT_EXPRLEAF	64
-#define OCT_CGSKIP	128
-#define OCT_COERCE	256
-#define OCT_ARITH	512
-#define OCT_UNARY	1024
-#define OCT_NEGATED	2048
-#define OCT_REL 	4096
-/* For booleans which have a side-effect somewhere in their (or a direct ancestor's) second operand's triple chain */
-#define OCT_SE		8192
-
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
 typedef struct
 {
 	char			name[20];
@@ -862,7 +840,6 @@ MBSTART {									\
 #define	IS_LAST_BOOL_OPERAND_TRUE	TRUE
 
 int		actuallist(oprtype *opr);
-<<<<<<< HEAD
 int		bool_expr(boolean_t sense, oprtype *addr, triple **boolexprfinish_ptr);
 void		bx_boollit(triple *t, int depth);
 void		bx_boolop(triple *t, boolean_t jmp_type_one, boolean_t jmp_to_next, boolean_t sense, oprtype *addr, int depth,
@@ -872,15 +849,6 @@ void		bx_relop(triple *t, opctype cmp, boolean_t sense, oprtype *addr, int depth
 					boolean_t caller_is_bool_expr, int jmp_depth, boolean_t is_last_bool_operand);
 void		bx_tail(triple *t, boolean_t sense, oprtype *addr, int depth, opctype andor_opcode,
 						boolean_t caller_is_bool_expr, int jmp_depth, boolean_t is_last_bool_operand);
-=======
-int		bool_expr(boolean_t sense, oprtype *addr);
-void		bx_boollit(triple *t);
-void		bx_boolop(triple *t, boolean_t jmp_type_one, boolean_t jmp_to_next, boolean_t sense, oprtype *addr);
-void		bx_relop(triple *t, opctype cmp, opctype tst, oprtype *addr);
-void		bx_sboolop(triple *t, boolean_t jmp_type_one, boolean_t jmp_to_next, boolean_t sense, oprtype *addr);
-triple		*bx_startbool(triple *t);
-void		bx_tail(triple *t, boolean_t sense, oprtype *addr);
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
 void		chktchain(triple *head);
 void		code_gen(void);
 void		coerce(oprtype *a, enum octype_t new_type);
@@ -896,14 +864,9 @@ int		expratom_coerce_mval(oprtype *a);
 int		exfunc(oprtype *a, boolean_t alias_target);
 int		expritem(oprtype *a);
 int		expr(oprtype *a, int m_type);
-<<<<<<< HEAD
 void		ex_tail(oprtype *opr, int depth);
 void		ex_arithlit_optimize(triple *t);
 mval		*ex_arithlit_compute(opctype c, mval *v0, mval *v1);
-=======
-void		ex_arithlit(triple *t);
-void		ex_tail(oprtype *opr, boolean_t is_boolchild, boolean_t parent_comval);
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
 int		extern_func(oprtype *a);
 int		f_ascii(oprtype *a, opctype op);
 int		f_char(oprtype *a, opctype op);

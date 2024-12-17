@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -797,26 +797,13 @@ STATICFNDEF void tcp_read(BFILE *bf, char *buf, int nbytes)
 	poll_timeout = MILLISECS_IN_SEC;
 	while (1)
 	{
-<<<<<<< HEAD
-		assertpro(FD_SETSIZE > bf->fd);
-		FD_ZERO(&fs);
-		FD_SET(bf->fd, &fs);
-		assert(0 != FD_ISSET(bf->fd, &fs));
-		/* Note: the check for EINTR from the select below should remain, as aa_select is a
-		 * function, and not all callers of aa_select behave the same when EINTR is returned.
-		 */
-		save_nap = nap;
-		status = select(bf->fd + 1, (void *)(&fs), (void *)0, (void *)0, &nap);
-		HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
-		nap = save_nap;
-=======
 		poll_fdlist[0].fd = bf->fd;
 		poll_fdlist[0].events = POLLIN;
 		poll_nfds = 1;
 		save_poll_timeout = poll_timeout;
 		status = poll(&poll_fdlist[0], poll_nfds, poll_timeout);
 		poll_timeout = save_poll_timeout;
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
+		HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 		if (status > 0)
 		{
 			RECV(bf->fd, curr, needed, 0, status);

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -3832,15 +3832,10 @@ MBSTART {												\
 	if (BLK_ID_32_VER < (CSD)->desired_db_format)							\
 		headroom = TN_HEADROOM_V7;								\
 	else												\
-	{	/* V5/V6/V6p - V4 conversions are not allowed */							\
+	{	/* V5/V6/V6p - V4 conversions are not allowed */					\
 		assert((CSD)->desired_db_format);							\
 		headroom = TN_HEADROOM_V6;								\
-<<<<<<< HEAD
-	else												\
-		headroom = TN_HEADROOM_V4;								\
-=======
 	}												\
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
 	headroom *= HEADROOM_FACTOR;									\
 	(ret_warn_tn) = (CSD)->trans_hist.curr_tn;							\
 	if ((headroom < (CSD)->max_tn) && ((ret_warn_tn) < ((CSD)->max_tn - headroom)))			\

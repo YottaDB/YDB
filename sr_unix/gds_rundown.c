@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -231,26 +231,8 @@ int4 gds_rundown(boolean_t cleanup_udi)
 			tp_change_reg();
 		}
 	}
-<<<<<<< HEAD
-=======
-	/* If this is a read-only database, simply return */
-	if (csd->read_only)
-	{
-		if (INVALID_SEMID != udi->semid)
-			semctl(udi->semid, 0, IPC_RMID);
-		udi->sem_deleted = TRUE;		/* Note that we deleted the semaphore */
-		udi->grabbed_access_sem = FALSE;
-		udi->counter_acc_incremented = FALSE;
-		assert(FALSE == udi->grabbed_ftok_sem);
-		if (INVALID_SEMID != udi->ftok_semid)
-			semctl(udi->ftok_semid, 0, IPC_RMID);
-		udi->counter_ftok_incremented = FALSE;
-		udi->semid = udi->ftok_semid = INVALID_SEMID;
-		return EXIT_NRM;
-	}
 	if (mu_upgrade_in_prog)
 		csa->nl->reorg_upgrade_pid = 0;
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
 	csa->regcnt--;
 	if (csa->regcnt)
 	{	/* There is at least one more region pointing to the same db file as this region.

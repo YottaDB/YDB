@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001 Sanchez Computer Associates, Inc.		*
  *								*
- * Copyright (c) 2019-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -15,7 +15,6 @@
 #ifndef GENERIC_SIGNAL_HANDLER_INCLUDED
 #define GENERIC_SIGNAL_HANDLER_INCLUDED
 
-<<<<<<< HEAD
 #include "gtm_string.h"
 
 #include <errno.h>
@@ -59,10 +58,7 @@ void drive_non_ydb_signal_handler_if_any(char *caller, int sig, siginfo_t *info,
 	}														\
 }
 
-void generic_signal_handler(int sig, siginfo_t *info, void *context, boolean_t is_os_signal_handler);
-=======
 boolean_t is_timer_initialized(ABS_TIME);
-void generic_signal_handler(int sig, siginfo_t *info, void *context);
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
+void generic_signal_handler(int sig, siginfo_t *info, void *context, boolean_t is_os_signal_handler);
 
 #endif /* GENERIC_SIGNAL_HANDLER_INCLUDED */

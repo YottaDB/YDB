@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  * Copyright (c) 2017-2018 Stephen L Johnson.			*
@@ -1563,6 +1563,7 @@ qw_num	gtm_byteswap_64(qw_num num64);
 #define HOUR			3600	/* one hour in seconds 60 * 60 */
 #define ONEDAY			86400	/* seconds in a day */
 #define MILLISECS_IN_SEC	((int)1E3)	/* millseconds in a second */
+#define MICROSECS_IN_MSEC	((int)1E3)	/* microseconds in a millisecond */
 #define MICROSECS_IN_SEC	((int)1E6)	/* microseconds in a second */
 #define NANOSECS_IN_SEC		((int)1E9)	/* nanoseconds in a second */
 #define NANOSECS_IN_MSEC	((int)1E6)	/* nanoseconds in a millisecond */

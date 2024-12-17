@@ -1,13 +1,9 @@
 /****************************************************************
  *								*
-<<<<<<< HEAD
- * Copyright (c) 2001-2021 Fidelity National Information	*
-=======
  * Copyright (c) 2001-2023 Fidelity National Information	*
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -25,9 +21,6 @@
 #include "gtm_string.h"
 #include "gtm_stdio.h"
 #include "gtm_ipc.h"
-#ifdef GTM_USE_POLL_FOR_SUBSECOND_SELECT
-#include "gtm_poll.h"
-#endif
 
 #include <sys/mman.h>
 #include <sys/shm.h>
@@ -63,10 +56,7 @@
 #include "gtm_c_stack_trace.h"
 #include "fork_init.h"
 #include "wbox_test_init.h"
-<<<<<<< HEAD
-=======
 #include "gtm_poll.h"
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
 #ifdef GTM_TRIGGER
 #include "trigger.h"
 #endif

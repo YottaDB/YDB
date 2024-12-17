@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -227,14 +227,10 @@ void	dm_read (mval *v)
 	unsigned char	inbyte, *outptr, *outtop, *ptr, *ptrnext, *ptrtop;
 	unsigned char	more_buf[GTM_MB_LEN_MAX + 1], *more_ptr;	/* to build up multi byte for character */
 	unsigned short	escape_length = 0;
-<<<<<<< HEAD
 	wint_t		*buffer_32_start, codepoint, inchar, *ptr32;
-=======
-	wint_t		*buffer_32_start, codepoint, *current_32_ptr, inchar, *ptr32;
 	int		poll_timeout;
 	nfds_t		poll_nfds;
 	struct pollfd	poll_fdlist[1];
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
 #	ifdef __MVS__
 	wint_t		asc_inchar;
 #	endif
@@ -447,25 +443,14 @@ void	dm_read (mval *v)
 				continue;
 			}
 		} else if (0 == status)
-<<<<<<< HEAD
-		{	/* select() says there's something to read, but read() found zero characters; assume connection dropped. */
+		{	/* poll() says there's something to read, but read() found zero characters; assume connection dropped. */
 			HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 			ISSUE_NOPRINCIO_IF_NEEDED(io_ptr, FALSE, FALSE);		/* FALSE, FALSE: READ tt not socket */
 			tt_ptr->discard_lf = FALSE;
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_IOEOF);
 		} else if (0 < status)
-		{	/* select() says it's ready to read and read() found some data */
-			HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
-			assert(0 != FD_ISSET(tt_ptr->fildes, &input_fd));
-=======
-		{	/* poll() says there's something to read, but read() found zero characters; assume connection dropped. */
-			ISSUE_NOPRINCIO_IF_NEEDED(io_ptr, FALSE, FALSE);		/* FALSE, FALSE: READ tt not socket */
-			tt_ptr->discard_lf = FALSE;
-			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_IOEOF);
-		}
-		else if (0 < status)
 		{
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
+			HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 			/* set prin_in_dev_failure to FALSE in case it was set to TRUE in the previous read which may have failed */
 			prin_in_dev_failure = FALSE;
 #			ifdef UTF8_SUPPORTED

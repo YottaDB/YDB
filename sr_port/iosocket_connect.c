@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -35,12 +35,9 @@
 #include "gtm_ipv6.h"
 #include "gtm_unistd.h"
 #include "min_max.h"
-<<<<<<< HEAD
 #include "gtm_fcntl.h"
 #include "eintr_wrappers.h"
-=======
 #include "gtm_poll.h"
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
 
 #define	ESTABLISHED	"ESTABLISHED"
 
@@ -68,10 +65,6 @@ boolean_t iosocket_connect(socket_struct *sockptr, uint8 nsec_timeout, boolean_t
 	d_socket_struct *dsocketptr, *real_dsocketptr;
 	socket_interrupt *sockintr, *real_sockintr;
 	ABS_TIME	cur_time, end_time;
-<<<<<<< HEAD
-	struct timeval	*sel_time, cur_timeval;
-=======
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
 	mv_stent	*mv_zintdev;
 	struct addrinfo *remote_ai_ptr, *raw_ai_ptr, *local_ai_ptr;
 	intrpt_state_t	prev_intrpt_state;
@@ -115,8 +108,7 @@ boolean_t iosocket_connect(socket_struct *sockptr, uint8 nsec_timeout, boolean_t
 			end_time = sockintr->end_time;
 		if ((socket_connect_inprogress == sockptr->state) && (FD_INVALID != sockptr->sd))
 		{
-<<<<<<< HEAD
-			need_select = TRUE;
+			need_poll = TRUE;
 			need_socket = need_connect = FALSE;	/* sd still good */
 		}
 		/* Done with this mv_stent. Pop it off if we can, else mark it inactive. */
@@ -129,27 +121,6 @@ boolean_t iosocket_connect(socket_struct *sockptr, uint8 nsec_timeout, boolean_t
 		}
 		DBGSOCK((stdout, "socconn: mv_stent found - endtime: %d/%d\n", end_time.tv_sec,
 			 end_time.tv_nsec / NANOSECS_IN_USEC));
-=======
-			if (sockintr->end_time_valid)
-				/* Restore end_time for timeout */
-				end_time = sockintr->end_time;
-			if ((socket_connect_inprogress == sockptr->state) && (FD_INVALID != sockptr->sd))
-			{
-				need_poll = TRUE;
-				need_socket = need_connect = FALSE;	/* sd still good */
-			}
-			/* Done with this mv_stent. Pop it off if we can, else mark it inactive. */
-			if (mv_chain == mv_zintdev)
-				POP_MV_STENT();	 /* pop if top of stack */
-			else
-			{       /* else mark it unused, see iosocket_open for use */
-				mv_zintdev->mv_st_cont.mvs_zintdev.buffer_valid = FALSE;
-				mv_zintdev->mv_st_cont.mvs_zintdev.io_ptr = NULL;
-			}
-			DBGSOCK((stdout, "socconn: mv_stent found - endtime: %d/%d\n", end_time.at_sec, end_time.at_usec));
-		} else
-			DBGSOCK((stdout, "socconn: no mv_stent found !!\n"));
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
 		real_dsocketptr->mupintr = dsocketptr->mupintr = FALSE;
 		real_sockintr->who_saved = sockintr->who_saved = sockwhich_invalid;
 	} else if (NO_M_TIMEOUT != nsec_timeout)
@@ -448,7 +419,7 @@ boolean_t iosocket_connect(socket_struct *sockptr, uint8 nsec_timeout, boolean_t
 			assert((0 == res) || (-1 == res));
 			if (no_time_left && (0 <= res))
 			{
-				assert(!need_select);
+				assert(!need_poll);
 				break;
 			}
 		}
@@ -456,35 +427,17 @@ boolean_t iosocket_connect(socket_struct *sockptr, uint8 nsec_timeout, boolean_t
 		{
 			sockerror = 0;
 			do
-<<<<<<< HEAD
-			{ /* unless outofband loop on select if connection continuing */
-				if (NO_M_TIMEOUT == nsec_timeout)
-					sel_time = NULL;
-=======
 			{	/* unless outofband loop on poll if connection continuing */
-				if (NO_M_TIMEOUT == msec_timeout)
+				if (NO_M_TIMEOUT == nsec_timeout)
 					poll_timeout = -1;
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
 				else
 				{
 					sys_get_curr_time(&cur_time);
 					cur_time = sub_abs_time(&end_time, &cur_time);
-<<<<<<< HEAD
 					SET_NSEC_TIMEOUT_FROM_DELTA_TIME(cur_time, nsec_timeout);
 					if (0 < nsec_timeout)
-					{
-						cur_timeval.tv_sec = cur_time.tv_sec;
-						cur_timeval.tv_usec = cur_time.tv_nsec / NANOSECS_IN_USEC;
-						sel_time = (struct timeval *)&cur_timeval;
-					} else
-=======
-					msec_timeout = (int4)(cur_time.at_sec * MILLISECS_IN_SEC +
-						/* Round up in order to prevent premature timeouts */
-						DIVIDE_ROUND_UP(cur_time.at_usec, MICROSECS_IN_MSEC));
-					if (0 < msec_timeout)
-						poll_timeout = msec_timeout;
+						poll_timeout = DIVIDE_ROUND_UP(nsec_timeout, NANOSECS_IN_MSEC);
 					else
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
 					{	/* timed out so done */
 						save_errno = res = 0;
 						no_time_left = TRUE;
@@ -508,12 +461,8 @@ boolean_t iosocket_connect(socket_struct *sockptr, uint8 nsec_timeout, boolean_t
 					} else if (0 == res && (0 != sockerror))
 					{
 						if (EINTR == sockerror)
-<<<<<<< HEAD
-						{	/* loop on select */
+						{	/* loop on poll */
 							eintr_handling_check();
-=======
-						{ /* loop on poll */
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
 							save_errno = 0;
 							continue;
 						} else
@@ -552,12 +501,8 @@ boolean_t iosocket_connect(socket_struct *sockptr, uint8 nsec_timeout, boolean_t
 						break;
 					}
 				}
-<<<<<<< HEAD
-			} while (TRUE); /* do select */
-			HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;	/* See similar usage in SELECT macro ("eintr_wrappers.h") */
-=======
 			} while (TRUE); /* do poll */
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
+			HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 		}
 		if (save_errno)
 		{

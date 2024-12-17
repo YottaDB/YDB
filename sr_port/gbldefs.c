@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -783,11 +783,7 @@ GBLDEF	enum db_ver	upgrade_block_split_format;	/* MUPIP REORG -UPGRADE started;r
 GBLDEF	inctn_opcode_t	inctn_opcode = inctn_invalid_op;
 GBLDEF	inctn_detail_t	inctn_detail;			/* holds detail to fill in to inctn jnl record */
 GBLDEF	uint4		region_open_count;		/* Number of region "opens" we have executed */
-<<<<<<< HEAD
-GBLDEF	uint4		ydb_blkupgrade_flag = UPGRADE_IF_NEEDED;	/* by default upgrade only if necessary */
-=======
-GBLDEF	uint4		gtm_blkupgrade_flag = UPGRADE_IF_NEEDED;	/* US1479867: DSE can manually upgrade a block */
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
+GBLDEF	uint4		ydb_blkupgrade_flag = UPGRADE_IF_NEEDED;	/* US1479867: DSE can manually upgrade a block */
 GBLDEF	boolean_t	disk_blk_read;
 GBLDEF	boolean_t	ydb_dbfilext_syslog_disable;	/* by default, log every file extension message */
 GBLDEF	int4		cws_reorg_remove_index;			/* see mu_swap_blk.c for comments on the need for these two */

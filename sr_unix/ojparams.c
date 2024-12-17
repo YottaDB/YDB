@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2020-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2020-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -277,12 +277,9 @@ void ojparams (char *p, job_params_type *job_params)
 	/* Gather local variables to pass */
 	if (job_params->passcurlvn)
 	{	/* Create a "memory file" to store the job_set_locals messages for later transmission by the middle child. */
-<<<<<<< HEAD
 		int4	status;
 
-=======
 		DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
 		curlvn_out = open_memstream(&job_params->curlvn_buffer_ptr, &job_params->curlvn_buffer_size);
 		ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 		local_variable_marshalling(curlvn_out);

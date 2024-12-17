@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -97,7 +97,7 @@ GBLREF	unsigned char		t_fail_hist[CDB_MAX_TRIES];
 GBLREF	cache_rec_ptr_t		cr_array[]; /* Maximum number of blocks that can be in transaction */
 GBLREF	unsigned int		cr_array_index;
 GBLREF	boolean_t		block_saved;
-GBLREF	uint4			gtmDebugLevel; 		/* Debug level */
+GBLREF	uint4			ydbDebugLevel; 		/* Debug level */
 GBLREF	uint4			update_trans;
 GBLREF	cw_set_element		cw_set[];		/* create write set. */
 GBLREF	gd_region		*gv_cur_region;
@@ -717,16 +717,11 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 			goto failed;
 		}
 	}
-<<<<<<< HEAD
+	CHECK_TN(csa, csd, cti->curr_tn);	/* macro might issue rts_error TNTOOLARGE */
 	/* We should never proceed to update a frozen database. Only exception is DSE.
 	 * See comment in FROZEN_HARD macro definition for why it needs to be invoked twice in the assert.
 	 */
 	assert(!FROZEN_HARD(csa) || !FROZEN_HARD(csa) || IS_DSE_IMAGE);
-=======
-	CHECK_TN(csa, csd, cti->curr_tn);	/* macro might issue rts_error TNTOOLARGE */
-	/* We should never proceed to update a frozen database. Only exception is DSE */
-	assert(!FROZEN_HARD(csa) || IS_DSE_IMAGE);
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
 	/* We never expect to come here with file_corrupt set to TRUE (in case of an online rollback) because
 	 * grab_crit done above will make sure of that. The only exception is RECOVER/ROLLBACK itself coming
 	 * here in the forward phase
@@ -1355,13 +1350,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 		}
 		assert(!jbp->last_eof_written);
 		assert(jgbl.gbl_jrec_time >= jbp->prev_jrec_time);
-<<<<<<< HEAD
-		if (((jbp->next_epoch_time <= jgbl.gbl_jrec_time) UNCONDITIONAL_EPOCH_ONLY(|| TRUE))
-=======
-		if (MAXUINT4 == jbp->next_epoch_time)
-			jbp->next_epoch_time = (uint4)(jgbl.gbl_jrec_time + jbp->epoch_interval);
-		if (((jbp->next_epoch_time <= jgbl.gbl_jrec_time) || (gtmDebugLevel & GDL_UnconditionalEpoch))
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
+		if (((jbp->next_epoch_time <= jgbl.gbl_jrec_time) || (ydbDebugLevel & GDL_UnconditionalEpoch))
 						&& !FROZEN_CHILLED(csa))
 		{	/* Flush the cache. Since we are in crit, defer syncing epoch */
 			if (!wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH | WCSFLU_IN_COMMIT | WCSFLU_SPEEDUP_NOBEFORE))

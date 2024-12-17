@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -56,13 +56,9 @@ GBLREF	sgmnt_data_ptr_t	cs_data;
 static	gtm_int8 const		zeroes_64 = 0;
 static	int4 const		zeroes_32 = 0;
 GBLREF	uint4			update_array_size;			/* for the BLK_* macros */
-<<<<<<< HEAD
 GBLREF	unsigned char		cw_set_depth;
 GBLREF	unsigned int		t_tries;
-=======
 GBLREF	uint4			mu_upgrade_in_prog;			/* non-zero while UPGRADE/REORD -UPGRADE in progress */
-GBLREF	unsigned char		cw_set_depth, t_tries;
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
 
 enum cdb_sc locate_block_split_point(srch_blk_status *blk_stat, int level, int cur_blk_size, int max_fill, int *last_rec_size,
 					unsigned char *last_key, int *last_keysz, int *top_off);
@@ -145,17 +141,13 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 	star_rec_hdr = long_blk_id ? star_rec_hdr64 : star_rec_hdr32;
 	level = cur_level;
 	max_fill_sav = max_fill = (0 == level) ? d_max_fill : i_max_fill;
-<<<<<<< HEAD
 	assert(0 <= max_fill);
-
-=======
 	if (create_root = ((level == gv_target->hist.depth) && (0 < level))) /* WARNING: assigment */
 	{	/* MUPIP REORG -UPGRADE starts from the top down as opposed to regular REORG which works from the
 		 * bottom up. As a result, the cur_level from the caller in a REORG -UPGRADE might be a root.
 		 */
 		assert(mu_upgrade_in_prog);
 	}
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
 	/*  -------------------
 	 *  Split working block.
 	 *  -------------------
@@ -258,15 +250,10 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 	BLK_ADDR(new_ins_key, new_blk1_last_keysz, unsigned char);
 	memcpy(new_ins_key, &new_blk1_last_key[0], new_blk1_last_keysz);
 	new_ins_keysz = new_blk1_last_keysz;
-<<<<<<< HEAD
-	assert(!mu_reorg_upgrd_dwngrd_in_prog || max_fill);
-	for (;;) 	/* ========== loop through ancestors as necessary ======= */
-=======
 	assert(!mu_upgrade_in_prog || max_fill);
 	if (mu_upgrade_in_prog)
 		reserve_bytes = 0;				/* REORG -UPGRADE is top down, so zero the reserve bytes */
 	while (!create_root) 	/* ========== loop through ancestors as necessary ======= */
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
 	{
 		if (create_root = (level == gv_target->hist.depth)) /* WARNING: assigment */
 			break;
@@ -654,32 +641,6 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 		memcpy(new_ins_key, &new_blk1_last_key[0], new_blk1_last_keysz);
 		new_ins_keysz = new_blk1_last_keysz;
 		if (create_root)
-<<<<<<< HEAD
-		{
-			BLK_ADDR(root_hdr, SIZEOF(rec_hdr), rec_hdr);
-			root_hdr->rsiz = bstar_rec_sz + new_ins_keysz;
-			SET_CMPC(root_hdr, 0);
-			BLK_INIT(bs_ptr2, bs_ptr1);
-			BLK_SEG(bs_ptr2, (sm_uc_ptr_t)root_hdr, SIZEOF(rec_hdr));
-			BLK_SEG(bs_ptr2, new_ins_key, new_ins_keysz);
-			ins_off = blk_seg_cnt;
-			BLK_SEG(bs_ptr2, zeroes, blk_id_sz);
-			BLK_SEG(bs_ptr2, (sm_uc_ptr_t)star_rec_hdr, SIZEOF(rec_hdr));
-			ins_off2 = blk_seg_cnt;
-			BLK_SEG(bs_ptr2, zeroes, blk_id_sz);
-			if (!BLK_FINI(bs_ptr2, bs_ptr1))
-			{
-				assert(t_tries < CDB_STAGNATE);
-				NONTP_TRACE_HIST_MOD(old_blk1_hist_ptr, t_blkmod_mu_split);
-				return cdb_sc_blkmod;
-			}
-			cse = t_write(&gv_target->hist.h[level], (unsigned char *)bs_ptr1, ins_off, left_index,
-				level + 1, TRUE, FALSE, GDS_WRITE_KILLTN);
-			UNUSED(cse);
-			t_write_root(ins_off2, right_index);	/* create a sibling cw-set-element to store ins_off2/right_index */
-			(*lvls_increased)++;
-=======
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
 			break;
 	} /* ========== End loop through ancestors as necessary ======= */
 	if (create_root && (-1 < left_index))

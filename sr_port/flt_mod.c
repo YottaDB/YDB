@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2020-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2020-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -37,7 +37,6 @@ void	flt_mod(mval *u, mval *v, mval *q)
 	mval	*u_orig;		/* original (caller's) value of u */
 	int	u_mvtype, v_mvtype;
 
-<<<<<<< HEAD
 	/* If u or v is $ZYSQLNULL, the result is $ZYSQLNULL */
 	if (MV_IS_SQLNULL(u) || MV_IS_SQLNULL(v))
 	{
@@ -46,27 +45,15 @@ void	flt_mod(mval *u, mval *v, mval *q)
 		*q = literal_sqlnull;
 		return;
 	}
-	u_orig = u;
 	MV_FORCE_NUM(u);
 	MV_FORCE_NUM(v);
+	u_orig = u;
 	u_mvtype = u->mvtype;
 	v_mvtype = v->mvtype;
 	if ((v_mvtype & MV_INT) && (0 == v->m[1]))
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DIVZERO); /* BYPASSRTSABT */
 	if (u_mvtype & MV_INT & v_mvtype)
 	{	/* Both are INT's; use shortcut */
-=======
-	MV_FORCE_NUM(u);
-	MV_FORCE_NUM(v);
-	u_orig = u;
-
-	if ((v->mvtype & MV_INT) != 0  &&  v->m[1] == 0)
-		rts_error_csa(NULL, VARLSTCNT(1) ERR_DIVZERO); /* BYPASSRTSABT */
-
-	if ((u->mvtype & MV_INT & v->mvtype) != 0)
-	{
-		/* Both are INT's; use shortcut.  */
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
 		q->mvtype = MV_NM | MV_INT;
 		eb_int_mod(u->m[1], v->m[1], q->m);
 		return;
@@ -104,15 +91,11 @@ void	flt_mod(mval *u, mval *v, mval *q)
 		} else
 		{	/* Signs same (=> floor(u/v) >= 0) or (w == 0) or (underflow) => floor(u/v) == 0 */
 			*q = *u_orig;	/* u - floor(u/v)*v == u - 0*v == u */
-<<<<<<< HEAD
 			/* Clear any bits other than MV_NM/MV_INT in result (e.g. MV_STR, MV_NUM_APPROX).
 			 * If "u_orig" had MV_NUM_APPROX bit set, we do not want to inherit it in the result which should
 			 * purely be a numeric value.
 			 */
 			q->mvtype &= MV_NUM_MASK;
-=======
-			MV_FORCE_CANONICAL(q);
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
 			return;
 		}
 	} else if (exp < EXP_IDX_BIAL)

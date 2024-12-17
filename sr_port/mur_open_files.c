@@ -3,7 +3,7 @@
  * Copyright (c) 2003-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -147,48 +147,6 @@ GBLREF	jnl_gbls_t		jgbl;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	uint4			process_id;
 
-<<<<<<< HEAD
-=======
-error_def(ERR_CRITSEMFAIL);
-error_def(ERR_DBFILOPERR);
-error_def(ERR_DBFRZRESETFL);
-error_def(ERR_DBFRZRESETSUC);
-error_def(ERR_DBJNLNOTMATCH);
-error_def(ERR_DBRDONLY);
-error_def(ERR_FILENOTFND);
-error_def(ERR_FILEPARSE);
-error_def(ERR_JNLBADRECFMT);
-error_def(ERR_JNLDBTNNOMATCH);
-error_def(ERR_JNLDBSEQNOMATCH);
-error_def(ERR_JNLFILEDUP);
-error_def(ERR_JNLFILEOPNERR);
-error_def(ERR_JNLNMBKNOTPRCD);
-error_def(ERR_JNLSTATEOFF);
-error_def(ERR_JNLTNOUTOFSEQ);
-error_def(ERR_MUKILLIP);
-error_def(ERR_MUPCLIERR);
-error_def(ERR_MUPJNLINTERRUPT);
-error_def(ERR_MUSTANDALONE);
-error_def(ERR_NOPREVLINK);
-error_def(ERR_NOSTARFILE);
-error_def(ERR_NOTALLJNLEN);
-error_def(ERR_NOTALLREPLON);
-error_def(ERR_ORLBKFRZOVER);
-error_def(ERR_ORLBKFRZPROG);
-error_def(ERR_ORLBKDBUPGRDREQ);
-error_def(ERR_ORLBKSTART);
-error_def(ERR_REPLSTATEOFF);
-error_def(ERR_RLBKNOBIMG);
-error_def(ERR_ROLLBKINTERRUPT);
-error_def(ERR_STARFILE);
-error_def(ERR_SYSCALL);
-error_def(ERR_TEXT);
-error_def(ERR_WCBLOCKED);
-error_def(ERR_ORLBKRESTART);
-error_def(ERR_ORLBKREL);
-error_def(ERR_REPLPOOLINST);
-
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
 #define		STAR_QUOTE "\"*\""
 
 /* Release all locks, in general follow the direction of mur_close_files. We do not reset fields

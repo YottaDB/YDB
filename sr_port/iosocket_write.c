@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -268,12 +268,8 @@ ssize_t iosocket_output(socket_struct *socketptr, char *buffer, size_t length, b
 				socketptr->obuffer_errno = save_errno;
 				status = -1;
 				break;
-<<<<<<< HEAD
 			} else
 				eintr_handling_check();
-=======
-			}
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
 			continue;
 		} else if (0 == istatus)
 		{	/* poll timedout */

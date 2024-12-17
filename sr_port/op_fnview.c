@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -124,7 +124,6 @@ LITREF	mval		literal_null;
 #define		GTM_BOOL_RES		"GT.M Boolean short-circuit"
 #define		STD_BOOL_RES		"Standard Boolean evaluation side effects"
 #define		WRN_BOOL_RES		"Standard Boolean with side-effect warning"
-#define		EXT_BOOL_RES		"Extended Boolean evaluation without short-circuiting"
 #define		NO_REPLINST		"No replication instance defined"
 #define		STATS_MAX_DIGITS	MAX_DIGITS_IN_INT8
 #define		STATS_KEYWD_SIZE	(3 + 1 + 1)	/* 3 character mnemonic, colon and comma */
@@ -289,10 +288,6 @@ void	op_fnview(int numarg, mval *dst, ...)
 				case FULL_BOOL_WARN:
 					tmpstr.addr = WRN_BOOL_RES;
 					tmpstr.len = SIZEOF(WRN_BOOL_RES)-1;
-					break;
-				case EXT_BOOL:
-					tmpstr.addr = EXT_BOOL_RES;
-					tmpstr.len = SIZEOF(EXT_BOOL_RES)-1;
 					break;
 				default:
 					assertpro(FALSE && TREF(ydb_fullbool));

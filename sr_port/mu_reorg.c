@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -346,12 +346,8 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 					level = pre_order_successor_level;
 				}
 				max_fill = (0 == level) ? d_max_fill : i_max_fill;
-<<<<<<< HEAD
 				assert(0 <= max_fill);
-				toler = (0 == level)? d_toler : i_toler;
-=======
 				toler = (0 == level) ? d_toler : i_toler;
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
 				cur_blk_size =  ((blk_hdr_ptr_t)(gv_target->hist.h[level].buffaddr))->bsiz;
 				if ((cur_blk_size > (max_fill + toler)) && (0 == (reorg_op & NOSPLIT))) /* SPLIT BLOCK */
 				{

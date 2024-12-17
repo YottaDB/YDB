@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -68,22 +68,16 @@ void op_fnfnumber(mval *src, mval *fmt, boolean_t use_fract, int fract, mval *ds
 		*dst = *t_src_p;
 		POP_MV_STENT(); 	/* Done with temporary */
 		return;
-<<<<<<< HEAD
 	}
 	/* Reserve space in string pool to hold the destination string plus the commas,periods etc. that could get added.
 	 * Since the number of commas,periods etc. that get added is proportional to the length of the string (1/3 of the length)
 	 * to be safe, just reserve twice the space in t_src_p->str.len. But if t_src_p->str.len is too small, minor overheads
 	 * like adding "+" at beginning and parentheses around the value could become more than twice the length so take
-	 * MAX_NUM_SIZE in that case before doing the twice calculation. Hence the MAX usage below.
+	 * MAX_NUM_SIZE in that case before doing the twice calculation. Hence the MAX_NUM_SIZE * 2 usage below.
 	 */
-	ENSURE_STP_FREE_SPACE(MAX(MAX_NUM_SIZE, t_src_p->str.len) * 2);
+	ENSURE_STP_FREE_SPACE((MAX_NUM_SIZE * 2) + fract);
 	ch = (unsigned char *)t_src_p->str.addr;
 	ct = t_src_p->str.len;
-=======
-	ENSURE_STP_FREE_SPACE((MAX_NUM_SIZE * 2) + fract);
-	ch = (unsigned char *)dst->str.addr;
-	ct = dst->str.len;
->>>>>>> f9ca5ad6 (GT.M V7.1-000)
 	cp = stringpool.free;
 	fncode = 0;
 	for (ff = (unsigned char *)fmt->str.addr, ff_top = ff + fmt->str.len; ff < ff_top;)
