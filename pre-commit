@@ -2,7 +2,7 @@
 #
 #################################################################
 #                                                               #
-# Copyright (c) 2020-2024 YottaDB LLC and/or its subsidiaries.  #
+# Copyright (c) 2020-2025 YottaDB LLC and/or its subsidiaries.  #
 # All rights reserved.                                          #
 #                                                               #
 #       This source code contains the intellectual property     #
@@ -27,9 +27,9 @@ if ( ! $?gtm_dist && $?gtm_root && $?gtm_curpro ) then
 	setenv gtm_dist $gtm_root/$gtm_curpro/pro
 endif
 if ( ! $?gtm_dist && `where pkg-config` != '' ) then
-        setenv gtm_dist `pkg-config --variable=prefix yottadb --silence-errors`
-        if ("" != "$gtm_dist") then
-                setenv gtm_dist $gtmdist
+        setenv gtm_dist_tmp `pkg-config --variable=prefix yottadb --silence-errors`
+        if ("" != "$gtm_dist_tmp") then
+                setenv gtm_dist $gtm_dist_tmp
         endif
 endif
 if ( ! $?gtm_dist && -f build/yottadb ) then
