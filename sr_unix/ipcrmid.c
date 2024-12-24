@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -71,8 +71,9 @@ int sem_rmid(int ipcid)
 			{
 				if (0 != (status = REMIPC(REMOVE_SEM, ipcid)))
 				{
-					errno = status;
-					assert(FALSE);
+					assert(-1 == status);
+					PRO_ONLY(UNUSED(status));
+					assert(!MEMCMP_LIT(getenv("test_subtest_name"), "gtmsecshrsrvf-ydb_tmp-ydb1112"));
 					return -1;
 				}
 			}
@@ -81,7 +82,8 @@ int sem_rmid(int ipcid)
 #	ifdef DEBUG
 	else if (0 != (status = REMIPC(REMOVE_SEM, ipcid)))
 	{
-		errno = status;
+		assert(-1 == status);
+		PRO_ONLY(UNUSED(status));
 		assert(FALSE);
 		return -1;
 	}
@@ -112,7 +114,8 @@ int shm_rmid(int ipcid)
 			{
 				if (0 != (status = REMIPC(REMOVE_SHM, ipcid)))
 				{
-					errno = status;
+					assert(-1 == status);
+					PRO_ONLY(UNUSED(status));
 					return -1;
 				}
 			}
@@ -121,7 +124,8 @@ int shm_rmid(int ipcid)
 #	ifdef DEBUG
 	else if (0 != (status = REMIPC(REMOVE_SHM, ipcid)))
 	{
-		errno = status;
+		assert(-1 == status);
+		PRO_ONLY(UNUSED(status));
 		return -1;
 	}
 #	endif

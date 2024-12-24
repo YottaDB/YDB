@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -283,6 +283,10 @@ int send_mesg2gtmsecshr(unsigned int code, unsigned int id, char *path, int path
 			  save_errno));
 		if (0 >= num_chars_sent)
 		{	/* SENDTO_SOCK failed - start server and attempt to resend */
+			char	buff[512];
+
+			SNPRINTF(buff, SIZEOF(buff), "sendto(\"%s\")", gtmsecshr_sock_name.sun_path);
+			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_STR(buff), CALLFROM, save_errno);
 			if ((EISCONN == save_errno) || (EBADF == save_errno))
 			{
 				gtmsecshr_sock_cleanup(CLIENT);
@@ -326,6 +330,8 @@ int send_mesg2gtmsecshr(unsigned int code, unsigned int id, char *path, int path
 				}
 			} else
 			{	/* Something untoward happened */
+				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8)
+					ERR_SYSCALL, 5, LEN_AND_STR("recvfrom()"), CALLFROM, save_errno);
 				if ((EAGAIN == save_errno) || (EWOULDBLOCK == save_errno))
 				{	/* Receive timeout expired in "RECVFROM()" call before any data was received */
 					recvfrom_timedout = TRUE;

@@ -374,7 +374,7 @@ BACKUPFAIL	<MUPIP cannot start backup with the above errors>/error/fao=0!/ansi=0
 MAXARGCNT	<Maximum number of arguments !UL exceeded>/error/fao=1!/ansi=0
 GTMSECSHRSEMGET	<semget error errno = !UL>/fatal/fao=1!/ansi=0
 VIEWARGCNT	<View parameter !AD has inappropriate number of subparameters>/error/fao=2!/ansi=0
-GTMSECSHRDMNSTARTED	<gtmsecshr daemon started (key: 0x!XL) for version !AD from !AD>/info/fao=5!/ansi=0
+GTMSECSHRDMNSTARTED	<gtmsecshr daemon started for version !AD from !AD using socket file !AZ>/info/fao=5!/ansi=0
 ZATTACHERR	<Error attaching to "!AD">/error/fao=2!/ansi=0
 ZDATEFMT	<$ZDATE format string contains invalid character>/error/fao=0!/ansi=0
 ZEDFILSPEC	<Illegal ZEDIT file specification: !AD> /error/fao=2!/ansi=0

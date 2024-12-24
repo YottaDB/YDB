@@ -210,7 +210,7 @@ LITDEF	err_msg merrors[] = {
 	{ "MAXARGCNT", "Maximum number of arguments !UL exceeded", 1, 0 },
 	{ "GTMSECSHRSEMGET", "semget error errno = !UL", 1, 0 },
 	{ "VIEWARGCNT", "View parameter !AD has inappropriate number of subparameters", 2, 0 },
-	{ "GTMSECSHRDMNSTARTED", "gtmsecshr daemon started (key: 0x!XL) for version !AD from !AD", 5, 0 },
+	{ "GTMSECSHRDMNSTARTED", "gtmsecshr daemon started for version !AD from !AD using socket file !AZ", 5, 0 },
 	{ "ZATTACHERR", "Error attaching to \"!AD\"", 2, 0 },
 	{ "ZDATEFMT", "$ZDATE format string contains invalid character", 0, 0 },
 	{ "ZEDFILSPEC", "Illegal ZEDIT file specification: !AD", 2, 0 },

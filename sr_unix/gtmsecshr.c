@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -542,7 +542,16 @@ void gtmsecshr_init(char_ptr_t argv[], char **rundir, int *rundir_len)
 	STR_HASH((char *)ydb_release_name, ydb_release_name_len, TREF(gtmsecshr_comkey), 0);
 	/* Initialization complete */
 	send_msg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_GTMSECSHRDMNSTARTED, 5,
-		gtmsecshr_key, ydb_release_name_len, ydb_release_name, *rundir_len, *rundir);
+		ydb_release_name_len, ydb_release_name, *rundir_len, *rundir, gtmsecshr_sock_name.sun_path);
+	/* Note down $ydb_tmp env var value at time of successful server startup through a GTMSECSHRTMPPATH syslog message.
+	 * Will later help in case other clients with different values of $ydb_tmp try starting the server. They will
+	 * log another GTMSECSHRTMPPATH message and that can be compared against this original GTMSECSHRTMPPATH syslog message.
+	 */
+	if (ydb_tmp_ptr = ydb_getenv(YDBENVINDX_TMP_ONLY, NULL_SUFFIX, NULL_IS_YDB_ENV_MATCH))	/* Warning - assignment */
+		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_GTMSECSHRTMPPATH, 2,
+			RTS_ERROR_TEXT(ydb_tmp_ptr), ERR_TEXT, 2, RTS_ERROR_TEXT("(from $ydb_tmp/$gtm_tmp)"));
+	else
+		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_GTMSECSHRTMPPATH, 2, RTS_ERROR_TEXT("/tmp"));
 	return;
 }
 
