@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-; Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	;
+; Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	;
 ; All rights reserved.						;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -187,6 +187,59 @@ set	; Intended to be the most common entry point to this routine (with unset lik
 	do ExportEnv("ydb_retention",ydbretention),ExportEnv("gtm_retention",ydbretention)
 	; set ydb_readline
 	do ExportEnv("ydb_readline",1)
+	; ------------------------------------------------------------------------------
+	; Set ydb_log/gtm_log/ydb_tmp/gtm_tmp env vars. Note that we need to do this
+	; BEFORE any Robustify or PEEKBYNAME call as that can require gtmseshr to remove
+	; an ipc (e.g. ftok semaphore of gtmhelp.dat created by another user) and in that
+	; case ydb_tmp env var needs to be set to the appropriate value for the correct
+	; socket file to be used to communicate with gtmsecshr (YDB#1112).
+	;
+	; ydb_log is set here, with the directory structure created if it does not exist
+	; ydb_tmp is set to the same value as ydb_log if not already set.
+	set tmp1=$get(currenv(("ydb_log"))),tmp2=$get(currenv(("gtm_log")))
+	set (tmp3,tmp4)=$select($zlength(tmp1):tmp1,$zlength(tmp2):tmp2,1:"/tmp/yottadb/"_env("ydb_rel"))
+	set tmp1=$get(currenv(("ydb_tmp_rel"))),tmp2=$get(currenv(("ydb_tmp_gtmver")))
+	do:$zlength(tmp1)
+	. set tmp4=$zpiece(tmp3,tmp1,1) for i=2:1:$zlength(tmp3,tmp1) set tmp4=tmp4_env("ydb_rel")_$zpiece(tmp3,tmp1,i)
+	. set tmp3=tmp4
+	if $zlength(tmp2) set tmp4=$zpiece(tmp3,tmp2,1) for i=2:1:$zlength(tmp3,tmp2) set tmp4=tmp4_env("gtmver")_$zpiece(tmp3,tmp2,i)
+	do:""=$zsearch(tmp4,-1)
+	. ; Release-specific directory (e.g. /tmp/yottadb/r1.23_x86_64) does not exist. Create it.
+	. ; Note: One might be tempted to combine the "umask" and "chmod o-rwx" commands below into one "umask command
+	. ;       But that might not be correct in case we also create /tmp/yottadb as part of the below "mkdir".
+	. ;       In that case, we do not want to create /tmp/yottadb with no world execute permissions because the
+	. ;       current YottaDB version is installed with no execute permissions for the world. Later if a different
+	. ;       YottaDB version gets installed with execute permissions for the world, a ydb_env_set invocation using
+	. ;       that version might not be able to access /tmp/yottadb with the restricted chmod. Hence we first do the
+	. ;       mkdir with a "umask 0" and later do a chmod of just the subdirectory /tmp/yottadb/r1.23_x86_64.
+	. open "mkdir":(shell="/bin/sh":command="umask 0; mkdir -p "_tmp4:readonly:writeonly)::"pipe"
+	. close "mkdir"
+	. new line,worldexecute,ydbgroup
+	. open "file":(shell="/bin/sh":command="ls -l "_dist_"/libyottadb.so":readonly)::"pipe"
+	. use "file" read line use io close "file"
+	. set worldexecute=$zextract(line,10)	; permissions are the first word in "line" so no need to do $zpiece before $zextract
+	. set ydbgroup=$zpiece(line," ",4)
+	. if "x"'=worldexecute do
+	. . ; $ydb_dist/libyottadb.so does not have world execute permissions, restrict directory access to only user and group
+	. . open "chmod":(shell="/bin/sh":command="chmod o-rwx "_tmp4:readonly:writeonly)::"pipe"
+	. . close "chmod"
+	. . ; ---------------------------------------------------------------------------------
+	. . ; If currently running user is part of the group that libyottadb.so belongs to,
+	. . ; then change the group of the created directory to the yottadb group. If not,
+	. . ; we cannot change the group (chgrp would error out) so skip this step in that case.
+	. . new user,index,membergroup
+	. . open "file":(shell="/bin/sh":command="id":readonly)::"pipe"
+	. . use "file" read line use io close "file"
+	. . set user=$zpiece($zpiece(line,")",1),"(",2)
+	. . set grouplist=$zpiece(line," groups=",2)	; gets list of group names that "user" is a member of
+	. . ; Since every group is surrounded by parentheses all we need to do is check if "(ydbgroup)" exists in "grouplist"
+	. . do:$zfind(grouplist,"("_ydbgroup_")")
+	. . . open "chgrp":(shell="/bin/sh":command="chgrp "_ydbgroup_" "_tmp4:readonly:writeonly)::"pipe"
+	. . . close "chgrp"
+	do ExportEnv("ydb_log",tmp4),ExportEnv("gtm_log",tmp4),ExportEnv("ydb_tmp",tmp4),ExportEnv("gtm_tmp",tmp4)
+	; Set ydb_tmp env var before any calls to Robustify/PEEKBYNAME (YDB#1112)
+	view "setenv":"ydb_tmp":tmp4
+	; ------------------------------------------------------------------------------
 	; ydb_gbldir is set here after setting ydb_repl_instance and
 	; ydb_retention because if an environment exists (determined
 	; by the existence of a global directory), Robustify needs
@@ -254,49 +307,6 @@ set	; Intended to be the most common entry point to this routine (with unset lik
 	. if $zlength(tmp2) set path=path_" "_tmp2
 	. else  set path=path_" "_tmp1
 	do ExportEnv("ydb_routines",path),ExportEnv("gtmroutines",path)
-	; ydb_log is set here, with the directory structure created if it does not exist
-	; ydb_tmp is set to the same value as ydb_log
-	set tmp1=$get(currenv(("ydb_log"))),tmp2=$get(currenv(("gtm_log")))
-	set (tmp3,tmp4)=$select($zlength(tmp1):tmp1,$zlength(tmp2):tmp2,1:"/tmp/yottadb/"_env("ydb_rel"))
-	set tmp1=$get(currenv(("ydb_tmp_rel"))),tmp2=$get(currenv(("ydb_tmp_gtmver")))
-	do:$zlength(tmp1)
-	. set tmp4=$zpiece(tmp3,tmp1,1) for i=2:1:$zlength(tmp3,tmp1) set tmp4=tmp4_env("ydb_rel")_$zpiece(tmp3,tmp1,i)
-	. set tmp3=tmp4
-	if $zlength(tmp2) set tmp4=$zpiece(tmp3,tmp2,1) for i=2:1:$zlength(tmp3,tmp2) set tmp4=tmp4_env("gtmver")_$zpiece(tmp3,tmp2,i)
-	do:""=$zsearch(tmp4,-1)
-	. ; Release-specific directory (e.g. /tmp/yottadb/r1.23_x86_64) does not exist. Create it.
-	. ; Note: One might be tempted to combine the "umask" and "chmod o-rwx" commands below into one "umask command
-	. ;       But that might not be correct in case we also create /tmp/yottadb as part of the below "mkdir".
-	. ;       In that case, we do not want to create /tmp/yottadb with no world execute permissions because the
-	. ;       current YottaDB version is installed with no execute permissions for the world. Later if a different
-	. ;       YottaDB version gets installed with execute permissions for the world, a ydb_env_set invocation using
-	. ;       that version might not be able to access /tmp/yottadb with the restricted chmod. Hence we first do the
-	. ;       mkdir with a "umask 0" and later do a chmod of just the subdirectory /tmp/yottadb/r1.23_x86_64.
-	. open "mkdir":(shell="/bin/sh":command="umask 0; mkdir -p "_tmp4:readonly:writeonly)::"pipe"
-	. close "mkdir"
-	. new line,worldexecute,ydbgroup
-	. open "file":(shell="/bin/sh":command="ls -l "_dist_"/libyottadb.so":readonly)::"pipe"
-	. use "file" read line use io close "file"
-	. set worldexecute=$zextract(line,10)	; permissions are the first word in "line" so no need to do $zpiece before $zextract
-	. set ydbgroup=$zpiece(line," ",4)
-	. if "x"'=worldexecute do
-	. . ; $ydb_dist/libyottadb.so does not have world execute permissions, restrict directory access to only user and group
-	. . open "chmod":(shell="/bin/sh":command="chmod o-rwx "_tmp4:readonly:writeonly)::"pipe"
-	. . close "chmod"
-	. . ; ---------------------------------------------------------------------------------
-	. . ; If currently running user is part of the group that libyottadb.so belongs to,
-	. . ; then change the group of the created directory to the yottadb group. If not,
-	. . ; we cannot change the group (chgrp would error out) so skip this step in that case.
-	. . new user,index,membergroup
-	. . open "file":(shell="/bin/sh":command="id":readonly)::"pipe"
-	. . use "file" read line use io close "file"
-	. . set user=$zpiece($zpiece(line,")",1),"(",2)
-	. . set grouplist=$zpiece(line," groups=",2)	; gets list of group names that "user" is a member of
-	. . ; Since every group is surrounded by parentheses all we need to do is check if "(ydbgroup)" exists in "grouplist"
-	. . do:$zfind(grouplist,"("_ydbgroup_")")
-	. . . open "chgrp":(shell="/bin/sh":command="chgrp "_ydbgroup_" "_tmp4:readonly:writeonly)::"pipe"
-	. . . close "chgrp"
-	do ExportEnv("ydb_log",tmp4),ExportEnv("gtm_log",tmp4),ExportEnv("ydb_tmp",tmp4),ExportEnv("gtm_tmp",tmp4)
 	; ydb_etrap & ydb_procstuckexec are set here, followed by miscellaneous environment variables
 	set tmp1=$select($data(currenv("ydb_etrap")):currenv("ydb_etrap"),$data(currenv("gtm_etrap")):currenv("gtm_etrap"),1:"Write:(0=$STACK) ""Error occurred: "",$ZStatus,!")
 	do ExportEnv("ydb_etrap",tmp1),ExportEnv("gtm_etrap",tmp1)
