@@ -840,7 +840,7 @@ LITDEF	err_msg merrors[] = {
 	{ "CONNSOCKREQ", "Socket not connected", 0, 0 },
 	{ "REPLEXITERR", "Replication process encountered an error while exiting", 0, 0 },
 	{ "MUDESTROYSUC", "Global section (!AD) corresponding to file !AD successfully destroyed", 4, 0 },
-	{ "DBRNDWN", "Error during global database rundown for region !AD.!/Notify those responsible for proper database operation.", 2, 0 },
+	{ "DBRNDWN", "Error during global database rundown for region !AD. Notify those responsible for proper database operation.", 2, 0 },
 	{ "MUDESTROYFAIL", "Global section (!AD) corresponding to file !AD failed to be destroyed", 4, 0 },
 	{ "NOTALLDBOPN", "Not all required database files were opened", 0, 0 },
 	{ "MUSELFBKUP", "Database file !AD can not be backed upon itself", 2, 0 },

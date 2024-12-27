@@ -1004,7 +1004,7 @@ UNUSEDMSG1003	<EXTRCLOSEERR nixed in r1.20 because it is a VMS only error>/error
 CONNSOCKREQ	<Socket not connected>/error/fao=0!/ansi=0
 REPLEXITERR	<Replication process encountered an error while exiting>/error/fao=0!/ansi=0
 MUDESTROYSUC	<Global section (!AD) corresponding to file !AD successfully destroyed>/info/fao=4!/ansi=0
-DBRNDWN		<Error during global database rundown for region !AD.!/Notify those responsible for proper database operation.>/error/fao=2!/ansi=0
+DBRNDWN		<Error during global database rundown for region !AD. Notify those responsible for proper database operation.>/error/fao=2!/ansi=0
 MUDESTROYFAIL	<Global section (!AD) corresponding to file !AD failed to be destroyed>/info/fao=4!/ansi=0
 NOTALLDBOPN	<Not all required database files were opened>/fatal/fao=0!/ansi=0
 MUSELFBKUP	<Database file !AD can not be backed upon itself>/error/fao=2!/ansi=0
