@@ -1,8 +1,32 @@
 # YottaDB
 
+YottaDB is the fastest, highest consistency data store for applications with thousands to millions of concurrent users. 
+
 All software in this package is part of YottaDB (https://yottadb.com) each
 file of which identifies its copyright holders. The software is made available
 to you under the terms of a license. Refer to the [LICENSE](LICENSE) file for details.
+
+## Why use YottaDB? 
+
+YottaDB is a hierachical database that doesn't force you to choose between consistency, reliability or performance, even with millions of concurrent users. 
+
+### The best data consistency for systems with millions of concurrent users
+
+YottaDB is not a distributed database. It runs in process, on one node and does not scale horizontally. It also has completely automated retry logic that is included out of the box and an optimisitc concurrency model. This means that YottaDB can handle ACID transations, including in systems with millions of concurrent users. 
+
+### High performance at massive scale
+
+Because YottaDB runs in process and does not scale horizontally, it remains high performance even with millions of concurrent users. 
+
+### Data layer flexibility throughout the application lifecycle
+
+Unlike many database engines, YottaDB gives you a lot of flexibility in your data layer both at the time of the application incitial creation as well as throughout the entire lifecycle. Part of this is thanks to the hierachical key value data structure, but it is also because configurations are handled via environment variables and permissions are implemented in either the application layer or at the operating system level rather than in the database itself. 
+
+## Who uses YottaDB? 
+
+YottaDB is used primarily in large scale healthcare and financial services applications where data consistency is critical. 
+
+## Getting started 
 
 Homepage: https://gitlab.com/YottaDB/DB/YDB
 
