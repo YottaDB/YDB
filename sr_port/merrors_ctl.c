@@ -228,7 +228,7 @@ LITDEF	err_msg merrors[] = {
 	{ "ZPRTLABNOTFND", "Label not found in routine", 0, 0 },
 	{ "VIEWAMBIG", "View parameter !AD is ambiguous", 2, 0 },
 	{ "VIEWNOTFOUND", "View parameter !AD not valid", 2, 0 },
-	{ "ZCPREALLVALSTR", "Pre-allocation allowed only for output or input/output variables of type ydb_buffer_t*, ydb_string_t*, or ydb_char_t*", 0, 0 },
+	{ "UNUSEDMSG395", "ZSETPRVARGBAD nixed in r1.20 because it is a VMS only error", 0, 0 },
 	{ "INVSPECREC", "!AD Invalid global modifier record", 2, 0 },
 	{ "UNUSEDMSG397", "ZSETPRVSYNTAX nixed in r1.20 because it is a VMS only error", 0, 0 },
 	{ "ZSRCHSTRMCT", "Search stream identifier out of range", 0, 0 },

@@ -1,9 +1,9 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries.*
+ * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -69,6 +69,7 @@ LITDEF	err_msg ydberrors[] = {
 	{ "ARGSLONGLINE", "Entered line is greater than maximum characters allowed (!UL)", 1, 0 },
 	{ "ZGBLDIRUNDEF", "Global Directory env var $ydb_gbldir/$gtmgbldir is undefined", 0, 0 },
 	{ "SHEBANGMEXT", "!AZ needs a .m extension to be a valid shebang script", 1, 0 },
+	{ "ZCPREALLVALSTR", "Pre-allocation allowed only for output or input/output variables of type ydb_buffer_t*, ydb_string_t*, or ydb_char_t*", 0, 0 },
 };
 
 
@@ -81,7 +82,7 @@ GBLDEF	err_ctl ydberrors_ctl = {
 	256,
 	"YDB",
 	&ydberrors[0],
-	52,
+	53,
 	&ydberrors_undocarr[0],
 	0
 };

@@ -3,7 +3,7 @@
 ! Copyright (c) 2001-2017 Fidelity National Information		!
 ! Services, Inc. and/or its subsidiaries. All rights reserved.	!
 !								!
-! Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries.	!
+! Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries.	!
 ! All rights reserved.						!
 !								!
 !	This source code contains the intellectual property	!
@@ -78,6 +78,7 @@ MUTRUNCALREADY	<Region !AD: no further truncation possible>/info/fao=2
 ARGSLONGLINE	<Entered line is greater than maximum characters allowed (!UL)>/warning/fao=1
 ZGBLDIRUNDEF	<Global Directory env var $ydb_gbldir/$gtmgbldir is undefined>/error/fao=0
 SHEBANGMEXT	<!AZ needs a .m extension to be a valid shebang script>/error/fao=1
+ZCPREALLVALSTR	<Pre-allocation allowed only for output or input/output variables of type ydb_buffer_t*, ydb_string_t*, or ydb_char_t*>/error/fao=0
 !
 ! If there are UNUSEDMSG* lines unused for more than one year and at least two non-patch releases, use them before adding new lines.
 !

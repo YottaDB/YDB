@@ -226,7 +226,7 @@ const static readonly int error_ansi[] = {
 	  13,	/* ZPRTLABNOTFND */
 	   0,	/* VIEWAMBIG */
 	   0,	/* VIEWNOTFOUND */
-	   0,	/* ZCPREALLVALSTR */
+	   0,	/* UNUSEDMSG395 */
 	   0,	/* INVSPECREC */
 	   0,	/* UNUSEDMSG397 */
 	   0,	/* ZSRCHSTRMCT */

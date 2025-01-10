@@ -1,9 +1,9 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries.*
+ * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -65,3 +65,4 @@
 #define ERR_ARGSLONGLINE 151028112
 #define ERR_ZGBLDIRUNDEF 151028122
 #define ERR_SHEBANGMEXT 151028130
+#define ERR_ZCPREALLVALSTR 151028138
