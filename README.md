@@ -26,6 +26,8 @@ Unlike many database engines, YottaDB gives you a lot of flexibility in your dat
 
 YottaDB is used primarily in large scale healthcare and financial services applications where data consistency is critical. 
 
+[Government Savings Bank] (https://www.gsb.or.th/en/) is a major bank in Thailand with over 60 million accounts. While most banks actually use a batch system that is updated daily, GSB has a true real-time system that is able to handle millions of concurrent users without reducation in performance or reliability. 
+
 ## Getting started 
 
 Homepage: https://gitlab.com/YottaDB/DB/YDB
