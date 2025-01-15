@@ -1332,7 +1332,7 @@ LOCKSPACEFULL	<No more room for LOCK slots on database file !AD>/error/fao=2!/an
 IOERROR		<Error occured while doing !AD in !AD operation -- called from module !AD at line !UL>/error/fao=7!/ansi=0
 MAXSSREACHED	<Maximum snapshots - !UL - for region !AD reached. Please wait for the existing snapshots to complete before starting a new one.>/error/fao=3!/ansi=0
 UNUSEDMSG1332	<SNAPSHOTNOV4 last used in V6.3-014 Oct 2022>/error/fao=0!/ansi=0
-DBUPGRDREQ	<Database file !AD is not fully upgraded (format !AZ) and cannot be used by this version of GT.M. Please upgrade the database.>/error/fao=3!/ansi=0
+DBUPGRDREQ	<Database file !AD is not fully upgraded (format !AZ) and cannot be used by this version of YottaDB. Please upgrade the database.>/error/fao=3!/ansi=0
 SSTMPDIRSTAT	<Cannot access temporary directory !AD>/error/fao=2!/ansi=0//1
 SSTMPCREATE	<Cannot create the temporary file in directory !AD for the requested snapshot>/error/fao=2!/ansi=0//1
 JNLFILEDUP	<Journal files !AD and !AD are the same>/error/fao=4!/ansi=0

@@ -1168,7 +1168,7 @@ LITDEF	err_msg merrors[] = {
 	{ "IOERROR", "Error occured while doing !AD in !AD operation -- called from module !AD at line !UL", 7, 0 },
 	{ "MAXSSREACHED", "Maximum snapshots - !UL - for region !AD reached. Please wait for the existing snapshots to complete before starting a new one.", 3, 0 },
 	{ "UNUSEDMSG1332", "SNAPSHOTNOV4 last used in V6.3-014 Oct 2022", 0, 0 },
-	{ "DBUPGRDREQ", "Database file !AD is not fully upgraded (format !AZ) and cannot be used by this version of GT.M. Please upgrade the database.", 3, 0 },
+	{ "DBUPGRDREQ", "Database file !AD is not fully upgraded (format !AZ) and cannot be used by this version of YottaDB. Please upgrade the database.", 3, 0 },
 	{ "SSTMPDIRSTAT", "Cannot access temporary directory !AD", 2, 0 },
 	{ "SSTMPCREATE", "Cannot create the temporary file in directory !AD for the requested snapshot", 2, 0 },
 	{ "JNLFILEDUP", "Journal files !AD and !AD are the same", 4, 0 },
