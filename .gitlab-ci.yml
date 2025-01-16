@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
@@ -76,16 +76,6 @@ commit-verify:
 
 clang-tidy-amd64:
   extends: .clang-tidy
-
-# We run this job only on master since it's slow (30 minutes)
-clang-tidy-aarch64:
-  # Override default runner timeout of 1 hour since this job has sometimes timed out
-  timeout: 3h
-  extends: .clang-tidy
-  tags:
-    - aarch64
-  only:
-    - master@YottaDB/DB/YDB
 
 build-test:
   stage: build
