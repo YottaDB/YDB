@@ -28,6 +28,7 @@ void dec_err(uint4 argcnt, ...)
 	util_out_print(NULL, RESET, NULL);	    /* reset the buffer */
 	VAR_START(var, argcnt);
 	gtm_putmsg_list(NULL, argcnt, var);
+	va_end(var);
 	util_out_print(NULL, FLUSH);
 
 }

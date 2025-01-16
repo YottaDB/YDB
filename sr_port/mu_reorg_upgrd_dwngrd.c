@@ -632,7 +632,8 @@ enum cdb_sc find_gvt_roots(block_id *curr_blk, gd_region *reg, cache_rec_ptr_t *
 					REG_LEN_STR(reg), curr_blk, lcl_gv_trees);
 		gv_trees = lcl_gv_trees;
 		return cdb_sc_normal;					/* done with this level 0 dt block; return up a level */
-	}
+	} else
+		status = cdb_sc_normal;
 	assert(level);
 	if (debug_mupip)
 		util_out_print("Region !AD: DT level !UL block 0x!@XQ\tprocessing GVTs", TRUE, REG_LEN_STR(reg), level, curr_blk);
