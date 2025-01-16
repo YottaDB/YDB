@@ -139,7 +139,7 @@ int4	mu_upgrade_bmm(gd_region *reg, size_t blocks_needed)
 	bt_rec_ptr_t		bt;
 	cache_rec_ptr_t		cr, child_cr = NULL;
 	gtm_int8		bmm_byte_adjust, extend;
-	gvnh_reg_t		*gvnh_reg;
+	gvnh_reg_t		*gvnh_reg = NULL;
 	gv_namehead		*gvt;
 	int			*blks_to_mv_levl_ptr[OLD_MAX_BT_DEPTH], currKeySize, cycle, i,
 				key_cmpc, key_len, lev, level, rec_sz, save_errno, *skipped_killed_ptr = NULL;
@@ -1046,7 +1046,7 @@ enum cdb_sc ditch_dead_globals(block_id curr_blk, block_id offset, cache_rec_ptr
 	boolean_t		is_bg, long_blk_id;
 	bt_rec_ptr_t		bt;
 	cache_rec_ptr_t		child_cr = NULL;
-	gvnh_reg_t		*gvnh_reg;
+	gvnh_reg_t		*gvnh_reg = NULL;
 	int			blk_kill_cnt, blk_seg_cnt, blk_size, blk_sz, key_cmpc, key_len, rec_sz, rec_offset;
 	int4			i, status;
 	mname_entry		gvname;
@@ -1352,7 +1352,7 @@ enum cdb_sc upgrade_dir_tree(block_id curr_blk, block_id offset, gd_region *reg,
 	cache_rec		dummy_dt_cr;
 	cache_rec_ptr_t		child_cr = NULL;
 	enum db_ver		blk_ver;
-	gvnh_reg_t		*gvnh_reg;
+	gvnh_reg_t		*gvnh_reg = NULL;
 	int			adjust, blk_seg_cnt, blk_sz, count, level, split_blks_added, split_levels_added, key_cmpc,
 				key_cmpc_sib, key_len, key_len_sib, rec_offset, rec_sz, rec_sz_sib, space_need, v7_rec_sz;
 	int4			blk_size, status;

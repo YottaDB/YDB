@@ -731,7 +731,7 @@ enum cdb_sc upgrade_idx_block(block_id *curr_blk, gd_region *reg, mname_entry *g
 	cache_rec	dummy_gvt_cr, curr_blk_cr;
 	cache_rec_ptr_t	child_cr;
 	enum db_ver	blk_ver;
-	gvnh_reg_t	*gvnh_reg;
+	gvnh_reg_t	*gvnh_reg = NULL;
 	int		blk_seg_cnt, i, key_cmpc, key_len, level, new_blk_sz, num_recs, rec_sz, space_need,
 			split_blks_added, split_levels_added, v7_rec_sz;
 	int4		blk_size, child_data_blks, status;

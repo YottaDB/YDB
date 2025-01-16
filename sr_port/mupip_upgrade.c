@@ -171,8 +171,11 @@ void mupip_upgrade(void)
 	TREF(statshare_opted_in) = NO_STATS_OPTIN;	/* Do not open statsdb automatically when basedb is opened */
 	gvinit();					/* initialize gd_header (needed by the later call to mu_getlst) and gv_keysize */
 	if ((file == region) && (TRUE == file))
+	{
 		mupip_exit(ERR_MUQUALINCOMP);
-	else if (file)
+		assert(FALSE);
+		rptr = NULL;	/* to silence [-Wsometimes-uninitialized] compiler warning */
+	} else if (file)
 	{
 		mu_gv_cur_reg_init();
 		seg = gv_cur_region->dyn.addr;

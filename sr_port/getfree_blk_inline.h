@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2025 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -11,7 +14,7 @@
  ****************************************************************/
 
 #ifndef GETFREE_INLINE_BLK_INCLUDED
-#define GETFREE_INLINE_BLK_NCLUDED
+#define GETFREE_INLINE_BLK_INCLUDED
 
 #define	RETURN_IF_FREE(VALID, PTR, BASE_ADDR)			\
 MBSTART{							\

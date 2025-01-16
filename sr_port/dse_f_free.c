@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2025 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -42,7 +45,7 @@ void dse_f_free(void)
 	block_id	blk, hint;
 	char		util_buff[MAX_UTIL_LEN];
 	int4		bplmap;
-	int4		lmap_bit, nocrit_present, util_len;
+	int4		lmap_bit, nocrit_present, util_len = 0;
 
 	DSE_DB_IS_TOO_OLD(cs_addrs, cs_data, gv_cur_region);
 	nocrit_present = (CLI_NEGATED == cli_present("CRIT"));
