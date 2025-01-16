@@ -888,7 +888,7 @@ tn_restart:
 		SET_CMPC(curr_rec_hdr, 0);
 		BLK_INIT(bs_ptr, bs1);
 		BLK_SEG(bs_ptr, (sm_uc_ptr_t)curr_rec_hdr, SIZEOF(rec_hdr));
-		BLK_SEG(bs_ptr, (unsigned char *)&zeroes_blkid_collhdr, db_long_blk_id ? SIZEOF(block_id_64) : SIZEOF(block_id_32));
+		BLK_SEG_ZERO(bs_ptr, db_long_blk_id ? SIZEOF(block_id_64) : SIZEOF(block_id_32));
 		if (0 == BLK_FINI(bs_ptr, bs1))
 		{
 			assert(CDB_STAGNATE > t_tries);
@@ -1944,7 +1944,7 @@ tn_restart:
 							memcpy(va, ((sm_uc_ptr_t)rp + rec_size) - value.len, value.len);
 							BLK_SEG(bs_ptr, (unsigned char *)va, value.len);
 						} else
-							BLK_SEG(bs_ptr, (unsigned char *)&zeroes_blkid_collhdr, blk_id_sz);
+							BLK_SEG_ZERO(bs_ptr, blk_id_sz);
 					} else
 						BLK_SEG(bs_ptr, (sm_uc_ptr_t)rp + rec_size - blk_id_sz, blk_id_sz);
 				}
@@ -2673,12 +2673,12 @@ tn_restart:
 				BLK_ADDR(cp1, target_key_size, unsigned char);
 				memcpy(cp1, temp_key->base, target_key_size);
 				BLK_SEG(bs_ptr, cp1, target_key_size);
-				BLK_SEG(bs_ptr, (unsigned char *)&zeroes_blkid_collhdr, blk_id_sz);
+				BLK_SEG_ZERO(bs_ptr, blk_id_sz);
 				BLK_ADDR(next_rec_hdr, SIZEOF(rec_hdr), rec_hdr);
 				next_rec_hdr->rsiz = bstar_rec_size(long_blk_id);
 				SET_CMPC(next_rec_hdr, 0);
 				BLK_SEG(bs_ptr, (sm_uc_ptr_t)next_rec_hdr, SIZEOF(rec_hdr));
-				BLK_SEG(bs_ptr, (unsigned char *)&zeroes_blkid_collhdr, blk_id_sz);
+				BLK_SEG_ZERO(bs_ptr, blk_id_sz);
 				if (0 == BLK_FINI(bs_ptr, bs1))
 				{
 					assert(CDB_STAGNATE > t_tries);

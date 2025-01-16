@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2025 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -61,7 +64,6 @@ enum cdb_sc	gvcst_kill_blk(srch_blk_status	*blkhist,
 	blk_hdr_ptr_t			old_blk_hdr;
 	blk_segment			*bs1, *bs_ptr;
 	block_id			blk, temp_blk;
-	const char			zeroes_blkid_collhdr[sizeof(block_id_64) + COLL_SPEC_LEN] = {0}; /* used with various len */
 	block_index			new_block_index;
 	bool				kill_root, first_copy;
 	cw_set_element			*cse, *old_cse;
@@ -216,7 +218,7 @@ enum cdb_sc	gvcst_kill_blk(srch_blk_status	*blkhist,
 		SET_CMPC(new_rec_hdr, 0);
 		BLK_INIT(bs_ptr, bs1);
 		BLK_SEG(bs_ptr, (sm_uc_ptr_t)new_rec_hdr, SIZEOF(rec_hdr));
-		BLK_SEG(bs_ptr, (sm_uc_ptr_t)&zeroes_blkid_collhdr, blk_id_sz);
+		BLK_SEG_ZERO(bs_ptr, blk_id_sz);
 		if (!BLK_FINI(bs_ptr, bs1))
 		{
 			assert(CDB_STAGNATE > t_tries);

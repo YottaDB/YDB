@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2023-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -226,6 +226,17 @@ typedef struct
 	(X) = (Z*)update_array_ptr, update_array_ptr += (INTPTR_T)Y			\
 )
 #endif
+
+#define	BLK_SEG_ZERO(BNUM, LEN)				\
+{							\
+	unsigned char	*bAddr;				\
+	int		bLen;				\
+							\
+	bLen = LEN;					\
+	BLK_ADDR(bAddr, bLen, unsigned char);		\
+	memset(bAddr, 0, bLen);				\
+	BLK_SEG(BNUM, bAddr, bLen);			\
+}
 
 /* ********************************************************************************
  *
