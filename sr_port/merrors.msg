@@ -630,7 +630,7 @@ TERMWRITE	<Error writing to terminal>/error/fao=0!/ansi=0
 COLLTYPVERSION	<Collation type !UL, version !UL mismatch>/error/fao=2!/ansi=0
 LVNULLSUBS	<Null subscripts not allowed in local variables>/error/fao=0!/ansi=0
 GVREPLERR	<Error replicating global in region !AD>/error/fao=2!/ansi=0
-UNUSEDMSG633	<DBFILERDONLY error nixed in YottaDB r1.36 (still in use in GT.M)>/error/fao=3!/ansi=0
+DBFILERDONLY	<The database file !AD was opened as read-only (perms !UL)>/error/fao=3!/ansi=0
 RMWIDTHPOS	<File record size or width must be greater than zero>/error/fao=0!/ansi=72
 OFFSETINV	<Entry point !AD+!SL not valid>/error/fao=3!/ansi=13
 JOBPARTOOLONG	<Total parameter length is too long for job command>/error/fao=0!/ansi=0
