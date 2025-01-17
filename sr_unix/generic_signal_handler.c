@@ -355,11 +355,8 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context, boolean_t i
 				{
 					sys_get_curr_time(&mu_stop_timer);
 					mu_stop_tm_array[0] = sub_abs_time(&mu_stop_timer, &mu_stop_tm_array[0]);
-					/* MUPIP STOP three times within a minute logs the event and acts like a kill -9 */
-					if (MINUTE > mu_stop_tm_array[0].tv_sec)
-						send_msg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_FORCEDHALT2, 2,
-								mu_stop_tm_array[0].tv_sec, process_id);
-					else
+					/* MUPIP STOP three times within a minute acts like a kill -9 */
+					if (MINUTE <= mu_stop_tm_array[0].tv_sec)
 					{
 						mu_stop_tm_array[0] = mu_stop_tm_array[1];
 						mu_stop_tm_array[1] = mu_stop_timer;
