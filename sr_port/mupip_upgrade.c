@@ -190,7 +190,7 @@ void mupip_upgrade(void)
 		insert_region(gv_cur_region, &(grlist), NULL, SIZEOF(tp_region));
 	} else
 	{	/* Region required */
-		mu_getlst("WHAT", SIZEOF(tp_region));
+		mu_getlst("REGION", SIZEOF(tp_region));
 		rptr = grlist;	/* setup of grlist down implicitly by insert_region() called in mu_getlst() */
 		if (error_mupip)
 		{
