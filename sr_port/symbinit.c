@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -29,6 +29,7 @@
 #include "gdsbt.h"
 #include "gdsfhead.h"
 #include "alias.h"
+#include "dollar_zlevel.h"
 
 #define MVST_STAB_SIZE (SIZEOF(*mv_chain) - SIZEOF(mv_chain->mv_st_cont) + SIZEOF(mv_chain->mv_st_cont.mvs_stab))
 
@@ -172,6 +173,7 @@ int4 symbinit(void)
 		ptr->symvlvl = curr_symval->symvlvl + 1;
 	else
 		ptr->symvlvl = 1;
+	ptr->stack_level = dollar_zlevel() - 1;
 	GTMTRIG_ONLY(ptr->trigr_symval = FALSE);
 	ptr->alias_activity = FALSE;
 	DBGRFCT((stderr,"symbinit: Allocated new symbol table at 0x"lvaddr" pushing old symbol table on M stack (0x"lvaddr")\n",

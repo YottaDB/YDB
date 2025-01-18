@@ -2,7 +2,7 @@
 ;								;
 ; Copyright 2001, 2014 Fidelity Information Services, Inc	;
 ;								;
-; Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries.	;
+; Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries.	;
 ; All rights reserved.						;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -212,6 +212,7 @@ OC_FNLENGTH:	pushab	val.0
 		pushab	val.1
 		calls	#2,xfer.xf_fnlength
 OC_FNLVNAME:	pushab	val.0
+		pushl	#0
 		pushl	val.2
 		pushab	val.1
 		calls	#3,xfer.xf_fnlvname
@@ -629,7 +630,8 @@ OC_INDO2:	pushab	val.2
 OC_INDPAT:	pushab	val.0
 		pushab	val.1
 		jsb	xfer.xf_indpat
-OC_INDRZSHOW:	pushab	val.2
+OC_INDRZSHOW:	pushl	val.2
+		pushab	val.3
 		pushab	val.1
 		jsb	xfer.xf_indrzshow
 OC_INDSET:	pushab	val.2
@@ -961,11 +963,13 @@ OC_ZPRINT:	jsb 	xfer.xf_restartpc
 		pushab	val.1
 		calls	#5,xfer.xf_zprint
 OC_ZSHOW:	jsb     xfer.xf_restartpc
+		pushl	val.3
 		pushl	#0
 		pushl	val.2
 		pushab	val.1
 		calls	#3,xfer.xf_zshow
 OC_ZSHOWLOC:	jsb     xfer.xf_restartpc
+		pushl	val.4
 		pushab	val.3
 		pushl	val.2
 		pushab	val.1

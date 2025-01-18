@@ -3,7 +3,7 @@
  * Copyright (c) 2010-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -159,6 +159,7 @@ error_def(ERR_TRIGTLVLCHNG);
 	ptr->alias_activity = FALSE;									\
 	ptr->last_tab = (prev);										\
 	ptr->symvlvl = prev->symvlvl + 1;								\
+	ptr->stack_level = dollar_zlevel() - 1;								\
 	/* The lv_blk chain can remain as is but need to reinit each block so no elements are "used" */	\
 	for (lvbp = ptr->lv_first_block; lvbp; lvbp = lvbp->next)					\
 	{	/* Likely only one of these blocks (some few lvvals) but loop in case.. */		\
@@ -775,6 +776,9 @@ int gtm_trigger(gv_trigger_t *trigdsc, gtm_trigger_parms *trigprm)
 	 */
 	new_stack_frame(trigdsc->rtn_desc.rt_adr, PTEXT_ADR(trigdsc->rtn_desc.rt_adr), transfer_addr);
 #	endif
+	/* Earlier, we set our `stack_level` to the *current* $STACK.
+	   But we just called `new_stack_frame` above, which increments the stack level. Bump the level by one. */
+	curr_symval->stack_level++;
 	dollar_tlevel_start = dollar_tlevel;
 	assert(gv_target->gd_csa == cs_addrs);
 	gv_target->trig_local_tn = local_tn;			/* Record trigger being driven for this global */

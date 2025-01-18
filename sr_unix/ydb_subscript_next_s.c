@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -95,7 +95,7 @@ int ydb_subscript_next_s(const ydb_buffer_t *varname, int subs_used, const ydb_b
 				varnamemv.mvtype = MV_STR;
 				varnamemv.str.addr = varname->buf_addr;
 				varnamemv.str.len = varname->len_used;
-				op_fnlvname(&varnamemv, FALSE, &nextsub);
+				op_fnlvname(&varnamemv, FALSE, curr_symval, &nextsub);
 			} else
 			{	/* We have some subscripts - subcases are as follows:
 				 *   - If we have more than one subscript - load the varname lv_val and all the subscripts

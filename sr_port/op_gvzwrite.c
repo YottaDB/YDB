@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2021-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2021-2025 YottaDB LLC and/or its subsidiaries.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,6 +30,7 @@
 #include "op.h"
 #include "mvalconv.h"
 #include "gtm_maxstr.h"
+#include "lv_val.h"
 
 void op_gvzwrite(UNIX_ONLY_COMMA(int4 count) int4 pat, ...)
 {
@@ -48,6 +49,7 @@ void op_gvzwrite(UNIX_ONLY_COMMA(int4 count) int4 pat, ...)
 	MAXSTR_BUFF_INIT;
 	memset(&output, 0, SIZEOF(output));
 	output.code = 'V';
+	output.stack_level = STACK_LEVEL_MINUS_ONE;
 	output.type = ZSHOW_DEVICE;
 	output.buff = &buff[0];
 	output.size = SIZEOF(buff);

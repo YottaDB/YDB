@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2020-2024 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2020-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -58,6 +58,7 @@ typedef struct zshow_out_struct
 {
 	char		type;		/* device, local variable or global variable				*/
 	char		code;		/* function = "BDSW"							*/
+	mint		stack_level;	/* for "V", the stack level of variables to show			*/
 	char		curr_code;	/* code from previous write						*/
 	int		size;		/* total size of the output buffer					*/
 	char		*buff;		/* output buffer							*/

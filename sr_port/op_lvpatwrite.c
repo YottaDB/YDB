@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2022-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -32,6 +32,7 @@
 #include "mvalconv.h"
 #include "gtm_maxstr.h"
 #include "alias.h"
+#include "lv_val.h"
 
 GBLREF	uint4		zwrtacindx;
 GBLREF	int		merge_args;
@@ -62,6 +63,7 @@ void op_lvpatwrite(UNIX_ONLY_COMMA(int4 count) UINTPTR_T arg1, ...)
 		MAXSTR_BUFF_INIT;
 		memset(&output, 0, SIZEOF(output));
 		output.code = 'V';
+		output.stack_level = STACK_LEVEL_MINUS_ONE;
 		output.type = ZSHOW_DEVICE;
 		output.buff = &buff[0];
 		output.size = SIZEOF(buff);

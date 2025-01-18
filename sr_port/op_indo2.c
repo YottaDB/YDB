@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -24,6 +24,8 @@
 
 error_def(ERR_ORDER2);
 error_def(ERR_VAREXPECTED);
+
+GBLREF	symval	*curr_symval;
 
 LITREF	mval	literal_one;
 LITREF	mval	literal_minusone;
@@ -53,7 +55,7 @@ void	op_indo2(mval *dst, uint4 indx, mval *direct)
 			slot->glvn_info.n++;				/* quick restore count so glvnpop works correctly */
 			/* like op_fnlvnameo2 */
 			if (literal_one.m[1] == direct->m[1])
-				op_fnlvname(slot->lvname, FALSE, dst);
+				op_fnlvname(slot->lvname, FALSE, curr_symval, dst);
 			else
 				op_fnlvprvname(slot->lvname, dst);
 		} else

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -35,6 +35,7 @@
 #include "zshow.h"
 #include "util.h"
 #include "mv_stent.h"
+#include "lv_val.h"
 
 #define DEFAULT_DUMP_FILENAME "YDB_JOBEXAM.ZSHOW_DMP"
 /* + 3 below is for for 2 intervening '_' chars and 1 extra */
@@ -235,7 +236,7 @@ void jobexam_dump(mval *dump_filename_arg, mval *dump_file_spec, char *fatal_fil
 		zshowops.str.len = fmt->str.len;
 	}
 
-	op_zshow(&zshowops, ZSHOW_DEVICE, NULL);
+	op_zshow(&zshowops, ZSHOW_DEVICE, NULL, STACK_LEVEL_MINUS_ONE);
 	parms.str.addr = (char *)dumpable_error_dump_file_noparms;
 	parms.str.len = SIZEOF(dumpable_error_dump_file_noparms);
 	SAVE_IN_OUT_IS_CURR_DEVICE(lcl_dev_in_use, in_is_curr_device, out_is_curr_device);

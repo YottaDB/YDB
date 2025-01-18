@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -20,6 +20,7 @@
 #include <rtnhdr.h>	/* Avoid changing a few hundred op_* and other modules to put this first */
 #include "hashtab_int4.h"
 #include "hashtab.h"
+#include "lv_val.h"
 
 #ifdef VMS
 /* Define a TWO-argument VMS_ONLY macro (first argument is empty string but is needed because of the VMS-only , that follows) */
@@ -72,7 +73,7 @@ void	op_fngvget1(mval *dst);
 void	op_fnj2(mval *src, int len, mval *dst);
 void	op_fnj3(mval *src, int width, int fract, mval *dst);
 void	op_fnlength(mval *a1, mval *a0);
-void	op_fnlvname(mval *src, boolean_t return_undef_alias, mval *dst);
+void	op_fnlvname(mval *src, boolean_t return_undef_alias, symval *sym, mval *dst);
 void	op_fnlvnameo2(mval *src, mval *dst, mval *direct);
 void	op_fnlvprvname(mval *src, mval *dst);
 void	op_fnname(UNIX_ONLY_COMMA(int sub_count) mval *finaldst, ...);
@@ -202,7 +203,7 @@ void	op_indname(mval *dst, mval *target, mval *subs);
 void	op_indo2(mval *dst, uint4 indx, mval *value);
 void	op_indpat(mval *v, mval *dst);
 void	op_indq2(mval *dst, uint4 indx, mval *value);
-void	op_indrzshow(mval *s1, mval *s2);
+void	op_indrzshow(mval *s1, mval *s2, mint level);
 void	op_indset(mval *target, mval *value);
 void	op_indtext(mval *lab, mint offset, mval *rtn, mval *dst);
 void	op_iocontrol(UNIX_ONLY_COMMA(int4 n) mval *vparg, ...);

@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2015 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2025 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -19,6 +22,7 @@
 #include "zshow.h"
 #include "advancewindow.h"
 #include "cmd.h"
+#include "lv_val.h"
 
 error_def(ERR_VAREXPECTED);
 
@@ -26,8 +30,8 @@ int m_zshow(void)
 {
 	static readonly char def_str[]="S";
 	int	code, rval;
-	oprtype	func, output;
-	triple	*lvar, *outtype, *r;
+	oprtype	func, output, *stack_dst, *stack_next_op = NULL;
+	triple	*lvar, *outtype, *r = NULL, *stack_level;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -69,8 +73,8 @@ int m_zshow(void)
 			else
 				r->operand[0] = func;
 			outtype->operand[0] = put_ilit(ZSHOW_GLOBAL);
-			ins_triple(r);
-			return TRUE;
+			stack_dst = &outtype->operand[1];
+			break;
 		case TK_IDENT:
 			if (!lvn(&output, OC_PUTINDX, 0))
 			{
@@ -86,36 +90,58 @@ int m_zshow(void)
 				r->operand[0] = func;
 			lvar = newtriple(OC_PARAMETER);
 			outtype->operand[1] = put_tref(lvar);
+			stack_dst = &lvar->operand[1];
 			lvar->operand[0] = output;
 			outtype->operand[0] = put_ilit(ZSHOW_LOCAL);
-			ins_triple(r);
-			return TRUE;
+			break;
 		case TK_ATSIGN:
 			if (!indirection(&output))
 			{
 				stx_error(ERR_VAREXPECTED);
 				return FALSE;
 			}
-			r = newtriple(OC_INDRZSHOW);
+			r = maketriple(OC_INDRZSHOW);
 			if (code == ZSHOW_NOPARM)
 				r->operand[0] = put_str(&def_str[0], (SIZEOF(def_str) - 1));
 			else
 				r->operand[0] = func;
-			r->operand[1] = output;
-			return TRUE;
+			stack_dst = &r->operand[1];
+			stack_next_op = &output;
+			break;
+		/* Second colon of `ZSHOW "V"::`, handled below */
+		case TK_COLON:
+			break;
 		default:
 			stx_error(ERR_VAREXPECTED);
 			return FALSE;
 		}
 	}
-	r = maketriple(OC_ZSHOW);
-	outtype = newtriple(OC_PARAMETER);
-	r->operand[1] = put_tref(outtype);
-	if (code == ZSHOW_NOPARM)
-		r->operand[0] = put_str(&def_str[0], (SIZEOF(def_str) - 1));
-	else
-		r->operand[0] = func;
-	outtype->operand[0] = put_ilit(ZSHOW_DEVICE);
+	if (NULL == r) { /* no output specified: output to device */
+		r = maketriple(OC_ZSHOW);
+		outtype = newtriple(OC_PARAMETER);
+		r->operand[1] = put_tref(outtype);
+		if (code == ZSHOW_NOPARM)
+			r->operand[0] = put_str(&def_str[0], (SIZEOF(def_str) - 1));
+		else
+			r->operand[0] = func;
+		outtype->operand[0] = put_ilit(ZSHOW_DEVICE);
+		stack_dst = &outtype->operand[1];
+	}
+
+	stack_level = newtriple(OC_PARAMETER);
+	if (TK_COLON == TREF(window_token))
+	{
+		advancewindow();
+		if (EXPR_FAIL == expr(&stack_level->operand[0], MUMPS_INT))
+			return FALSE;
+	} else {
+		stack_level->operand[0] = put_ilit(STACK_LEVEL_MINUS_ONE);
+	}
+
+	*stack_dst = put_tref(stack_level);
+	if (NULL != stack_next_op)
+		stack_level->operand[1] = *stack_next_op;
+
 	ins_triple(r);
 	return TRUE;
 }

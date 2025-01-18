@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -342,11 +342,13 @@ typedef struct symval_struct
 	lvTree			*lvtree_flist;
 	lvTreeNode		*lvtreenode_flist;
 	struct symval_struct	*last_tab;
-	int4			symvlvl;		/* Level of symval struct (nesting) */
-	boolean_t		trigr_symval;		/* Symval is owned by a trigger */
+	int4			symvlvl;	/* Level of symval struct (nesting) */
+	mint			stack_level;	/* $STACK when symval struct was created. Used by ZSHOW "V". */
+	boolean_t		trigr_symval;	/* Symval is owned by a trigger */
 	boolean_t		alias_activity;
-	GTM64_ONLY(int4		filler;)
 } symval;
+
+#define STACK_LEVEL_MINUS_ONE -1 /* Treated as an alias for $STACK by ZSHOW "V" */
 
 /* Structure to describe the block allocated to describe a var specified on a TSTART to be restored
  * on a TP restart. Block moved here from tpframe.h due to the structure references it [now] makes.
@@ -553,7 +555,7 @@ void	op_setalsctin2als(lv_val *src, int dstindx);
 void	op_setalsct2alsct(lv_val *src, lv_val *dst);
 void	op_setfnretin2als(mval *srcmv, int destindx); /* not an lv_val ref but kept here with its friends so it's not lonely */
 void	op_setfnretin2alsct(mval *srcmv, lv_val *dstlv);
-void	op_zshow(mval *func, int type, lv_val *lvn);
+void	op_zshow(mval *func, int type, lv_val *lvn, int level);
 
 lv_val   *op_getindx(UNIX_ONLY_COMMA(int argcnt) lv_val *start, ...);
 lv_val   *op_putindx(UNIX_ONLY_COMMA(int argcnt) lv_val *start, ...);

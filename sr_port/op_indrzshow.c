@@ -2,6 +2,9 @@
  *								*
  *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
+ * Copyright (c) 2025 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -21,13 +24,13 @@
 
 error_def(ERR_VAREXPECTED);
 
-void op_indrzshow(mval *s1, mval *s2)
+void op_indrzshow(mval *s1, mval *s2, mint level)
 {
 	icode_str	indir_src;
 	int		rval;
 	mstr		*obj, object;
 	oprtype		v;
-	triple		*lvar, *outtype, *r, *src;
+	triple		*lvar, *outtype, *mlevel, *r, *src;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -50,6 +53,7 @@ void op_indrzshow(mval *s1, mval *s2)
 				r->operand[1] = put_tref(outtype);
 				r->operand[0] = put_tref(src);
 				outtype->operand[0] = put_ilit(ZSHOW_GLOBAL);
+				outtype->operand[1] = put_ilit(level);
 				ins_triple(r);
 			}
 			break;
@@ -63,6 +67,7 @@ void op_indrzshow(mval *s1, mval *s2)
 				lvar = newtriple(OC_PARAMETER);
 				outtype->operand[1] = put_tref(lvar);
 				lvar->operand[0] = v;
+				lvar->operand[1] = put_ilit(level);
 				outtype->operand[0] = put_ilit(ZSHOW_LOCAL);
 				ins_triple(r);
 			}
@@ -71,8 +76,11 @@ void op_indrzshow(mval *s1, mval *s2)
 			if (EXPR_FAIL != (rval = indirection(&v)))		/* NOTE assignment */
 			{
 				r = newtriple(OC_INDRZSHOW);
+				mlevel = newtriple(OC_PARAMETER);
 				r->operand[0] = put_tref(src);
-				r->operand[1] = v;
+				r->operand[1] = put_tref(mlevel);
+				mlevel->operand[0] = put_ilit(level);
+				mlevel->operand[1] = v;
 			}
 			break;
 		default:

@@ -2,6 +2,9 @@
  *								*
  *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
+ * Copyright (c) 2025 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -21,7 +24,7 @@
 GBLREF spdesc stringpool;
 GBLREF symval *curr_symval;
 
-void op_fnlvname(mval *src, boolean_t return_undef_aliases,  mval *dst)
+void op_fnlvname(mval *src, boolean_t return_undef_aliases, symval *sym, mval *dst)
 {
 	ht_ent_mname	*p, *min, *top;
 	int 		n;
@@ -32,9 +35,11 @@ void op_fnlvname(mval *src, boolean_t return_undef_aliases,  mval *dst)
 	name.addr = src->str.addr;
 	name.len = (MAX_MIDENT_LEN > src->str.len) ? src->str.len : MAX_MIDENT_LEN;
 
-	p = curr_symval->h_symtab.base;
-	top = p + curr_symval->h_symtab.size;
-	assert(top == curr_symval->h_symtab.top);
+	if (NULL == sym)
+		sym = curr_symval;
+	p = sym->h_symtab.base;
+	top = p + sym->h_symtab.size;
+	assert(top == sym->h_symtab.top);
 	min = 0;
 	for ( ; p < top ; p++)
 	{

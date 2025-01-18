@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -299,6 +299,7 @@ void local_variable_marshalling(FILE *setup_file_orig)
 	SETUP_THREADGBL_ACCESS;
 	memset(&output, 0, SIZEOF(output));
 	output.code = 'V';
+	output.stack_level = STACK_LEVEL_MINUS_ONE;
 	output.type = ZSHOW_BUFF_ONLY;
 	/* Expanded MAXSTR_BUFF_DECL/MAXSTR_BUFF_INIT below because they are designed to handle the size of MAX_STRBUFF_INIT when we
 	 * really want is MAX_STRLEN The condition handler established within MAXSTR_BUFF_INIT is futile because any error we

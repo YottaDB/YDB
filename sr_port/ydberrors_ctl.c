@@ -70,6 +70,7 @@ LITDEF	err_msg ydberrors[] = {
 	{ "ZGBLDIRUNDEF", "Global Directory env var $ydb_gbldir/$gtmgbldir is undefined", 0, 0 },
 	{ "SHEBANGMEXT", "!AZ needs a .m extension to be a valid shebang script", 1, 0 },
 	{ "ZCPREALLVALSTR", "Pre-allocation allowed only for output or input/output variables of type ydb_buffer_t*, ydb_string_t*, or ydb_char_t*", 0, 0 },
+	{ "ZSHOWSTACKRANGE", "Invalid stack level value !SL for ZSHOW \"V\"", 1, 0 },
 };
 
 
@@ -82,7 +83,7 @@ GBLDEF	err_ctl ydberrors_ctl = {
 	256,
 	"YDB",
 	&ydberrors[0],
-	53,
+	54,
 	&ydberrors_undocarr[0],
 	0
 };

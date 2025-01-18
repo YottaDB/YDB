@@ -6730,7 +6730,7 @@
 
    The format of the ZSHOW command is:
 
-   ZSH[OW][:tvexpr][expr[:glvn][,...]]
+   ZSH[OW][:tvexpr][expr[:glvn[:level]][,...]]
 
 3 ZSHOW_Information_Codes
    ZSHOW Information Codes

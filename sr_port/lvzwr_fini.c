@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -29,6 +29,7 @@
 #include "zwrite.h"
 #include "op.h"
 #include "patcode.h"
+#include "dollar_zlevel.h"
 
 GBLREF symval		*curr_symval;
 GBLREF lvzwrite_datablk	*lvzwrite_block;
@@ -39,18 +40,33 @@ void lvzwr_fini(zshow_out *out, int t)
 {
 	int4		size;
 	mval 		local;
+	mint		level;
 	mname_entry	temp_key;
 	ht_ent_mname	*tabent;
 	mident_fixed	m;
 
 	zwr_output = out;
 	assert(lvzwrite_block);
+
+	symval *target_symval = curr_symval;
+	level = out->stack_level;
+	/* -1 is an alias for $STACK. We need to pass some value as the default in `m_zshow`.
+	   That function is executed at compile time, so any value it passes is indistinguishable
+	   from a value passed by M code at runtime. */
+	if (STACK_LEVEL_MINUS_ONE == level)
+		level = dollar_zlevel() - 1;
+	else if (level < 0 || level >= dollar_zlevel())
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_ZSHOWSTACKRANGE, 1, level);
+	while ((NULL != target_symval->last_tab) && (level < target_symval->stack_level)) {
+		target_symval = target_symval->last_tab;
+	}
+
 	if (zwr_patrn_mident == lvzwrite_block->zwr_intype)
 	{	/* Mident specified for "pattern" (fixed name, no pattern) */
 		size = (lvzwrite_block->pat->str.len <= MAX_MIDENT_LEN) ? lvzwrite_block->pat->str.len : MAX_MIDENT_LEN;
 		temp_key.var_name = lvzwrite_block->pat->str;
 		COMPUTE_HASH_MNAME(&temp_key);
-		tabent = lookup_hashtab_mname(&curr_symval->h_symtab, &temp_key);
+		tabent = lookup_hashtab_mname(&target_symval->h_symtab, &temp_key);
 		if (!tabent || !LV_IS_VAL_DEFINED(tabent->value) && !LV_HAS_CHILD(tabent->value))
 		{
 			lvzwrite_block->subsc_count = 0;
@@ -78,13 +94,13 @@ void lvzwr_fini(zshow_out *out, int t)
 				memset(&m.c[local.str.len], 0, SIZEOF(m.c) - local.str.len);
 				temp_key.var_name = local.str;
 				COMPUTE_HASH_MNAME(&temp_key);
-				if (NULL != (tabent = lookup_hashtab_mname(&curr_symval->h_symtab, &temp_key)))
+				if (NULL != (tabent = lookup_hashtab_mname(&target_symval->h_symtab, &temp_key)))
 				{
 					lvzwrite_block->curr_name = &tabent->key.var_name;
 					lvzwr_var(((lv_val *)tabent->value), 0);
 				}
 			}
-			op_fnlvname(&local, TRUE, &local);
+			op_fnlvname(&local, TRUE, target_symval, &local);
 			assert(local.str.len <= MAX_MIDENT_LEN);
 			memcpy(&m.c[0], local.str.addr, local.str.len);
 			local.str.addr = &m.c[0];

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -40,7 +40,7 @@ LITREF unsigned char lower_to_upper_table[];
 
 error_def(ERR_ZSHOWBADFUNC);
 
-void op_zshow(mval *func, int type, lv_val *lvn)
+void op_zshow(mval *func, int type, lv_val *lvn, mint level)
 {
 	const char	*ptr, *ptr_top;
   	zshow_out	output;
@@ -163,6 +163,7 @@ void op_zshow(mval *func, int type, lv_val *lvn)
 				zshow_locks(&output, TRUE);
 				break;
 			case 'V':
+				output.stack_level = level;
 				zshow_zwrite(&output);
 				break;
 			default:
