@@ -4,7 +4,7 @@
 # Copyright (c) 2009-2022 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
-# Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 # Copyright (c) 2017-2018 Stephen L Johnson.			#
@@ -60,7 +60,7 @@ ext=".so"
 
 # Flags to build shared libraries of M routines
 if [ "ibm" = $arch ] ; then ldflags="-brtl -G -bexpfull -bnoentry -b64" ; ldcmd="ld" # AIX
-elif [ "linux" = $arch ] ; then ldflags="-shared" ; ldcmd="ld.gold" # Linux - all platforms
+elif [ "linux" = $arch ] ; then ldflags="-shared" ; ldcmd="ld" # Linux - all platforms
 else echo "Shared libary ldflags not set for this platform"; exit 1
 fi
 

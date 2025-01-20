@@ -3,7 +3,7 @@
 # Copyright (c) 2001-2021 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
-# Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 # Copyright (c) 2017-2018 Stephen L Johnson.			#
@@ -162,7 +162,7 @@ if ( $?gtm_version_change == "1" ) then
 	endif
 
 	# Default linker options for M objects
-	setenv	gt_ld_m_shl_linker	"ld.gold"
+	setenv	gt_ld_m_shl_linker	"ld"
 	setenv  gt_ld_m_shl_options     "-shared"
 
 	if ( "armv6l" == $mach_type ) then

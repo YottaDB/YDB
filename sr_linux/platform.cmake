@@ -3,7 +3,7 @@
 # Copyright (c) 2013-2020 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
-# Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 # Copyright (c) 2017-2018 Stephen L Johnson.			#
@@ -165,29 +165,23 @@ else()
 endif()
 
 if ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
-	# Newer versions of Linux by default include -fstack-protector in gcc. This causes the build to slightly bloat
-	# in size and have a runtime overhead (as high as 5% extra CPU cost in our experiments). So keep that option
-	# enabled only for DEBUG builds of YottaDB.
-	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fstack-protector-all")
+  # Newer versions of Linux by default include -fstack-protector in gcc. This causes the build to slightly bloat
+  # in size and have a runtime overhead (as high as 5% extra CPU cost in our experiments). So keep that option
+  # enabled only for DEBUG builds of YottaDB.
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fstack-protector-all")
 else()
-	# For "Release" or "RelWithDebInfo" type of builds, keep this option disabled for performance reasons
+  # For "Release" or "RelWithDebInfo" type of builds, keep this option disabled for performance reasons
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fno-stack-protector")
   if (CMAKE_COMPILER_IS_GNUCC)
-    # Avoid using LTO on armv6l due to excessive link time plus creates many undefs due to failed/missing plugins
-    if (NOT (("${arch}" STREQUAL "armv6l") OR ("${arch}" STREQUAL "aarch64")))
-      # Enable (a) link time optimization and (b) use gold linker.
-      # (a) was seen to reduce the size of libyottadb.so by 5% and improve runtimes by 7% on a simple database test
-      # (b) gold linker was seen to slightly (~ 0.1%) improve build times and run times compared to default ld linker.
-      # Use -flto=N where N is number of available CPUs to speed up the link time.
-      include(ProcessorCount)
-      ProcessorCount(NUMCPUS)
-      set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -flto=${NUMCPUS} -fuse-ld=gold")
-      set(CMAKE_AR "gcc-ar")		# needed on some versions of gcc to get -flto working
-      set(CMAKE_RANLIB "gcc-ranlib")	# needed on some versions of gcc to get -flto working
-      message("*** Production build using LTO")
-    else()
-      message("*** Production build not using LTO due to issues building on armv6l or aarch64 (see #498)")
-    endif()
+    # Enable link time optimization
+    # Reduces the size of libyottadb.so by 5% and improve runtimes by 7% on a simple database test
+    # Use -flto=N where N is number of available CPUs to speed up the link time.
+    include(ProcessorCount)
+    ProcessorCount(NUMCPUS)
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -flto=${NUMCPUS}")
+    set(CMAKE_AR "gcc-ar")		# needed on some versions of gcc to get -flto working
+    set(CMAKE_RANLIB "gcc-ranlib")	# needed on some versions of gcc to get -flto working
+    message("*** Production build using LTO")
   endif()
 endif()
 
