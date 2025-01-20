@@ -1,69 +1,88 @@
 # YottaDB
 
-All software in this package is part of YottaDB (https://yottadb.com) each
+YottaDB<sup>Ⓡ</sup> is the fastest, highest consistency, database that scales to meet the needs of the very largest applications.
+
+All software in this package is part of [YottaDB](https://yottadb.com) each
 file of which identifies its copyright holders. The software is made available
-to you under the terms of a license. Refer to the [LICENSE](LICENSE) file for details.
+to you under the terms of a license. Refer to the [COPYING](COPYING) and [LICENSE](LICENSE) files for details.
 
-Homepage: https://gitlab.com/YottaDB/DB/YDB
+## Why use YottaDB?
 
-Documentation: https://yottadb.com/resources/documentation/
+YottaDB gives you uncompromising consistency, reliability and performance, even in large enterprise and nation-scale applications. Other databases force you to make compromises.
 
-## Cloning the repository for the latest updates
+### The Best Data Consistency for Systems with Tens of Thousands of Concurrent Processes
 
-You may want to clone the YottaDB repository for access to the latest code.
+The YottaDB database engine runs in-process, on one node and scales vertically. Its transactions have [completely automated retry logic](https://yottadb.com/bid-wars/) that is included out of the box and [optimistic concurrency control](http://daslab.seas.harvard.edu/reading-group/papers/kung.pdf) model for ACID  properties, even with tens of thousands of concurrent processes making tens of millions of database accesses, all on a single system.
+
+### High performance at Massive Scale
+
+Because YottaDB runs in-process and scales vertically, it delivers extreme performance that maximizes the throughput of the underlying hardware and operating system.
+
+### Data Layer Flexibility Throughout the Application Lifecycle
+
+Unlike most other databases, YottaDB's hierarchical data structure gives you flexibility in your data layer both at the time of the application initial creation as well as throughout the entire lifecycle. Permissions are implemented in the application layer and/or the operating system rather than in the database itself.
+
+## Who Uses YottaDB?
+
+YottaDB is used primarily, but not exclusively, in large scale healthcare and financial services applications where data consistency is critical and [support from YottaDB LLC](https://yottadb.com/product/services/) provides peace of mind. For example:
+
+- [One of the largest banks in Thailand, with 60 million accounts uses YottaDB.](https://yottadb.com/resources/success-stories/government-savings-bank/) While most large banks use a batch system that is updated daily, they have a true real-time system that is able to handle tens of thousands of concurrent users with excellent performance.
+- [A nation-scale electronic health record system in Jordan uses YottaDB.](https://yottadb.com/resources/success-stories/electronic-health-solutions/) It  uses an open source software stack including YottaDB on Linux for round-the-clock real-time access to medical records for patients and providers in a country of over 10 million people.
+
+See [Success Stories](https://yottadb.com/resources/success-stories/) for more examples. You do not have to be a large enterprise or a nation-scale application to benefit from YottaDB, but YottaDB will not limit your growth.
+
+## Start with Pre-built Distributions
+
+The [Get Started page](https://yottadb.com/product/get-started/) gets you started with YottaDB, on your machine, on our virtual machine, or a Docker container. YottaDB provides pre-built binary distributions for current versions of popular Linux distributions ([Debian](https://www.debian.org/), [Red Hat](https://www.redhat.com/en), [SUSE](https://www.suse.com/), and [Ubuntu](https://ubuntu.com/), as well as selected derivatives), and the [ydbinstall.sh](https://download.yottadb.com/ydbinstall.sh) downloads and installs the current release for Supported platforms. Details are on the Get Started page.
+
+Debian is Supported on both x86_64 and ARM64 CPUs.
+
+## Resources
+
+- [Website](https://yottadb.com)
+- [Documentation](https://yottadb.com/resources/documentation/)
+- [Source code](https://gitlab.com/YottaDB/DB/YDB)
+
+## Build and Install YottaDB from Source
+
+On current releases of popular Linux distributions which are Supportable but not Supported (such as [Arch Linux](https://archlinux.org/) and derivatives) the `--from-source` option of the [ydbinstall.sh](https://download.yottadb.com/ydbinstall.sh) script downloads, builds, and installs YottaDB. If you are a developer, you can also clone the repository to build and install YottaDB.
 
 ```sh
 git clone https://gitlab.com/YottaDB/DB/YDB.git
 ```
 
-To contribute or help with further development, [fork the repository](https://docs.gitlab.com/ee/gitlab-basics/fork-project.html), clone your fork to a local copy and begin contributing! Please also set up the pre-commit script to automatically enforce some coding conventions. Assuming you are in the top-level directory, the following will work:
+YottaDB relies on [CMake](https://cmake.org/) to generate the Makefiles to build binaries from source.
+Refer to the [Release Notes](https://gitlab.com/YottaDB/DB/YDB/-/releases) for each release for a list of the Supported platforms
+in which we build and test YottaDB binary distributions.
+At least CMake version 3 is required.
 
 ```sh
-ln -s ../../pre-commit .git/hooks
-```
-
-## Install pre-built YottaDB binaries
-
-To quickly get started with running YottaDB, follow the instructions on our [Get Started](https://yottadb.com/product/get-started/) page.
-
-## Build and Install YottaDB from source
-
-YottaDB relies on CMake to generate the Makefiles to build binaries from source.
-Refer to the Release Notes for each release for a list of the Supported platforms
-in which we build and test YottaDB binary distributions.
-At least cmake version 3 is required.
-
-```
-# Ubuntu or Debian-like distro
+# Debian, Ubuntu and derivatives
 sudo apt-get install --no-install-recommends cmake
-# CentOS
-sudo yum install cmake3
+# Red Hat and derivatives
+sudo yum install cmake
+# SUSE and derivatives
+sudo zypper install cmake
 ```
-
-On CentOS it will be installed as `cmake3` instead of cmake,
-so use `cmake3` on CentOS wherever `cmake` is referenced below.
 
 Note: Both gcc and Clang/LLVM are supported on `x86_64`. To use Clang/LLVM you would need to
 install the Clang/LLVM packages for your distribution in addition to the packages
 listed below. For example for Ubuntu Linux:
 
 ```sh
- sudo apt-get install --no-install-recommends clang llvm lld
- ```
+sudo apt-get install --no-install-recommends clang llvm lld
+```
 
 - Install prerequisite packages
 
   ```sh
-  Ubuntu Linux OR Raspbian Linux OR Beagleboard Debian
+  Debian, Ubuntu, and derivatives
   sudo apt-get install --no-install-recommends file cmake make gcc git curl tcsh {libconfig,libelf,libicu,libncurses,libreadline}-dev binutils ca-certificates
 
-  Arch Linux
-  sudo pacman -S file cmake make gcc git curl tcsh {libconfig,libelf,icu,ncurses,readline} binutils ca-certificates
-
-  CentOS Linux OR RedHat Linux
+  Red Hat and derivatives
   sudo yum install file cmake make gcc git curl tcsh {libconfig,libicu,ncurses,elfutils-libelf,readline}-devel binutils ca-certificates
 
-  SUSE (SLES or SLED) or OpenSUSE Leap or OpenSUSE Tumbleweed
+  SUSE and derivatives
   sudo zypper install cmake make gcc git file curl tcsh binutils-gold icu {libconfig,libicu,ncurses,libelf,readline}-devel binutils ca-certificates
   ```
 
@@ -99,9 +118,9 @@ listed below. For example for Ubuntu Linux:
   ### Build with gcc
   ```sh
   cmake ..
-  export ydb_icu_version=65.1.suse # this is needed only on OpenSUSE Leap 15.4 or SLES 15.4 or SLED 15.4
+  export ydb_icu_version=$(pkg-config --modversion icu-io).suse  # needed only on SUSE and derivatives
   make -j $(getconf _NPROCESSORS_ONLN)
-  make install	# For known errors in this step and how to work around them, consult the FAQ section below
+  make install
   cd yottadb_r*  # The latest release number will be seen in the directory name
   ```
 
@@ -109,15 +128,14 @@ listed below. For example for Ubuntu Linux:
   ```sh
   export CC=/usr/bin/clang
   cmake -D CMAKE_LINKER:PATH=/usr/bin/ld.lld ..
-  export ydb_icu_version=65.1.suse # this is needed only on OpenSUSE Leap 15.4 or SLES 15.4 or SLED 15.4
+  export ydb_icu_version=$(pkg-config --modversion icu-io).suse  # needed only on SUSE and derivatives
   make -j $(getconf _NPROCESSORS_ONLN)
-  make install	# For known errors in this step and how to work around them, consult the FAQ section below
+  make install
   cd yottadb_r*  # The latest release number will be seen in the directory name
   ```
 
   Note that the ```make install``` command above does not create the final installed YottaDB.
   Instead, it stages YottaDB for distribution.
-  If cmake or make issues an error in the above steps, please see the [FAQ](#faq) below.
 
 - Installing YottaDB
 
@@ -144,7 +162,7 @@ NOTE: You must have at least docker 17.05 as [multi-stage](https://docs.docker.c
 
 ### Image information
 
-The docker image is built using the generic `ydb_env_set` script that gives the user some sane defaults to begin exploring YottaDB. This isn't meant for production usage.
+The docker image is built using the generic `ydb_env_set` script that gives the user some sane defaults.
 
 The commands below assume that you want to remove the docker container after running the command, which means that if you don't mount a volume that contains your database and routines they will be lost. If you want the container to persist remove the ```--rm``` parameter from the ```docker``` command.
 
@@ -158,82 +176,36 @@ This creates a ydb-data directory in your current working directory. This can be
 
 The [YottaDB GUI](https://gitlab.com/YottaDB/UI/YDBGUI) is available on port 9080; statistics for the GUI is running on port 9081.
 
-### Pre-built images
+### Pre-built Images
 
 Pre-built images are available on [docker hub](https://hub.docker.com/r/yottadb/)
 
-### Running a Pre-built image
+### Running a Pre-built Image
 
 ```
 docker run --rm -it -p 9080-9081:9080-9081 download.yottadb.com/yottadb/yottadb # you can add a specific version after a ":" if desired
 ```
 
-### Build Steps
+### Build & Run an Image
 
-1) Build the image
+1. Build the image
+
    ```
    docker build -t yottadb/yottadb:latest-master .
    ```
-2) Run the created image
+
+1. Run the created image
+
    ```
    docker run --rm -it -p 9080-9081:9080-9081 yottadb/yottadb:latest-master
    ```
 
-## FAQ
+## Contribute to YottaDB Development
 
-- The CMake build fails with the following message followed by one or more cases.
+To contribute or help with further development, [fork the repository](https://docs.gitlab.com/ee/gitlab-basics/fork-project.html), clone your fork to a local copy, and submit Merge Requests! Please also set up the pre-commit script to automatically enforce some coding conventions. Assuming you are in the top-level directory, the following will work:
 
-  ```
-  CMake Error: The following variables are used in this project, but they are set to NOTFOUND. Please set them or make sure they are set and tested correctly in the CMake files
-  ```
+```sh
+ln -s ../../pre-commit .git/hooks
+```
 
-  This indicates that required libraries are not found. Please consult the list of libraries and check your distributions package manager.
-
-- YottaDB installation fails with %YDB-E-DLLNOOPEN
-
-  Example error message that would be printed to the screen:
-
-  ```
-  %YDB-E-DLLNOOPEN, Failed to load external dynamic library /usr/local/lib/yottadb/r136/libyottadb.so
-  %YDB-E-TEXT, libtinfo.so.5: cannot open shared object file: No such file or directory
-  ```
-
-  This indicates that the libtinfo5 package isn't installed and libtinfo6 is not backwards compatible with libtinfo5. This has been observed on Ubutntu 18.10 and could possibly apply to other Linux distributions as well. To resolve the issue, libtinfo5 can be installed via the following command:
-
-  ```bash
-  sudo apt-get install --no-install-recommends libtinfo5
-  ```
-- YottaDB compilation fails with plugin needed to handle lto object
-
-  There is a [known issue](https://sourceware.org/git/gitweb.cgi?p=binutils-gdb.git;a=commit;h=103da91bc083f94769e3758175a96d06cef1f8fe) with binutils and has been observed on Ubuntu 18.10 and could possibly apply to other Linux distributions including debian unstable that may cause ar and ranlib to generate the following error messages:
-
-  ```
-  /usr/bin/ar: CMakeFiles/libmumps.dir/sr_port/zshow_locks.c.o: plugin needed to handle lto object
-  /usr/bin/ar: CMakeFiles/libmumps.dir/sr_port/zshow_output.c.o: plugin needed to handle lto object
-  /usr/bin/ar: CMakeFiles/libmumps.dir/sr_port/zshow_stack.c.o: plugin needed to handle lto object
-  /usr/bin/ar: CMakeFiles/libmumps.dir/sr_port/zshow_svn.c.o: plugin needed to handle lto object
-  /usr/bin/ar: CMakeFiles/libmumps.dir/sr_port/zshow_zbreaks.c.o: plugin needed to handle lto object
-  /usr/bin/ar: CMakeFiles/libmumps.dir/sr_port/zshow_zwrite.c.o: plugin needed to handle lto object
-  /usr/bin/ar: CMakeFiles/libmumps.dir/sr_port/ztrap_save_ctxt.c.o: plugin needed to handle lto object
-  /usr/bin/ar: CMakeFiles/libmumps.dir/sr_port/zwr2format.c.o: plugin needed to handle lto object
-  /usr/bin/ar: CMakeFiles/libmumps.dir/sr_port/zyerror_init.c.o: plugin needed to handle lto object
-  /usr/bin/ranlib: libmumps.a(f_zwrite.c.o): plugin needed to handle lto object
-  /usr/bin/ranlib: libmumps.a(fgn_glopref.c.o): plugin needed to handle lto object
-  /usr/bin/ranlib: libmumps.a(fgncal_unwind.c.o): plugin needed to handle lto object
-  /usr/bin/ranlib: libmumps.a(find_line_addr.c.o): plugin needed to handle lto object
-  /usr/bin/ranlib: libmumps.a(find_line_start.c.o): plugin needed to handle lto object
-  /usr/bin/ranlib: libmumps.a(find_mvstent.c.o): plugin needed to handle lto object
-  ```
-
-  The work around is to bump the open file descriptors limit to 4096 or higher
-
-  bash/sh
-  ```bash
-  ulimit -n 4096
-  ```
-  OR
-
-  tcsh
-  ```tcsh
-  limit openfiles 4096
-  ```
+**YottaDB is a registered trademark of YottaDB LLC**
