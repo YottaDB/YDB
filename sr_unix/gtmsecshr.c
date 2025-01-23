@@ -244,7 +244,7 @@ int main(int argc, char_ptr_t argv[])
 		poll_fdlist[0].events = POLLIN;
 		poll_nfds = 1;
 		poll_timeout = MAX_TIMEOUT_VALUE * MILLISECS_IN_SEC; 	/* Restart timeout each interation for platforms that save
-									 * unexpired time when select exits.
+									 * unexpired time when poll exits.
 									 */
 		selstat = poll(&poll_fdlist[0], poll_nfds, poll_timeout);
 		if (0 > selstat)

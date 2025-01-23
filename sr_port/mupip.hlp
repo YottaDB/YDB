@@ -9305,7 +9305,7 @@ Example:
    * denotes the GT.M version in which the qualifier or command was first
    introduced. Versions that start with a minus sign, -, denote versions
    where the qualifier or command was removed. This column is maintained for
-   qualifiers and command introduced in GT.M versions starting with GT.M
+   qualifiers and commands introduced in GT.M versions starting with GT.M
    V5.4-002.
 
    # Additional information about Standalone Access:

@@ -42,7 +42,7 @@ GBLREF	unsigned char		rdfail_detail;
 error_def(ERR_DBFILERDONLY);
 
 sm_uc_ptr_t mm_read(block_id blk)
-{	/* this is a kissing cousin to code in dsk_read and the two blocs should be maintained in parallel */
+{	/* this is a kissing cousin to code in dsk_read and the two blocks should be maintained in parallel */
 	boolean_t		buff_is_modified_after_read = FALSE, fully_upgraded, read_only, was_crit;
 	enum db_ver		tmp_ondskblkver;
 	int			level;
@@ -110,7 +110,7 @@ sm_uc_ptr_t mm_read(block_id blk)
 			 * 	2) check the block header to ensure it needs an upgrade (version and level)
 			 * 	3) call blk_ptr_adjust() as needed
 			 */
-			if (FALSE == (was_crit = csa->now_crit)) /* WARNING assigment */
+			if (FALSE == (was_crit = csa->now_crit)) /* WARNING assignment */
 				grab_crit(gv_cur_region, WS_15);
 			if ((GDSV6p > ((blk_hdr_ptr_t)buff)->bver) && ((blk_hdr_ptr_t)buff)->levl &&
 					(TRUE == blk_ptr_adjust(buff, csd->offset)))
