@@ -233,6 +233,7 @@ help_exit()
 	echo "	$0 --utf8			# installs YottaDB release r2.02 with added support for UTF-8"
 	echo "	$0 --installdir /r202 r2.02	# installs YottaDB r2.02 at /r202"
 	echo "	$0 --gtm			# installs latest GT.M version (V7.1-006) at /usr/local/lib/fis-gtm/V7.1-006_x86_64"
+	echo "	$0 --from-source --branch r2.02	# builds YottaDB r2.02 and installs it at /usr/local/lib/yottadb/r202"
 	echo ""
 	echo "As options are processed left to right, later options can override earlier options."
 	echo ""
