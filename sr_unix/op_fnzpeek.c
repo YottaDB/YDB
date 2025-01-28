@@ -3,7 +3,7 @@
  * Copyright (c) 2013-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -571,12 +571,8 @@ void	op_fnzpeek(mval *structid, int offset, int len, mval *format, mval *ret)
 			 * All the rest need it to be open. If there are any errors in the open (e.g. statsdb specified
 			 * and ydb_statsdir env var is too long etc.) then handle it by issuing an error.
 			 */
-<<<<<<< HEAD
+			assert((PO_GDRREG == mnemonic_opcode) || (PO_GDSSEG == mnemonic_opcode) || (NULL != r_ptr));
 			if ((PO_GDRREG != mnemonic_opcode) && (PO_GDSSEG != mnemonic_opcode) && !r_ptr->open)
-=======
-			assert((PO_GDRREG == mnemonic_opcode) || r_ptr);
-			if ((PO_GDRREG != mnemonic_opcode) && !r_ptr->open)
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 			{
 				gv_init_reg(r_ptr);
 				if (!r_ptr->open)
@@ -613,32 +609,47 @@ void	op_fnzpeek(mval *structid, int offset, int len, mval *format, mval *ret)
 	switch(mnemonic_opcode)
 	{
 		case PO_CSAREG:		/* r_ptr set from option processing */
-<<<<<<< HEAD
 			if (arg_supplied)
+			{
+				assert(r_ptr);
 				zpeekadr = &FILE_INFO(r_ptr)->s_addrs;
+			}
 			break;
 		case PO_FHREG:		/* r_ptr set from option processing */
 			if (arg_supplied)
+			{
+				assert(r_ptr);
 				zpeekadr = (&FILE_INFO(r_ptr)->s_addrs)->hdr;
+			}
 			break;
 		case PO_GDRREG:		/* r_ptr set from option processing */
 			assert(arg_supplied);	/* 4SCA: Assigned value is garbage or undefined, even though args are required */
 			if (arg_supplied)
+			{
+				assert(r_ptr);
 				zpeekadr = r_ptr;
+			}
 			break;
 		case PO_GDSSEG:		/* r_ptr set from option processing */
 			assert(arg_supplied);	/* 4SCA: Assigned value is garbage or undefined, even though args are required */
 			if (arg_supplied)
+			{
+				assert(r_ptr);
 				zpeekadr = r_ptr->dyn.addr;
+			}
 			break;
 		case PO_NLREG:		/* r_ptr set from option processing */
 			if (arg_supplied)
+			{
+				assert(r_ptr);
 				zpeekadr = (&FILE_INFO(r_ptr)->s_addrs)->nl;
+			}
 			break;
 		case PO_JNLREG:		/* r_ptr set from option processing */
 		case PO_JBFREG:
 			if (arg_supplied)
 			{
+				assert(r_ptr);
 				csa = &FILE_INFO(r_ptr)->s_addrs;
 				if (NULL == csa->jnl)
 					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_ZPEEKNOJNLINFO, 2, REG_LEN_STR(r_ptr));
@@ -647,32 +658,10 @@ void	op_fnzpeek(mval *structid, int offset, int len, mval *format, mval *ret)
 			break;
 		case PO_UDIREG:		/* r_ptr set from option processing */
 			if (arg_supplied)
+			{
+				assert(r_ptr);
 				zpeekadr = FILE_INFO(r_ptr);
-=======
-			assert(r_ptr);
-			zpeekadr = &FILE_INFO(r_ptr)->s_addrs;
-			break;
-		case PO_FHREG:		/* r_ptr set from option processing */
-			assert(r_ptr);
-			zpeekadr = (&FILE_INFO(r_ptr)->s_addrs)->hdr;
-			break;
-		case PO_GDRREG:		/* r_ptr set from option processing */
-			assert(arg_supplied);	/* 4SCA: Assigned value is garbage or undefined, even though args are required */
-			assert(r_ptr);
-			zpeekadr = r_ptr;
-			break;
-		case PO_NLREG:		/* r_ptr set from option processing */
-			assert(r_ptr);
-			zpeekadr = (&FILE_INFO(r_ptr)->s_addrs)->nl;
-			break;
-		case PO_JNLREG:		/* r_ptr set from option processing */
-		case PO_JBFREG:
-			assert(r_ptr);
-			csa = &FILE_INFO(r_ptr)->s_addrs;
-			if (NULL == csa->jnl)
-				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_ZPEEKNOJNLINFO, 2, REG_LEN_STR(r_ptr));
-			zpeekadr = (PO_JNLREG == mnemonic_opcode) ? (void *)csa->jnl : (void *)csa->jnl->jnl_buff;
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
+			}
 			break;
 		case PO_GLFREPL:	/* This set of opcodes all require the journal pool to be initialized. Verify it */
 		case PO_GSLREPL:
@@ -691,21 +680,18 @@ void	op_fnzpeek(mval *structid, int offset, int len, mval *format, mval *ret)
 			switch(mnemonic_opcode)
 			{
 				case PO_GLFREPL:	/* arryidx set by option processing */
-<<<<<<< HEAD
 					if (arg_supplied)
+					{
+						assert(-1 != arryidx);
 						zpeekadr = (jnlpool->gtmsrc_lcl_array + arryidx);
+					}
 					break;
 				case PO_GSLREPL:	/* arryidx set by option processing */
 					if (arg_supplied)
+					{
+						assert(-1 != arryidx);
 						zpeekadr = (jnlpool->gtmsource_local_array + arryidx);
-=======
-					assert(-1 != arryidx);
-					zpeekadr = (jnlpool->gtmsrc_lcl_array + arryidx);
-					break;
-				case PO_GSLREPL:	/* arryidx set by option processing */
-					assert(-1 != arryidx);
-					zpeekadr = (jnlpool->gtmsource_local_array + arryidx);
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
+					}
 					break;
 				case PO_NLREPL:
 					zpeekadr = (&FILE_INFO(jnlpool->jnlpool_dummy_reg)->s_addrs)->nl;
@@ -718,11 +704,8 @@ void	op_fnzpeek(mval *structid, int offset, int len, mval *format, mval *ret)
 					break;
 				default:
 					assert(FALSE);
-<<<<<<< HEAD
 					zpeekadr = NULL; /* needed to silence [-Wsometimes-uninitialized] warning from CLang/LLVM */
-=======
 					GTM_UNREACHABLE();
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 			}
 			break;
 		case PO_RPCREPL:	/* This set of opcodes all require the receive pool to be initialized. Verify it */
@@ -754,11 +737,8 @@ void	op_fnzpeek(mval *structid, int offset, int len, mval *format, mval *ret)
 					break;
 				default:
 					assert(FALSE);
-<<<<<<< HEAD
 					zpeekadr = NULL; /* needed to silence [-Wsometimes-uninitialized] warning from CLang/LLVM */
-=======
 					GTM_UNREACHABLE();
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 			}
 			break;
 		case PO_PEEK:		/* prmpeekadr set up in argument processing */
@@ -767,11 +747,8 @@ void	op_fnzpeek(mval *structid, int offset, int len, mval *format, mval *ret)
 			break;
 		default:
 			assert(FALSE);
-<<<<<<< HEAD
 			zpeekadr = NULL; /* needed to silence [-Wsometimes-uninitialized] warning from LLVM compiler */
-=======
 			GTM_UNREACHABLE();
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 	}
 	if (NULL == zpeekadr)
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_BADZPEEKARG, 2, RTS_ERROR_LITERAL("zpeekadr"));

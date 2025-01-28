@@ -3642,32 +3642,20 @@
    PROblksplit
 
    Specifies the approximate number of records a block in the region must
-<<<<<<< HEAD
-   exceed before YottaDB considers a proactive block split. If the specified
-   value is 0, YottaDB does not engage in proactive block splitting. The format
-   of the -PROBLKSPLIT qualifier is:
-
-   -PRO[BLKSPLIT]=integer
-
-     o YottaDB makes proactive block splits when a block has a history of
-       causing repeated restarts; YottaDB never proactively splits blocks that
-       don't encounter restarts.
-=======
-   exceed before GT.M considers a proactive block split. The format of the
+   exceed before YottaDB considers a proactive block split. The format of the
    -PROBLKSPLIT qualifier is:
 
    -PRO[BLKSPLIT]=integer
 
-     o GT.M never performs proactive block splitting inside a TP transaction.
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
+     o YottaDB never performs proactive block splitting inside a TP transaction.
      o Proactive block splits tend to make globals require more blocks and
        potentially deeper trees.
      o A value of one (1) indicates to always consider proactive splits,
        which might be useful for regions used to hold globals with a first
        subscript of, for example, $job.
-     o A value of five (5) indicates that GT.M considers proactive block
+     o A value of five (5) indicates that YottaDB considers proactive block
        split only when the number of records in a block exceed 5.
-     o The default is zero (0). It means that GT.M does not consider
+     o The default is zero (0). It means that YottaDB does not consider
        proactive block splitting by default.
 
 3 Qdbrundown

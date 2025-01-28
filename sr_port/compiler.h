@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -15,11 +15,8 @@
 #ifndef COMPILER_H_INCLUDED
 #define COMPILER_H_INCLUDED
 
-<<<<<<< HEAD
-#include "opcode.h"
-=======
 #include "mdq.h"
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
+#include "opcode.h"
 
 /* Values for oprclass - Changes made here need to be reflected in cdbg_dump opr_type_names table */
 typedef enum
@@ -1003,16 +1000,14 @@ void		walktree(mvar *n,void (*f)(),char *arg);
 void		wrtcatopt(triple *r, triple ***lpx, triple **lptop);
 int		zlcompile(unsigned char len, unsigned char *addr);		/***type int added***/
 
-<<<<<<< HEAD
-/* Helper functions */
-triple		*bool_return_leftmost_triple(triple *t);
-opctype		bx_get_andor_opcode(opctype ref_opcode, opctype andor_opcode);
-=======
 static inline void exorder_init(triple *chain)
 {
 	chain->opcode = OCQ_INVALID;
 	dqinit(chain, exorder);
 }
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
+
+/* Helper functions */
+triple		*bool_return_leftmost_triple(triple *t);
+opctype		bx_get_andor_opcode(opctype ref_opcode, opctype andor_opcode);
 
 #endif /* COMPILER_H_INCLUDED */

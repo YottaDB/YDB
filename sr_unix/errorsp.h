@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -288,14 +288,10 @@ void ch_trace_point() {return;}
 					ctxt->intrpt_ok_state = prev_intrpt_state_est;				\
 					if (0 != setjmp(ctxt->jmp))						\
 					{									\
-<<<<<<< HEAD
 						/* Undo increment done in rts_error_csa() */			\
 						if (0 < TREF(rts_error_depth))					\
 							--(TREF(rts_error_depth));				\
-						prev_intrpt_state = ctxt->intrpt_ok_state;			\
-=======
 						prev_intrpt_state_est = ctxt->intrpt_ok_state;			\
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 						REVERT;								\
 						/* See ESTABLISH_RET macro comment for below assert */		\
 						if (!multi_thread_in_use)					\
@@ -308,36 +304,10 @@ void ch_trace_point() {return;}
 					} else									\
 						ENABLE_INTERRUPTS(INTRPT_IN_CONDSTK, prev_intrpt_state_est);	\
 				}
-# define ESTABLISH_NORET(x, did_long_jump)									\
-				{										\
-<<<<<<< HEAD
-					intrpt_state_t		prev_intrpt_state;				\
-														\
-					DEFER_INTERRUPTS(INTRPT_IN_CONDSTK, prev_intrpt_state);			\
-					did_long_jump = FALSE;							\
-					ESTABLISH_NOJMP(x);							\
-					/* See ESTABLISH_RET macro comment for below assert */			\
-					ctxt->intrpt_ok_state = prev_intrpt_state;				\
-					if (0 != setjmp(ctxt->jmp))						\
-					{									\
-						/* Undo increment done in rts_error_csa() */			\
-						if (0 < TREF(rts_error_depth))					\
-							--(TREF(rts_error_depth));				\
-						prev_intrpt_state = ctxt->intrpt_ok_state;			\
-						did_long_jump = TRUE;						\
-						/* See ESTABLISH_RET macro comment for below assert */		\
-						assert(INTRPT_OK_TO_INTERRUPT <= prev_intrpt_state);		\
-						assert(INTRPT_NUM_STATES > prev_intrpt_state);			\
-						/* Assert "intrpt_ok_state" and "prev_intrpt_state" are same in	\
-						 * "dbg" but restore "intrpt_ok_state" in "pro" just in case	\
-						 */								\
-						assert(prev_intrpt_state == intrpt_ok_state);			\
-						intrpt_ok_state = prev_intrpt_state;				\
-					} else									\
-						ENABLE_INTERRUPTS(INTRPT_IN_CONDSTK, prev_intrpt_state);	\
-=======
+# define ESTABLISH_NORET(x, did_long_jump)										\
+				{											\
 					intrpt_state_t		prev_intrpt_state_estnr;				\
-					\
+															\
 					DEFER_INTERRUPTS(INTRPT_IN_CONDSTK, prev_intrpt_state_estnr);			\
 					did_long_jump = FALSE;								\
 					ESTABLISH_NOJMP(x);								\
@@ -345,6 +315,9 @@ void ch_trace_point() {return;}
 					ctxt->intrpt_ok_state = prev_intrpt_state_estnr;				\
 					if (0 != setjmp(ctxt->jmp))							\
 					{										\
+						/* Undo increment done in rts_error_csa() */				\
+						if (0 < TREF(rts_error_depth))						\
+							--(TREF(rts_error_depth));					\
 						prev_intrpt_state_estnr = ctxt->intrpt_ok_state;			\
 						did_long_jump = TRUE;							\
 						/* See ESTABLISH_RET macro comment for below assert */			\
@@ -357,7 +330,6 @@ void ch_trace_point() {return;}
 						intrpt_ok_state = prev_intrpt_state_estnr;				\
 					} else										\
 						ENABLE_INTERRUPTS(INTRPT_IN_CONDSTK, prev_intrpt_state_estnr);		\
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 				}
 
 # define WITH_CH(HANDLER, OP, ERR_OP)										\

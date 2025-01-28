@@ -93,12 +93,9 @@
 # include "gtm_utf8.h"
 #endif
 #include "getjobnum.h"
-<<<<<<< HEAD
+#include "wbox_test_init.h"
 #include "ydb_chk_dist.h"
 #include "ydb_getenv.h"
-=======
-#include "wbox_test_init.h"
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 
 #define intent_open		"for open"	/* FLUSH_DB_IPCS_INFO types */
 #define intent_close		"for close"

@@ -3,7 +3,7 @@
  * Copyright (c) 2020-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2022-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -158,10 +158,6 @@ static inline void copy_curr_and_prev_key_to_gvtarget_clue(gv_namehead *gvt, gv_
 
 static inline void gv_append_max_subs_key(gv_key *gvkey, gv_namehead *gvt)
 {
-<<<<<<< HEAD
-	GBLREF gd_region	*gv_cur_region;
-=======
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 	int			lastsubslen, keysize;
 	unsigned char		*ptr;
 

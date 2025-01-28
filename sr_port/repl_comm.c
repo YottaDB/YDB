@@ -332,12 +332,7 @@ int repl_send(int sock_fd, unsigned char *buff, int *send_len, int timeout GTMTL
 int repl_recv(int sock_fd, unsigned char *buff, int *recv_len, int timeout GTMTLS_ONLY_COMMA(int *poll_direction))
 {
 	int		status, max_recv_len, io_ready, save_errno;
-<<<<<<< HEAD
-	ssize_t		bytes_recvd;
-=======
 	ssize_t		bytes_recvd = 0;
-	char const	*errptr;
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 
 	if (!repl_recv_trace_buff)
 		repl_recv_trace_buff = malloc(REPL_RECV_TRACE_BUFF_SIZE);

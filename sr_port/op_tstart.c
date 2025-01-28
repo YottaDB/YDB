@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -394,15 +394,9 @@ void	op_tstart(int tstart_flag, ...) /* value of $T when TSTART */
 			TREF(gv_tporigkey_ptr) = (gv_key_buf *)malloc(SIZEOF(gv_key_buf));
 			memset(TREF(gv_tporigkey_ptr), 0, SIZEOF(gv_key_buf));
 		}
-<<<<<<< HEAD
-		tf->orig_key = (gv_key *)&((TREF(gv_tporigkey_ptr))->key);
+		tf->orig_key = &((TREF(gv_tporigkey_ptr))->key);
 		if (NULL != gv_currkey)
 			MEMCPY_KEY(tf->orig_key, gv_currkey);
-=======
-		tf->orig_key = &((TREF(gv_tporigkey_ptr))->key);
-		assert(NULL != gv_currkey);
-		MEMCPY_KEY(tf->orig_key, gv_currkey);
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 		tf->gd_header = gd_header;
 		tf->gd_reg = gv_cur_region;
 		tf->orig_gv_target = gv_target;

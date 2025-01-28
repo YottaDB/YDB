@@ -216,15 +216,9 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 	trans_num		valid_thru, oldest_hist_tn, dbtn, blktn, temp_tn, epoch_tn, old_block_tn;
 	unsigned char		cw_depth, cw_bmp_depth, buff[MAX_ZWR_KEY_SZ], *end;
 	jnldata_hdr_ptr_t	jnl_header;
-<<<<<<< HEAD
 	uint4			tmp_cw_set_depth, prev_cw_set_depth;
 	gtm_uint64_t		total_jnl_rec_size;
-	jnlpool_ctl_ptr_t	jpl;
-=======
-	uint4			total_jnl_rec_size, tmp_cw_set_depth, prev_cw_set_depth;
-	DEBUG_ONLY(unsigned int	tot_jrec_size;)
 	jnlpool_ctl_ptr_t	jpl = NULL;
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 	jnlpool_addrs_ptr_t	save_jnlpool, tmp_jnlpool;
 	boolean_t		replication = FALSE;
 	boolean_t		supplementary = FALSE;	/* this variable is initialized ONLY if "replication" is TRUE. */

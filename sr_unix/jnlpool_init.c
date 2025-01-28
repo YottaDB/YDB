@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -216,13 +216,8 @@ MBSTART {														\
 
 void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t *jnlpool_creator, gd_addr *gd_ptr)
 {
-<<<<<<< HEAD
-	boolean_t		hold_onto_ftok_sem, is_src_srvr, new_ipc, reset_gtmsrclcl_info, slot_needs_init, srv_alive;
-	boolean_t		cannot_activate, ftok_counter_halted, skip_locks, new_tmp_jnlpool, new_dummy_reg;
-=======
 	boolean_t		hold_onto_ftok_sem, is_src_srvr, new_ipc, reset_gtmsrclcl_info = FALSE, slot_needs_init, srv_alive;
-	boolean_t		cannot_activate, ftok_counter_halted, skip_locks, new_tmp_jnlpool, new_dummy_reg, gdid_matched;
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
+	boolean_t		cannot_activate, ftok_counter_halted, skip_locks, new_tmp_jnlpool, new_dummy_reg;
 	char			instfilename[MAX_FN_LEN + 1], machine_name[MAX_MCNAMELEN], scndry_msg[OUT_BUFF_SIZE];
 	gd_region		*r_save, *reg;
 	int			status, save_errno;

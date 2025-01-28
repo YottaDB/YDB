@@ -3,7 +3,7 @@
  * Copyright (c) 2017-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -352,7 +352,6 @@ void restrict_init(void)
 							tls = TRUE;
 #						endif
 						else
-<<<<<<< HEAD
 						{       /* Invalid option - parse error and restrict everything */
 							send_msg_csa(CSA_ARG(NULL) VARLSTCNT(9)
 									ERR_RESTRICTSYNTAX, 3,
@@ -362,20 +361,6 @@ void restrict_init(void)
 									("Invalid auditing option"));
 							restrict_all = TRUE;
 							break;
-=======
-						{	/* Invalid option - parse error and restrict everything */
-							if (!valid_option)
-							{
-								send_msg_csa(CSA_ARG(NULL) VARLSTCNT(9)
-										ERR_RESTRICTSYNTAX, 3,
-										LEN_AND_STR(restrictpath), lineno,
-										ERR_TEXT, 2,
-										LEN_AND_LIT
-										("Invalid auditing option"));
-								restrict_all = TRUE;
-								break;
-							}
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 						}
 					}
 					if (restrict_all)

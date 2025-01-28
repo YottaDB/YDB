@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -44,11 +44,7 @@ int f_order(oprtype *a, opctype op)
 	opctype		gv_oc;
 	oprtype		control_slot, dir_opr, *dir_oprptr, *next_oprptr;
 	short int	column;
-<<<<<<< HEAD
-	triple		*oldchain, *r, *sav_dirref, *sav_gv1, *sav_gvn, *sav_lvn, *sav_ref, *triptr;
-=======
-	triple		*oldchain, *r, *sav_dirref, *sav_gv1 = NULL, *sav_gvn = NULL, *sav_lvn, *sav_ref, *share, *triptr;
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
+	triple		*oldchain, *r, *sav_dirref, *sav_gv1 = NULL, *sav_gvn = NULL, *sav_lvn, *sav_ref, *triptr;
 	triple		*chain2, *obp, tmpchain2;
 	save_se		save_state;
 	static opctype order_opc[LAST_OBJECT][LAST_DIRECTION] =
@@ -197,12 +193,7 @@ int f_order(oprtype *a, opctype op)
 				break;
 			case INDIRECT:		/* Save and restore the variable lookup for true left-to-right evaluation */
 				*next_oprptr = *dir_oprptr;
-<<<<<<< HEAD
-				dqinit(&tmpchain2, exorder);
-=======
-				used_glvn_slot = TRUE;
 				exorder_init(&tmpchain2);
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 				chain2 = setcurtchain(&tmpchain2);
 				INSERT_INDSAVGLVN(control_slot, r->operand[0], ANY_SLOT, 1);
 				setcurtchain(chain2);

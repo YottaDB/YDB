@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2021-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2021-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -97,11 +97,7 @@ static inline void grab_lock_crit_intl(mlk_pvtctl_ptr_t pctl, boolean_t *ret_was
 		 * in GRAB_LATCH_INDEFINITE_WAIT as the timeout.
 		 */
 		grab_latch(&csa->nl->lock_crit, GRAB_LATCH_INDEFINITE_WAIT, WS_38, csa);
-<<<<<<< HEAD
 		*ret_was_crit = FALSE;				/* Initialize to keep code analyzer happy */
-=======
-		*ret_was_crit = FALSE;
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 	}
 }
 

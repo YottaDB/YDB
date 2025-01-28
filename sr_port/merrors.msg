@@ -1228,11 +1228,7 @@ UNUSEDMSG1227	<MMNODYNDWNGRD removed from code in V7.1-000 Feb 2023>/error/fao=0
 UNUSEDMSG1228	<MMNODYNUPGRD removed from code in V7.1-000 Feb 2023>/error/fao=0!/ansi=0
 UNUSEDMSG1229	<MUDWNGRDNRDY removed from code in V7.1-000 Feb 2023>/error/fao=0!/ansi=0
 REORGUPCNFLCT	<MUPIP !AD encountered a conflict due to !AD (PID:!UL)>/error/fao=5!/ansi=0
-<<<<<<< HEAD
-MUDWNGRDNOTPOS	<Start VBN value is [!UL] while downgraded YottaDB version can support only [!UL]. Downgrade not possible>/error/fao=2!/ansi=0
-=======
 MUDWNGRDNOTPOS	<Downgrade not possible for a V7 database version>/error/fao=0!/ansi=0
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 MUUPGRDNRDY	<Database !AD has not been completely upgraded to !AD format - still !@UQ database blocks to upgrade>/error/fao=5!/ansi=0
 TNWARN		<Database file !AD has 0x!16@XQ more transactions to go before reaching the transaction number limit (0x!16@XQ). Renew database with MUPIP INTEG TN_RESET>/warning/fao=4!/ansi=0
 TNTOOLARGE	<Database file !AD has reached the transaction number limit (0x!16@XQ). Renew database with MUPIP INTEG TN_RESET>/error/fao=3!/ansi=0
@@ -1457,13 +1453,8 @@ MUTRUNCBACKINPROG	<Truncate detected concurrent backup in progress for region !A
 MUTRUNCERROR	<Truncate of region !AD encountered service error !AD>/error/fao=4!/ansi=0
 MUTRUNCFAIL	<Truncate failed after reorg.  Failure code: !AD.>/error/fao=2!/ansi=0
 MUTRUNCNOSPACE	<Region !AD has insufficient space to meet truncate target percentage of !UL>/info/fao=3!/ansi=0
-<<<<<<< HEAD
 MUTRUNCNOTBG	<Region !AD does not have access method BG>/error/fao=2!/ansi=0
-UNUSEDMSG1457	<MUTRUNCNOV4 Last used in V7.0-004 Fed 2023>/fatal/fao=0!/ansi=0
-=======
-MUTRUNCNOTBG	<Region !AD does not have access method BG >/error/fao=2!/ansi=0
 PIDMISMATCH	<Global variable with PID=!UL does not match specified PID=!UL>/warning/fao=2!/ansi=0
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 MUTRUNCPERCENT	<Truncate threshold percentage should be from 0 to 99>/error/fao=0!/ansi=0
 MUTRUNCSSINPROG	<Truncate detected concurrent snapshot in progress for region !AD>/info/fao=2!/ansi=0
 MUTRUNCSUCCESS	<Database file !AD truncated from 0x!16@XQ blocks to 0x!16@XQ at transaction 0x!16@XQ>/info/fao=5!/ansi=0

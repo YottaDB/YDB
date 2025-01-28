@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -86,13 +86,8 @@ void op_fnquery_va(int sbscnt, mval *dst, va_list var)
 	lvTree			*lvt;
 	lvTreeNode		**h1, **h2, *history[MAX_LVSUBSCRIPTS + 1], *node, *nullsubsnode, *nullsubsparent, *parent;
 	mname_entry		lvent;
-<<<<<<< HEAD
-	mval			*arg1, **argpp, *argp2, **argpp2, *args[MAX_LVSUBSCRIPTS], *lfrsbs, *mv, tmpmv, tmp_sbs,
-				*last_fnquery_ret, *varname, *v1, *v2;
-=======
 	mval			*arg1 = NULL, **argpp, *argp2, **argpp2, *args[MAX_LVSUBSCRIPTS], *lfrsbs, *mv, tmpmv, tmp_sbs,
-				*varname, *v1, *v2;
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
+				*last_fnquery_ret, *varname, *v1, *v2;
 	mval			xform_args[MAX_LVSUBSCRIPTS];	/* for lclcol */
 	mstr			format_out, *retsub;
 	DCL_THREADGBL_ACCESS;
@@ -239,7 +234,6 @@ void op_fnquery_va(int sbscnt, mval *dst, va_list var)
 			break; /* Key not found in tree at this level. find right sibling in "lvt" tree with key="arg1" */
 		lvt = LV_GET_CHILD(node);
 		*h1 = node;
-<<<<<<< HEAD
 		if (NULL == lvt)
 		{	/* Subtree does not exist at this level. To get $query of input node,
 			 * need to start from right sibling of parent level.  */
@@ -248,39 +242,6 @@ void op_fnquery_va(int sbscnt, mval *dst, va_list var)
 			lvt = LV_GET_CHILD(node);
 			assert(NULL != lvt);
 			break;
-=======
-	}
-	va_end(var);
-	assert((i != sbscnt) || !found);
-	if (!found)
-	{
-		if (i == sbscnt)
-		{
-			assert(!found);
-			parent = *(h1 - 1);
-			assert(NULL != parent);
-			lvt = LV_GET_CHILD(parent);
-			if (lvt)
-			{
-				found = TRUE;
-				nullsubsnode = TREF(local_collseq_stdnull)
-					?  lvAvlTreeLookupStr(lvt, (treeKeySubscr *)&literal_null, &nullsubsparent) : NULL;
-				node = (NULL == nullsubsnode) ? lvAvlTreeFirst(lvt) : nullsubsnode;
-				assert(NULL != node);
-				*h1 = node;
-			} else
-				--h1;
-		} else
-		{	/* Need to find right sibling. "lvt" is tree to search in and "arg1" is key to search for. */
-			assert(arg1);
-			node = lvAvlTreeKeyCollatedNext(lvt, arg1);
-			if (NULL != node)
-			{
-				*h1 = node;
-				found = TRUE;
-			} else	/* if "node" is still NULL, need to start searching for right siblings at the parent level. */
-				h1--;
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 		}
 	}
 	va_end(var);
@@ -296,6 +257,7 @@ void op_fnquery_va(int sbscnt, mval *dst, va_list var)
 		*h1 = node;
 	} else
 	{	/* Need to find right sibling. "lvt" is tree to search in and "arg1" is key to search for. */
+		assert(NULL != arg1);
 		node = lvAvlTreeKeyCollatedNext(lvt, arg1);
 		if (NULL != node)
 		{

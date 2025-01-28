@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -282,13 +282,6 @@ STATICFNDEF void receive_child_locals_finalize(char **local_buff)
 	ENABLE_INTERRUPTS(INTRPT_IN_FRAME_POINTER_NULL, prev_intrpt_state);
 	msp += SIZEOF(stack_frame *);           /* Remove frame save pointer from stack */
 	free(*local_buff);
-<<<<<<< HEAD
-	free((TREF(source_buffer)).addr);
-	/* Reset the source buffer */
-	(TREF(source_buffer)).len = MAX_SRCLINE;
-	(TREF(source_buffer)).addr = (char *)aligned_source_buffer;
-=======
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 	/* Return the space saved for command strings */
 	POP_MV_STENT();
 	ctxt = active_ch = chnd;		/* Clear extra condition handlers added by dm_start()s */

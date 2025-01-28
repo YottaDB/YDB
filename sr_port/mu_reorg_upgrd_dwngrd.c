@@ -230,31 +230,6 @@ void	mu_reorg_upgrd_dwngrd(void)
 		assert(DBKEYSIZE(MAX_KEY_SZ) == gv_keysize);		/* gv_keysize was init'ed by gvinit() in the caller */
 		gvcst_init(reg);
 		change_reg();
-<<<<<<< HEAD
-#ifndef	REORG_UPGRADE_IS_ONLINE
-		/* Obtain standalone access for MUPIP REORG -UPGRADE until ONLINE tests cleanly */
-		if (EXIT_NRM != gds_rundown(CLEANUP_UDI_FALSE))
-		{	/* Failed to rundown the DB, so we can't get standalone access */
-			error = TRUE;
-			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_DBRNDWN, 2, DB_LEN_STR(gv_cur_region));
-			util_out_print("Region !AD : Failed to rundown the database (!AD) in order to get standalone access.",
-			       TRUE, REG_LEN_STR(reg), DB_LEN_STR(reg));
-			continue;
-		}
-		if (!STANDALONE(reg) || !(FILE_INFO(reg)->grabbed_access_sem))
-		{
-			error = TRUE;
-			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_MUSTANDALONE, 2, DB_LEN_STR(reg));
-			util_out_print("Region !AD : Failed to get standalone access (!AD).",
-					TRUE, REG_LEN_STR(reg), DB_LEN_STR(reg));
-			continue;
-		}
-		/* Reopen the region now that we have standalone access */
-		gvcst_init(reg);
-		change_reg();
-#endif
-=======
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 		csd = cs_data;
 		csa = cs_addrs;
 		is_bg = (dba_bg == csd->acc_meth);
@@ -748,11 +723,7 @@ enum cdb_sc upgrade_idx_block(block_id *curr_blk, gd_region *reg, mname_entry *g
 	cache_rec_ptr_t	child_cr;
 	enum db_ver	blk_ver;
 	gvnh_reg_t	*gvnh_reg = NULL;
-<<<<<<< HEAD
-	int		blk_seg_cnt, i, key_cmpc, key_len, level, new_blk_sz, num_recs, rec_sz, space_need,
-=======
 	int		blk_seg_cnt, i, key_cmpc, key_len, level, max_fill, new_blk_sz, num_recs, rec_sz, space_need,
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 			split_blks_added, split_levels_added, v7_rec_sz;
 	int4		blk_size, child_data_blks, status;
 	mname_entry	gvt_name;

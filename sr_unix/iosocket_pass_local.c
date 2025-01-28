@@ -3,7 +3,7 @@
  * Copyright (c) 2014-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -36,16 +36,10 @@
 #include "error.h"
 
 #define MAX_PASS_FDS			256
-<<<<<<< HEAD
-
-#if defined(__linux__) || defined(__sun) || defined(_AIX)
-#define PID_CHECKING_SUPPORTED
-=======
 #if defined(__linux__) || defined(__sun) || defined(_AIX)
 #	define PID_CHECKING_SUPPORTED		(1)
 #else
 #	define PID_CHECKING_SUPPORTED		(0)
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 #endif
 
 #define RECVALL(FD, BUF, BUFLEN, RVAL)		XFERALL(recv, FD, BUF, BUFLEN, RVAL)
@@ -297,13 +291,9 @@ void iosocket_pass_local(io_desc *iod, pid_t pid, uint8 nsec_timeout, int argcnt
 	assert(rval == STR_LIT_LEN(ACCEPT_COMPLETE));
 	if (0 != STRNCMP_LIT(complete_buf, ACCEPT_COMPLETE))
 	{
-<<<<<<< HEAD
 		if ((NO_M_TIMEOUT != nsec_timeout) && !out_of_time)
-=======
-		if ((NO_M_TIMEOUT != msec_timeout) && !out_of_time)
 		{
 			assert(timer_id);
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 			cancel_timer(timer_id);
 		}
 		iod->dollar.za = ZA_IO_ERR;
@@ -314,13 +304,9 @@ void iosocket_pass_local(io_desc *iod, pid_t pid, uint8 nsec_timeout, int argcnt
 		REVERT_GTMIO_CH(&iod->pair, ch_set);
 		return;
 	}
-<<<<<<< HEAD
 	if ((NO_M_TIMEOUT != nsec_timeout) && !out_of_time)
-=======
-	if ((NO_M_TIMEOUT != msec_timeout) && !out_of_time)
 	{
 		assert(timer_id);
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 		cancel_timer(timer_id);
 	}
 	for (argn = 0; argn < argcnt; argn++)
@@ -343,13 +329,9 @@ ioerr:
 		REVERT_GTMIO_CH(&iod->pair, ch_set);
 		return;
 	}
-<<<<<<< HEAD
 	if ((NO_M_TIMEOUT != nsec_timeout) && !out_of_time)
-=======
-	if ((NO_M_TIMEOUT != msec_timeout) && !out_of_time)
 	{
 		assert(timer_id);
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 		cancel_timer(timer_id);
 	}
 	iod->dollar.za = ZA_IO_ERR;
@@ -479,13 +461,9 @@ void iosocket_accept_local(io_desc *iod, mval *handlesvar, pid_t pid, uint8 nsec
 		goto ioerr;
 	if (SIZEOF(mdata) != rval)
 	{
-<<<<<<< HEAD
 		if ((NO_M_TIMEOUT != nsec_timeout) && !out_of_time)
-=======
-		if ((NO_M_TIMEOUT != msec_timeout) && !out_of_time)
 		{
 			assert(timer_id);
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 			cancel_timer(timer_id);
 		}
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_SOCKNOTPASSED);
@@ -505,13 +483,9 @@ void iosocket_accept_local(io_desc *iod, mval *handlesvar, pid_t pid, uint8 nsec
 		cmsg = CMSG_NXTHDR(&msg, cmsg);
 	if (NULL == cmsg)
 	{
-<<<<<<< HEAD
 		if ((NO_M_TIMEOUT != nsec_timeout) && !out_of_time)
-=======
-		if ((NO_M_TIMEOUT != msec_timeout) && !out_of_time)
 		{
 			assert(timer_id);
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 			cancel_timer(timer_id);
 		}
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(2) ERR_SOCKNOTPASSED, 0);
@@ -522,13 +496,9 @@ void iosocket_accept_local(io_desc *iod, mval *handlesvar, pid_t pid, uint8 nsec
 	assert(((cmsg->cmsg_len - ((char *)CMSG_DATA(cmsg) - (char *)cmsg)) / SIZEOF(int)) == fdcount);
 	if (0 == fdcount)
 	{
-<<<<<<< HEAD
 		if ((NO_M_TIMEOUT != nsec_timeout) && !out_of_time)
-=======
-		if ((NO_M_TIMEOUT != msec_timeout) && !out_of_time)
 		{
 			assert(timer_id);
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 			cancel_timer(timer_id);
 		}
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(2) ERR_SOCKNOTPASSED, 0);
@@ -536,13 +506,9 @@ void iosocket_accept_local(io_desc *iod, mval *handlesvar, pid_t pid, uint8 nsec
 	}
 	if (ydb_max_sockets <= (socket_pool->n_socket + fdcount))
 	{
-<<<<<<< HEAD
 		if ((NO_M_TIMEOUT != nsec_timeout) && !out_of_time)
-=======
-		if ((NO_M_TIMEOUT != msec_timeout) && !out_of_time)
 		{
 			assert(timer_id);
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 			cancel_timer(timer_id);
 		}
 		for (fdn = 0; fdn < fdcount; fdn++)
@@ -609,13 +575,9 @@ void iosocket_accept_local(io_desc *iod, mval *handlesvar, pid_t pid, uint8 nsec
 	assert(rval == STR_LIT_LEN(PASS_COMPLETE));
 	if (0 != STRNCMP_LIT(complete_buf, PASS_COMPLETE))
 	{
-<<<<<<< HEAD
 		if ((NO_M_TIMEOUT != nsec_timeout) && !out_of_time)
-=======
-		if ((NO_M_TIMEOUT != msec_timeout) && !out_of_time)
 		{
 			assert(timer_id);
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 			cancel_timer(timer_id);
 		}
 		for (fdn = scnt - 1; fdn >= 0; fdn--)
@@ -639,13 +601,9 @@ void iosocket_accept_local(io_desc *iod, mval *handlesvar, pid_t pid, uint8 nsec
 	if (-1 == rval)
 		goto ioerr;
 	assert(rval == STR_LIT_LEN(ACCEPT_COMPLETE));
-<<<<<<< HEAD
 	if ((NO_M_TIMEOUT != nsec_timeout) && !out_of_time)
-=======
-	if ((NO_M_TIMEOUT != msec_timeout) && !out_of_time)
 	{
 		assert(timer_id);
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 		cancel_timer(timer_id);
 	}
 	if (NULL != handlesvar)

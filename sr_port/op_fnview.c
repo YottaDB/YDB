@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -142,34 +142,6 @@ LITREF	mval		literal_null;
 }
 
 void	op_fnview(int numarg, mval *dst, ...)
-<<<<<<< HEAD
-{	boolean_t	save_transform, n_int8 = FALSE;
-	char		instfilename[MAX_FN_LEN + 1 + 1];	/* 1 for possible flag character */
-	collseq		*csp;
-	gd_binding	*map, *start_map, *end_map;
-	gd_gblname	*gname;
-	gd_region	*reg, *reg_start, *reg_top, *statsDBreg;
-	gv_key		*gvkey;
-	gv_key_buf	save_currkey;
-	gv_namehead	temp_gv_target;
-	gvnh_reg_t	*gvnh_reg;
-	gvnh_spanreg_t	*gvspan;
-	int		apdtype, n, tl, newlevel, res, reg_index, collver, nct, act, ver, trigdepth, cidepth;
-	block_id	n2 = 0;
-	lv_val		*lv;
-	mstr		tmpstr, commastr, *gblnamestr;
-	mval		*arg1, *arg2, tmpmval;
-	mval		*keyword;
-	sgmnt_addrs	*csa;
-	tp_frame	*tf;
-	trans_num	gd_targ_tn, *tn_array;
-	unsigned char	*c, *c_top, *key;
-	unsigned char	buff[MAX_ZWR_KEY_SZ];
-	unsigned char	device_status[DEVICE_MAX_STATUS];
-	va_list		var;
-	viewparm	parmblk, parmblk2;
-	viewtab_entry	*vtp;
-=======
 {	boolean_t		save_transform, n_int8 = FALSE, found = FALSE;
 	char			instfilename[MAX_FN_LEN + 1 + 1];	/* 1 for possible flag character */
 	collseq			*csp;
@@ -182,7 +154,7 @@ void	op_fnview(int numarg, mval *dst, ...)
 	gvnh_reg_t		*gvnh_reg;
 	gvnh_spanreg_t		*gvspan;
 	jnlpool_addrs_ptr_t	jnlpool_local;
-	int			apdtype, n = 0x1bad2bad, tl, newlevel, res, reg_index, collver, nct, act, ver;
+	int			apdtype, n = 0x1bad2bad, tl, newlevel, res, reg_index, collver, nct, act, ver, trigdepth, cidepth;
 	block_id		n2 = 0;
 	lv_val			*lv;
 	mstr			tmpstr, commastr, *gblnamestr;
@@ -197,7 +169,6 @@ void	op_fnview(int numarg, mval *dst, ...)
 	va_list			var;
 	viewparm		parmblk, parmblk2;
 	viewtab_entry		*vtp;
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;

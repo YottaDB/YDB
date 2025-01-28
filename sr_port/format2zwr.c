@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -38,13 +38,8 @@ int format2zwr(sm_uc_ptr_t src, int src_len, unsigned char *des, int *des_len)
 {
 	sm_uc_ptr_t	cp;
 	uint4		ch;
-<<<<<<< HEAD
-	int		fastate = 0, ncommas, dstlen, chlen, max_len;
-	boolean_t	isctl, isill, nospace;
-=======
 	int		fastate = 0, ncommas = 0, dstlen, chlen, max_len;
-	boolean_t	isctl, isill;
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
+	boolean_t	isctl, isill, nospace;
 	uchar_ptr_t	srctop, strnext, tmpptr;
 
 	max_len = *des_len;
@@ -81,13 +76,7 @@ int format2zwr(sm_uc_ptr_t src, int src_len, unsigned char *des, int *des_len)
 			case 0:	/* beginning of the string */
 			case 1: /* beginning of a new substring followed by a graphic character */
 				if (isill)
-<<<<<<< HEAD
 			        {
-=======
-				{
-					assert(max_len > (dstlen + STR_LIT_LEN(DOLLARZCH)
-								+ MAX_ZWR_ZCHAR_DIGITS + ((dstlen) ? 2 : 0)));
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 					if (max_len > (dstlen + STR_LIT_LEN(DOLLARZCH)
 								+ MAX_ZWR_ZCHAR_DIGITS + ((dstlen) ? 2 : 0)))
 					{
@@ -107,15 +96,8 @@ int format2zwr(sm_uc_ptr_t src, int src_len, unsigned char *des, int *des_len)
 						nospace = TRUE;
 					}
 					break;
-<<<<<<< HEAD
-			        } else if (isctl)
-			        {
-=======
 				} else if (isctl)
 				{
-					assert(max_len > (dstlen + STR_LIT_LEN(DOLLARCH)
-								+ MAX_ZWR_DCHAR_DIGITS + ((dstlen) ? 2 : 0)));
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 					if (max_len > (dstlen + STR_LIT_LEN(DOLLARCH)
 								+ MAX_ZWR_DCHAR_DIGITS + ((dstlen) ? 2 : 0)))
 					{
@@ -132,13 +114,9 @@ int format2zwr(sm_uc_ptr_t src, int src_len, unsigned char *des, int *des_len)
 					} else
 					{
 						cp = srctop;	/* Not enough space, terminate the loop */
-<<<<<<< HEAD
 						nospace = TRUE;
 					}
-			        } else
-=======
 				} else
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 				{ /* graphic characters */
 					if (max_len > (dstlen + 2 + ((!gtm_utf8_mode) ? 1 : chlen)))
 					{
@@ -289,7 +267,6 @@ int format2zwr(sm_uc_ptr_t src, int src_len, unsigned char *des, int *des_len)
 		switch(fastate)
 		{
 		case 1:
-<<<<<<< HEAD
 			if (!nospace)
 				des[dstlen++] = '"';
 			break;
@@ -297,13 +274,6 @@ int format2zwr(sm_uc_ptr_t src, int src_len, unsigned char *des, int *des_len)
 		case 3:
 			if (!nospace)
 				des[dstlen++] = ')';
-=======
-			des[dstlen++] = '"';
-			break;
-		case 2:
-		case 3:
-			des[dstlen++] = ')';
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 			break;
 		default:
 			assert(FALSE);

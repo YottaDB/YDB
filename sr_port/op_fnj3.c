@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2021-2024 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2021-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -40,14 +40,7 @@ void op_fnj3(mval *src, int width, int fract, mval *dst)
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_MAXSTRLEN);
 	if (0 > fract)
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_JUSTFRACT);
-<<<<<<< HEAD
 	else if (MAX_STRLEN < fract)
-=======
-	/* The literal two below accounts for the possibility
-	 * of inserting a zero and/or a minus with a width of zero.
-	 */
-	if (MAXINT4 < (gtm_uint8)width + MAX_NUM_SIZE + 2 + (gtm_uint8)fract)
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_MAXSTRLEN);
 	w = width + MAX_NUM_SIZE + 2 + fract;
 	if  ((0 > w) || (MAX_STRLEN < w))

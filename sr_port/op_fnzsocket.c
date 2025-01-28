@@ -3,7 +3,7 @@
  * Copyright (c) 2014-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -512,28 +512,10 @@ void	op_fnzsocket(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 		case zsocket_number:
 			numret = (int)dsocketptr->n_socket;
 			break;
-<<<<<<< HEAD
 		case zsocket_options:;
 			int determined_length = 0;
-			for (zsocket_item_round_t round = ZSIR_1_DETERMINE_LENGTH; round <= ZSIR_2_RENDER_RESULT; round++)
-=======
-		case zsocket_options:
-			/* build string from socket struct - note this may not be exactly what was specified */
 			assert(socketptr);
-			len = 0;
-			if (SOCKOPTIONS_SYSTEM < socketptr->options_state.alive)
-			{	/* user specified */
-				len += STRLEN(KEEPALIVE_STR);
-				if (0 == socketptr->keepalive)
-					len++;		/* disabled */
-				else if (SOCKOPTIONS_SYSTEM < socketptr->options_state.idle)
-				{	/* if keepalive disabled skip keepidle */
-					len += STRLEN(KEEPIDLE_STR) + 1;	/* count = */
-					len += MAX_DIGITS_IN_INT;
-				}
-			}
-			if (SOCKOPTIONS_SYSTEM < socketptr->options_state.sndbuf)
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
+			for (zsocket_item_round_t round = ZSIR_1_DETERMINE_LENGTH; round <= ZSIR_2_RENDER_RESULT; round++)
 			{
 				bool need_optionend_flag = false;
 

@@ -3,7 +3,7 @@
  * Copyright (c) 2015-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -177,12 +177,7 @@ void mupip_reorg_encrypt(void)
 	uint4			lcl_update_trans, pid, bptr_size;
 	jnl_private_control	*jpc;
 #	ifdef DEBUG
-<<<<<<< HEAD
-	uint4			reencryption_count;
-=======
 	uint4			reencryption_count = 0;
-	block_id		initial_blk_cnt;
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 #	endif
 	unix_db_info		*udi;
 	DCL_THREADGBL_ACCESS;

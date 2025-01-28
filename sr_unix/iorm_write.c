@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -126,11 +126,7 @@ void iorm_write_utf(mstr *v)
 	wint_t		utf_code;
 	io_desc		*iod;
 	d_rm_struct	*rm_ptr;
-<<<<<<< HEAD
-	unsigned char	*inptr, *top, *nextmb, *outptr, *outstart, temppad, temppadarray[2];
-=======
-	unsigned char	*inptr, *top, *nextmb, *outptr = NULL, *nextoutptr, *outstart, temppad, temppadarray[2];
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
+	unsigned char	*inptr, *top, *nextmb, *outptr = NULL, *outstart, temppad, temppadarray[2];
 	char		*out_ptr;
 	boolean_t	utf8_active = TRUE;		/* needed by GTM_IO_WCWIDTH macro */
 	boolean_t	stream, wrap;
@@ -234,12 +230,9 @@ void iorm_write_utf(mstr *v)
 			}
 			if (CHSET_UTF8 != iod->ochset)
 			{
-<<<<<<< HEAD
 				unsigned char *nextoutptr;
 
-=======
 				assert(outptr);
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 				if (CHSET_UTF16BE == iod->ochset)
 					nextoutptr = UTF16BE_WCTOMB(utf_code, outptr);
 				else

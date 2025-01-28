@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -67,13 +67,7 @@ int rc_prc_getr(rc_q_hdr *qhdr)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-<<<<<<< HEAD
 	ASSERT_IS_LIBGTCM;
-=======
-	/*This code is probably not being maintained as part of the v7 change so put this assert here to see
-	 * if we are even hitting this code during testing*/
-	assert(FALSE);
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 	ESTABLISH_RET(rc_dbms_ch,0);
 	req = (rc_req_getr *)qhdr;
 	rsp = (rc_rsp_page *)qhdr;

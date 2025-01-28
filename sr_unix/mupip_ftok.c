@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -61,15 +61,9 @@ void mupip_ftok(void)
 	boolean_t	fd, jnlpool, ispool, only, recvpool, showheader;
 	char		fn[MAX_FN_LEN + 1], instfilename[MAX_FN_LEN + 1], replf[MAX_FN_LEN + 1];
 	gd_id		fid;
-<<<<<<< HEAD
 	int		index, semid, shmid;
-	int4            id;
-	key_t           semkey;
-=======
-	int		index, ispool, semid, shmid;
-	int4		id, status;
+	int4		id;
 	key_t		semkey = (key_t)-1;
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 	mstr		file;
 	repl_inst_hdr	repl_instance;
 	sgmnt_data	header;
@@ -95,10 +89,11 @@ void mupip_ftok(void)
 	} else
 		use_instfilename = FALSE;
 	showheader = (!cli_negated("HEADER"));
-<<<<<<< HEAD
 	for (index = 0; index < TREF(parms_cnt); index++)
 	{	/* In order to handle multiple files, this loop directly uses the array built by cli. */
 		char	*fn_ptr;
+
+		semid = shmid = -1;
 		if (ispool)
 		{	/* This is an instance file */
 			if (!use_instfilename)
@@ -107,52 +102,12 @@ void mupip_ftok(void)
 			{
 				strcpy(fn, instfilename);	/* Null terminated & range checked from repl_inst_get_name */
 				fn_ptr = fn;
-=======
-	index = (only && ispool);				/* if only, skip the instance file  */
-	for (; index < TREF(parms_cnt); index++)
-	{	/*  in order to handle multiple files, this loop directly uses the array built by cli */
-		semid = shmid = -1;
-		if (ispool)
-		{	/* ispool idicates we're precessing based on the replication instance file */
-			if (only == index)
-			{	/* first pass - process the instance file */
-				if (!repl_inst_get_name(instfilename, &full_len, SIZEOF(instfilename), issue_rts_error, NULL))
-					assertpro(NULL == instfilename);	/* otherwise, repl_inst_get_name issues rts_error */
-				in_mupip_ftok = TRUE;	/* this flag implicitly relies on mupip ftok being once and done */
-				repl_inst_read(instfilename, (off_t)0, (sm_uc_ptr_t)&repl_instance, SIZEOF(repl_inst_hdr));
-				in_mupip_ftok = FALSE;	/* no condition hander to reset this in case of error - see comment above */
-				memset(&pblk, 0, SIZEOF(pblk));
-				pblk.buff_size = MAX_FN_LEN;
-				pblk.buffer = replf;
-				pblk.fop = F_SYNTAXO;
-				file.addr = instfilename;
-				file.len = full_len;
-				status = parse_file(&file, &pblk);	/* this gets us to directory, name and extension */
-				fn_len = pblk.b_dir + pblk.b_name + pblk.b_ext;
-				memcpy(fn, pblk.l_dir, fn_len);
-				fn[fn_len] = 0;
-				semkey = FTOK(fn, REPLPOOL_ID);
-			}
-			if (jnlpool && (1 == index))
-			{	/* goes first if also -recvpool */
-				semid = repl_instance.jnlpool_semid;
-				shmid = repl_instance.jnlpool_shmid;
-				fn_len = SIZEOF("jnlpool");
-				strncpy(fn, "jnlpool", fn_len);
-			} else if (recvpool && ((jnlpool ? 2 : 1) == index))
-			{	/* last or sole */
-				semid = repl_instance.recvpool_semid;
-				shmid = repl_instance.recvpool_shmid;
-				fn_len = SIZEOF("recvpool");
-				strncpy(fn, "recvpool", fn_len);
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 			}
 			/* Process the instance file */
 			in_mupip_ftok = TRUE;	/* this flag implicitly relies on mupip ftok being once and done */
 			repl_inst_read(fn_ptr, (off_t)0, (sm_uc_ptr_t)&repl_instance, SIZEOF(repl_inst_hdr));
 			in_mupip_ftok = FALSE;	/* no condition hander to reset this in case of error - see comment above */
 			semkey = FTOK(fn_ptr, REPLPOOL_ID);
-			semid = shmid = -1;			/* not relevant for the instance file file */
 		} else
 		{	/* Not instance file based. This is a database file. */
 			fn_ptr = TAREF1(parm_ary, index);

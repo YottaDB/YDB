@@ -213,12 +213,8 @@ void	dm_read (mval *v)
 	int		instr;			/* insert point in input string */
 	int		ioptr_width;		/* display width of the IO device */
 	int		outlen;			/* total characters in line so far */
-<<<<<<< HEAD
 	int		match_length, msk_in, msk_num, right, selstat, status, up, home, end;
-	int		utf8_more, utf8_seen;
-=======
-	int		match_length, msk_in, msk_num, num_chars_left, num_lines_above, right, selstat, status, up, utf8_more = 0;
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
+	int		utf8_more = 0, utf8_seen;
 	io_desc 	*io_ptr;
 	io_termmask	mask_term;
 	mv_stent	*mvc, *mv_zintdev;
@@ -230,11 +226,7 @@ void	dm_read (mval *v)
 	unsigned char	inbyte, *outptr, *outtop, *ptr, *ptrnext, *ptrtop;
 	unsigned char	more_buf[GTM_MB_LEN_MAX + 1], *more_ptr = NULL;	/* to build up multi byte for character */
 	unsigned short	escape_length = 0;
-<<<<<<< HEAD
-	wint_t		*buffer_32_start, codepoint, inchar, *ptr32;
-=======
-	wint_t		*buffer_32_start = NULL, codepoint, *current_32_ptr, inchar, *ptr32;
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
+	wint_t		*buffer_32_start = NULL, codepoint, inchar, *ptr32;
 	int		poll_timeout;
 	nfds_t		poll_nfds;
 	struct pollfd	poll_fdlist[1];
@@ -570,21 +562,6 @@ void	dm_read (mval *v)
 						outptr = UTF8_WCTOMB(inchar, outptr);
 					}
 					*outptr = '\0';
-<<<<<<< HEAD
-=======
-				} else
-				{
-#				endif
-					match_length = (uint4)strcspn((const char *)buffer_start, delimiter_string);
-					/* only "rec" and "recall" should be accepted */
-					if (((strlen(REC) == match_length) || (strlen(RECALL) == match_length))
-					     && (0 == strncmp((const char *)buffer_start, RECALL, match_length))
-					     && ((' ' == (inbyte = GET_OFF(match_length)) || !inbyte)))		/* WARNING assign */
-						argv[1] = inbyte ? (char *)(buffer_start + match_length + 1) : NULL;
-					else
-						break;		/* not RECALL so end of line */
-#				ifdef UTF8_SUPPORTED
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 				}
 #				endif
 
@@ -710,12 +687,9 @@ void	dm_read (mval *v)
 			{
 				if (0 < instr)
 				{
-<<<<<<< HEAD
-					MOVE_CURSOR_LEFT_ONE_CHAR(delchar_width, dx, dx_prev, dx_instr, dx_start, instr, ioptr_width);
-=======
 					assert(!utf8_active || buffer_32_start);
-					MOVE_CURSOR_LEFT_ONE_CHAR(dx, instr, dx_instr, dx_start, ioptr_width);
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
+					MOVE_CURSOR_LEFT_ONE_CHAR(delchar_width, dx, dx_prev, dx_instr, dx_start,	\
+						instr, ioptr_width);
 					DEL_ONE_CHAR_AT_CURSOR(outlen, dx_outlen, dx, dx_instr, dx_start, ioptr_width);
 				}
 			} else if (NATIVE_ESC == inchar)

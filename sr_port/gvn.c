@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -42,14 +42,9 @@ int gvn(void)
 	char		x;
 	int		hash_code;
 	opctype		ox;
-<<<<<<< HEAD
 	/* The subscripts array needs to be 2 larger than max subscripts to actually hold the maximum number of subscripts */
 	oprtype		*sb1, *sb2, subscripts[MAX_GVSUBSCRIPTS + 2];
-	triple		*oldchain, *ref, *s, tmpchain, *triptr;
-=======
-	oprtype		*sb1, *sb2, subscripts[MAX_GVSUBSCRIPTS + 1];
 	triple		*oldchain = NULL, *ref, *s, tmpchain, *triptr;
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -57,14 +52,8 @@ int gvn(void)
 	advancewindow();
 	sb1 = sb2 = subscripts;
 	ox = 0;
-<<<<<<< HEAD
 	if (shifting = (TREF(shift_side_effects) && (!TREF(saw_side_effect) || (YDB_BOOL == TREF(ydb_fullbool)
 		&& (OLD_SE == TREF(side_effect_handling))))))
-=======
-	if (shifting = ((EXT_BOOL != TREF(gtm_fullbool)) && TREF(shift_side_effects)
-		&& (!TREF(saw_side_effect)
-			|| (GTM_BOOL == TREF(gtm_fullbool) && (OLD_SE == TREF(side_effect_handling))))))
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 	{	/* NOTE assignment above */
 		exorder_init(&tmpchain);
 		oldchain = setcurtchain(&tmpchain);
@@ -211,12 +200,8 @@ int gvn(void)
 	SUBS_ARRAY_2_TRIPLES(ref, sb1, sb2, subscripts, 0);
 	if (shifting)
 	{
-<<<<<<< HEAD
-		if (TREF(saw_side_effect) && ((YDB_BOOL != TREF(ydb_fullbool)) || (OLD_SE != TREF(side_effect_handling))))
-=======
 		assert(oldchain);
-		if (TREF(saw_side_effect) && ((GTM_BOOL != TREF(gtm_fullbool)) || (OLD_SE != TREF(side_effect_handling))))
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
+		if (TREF(saw_side_effect) && ((YDB_BOOL != TREF(ydb_fullbool)) || (OLD_SE != TREF(side_effect_handling))))
 		{	/* saw a side effect in a subscript - our reference has been superceded so no targ game on the name */
 			setcurtchain(oldchain);
 			triptr = (TREF(curtchain))->exorder.bl;

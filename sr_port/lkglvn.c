@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -40,13 +40,8 @@ int lkglvn(boolean_t gblvn)
 	boolean_t	shifting, vbar;
 	char		*lknam, lkname_buf[MAX_MIDENT_LEN + 1], x;
 	opctype		ox;
-<<<<<<< HEAD
 	oprtype		*sb1, *sb2, subscripts[MAX_LKSUBSCRIPTS];
-	triple		*oldchain, *ref, tmpchain, *triptr;
-=======
-	oprtype		*sb1, *sb2, subscripts[MAX_GVSUBSCRIPTS + 1];
 	triple		*oldchain = NULL, *ref, tmpchain, *triptr;
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -55,14 +50,8 @@ int lkglvn(boolean_t gblvn)
 	lknam = lkname_buf;
 	if (gblvn)
 		*lknam++ = '^';
-<<<<<<< HEAD
 	if (shifting = (TREF(shift_side_effects) && (!TREF(saw_side_effect) || (YDB_BOOL == TREF(ydb_fullbool)
 		&& (OLD_SE == TREF(side_effect_handling))))))
-=======
-	if (shifting = ((EXT_BOOL != TREF(gtm_fullbool)) && TREF(shift_side_effects)
-		&& (!TREF(saw_side_effect)
-			|| (GTM_BOOL == TREF(gtm_fullbool) && (OLD_SE == TREF(side_effect_handling))))))
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 	{	/* NOTE assignment above */
 		exorder_init(&tmpchain);
 		oldchain = setcurtchain(&tmpchain);

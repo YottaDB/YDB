@@ -3,7 +3,7 @@
  * Copyright (c) 2009-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -224,13 +224,8 @@ boolean_t	ss_initiate(gd_region *reg,			/* Region in which snapshot has to be st
 	struct perm_diag_data	pdd;
 	struct stat		stat_buf;
 	uint4			crit_counter, fstat_status, tempnamprefix_len;
-<<<<<<< HEAD
 	block_id		tot_blks, ss_shmsize, ss_shm_vbn;
-	void			*ss_shmaddr;
-=======
-	block_id		tot_blks, ss_shmsize, prev_ss_shmsize, ss_shm_vbn;
 	void			*ss_shmaddr = NULL;
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 	intrpt_state_t		prev_intrpt_state;
 	DCL_THREADGBL_ACCESS;
 

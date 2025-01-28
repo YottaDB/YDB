@@ -1054,23 +1054,7 @@ void repl_check_jnlver_compat(boolean_t same_endianness)
 	assert(is_src_server || is_rcvr_server);
 	if (JNL_VER_EARLIEST_REPL > REMOTE_JNL_VER)
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_UNIMPLOP, 0, ERR_TEXT, 2,
-<<<<<<< HEAD
 			LEN_AND_LIT("Replication not supported between these two GT.M versions"));
-=======
-			LEN_AND_LIT("Dual/Multi site replication not supported between these two GT.M versions"));
-	else if ((V18_JNL_VER > REMOTE_JNL_VER) && !same_endianness)
-	{	/* cross-endian replication is supported only from V5.3-003 onwards. Issue error and shutdown. */
-		if (is_src_server)
-			other_side = "Replicating";
-		else if (is_rcvr_server)
-			other_side = "Originating";
-		else
-		{	/* repl_check_jnlver_compat is called only from source server and receiver server */
-			assertpro(is_src_server || is_rcvr_server);
-		}
-		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_REPLNOXENDIAN, 4, LEN_AND_STR(other_side), LEN_AND_STR(other_side));
-	}
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 }
 
 /* The following code defines the functions that convert one jnl format to another.

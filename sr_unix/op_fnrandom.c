@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -24,13 +24,9 @@
 #include "xoshiro.h"
 #include <errno.h>
 
-<<<<<<< HEAD
 GBLREF uint4	process_id;
 GBLREF uint64_t sm64_x;
 GBLREF uint64_t x256_s[4];
-=======
-GBLREF uint4 process_id;
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 
 error_def(ERR_RANDARGNEG);
 
@@ -41,17 +37,11 @@ void op_fnrandom (int4 interval, mval *ret)
 
 	if (1 >= interval)
 	{
-<<<<<<< HEAD
 		if (1 > interval)
-			RTS_ERROR_ABT(VARLSTCNT(1) ERR_RANDARGNEG);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_RANDARGNEG);
 		/* Else: it is $random(1). The result/random-value is always 0. */
 		random = 0;
 	} else
-=======
-		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_RANDARGNEG);
-	}
-	if (seed == 0)
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 	{
 		if (0 == sm64_x)
 		{	// initialize the random number generator if uninitialized

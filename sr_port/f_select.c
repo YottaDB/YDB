@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -64,13 +64,9 @@ int f_select(oprtype *a, opctype op)
 	boolean_t	first_time, got_true, se_saw_side, shifting, throwing;
 	opctype		old_op;
 	oprtype		*cnd, endtrip, target, tmparg;
-<<<<<<< HEAD
 	triple		dmpchain, *r, *ref, *savechain, tmpchain, *triptr, *noop;
 	triple		*boolexprfinish, *boolexprfinish2;
-	triple		*loop_expr_start, *oldchain;
-=======
-	triple		dmpchain, *loop_expr_start, *oldchain = NULL, *r, *ref, *savechain, tmpchain, *triptr;
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
+	triple		*loop_expr_start, *oldchain = NULL;
 	mval		*v;
 	save_for_select	*save_state, ss;
 	DCL_THREADGBL_ACCESS;
@@ -159,13 +155,9 @@ int f_select(oprtype *a, opctype op)
 				break;					/* Boolean was not a literal */
 			v = &triptr->operand[0].oprval.mlit->v;		/* Boolean was a literal, so optimize it */
 			dqdel(triptr, exorder);
-<<<<<<< HEAD
 			/* Remove OC_BOOLEXPRSTART and OC_BOOLEXPRFINISH opcodes too */
 			REMOVE_BOOLEXPRSTART_AND_FINISH(boolexprfinish);	/* Note: Will set "boolexprfinish" to NULL */
-			dqinit(&dmpchain, exorder);			/* both got_true and throwing use dumping */
-=======
 			exorder_init(&dmpchain);			/* both got_true and throwing use dumping */
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 			unuse_literal(v);
 			if (0 == MV_FORCE_BOOL(v))
 			{	/* Boolean FALSE: discard the corresponding value */

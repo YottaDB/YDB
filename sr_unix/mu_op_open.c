@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -112,11 +112,7 @@ static boolean_t mu_open_try(io_log_name *naml, io_log_name *tl, mval *pp, mval 
 	boolean_t	ichset_specified, ochset_specified, filecreated = FALSE;
 	char		*buf, namebuf[LOGNAME_LEN + 1];
 	d_rm_struct	*d_rm;
-<<<<<<< HEAD
-	int		file_des, fstat_res, oflag, p_offset, save_errno, umask_creat, umask_orig;
-=======
-	int		char_or_block_special, file_des, fstat_res, oflag, p_offset, save_errno = 0, umask_creat, umask_orig;
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
+	int		file_des, fstat_res, oflag, p_offset, save_errno = 0, umask_creat, umask_orig;
 	int4		recordsize, status;
 	io_desc		*iod;
 	mstr		chset_mstr;
@@ -358,13 +354,8 @@ static boolean_t mu_open_try(io_log_name *naml, io_log_name *tl, mval *pp, mval 
 	SET_CODE_SET(iod->out_code_set, OUTSIDE_CH_SET);
 	if (DEFAULT_CODE_SET != iod->out_code_set)
 		ICONV_OPEN_CD(iod->output_conv_cd, INSIDE_CH_SET, OUTSIDE_CH_SET);
-<<<<<<< HEAD
 #	endif
 	assert(-1 != file_des); /* as otherwise we would have returned after the OPEN3 above */
-=======
-#endif
-	assert(-1 != file_des);
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 	if (n_io_dev_types == iod->type)
 	{
 		if (isatty(file_des))

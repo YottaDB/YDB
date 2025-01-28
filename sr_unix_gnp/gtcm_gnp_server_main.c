@@ -1,9 +1,9 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -145,7 +145,7 @@ error_def(ERR_TEXT);
 
 STATICFNDEF void gtcm_gnp_server_actions(void)
 {
-	int4			status;
+	int4			status = SS_NORMAL;
 	unsigned short		value;
 	cm_op_t			reply;
 	connection_struct	*prev_curr_entry;
@@ -289,7 +289,7 @@ STATICFNDEF void gtcm_gnp_server_actions(void)
 			}
 			if (curr_entry)		/* curr_entry can be NULL if went through gtcmtr_terminate */
 			{
-			  	time(&curr_entry->lastact);
+				time(&curr_entry->lastact);
 				/* curr_entry is used by gtcm_urgread_ast to determine if it needs to defer the interrupt message */
 				prev_curr_entry = curr_entry;
 				if (CM_WRITE == reply)

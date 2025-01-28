@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -245,12 +245,8 @@ void	iosocket_iocontrol(mstr *mn, int4 argcnt, va_list args)
 				extraarg = NULL;
 		} else
 			extraarg = NULL;
-<<<<<<< HEAD
-		iosocket_tls(option, (int)(nsec_timeout / NANOSECS_IN_MSEC), tlsid, password, extraarg);
-=======
 		assert(option);
-		iosocket_tls(option, msec_timeout, tlsid, password, extraarg);
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
+		iosocket_tls(option, (int)(nsec_timeout / NANOSECS_IN_MSEC), tlsid, password, extraarg);
 #	endif
 	} else if (0 == memcmp(action, "BLOCK", length))
 	{	/* OFF, CLEAR, COUNT .lvn, SENT .lvn */

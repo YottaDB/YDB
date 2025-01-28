@@ -3,7 +3,7 @@
  * Copyright (c) 2010-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -1485,12 +1485,7 @@ int	gvtr_match_n_invoke(gtm_trigger_parms *trigparms, gvtr_invoke_parms_t *gvtr_
 	gv_key_buf		save_currkey;
 	gv_trigger_t		*trigdsc, *trigstop, *trigstart;
 	int			gtm_trig_status, tfxb_status, num_triggers_invoked, trigmax, trig_list_offset;
-<<<<<<< HEAD
-	mstr			*ztupd_mstr;
-=======
 	mstr			*ztupd_mstr = NULL;
-	mval			*keysub_mval;
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 	mval			*lvvalarray[MAX_GVSUBSCRIPTS + 1];
 	mval			*ztupd_mval, dummy_mval;
 	uint4			*lvindexarray;
@@ -1644,16 +1639,11 @@ int	gvtr_match_n_invoke(gtm_trigger_parms *trigparms, gvtr_invoke_parms_t *gvtr_
 			ok_to_invoke_trigger = TRUE;
 			if (trigdsc->delimiter.str.len)
 			{
-<<<<<<< HEAD
 				trigparms->ztdelim_new = (mval *)&trigdsc->delimiter;
 				if (is_set_trigger)
-=======
-				assert(0 == ztupd_mval->mvtype);
-				assert(ztupd_mstr);
-				if (trigdsc->delimiter.str.len)
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 				{
 					assert(0 == ztupd_mval->mvtype);
+					assert(ztupd_mstr);
 					strpiecediff(&trigparms->ztoldval_new->str, &trigparms->ztvalue_new->str,
 						&trigdsc->delimiter.str, trigdsc->numpieces, trigdsc->piecearray,
 						!trigdsc->is_zdelim && gtm_utf8_mode, ztupd_mstr);

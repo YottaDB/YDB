@@ -3,7 +3,7 @@
  * Copyright (c) 2012-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2020-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2020-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -80,11 +80,10 @@ GBLREF	unsigned char		cw_set_depth;
 GBLREF	unsigned char		rdfail_detail;
 GBLREF	unsigned int		t_tries;
 
-<<<<<<< HEAD
 #ifdef DEBUG
 GBLREF	block_id		ydb_skip_bml_num;
 #endif
-=======
+
 error_def(ERR_DBRDONLY);
 error_def(ERR_GBLNOEXIST);
 error_def(ERR_MAXBTLEVEL);
@@ -92,7 +91,6 @@ error_def(ERR_MUNOFINISH);
 error_def(ERR_MUREORGFAIL);
 error_def(ERR_MUTRUNCNOTBG);
 error_def(ERR_REORGUPCNFLCT);
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 
 #define RETRY_SWAP		(0)
 #define ABORT_SWAP		(-1)

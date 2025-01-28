@@ -1380,14 +1380,9 @@ enum cdb_sc upgrade_dir_tree(block_id curr_blk, block_id offset, gd_region *reg,
 	cache_rec_ptr_t		child_cr = NULL;
 	enum db_ver		blk_ver;
 	gvnh_reg_t		*gvnh_reg = NULL;
-<<<<<<< HEAD
-	int			adjust, blk_seg_cnt, blk_sz, count, level, split_blks_added, split_levels_added, key_cmpc,
-				key_cmpc_sib, key_len, key_len_sib, rec_offset, rec_sz, rec_sz_sib, space_need, v7_rec_sz;
-=======
 	int			adjust, blk_seg_cnt, blk_sz, count, level, max_fill, new_blk_sz, split_blks_added,
 				split_levels_added, key_cmpc, key_cmpc_sib, key_len, key_len_sib, rec_offset, rec_sz, rec_sz_sib,
 				space_need, v7_rec_sz;
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 	int4			blk_size, status;
 	kill_set		kill_set_list;
 	mname_entry		gvname;

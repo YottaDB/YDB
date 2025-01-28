@@ -3,7 +3,7 @@
  * Copyright (c) 2020-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2023-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -93,17 +93,8 @@ void db_header_dwnconv(sgmnt_data_ptr_t v7)
 	v6->last_com_bkup_last_blk = v7->last_com_bkup_last_blk;
 	assert_conversion(v7->last_rec_bkup_last_blk, dbg_blkid);
 	v6->last_rec_bkup_last_blk = v7->last_rec_bkup_last_blk;
-<<<<<<< HEAD
-	/* Note: v7->reorg_restart_block can be updated outside of crit by a concurrently running "mupip reorg" process
-	 * and so the following assert is not valid (and hence is commented out).
-	 *
-	 * DEBUG_ONLY(dbg_blkid = v7->reorg_restart_block);
-	 * assert((block_id_32)(v7->reorg_restart_block) == v7->reorg_restart_block);
-	 */
-=======
 	/* The following is modified by REORG without crit */
 	assert_conversion(v7->reorg_restart_block, dbg_blkid);
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 	v6->reorg_restart_block = v7->reorg_restart_block;
 	/* The following is not used by REORG -UPGRADE anymore and is available for repurposing */
 	assert_conversion(v7->reorg_upgrd_dwngrd_restart_block, dbg_blkid);

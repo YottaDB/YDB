@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -159,7 +159,6 @@ void mupip_extend(void)
 	old_total = cs_addrs->ti->total_blks;
 	if (NO_FREE_SPACE == (status = GDSFILEXT(blocks, old_total, TRANS_IN_PROG_FALSE)))
 	{
-<<<<<<< HEAD
 		rel_crit(gv_cur_region);
 		util_out_print("The extension failed on file !AD; check disk space and permissions.", TRUE,
 			DB_LEN_STR(gv_cur_region));
@@ -171,30 +170,6 @@ void mupip_extend(void)
 	bplmap = cs_addrs->hdr->bplmap;
 	bit_maps = DIVIDE_ROUND_UP(total, bplmap) - DIVIDE_ROUND_UP(old_total, bplmap);
 	rel_crit(gv_cur_region);
-=======
-		case dba_bg:
-		case dba_mm:
-			grab_crit(gv_cur_region, WS_67);
-			GRAB_UNFROZEN_CRIT(gv_cur_region, cs_addrs, WS_68);
-			old_total = cs_addrs->ti->total_blks;
-			if (NO_FREE_SPACE == (status = GDSFILEXT(blocks, old_total, TRANS_IN_PROG_FALSE)))
-			{
-				rel_crit(gv_cur_region);
-				util_out_print("The extension failed on file !AD; check disk space and permissions.", TRUE,
-					DB_LEN_STR(gv_cur_region));
-				DB_IPCS_RESET(gv_cur_region);
-				mupip_exit(ERR_MUNOACTION);
-			} else
-				assert(SS_NORMAL == status);
-			total = cs_addrs->ti->total_blks;
-			bplmap = cs_addrs->hdr->bplmap;
-			bit_maps = DIVIDE_ROUND_UP(total, bplmap) - DIVIDE_ROUND_UP(old_total, bplmap);
-			rel_crit(gv_cur_region);
-			break;
-		default:
-			assertpro(IS_REG_BG_OR_MM(gv_cur_region));
-}
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 	temp1 = total - old_total - bit_maps;
 	temp2 = total - DIVIDE_ROUND_UP(total, bplmap);
 	util_out_print("Extension successful, file !AD extended by !@UQ blocks.  Total blocks = !@UQ.",TRUE,

@@ -128,11 +128,7 @@ typedef enum {
 	WBTEST_ANTIFREEZE_OUTOFSPACE,		/* 81 :  */
 	/* End ANTIFREEZE related white box test cases */
 	WBTEST_SIGTSTP_IN_JNL_OUTPUT_SP,	/* 82 : Send SIGTSTP to self if wcs_timers is 0 */
-<<<<<<< HEAD
-	WBTEST_CONCBKUP_RUNNING,		/* 83 : Sleep in mupip_backup to test concurrent BACKUPs */
-=======
 	WBTEST_FORCE_SEMGETERROR,		/* 83 : Send SEMGETERROR to gtmsecshr to validate it handles it correctly */
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 	WBTEST_LONGSLEEP_IN_REPL_SHUTDOWN,	/* 84 : Sleep in Source/Receiver shutdown logic to ensure sem/shm is not removed */
 	WBTEST_FORCE_WCS_GET_SPACE,		/* 85 : Simulate state in which nearly all global buffers are dirty, forcing
 						 *      wcs_get_space to be called before committing an update */
@@ -249,6 +245,7 @@ typedef enum {
 	WBTEST_YDB_MAXSECSHRRETRY,		/* 405 : Cause loop gated by MAX_COMM_ATTEMPTs in secshr_client.c to fail */
 	WBTEST_YDB_RLSIGLONGJMP,                /* 406 : Slow down processing of SIGALRM timers to illustrate multiple signal processing issues with readline */
 	WBTEST_YDB_ENCR_ENV_TOOLONG,            /* 407 : Encryption env vars are set to too long values (v53003/D9I10002703 subtest) */
+	WBTEST_CONCBKUP_RUNNING,		/* 408 : Sleep in mupip_backup to test concurrent BACKUPs */
 } wbtest_code_t;
 
 #if defined (DEBUG) && !defined (STATIC_ANALYSIS)

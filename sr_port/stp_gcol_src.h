@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  * Copyright (c) 2017 Stephen L Johnson. All rights reserved.	*
@@ -472,11 +472,7 @@ void stp_gcol(size_t space_asked)	/* BYPASSOK */
 	lv_blk			*lv_blk_ptr;
 	lv_val			*lvp, *lvlimit;
 	lvTreeNode		*node, *node_limit;
-<<<<<<< HEAD
-	mstr			**cstr, *x, **cstr_top, *mstrp, *mstrp_top;
-=======
-	mstr			**cstr = NULL, *x;
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
+	mstr			**cstr = NULL, *x, **cstr_top, *mstrp, *mstrp_top;
 	mv_stent		*mvs;
 	mval			*m, **mm, **mmtop, *mtop;
 	intszofptr_t		lv_subs;

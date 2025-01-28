@@ -3,7 +3,7 @@
  * Copyright (c) 2015-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -104,7 +104,6 @@ typedef struct {
 
 int	gtm_multi_thread_helper(thread_parm_t *tparm);
 
-<<<<<<< HEAD
 #define	INITIALIZE_THREAD_MUTEX_IF_NEEDED										\
 {															\
 	int	rc;													\
@@ -117,35 +116,6 @@ int	gtm_multi_thread_helper(thread_parm_t *tparm);
 					ERR_SYSCALL, 5, RTS_ERROR_LITERAL("pthread_mutex_init()"), CALLFROM, rc);	\
 		thread_mutex_initialized = TRUE;									\
 	}														\
-=======
-#define	IS_LIBPTHREAD_MUTEX_LOCK_HOLDER 	(pthread_self() == thread_mutex_holder)
-
-#define	PTHREAD_MUTEX_LOCK_IF_NEEDED(WAS_HOLDER)								\
-{														\
-	int	rc;												\
-														\
-	if (multi_thread_in_use)										\
-	{	/* gtm_malloc/gtm_free is not thread safe. So use locks to serialize */				\
-		assert(thread_mutex_initialized);								\
-		/* We should never use pthread_* calls inside a signal/timer handler. Assert that */		\
-		assert(!in_nondeferrable_signal_handler);							\
-		/* Allow for self to already own the lock (due to nested codepaths that need the lock. */	\
-		if (!IS_LIBPTHREAD_MUTEX_LOCK_HOLDER)								\
-		{												\
-			rc = pthread_mutex_lock(&thread_mutex);							\
-			if (rc)											\
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,			\
-						RTS_ERROR_LITERAL("pthread_mutex_lock()"), CALLFROM, rc);	\
-			thread_mutex_holder = pthread_self();							\
-			WAS_HOLDER = FALSE;									\
-		} else												\
-			WAS_HOLDER = TRUE;									\
-	} else													\
-	{													\
-		assert(!thread_mutex_holder);									\
-		WAS_HOLDER = FALSE;										\
-	}													\
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 }
 
 #define	IS_LIBPTHREAD_MUTEX_LOCK_HOLDER 	(pthread_equal(pthread_self(), thread_mutex_holder))
@@ -186,7 +156,10 @@ int	gtm_multi_thread_helper(thread_parm_t *tparm);
 			} else												\
 				WAS_HOLDER = TRUE;									\
 		} else													\
+		{													\
 			assert(0 == (uintptr_t)thread_mutex_holder);							\
+			WAS_HOLDER = FALSE;										\
+		}													\
 	}														\
 	/* else : We are in the process of exiting. It is possible we are in a signal handler at this point in which	\
 	 *        case, doing pthread_* calls can cause deadlock so best avoid it and terminate the process without	\

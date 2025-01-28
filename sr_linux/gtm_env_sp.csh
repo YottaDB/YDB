@@ -172,7 +172,6 @@ if ( $?gtm_version_change == "1" ) then
 		endif
 	endif
 
-<<<<<<< HEAD
 	# Default linker options for M objects
 	setenv	gt_ld_m_shl_linker	"ld"
 	setenv  gt_ld_m_shl_options     "-shared"
@@ -189,12 +188,6 @@ if ( $?gtm_version_change == "1" ) then
 
         setenv  gt_cc_options_common    "$gt_cc_options_common -D_GNU_SOURCE -D_FILE_OFFSET_BITS=64 "
         setenv  gt_cc_options_common    "$gt_cc_options_common -D_XOPEN_SOURCE=600 -fsigned-char -Wreturn-type -Wpointer-sign "
-=======
-	setenv  gt_cc_options_common    "$gt_cc_options_common -D_GNU_SOURCE -D_FILE_OFFSET_BITS=64"
-	setenv  gt_cc_options_common    "$gt_cc_options_common -D_XOPEN_SOURCE=600"
-	#setenv  gt_cc_options_common    "$gt_cc_options_common -Werror "
-	#setenv  gt_cc_options_common    "$gt_cc_options_common -Wstrict-overflow=5"
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 
 	if ( "ia64" != $mach_type ) then
 		if ("$gt_cc_compiler" =~ *icc*) then
@@ -269,13 +262,8 @@ if ( $?gtm_version_change == "1" ) then
 	# -ffloat-store for consistent results avoiding rounding differences
 	# -fno-omit-frame-pointer so %rbp always gets set up (required by caller_id()). Default changed in gcc 4.6.
 	if ( "ia64" != $mach_type ) then
-<<<<<<< HEAD
 		setenv	gt_cc_option_optimize	"-O2 -fno-defer-pop -fno-strict-aliasing -ffloat-store -fno-omit-frame-pointer"
 		if ( ( "32" == $gt_build_type ) && ( "armv6l" != $mach_type ) && ( "armv7l" != $mach_type ) ) then
-=======
-		setenv	gt_cc_option_optimize	"-O3 -fno-defer-pop -ffloat-store -fno-omit-frame-pointer"
-		if ( "32" == $gt_build_type ) then
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 			# applies to 32bit x86_64, ia32 and cygwin
 			# Compile 32-bit x86 GT.M using 586 instruction set rather than 686 as the new Intel Quark
 			# low power system-on-a-chip uses the 586 instruction set rather than the 686 instruction set
@@ -303,18 +291,11 @@ if ( $?gtm_version_change == "1" ) then
 	setenv	gt_ld_linker		"$gt_cc_compiler" # redefine to use new C compiler definition
 
 	# -M		generate link map onto standard output
-<<<<<<< HEAD
 	setenv	gt_ld_options_common	"-Wl,-M"
 	setenv 	gt_ld_options_yottadb	"-Wl,--version-script,yottadb_symbols.export"
-=======
-	setenv	gt_ld_options_common	"-Wl,-M -Wl,-z,noexecstack"
-	setenv 	gt_ld_options_gtmshr	"-Wl,-u,accumulate -Wl,-u,is_big_endian -Wl,-u,to_ulong"
-	setenv 	gt_ld_options_gtmshr	"$gt_ld_options_gtmshr -Wl,-u,gtm_filename_to_id -Wl,--version-script,gtmshr_symbols.export"
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 	setenv 	gt_ld_options_all_exe	"-rdynamic -Wl,-u,gtm_filename_to_id -Wl,-u,gtm_zstatus"
 	setenv	gt_ld_options_all_exe	"$gt_ld_options_all_exe -Wl,--version-script,ydbexe_symbols.export"
 
-<<<<<<< HEAD
   	# optimize for all 64bit platforms
  	#
  	# -lrt doesn't work to pull in semaphores with GCC 4.6, so use -lpthread.
@@ -322,15 +303,6 @@ if ( $?gtm_version_change == "1" ) then
  	# of libc routines from libpthread.
         setenv	gt_ld_syslibs		" -lelf -lncurses -lm -ldl -lc -lpthread -lrt"
 	if ( ( 32 == $gt_build_type ) && ( "armv6l" != $mach_type ) && ( "armv7l" != $mach_type ) ) then
-=======
-	# optimize for all 64bit platforms
-	#
-	# -lrt doesn't work to pull in semaphores with GCC 4.6, so use -lpthread.
-	# Add -lc in front of -lpthread to avoid linking in thread-safe versions
-	# of libc routines from libpthread.
-	setenv	gt_ld_syslibs		" -lelf -lncurses -lm -ldl -lc -lpthread -lrt"
-	if ( 32 == $gt_build_type ) then
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 		# 32bit x86_64 and ia32 - decided at the beginning of the file
 		setenv  gt_ld_syslibs           " -lncurses -lm -ldl -lc -lpthread -lrt"
 	endif
@@ -354,19 +326,11 @@ if ( $?gtm_version_change == "1" ) then
 	# over-ride option.
 	if ( "x86_64" == $mach_type && "32" == $gt_build_type ) then
 		setenv  gt_cc_options_common 	"$gt_cc_options_common -m32"
-<<<<<<< HEAD
 		setenv  gt_ld_options_yottadb	"$gt_ld_options_yottadb -m32"
                 setenv  gt_cc_shl_options	"$gt_cc_shl_options -m32"
                 setenv  gt_ld_shl_options	"$gt_ld_shl_options -m32"
                 setenv  gt_ld_options_common	"$gt_ld_options_common -m32"
         endif
-=======
-		setenv  gt_ld_options_gtmshr	"$gt_ld_options_gtmshr -m32"
-		setenv  gt_cc_shl_options	"$gt_cc_shl_options -m32"
-		setenv  gt_ld_shl_options	"$gt_ld_shl_options -m32"
-		setenv  gt_ld_options_common	"$gt_ld_options_common -m32"
-	endif
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 
 	# need to re-define these in terms of new gt_ld_options_common:
 	setenv	gt_ld_options_bta	"$gt_ld_options_common"

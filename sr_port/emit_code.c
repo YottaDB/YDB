@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  * Copyright (c) 2017-2018 Stephen L Johnson.			*
@@ -1068,13 +1068,7 @@ void emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 	boolean_t	inst_emitted;
 	unsigned char	reg;
 	int		offset, immediate;
-<<<<<<< HEAD
-	triple		*ct;
-=======
-	int		upper_idx, lower_idx;
 	triple		*ct = NULL;
-	int		low, extra, high;
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 	GTM64_ONLY(int	next_ptr_offset = 8;)
 	if (TRIP_REF == opr->oprclass)
 	{

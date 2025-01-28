@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2020-2024 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2020-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -35,15 +35,15 @@
 		if ((land & MV_NM) != 0 && (lor & MV_NUM_APPROX) == 0)								\
 		{														\
 			/* at this point, the mval's are both exact numbers, we can do a numeric comparison */			\
-			/* If they are both integers, compare only the relevant cells */					\
-			if (land & MV_INT)											\
+			if (land & MV_INT)	/* If they are both integers, compare only the relevant cells */		\
 			{													\
 				result = t ? (u->m[1] == v->m[1]) : (u->m[1] != v->m[1]);					\
 				break;												\
 			}													\
-			/* If one is an integer and the other is not, the two values cannot be equal */				\
 			if (lor & MV_INT)											\
-			{													\
+			{	/* If one is an integer and the other is not, the two values cannot be equal */			\
+				assert((vtyp & MV_INT) ? (u->m[1] || u->m[0]) : (v->m[1] || v->m[0]));				\
+					/* above line asserts that the zero value must be INT */				\
 				result = t ? 0 : 1;										\
 				break;												\
 			}													\

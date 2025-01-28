@@ -459,26 +459,15 @@ void	gvcst_put2(mval *val, span_parms *parms)
 {
 	blk_segment		*bs1, *bs_ptr, *new_blk_bs;
 	block_id		allocation_clue, blk_num, gvt_for_root, last_split_blk_num[MAX_BT_DEPTH], last_split_bnum;
-<<<<<<< HEAD
-	block_id		lcl_root, tp_root;
-	block_index		ins_chain_index, left_hand_index, next_blk_index, root_blk_cw_index;
+	block_id		lcl_root = -1, tp_root;
+	block_index		ins_chain_index, left_hand_index, next_blk_index, root_blk_cw_index = -1;
 	block_offset		ins_off1, ins_off2, old_curr_chain_next_off;
-	boolean_t		blk_match, collhdr = FALSE, copy_extra_record, dont_copy_extra_record = FALSE,
+	block_ref		chain1, chain2, curr_chain;
+	boolean_t		blk_match, collhdr = FALSE, copy_extra_record = FALSE, dont_copy_extra_record = FALSE,
 				duplicate_set, fits, gbl_target_was_set, is_dummy, is_split_dir_left, jnl_format_done,
 				lcl_span_status, level_0, key_exists, make_it_null, need_extra_block_split, needfmtjnl,
 				new_rec, new_rec_goes_to_right, no_pointers, preemptive_split, succeeded, write_logical_jnlrecs,
 				want_root_search = FALSE;
-=======
-	block_id		lcl_root = -1, tp_root;
-	block_index		ins_chain_index, left_hand_index, next_blk_index, root_blk_cw_index = -1;
-	block_offset		first_offset, ins_off1, ins_off2, next_offset, old_curr_chain_next_off;
-	block_ref		chain1, chain2, curr_chain;
-	boolean_t		blk_match, can_write_logical_jnlrecs, collhdr = FALSE, copy_extra_record = FALSE,
-				dont_copy_extra_record = FALSE, duplicate_set, fits, gbl_target_was_set, is_dummy,
-				is_split_dir_left, jnl_format_done, lcl_span_status, level_0, key_exists, make_it_null,
-				need_extra_block_split, needfmtjnl, new_rec, new_rec_goes_to_right, no_pointers, preemptive_split,
-				succeeded, write_logical_jnlrecs, want_root_search = FALSE;
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 	boolean_t		db_long_blk_id, long_blk_id;	/* db_long_blk_id is based on csd->desired_db_format,
 								 * while long_blk_id is based on bp->bver
 								 */
@@ -2369,21 +2358,14 @@ tn_restart:
 								curr_chain.chain.next_off = (block_offset)(left_hand_offset
 												- curr_offset);
 							} else
-<<<<<<< HEAD
-								curr_chain.next_off = 0;
+								curr_chain.chain.next_off = 0;
 							/* See first occurrence of tag BLK_RESERVED_SIZE_ASSERT_COMMENT_OUT_FOR_NOW
 							 * in this C file for why the below assert is disabled.
 							 *
-							 * assert((curr - buffaddr + curr_chain.next_off)
+							 * assert((curr - buffaddr + curr_chain.chain.next_off)
 							 *		<= ((new_blk_size_l < blk_reserved_size
 							 *		? new_blk_size_l : blk_reserved_size) - off_chain_sz)));
 							 */
-=======
-								curr_chain.chain.next_off = 0;
-							assert((curr - buffaddr + curr_chain.chain.next_off)
-									<= ((new_blk_size_l < blk_reserved_size
-									? new_blk_size_l : blk_reserved_size) - off_chain_sz));
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 							if (dollar_tlevel != cse->t_level)
 							{
 								assert(dollar_tlevel > cse->t_level);

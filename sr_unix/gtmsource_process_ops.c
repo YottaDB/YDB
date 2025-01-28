@@ -3,7 +3,7 @@
  * Copyright (c) 2006-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -639,19 +639,8 @@ int gtmsource_recv_restart(seq_num *recvd_jnl_seqno, int *msg_type, int *start_f
 			REPL_DPRINT3("Local jnl ver is octal %o, remote jnl ver is octal %o\n",
 				this_side->jnl_ver, remote_side->jnl_ver);
 			repl_check_jnlver_compat(!remote_side->cross_endian);
-<<<<<<< HEAD
-			remote_side->is_std_null_coll = (*start_flags & START_FLAG_COLL_M) ? TRUE : FALSE;
-			remote_side->trigger_supported = (*start_flags & START_FLAG_TRIGGER_SUPPORT) ? TRUE : FALSE;
-=======
-			assert(remote_side->jnl_ver > V15_JNL_VER || 0 == (lcl_start_flags & START_FLAG_COLL_M));
-			if (remote_side->jnl_ver <= V15_JNL_VER)
-				lcl_start_flags &= ~START_FLAG_COLL_M; /* zap it for pro, just in case */
 			remote_side->is_std_null_coll = (lcl_start_flags & START_FLAG_COLL_M) ? TRUE : FALSE;
-			assert((remote_side->jnl_ver >= V19_JNL_VER) || (0 == (lcl_start_flags & START_FLAG_TRIGGER_SUPPORT)));
-			if (remote_side->jnl_ver < V19_JNL_VER)
-				lcl_start_flags &= ~START_FLAG_TRIGGER_SUPPORT; /* zap it for pro, just in case */
 			remote_side->trigger_supported = (lcl_start_flags & START_FLAG_TRIGGER_SUPPORT) ? TRUE : FALSE;
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 #			ifdef GTM_TRIGGER
 			if (!remote_side->trigger_supported)
 				repl_log(gtmsource_log_fp, TRUE, TRUE, "Warning : Secondary does not support GT.M "

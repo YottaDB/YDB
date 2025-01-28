@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -82,11 +82,6 @@ void op_zsystem(mval *v)
 	TPNOTACID_CHECK(ZSYSTEMSTR);
 	MV_FORCE_STR(v);
 	flush_pio();
-<<<<<<< HEAD
-=======
-	if (io_std_device.in->type == tt)
-		iott_resetterm(io_std_device.in);
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 	if (v->str.len)
 	{
 		/* Copy the command to a new buffer and append a '\0' */
@@ -146,10 +141,5 @@ void op_zsystem(mval *v)
 #endif
 	if (WIFEXITED(wait_stat))
 		dollar_zsystem = WEXITSTATUS(wait_stat);
-<<<<<<< HEAD
-=======
-	if (io_std_device.in->type == tt)
-		iott_setterm(io_std_device.in);
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 	return;
 }

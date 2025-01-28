@@ -41,13 +41,8 @@ GBLREF	unsigned char		rdfail_detail;
 
 error_def(ERR_DBFILERDONLY);
 
-<<<<<<< HEAD
-sm_uc_ptr_t mm_read(block_id blk)
-{	/* this is a kissing cousin to code in dsk_read and the two blocks should be maintained in parallel */
-=======
 sm_uc_ptr_t mm_read(block_id blk, boolean_t blk_free)
-{	/* this is a kissing cousin to code in dsk_read and the two blocs should be maintained in parallel */
->>>>>>> 5876dbb8 ([#1018] [V71001] Merge GT.M V7.1-001 into YottaDB mainline (with conflicts))
+{	/* this is a kissing cousin to code in dsk_read and the two blocks should be maintained in parallel */
 	boolean_t		buff_is_modified_after_read = FALSE, fully_upgraded, read_only, was_crit;
 	enum db_ver		tmp_ondskblkver;
 	int			level;

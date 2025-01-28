@@ -66,18 +66,9 @@
    Change commands are not required for normal operation, and are usually
    only used under the direction of YottaDB support to recover from the
    unanticipated consequences of failures not adequately planned for (for
-<<<<<<< HEAD
    example, you should configure YottaDB applications such that you never need a
-   Change command to recover from a system crash).
-
-   Inquiry commands let you see the attributes of your database. You may
-   frequently use the inquiry commands for collecting your database metrics
-   and status reporting.
-=======
-   example, you should configure GT.M applications such that you never need a
    Change command to recover from a system crash). Use Inquiry commands
    sparingly and only when there is no alternate available.
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 
    The list of Change commands is as follows:
 

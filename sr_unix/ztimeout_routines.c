@@ -3,7 +3,7 @@
  * Copyright (c) 2018-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2023-2024 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2023-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -220,14 +220,9 @@ void ztimeout_set(int4 dummy_param)
 	SETUP_THREADGBL_ACCESS;
 	assert(INTRPT_IN_EVENT_HANDLING == intrpt_ok_state);
 	assert(ztimeout == outofband);
-<<<<<<< HEAD
 	if (dollar_zininterrupt || ((0 < dollar_ecode.index) && ETRAP_IN_EFFECT)
-		|| (jobinterrupt == (TREF(save_xfer_root_ptr))->ev_que.fl->outofband))
-=======
-	if (dollar_zininterrupt || ((0 < dollar_ecode.index) && ETRAP_IN_EFFECT) || have_crit(CRIT_HAVE_ANY_REG | CRIT_IN_COMMIT)
 		|| (jobinterrupt == (TREF(save_xfer_root_ptr))->ev_que.fl->outofband)
 		|| ((0 == gtm_trigger_depth) && dollar_tlevel))
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 	{	/* not a good time, so save it */
 		outofband = no_event;
 		TAREF1(save_xfer_root, ztimeout).event_state = queued;

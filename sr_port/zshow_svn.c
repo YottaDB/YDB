@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -154,11 +154,7 @@ GBLREF int			jobinterrupt_sig_num;
 GBLREF boolean_t		dollar_zquit_anyway;
 GBLREF int4			dollar_zeditor, dollar_zsystem, zdir_form;
 GBLREF io_log_name		*dollar_principal, *io_root_log_name;
-<<<<<<< HEAD
 GBLREF io_pair			io_curr_device, io_std_device;
-=======
-GBLREF io_pair			io_curr_device, *io_std_device;
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 GBLREF mlk_subhash_val_t	mlk_last_hash;
 GBLREF mstr			dollar_zchset, dollar_zpatnumeric, dollar_zpin, dollar_zpout;
 GBLREF mval			dollar_estack_delta, dollar_job, dollar_system, dollar_zdir, dollar_zerror, dollar_zgbldir;

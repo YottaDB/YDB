@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -66,14 +66,10 @@ static int		rc_overflow_size = 0;
 static CONDITION_HANDLER(rc_fnd_file_ch1);
 static CONDITION_HANDLER(rc_fnd_file_ch2);
 
-<<<<<<< HEAD
 LITREF	char	*ydbenvname[YDBENVINDX_MAX_INDEX];
 LITREF	char	*gtmenvname[YDBENVINDX_MAX_INDEX];
 
-short rc_fnd_file(rc_xdsid *xdsid)
-=======
 unsigned short rc_fnd_file(rc_xdsid *xdsid)
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 {
 	gv_namehead	*g;
 	short		dsid, node;

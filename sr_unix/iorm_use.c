@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2020-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2020-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -189,11 +189,7 @@ void	iorm_use(io_desc *iod, mval *pp)
 	unsigned char	c;
 	short		mode = 0, mode1 = 0;
 	int4		length, width, width_bytes, recordsize, recsize_before, padchar;
-<<<<<<< HEAD
 	int		fstat_res, rv;
-=======
-	int		fstat_res, save_errno = 0, rv;
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 	d_rm_struct	*rm_ptr;
 	struct stat	statbuf;
 	int		p_offset;

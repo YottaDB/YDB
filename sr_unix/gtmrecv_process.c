@@ -3,7 +3,7 @@
  * Copyright (c) 2006-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -2682,13 +2682,8 @@ STATICFNDEF boolean_t gtmrecv_exchange_tls_info(void)
 STATICFNDEF void do_main_loop(boolean_t crash_restart)
 {
 	/* The work-horse of the Receiver Server */
-<<<<<<< HEAD
 	boolean_t			dont_reply_to_heartbeat = FALSE, is_repl_cmpc, is_wacky_message;
-	boolean_t			uncmpfail, send_cross_endian, recvpool_prepared, copied_to_recvpool;
-=======
-	boolean_t			dont_reply_to_heartbeat = FALSE, is_repl_cmpc;
 	boolean_t			uncmpfail, send_cross_endian, recvpool_prepared = FALSE, copied_to_recvpool = FALSE;
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 	gtmrecv_local_ptr_t		gtmrecv_local;
 	gtm_time4_t			ack_time;
         char				print_msg[PROC_RECVOPS_PRINT_MSG_LEN];
@@ -2938,16 +2933,10 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 				if (!remote_side->endianness_known)
 				{
 					remote_side->endianness_known = TRUE;
-<<<<<<< HEAD
-			                msg_type = ((repl_msg_ptr_t)buffp)->type;
+					msg_type = ((repl_msg_ptr_t)buffp)->type;
 					CHECK_FOR_WACKY_MESSAGE(msg_type, gtmrecv_log_fp, is_wacky_message);
 					if (is_wacky_message)
 						return;
-=======
-					msg_type = ((repl_msg_ptr_t)buffp)->type;
-					if (!((REPL_MSGTYPE_LAST > msg_type) || (REPL_MSGTYPE_LAST > GTM_BYTESWAP_32(msg_type))))
-						WACKY_MESSAGE(msg_type, &gtmrecv_sock_fd, 1);	/* impossible message type */
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 					if ((REPL_MSGTYPE_LAST < msg_type) && (REPL_MSGTYPE_LAST > GTM_BYTESWAP_32(msg_type)))
 					{
 						remote_side->cross_endian = TRUE;

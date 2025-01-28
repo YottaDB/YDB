@@ -3,7 +3,7 @@
  * Copyright (c) 2015-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -165,13 +165,8 @@ boolean_t utfcgr_scanforcharN(int char_num, utfscan_parseblk *utf_parse_blk)
 {
 	int		char_idx, tcharcnt, tbyteidx, gcharcnt, gbytecnt, bytecnt, skip, bidx;
 	int		lchar_byteidx, lchar_charcnt;
-<<<<<<< HEAD
-	unsigned int	utfcgrepcnt, utfcgridx, chartype, lchar_typflags;
-	boolean_t	noslots, cachemod, scaneol;
-=======
 	unsigned int	utfcgrepcnt, utfcgridx, chartype = UTFCGR_NONE, lchar_typflags;
-	boolean_t	noslots, lastcharbad, cachemod, scaneol;
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
+	boolean_t	noslots, cachemod, scaneol;
 	unsigned char	*scantop, *scanptr;
 	mval		*mv;
 	utfcgr		*utfcgrp;

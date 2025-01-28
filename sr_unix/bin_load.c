@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -239,19 +239,12 @@ void bin_load(gtm_uint64_t begin, gtm_uint64_t end, char *line1_ptr, int line1_l
 	unsigned char		hdr_lvl, src_buff[MAX_KEY_SZ + 1], dest_buff[MAX_ZWR_KEY_SZ],
 				cmpc_str[MAX_KEY_SZ + 1], dup_key_str[MAX_KEY_SZ + 1], sn_key_str[MAX_KEY_SZ + 1], *sn_key_str_end;
 	unsigned char		*end_buff, *gvn_char, *subs, mych;
-<<<<<<< HEAD
-	unsigned short		rec_len, next_cmpc, numsubs, num_subscripts;
-	int			len, current, last, max_key, max_rec, fmtd_key_len;
-
-	int			tmp_cmpc, sn_chunk_number, expected_sn_chunk_number = 0, sn_hold_buff_pos, sn_hold_buff_size, i;
-	uint4			max_data_len, max_subsc_len, gblsize, data_len, num_of_reg = 0;
-=======
 	unsigned short		rec_len, next_cmpc, numsubs = 0, num_subscripts;
 	int			len, current, last, max_key = 0, max_rec = 0, fmtd_key_len;
 	int			tmp_cmpc, sn_chunk_number, expected_sn_chunk_number = 0;
 	int			sn_hold_buff_pos = 0, sn_hold_buff_size = 0;
+	int			i;
 	uint4			max_data_len, max_subsc_len, gblsize = 0, data_len, num_of_reg = 0;
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 	ssize_t			subsc_len, extr_std_null_coll;
 	gtm_uint64_t		iter, key_count, tmp_rec_count, global_key_count;
 	DEBUG_ONLY(gtm_uint64_t		saved_begin = 0);
@@ -264,29 +257,16 @@ void bin_load(gtm_uint64_t begin, gtm_uint64_t end, char *line1_ptr, int line1_l
 	mname_entry		gvname;
 	mstr			mstr_src, mstr_dest, opstr;
 	collseq			*extr_collseq, *db_collseq, *save_gv_target_collseq;
-<<<<<<< HEAD
-	coll_hdr		extr_collhdr, db_collhdr;
-	gv_key			*tmp_gvkey, *sn_gvkey, *sn_savekey, *save_orig_key;
-=======
 	coll_hdr		extr_collhdr = { 0, 0, 0, 0,}, db_collhdr = { 0, 0, 0, 0 };
 	bool			extr_collhdr_set = FALSE, db_collhdr_set = FALSE;
-	gv_key			*tmp_gvkey = NULL;	/* null-initialize at start, will be malloced later */
-	gv_key			*sn_gvkey = NULL; /* null-initialize at start, will be malloced later */
-	gv_key			*sn_savekey = NULL; /* null-initialize at start, will be malloced later */
-	gv_key			*save_orig_key = NULL; /* null-initialize at start, will be malloced later */
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
+	gv_key			*tmp_gvkey, *sn_gvkey, *sn_savekey, *save_orig_key;
 	gv_key			*orig_gv_currkey_ptr = NULL;
 	char			std_null_coll[BIN_HEADER_NUMSZ + 1], *sn_hold_buff = NULL, *sn_hold_buff_temp;
 	int			in_len, gtmcrypt_errno, n_index, encrypted_hash_array_len, null_iv_array_len;
 	char			*inbuf, *encrypted_hash_array_ptr, *curr_hash_ptr, *null_iv_array_ptr = NULL, null_iv_char;
 	int4			index;
-<<<<<<< HEAD
 	gtmcrypt_key_t		*encr_key_handles;
-	boolean_t		encrypted_version, mixed_encryption, valid_gblname;
-=======
-	gtmcrypt_key_t		*encr_key_handles = NULL;
 	boolean_t		encrypted_version, mixed_encryption = FALSE, valid_gblname;
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 	char			index_err_buf[1024];
 	gvnh_reg_t		*gvnh_reg;
 	gd_region		*dummy_reg, *reg_ptr = NULL;

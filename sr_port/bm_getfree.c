@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -337,11 +337,8 @@ block_id bm_getfree(block_id hint_arg, boolean_t *blk_used, unsigned int cw_work
 		assert((NO_FREE_SPACE == free_bit) && (!lcnt));	/* All maps full, should have extended */
 		assertpro(FALSE);
 	}
-<<<<<<< HEAD
 	assert(0 <= free_bit);	/* or else we would be allocating a block in the previous bit map */
-=======
 	assert(0 <= depth);
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 	if (0 != depth)
 	{
 		b_ptr = cs1->upd_addr.map;

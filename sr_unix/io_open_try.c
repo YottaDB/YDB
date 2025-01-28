@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -421,11 +421,13 @@ boolean_t io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, uint8 nsec_t
 		}
 		/* Check the saved error from mknod() for fifo, also saved error from fstat() or stat()
 		   so error handler (if set)  can handle it */
-<<<<<<< HEAD
 		if (ff == tl->iod->type)
 		{
 			if (mknod_err)
+			{
+				assert(save_mknod_err);
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_DEVOPENFAIL, 2, LEN_AND_STR(buf), save_mknod_err);
+			}
 			/* Before doing the OPEN3 a few lines later, check if "outofband" is non-zero. If so act on it.
 			 * This is because a FIFO OPEN can block for a while and it is better to handle Ctrl-C etc. events
 			 * if any happened before the OPEN starts.
@@ -435,20 +437,10 @@ boolean_t io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, uint8 nsec_t
 		}
 		/* Error from either stat() or fstat() function */
 		if (stat_err)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_DEVOPENFAIL, 2, LEN_AND_STR(buf), save_stat_err);
-=======
-		if (ff == tl->iod->type  && mknod_err)
-		{
-			assert(save_mknod_err);
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) save_mknod_err);
-		}
-		/* Error from either stat() or fstat() function */
-		if (stat_err)
 		{
 			assert(save_stat_err);
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) save_stat_err);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_DEVOPENFAIL, 2, LEN_AND_STR(buf), save_stat_err);
 		}
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 		/* Error from trying to open a dir */
 		if (dir_err)
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_DEVOPENFAIL, 2, LEN_AND_STR(buf),

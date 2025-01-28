@@ -155,8 +155,13 @@ void db_auto_upgrade(gd_region *reg)
 				csd->max_update_array_size
 					+= (int4)(ROUND_UP2(MAX_BITMAP_UPDATE_ARRAY_SIZE(csd), UPDATE_ARRAY_ALIGN_SIZE));
 			case GDSMV70001:
-<<<<<<< HEAD
 			case GDSMV70002:
+				/* GT.M V70002 added proactive block split option.
+				 * GT.M V71001 changed proactive block split default.
+				 * So just one line below to incorporate both those changes in one shot.
+				 */
+				csd->problksplit = DEFAULT_PROBLKSPLIT;
+			case GDSMV71001:
 				if (GDSMR200_V70000 != csd->minor_dbver)
 				{
 					/* Do YottaDB r2.00 related auto upgrade operations.
@@ -191,39 +196,31 @@ void db_auto_upgrade(gd_region *reg)
 					csd->max_procs.time = 0;
 				}
 			case GDSMR200_V70001:
-				if (GDSMV70002 != csd->minor_dbver)
-				{	/* GT.M V70002 added proactive block split option */
-					csd->problksplit = DEFAULT_PROBLKSPLIT;
-				}
-				break;		/* so a new "case" needs to be added BEFORE the assert. */
 			case GDSMR202_V70002:
+				/* GT.M V70002 added proactive block split option.
+				 * GT.M V71001 changed proactive block split default.
+				 * So just one line below to incorporate both those changes in one shot.
+				 */
+				csd->problksplit = DEFAULT_PROBLKSPLIT;
+				break;		/* so a new "case" needs to be added BEFORE the assert. */
+			case GDSMR204_V71001:
 				/* When adding a new minor version, the following template should be maintained
 				 * 1) Remove the penultimate 'break' (i.e. "break" in the PREVIOUS "case" block.
 				 * 2) If there are any file header fields added in the new minor version, initialize the fields
-				 *    to default values in THIS/CURRENT case (i.e. above this comment block). Do not add a
+				 *    to default values in THIS/CURRENT case (i.e. above this comment block). Do add a
 				 *    "break" for THIS/CURRENT "case" block.
-				 * 3) Then, add a NEW "case" statement with the new minor version. The below 3 lines become
-				 *    part of that "case".
+				 * 3) Then, add a NEW "case" statement with the new minor version. This comment block and
+				 *    the below 3 lines become part of that "case".
 				 * 4) For every GT.M minor ver added since the previous YottaDB release, duplicate the relevant
 				 *    auto upgrade code in this case block. This is needed as the GT.M GDSMV* (e.g. GDSMV63012)
 				 *    values will be way less than the older YottaDB GDSMVCURR value (e.g. in case of YottaDB
 				 *    r1.32) and so those GT.M switch/case code paths above will not be reached for upgrades
 				 *    from an older YottaDB release to a newer YottaDB release.
 				 */
-=======
-				/* GT.M V70002 added proactive block split option */
-				csd->problksplit = DEFAULT_PROBLKSPLIT;
-			case GDSMV70002:
-				/* GT.M V71001 changed proactive block split default */
-				csd->problksplit = DEFAULT_PROBLKSPLIT;
-				break;		/* so a new "case" needs to be added BEFORE the assert. */
-			case GDSMV71001:
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 				/* Nothing to do for this version since it is GDSMVCURR for now. */
 				assert(FALSE);		/* When this assert fails, it means a new GDSMV* was created, */
 				break;			/* 	so a new "case" needs to be added BEFORE the assert. */
 			/* Remove the below cases one by one as later GT.M versions use up these minor db version enum values. */
-			case GDSMVFILLER28:
 			case GDSMVFILLER29:
 			case GDSMVFILLER30:
 			case GDSMVFILLER31:
@@ -233,6 +230,217 @@ void db_auto_upgrade(gd_region *reg)
 			case GDSMVFILLER35:
 			case GDSMVFILLER36:
 			case GDSMVFILLER37:
+			case GDSMVFILLER45:
+			case GDSMVFILLER46:
+			case GDSMVFILLER47:
+			case GDSMVFILLER48:
+			case GDSMVFILLER49:
+			case GDSMVFILLER50:
+			case GDSMVFILLER51:
+			case GDSMVFILLER52:
+			case GDSMVFILLER53:
+			case GDSMVFILLER54:
+			case GDSMVFILLER55:
+			case GDSMVFILLER56:
+			case GDSMVFILLER57:
+			case GDSMVFILLER58:
+			case GDSMVFILLER59:
+			case GDSMVFILLER60:
+			case GDSMVFILLER61:
+			case GDSMVFILLER62:
+			case GDSMVFILLER63:
+			case GDSMVFILLER64:
+			case GDSMVFILLER65:
+			case GDSMVFILLER66:
+			case GDSMVFILLER67:
+			case GDSMVFILLER68:
+			case GDSMVFILLER69:
+			case GDSMVFILLER70:
+			case GDSMVFILLER71:
+			case GDSMVFILLER72:
+			case GDSMVFILLER73:
+			case GDSMVFILLER74:
+			case GDSMVFILLER75:
+			case GDSMVFILLER76:
+			case GDSMVFILLER77:
+			case GDSMVFILLER78:
+			case GDSMVFILLER79:
+			case GDSMVFILLER80:
+			case GDSMVFILLER81:
+			case GDSMVFILLER82:
+			case GDSMVFILLER83:
+			case GDSMVFILLER84:
+			case GDSMVFILLER85:
+			case GDSMVFILLER86:
+			case GDSMVFILLER87:
+			case GDSMVFILLER88:
+			case GDSMVFILLER89:
+			case GDSMVFILLER90:
+			case GDSMVFILLER91:
+			case GDSMVFILLER92:
+			case GDSMVFILLER93:
+			case GDSMVFILLER94:
+			case GDSMVFILLER95:
+			case GDSMVFILLER96:
+			case GDSMVFILLER97:
+			case GDSMVFILLER98:
+			case GDSMVFILLER99:
+			case GDSMVFILLER100:
+			case GDSMVFILLER101:
+			case GDSMVFILLER102:
+			case GDSMVFILLER103:
+			case GDSMVFILLER104:
+			case GDSMVFILLER105:
+			case GDSMVFILLER106:
+			case GDSMVFILLER107:
+			case GDSMVFILLER108:
+			case GDSMVFILLER109:
+			case GDSMVFILLER110:
+			case GDSMVFILLER111:
+			case GDSMVFILLER112:
+			case GDSMVFILLER113:
+			case GDSMVFILLER114:
+			case GDSMVFILLER115:
+			case GDSMVFILLER116:
+			case GDSMVFILLER117:
+			case GDSMVFILLER118:
+			case GDSMVFILLER119:
+			case GDSMVFILLER120:
+			case GDSMVFILLER121:
+			case GDSMVFILLER122:
+			case GDSMVFILLER123:
+			case GDSMVFILLER124:
+			case GDSMVFILLER125:
+			case GDSMVFILLER126:
+			case GDSMVFILLER127:
+			case GDSMVFILLER128:
+			case GDSMVFILLER129:
+			case GDSMVFILLER130:
+			case GDSMVFILLER131:
+			case GDSMVFILLER132:
+			case GDSMVFILLER133:
+			case GDSMVFILLER134:
+			case GDSMVFILLER135:
+			case GDSMVFILLER136:
+			case GDSMVFILLER137:
+			case GDSMVFILLER138:
+			case GDSMVFILLER139:
+			case GDSMVFILLER140:
+			case GDSMVFILLER141:
+			case GDSMVFILLER142:
+			case GDSMVFILLER143:
+			case GDSMVFILLER144:
+			case GDSMVFILLER145:
+			case GDSMVFILLER146:
+			case GDSMVFILLER147:
+			case GDSMVFILLER148:
+			case GDSMVFILLER149:
+			case GDSMVFILLER150:
+			case GDSMVFILLER151:
+			case GDSMVFILLER152:
+			case GDSMVFILLER153:
+			case GDSMVFILLER154:
+			case GDSMVFILLER155:
+			case GDSMVFILLER156:
+			case GDSMVFILLER157:
+			case GDSMVFILLER158:
+			case GDSMVFILLER159:
+			case GDSMVFILLER160:
+			case GDSMVFILLER161:
+			case GDSMVFILLER162:
+			case GDSMVFILLER163:
+			case GDSMVFILLER164:
+			case GDSMVFILLER165:
+			case GDSMVFILLER166:
+			case GDSMVFILLER167:
+			case GDSMVFILLER168:
+			case GDSMVFILLER169:
+			case GDSMVFILLER170:
+			case GDSMVFILLER171:
+			case GDSMVFILLER172:
+			case GDSMVFILLER173:
+			case GDSMVFILLER174:
+			case GDSMVFILLER175:
+			case GDSMVFILLER176:
+			case GDSMVFILLER177:
+			case GDSMVFILLER178:
+			case GDSMVFILLER179:
+			case GDSMVFILLER180:
+			case GDSMVFILLER181:
+			case GDSMVFILLER182:
+			case GDSMVFILLER183:
+			case GDSMVFILLER184:
+			case GDSMVFILLER185:
+			case GDSMVFILLER186:
+			case GDSMVFILLER187:
+			case GDSMVFILLER188:
+			case GDSMVFILLER189:
+			case GDSMVFILLER190:
+			case GDSMVFILLER191:
+			case GDSMVFILLER192:
+			case GDSMVFILLER193:
+			case GDSMVFILLER194:
+			case GDSMVFILLER195:
+			case GDSMVFILLER196:
+			case GDSMVFILLER197:
+			case GDSMVFILLER198:
+			case GDSMVFILLER199:
+			case GDSMVFILLER200:
+			case GDSMVFILLER201:
+			case GDSMVFILLER202:
+			case GDSMVFILLER203:
+			case GDSMVFILLER204:
+			case GDSMVFILLER205:
+			case GDSMVFILLER206:
+			case GDSMVFILLER207:
+			case GDSMVFILLER208:
+			case GDSMVFILLER209:
+			case GDSMVFILLER210:
+			case GDSMVFILLER211:
+			case GDSMVFILLER212:
+			case GDSMVFILLER213:
+			case GDSMVFILLER214:
+			case GDSMVFILLER215:
+			case GDSMVFILLER216:
+			case GDSMVFILLER217:
+			case GDSMVFILLER218:
+			case GDSMVFILLER219:
+			case GDSMVFILLER220:
+			case GDSMVFILLER221:
+			case GDSMVFILLER222:
+			case GDSMVFILLER223:
+			case GDSMVFILLER224:
+			case GDSMVFILLER225:
+			case GDSMVFILLER226:
+			case GDSMVFILLER227:
+			case GDSMVFILLER228:
+			case GDSMVFILLER229:
+			case GDSMVFILLER230:
+			case GDSMVFILLER231:
+			case GDSMVFILLER232:
+			case GDSMVFILLER233:
+			case GDSMVFILLER234:
+			case GDSMVFILLER235:
+			case GDSMVFILLER236:
+			case GDSMVFILLER237:
+			case GDSMVFILLER238:
+			case GDSMVFILLER239:
+			case GDSMVFILLER240:
+			case GDSMVFILLER241:
+			case GDSMVFILLER242:
+			case GDSMVFILLER243:
+			case GDSMVFILLER244:
+			case GDSMVFILLER245:
+			case GDSMVFILLER246:
+			case GDSMVFILLER247:
+			case GDSMVFILLER248:
+			case GDSMVFILLER249:
+			case GDSMVFILLER250:
+			case GDSMVFILLER251:
+			case GDSMVFILLER252:
+			case GDSMVFILLER253:
+			case GDSMVFILLER254:
+			case GDSMVFILLER255:
 			default:
 				/* Unrecognized version in the header */
 				assertpro(FALSE && csd->minor_dbver);

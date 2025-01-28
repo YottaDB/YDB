@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -163,12 +163,7 @@ void iosocket_close(io_desc *iod, mval *pp)
 void iosocket_close_range(d_socket_struct *dsocketptr, int start, int end, boolean_t socket_delete)
 {
 	int4		ii,jj;
-<<<<<<< HEAD
-	int		rc, save_fd, save_rc = 0, save_errno;
-=======
 	int		rc, save_fd = FD_INVALID, save_rc = 0, save_errno = 0;
-	int		local_process_exiting;
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 	ssize_t		status;
 	intrpt_state_t	prev_intrpt_state;
 	socket_struct	*socketptr;

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -1546,11 +1546,6 @@ MBSTART {												\
 
 #define	FREE_JBUF_RSRV_STRUCT(JRS)		\
 MBSTART {					\
-<<<<<<< HEAD
-=======
-	assert((NULL != JRS) 			\
-		|| (WBTEST_ENABLED(WBTEST_SKIP_CORE_FOR_MEMORY_ERROR)));	\
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 	if (NULL != JRS)			\
 	{					\
 		if (NULL != JRS->jrs_array)	\

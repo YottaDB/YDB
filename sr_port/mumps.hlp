@@ -11907,35 +11907,22 @@
    $ZCOmpile
 
    $ZCO[MPILE] contains a string value composed of one or more qualifiers
-<<<<<<< HEAD
-   that control the YottaDB compiler. Explicit ZLINKs and auto-ZLINKs use these
-   qualifiers as defaults for any compilations that they perform.
-=======
-   that control the GT.M run-time compiler. ZCOMPILE, explicit ZLINKs and
+   that control the YottaDB run-time compiler. ZCOMPILE, explicit ZLINKs and
    auto-ZLINKs use these qualifiers as defaults for any compilations they
    perform.
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 
    $ZCOMPILE is a read-write ISV, that is, it can appear on the left side of
    the equal sign (=) in the argument to the SET command. A $ZCOMPILE value
    has the form of a list of M command qualifiers each separated by a space (
    ).
 
-<<<<<<< HEAD
-   When the environment variable ydb_compile is defined, YottaDB initializes
-   $ZCOMPILE to the translation of ydb_compile. Otherwise YottaDB initializes
+   When the ydb_compile environment variable is defined, YottaDB initializes
+   $ZCOMPILE to the translation of $ydb_compile. Otherwise YottaDB initializes
    $ZCOMPILE to null. Changes to the value of $ZCOMPILE during a YottaDB
    invocation only last for the current invocation and do not change the
-   value of the environment variable ydb_compile.
+   value of the ydb_compile environment variable .
 
    ZCOMPILE returns a status of 1 after any error in compilation.
-=======
-   When the gtmcompile environment variable is defined, GT.M initializes
-   $ZCOMPILE to the translation of $gtmcompile. Otherwise GT.M initializes
-   $ZCOMPILE to null. Changes to the value of $ZCOMPILE during a GT.M
-   invocation only last for the current invocation and do not change the
-   value of the $gtmcompile environment variable.
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 
    When $ZCOMPILE is null, YottaDB uses the default M command qualifiers
    -IGNORE, -LABEL=LOWER, -NOLIST, and -OBJECT.
@@ -11966,21 +11953,12 @@
    $ZCstatus
 
    $ZC[STATUS] holds the value of the status code for the last compilation
-<<<<<<< HEAD
-   performed by a ZCOMPILE command. One (1) indicates a clean compilation, a
-   positive number greater than one is an error code you can turn into text
-   with $ZMESSAGE(), and a negative number is a negated error code that
-   indicates YottaDB was not able to produce an object file. The error details
-   appear in the compilation output, so $ZCSTATUS typically contains the code
-   for ERRORSUMMARY.
-=======
    performed by a ZCOMPILE, ZLINK or auto-ZLINK . One (1) indicates a clean
    compilation, a positive number greater than one is an error code you can
    turn into text with $ZMESSAGE(), and a negative number is a negated error
-   code that indicates GT.M was not able to produce an object file. The error
+   code that indicates YottaDB was not able to produce an object file. The error
    details appear in the compilation output, so $ZCSTATUS typically contains
    the code for ERRORSUMMARY.
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 
    YottaDB does not permit the SET command to modify $ZCSTATUS.
 
@@ -13489,17 +13467,11 @@
    Note that YottaDB only recognizes interrupts such as from $ZTIMEOUT at points
    where it can properly resume operation, such as the beginning of a line,
    when waiting on a command with a timeout, or when starting a FOR
-<<<<<<< HEAD
-   iteration. When a timeout occurs, if the last assignment specified no
-   vector, YottaDB uses the current $ETRAP or $ZTRAP. When a $ZTIMEOUT expires,
-   it invokes one of three possible vectors:
-=======
-   iteration. GT.M defers recognition of a $ZTIMEOUT arriving while executing
+   iteration. YottaDB defers recognition of a $ZTIMEOUT arriving while executing
    a TP transaction until after a TROLLBACK or the "master" TCOMMIT. When a
-   timeout occurs, if the last assignment specified no vector, GT.M uses the
+   timeout occurs, if the last assignment specified no vector, YottaDB uses the
    current $ETRAP or $ZTRAP. When a $ZTIMEOUT expires, it invokes one of
    three possible vectors:
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 
      o Its own labelref, which creates a new stack frame, from which it
        returns to the point at which it was recognized - similar to what

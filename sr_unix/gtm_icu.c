@@ -3,7 +3,7 @@
  * Copyright (c) 2006-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -276,13 +276,8 @@ void gtm_icu_init(void)
 	void_ptr_t	handle;
 	char_ptr_t	err_str;
 	icu_func_t	fptr;
-<<<<<<< HEAD
 	int		findx;
-	boolean_t	icu_getversion_found = FALSE, ydb_icu_ver_defined, symbols_renamed;
-=======
-	int		findx, ver;
-	boolean_t	icu_getversion_found = FALSE, gtm_icu_ver_defined, symbols_renamed = -1;
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
+	boolean_t	icu_getversion_found = FALSE, ydb_icu_ver_defined, symbols_renamed = -1;
 	UVersionInfo	icu_version;
 	int		iculdflags = ICU_LIBFLAGS;
 	struct stat	libpath_stat;
@@ -510,7 +505,6 @@ void gtm_icu_init(void)
 		}
 #		endif
 	}
-<<<<<<< HEAD
 	/* Note that a call to "dlopen_handle_array_add(handle)" should normally have been placed here but
 	 * if "dlopen_handle_array_close()" happens on this handle (corresponding to libicuio.so) later and
 	 * any type of error occurs (e.g. CALLINAFTERXIT etc.), it is very likely we would end up invoking
@@ -518,16 +512,6 @@ void gtm_icu_init(void)
 	 * has already been done on libicuio.so. Since this library is so much tied with YottaDB error handling,
 	 * we skip the "dlopen_handle_array_add" (and in turn "dlopen_handle_array_close" at "ydb_exit" time).
 	 */
-	#ifndef DEBUG
-		symbols_renamed = FALSE; /* This should not be needed because findx will be 0 on the first iteration and this
-				  	  * variable should be initialized after the first iteration but valgrind throws what
-				  	  * what we believe is a false uninitialized variable warning for this so we set it
-					  * to avoid the warning.
-				  	  */
-	#endif
-	DEBUG_ONLY(symbols_renamed = -1;)
-=======
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 	for (findx = 0; findx < icu_func_n; ++findx)
 	{
 		cur_icu_fname = icu_fname[findx];

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2020-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2020-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -14,10 +14,6 @@
  ****************************************************************/
 #ifndef DEFERRED_EVENTS_INCLUDED
 #define DEFERRED_EVENTS_INCLUDED
-<<<<<<< HEAD
-=======
-
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 
 #ifdef DEBUG
 /* Uncomment below to enable tracing of deferred events */

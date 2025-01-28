@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -248,13 +248,8 @@ void mupip_backup(void)
 	char			tempdir_full_buffer[MAX_FN_LEN + 1];
 	char			*jnl_str_ptr, jnl_str[256], entry[256], prev_jnl_fn[JNL_NAME_SIZE];
 	int			index, jnl_fstat, attemptcnt, maxtries;
-<<<<<<< HEAD
 	mstr			tempdir_trans, *file, *rfile, *replinstfile, tempdir_full, filestr;
-	uint4			jnl_status, temp_file_name_len, tempdir_trans_len, trans_log_name_status;
-=======
-	mstr			tempdir_log, tempdir_trans, *file, *rfile, *replinstfile, tempdir_full, filestr;
 	uint4			jnl_status, temp_file_name_len, tempdir_trans_len, trans_log_name_status = SS_NORMAL;
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 	boolean_t		jnl_options[jnl_end_of_list] = {FALSE, FALSE, FALSE}, save_no_prev_link;
 	jnl_private_control	*jpc;
 	jnl_buffer_ptr_t	jbp;

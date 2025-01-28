@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -307,13 +307,6 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 						 * 	fixed part from the indefinite part.
 						 */
 						split_atom = TRUE;
-<<<<<<< HEAD
-=======
-						if ((count >= (MAX_PATTERN_ATOMS - 1)) ||
-								(atom_map >= (MAX_PATTERN_ATOMS -2)))
-							return ERR_PATMAXLEN;
-
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 					} else
 					{
 						infinite = TRUE;

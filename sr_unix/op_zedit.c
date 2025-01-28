@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -174,7 +174,6 @@ void op_zedit(mval *v, mval *p)
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_RESTRICTEDOP, 1, "ZEDIT");
 
 	flush_pio();
-<<<<<<< HEAD
 	ret = gtm_system_internal(editor.addr, es, NULL, NULL);
 	if (-1 == ret)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("gtm_system_internal()"), CALLFROM, errno);
@@ -185,39 +184,6 @@ void op_zedit(mval *v, mval *p)
 	{
 		ret = WEXITSTATUS(ret);
 		dollar_zeditor = ret;
-=======
-	if (tt == io_std_device.in->type)
-		iott_resetterm(io_std_device.in);
-	/* ignore interrupts */
-	sigemptyset(&act.sa_mask);
-	act.sa_flags = 0;
-	act.sa_handler = SIG_IGN;
-	sigaction(SIGINT, &act, &intr);
-	FORK(childid);
-	if (childid)
-	{
-		waitid = (int)childid;
-		for (;;)
-		{
-#ifdef _BSD
-			WAIT(&wait_status, waitid);
-#else
-			WAIT((int *)&status, waitid);
-#endif
-			if (waitid == (int)childid)
-				break;
-			if (-1 == waitid)
-				break;
-		}
-		if (-1 != waitid)
-			dollar_zeditor = 0;
-		else
-			dollar_zeditor = errno;
-		/* restore interrupt handler */
-		sigaction(SIGINT, &intr, 0);
-		if (tt == io_std_device.in->type)
-			iott_setterm(io_std_device.in);
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 	} else
 		dollar_zeditor = -1;	/* Not sure how child did not terminate. Record that event with a -1 here. */
 }

@@ -114,20 +114,7 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 	if (mu_upgrade_in_prog)
 	{	/* Future enhancement should make full use of i_max_fill and d_max_fill */
 		assert(i_max_fill == d_max_fill);
-<<<<<<< HEAD
-		reserve_bytes = cs_data->i_reserved_bytes + i_max_fill;
-		available_bytes = cs_data->blk_size - blk_hdr_ptr->bsiz;
-		if (available_bytes >= reserve_bytes)
-			CLEAR_BLKFMT_AND_RETURN(cdb_sc_oprnotneeded);	/* upgrade does not require a split */
-		if ((cs_data->blk_size << 1) < reserve_bytes)
-		{
-			DEBUG_ONLY(available_bytes += cs_data->i_reserved_bytes);
-			reserve_bytes = i_max_fill;
-		}
-		assert((cs_data->blk_size << 1) > available_bytes);	/* Half block size should always be enough */
-=======
 		reserve_bytes = 0;					/* REORG -UPGRADE is top down, so zero the reserve bytes */
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
 	}
 	blk_size = cs_data->blk_size;
 	CHECK_AND_RESET_UPDATE_ARRAY;					/* reset update_array_ptr to update_array */

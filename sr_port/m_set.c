@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -134,14 +134,9 @@ int m_set(void)
 	int		first_setleft_invalid;	/* set to TRUE if the first setleft target is invalid */
 	opctype		put_oc = OC_NOOP;
 	oprtype		delimval, firstval, lastval, resptr, *result, v, control_slot, first_control_slot;
-<<<<<<< HEAD
-	triple		*curtargchain, *delimiter, discardcurtchain, *first, *get, *jmptrp1, *jmptrp2, *last, *obp, *put;
-	triple		*s, *s1, save_targchain, *save_curtchain, *save_curtchain1, *sub, targchain, *tmp;
-=======
 	triple		*curtargchain, *delimiter, discardcurtchain, *first = NULL, *get, *jmptrp1, *jmptrp2, *last, *obp,
 			*put = NULL;
-	triple		*s, *s0, *s1, save_targchain, *save_curtchain, *save_curtchain1, *sub, targchain, *tmp;
->>>>>>> 3c1c09f2 (GT.M V7.1-001)
+	triple		*s, *s1, save_targchain, *save_curtchain, *save_curtchain1, *sub, targchain, *tmp;
 	triple		*ref;
 	mint		delimlit;
 	mval		*delim_mval;
