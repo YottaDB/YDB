@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -55,6 +55,6 @@ void suspend(int sig)
 	 * mode. Also update ttptr->setterm_done_by to indicate that the terminal is
 	 * now set-up for direct mode. */
 	if (NULL != io_std_device.in && tt == io_std_device.in->type)
-		setterm(io_std_device.in);
+		iott_setterm(io_std_device.in);
 	return;
 }

@@ -1,42 +1,67 @@
 /****************************************************************
- *                                                              *
- * Copyright (c) 2011-2023 Fidelity National Information	*
- * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+ *								*
+ * Copyright 2011, 2014 Fidelity Information Services, Inc	*
  *								*
  * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
- *                                                              *
- *      This source code contains the intellectual property     *
- *      of its copyright holder(s), and is made available       *
- *      under a license.  If you do not know the terms of       *
- *      the license, please stop and do not read further.       *
- *                                                              *
+ *								*
+ *	This source code contains the intellectual property	*
+ *	of its copyright holder(s), and is made available	*
+ *	under a license.  If you do not know the terms of	*
+ *	the license, please stop and do not read further.	*
+ *								*
  ****************************************************************/
 
 /*-----------------------------------------------------------------------------
  * MurmurHash3 was written by Austin Appleby, and is placed in the public
  * domain. The author hereby disclaims copyright to this source code.
  *
+ * Note - The x86 and x64 versions do _not_ produce the same results, as the
+ * algorithms are optimized for their respective platforms. You can still
+ * compile and run any of them on any platform, but your performance with the
+ * non-native version will be less than optimal.
+ *
  * This version converted to C for use in GT.M/YottaDB by FIS/YottaDB.
- * The original implementation has been superseded by an incremental,
- * endian stable one, with only a few core pieces remaining.
  *-----------------------------------------------------------------------------*/
 
 #include "mdef.h"
+
 #include "gtm_string.h"
+
 #include "mmrhash.h"
 
-#define C1 BIG_CONSTANT(0x87c37b91114253d5)
-#define C2 BIG_CONSTANT(0x4cf5ad432745937f)
-#define M1 0x52dce729
-#define M2 0x38495ab5
+/*
+ * Since this code is largely third-party, its form is somewhat different than
+ * other code in YottaDB/GT.M. This is intentional, at least for the initial version,
+ * in order to allow for comparison with the original. This may be cleaned up
+ * in future versions, as no revisions to the original public domain code are
+ * expected. The original code is hosted at http://code.google.com/p/smhasher/ .
+ *
+ * Note also that YottaDB/GT.M is currently only using the 32 bit hash function,
+ * MurmurHash3_x86_32(). The 128 bit functions MurmurHash3_x86_128() and MurmurHash3_x64_128()
+ * are retained for completeness and possible future use.
+ *
+ */
 
-#define LSHIFT_BYTES_SAFE(LHS, RHS)	((LHS) << ((RHS) * 8))
-#define RSHIFT_BYTES_SAFE(LHS, RHS)	((LHS) >> ((RHS) * 8))
-#define LSHIFT_BYTES(LHS, RHS)		((RHS < SIZEOF(LHS)) ? LSHIFT_BYTES_SAFE(LHS, RHS) : 0)
-#define RSHIFT_BYTES(LHS, RHS)		((RHS < SIZEOF(LHS)) ? RSHIFT_BYTES_SAFE(LHS, RHS) : 0)
+#if 0
+#define	FORCE_INLINE __attribute__((always_inline))
+#else
+#define	FORCE_INLINE
+#endif
 
-/* Implementation */
+
+static uint4 fmix ( uint4 h );
+
+static ydb_uint8 fmix64 ( ydb_uint8 k );
+
+#define ROTL32(X,Y)	(((X) << (Y)) | ((X) >> (32 - (Y))))
+#define ROTL64(X,Y)	(((X) << (Y)) | ((X) >> (64 - (Y))))
+
+#define BIG_CONSTANT(x) (x##LLU)
+
+#define GETBLOCK(p,i) (((const uint4 *)p)[(int)i])
+
+#define GETBLOCK64(p,i) (((const ydb_uint8 *)p)[(int)i])
 
 #ifdef BIGENDIAN
 #	if defined(__GNUC__) && (__GNUC__>4 || (__GNUC__==4 && __GNUC_MINOR__>=3))
@@ -55,29 +80,384 @@
 #define UI64_TO_LE(X)			/* nothing */
 #endif
 
-#define GETBLOCK(p,i) (((const uint4 *)p)[(int)i])
+/*-----------------------------------------------------------------------------
+ * Finalization mix - force all bits of a hash block to avalanche            */
 
-static inline uint4 fmix(uint4 h)
+static FORCE_INLINE uint4 fmix ( uint4 h )
 {
-	h ^= h >> 16;
-	h *= 0x85ebca6b;
-	h ^= h >> 13;
-	h *= 0xc2b2ae35;
-	h ^= h >> 16;
+  h ^= h >> 16;
+  h *= 0x85ebca6b;
+  h ^= h >> 13;
+  h *= 0xc2b2ae35;
+  h ^= h >> 16;
 
-	return h;
+  return h;
 }
 
-static inline ydb_uint8 fmix64(ydb_uint8 k)
-{
-	k ^= k >> 33;
-	k *= BIG_CONSTANT(0xff51afd7ed558ccd);
-	k ^= k >> 33;
-	k *= BIG_CONSTANT(0xc4ceb9fe1a85ec53);
-	k ^= k >> 33;
+/*----------*/
 
-	return k;
+static FORCE_INLINE ydb_uint8 fmix64 ( ydb_uint8 k )
+{
+  k ^= k >> 33;
+  k *= BIG_CONSTANT(0xff51afd7ed558ccd);
+  k ^= k >> 33;
+  k *= BIG_CONSTANT(0xc4ceb9fe1a85ec53);
+  k ^= k >> 33;
+
+  return k;
 }
+
+/*-----------------------------------------------------------------------------*/
+
+void MurmurHash3_x86_32 ( const void * key, int len,
+                          uint4 seed, void * out )
+{
+  int i;
+  const unsigned char * tail;
+  const uint4 * blocks;
+  const int nblocks = len / 4;
+  static char	*buff;
+  static int	bufflen;
+
+  uint4 h1 = seed;
+
+  uint4 c1 = 0xcc9e2d51;
+  uint4 c2 = 0x1b873593;
+  uint4 k1;
+
+  /*----------
+   * body   */
+# ifndef UNALIGNED_ACCESS_FULLY_SUPPORTED
+  /* Murmur3 hash works only on 4-byte aligned keys so align key to avoid unaligned access error
+   * messages from an architecture that does not support it.
+   */
+  if (len && (0 != ((UINTPTR_T)key % 4)))
+  {	/* make buffer 4-byte aligned */
+  	if (bufflen < len)
+	{
+  		if (NULL != buff)
+		{
+			assert(bufflen);
+			free(buff);
+		}
+		bufflen = len * 2;
+		buff = malloc(bufflen);
+	}
+	assert(bufflen >= len);
+	memcpy(buff, key, len);
+	key = (const unsigned char*)buff;
+  }
+# endif
+  blocks = (const uint4 *)((char *)key + nblocks*4);
+  for(i = -nblocks; i; i++)
+  {
+    k1 = GETBLOCK(blocks,i);
+
+    k1 *= c1;
+    k1 = ROTL32(k1,15);
+    k1 *= c2;
+
+    h1 ^= k1;
+    h1 = ROTL32(h1,13);
+    h1 = h1*5+0xe6546b64;
+  }
+
+  /*----------
+   * tail   */
+
+  tail = (const unsigned char*)blocks;
+
+  k1 = 0;
+
+  /* The shifts below assume little endian, so the handling of the tail block is inconsistent with normal blocks
+   * on big endian systems. However, we are already using this version and we don't want to change the resulting
+   * hashes, so leave it alone.
+   */
+  switch(len & 3)
+  {
+  case 3: k1 ^= tail[2] << 16;
+  case 2: k1 ^= tail[1] << 8;
+  case 1: k1 ^= tail[0];
+          k1 *= c1; k1 = ROTL32(k1,15); k1 *= c2; h1 ^= k1;
+  };
+
+  /*----------
+   * finalization  */
+
+  h1 ^= len;
+
+  h1 = fmix(h1);
+
+  *(uint4*)out = h1;
+}
+
+/*-----------------------------------------------------------------------------*/
+
+void MurmurHash3_x86_128 ( const void * key, const int len,
+                           uint4 seed, void * out )
+{
+  int i;
+  const unsigned char * data = (const unsigned char*)key;
+  const unsigned char * tail;
+  const int nblocks = len / 16;
+  static char	*buff;
+  static int	bufflen;
+
+  uint4 h1 = seed;
+  uint4 h2 = seed;
+  uint4 h3 = seed;
+  uint4 h4 = seed;
+
+  uint4 c1 = 0x239b961b;
+  uint4 c2 = 0xab0e9789;
+  uint4 c3 = 0x38b34ae5;
+  uint4 c4 = 0xa1e38b93;
+
+  uint4 k1;
+  uint4 k2;
+  uint4 k3;
+  uint4 k4;
+
+  /*----------
+   * body   */
+# ifndef UNALIGNED_ACCESS_FULLY_SUPPORTED
+  /* Murmur3 hash works only on 4-byte aligned keys so align key to avoid unaligned access error
+   * messages from an architecture that does not support it.
+   */
+  if (len && (0 != ((UINTPTR_T)key % 4)))
+  {	/* make buffer 4-byte aligned */
+  	if (bufflen < len)
+	{
+  		if (NULL != buff)
+		{
+			assert(bufflen);
+			free(buff);
+		}
+		bufflen = len * 2;
+		buff = malloc(bufflen);
+	}
+	assert(bufflen >= len);
+	memcpy(buff, key, len);
+	data = (const unsigned char*)buff;
+  }
+# endif
+
+  const uint4 * blocks = (const uint4 *)(data + nblocks*16);
+
+  for(i = -nblocks; i; i++)
+  {
+    k1 = GETBLOCK(blocks,i*4+0);
+    k2 = GETBLOCK(blocks,i*4+1);
+    k3 = GETBLOCK(blocks,i*4+2);
+    k4 = GETBLOCK(blocks,i*4+3);
+
+    k1 *= c1; k1  = ROTL32(k1,15); k1 *= c2; h1 ^= k1;
+
+    h1 = ROTL32(h1,19); h1 += h2; h1 = h1*5+0x561ccd1b;
+
+    k2 *= c2; k2  = ROTL32(k2,16); k2 *= c3; h2 ^= k2;
+
+    h2 = ROTL32(h2,17); h2 += h3; h2 = h2*5+0x0bcaa747;
+
+    k3 *= c3; k3  = ROTL32(k3,17); k3 *= c4; h3 ^= k3;
+
+    h3 = ROTL32(h3,15); h3 += h4; h3 = h3*5+0x96cd1c35;
+
+    k4 *= c4; k4  = ROTL32(k4,18); k4 *= c1; h4 ^= k4;
+
+    h4 = ROTL32(h4,13); h4 += h1; h4 = h4*5+0x32ac3b17;
+  }
+
+  /*----------
+   * tail   */
+
+  tail = (const unsigned char*)(data + nblocks*16);
+
+  k1 = 0;
+  k2 = 0;
+  k3 = 0;
+  k4 = 0;
+
+  /* The shifts below assume little endian, so the handling of the tail block is inconsistent with normal blocks
+   * on big endian systems. If we start using this routine, we should decide whether to fix it or not.
+   */
+  switch(len & 15)
+  {
+  case 15: k4 ^= tail[14] << 16;
+  case 14: k4 ^= tail[13] << 8;
+  case 13: k4 ^= tail[12] << 0;
+           k4 *= c4; k4  = ROTL32(k4,18); k4 *= c1; h4 ^= k4;
+
+  case 12: k3 ^= tail[11] << 24;
+  case 11: k3 ^= tail[10] << 16;
+  case 10: k3 ^= tail[ 9] << 8;
+  case  9: k3 ^= tail[ 8] << 0;
+           k3 *= c3; k3  = ROTL32(k3,17); k3 *= c4; h3 ^= k3;
+
+  case  8: k2 ^= tail[ 7] << 24;
+  case  7: k2 ^= tail[ 6] << 16;
+  case  6: k2 ^= tail[ 5] << 8;
+  case  5: k2 ^= tail[ 4] << 0;
+           k2 *= c2; k2  = ROTL32(k2,16); k2 *= c3; h2 ^= k2;
+
+  case  4: k1 ^= tail[ 3] << 24;
+  case  3: k1 ^= tail[ 2] << 16;
+  case  2: k1 ^= tail[ 1] << 8;
+  case  1: k1 ^= tail[ 0] << 0;
+           k1 *= c1; k1  = ROTL32(k1,15); k1 *= c2; h1 ^= k1;
+  };
+
+  /*----------
+   * finalization  */
+
+  h1 ^= len; h2 ^= len; h3 ^= len; h4 ^= len;
+
+  h1 += h2; h1 += h3; h1 += h4;
+  h2 += h1; h3 += h1; h4 += h1;
+
+  h1 = fmix(h1);
+  h2 = fmix(h2);
+  h3 = fmix(h3);
+  h4 = fmix(h4);
+
+  h1 += h2; h1 += h3; h1 += h4;
+  h2 += h1; h3 += h1; h4 += h1;
+
+  ((uint4*)out)[0] = h1;
+  ((uint4*)out)[1] = h2;
+  ((uint4*)out)[2] = h3;
+  ((uint4*)out)[3] = h4;
+}
+
+/*-----------------------------------------------------------------------------*/
+
+void MurmurHash3_x64_128 ( const void * key, const int len,
+                           const uint4 seed, void * out )
+{
+  int i;
+  const unsigned char * data = (const unsigned char*)key;
+  const unsigned char * tail;
+  const int nblocks = len / 16;
+  static char	*buff;
+  static int	bufflen;
+
+  ydb_uint8 h1 = seed;
+  ydb_uint8 h2 = seed;
+
+  ydb_uint8 c1 = BIG_CONSTANT(0x87c37b91114253d5);
+  ydb_uint8 c2 = BIG_CONSTANT(0x4cf5ad432745937f);
+
+  ydb_uint8 k1;
+  ydb_uint8 k2;
+
+  /*----------
+   * body   */
+# ifndef UNALIGNED_ACCESS_FULLY_SUPPORTED
+  /* Murmur3 hash works only on 4-byte aligned keys so align key to avoid unaligned access error
+   * messages from an architecture that does not support it.
+   */
+  if (len && (0 != ((UINTPTR_T)key % 8)))
+  {	/* make buffer 4-byte aligned */
+  	if (bufflen < len)
+	{
+  		if (NULL != buff)
+		{
+			assert(bufflen);
+			free(buff);
+		}
+		bufflen = len * 2;
+		buff = malloc(bufflen);
+	}
+	assert(bufflen >= len);
+	memcpy(buff, key, len);
+	data = (const unsigned char*)buff;
+  }
+# endif
+
+  const ydb_uint8 * blocks = (const ydb_uint8 *)(data);
+
+  for(i = 0; i < nblocks; i++)
+  {
+    k1 = GETBLOCK64(blocks,i*2+0);
+    k2 = GETBLOCK64(blocks,i*2+1);
+
+    UI64_TO_LE(k1);
+    UI64_TO_LE(k2);
+
+    k1 *= c1; k1  = ROTL64(k1,31); k1 *= c2; h1 ^= k1;
+
+    h1 = ROTL64(h1,27); h1 += h2; h1 = h1*5+0x52dce729;
+
+    k2 *= c2; k2  = ROTL64(k2,33); k2 *= c1; h2 ^= k2;
+
+    h2 = ROTL64(h2,31); h2 += h1; h2 = h2*5+0x38495ab5;
+  }
+
+  /*----------
+   * tail   */
+
+  tail = (const unsigned char*)(data + nblocks*16);
+
+  k1 = 0;
+  k2 = 0;
+
+  /* The shifts below originally assumed little endian, so the handling of the tail block was inconsistent with normal blocks
+   * on big endian systems. Since we haven't used this routine previously, fix it here instead of making the progressive
+   * version consistent with the broken implementation.
+   */
+  switch(len & 15)
+  {
+  case 15: k2 ^= ((ydb_uint8)tail[14]) << 48;
+  case 14: k2 ^= ((ydb_uint8)tail[13]) << 40;
+  case 13: k2 ^= ((ydb_uint8)tail[12]) << 32;
+  case 12: k2 ^= ((ydb_uint8)tail[11]) << 24;
+  case 11: k2 ^= ((ydb_uint8)tail[10]) << 16;
+  case 10: k2 ^= ((ydb_uint8)tail[ 9]) << 8;
+  case  9: k2 ^= ((ydb_uint8)tail[ 8]) << 0;
+           k2 *= c2; k2  = ROTL64(k2,33); k2 *= c1; h2 ^= k2;
+
+  case  8: k1 ^= ((ydb_uint8)tail[ 7]) << 56;
+  case  7: k1 ^= ((ydb_uint8)tail[ 6]) << 48;
+  case  6: k1 ^= ((ydb_uint8)tail[ 5]) << 40;
+  case  5: k1 ^= ((ydb_uint8)tail[ 4]) << 32;
+  case  4: k1 ^= ((ydb_uint8)tail[ 3]) << 24;
+  case  3: k1 ^= ((ydb_uint8)tail[ 2]) << 16;
+  case  2: k1 ^= ((ydb_uint8)tail[ 1]) << 8;
+  case  1: k1 ^= ((ydb_uint8)tail[ 0]) << 0;
+           k1 *= c1; k1  = ROTL64(k1,31); k1 *= c2; h1 ^= k1;
+  };
+
+  /*----------
+   * finalization  */
+
+  h1 ^= len; h2 ^= len;
+
+  h1 += h2;
+  h2 += h1;
+
+  h1 = fmix64(h1);
+  h2 = fmix64(h2);
+
+  h1 += h2;
+  h2 += h1;
+
+  ((ydb_uint8*)out)[0] = h1;
+  ((ydb_uint8*)out)[1] = h2;
+}
+
+/*******************************************************************************
+ * Progressive 128-bit MurmurHash3
+ *******************************************************************************/
+
+#define C1 BIG_CONSTANT(0x87c37b91114253d5)
+#define C2 BIG_CONSTANT(0x4cf5ad432745937f)
+#define M1 0x52dce729
+#define M2 0x38495ab5
+
+#define LSHIFT_BYTES_SAFE(LHS, RHS)	((LHS) << ((RHS) * 8))
+#define RSHIFT_BYTES_SAFE(LHS, RHS)	((LHS) >> ((RHS) * 8))
+#define LSHIFT_BYTES(LHS, RHS)		((RHS < SIZEOF(LHS)) ? LSHIFT_BYTES_SAFE(LHS, RHS) : 0)
+#define RSHIFT_BYTES(LHS, RHS)		((RHS < SIZEOF(LHS)) ? RSHIFT_BYTES_SAFE(LHS, RHS) : 0)
 
 #if !defined(BIGENDIAN)
 
@@ -294,103 +674,45 @@ MBSTART {													\
 	ADD_BYTES((STATEPTR), (KEY) + pb_carry_fill, (LEN) - pb_carry_fill);					\
 } MBEND
 
-#if (defined(__i386) || defined(__x86_64__) || defined(_AIX))
-#	define UNALIGNED_SAFE	(1)
-#else
-#	define UNALIGNED_SAFE	(0)
-#endif
 
-/* Declare these here to generate non-inline versions */
-void	ydb_mmrhash_32(const void *key, int len, uint4 seed, uint4 *out4);
-void	ydb_mmrhash_128(const void *key, int len, uint4 seed, ydb_uint16 *out);
-void	ydb_mmrhash_128_hex(const ydb_uint16 *hash, unsigned char *out);
-void	ydb_mmrhash_128_bytes(const ydb_uint16 *hash, unsigned char *out);
-
-void MurmurHash3_x86_32(const void *key, int len, uint4 seed, void *out)
+/* This is an endian-independent 16-byte murmur hash function */
+void ydb_mmrhash_128(const void *key, int len, uint4 seed, ydb_uint16 *out)
 {
-	int			i;
-	const unsigned char 	*tail;
-	const uint4		*blocks;
-	int			nblocks = len / 4;
-	uint4			h1 = seed;
-	uint4			c1 = 0xcc9e2d51;
-	uint4			c2 = 0x1b873593;
-	uint4			k1;
-#	ifndef UNALIGNED_ACCESS_FULLY_SUPPORTED
-	static char		*buff;
-	static int		bufflen;
-#	endif
+	hash128_state_t state;
 
-	# ifndef UNALIGNED_ACCESS_FULLY_SUPPORTED
-	/* Murmur3 hash works only on 4-byte aligned keys so align key to avoid unaligned access error
-	* messages from an architecture that does not support it.
-	*/
-	if (len && (0 != ((UINTPTR_T)key % 4)))
-	{	/* make buffer 4-byte aligned */
-		if (bufflen < len)
-		{
-			if (NULL != buff)
-			{
-				assert(bufflen);
-				free(buff);
-			}
-			bufflen = len * 2;
-			buff = malloc(bufflen);
-		}
-		assert(bufflen >= len);
-		memcpy(buff, key, len);
-		key = (const unsigned char*)buff;
-	}
-	# endif
-	blocks = (const uint4 *)((char *)key + nblocks * 4);
-	for(i = -nblocks; i; i++)
-	{
-		k1 = GETBLOCK(blocks,i);
-
-		k1 *= c1;
-		k1 = ROTL32(k1,15);
-		k1 *= c2;
-
-		h1 ^= k1;
-		h1 = ROTL32(h1,13);
-		h1 = h1 * 5 + 0xe6546b64;
-	}
-	tail = (const unsigned char*)blocks;
-	k1 = 0;
-
-	/* The shifts below assume little endian, so the handling of the tail block is inconsistent with normal blocks
-	* on big endian systems. However, we are already using this version and we don't want to change the resulting
-	* hashes, so leave it alone.
-	*/
-	switch(len & 3)
-	{
-	case 3: k1 ^= tail[2] << 16;
-	/* no break */
-	case 2: k1 ^= tail[1] << 8;
-	/* no break */
-	case 1: k1 ^= tail[0];
-		k1 *= c1;
-		k1 = ROTL32(k1,15);
-		k1 *= c2;
-		h1 ^= k1;
-	};
-
-	h1 ^= len;
-	h1 = fmix(h1);
-	*(uint4*)out = h1;
+	HASH128_STATE_INIT(state, seed);
+	assert((state.carry_bytes == 0) && (state.c.one == 0) && (state.c.two == 0));
+	ydb_mmrhash_128_ingest(&state, key, len);
+	ydb_mmrhash_128_result(&state, len, out);
 }
 
-int ydb_mmrhash_128_ingest(hash128_state_t *state, const void *key, int len)
+/* This is the same as ydb_mmrhash_128 (i.e. is endian independent) except that it generates a 4-byte hash
+ * (needed e.g. by STR_HASH macro). To avoid the overhead of an extra function call, we duplicate the
+ * code of "gtmmmrhash_128" here.
+ */
+void ydb_mmrhash_32(const void *key, int len, uint4 seed, uint4 *out4)
+{
+	hash128_state_t state;
+	ydb_uint16	out16;
+
+	HASH128_STATE_INIT(state, seed);
+	assert((state.carry_bytes == 0) && (state.c.one == 0) && (state.c.two == 0));
+	ydb_mmrhash_128_ingest(&state, key, len);
+	ydb_mmrhash_128_result(&state, len, &out16);
+	*out4 = (uint4)out16.one;
+}
+
+void ydb_mmrhash_128_ingest(hash128_state_t *state, const void *key, int len)
 {
 	int			i;
 	ydb_uint8		k1, k2;
 	const unsigned char	*keyptr;
 
 	if (0 == len)
-		return 0;
+		return;
 
 	keyptr = key;
-#	if !UNALIGNED_SAFE
+#	if !(defined(__i386) || defined(__x86_64__) || defined(_AIX))
 	/* determine the number of bytes to consume to reach 64-bit (8 byte) alignment */
 	i = (0x8 - ((UINTPTR_T)keyptr & 0x7)) & 0x7;
 	if (i > len)
@@ -409,8 +731,6 @@ int ydb_mmrhash_128_ingest(hash128_state_t *state, const void *key, int len)
 	}
 	if (len > 0)
 		PROCESS_BYTES(state, keyptr, len);
-
-	return len;
 }
 
 void ydb_mmrhash_128_result(hash128_state_t *state, uint4 total_len, ydb_uint16 *out)
@@ -445,5 +765,49 @@ void ydb_mmrhash_128_result(hash128_state_t *state, uint4 total_len, ydb_uint16 
 	out->one = h1;
 	out->two = h2;
 }
+
+void ydb_mmrhash_128_bytes(const ydb_uint16 *hash, unsigned char *out)
+{
+#	ifdef BIGENDIAN
+#	define EXTRACT_BYTE(X, N)	(((uint64_t)(X) & ((uint64_t)0xff << (N) * 8)) >> (N) * 8)
+	out[0] = EXTRACT_BYTE(hash->one, 0);
+	out[1] = EXTRACT_BYTE(hash->one, 1);
+	out[2] = EXTRACT_BYTE(hash->one, 2);
+	out[3] = EXTRACT_BYTE(hash->one, 3);
+	out[4] = EXTRACT_BYTE(hash->one, 4);
+	out[5] = EXTRACT_BYTE(hash->one, 5);
+	out[6] = EXTRACT_BYTE(hash->one, 6);
+	out[7] = EXTRACT_BYTE(hash->one, 7);
+	out[8] = EXTRACT_BYTE(hash->two, 0);
+	out[9] = EXTRACT_BYTE(hash->two, 1);
+	out[10] = EXTRACT_BYTE(hash->two, 2);
+	out[11] = EXTRACT_BYTE(hash->two, 3);
+	out[12] = EXTRACT_BYTE(hash->two, 4);
+	out[13] = EXTRACT_BYTE(hash->two, 5);
+	out[14] = EXTRACT_BYTE(hash->two, 6);
+	out[15] = EXTRACT_BYTE(hash->two, 7);
+#	else
+	((ydb_uint8 *)out)[0] = hash->one;
+	((ydb_uint8 *)out)[1] = hash->two;
+#	endif
+}
+
+void ydb_mmrhash_128_hex(const ydb_uint16 *hash, unsigned char *out)
+{
+	int			i;
+	unsigned char		bytes[16], n;
+
+	ydb_mmrhash_128_bytes(hash, bytes);
+	for (i = 0; i < 16; i++)
+	{
+		n = bytes[i] & 0xf;
+		out[i * 2 + 1] = (n < 10) ? (n + '0') : (n - 10 + 'a');
+		n = (bytes[i] >> 4) & 0xf;
+		out[i * 2] = (n < 10) ? (n + '0') : (n - 10 + 'a');
+	}
+}
+
+
+/*******************************************************************************/
 
 /*-----------------------------------------------------------------------------*/

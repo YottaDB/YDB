@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -44,7 +44,7 @@ void iott_setterm(io_desc *ioptr)
 	if (0 != tt_ptr->setterm_done_by)
 	{
 		assert(process_id == tt_ptr->setterm_done_by);
-		return;	/* "setterm" already done */
+		return;	/* "iott_setterm" already done */
 	}
 	t = *tt_ptr->ttio_struct;
 	if (tt_ptr->canonical)
@@ -68,7 +68,7 @@ void iott_setterm(io_desc *ioptr)
 
 
 /* These routines are here because it is frightfully important to keep them
-   in synch with setterm.  When they get out of line, a r x:0 causes your
+   in synch with iott_setterm.  When they get out of line, a r x:0 causes your
    terminal to be unreachable thereafter.
 */
 

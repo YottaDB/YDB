@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -19,7 +19,7 @@
 #include "gtm_termios.h"
 #include "gtm_stdio.h"
 #include "compiler.h"
-#include "setterm.h"
+#include "iott_setterm.h"
 
 #define TERM_MSK	0x08002400	/* CR LF ESC */
 #define TERM_MSK_UTF8_0	0x08003400	/* add FF */
@@ -55,7 +55,7 @@ GBLREF	uint4	process_id;
 					&& (NULL != IOPTR->dev_sp)						\
 					&& (process_id == ((d_tt_struct *)IOPTR->dev_sp)->setterm_done_by))
 
-/* If we are going to read from the terminal, and "setterm" has not yet been done, do it first.
+/* If we are going to read from the terminal, and "iott_setterm" has not yet been done, do it first.
  * This is needed so we get nocanonical and noecho mode turned on. That way we see the keystrokes as the user types them in,
  * with no translation (e.g. escape sequences etc.) done by the terminal driver.
  */
@@ -64,7 +64,7 @@ MBSTART {										\
 	/* Only the true runtime runs with the modified terminal settings */		\
 	assert(ttPtr == ((d_tt_struct *)ioPtr->dev_sp));				\
 	if (0 == ttPtr->setterm_done_by)						\
-		setterm(ioPtr);								\
+		iott_setterm(ioPtr);							\
 } MBEND
 
 #define	EXPECT_SETTERM_DONE_FALSE	FALSE
@@ -75,7 +75,7 @@ MBSTART {										\
 MBSTART {									\
 	assert(!expectSettermDone || IS_SETTERM_DONE(ioPtr));			\
 	if (IS_SETTERM_DONE(ioPtr))						\
-		resetterm(ioPtr);						\
+		iott_resetterm(ioPtr);						\
 	assert(!IS_SETTERM_DONE(ioPtr));					\
 } MBEND
 
@@ -177,8 +177,8 @@ typedef struct
 	boolean_t		discard_lf;		/* UTF8 mode - previous char was CR so ignore following LF */
 	boolean_t		default_mask_term;	/* mask_term is the default */
 	boolean_t		done_1st_read;		/* UTF8 mode - check for BOM if not */
-	pid_t			setterm_done_by;	/* if non-zero, points to pid that did "setterm";
-							 * used to later invoke "resetterm" if needed.
+	pid_t			setterm_done_by;	/* if non-zero, points to pid that did "iott_setterm";
+							 * used to later invoke "iott_resetterm" if needed.
 							 */
 }d_tt_struct;
 

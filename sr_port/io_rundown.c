@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -23,7 +23,7 @@
 #include "io_params.h"
 #include "error.h"
 #include "iottdef.h"
-#include "setterm.h"
+#include "iott_setterm.h"
 #include "gtmio.h"
 
 GBLREF	io_log_name	*io_root_log_name;
@@ -67,8 +67,8 @@ void io_rundown (int rundown_type)
 			for (i = 0; i < 2; i++)
 			{
 				ioptr = iod[i];
-				/* If standard device is a terminal and is open, check if "setterm" had been done.
-				 * If so do "resetterm" to restore terminal to what it was (undo whatever stty settings
+				/* If standard device is a terminal and is open, check if "iott_setterm" had been done.
+				 * If so do "iott_resetterm" to restore terminal to what it was (undo whatever stty settings
 				 * YottaDB changed in terminal).
 				 */
 				RESETTERM_IF_NEEDED(ioptr, EXPECT_SETTERM_DONE_FALSE);

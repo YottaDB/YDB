@@ -93,7 +93,6 @@
 # include "gtm_utf8.h"
 #endif
 #include "getjobnum.h"
-#include "wbox_test_init.h"
 #include "ydb_chk_dist.h"
 #include "ydb_getenv.h"
 
@@ -483,15 +482,6 @@ void gtmsecshr_init(char_ptr_t argv[], char **rundir, int *rundir_len)
 			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_GTMSECSHRSEMGET, 1, errno);
 			gtmsecshr_exit(SEMGETERROR, FALSE);
 		}
-#		ifdef DEBUG
-		/* If the whitebox case is enabled let's force an error. Not to worry, gtmsecshr_exit knows it's a test and
-		 * just return back to us, i.e., not actual exit.  We placed an assert in that function to verify that it
-		 * properly deals with the SEMGETERROR status. Note: if an additional white box case is ever needed it needs
-		 * to also be added to gtmsecshr_wrapper.c to have it passed to gtmsecshr.c.
-		 */
-		if (WBTEST_ENABLED(WBTEST_FORCE_SEMGETERROR))
-			gtmsecshr_exit(SEMGETERROR, FALSE);
-#		endif
 	}
 	sop[0].sem_num = 0;
 	sop[0].sem_op = 0;
@@ -585,15 +575,8 @@ void gtmsecshr_exit(int exit_code, boolean_t dump)
 	exit_handler_active = TRUE;
 	if (dump)
 		DUMP_CORE;
-#	ifdef DEBUG
-	if (!WBTEST_ENABLED(WBTEST_FORCE_SEMGETERROR))
-	{
-#	endif
-		gtmsecshr_sock_cleanup(SERVER);
-		gtmsecshr_sockfd = FD_INVALID;
-#	ifdef DEBUG
-	}
-#	endif
+	gtmsecshr_sock_cleanup(SERVER);
+	gtmsecshr_sockfd = FD_INVALID;
 	/* Only remove the semaphore if we it is ours. So, if we couldn't find/create the semaphore
 	 * or we could not lock it, don't remove it
 	 */
@@ -612,16 +595,7 @@ void gtmsecshr_exit(int exit_code, boolean_t dump)
 	exit_handler_complete = TRUE;
 	/* Note shutdown message taken care of by generic_signal_handler */
 
-#	ifdef DEBUG
-	/* If this is us via the white box case we just proved we did not take the above assert on the SEMGETERROR exit_code
-	 * so don't actually exit - just return to continue normal processing.
-	 */
-	if (!WBTEST_ENABLED(WBTEST_FORCE_SEMGETERROR))
-#	endif
-		EXIT(exit_code);
-#	ifdef DEBUG /* we done with our test so turn off doing white box cases */
-	gtm_white_box_test_case_enabled = FALSE;
-#	endif
+	EXIT(exit_code);
 }
 
 void gtmsecshr_timer_handler(void)

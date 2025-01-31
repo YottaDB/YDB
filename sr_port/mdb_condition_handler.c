@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -303,11 +303,11 @@ CONDITION_HANDLER(mdb_condition_handler)
 	 * easy to establish a condition handler there. Easy solution is following one line code.
 	 */
 	NULLIFY_MERGE_ZWRITE_CONTEXT;
-	/* If a function like "dm_read" is erroring out after having done a "setterm", but before doing the "resetterm"
+	/* If a function like "dm_read" is erroring out after having done a "iott_setterm", but before doing the "iott_resetterm"
 	 * do that cleanup here. There are a few exceptions. The only one currently is a job interrupt in which case
 	 * it is possible we are in direct mode read or a READ command that was interrupted by the job interrupt. In that
-	 * case, if we do a resetterm(), it is possible for keystroke(s) the user enters while the job interrupt is
-	 * processing to show up in the terminal (since resetterm will turn ECHO back on) but the direct-mode/READ command
+	 * case, if we do a iott_resetterm(), it is possible for keystroke(s) the user enters while the job interrupt is
+	 * processing to show up in the terminal (since iott_resetterm will turn ECHO back on) but the direct-mode/READ command
 	 * routine is going to echo the same keystroke(s) once it gets control back from the job interrupt. This would
 	 * cause duplication of those keystrokes and confuse the user.
 	 */
