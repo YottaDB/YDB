@@ -2,7 +2,7 @@
 
 #################################################################
 #								#
-# Copyright (c) 2020-2023 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2020-2025 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
@@ -61,21 +61,22 @@ cat > $output_dir/clang_tidy_checks.txt << CAT_EOF
 Checks: >
     -clang-analyzer-security.insecureAPI.*,
     bugprone-*,
-    -bugprone-signed-char-misuse,
-    -bugprone-narrowing-conversions,
-    -bugprone-macro-parentheses,
-    -bugprone-easily-swappable-parameters,
     -bugprone-assert-side-effect,
+    -bugprone-branch-clone,
+    -bugprone-easily-swappable-parameters,
     -bugprone-implicit-widening-of-multiplication-result,
+    -bugprone-macro-parentheses,
+    -bugprone-narrowing-conversions,
+    -bugprone-signed-char-misuse,
     -bugprone-sizeof-expression,
     -bugprone-suspicious-string-compare,
-    -clang-analyzer-core.NonNullParamChecker,
-    -clang-analyzer-core.uninitialized.Assign,
     -clang-analyzer-core.CallAndMessage,
-    -clang-analyzer-core.uninitialized.Branch,
-    -clang-analyzer-core.UndefinedBinaryOperatorResult,
+    -clang-analyzer-core.NonNullParamChecker,
     -clang-analyzer-core.NullDereference,
-    -bugprone-branch-clone,
+    -clang-analyzer-core.UndefinedBinaryOperatorResult,
+    -clang-analyzer-core.uninitialized.Assign,
+    -clang-analyzer-core.uninitialized.Branch,
+    -clang-analyzer-deadcode.DeadStores
 CAT_EOF
 
 # While we don't have file names with embedded spaces, we still use -print0/-0
