@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2025 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -27,7 +30,7 @@ GBLREF	gd_region	*gv_cur_region;
 GBLREF unsigned int	t_tries;
 GBLREF	uint4		dollar_tlevel;
 
-/* Note: A lot of the code below is similar to that in gvcst_blk_search.h.
+/* Note: A lot of the code below is similar to that in gvcst_blk_search.c.
  * Any changes there need to be incorporated here and vice-versa.
  */
 enum cdb_sc	gvcst_expand_key(srch_blk_status *pStat, int4 rec_top, gv_key *key)

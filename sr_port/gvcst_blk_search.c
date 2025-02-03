@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -215,9 +215,15 @@ enum cdb_sc 	gvcst_search_blk_expand_prevkey(gv_key *pKey, srch_blk_status *pSta
 	{
 		pRec = pRecBase + nRecLen;
 		if (pRecBase != pBlkBase)
-		{	/* nTmp points to the compression count corresponding to pPrevRec */
+		{	/* nTmp points to the compression count corresponding to pPrevRec.
+			 * Check if we need to copy over uncompressed key bytes from the previous record into "gv_altkey".
+			 */
 			if (nTmp > prevKeyCmpLen)
 			{
+				/* Check that "gv_altkey" (destination of "memcpy" below) has space to hold
+				 * the additional uncompressed key bytes from the current record. If not, it is
+				 * a restartable situation.
+				 */
 				if (((prevKeyStart + nTmp) >= prevKeyTop) || (NULL == prevKeyUnCmp))
 				{
 					if (dollar_tlevel)
@@ -228,7 +234,7 @@ enum cdb_sc 	gvcst_search_blk_expand_prevkey(gv_key *pKey, srch_blk_status *pSta
 						NONTP_TRACE_HIST_MOD(pStat, t_blkmod_gvcst_srch);
 					return cdb_sc_blkmod;
 				}
-				assert(prevKeyUnCmp > pBlkBase);
+				assert((prevKeyUnCmp > pBlkBase) && (prevKeyUnCmp < pTop));
 				memcpy(prevKeyStart + prevKeyCmpLen, prevKeyUnCmp, nTmp - prevKeyCmpLen);
 			}
 			prevKeyCmpLen = nTmp;
@@ -243,8 +249,25 @@ enum cdb_sc 	gvcst_search_blk_expand_prevkey(gv_key *pKey, srch_blk_status *pSta
 			}
 			nTargLen = 0;
 			if (!level0)
+			{	/* Check if we saw at least one record in this index block (we are guaranteed to
+				 * have at least a star key). If not, this is an empty index block. Most likely,
+				 * a reorg has concurrently moved the contents of this index block. It is definitely
+				 * a restartable situation. So return right away. Not doing so will cause us to
+				 * break out of the surrounding for loop and fail the following assert in the end.
+				 *	assert(pStat->curr_rec.offset >= SIZEOF(blk_hdr));
+				 */
+				if (pRecBase == pBlkBase)
+				{
+					if (dollar_tlevel)
+						TP_TRACE_HIST_MOD(pStat->blk_num, pStat->blk_target,
+							tp_blkmod_gvcst_srch, cs_data,
+							pStat->tn, ((blk_hdr_ptr_t)pBlkBase)->tn, pStat->level);
+					else
+						NONTP_TRACE_HIST_MOD(pStat, t_blkmod_gvcst_srch);
+					return cdb_sc_blkmod;
+				}
 				nMatchCnt = 0;	/* star key */
-			else
+			} else
 			{	/* data block */
 				pPrevRec = pRecBase;
 				pRecBase = pRec;
@@ -296,10 +319,16 @@ enum cdb_sc 	gvcst_search_blk_expand_prevkey(gv_key *pKey, srch_blk_status *pSta
 			break;
 		}
 	}
-	pStat->prev_rec.offset = (short)(pPrevRec - pBlkBase);
-	pStat->prev_rec.match = (short)nMatchCnt;
-	pStat->curr_rec.offset = (short)(pRecBase - pBlkBase);
-	pStat->curr_rec.match = (short)nTargLen;
+	pStat->prev_rec.offset = (unsigned short)(pPrevRec - pBlkBase);
+	pStat->prev_rec.match = (unsigned short)nMatchCnt;
+	/* "gvcst_search" relies on the fact that PREV_REC_UNINITIALIZED is never a valid value
+	 * for prev_rec.match/prev_rec.offset. Assert that.
+	 */
+	assert(PREV_REC_UNINITIALIZED != pStat->prev_rec.match);
+	assert(PREV_REC_UNINITIALIZED != pStat->prev_rec.offset);
+	pStat->curr_rec.offset = (unsigned short)(pRecBase - pBlkBase);
+	assert(pStat->curr_rec.offset >= SIZEOF(blk_hdr));
+	pStat->curr_rec.match = (unsigned short)nTargLen;
 	if (NULL != (tmpPtr = prevKeyUnCmp))	/* Note: Assignment */
 	{	/* gv_altkey->base[0] thru gv_altkey->base[prevKeyCmpLen] already holds the compressed portion of prevKey.
 		 * Copy over uncompressed portion of prevKey into gv_altkey->base and update gv_altkey->end before returning.
@@ -335,7 +364,10 @@ enum cdb_sc 	gvcst_search_blk_expand_prevkey(gv_key *pKey, srch_blk_status *pSta
 		memcpy(prevKeyStart, prevKeyUnCmp, prevKeyUnCmpLen);
 		gv_altkey->end = prevKeyCmpLen + prevKeyUnCmpLen - 1;	/* remove 2nd KEY_DELIMITER from "end" calculation */
 	} else
+	{
 		gv_altkey->end = 0;
+		DEBUG_ONLY(gv_altkey->base[0] = KEY_DELIMITER);	/* so DBG_CHECK_GVKEY_VALID passes check */
+	}
 	return cdb_sc_normal;
 }
 
@@ -352,8 +384,9 @@ enum cdb_sc	gvcst_search_tail_expand_prevkey(gv_key *pKey, srch_blk_status *pSta
 	boolean_t		long_blk_id;
 	unsigned char		*pOldKeyBase, *pCurrTargPos;
 	int			tmp_cmpc;
-	gv_key		*prevKey;
-	enum cdb_sc	status;
+	gv_key			*prevKey;
+	enum cdb_sc		status;
+	boolean_t		first_iteration;
 	unsigned short		nRecLen;
 	int			prevKeyCmpLen;	/* length of compressed portion of prevKey stored in gv_altkey->base */
 	int			prevKeyUnCmpLen;/* Length of uncompressed portion of prevKey */
@@ -381,6 +414,7 @@ enum cdb_sc	gvcst_search_tail_expand_prevkey(gv_key *pKey, srch_blk_status *pSta
 	pTargKeyBase = pCurrTarg;
 	pRecBase = pBlkBase + pStat->curr_rec.offset;
 	pRec = pRecBase;
+	ASSERT_LEAF_BLK_PREV_REC_INITIALIZED(pStat); /* See later call to this macro for why it is called here */
 	nMatchCnt = pStat->prev_rec.match;
 	pOldKeyBase = pOldKey->base;
 	pPrevRec = pBlkBase + pStat->prev_rec.offset;
@@ -395,11 +429,13 @@ enum cdb_sc	gvcst_search_tail_expand_prevkey(gv_key *pKey, srch_blk_status *pSta
 	{	/* Since gv_altkey is used elsewhere, ensure that it is in sync with prevKey before performing the search
 		 * and returning to the caller.
 		 */
+		assert(prevKey->end < gv_altkey->top);	/* so the below memcpy is safe */
 		memcpy(gv_altkey->base, prevKey->base, prevKey->end - 1);
 	}
 	assert(prevKey->end);
 	prevKeyCmpLen = prevKey->end - 1;
 	prevKeyUnCmp = &prevKey->base[prevKeyCmpLen];
+	first_iteration = TRUE;
 	assert(KEY_DELIMITER == prevKeyUnCmp[0]);
 	assert(KEY_DELIMITER == prevKeyUnCmp[1]);
 	if (pRec >= pTop)
@@ -469,10 +505,29 @@ enum cdb_sc	gvcst_search_tail_expand_prevkey(gv_key *pKey, srch_blk_status *pSta
 		{
 			pRec = pRecBase + nRecLen;
 			if (pRecBase != pBlkBase)
-			{	/* nTmp points to the compression count corresponding to pPrevRec */
+			{	/* nTmp points to the compression count corresponding to pPrevRec.
+				 * Check if we need to copy over uncompressed key bytes from the previous record into "gv_altkey".
+				 */
 				if (nTmp > prevKeyCmpLen)
 				{
-					if (((prevKeyStart + nTmp) >= prevKeyTop) || (NULL == prevKeyUnCmp))
+					assert((!first_iteration && (prevKeyUnCmp > pBlkBase) && (prevKeyUnCmp < pTop))
+						|| (first_iteration && (prevKeyUnCmp == &prevKey->base[prevKeyCmpLen])
+							&& (prevKeyCmpLen == (prevKey->end - 1))));
+					/* Check that "gv_altkey" (destination of "memcpy" below) has space to hold
+					 * the additional uncompressed key bytes from the current record. If not, it is
+					 * a restartable situation.
+					 */
+					if (((prevKeyStart + nTmp) >= prevKeyTop) || (NULL == prevKeyUnCmp)
+						/* Check if "prevKeyUnCmp" (source of "memcpy" below) is pointing to prevKey.
+						 * This is the case in the first iteration (as asserted above). If so, the
+						 * maximum value that is allowed for "nTmp" is "prevKeyCmpLen + 1" (i.e. the
+						 * first null terminator byte for the last subscript of the previous key can
+						 * match with the next key). If not, this is a restartable situation as
+						 * "nTmp" (the compression count of the current key relative to the previous key)
+						 * cannot be greater than "prevKeyCmpLen" (the entire length of the previous key).
+						 * Hence add this condition too to the "if" check that is already in progress.
+						 */
+						|| (first_iteration && (nTmp > (prevKeyCmpLen + 1))))
 					{
 						if (dollar_tlevel)
 							TP_TRACE_HIST_MOD(pStat->blk_num, pStat->blk_target, tp_blkmod_gvcst_srch,
@@ -482,14 +537,12 @@ enum cdb_sc	gvcst_search_tail_expand_prevkey(gv_key *pKey, srch_blk_status *pSta
 							NONTP_TRACE_HIST_MOD(pStat, t_blkmod_gvcst_srch);
 						return cdb_sc_blkmod;
 					}
-					assert((prevKeyUnCmp > pBlkBase)
-						|| ((prevKeyUnCmp == &prevKey->base[prevKeyCmpLen])
-							&& (prevKeyCmpLen == (prevKey->end - 1))));
 					memcpy(prevKeyStart + prevKeyCmpLen, prevKeyUnCmp, nTmp - prevKeyCmpLen);
 				}
 				prevKeyCmpLen = nTmp;
 				prevKeyUnCmp = pRecBase + SIZEOF(rec_hdr);
 			}
+			first_iteration = FALSE;
 			if (pRec >= pTop)
 			{	/* Terminated at end of block */
 				if (pRec > pTop)	/* If record goes off the end, then block must be bad */
@@ -520,8 +573,8 @@ enum cdb_sc	gvcst_search_tail_expand_prevkey(gv_key *pKey, srch_blk_status *pSta
 				continue;
 			if (nTmp < nMatchCnt)
 			{	/* Terminate on compression count < previous match, this key is after the target */
-				/* Data block, make match = current compression count */
-				nTargLen = nTmp;
+					/* Data block, make match = current compression count */
+					nTargLen = nTmp;
 				break;
 			}
 		alt_loop_entry:
@@ -537,15 +590,21 @@ enum cdb_sc	gvcst_search_tail_expand_prevkey(gv_key *pKey, srch_blk_status *pSta
 				nMatchCnt = (int)(pCurrTarg - pTargKeyBase);
 			else
 			{	/* Key is after target*/
-				nTargLen = (int)(pCurrTarg - pTargKeyBase);
+					nTargLen = (int)(pCurrTarg - pTargKeyBase);
 				break;
 			}
 		}
 	}
-	pStat->prev_rec.offset = (short)(pPrevRec - pBlkBase);
-	pStat->prev_rec.match = (short)nMatchCnt;
-	pStat->curr_rec.offset = (short)(pRecBase - pBlkBase);
-	pStat->curr_rec.match = (short)nTargLen;
+	pStat->prev_rec.offset = (unsigned short)(pPrevRec - pBlkBase);
+	pStat->prev_rec.match = (unsigned short)nMatchCnt;
+	/* "gvcst_search" relies on the fact that PREV_REC_UNINITIALIZED is never a valid value
+	 * for prev_rec.match/prev_rec.offset. Assert that.
+	 */
+	assert(PREV_REC_UNINITIALIZED != pStat->prev_rec.match);
+	assert(PREV_REC_UNINITIALIZED != pStat->prev_rec.offset);
+	pStat->curr_rec.offset = (unsigned short)(pRecBase - pBlkBase);
+	assert(pStat->curr_rec.offset >= SIZEOF(blk_hdr));
+	pStat->curr_rec.match = (unsigned short)nTargLen;
 	if (NULL != (tmpPtr = prevKeyUnCmp))	/* Note: Assignment */
 	{	/* gv_altkey->base[0] thru gv_altkey->base[prevKeyCmpLen] already holds the compressed portion of prevKey.
 		 * Copy over uncompressed portion of prevKey into gv_altkey->base and update gv_altkey->end before returning.
@@ -581,7 +640,10 @@ enum cdb_sc	gvcst_search_tail_expand_prevkey(gv_key *pKey, srch_blk_status *pSta
 		memcpy(prevKeyStart, prevKeyUnCmp, prevKeyUnCmpLen);
 		gv_altkey->end = prevKeyCmpLen + prevKeyUnCmpLen - 1;	/* remove 2nd KEY_DELIMITER from "end" calculation */
 	} else
+	{
 		gv_altkey->end = 0;
+		DEBUG_ONLY(gv_altkey->base[0] = KEY_DELIMITER);	/* so DBG_CHECK_GVKEY_VALID passes check */
+	}
 	return cdb_sc_normal;
 }
 
@@ -628,8 +690,25 @@ enum cdb_sc	gvcst_search_blk(gv_key *pKey, srch_blk_status *pStat)
 			}
 			nTargLen = 0;
 			if (!level0)
+			{	/* Check if we saw at least one record in this index block (we are guaranteed to
+				 * have at least a star key). If not, this is an empty index block. Most likely,
+				 * a reorg has concurrently moved the contents of this index block. It is definitely
+				 * a restartable situation. So return right away. Not doing so will cause us to
+				 * break out of the surrounding for loop and fail the following assert in the end.
+				 *	assert(pStat->curr_rec.offset >= SIZEOF(blk_hdr));
+				 */
+				if (pRecBase == pBlkBase)
+				{
+					if (dollar_tlevel)
+						TP_TRACE_HIST_MOD(pStat->blk_num, pStat->blk_target,
+							tp_blkmod_gvcst_srch, cs_data,
+							pStat->tn, ((blk_hdr_ptr_t)pBlkBase)->tn, pStat->level);
+					else
+						NONTP_TRACE_HIST_MOD(pStat, t_blkmod_gvcst_srch);
+					return cdb_sc_blkmod;
+				}
 				nMatchCnt = 0;	/* star key */
-			else
+			} else
 			{	/* data block */
 				pPrevRec = pRecBase;
 				pRecBase = pRec;
@@ -681,10 +760,16 @@ enum cdb_sc	gvcst_search_blk(gv_key *pKey, srch_blk_status *pStat)
 		}
 	}
 	assert(pPrevRec);
-	pStat->prev_rec.offset = (short)(pPrevRec - pBlkBase);
-	pStat->prev_rec.match = (short)nMatchCnt;
-	pStat->curr_rec.offset = (short)(pRecBase - pBlkBase);
-	pStat->curr_rec.match = (short)nTargLen;
+	pStat->prev_rec.offset = (unsigned short)(pPrevRec - pBlkBase);
+	pStat->prev_rec.match = (unsigned short)nMatchCnt;
+	/* "gvcst_search" relies on the fact that PREV_REC_UNINITIALIZED is never a valid value
+	 * for prev_rec.match/prev_rec.offset. Assert that.
+	 */
+	assert(PREV_REC_UNINITIALIZED != pStat->prev_rec.match);
+	assert(PREV_REC_UNINITIALIZED != pStat->prev_rec.offset);
+	pStat->curr_rec.offset = (unsigned short)(pRecBase - pBlkBase);
+	assert(pStat->curr_rec.offset >= SIZEOF(blk_hdr));
+	pStat->curr_rec.match = (unsigned short)nTargLen;
 	return cdb_sc_normal;
 }
 
@@ -705,7 +790,12 @@ enum cdb_sc	gvcst_search_tail(gv_key *pKey, srch_blk_status *pStat, gv_key *pOld
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	assert(0 < memcmp(pKey->base, pOldKey->base, pKey->end + 1));	/* below code assumes this is ensured by caller */
+	/* Before using pStat->prev_rec.offset, we need to make sure it is initialized. i.e. it never holds the value
+	 * PREV_REC_UNINITIALIZED. This is guaranteed because "gvcst_search_tail" is currently invoked only for leaf blocks.
+	 * And "gvcst_search" does not currently skip "gvcst_search_blk" for leaf blocks. The below assert captures all
+	 * of these so just invoke that.
+	 */
+	ASSERT_LEAF_BLK_PREV_REC_INITIALIZED(pStat);
 	if (0 == pStat->prev_rec.offset)
 		return gvcst_search_blk(pKey, pStat);	/* nice clean start at the begining of a block */
 	/* The following load code (and code in a few other places) is coded in a "assembler" style
@@ -723,6 +813,7 @@ enum cdb_sc	gvcst_search_tail(gv_key *pKey, srch_blk_status *pStat, gv_key *pOld
 	pTargKeyBase = pCurrTarg;
 	pRecBase = pBlkBase + pStat->curr_rec.offset;
 	pRec = pRecBase;
+	ASSERT_LEAF_BLK_PREV_REC_INITIALIZED(pStat); /* Purpose is in comment before previous usage of this macro just above */
 	nMatchCnt = pStat->prev_rec.match;
 	pOldKeyBase = pOldKey->base;
 	pPrevRec = pBlkBase + pStat->prev_rec.offset;
@@ -817,8 +908,8 @@ enum cdb_sc	gvcst_search_tail(gv_key *pKey, srch_blk_status *pStat, gv_key *pOld
 				continue;
 			if (nTmp < nMatchCnt)
 			{	/* Terminate on compression count < previous match, this key is after the target */
-				/* Data block, make match = current compression count */
-				nTargLen = nTmp;
+					/* Data block, make match = current compression count */
+					nTargLen = nTmp;
 				break;
 			}
 			alt_loop_entry:
@@ -834,14 +925,20 @@ enum cdb_sc	gvcst_search_tail(gv_key *pKey, srch_blk_status *pStat, gv_key *pOld
 				nMatchCnt = (int)(pCurrTarg - pTargKeyBase);
 			else
 			{	/* Key is after target*/
-				nTargLen = (int)(pCurrTarg - pTargKeyBase);
+					nTargLen = (int)(pCurrTarg - pTargKeyBase);
 				break;
 			}
 		}
 	}
-	pStat->prev_rec.offset = (short)(pPrevRec - pBlkBase);
-	pStat->prev_rec.match = (short)nMatchCnt;
-	pStat->curr_rec.offset = (short)(pRecBase - pBlkBase);
-	pStat->curr_rec.match = (short)nTargLen;
+	pStat->prev_rec.offset = (unsigned short)(pPrevRec - pBlkBase);
+	pStat->prev_rec.match = (unsigned short)nMatchCnt;
+	/* "gvcst_search" relies on the fact that PREV_REC_UNINITIALIZED is never a valid value
+	 * for prev_rec.match/prev_rec.offset. Assert that.
+	 */
+	assert(PREV_REC_UNINITIALIZED != pStat->prev_rec.match);
+	assert(PREV_REC_UNINITIALIZED != pStat->prev_rec.offset);
+	pStat->curr_rec.offset = (unsigned short)(pRecBase - pBlkBase);
+	assert(pStat->curr_rec.offset >= SIZEOF(blk_hdr));
+	pStat->curr_rec.match = (unsigned short)nTargLen;
 	return cdb_sc_normal;
 }
