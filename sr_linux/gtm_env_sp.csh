@@ -268,7 +268,11 @@ if ( $?gtm_version_change == "1" ) then
 			# Compile 32-bit x86 GT.M using 586 instruction set rather than 686 as the new Intel Quark
 			# low power system-on-a-chip uses the 586 instruction set rather than the 686 instruction set
 			setenv  gt_cc_option_optimize "$gt_cc_option_optimize -march=i586"
+		else if ("aarch64" == $mach_type) then
+			# AARCH64 does not support -mavx compiler flag
+			setenv  gt_cc_option_optimize "$gt_cc_option_optimize -mtune=native"
 		else
+			# x86_64 supports -mavx compiler flag
 			setenv  gt_cc_option_optimize "$gt_cc_option_optimize -mavx -mtune=native"
 		endif
 	endif
