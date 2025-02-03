@@ -3,6 +3,9 @@
  * Copyright (c) 2005-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2025 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -32,7 +35,7 @@ LITREF	mval		literal_notimeout;
  * Returns: TRUE if confirmed, FALSE if not confirmed */
 boolean_t mu_upgrd_dngrd_confirmed(void)
 {
-	mval		dummy, *input_line;
+	mval		dummy = { 0 }, *input_line;
 
 	util_out_print("!AD", TRUE, LEN_AND_LIT("You must have a backup before you proceed!!"));
 	util_out_print("!AD", TRUE, LEN_AND_LIT("An abnormal termination may damage the database files during the operation !!"));
