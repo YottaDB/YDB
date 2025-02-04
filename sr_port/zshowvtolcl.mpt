@@ -3,6 +3,9 @@
 ; Copyright (c) 2015-2023 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
+; Copyright (c) 2025 YottaDB LLC and/or its subsidiaries.	;
+; All rights reserved.						;
+;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
 ;	under a license.  If you do not know the terms of	;
@@ -19,6 +22,7 @@
 	; validation, it does not currently handle any GT.M errors, most likely due to input that's badly formed and fails when used
 	; for indirection; rather it relies on the current error trap, and it sends its messages of validation issues to the
 	; principal device; see sendmsg below if you want to change that.
+	new x,ret
 	if ""'=$ecode do sendmsg("m0") quit:$quit 0 quit				; want to start "error free"
 	if "^"'=$extract($qsubscript(%ZSHOWvbase,0)) do sendmsg("m1",%ZSHOWvbase) quit:$quit 0 quit
 	set %ZSHOWvbase("x")=%ZSHOWvbase,%ZSHOWvbase("cnt")=0				; setup & find lvn output from ZSHOW
