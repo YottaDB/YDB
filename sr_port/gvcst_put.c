@@ -378,16 +378,12 @@ void	gvcst_put(mval *val)
 		pre_incr_mval = &mv_chain->mv_st_cont.mvs_mval;
 		found = gvcst_get(pre_incr_mval);	/* what if it doesn't exist? needs to be treated as 0 */
 		if (found)
-		{
-test_incr_numoflow:
 			pre_incr_mval->mvtype = MV_STR;
-		}
 		else
 			*pre_incr_mval = literal_null;
 		op_add(pre_incr_mval, &increment_delta_mval, post_incr_mval);
 		POP_MV_STENT();			/* pre_incr_mval */
-		DEBUG_ONLY(if (!TREF(gvcst_incr_numoflow)))
-			assert(MV_IS_NUMERIC(post_incr_mval));
+		assert(MV_IS_NUMERIC(post_incr_mval));
 		MV_FORCE_STR(post_incr_mval);
 		val = post_incr_mval;		/* its a number, should fit in single block.. unless ridick rsrvdbytes.. */
 		fits = RECORD_FITS_IN_A_BLOCK(val, gv_currkey, cs_data->blk_size, parms.blk_reserved_bytes);
@@ -449,10 +445,6 @@ test_incr_numoflow:
 		REVERT; /* remove our condition handler */
 	}
 	assert(save_dollar_tlevel == dollar_tlevel);
-	return;
-	assertpro(FALSE);		/* ensure we never reach the goto below */
-	goto test_incr_numoflow;	/* Dummy goto makes the compiler satisfied the label used as a breakpoint in a
-					 * test is legit. The test_incr_numoflow label is used by increment/numoflow test. */
 }
 
 void	gvcst_put2(mval *val, span_parms *parms)
@@ -655,13 +647,6 @@ void	gvcst_put2(mval *val, span_parms *parms)
 		status = cdb_sc_normal;
 		lcl_dollar_tlevel = dollar_tlevel;
 	)
-	if (TREF(gvcst_incr_numoflow))
-	{
-		TREF(gvcst_incr_numoflow) = FALSE;
-		is_dollar_incr = TRUE;
-		status = cdb_sc_blkmod;
-		GOTO_RETRY;
-	}
 fresh_tn_start:
 	DEBUG_ONLY(lcl_t_tries = -1;)
 	DEBUG_ONLY(is_fresh_tn_start = TRUE;)

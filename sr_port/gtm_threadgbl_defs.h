@@ -3,7 +3,7 @@
  * Copyright (c) 2010-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -294,9 +294,6 @@ THREADGBLDEF(gtmprompt,				mstr)				/* mstr pointing to prombuf containing the G
 										 * prompt */
 THREADGBLDEF(gtmsecshr_comkey,			unsigned int)			/* Hashed version key for gtmsecshr communications
 										 * eliminates cross-version issues */
-THREADGBLDEF(gvcst_incr_numoflow,		boolean_t)			/* set to TRUE by s2n if NUMOFLOW error encountered
-										 * during $INCREMENT to retry the operation, set to
-										 * FALSE in gvincr_compute_post_incr */
 THREADGBLDEF(gvcst_statsDB_open_ch_active,	boolean_t)			/* Condition handler is active */
 THREADGBLDEF(in_zwrite,				boolean_t)			/* ZWrite is active */
 THREADGBLDEF(is_socketpool,			boolean_t)			/* True when device-to-be-opened is socketpool */

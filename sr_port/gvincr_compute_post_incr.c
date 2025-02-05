@@ -1,7 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2004-2023 Fidelity National Information	*
- * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+ *	Copyright 2004, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -51,9 +50,7 @@ enum cdb_sc	gvincr_compute_post_incr(srch_blk_status *bh)
 	uint4		gvincr_malloc_len;
 	mval		pre_incr_mval;
 	int		tmp_cmpc;
-	DCL_THREADGBL_ACCESS;
 
-	SETUP_THREADGBL_ACCESS;
 	buffaddr = bh->buffaddr;
 	cur_blk_size = ((blk_hdr_ptr_t)buffaddr)->bsiz;
 	rp = (rec_hdr_ptr_t)(buffaddr + bh->curr_rec.offset);
@@ -85,11 +82,6 @@ enum cdb_sc	gvincr_compute_post_incr(srch_blk_status *bh)
 	pre_incr_mval.str.len = data_len;
 	memcpy(pre_incr_mval.str.addr, (sm_uc_ptr_t)rp + rec_size - data_len, data_len);
 	op_add(&pre_incr_mval, &increment_delta_mval, post_incr_mval);
-	if (TREF(gvcst_incr_numoflow))
-	{
-		TREF(gvcst_incr_numoflow) = FALSE;
-		return cdb_sc_blkmod;
-	}
 	assert(MV_IS_NUMERIC(post_incr_mval));
 	/* "post_incr_mval" is of numeric type, convert it to a string type so it can be used by the caller to set "value" */
 	MV_FORCE_STR(post_incr_mval);	/* will use stringpool to store string representation */

@@ -183,14 +183,8 @@ char *s2n(mval *u)
 			{
 				u->mvtype &= ~NUM_MASK;
 				if (!TREF(compile_time))
-				{
-					if (is_dollar_incr && (CDB_STAGNATE > t_tries))
-					{
-						TREF(gvcst_incr_numoflow) = TRUE;
-						return NULL;
-					}
 					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_NUMOFLOW);
-				} else
+				else
 					TREF(s2n_intlit) = 0;	/* "advancewindow" relies on this */
 				u->mvtype |= MV_NUM_APPROX; /* breadcrumb for expritem to help f_[z]char() with NUMOFLOW error */
 			} else
