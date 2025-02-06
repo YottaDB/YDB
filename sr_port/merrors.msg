@@ -1454,7 +1454,7 @@ MUTRUNCERROR	<Truncate of region !AD encountered service error !AD>/error/fao=4!
 MUTRUNCFAIL	<Truncate failed after reorg.  Failure code: !AD.>/error/fao=2!/ansi=0
 MUTRUNCNOSPACE	<Region !AD has insufficient space to meet truncate target percentage of !UL>/info/fao=3!/ansi=0
 MUTRUNCNOTBG	<Region !AD does not have access method BG>/error/fao=2!/ansi=0
-PIDMISMATCH	<Global variable with PID=!UL does not match specified PID=!UL>/warning/fao=2!/ansi=0
+PIDMISMATCH	<PID=!UL has a mismatched internal process id value of !UL>/warning/fao=2!/ansi=0
 MUTRUNCPERCENT	<Truncate threshold percentage should be from 0 to 99>/error/fao=0!/ansi=0
 MUTRUNCSSINPROG	<Truncate detected concurrent snapshot in progress for region !AD>/info/fao=2!/ansi=0
 MUTRUNCSUCCESS	<Database file !AD truncated from 0x!16@XQ blocks to 0x!16@XQ at transaction 0x!16@XQ>/info/fao=5!/ansi=0
