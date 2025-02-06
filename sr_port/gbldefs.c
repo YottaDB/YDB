@@ -1247,6 +1247,9 @@ GBLDEF	dm_audit_info	audit_conn[MAX_AUD_CONN];	/* AUdit logging connection infor
 
 /* YottaDB global variables */
 GBLDEF	CLI_ENTRY	*cmd_ary;	/* Pointer to command table for MUMPS/DSE/LKE etc. */
+/* used by OC_GVNAMENAKED to determine dynamically whether a naked optimization is legal */
+GBLDEF int gv_namenaked_state = NAMENAKED_LEGAL;
+
 
 /* Begin -- GT.CM OMI related global variables */
 GBLDEF	bool		neterr_pending;
@@ -1493,4 +1496,3 @@ GBLDEF	int		indr_stp_incr_factor = 1;
 GBLDEF	int		rts_stp_incr_factor = 1;
 GBLDEF	mstr		**sp_topstr, **sp_array, **sp_arraytop;
 GBLDEF	ssize_t		sp_totspace, sp_totspace_nosort;
-

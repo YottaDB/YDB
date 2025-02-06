@@ -71,11 +71,14 @@ LITDEF	err_msg ydberrors[] = {
 	{ "SHEBANGMEXT", "!AZ needs a .m extension to be a valid shebang script", 1, 0 },
 	{ "ZCPREALLVALSTR", "Pre-allocation allowed only for output or input/output variables of type ydb_buffer_t*, ydb_string_t*, or ydb_char_t*", 0, 0 },
 	{ "ZSHOWSTACKRANGE", "Invalid stack level value !SL for ZSHOW \"V\"", 1, 0 },
+	{ "GVDBGNAKEDUNSET", "Invalid GVNAKED in gv_optimize: $REFERENCE was unset. Opcodes seen: !AD", 2, 0 },
+	{ "GVDBGNAKEDMISMATCH", "Invalid GVNAKED in gv_optimize: $REFERENCE did not match OP_GVNAKED: !AD !!= !AD. Opcodes seen: !AD", 6, 0 },
 };
 
 
 
 LITDEF	int ydberrors_undocarr[] = {
+	0	/* Placeholder to prevent empty array */
 };
 
 
@@ -83,7 +86,7 @@ GBLDEF	err_ctl ydberrors_ctl = {
 	256,
 	"YDB",
 	&ydberrors[0],
-	54,
+	56,
 	&ydberrors_undocarr[0],
 	0
 };

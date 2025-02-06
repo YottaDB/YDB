@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -17,6 +17,7 @@
 
 #include "gtm_stdio.h"
 
+#include "op.h"
 #include "stack_frame.h"
 #include "mprof.h"
 #include "error.h"
@@ -56,6 +57,9 @@ void copy_stack_frame(void)
 	sf->ret_value = NULL;
 	sf->dollar_test = -1;		/* initialize it with -1 for indication of not yet being used */
 	frame_pointer = sf;
+	/* When `-line_entry` is enabled, I could not find any compile-time difference between the start of a function and any other
+	 * code. Set a runtime flag on each function call so we don't misoptimize. */
+	gv_namenaked_state = NAMENAKED_UNKNOWNREFERENCE;
 	DBGEHND((stderr, "copy_stack_frame: Added stackframe at addr 0x"lvaddr"  old-msp: 0x"lvaddr"  new-msp: 0x"lvaddr"\n",
 		 sf, msp_save, msp));
 	assert((frame_pointer < frame_pointer->old_frame_pointer) || (NULL == frame_pointer->old_frame_pointer));

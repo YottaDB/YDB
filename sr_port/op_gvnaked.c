@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -53,8 +53,6 @@ GBLREF	uint4		dollar_tlevel;
 error_def(ERR_GVNAKED);
 error_def(ERR_MAXNRSUBSCRIPTS);
 
-STATICFNDCL void op_gvnaked_common(int count, int hash_code_dummy, mval *val_arg, va_list var);
-
 void op_gvnaked(UNIX_ONLY_COMMA(int count_arg) mval *val_arg, ...)
 {
 	va_list		var;
@@ -78,7 +76,7 @@ void op_gvnaked_fast(UNIX_ONLY_COMMA(int count_arg) int hash_code_dummy, mval *v
 	va_end(var);
 }
 
-STATICFNDEF void op_gvnaked_common(int count, int hash_code_dummy, mval *val_arg, va_list var)
+void op_gvnaked_common(int count, int hash_code_dummy, mval *val_arg, va_list var)
 {
 	boolean_t	was_null, is_null;
 	mval		*val;

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -18,6 +18,7 @@
 #include "gtm_stdio.h"
 #include "gtm_string.h"
 
+#include "op.h"
 #include "stack_frame.h"
 #include "mprof.h"
 #include "error.h"
@@ -91,6 +92,8 @@ void new_stack_frame(rhdtyp *rtn_base, unsigned char *context, unsigned char *tr
 	memset(msp, 0, x1 + x2);
 	frame_pointer = sf;
 	assert((frame_pointer < frame_pointer->old_frame_pointer) || (NULL == frame_pointer->old_frame_pointer));
+	if (NAMENAKED_LEGAL == gv_namenaked_state) /* function calls can occur inside interupts; don't forget that we're in an interrupt */
+		gv_namenaked_state = NAMENAKED_UNKNOWNREFERENCE; /* function call or GOTO; we cannot predict $REFERENCE at compile time */
 	DBGEHND((stderr, "new_stack_frame: Added stackframe at addr 0x"lvaddr"  old-msp: 0x"lvaddr"  new-msp: 0x"lvaddr
 		 " for routine %.*s (rtnhdr 0x"lvaddr")\n", sf, msp_save, msp, rtn_base->routine_name.len,
 		 rtn_base->routine_name.addr, rtn_base));

@@ -1113,7 +1113,7 @@ void emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 							inst_emitted = TRUE;
 							break;
 						case OC_TRIPSIZE:
-							/* This tiples value is calculated in the shrink_jmp/shrink_trips
+							/* This triple's value is calculated in the shrink_jmp/shrink_trips
 							 * phase. It is a parameter to (currently only) op_exfun and is the
 							 * length of the generated jump instruction. op_exfun needs this
 							 * length to adjust the return address in the created stackframe

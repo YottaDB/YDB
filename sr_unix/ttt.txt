@@ -557,6 +557,11 @@ OC_GVNAKED:	irepab	val.3
 OC_GVNAME:	irepab	val.3
 		pushl	val.2		; /* hash_code */
 		calls	val.1,xfer.xf_gvname
+OC_GVNAMENAKED:	irepab	val.5
+		pushab	val.4		; /* opcodes */
+		pushl	val.3		; /* expected_subs  */
+		pushl	val.2		; /* hash_code */
+		calls	val.1,xfer.xf_gvnamenaked
 OC_GVNEXT:	pushab	val.0
 		calls	#1,xfer.xf_gvnext
 OC_GVO2:	pushab	val.1

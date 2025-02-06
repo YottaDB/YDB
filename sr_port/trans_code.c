@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -116,6 +116,7 @@ void trans_code_finish(void)
 		dummy.str = dollar_zyerror.str;
 		ESTABLISH(zyerr_ch);
 		op_commarg(&dummy, indir_do);
+		gv_namenaked_state = NAMENAKED_ININTERRUPT; /* $ZYERROR interrupt; code executed is not visible at compile time */
 		REVERT;
 		op_newintrinsic(SV_ZYERROR); /* for user's convenience */
 		assert(NULL == zyerr_frame);
@@ -159,6 +160,8 @@ CONDITION_HANDLER(trans_code_ch)
 		/* Note: TREF(trans_code_pop) already holds the stuff that we need to recompile */
 	}
 	op_commarg(TADR(trans_code_pop), indir_goto);
+	gv_namenaked_state = NAMENAKED_ININTERRUPT; /* $ZTRAP or EXCEPTION interrupt;
+							the code executed is not visible at compile time. */
 	if (NULL != gtm_err_dev)
 	{
 		if ((gtmsocket == gtm_err_dev->type) && gtm_err_dev->newly_created)
@@ -215,6 +218,7 @@ void trans_code(void)
 	(TREF(trans_code_pop)).str = *err_act;
 	ESTABLISH(trans_code_ch);
 	op_commarg(TADR(trans_code_pop), (ZTRAP_CODE & (TREF(ztrap_form)) || IS_ETRAP) ? indir_linetail : indir_goto);
+	gv_namenaked_state = NAMENAKED_ININTERRUPT; /* $ETRAP interrupt; the code executed is not visible at compile time. */
 	REVERT;
 	if (NULL != gtm_err_dev)
 	{

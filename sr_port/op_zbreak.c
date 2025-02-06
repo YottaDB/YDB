@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -20,6 +20,7 @@
 #include "io.h"
 #include "compiler.h"
 #include "restrict.h"
+#include "op.h"
 
 GBLREF int4		gtm_trigger_depth;
 GBLREF stack_frame	*frame_pointer;
@@ -45,6 +46,7 @@ int op_zbreak(stack_frame *fp)
 		flush_pio();
 		comp_indr(&z_ptr->action->obj);
 		frame_pointer->type = SFT_ZBRK_ACT;
+		gv_namenaked_state = NAMENAKED_ININTERRUPT; /* ZBREAK interrupt; code executed is not visible at compile time */
 		return (FALSE);
 	}
 }

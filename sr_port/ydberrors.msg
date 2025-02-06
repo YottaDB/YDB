@@ -80,6 +80,8 @@ ZGBLDIRUNDEF	<Global Directory env var $ydb_gbldir/$gtmgbldir is undefined>/erro
 SHEBANGMEXT	<!AZ needs a .m extension to be a valid shebang script>/error/fao=1
 ZCPREALLVALSTR	<Pre-allocation allowed only for output or input/output variables of type ydb_buffer_t*, ydb_string_t*, or ydb_char_t*>/error/fao=0
 ZSHOWSTACKRANGE	<Invalid stack level value !SL for ZSHOW "V">/error/fao=1
+GVDBGNAKEDUNSET	<Invalid GVNAKED in gv_optimize: $REFERENCE was unset. Opcodes seen: !AD>/error/fao=2
+GVDBGNAKEDMISMATCH	<Invalid GVNAKED in gv_optimize: $REFERENCE did not match OP_GVNAKED: !AD !!= !AD. Opcodes seen: !AD>/error/fao=6
 !
 ! If there are UNUSEDMSG* lines unused for more than one year and at least two non-patch releases, use them before adding new lines.
 !

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -80,6 +80,22 @@ void op_unwind(void)
 	{	/* If unwinding a counted frame, make sure we clean up any alias return argument in flight */
 		if (NULL != alias_retarg)
 			CLEAR_ALIAS_RETARG;
+	}
+	if (gv_namenaked_state == NAMENAKED_ININTERRUPT) {
+		/* We have finished executing a stack frame inside an interrupt. But we may not be returning to normal code, because
+		 * interrupts can nest. First verify that this is the outermost interrupt. */
+		boolean_t frame_is_interrupt = frame_pointer->type & (SFT_ZSTEP_ACT | SFT_ZBRK_ACT | SFT_ZTRAP | SFT_DEV_ACT);
+		boolean_t nested_interrupt = false;
+		stack_frame *current_frame = frame_pointer;
+		while (!nested_interrupt && NULL != current_frame->old_frame_pointer) {
+			current_frame = current_frame->old_frame_pointer;
+			nested_interrupt |= current_frame->type & (SFT_ZSTEP_ACT | SFT_ZBRK_ACT | SFT_ZTRAP | SFT_DEV_ACT);
+		}
+		if (frame_is_interrupt && !nested_interrupt)
+			/* At this point we know at compile time the code that is executing. But we do not know the state of $REFERENCE.
+			* Refrain from optimizing until we see a GVNAME that resets it to a known state.
+			*/
+			gv_namenaked_state = NAMENAKED_UNKNOWNREFERENCE;
 	}
 	DBGEHND_ONLY(prevfp = frame_pointer);
 	if (tp_pointer && tp_pointer->fp <= frame_pointer)

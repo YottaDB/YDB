@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -49,4 +49,5 @@ void op_zst_break(void)
 	op_commarg(&(TREF(zstep_action)), indir_linetail);
 	(TREF(zstep_action)).mvtype = 0;	/* allow stp_gcol to abandon the zstep action, apparently because it's cached */
 	frame_pointer->type = SFT_ZSTEP_ACT;
+	gv_namenaked_state = NAMENAKED_ININTERRUPT; /* $ZSTEP interrupt; code executed is not visible at compile time */
 }

@@ -945,6 +945,7 @@ mlabel		*get_mladdr(mident *c);
 mvar		*get_mvaddr(mident *c);
 int		glvn(oprtype *a);
 int		gvn(void);
+boolean_t	gvname2naked_optimize(triple *chainstart);
 void		ind_code(mstr *obj);
 int		indirection(oprtype *a);
 void		ins_triple(triple *x);

@@ -190,6 +190,7 @@ boolean_t compiler_startup(void)
 	start_fetches(OC_NOOP);
 	resolve_blocks();
 	errknt = resolve_ref(errknt);
+	gvname2naked_optimize(&t_orig);
 	assert(indr_stringpool.base == stringpool.base);
 	INVOKE_STP_GCOL(0);
 	/* The above invocation of stp_gcol with a parameter of 0 is a critical part of compilation

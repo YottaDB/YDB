@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -41,6 +41,9 @@
 #include "tp_set_sgm.h"
 #include "min_max.h"
 #include "gvt_inline.h"
+#ifdef DEBUG
+#include "get_reference.h"
+#endif
 
 GBLREF gd_addr		*gd_header;
 GBLREF gv_key		*gv_currkey;
@@ -80,6 +83,67 @@ void op_gvname_fast(UNIX_ONLY_COMMA(int count_arg) int hash_code, mval *val_arg,
 	VMS_ONLY(va_count(count);)
 	op_gvname_common(UNIX_ONLY_COMMA(count_arg) VMS_ONLY_COMMA(count) hash_code, val_arg, var);
 	va_end(var);
+}
+
+void op_gvnamenaked(int count, int hash_code, int subs_cached, mval *opcodes, mval *val_arg, ...)
+{
+	va_list		var;
+	VAR_START(var, val_arg);
+
+	mval *naked_val_arg;
+#	ifdef DEBUG
+	gv_key_buf	save_currkey, gvnaked_currkey;
+	va_list save_var;
+#	endif
+
+	/* First, check if it is legal to do a naked reference. This could be false if an interrupt modifies $REFERENCE.
+	 * Theoretically we might be able to optimize *within* (but not across) an interrupt.
+	 * But that's tricky, because we might have a nested interrupt (e.g. ZSTEP into a $ZINTERRUPT handler).
+	 * Interrupts are rare in any case, so just disable the optimization until it finishes executing. */
+	if (NAMENAKED_LEGAL != gv_namenaked_state) {
+		op_gvname_common(count, hash_code, val_arg, var);
+		va_end(var);
+		return;
+	}
+
+#	ifdef DEBUG
+	/* Cross check GVNAKED against GVNAME to make sure they get the same result.
+	 * Start by checking that a GVNAKED is legal at all. */
+	if (IS_ILLEGAL_GVNAKED(gv_currkey))
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_GVDBGNAKEDUNSET, 2, opcodes->str.len, opcodes->str.addr);
+	SAVE_GV_CURRKEY(save_currkey);
+	va_copy(save_var, var);
+#	endif
+	/* Now do a GVNAKED. */
+	assert(subs_cached < (count - 2)); /* one for hash code, one for variable name */
+	for (int i = subs_cached; i >= 0; --i) { /* Discard all cached subscripts. */
+		naked_val_arg = va_arg(var, mval *);
+	}
+	/* -1 for variable name */
+	op_gvnaked_common(count - subs_cached - 1, 0, naked_val_arg, var);
+	va_end(var);
+#	ifdef DEBUG
+	SAVE_GV_CURRKEY(gvnaked_currkey);
+	RESTORE_GV_CURRKEY(save_currkey);
+
+	/* Ok, now do a regular GVNAME. */
+	op_gvname_common(count, hash_code, val_arg, save_var);
+	va_end(save_var);
+
+	/* Verify that this got the same result as GVNAKED. */
+	if (memcmp(gvnaked_currkey.buf, gv_currkey, SIZEOF(gv_key) + gv_currkey->end + 1)) {
+		mval actual, expected;
+		get_reference(&actual);
+		SAVE_GV_CURRKEY(save_currkey);
+		RESTORE_GV_CURRKEY(gvnaked_currkey);
+		get_reference(&expected);
+		RESTORE_GV_CURRKEY(save_currkey); /* Required by rts_error internals, otherwise we get an assertion failure */
+
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_GVDBGNAKEDMISMATCH, 6, actual.str.len, actual.str.addr,
+			expected.str.len, expected.str.addr, opcodes->str.len, opcodes->str.addr);
+	}
+#	endif
+
 }
 
 STATICFNDEF void op_gvname_common(int count, int hash_code, mval *val_arg, va_list var)
@@ -146,5 +210,11 @@ STATICFNDEF void op_gvname_common(int count, int hash_code, mval *val_arg, va_li
 	if (was_null && (NEVER == reg->null_subs))
 		sgnl_gvnulsubsc(NULL);
 	TREF(prev_gv_target) = gv_target;	/* note down gv_target in another global for debugging purposes (C9I09-003039) */
+	/* Normally, we expect all GVNAMENAKED opcodes to be legal. However, we cannot tell at compile time whether an
+	 * interrupt will execute and modify $REFERENCE. If that happens, we disable the optimization until the next GVNAME
+	 * after the interrupt finishes. We have just finished a GVNAME, so we know it is legal to start optimizing again.
+	 */
+	if (NAMENAKED_UNKNOWNREFERENCE == gv_namenaked_state)
+		gv_namenaked_state = NAMENAKED_LEGAL;
 	return;
 }

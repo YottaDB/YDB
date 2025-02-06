@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -74,6 +74,7 @@ void flush_jmp (rhdtyp *rtn_base, unsigned char *context, unsigned char *transfe
 	GTMTRIG_ONLY(DBGTRIGR((stderr, "flush_jmp: Disabling SFF_NORET_VIA_MUMTSTART_OFF in frame 0x"lvaddr"\n", frame_pointer)));
 	USHBIN_ONLY(old_rtnhdr = frame_pointer->rvector);
 	frame_pointer->rvector = rtn_base;
+	gv_namenaked_state = NAMENAKED_UNKNOWNREFERENCE; /* ZGOTO; we cannot predict the state of $REFERENCE at compile time */
 	/* Now that fp->rvector has been overwritten to new routine, check if the older routine had a "rtn_relinked" flag set
 	 * and if so that cleanup can be performed now.
 	 */

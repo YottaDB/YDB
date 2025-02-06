@@ -33,6 +33,14 @@
 #define NO_VALUE -1
 #define DELETE_VALUE -2
 
+/* A state machine that tracks whether a `gvname2naked` optimization is legal at runtime.
+ * In particular, a transition from the ININTERRUPT to LEGAL state is always wrong; we have to see at least one GVNAME to get back
+ * to a known state before doing an optimization. */
+#define NAMENAKED_LEGAL 0             /* Naked reference optimization OK */
+#define NAMENAKED_ININTERRUPT 1       /* Can't do a naked reference optimization until we leave the interrupt AND see a GVNAME */
+#define NAMENAKED_UNKNOWNREFERENCE 2  /* The next GVNAME will make a naked reference optimization legal */
+GBLREF int gv_namenaked_state;
+
 void	op_add(mval *u, mval *v, mval *s);
 void	add_mvals(mval *u, mval *v, int subtraction, mval *result);	/* function defined in op_add.c */
 void	op_bindparm(UNIX_ONLY_COMMA(int frmc) int frmp_arg, ...);
@@ -165,8 +173,10 @@ void	op_gvincr(mval *increment, mval *result);
 void	op_gvkill(void);
 void	op_gvnaked(UNIX_ONLY_COMMA(int count_arg) mval *val_arg, ...);
 void	op_gvnaked_fast(UNIX_ONLY_COMMA(int count_arg) int hash_code, mval *val_arg, ...);
+void	op_gvnaked_common(int count, int hash_code_dummy, mval *val_arg, va_list var);
 void	op_gvname(UNIX_ONLY_COMMA(int count_arg) mval *val_arg, ...);
 void	op_gvname_fast(UNIX_ONLY_COMMA(int count_arg) int hash_code, mval *val_arg, ...);
+void	op_gvnamenaked(int count_arg, int hash_code, int subs, mval *opcodes, mval *val_arg, ...);
 void	op_gvnext(mval *v);
 void	op_gvo2(mval *dst, mval *direct);
 void	op_gvorder(mval *v);
@@ -175,8 +185,8 @@ void	op_gvquery(mval *v);
 void	op_gvreversequery(mval *v);
 boolean_t op_gvqueryget(mval *key, mval *val);
 void	op_gvq2(mval *dst, mval *direct);
-void	op_gvrectarg(mval *v);
-void	op_gvsavtarg(mval *v);
+void	op_gvrectarg(mval *v); /* Restore gv_currkey */
+void	op_gvsavtarg(mval *v); /* Save gv_currkey*/
 void	op_gvzwithdraw(void);
 void	op_gvzwrite(UNIX_ONLY_COMMA(int4 count) int4 pat, ...);
 void	op_hang(mval *num);
