@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -81,6 +81,7 @@ void stx_error_va(int in_error, va_list args)
 	char		*c;
 	mstr		msg;
 	va_list		dup_args;
+	static	int	last_numoflow_source_line, last_numoflow_source_column;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -253,6 +254,12 @@ void stx_error_va(int in_error, va_list args)
 			dec_err(VARLSTCNT(4) in_error, 2, arg1, arg2);
 			dec_err(VARLSTCNT(4) ERR_SRCNAM, 2, source_name_len, source_file_name);
 		}
+	} else if ((ERR_NUMOFLOW == in_error)
+			&& (last_numoflow_source_line == TREF(source_line))
+			&& (last_numoflow_source_column == TREF(last_source_column)))
+	{	/* NUMOFLOW error/warning for this line # and column # combination has already been issued.
+		 * Skip issuing a duplicate error/warning.
+		 */
 	} else
 	{
 		show_source_line(warn);
@@ -277,6 +284,11 @@ void stx_error_va(int in_error, va_list args)
 				arg1 = va_arg(args, VA_ARG_TYPE);
 				dec_err(VARLSTCNT(3) in_error, 1, arg1);
 			}
+		}
+		if (ERR_NUMOFLOW == in_error)
+		{
+			last_numoflow_source_line = TREF(source_line);
+			last_numoflow_source_column = TREF(last_source_column);
 		}
 	}
 	va_end(args);

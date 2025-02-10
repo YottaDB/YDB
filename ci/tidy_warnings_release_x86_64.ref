@@ -52,6 +52,7 @@ rts_error.c:warning: Initialized va_list 'var_dup' is leaked [clang-analyzer-val
 send_msg.c:warning: Uninitialized va_list is copied [clang-analyzer-valist.Uninitialized]
 send_msg.c:warning: Uninitialized va_list is copied [clang-analyzer-valist.Uninitialized]
 sgtm_putmsg.c:warning: Uninitialized va_list is copied [clang-analyzer-valist.Uninitialized]
+stx_error.c:warning: Initialized va_list 'var' is leaked [clang-analyzer-valist.Unterminated]
 stx_error.c:warning: va_end() is called on an uninitialized va_list [clang-analyzer-valist.Uninitialized]
 t_end.c:warning: redundant condition 'replication' [bugprone-redundant-branch-condition]
 util_out_print_gtmio.c:warning: va_end() is called on an uninitialized va_list [clang-analyzer-valist.Uninitialized]
