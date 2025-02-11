@@ -156,13 +156,11 @@ void	mu_reorg_upgrd_dwngrd(void)
 	int4			lcnt, resetcnt, sleepcnt, status;
 	jnl_private_control	*jpc;
 	jnl_buffer_ptr_t	jbp;
-	mname_entry		gvname;
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
 	trans_num		curr_tn;
 	tp_region		*rptr, single;
 	uint4			jnl_status;
-	unsigned char		gname[SIZEOF(mident_fixed) + 2];
 
 #ifndef V6TOV7UPGRADEABLE	/* Reject until upgrades are enabled */
 	mupip_exit(ERR_GTMCURUNSUPP);
@@ -277,8 +275,7 @@ void	mu_reorg_upgrd_dwngrd(void)
 		csa->nl->reorg_upgrade_pid = process_id;
 		util_out_print("!/Region !AD : MUPIP REORG -UPGRADE of !AD started (!UL of !UL)", TRUE,
 					REG_LEN_STR(reg), DB_LEN_STR(reg), csd->blks_to_upgrd, csd->trans_hist.total_blks);
-		gvname.var_name.addr = (char *)gname;
-		gv_target = targ_alloc(csa->hdr->max_key_size, &gvname, reg);
+		gv_target = targ_alloc(csa->hdr->max_key_size, NULL, reg);
 		gv_target->root = DIR_ROOT;
 		gv_target->clue.end = 0;
 		curr_blk = DIR_ROOT;			/* DIR_ROOT to variable makes pointer to pass below */
@@ -292,7 +289,7 @@ void	mu_reorg_upgrd_dwngrd(void)
 			status = find_gvt_roots(&curr_blk, reg, &child_cr);
 			if (is_bg && (NULL != child_cr))
 			{	/* Release the cache record, transitively making the corresponding buffer, that this function just
-				 * modified, avaiable for re-use. Doing so ensures that all the CRs being touched as part of the
+				 * modified, available for re-use. Doing so ensures that all the CRs being touched as part of the
 				 * REORG UPGRADE do not accumulate creating a situation where "when everything is special, nothing
 				 * is special" resulting in parent blocks being moved around in memory which causes restarts.
 				 */
@@ -532,7 +529,7 @@ enum cdb_sc find_gvt_roots(block_id *curr_blk, gd_region *reg, cache_rec_ptr_t *
 				status = upgrade_idx_block(&blk_pter, reg, &gvname, &child_cr);
 				if (is_bg && (NULL != child_cr))
 				{	/* Release the cache record, transitively making the corresponding buffer, that this
-					 * function just modified, avaiable for re-use. Doing so ensures that all the CRs being
+					 * function just modified, available for re-use. Doing so ensures that all the CRs being
 					 * touched as part of the REORG UPGRADE do not accumulate creating a situation where "when
 					 * everything is special, nothing is special" resulting in parent blocks being moved around
 					 * in memory which causes restarts.
@@ -632,7 +629,7 @@ enum cdb_sc find_gvt_roots(block_id *curr_blk, gd_region *reg, cache_rec_ptr_t *
 		status = find_gvt_roots(&blk_pter, reg, &child_cr);
 		if (is_bg && (NULL != child_cr))
 		{	/* Release the cache record, transitively making the corresponding buffer, that this function just
-			 * modified, avaiable for re-use. Doing so ensures that all the CRs being touched as part of the
+			 * modified, available for re-use. Doing so ensures that all the CRs being touched as part of the
 			 * REORG UPGRADE do not accumulate creating a situation where "when everything is special, nothing
 			 * is special" resulting in parent blocks being moved around in memory which causes restarts.
 			 */
@@ -732,7 +729,7 @@ enum cdb_sc upgrade_idx_block(block_id *curr_blk, gd_region *reg, mname_entry *g
 	srch_blk_status	blkHist, *curr_blk_hist_ptr;
 	srch_hist	alt_hist;
 	trans_num	lcl_tn;
-	unsigned char	gname[SIZEOF(mident_fixed) + 2], key_buff[MAX_KEY_SZ + 3];
+	unsigned char	key_buff[MAX_KEY_SZ + 3];
 	uint4		lcl_bsiz;
 
 	csa = cs_addrs;
@@ -1099,7 +1096,7 @@ enum cdb_sc upgrade_idx_block(block_id *curr_blk, gd_region *reg, mname_entry *g
 			status = upgrade_idx_block(&blk_pter, reg, &gvt_name, &child_cr);
 			if (is_bg && (NULL != child_cr))
 			{	/* Release the cache record, transitively making the corresponding buffer, that this function just
-				 * modified, avaiable for re-use. Doing so ensures that all the CRs being touched as part of the
+				 * modified, available for re-use. Doing so ensures that all the CRs being touched as part of the
 				 * REORG UPGRADE do not accumulate creating a situation where "when everything is special, nothing
 				 * is special" resulting in parent blocks being moved around in memory which causes restarts.
 				 */
