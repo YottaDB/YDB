@@ -155,6 +155,7 @@ int4	mu_upgrade_bmm(gd_region *reg, size_t blocks_needed)
 	trans_num		ret_tn;
 	unix_db_info		*udi;
 	unsigned char		*cp, gname[sizeof(mident_fixed) + 2], key_buff[MAX_KEY_SZ + 3];
+	char			*bml_lcl_buff;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -225,6 +226,7 @@ int4	mu_upgrade_bmm(gd_region *reg, size_t blocks_needed)
 	mv_blk_err = FALSE;
 	memset(&hist, 0, sizeof(hist));
 	blkhist = &hist;	/* Block history stand-in */
+	bml_lcl_buff = malloc(BM_SIZE(BLKS_PER_LMAP));
 	for (curbml = 0, index = old_blk_num = 1; old_blk_num < blks_in_way; curbml += BLKS_PER_LMAP)
 	{	/* check which blocks need to move */
 		bml_buff = t_qread(curbml, (sm_int_ptr_t)&cycle, &cr);
@@ -234,13 +236,15 @@ int4	mu_upgrade_bmm(gd_region *reg, size_t blocks_needed)
 			mu_upgrade_in_prog = MUPIP_UPGRADE_OFF;
 			util_out_print("Region !AD: Read of Bit map @x!@XQ failed.", TRUE, REG_LEN_STR(reg), &curbml);
 			util_out_print("Region !AD: not upgraded", TRUE,REG_LEN_STR(reg));
+			free(bml_lcl_buff);
 			return ERR_MUNOFINISH;
 		}
+		memcpy(bml_lcl_buff, bml_buff, BM_SIZE(BLKS_PER_LMAP));
 		blks_in_bml = (blks_in_way > curbml) ? BLKS_PER_LMAP : 2;		/* in last bml only interested in block 1 */
 		for (bml_index = 1; bml_index < blks_in_bml; bml_index++)		/* skip bml_index = 0 - the bml itself */
 		{	/* process the local bit map for BUSY blocks */
 			old_blk_num = curbml + bml_index;
-			GET_BM_STATUS(bml_buff, bml_index, bml_status);
+			GET_BM_STATUS(bml_lcl_buff, bml_index, bml_status);
 			assert(BLK_MAPINVALID != bml_status);
 			if (BLK_BUSY != bml_status)
 				continue;
@@ -269,6 +273,7 @@ int4	mu_upgrade_bmm(gd_region *reg, size_t blocks_needed)
 			blks_to_mv_levl_ptr[level][old_blk_num] = index;
 		}	/* end of loop over a local bit map */
 	}	/* end identification of blocks to move */
+	free(bml_lcl_buff);
 	/* crit management is not critical as this runs standalone */
 	gvname.var_name.addr = (char *)gname;
 	blk_moved_cnt = root_moved_cnt = 0;
