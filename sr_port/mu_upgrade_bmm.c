@@ -766,7 +766,6 @@ int4 upgrade_extend(gtm_int8 extension, gd_region *reg)
 		FALSE, REG_LEN_STR(reg));
 	if (0 == cs_data->extension_size)
 	{	/* no extension size in segment data to work with */
-		assert(cs_data->extension_size);
 		util_out_print("Region !AD: Extension size not set in database header.", TRUE, REG_LEN_STR(reg));
 		util_out_print("Region !AD: Perform a MUPIP EXTEND on this region,", FALSE, REG_LEN_STR(reg));
 		util_out_print(" otherwise free at least 0x!@XQ blocks to continue.", TRUE, &extension);
