@@ -946,6 +946,7 @@ enum cdb_sc gen_hist_for_blk(srch_blk_status *blkhist, sm_uc_ptr_t blkBase2, sm_
 			assert(MUPIP_REORG_UPGRADE_IN_PROGRESS == mu_upgrade_in_prog);
 			return cdb_sc_gvtrootnonzero;
 		}
+		t_begin_crit(ERR_MUNOUPGRD);
 		if (gv_currkey->end != (key_len - 1))
 		{	/* gv_bind_name/gvcst_root_search can overwrite gv_currkey */
 			memcpy(gv_currkey->base, key_buff, key_len + 1);	/* the + 1 picks up a key_delimiter */
@@ -959,8 +960,12 @@ enum cdb_sc gen_hist_for_blk(srch_blk_status *blkhist, sm_uc_ptr_t blkBase2, sm_
 			status = gvcst_search(gv_currkey, NULL);
 			assert((cdb_sc_normal == status) || (MUPIP_REORG_UPGRADE_IN_PROGRESS == mu_upgrade_in_prog));
 			if (cdb_sc_normal != status)
+			{
+				t_abort(gv_cur_region, cs_addrs);
 				return status;
+			}
 		}
+		t_abort(gv_cur_region, cs_addrs);
 		if ((curr_blk != gv_target->root)
 			&& (curr_blk != gv_target->hist.h[curr_level].blk_num))
 		{
