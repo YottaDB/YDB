@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -44,6 +44,8 @@
 #include "gtm_threadgbl.h"
 #include "ydb_getenv.h"
 #include "op.h"
+#include "gdskill.h"
+#include "mu_upgrade_bmm.h"
 
 #define	NOISOLATION_LITERAL	"NOISOLATION"
 
@@ -52,6 +54,7 @@ GBLREF	gd_addr		*gd_header;
 GBLREF	gv_namehead	*gv_target_list;
 GBLREF	gdr_name	*gdr_name_head;
 GBLREF	gd_addr		*gd_addr_head;
+GBLREF	uint4		mu_upgrade_in_prog;
 
 LITREF	char		gde_labels[GDE_LABEL_NUM][GDE_LABEL_SIZE];
 
@@ -200,10 +203,16 @@ gd_addr *zgbldir_opt(mval *v, boolean_t env_translated, boolean_t force_load)
 		name->link = NULL;
 	gdr_name_head = name;
 	gdr_name_head->gd_ptr = gd_ptr;
-	if (NULL == name->link)
+	if ((NULL == name->link) && (MUPIP_UPGRADE_IN_PROGRESS != mu_upgrade_in_prog))
 	{	/* Now that the FIRST global directory has been opened by this process, check if "ydb_app_ensures_isolation"
 		 * env var was specified. If so do needed initialization for that here. Cannot do this initialization before
 		 * here as it can cause STATSDB related issues (YDB#1047).
+		 *
+		 * Also if "mupip upgrade" is in progress, it overrides all names to be in the current region and resets
+		 * "gvt->gd_csa = cs_addrs" for all gvts in "gv_target_list" which includes all gvts in "gvt_pending_list"
+		 * too. This can cause assert failures in "process_gvt_pending_list()" due to the "gvt->gd_csa" overwrite.
+		 * In that case, ignore the "ydb_app_ensures_isolation" env var as this process is operating with a tampered
+		 * global directory.
 		 */
 		char	*ptr;
 		mval	noiso_lit, gbllist;

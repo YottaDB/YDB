@@ -167,7 +167,12 @@ void mupip_upgrade(void)
 	file = (CLI_PRESENT == cli_present("FILE"));
 	region = (CLI_PRESENT == cli_present("REGION")) || (CLI_PRESENT == cli_present("R"));
 	TREF(statshare_opted_in) = NO_STATS_OPTIN;	/* Do not open statsdb automatically when basedb is opened */
+	mu_upgrade_in_prog = MUPIP_UPGRADE_IN_PROGRESS;	/* needed to signal "zgbldir_opt()" (called inside "gvinit()")
+							 * to not process YDBENVINDX_APP_ENSURES_ISOLATION env var.
+							 * See comment there for more details.
+							 */
 	gvinit();				/* initialize gd_header (needed by the later call to mu_getlst) and gv_keysize */
+	mu_upgrade_in_prog = MUPIP_UPGRADE_OFF;
 	if ((file == region) && (TRUE == file))
 	{
 		mupip_exit(ERR_MUQUALINCOMP);
