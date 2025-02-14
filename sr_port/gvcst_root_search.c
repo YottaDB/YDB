@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -45,6 +45,9 @@
 #include "error.h"
 #include "io.h"
 #include "gvt_inline.h"
+#ifdef DEBUG
+#include "mu_upgrade_bmm.h"
+#endif
 
 GBLREF	boolean_t	mu_reorg_in_swap_blk, mu_reorg_process, mupip_jnl_recover;
 GBLREF	gd_region	*gv_cur_region;
@@ -266,7 +269,8 @@ enum cdb_sc gvcst_root_search(boolean_t donot_restart)
 	}
 	T_BEGIN_READ_NONTP_OR_TP(ERR_GVGETFAIL);
 	/* We better hold crit in the final retry (TP & non-TP). Only exception is journal recovery */
-	assert((t_tries < CDB_STAGNATE) || cs_addrs->now_crit || mupip_jnl_recover);
+	assert((t_tries < CDB_STAGNATE) || cs_addrs->now_crit
+		|| mupip_jnl_recover || (MUPIP_UPGRADE_IN_PROGRESS == mu_upgrade_in_prog));
 	for (;;)
 	{	/* for provides convenient mechanism to exit if failure */
 		lcl_root = 0; /* set lcl_root to 0 at the start of every iteration (this way even retry will get fresh value) */

@@ -57,6 +57,8 @@
 #include "t_write.h"
 #include "util.h"
 #include "wcs_sleep.h"
+#include "mu_upgrade_bmm.h"
+#include "t_begin_crit.h"
 
 GBLREF	boolean_t		mu_reorg_process;
 GBLREF	boolean_t		need_kip_incr;
@@ -79,6 +81,7 @@ GBLREF	unsigned char		cw_map_depth;
 GBLREF	unsigned char		cw_set_depth;
 GBLREF	unsigned char		rdfail_detail;
 GBLREF	unsigned int		t_tries;
+GBLREF	uint4			mu_upgrade_in_prog;
 
 #ifdef DEBUG
 GBLREF	block_id		ydb_skip_bml_num;
@@ -162,7 +165,10 @@ void	mu_swap_root(glist *gl_ptr, int *root_swap_statistic_ptr, block_id upg_mv_b
 		return;
 	SET_GV_ALTKEY_TO_GBLNAME_FROM_GV_CURRKEY;		/* set up gv_altkey to be just the gblname */
 	/* ------------ Swap root block of global variable tree --------- */
-	t_begin(ERR_MUREORGFAIL, UPDTRNS_DB_UPDATED_MASK);
+	if (MUPIP_UPGRADE_IN_PROGRESS != mu_upgrade_in_prog)
+		t_begin(ERR_MUREORGFAIL, UPDTRNS_DB_UPDATED_MASK);
+	else
+		t_begin_crit(ERR_MUREORGFAIL);
 	for (;;)
 	{
 		curr_tn = csa->ti->curr_tn;
@@ -206,7 +212,10 @@ void	mu_swap_root(glist *gl_ptr, int *root_swap_statistic_ptr, block_id upg_mv_b
 	/* ------------ Swap blocks in branch of directory tree --------- */
 	for (level = 0; level <= MAX_BT_DEPTH; level++)
 	{
-		t_begin(ERR_MUREORGFAIL, UPDTRNS_DB_UPDATED_MASK);
+		if (MUPIP_UPGRADE_IN_PROGRESS != mu_upgrade_in_prog)
+			t_begin(ERR_MUREORGFAIL, UPDTRNS_DB_UPDATED_MASK);
+		else
+			t_begin_crit(ERR_MUREORGFAIL);
 		for (;;)
 		{
 			curr_tn = csa->ti->curr_tn;
