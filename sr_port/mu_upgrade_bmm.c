@@ -105,6 +105,7 @@ GBLREF	uint4			update_trans;
 GBLREF	uint4			process_id;
 GBLREF	unsigned char		cw_map_depth, rdfail_detail, t_fail_hist[];
 GBLREF	unsigned int		t_tries;
+GBLREF	int4			cws_reorg_remove_index;
 
 static gtm_int8	blk_moved_cnt, killed_gbl_cnt, root_moved_cnt, tot_dt, tot_kill_block_cnt, tot_kill_byte_cnt, tot_levl_cnt,
 	tot_splt_cnt;
@@ -976,6 +977,10 @@ enum cdb_sc gen_hist_for_blk(srch_blk_status *blkhist, sm_uc_ptr_t blkBase2, sm_
 			gv_target->root = 0;
 			status = gvcst_root_search(FALSE);
 			mu_reorg_in_swap_blk = FALSE;
+			/* Clear "cws_reorg_remove_index" (would have been incremented inside "gvcst_root_search()" call above due
+			 * to "mu_reorg_in_swap_blk" being TRUE during that call) now that "mu_reorg_in_swap_blk" is also cleared.
+			 */
+			cws_reorg_remove_index = 0;
 			assert(cdb_sc_normal == status);
 			if (cdb_sc_normal != status)
 				return status;
