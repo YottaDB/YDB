@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -84,6 +84,8 @@ cmi_status_t cmi_open(struct CLB *lnk)
 		return save_errno;
 	}
 	rval = connect(new_fd, ai_ptr->ai_addr, ai_ptr->ai_addrlen);		/* BYPASSOK(connect) */
+	if (FD_SETSIZE <= new_fd)
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_FDSIZELMT, 1, new_fd);
 	HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 	if ((-1 == rval) && ((EINTR == errno) || (EINPROGRESS == errno)
 #	if (defined(__osf__) && defined(__alpha)) || defined(__sun) || defined(__vms)
@@ -91,8 +93,6 @@ cmi_status_t cmi_open(struct CLB *lnk)
 #	endif
 			     ))
 	{	/* connection attempt will continue so wait for completion */
-		if (FD_SETSIZE <= new_fd)
-			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_FDSIZELMT, 1, new_fd);
 		do
 		{
 			if (EINTR == errno)
