@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -49,6 +49,7 @@
 #include "gtm_c_stack_trace.h"
 #include "anticipatory_freeze.h"
 #include "wcs_wt.h"
+#include "mu_upgrade_bmm.h"
 
 GBLREF sgmnt_addrs		*cs_addrs;
 GBLREF gd_region		*gv_cur_region;
@@ -61,6 +62,9 @@ GBLREF boolean_t		mu_reorg_more_tries;
 GBLREF uint4 			update_trans;
 GBLREF jnlpool_addrs_ptr_t	jnlpool;
 #endif
+GBLREF	block_id	mu_upgrade_pin_blkarray[MAX_BT_DEPTH + 1];
+GBLREF	int		mu_upgrade_pin_blkarray_idx;
+GBLREF	uint4		mu_upgrade_in_prog;
 
 #define	TRACE_AND_SLEEP(ocnt)				\
 {							\
@@ -276,6 +280,22 @@ cache_rec_ptr_t	db_csh_getn(block_id block)
 				 * to be skipped from reuse. Hence the placement of this reset logic AFTER the cw_stagnate check.
 				 */
 				tp_srch_status->blk_target->clue.end = 0;
+			}
+			if (mu_reorg_more_tries && mu_upgrade_pin_blkarray_idx)
+			{
+				int	i;
+
+				assert(MUPIP_UPGRADE_IN_PROGRESS == mu_upgrade_in_prog);
+				for (i = 0; i < mu_upgrade_pin_blkarray_idx; i++)
+				{
+					if (cr->blk == mu_upgrade_pin_blkarray[i])
+						break;
+				}
+				if (i < mu_upgrade_pin_blkarray_idx)
+				{
+					cr->refer = TRUE;
+					continue;
+				}
 			}
 		}
 		if (cr->dirty)

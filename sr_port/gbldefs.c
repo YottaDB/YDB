@@ -1482,4 +1482,11 @@ GBLDEF gdr_name	*gdr_name_head;
 GBLDEF gd_addr	*gd_addr_head;
 
 GBLDEF	boolean_t	shebang_invocation;	/* TRUE if yottadb is invoked through the "ydbsh" (YDBSH macro) soft link */
+GBLDEF	block_id	mu_upgrade_pin_blkarray[MAX_BT_DEPTH + 1]; /* List of block numbers that "mupip upgrade" wants pinned. Used
+								    * by "db_csh_getn()" to ensure these blocks do not get reused.
+								    * Note that this is different from "cw_stagnate" in that the
+								    * latter hash table is reinitialized after every "t_end()" or
+								    * "t_abort()" call whereas "mu_upgrade_pin_blkarray[]" is not.
+								    */
+GBLDEF	int		mu_upgrade_pin_blkarray_idx;	/* Index into the next available slot in mu_upgrade_pin_blkarray[] */
 

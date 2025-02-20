@@ -107,6 +107,9 @@ GBLREF	uint4			process_id;
 GBLREF	unsigned char		cw_map_depth, rdfail_detail, t_fail_hist[];
 GBLREF	unsigned int		t_tries;
 GBLREF	int4			cws_reorg_remove_index;
+GBLREF	boolean_t		mu_reorg_more_tries;
+GBLREF	block_id		mu_upgrade_pin_blkarray[MAX_BT_DEPTH + 1];
+GBLREF	int			mu_upgrade_pin_blkarray_idx;
 
 #define	GVT_HIST_CWS_INSERT(HIST)						\
 {										\
@@ -114,6 +117,21 @@ GBLREF	int4			cws_reorg_remove_index;
 										\
 	for (tmpHist = (HIST)->h; tmpHist->blk_num; tmpHist++)			\
 		CWS_INSERT(tmpHist->blk_num);					\
+}
+
+#define	MU_UPGRADE_PIN_BLK(CURR_BLK, SAVE_CW_STAGNATE_COUNT)				\
+{											\
+	assert(ARRAYSIZE(mu_upgrade_pin_blkarray) > mu_upgrade_pin_blkarray_idx);	\
+	DEBUG_ONLY(SAVE_CW_STAGNATE_COUNT = cw_stagnate.count);				\
+	mu_upgrade_pin_blkarray[mu_upgrade_pin_blkarray_idx++] = CURR_BLK;		\
+}
+
+#define	MU_UPGRADE_UNPIN_BLK(CURR_BLK, SAVE_CW_STAGNATE_COUNT)				\
+{											\
+	assert(0 < mu_upgrade_pin_blkarray_idx);					\
+	mu_upgrade_pin_blkarray_idx--;							\
+	assert(SAVE_CW_STAGNATE_COUNT >= cw_stagnate.count);				\
+	delete_hashtab_int8(&cw_stagnate, (ublock_id *)&CURR_BLK);			\
 }
 
 static gtm_int8	blk_moved_cnt, killed_gbl_cnt, root_moved_cnt, tot_dt, tot_kill_block_cnt, tot_kill_byte_cnt, tot_levl_cnt,
@@ -526,15 +544,18 @@ int4	mu_upgrade_bmm(gd_region *reg, size_t blocks_needed)
 		return ERR_MUNOFINISH;
 	}
 	/* identify KILL'd tree stumps before moving DIR_ROOT as some may be stuck in the blks_in_way zone "without history" */
+	mu_reorg_more_tries = TRUE;	/* so "mu_upgrade_pin_blkarray[]" will be honored by "db_csh_getn()" */
+	mu_upgrade_pin_blkarray_idx = 0;	/* initialize global variable in outermost call to "ditch_dead_globals()" */
 	status = ditch_dead_globals(DIR_ROOT, blks_in_way, &child_cr);
 	if (is_bg && (NULL != child_cr))
 	{	/* Release the cache record, transitively making the corresponding buffer, that this function just
-		 * modified, avaiable for re-use. Doing so ensures that all the CRs being touched as part of the
+		 * modified, available for re-use. Doing so ensures that all the CRs being touched as part of the
 		 * REORG UPGRADE do not accumulate creating a situation where "when everything is special, nothing
 		 * is special" resulting in parent blocks being moved around in memory which causes restarts.
 		 */
 		child_cr->refer = FALSE;
 	}
+	mu_reorg_more_tries = FALSE;	/* no longer need to honor "mu_upgrade_pin_blkarray[]" in "db_csh_getn()" */
 	if (cdb_sc_normal != status)
 	{	/* not able to process for dead globals */
 		assert(cdb_sc_normal == status);
@@ -682,14 +703,16 @@ int4	mu_upgrade_bmm(gd_region *reg, size_t blocks_needed)
 	util_out_print("Region !AD : Master map required 0x!@XQ blocks", FALSE, REG_LEN_STR(reg), &blks_in_way);
 	util_out_print(" size is now at 0x!@XQ blocks after any extension", TRUE, &csd->trans_hist.total_blks);
 	tot_dt = tot_kill_byte_cnt = tot_levl_cnt = tot_splt_cnt = 0;
+	mu_reorg_more_tries = TRUE;	/* so "mu_upgrade_pin_blkarray[]" will be honored by "db_csh_getn()" */
 	for (i = 1; i >= 0; i--)
 	{	/* Upgrade_dir_tree does both the offest adjustment and the pointer enlargement. It is possible
 		 * for DIR_ROOT to split, so loop once more to account for it.
 		 */
+		mu_upgrade_pin_blkarray_idx = 0;	/* initialize global variable in outermost call to "upgrade_dir_tree()" */
 		status = upgrade_dir_tree(DIR_ROOT, blks_in_way, reg, &lost, &child_cr);
 		if (is_bg && (NULL != child_cr))
 		{	/* Release the cache record, transitively making the corresponding buffer, that this function just
-			 * modified, avaiable for re-use. Doing so ensures that all the CRs being touched as part of the
+			 * modified, available for re-use. Doing so ensures that all the CRs being touched as part of the
 			 * REORG UPGRADE do not accumulate creating a situation where "when everything is special, nothing
 			 * is special" resulting in parent blocks being moved around in memory which causes restarts.
 			 */
@@ -698,6 +721,7 @@ int4	mu_upgrade_bmm(gd_region *reg, size_t blocks_needed)
 		if (cdb_sc_normal <= status)
 			break;
 	}
+	mu_reorg_more_tries = FALSE;	/* no longer need to honor "mu_upgrade_pin_blkarray[]" in "db_csh_getn()" */
 	if (cdb_sc_normal != status)
 	{	/* directory tree upgrade failed */
 		csa->hold_onto_crit = FALSE;
@@ -1116,6 +1140,7 @@ enum cdb_sc ditch_dead_globals(block_id curr_blk, block_id offset, cache_rec_ptr
 	kill_set		kill_set_list;
 	unsigned char		gname[sizeof(mident_fixed) + 2], key_buff[MAX_KEY_SZ + 3];
 	unsigned char		*c, *cp;
+	DEBUG_ONLY(unsigned int	save_cw_stagnate_count);
 
 	dirHist.blk_num = curr_blk;
 	if (NULL == (dirHist.buffaddr = t_qread(dirHist.blk_num, (sm_int_ptr_t)&dirHist.cycle, &dirHist.cr)))
@@ -1125,6 +1150,7 @@ enum cdb_sc ditch_dead_globals(block_id curr_blk, block_id offset, cache_rec_ptr
 		t_abort(gv_cur_region, cs_addrs);						/* do crit and other cleanup */
 		return status;								/* failed to read the indicated block */
 	}
+	MU_UPGRADE_PIN_BLK(curr_blk, save_cw_stagnate_count);
 	if (is_bg = (dba_bg == cs_data->acc_meth))
 	{
 		if (NULL == (bt = (bt_get(curr_blk))))
@@ -1202,7 +1228,7 @@ enum cdb_sc ditch_dead_globals(block_id curr_blk, block_id offset, cache_rec_ptr
 			status = ditch_dead_globals(blk_pter, offset, &child_cr);
 			if (is_bg && (NULL != child_cr))
 			{	/* Release the cache record, transitively making the corresponding buffer, that this function just
-				 * modified, avaiable for re-use. Doing so ensures that all the CRs being touched as part of the
+				 * modified, available for re-use. Doing so ensures that all the CRs being touched as part of the
 				 * REORG UPGRADE do not accumulate creating a situation where "when everything is special, nothing
 				 * is special" resulting in parent blocks being moved around in memory which causes restarts.
 				 */
@@ -1226,9 +1252,13 @@ enum cdb_sc ditch_dead_globals(block_id curr_blk, block_id offset, cache_rec_ptr
 			}
 			rootBase = (blk_hdr_ptr_t)(rootHist.buffaddr);
 			if ((1 != rootBase->levl) || ((SIZEOF(blk_hdr) + bstar_rec_size(BLKID_32)) != rootBase->bsiz))
+			{
+				delete_hashtab_int8(&cw_stagnate, (ublock_id *)&rootHist.blk_num);
 				continue;	/* root node not level 1 or isn't just a star record so not a killed global tree */
+			}
 			GET_BLK_ID_32((leafHist.blk_num), rootHist.buffaddr + SIZEOF(blk_hdr) + SIZEOF(rec_hdr));
-			if (NULL == (leafHist.buffaddr = t_qread(leafHist.blk_num, (sm_int_ptr_t)&leafHist.cycle, &leafHist.cr)))
+			leafHist.buffaddr = t_qread(leafHist.blk_num, (sm_int_ptr_t)&leafHist.cycle, &leafHist.cr);
+			if (NULL == leafHist.buffaddr)
 			{	/* Failed to read the indicated block */
 				status = (enum cdb_sc)rdfail_detail;
 				assert(cdb_sc_normal == (enum cdb_sc)status);
@@ -1236,7 +1266,11 @@ enum cdb_sc ditch_dead_globals(block_id curr_blk, block_id offset, cache_rec_ptr
 				return status;
 			}
 			if (SIZEOF(blk_hdr) != ((blk_hdr_ptr_t)leafHist.buffaddr)->bsiz)
+			{
+				delete_hashtab_int8(&cw_stagnate, (ublock_id *)&rootHist.blk_num);
+				delete_hashtab_int8(&cw_stagnate, (ublock_id *)&leafHist.blk_num);
 				continue;	/* This leaf node is not empty so this cannot be a killed global tree */
+			}
 			/* Found a killed global. Generate history for the following bitmap update */
 			mu_reorg_process = FALSE;
 			gvname.var_name.addr = (char *)gname;
@@ -1294,8 +1328,11 @@ enum cdb_sc ditch_dead_globals(block_id curr_blk, block_id offset, cache_rec_ptr
 				util_out_print("and data block 0x!@XQ", TRUE, &leafHist.blk_num);
 			}
 			killed_gbl_cnt++;
+			delete_hashtab_int8(&cw_stagnate, (ublock_id *)&rootHist.blk_num);
+			delete_hashtab_int8(&cw_stagnate, (ublock_id *)&leafHist.blk_num);
 		}
 	}
+	MU_UPGRADE_UNPIN_BLK(curr_blk, save_cw_stagnate_count);
 	return cdb_sc_normal;
 }
 
@@ -1395,9 +1432,9 @@ enum cdb_sc adjust_master_map(block_id blks_in_way, gd_region *reg)
  * This recursively traverses the directory tree and upgrades the pointers, including those
  * in level 0 blocks which hold data except in the directory tree; this approach is key to
  * addressing the issue of recognizing those level 0 blocks that hold pointers so dsk_read
- * does not have to expend resources doing so; it also deals with KILL'd global vestigages
+ * does not have to expend resources doing so; it also deals with KILL'd global vestiges
  * by eliminating their entries in the directory tree while this code has sole control of
- * the database file; as mentioned earlier, it upgrages all the pointers from 32-bit to 64-
+ * the database file; as mentioned earlier, it upgrades all the pointers from 32-bit to 64-
  * bit format, which likely entails block splitting; that part is unlikely to be needed in
  * the event of any subsequent master map extentions
  *
@@ -1435,6 +1472,7 @@ enum cdb_sc upgrade_dir_tree(block_id curr_blk, block_id offset, gd_region *reg,
 	trans_num		ret_tn;
 	unsigned char		gname[sizeof(mident_fixed) + 2], key_buff[MAX_KEY_SZ + 3],
 				key_buffN[MAX_KEY_SZ + 3], key_buffP[MAX_KEY_SZ + 3];
+	DEBUG_ONLY(unsigned int	save_cw_stagnate_count);
 
 	csa = cs_addrs;
 	csd = cs_data;
@@ -1450,6 +1488,8 @@ enum cdb_sc upgrade_dir_tree(block_id curr_blk, block_id offset, gd_region *reg,
 	long_blk_id = IS_64_BLK_ID(blkBase);
 	if (long_blk_id)
 		return cdb_sc_normal;					/* no need to reprocess an already upgraded level 0 block */
+	MU_UPGRADE_PIN_BLK(curr_blk, save_cw_stagnate_count);
+
 	is_bg = (dba_bg == reg->dyn.addr->acc_meth);
 	blk_sz = ((blk_hdr_ptr_t)blkBase)->bsiz;
 	blkEnd = blkBase + blk_sz;
@@ -1502,7 +1542,7 @@ enum cdb_sc upgrade_dir_tree(block_id curr_blk, block_id offset, gd_region *reg,
 		else if (GDSV6p == blk_ver)
 		{
 			if (debug_mupip)
-				util_out_print("reproccessing directory block 0x!@XQ with version !UL pointer 0x!@XQ", TRUE,
+				util_out_print("reprocessing directory block 0x!@XQ with version !UL pointer 0x!@XQ", TRUE,
 						&curr_blk, (char)blk_ver, &blk_pter);
 		} else
 		{
@@ -1532,7 +1572,7 @@ enum cdb_sc upgrade_dir_tree(block_id curr_blk, block_id offset, gd_region *reg,
 			status = upgrade_dir_tree(blk_pter, offset, reg, lost, &child_cr);
 			if (is_bg && (NULL != child_cr))
 			{	/* Release the cache record, transitively making the corresponding buffer, that this function just
-				 * modified, avaiable for re-use. Doing so ensures that all the CRs being touched as part of the
+				 * modified, available for re-use. Doing so ensures that all the CRs being touched as part of the
 				 * REORG UPGRADE do not accumulate creating a situation where "when everything is special, nothing
 				 * is special" resulting in parent blocks being moved around in memory which causes restarts.
 				 */
@@ -1542,7 +1582,10 @@ enum cdb_sc upgrade_dir_tree(block_id curr_blk, block_id offset, gd_region *reg,
 			{	/* negative status means a split, except for DIR_ROOT return to caller for reprocessing */
 				assert(!*lost);
 				if (DIR_ROOT != curr_blk)
+				{
+					MU_UPGRADE_UNPIN_BLK(curr_blk, save_cw_stagnate_count);
 					return status;
+				}
 				/* DIR_ROOT resets to starting conditions to reprocess tree split */
 				assert(blkBase == dirHist.buffaddr);
 				blk_sz = ((blk_hdr_ptr_t)blkBase)->bsiz;
@@ -1768,6 +1811,7 @@ enum cdb_sc upgrade_dir_tree(block_id curr_blk, block_id offset, gd_region *reg,
 		}
 		if (debug_mupip)
 			util_out_print("dropping level !UL directory block @x!@XQ", TRUE, level, &curr_blk);
+		MU_UPGRADE_UNPIN_BLK(curr_blk, save_cw_stagnate_count);
 		return cdb_sc_normal;
 	}
 	assert((dirHist.buffaddr == blkBase) && (dirHist.level == level));
@@ -1829,6 +1873,7 @@ enum cdb_sc upgrade_dir_tree(block_id curr_blk, block_id offset, gd_region *reg,
 		tot_splt_cnt += split_blks_added;
 		tot_levl_cnt += split_levels_added;
 		split_blks_added -= split_levels_added;
+		MU_UPGRADE_UNPIN_BLK(curr_blk, save_cw_stagnate_count);
 		if (0 < split_blks_added)
 			return -split_blks_added;						/* force reprocessing after split */
 		if (0 < split_levels_added)
@@ -1907,6 +1952,7 @@ enum cdb_sc upgrade_dir_tree(block_id curr_blk, block_id offset, gd_region *reg,
 	mu_reorg_process = TRUE;
 	ret_tn = t_end(&(gv_target->hist), NULL, TN_NOT_SPECIFIED);
 	mu_reorg_process = FALSE;
+	MU_UPGRADE_UNPIN_BLK(curr_blk, save_cw_stagnate_count);
 	t_abort(gv_cur_region, csa);								/* do crit and other cleanup */
 	assertpro(0 != ret_tn);							/* this is a fine fix you've gotten us into Ollie */
 	tot_dt++;

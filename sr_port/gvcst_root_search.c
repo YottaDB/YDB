@@ -268,7 +268,9 @@ enum cdb_sc gvcst_root_search(boolean_t donot_restart)
 		reset_gv_target = save_targ;
 	}
 	T_BEGIN_READ_NONTP_OR_TP(ERR_GVGETFAIL);
-	/* We better hold crit in the final retry (TP & non-TP). Only exception is journal recovery */
+	/* We better hold crit in the final retry (TP & non-TP).
+	 * Only exceptions are journal recovery or mupip upgrade both of which hold standalone access.
+	 */
 	assert((t_tries < CDB_STAGNATE) || cs_addrs->now_crit
 		|| mupip_jnl_recover || (MUPIP_UPGRADE_IN_PROGRESS == mu_upgrade_in_prog));
 	for (;;)
