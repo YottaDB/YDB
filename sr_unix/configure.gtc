@@ -60,7 +60,7 @@ ext=".so"
 
 # Flags to build shared libraries of M routines
 if [ "ibm" = $arch ] ; then ldflags="-brtl -G -bexpfull -bnoentry -b64" ; ldcmd="ld" # AIX
-elif [ "linux" = $arch ] ; then ldflags="-shared" ; ldcmd="ld" # Linux - all platforms
+elif [ "linux" = $arch ] ; then ldflags="-shared -z noexecstack" ; ldcmd="ld" # Linux - all platforms
 else echo "Shared libary ldflags not set for this platform"; exit 1
 fi
 
