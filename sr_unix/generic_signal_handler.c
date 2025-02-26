@@ -364,7 +364,8 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context, boolean_t i
 						assert(!IS_GTMSECSHR_IMAGE);
 						if (exit_handler_active && !ydb_quiet_halt)
 							SEND_AND_PUT_MSG(VARLSTCNT(1) forced_exit_err);
-						return;
+						DECREMENT_IN_OS_SIGNAL_HANDLER_IF_NEEDED;
+						CLEANUP_AND_RETURN(got_tlevel_lock);
 					}
 				}
 				DEBUG_ONLY(in_nondeferrable_signal_handler = IN_GENERIC_SIGNAL_HANDLER);
