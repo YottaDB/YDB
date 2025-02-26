@@ -3,7 +3,7 @@
  * Copyright (c) 2009-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -69,6 +69,7 @@
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	enum gtmImageTypes	image_type;
 GBLREF	uint4			process_id;
+GBLREF	int			process_exiting;
 #ifdef DEBUG
 GBLREF	volatile int		in_os_signal_handler;
 #endif
@@ -166,12 +167,15 @@ boolean_t	ss_destroy_context(snapshot_context_ptr_t lcl_ss_ctx)
 	long		save_attach_shmid;
 	intrpt_state_t	prev_intrpt_state;
 
-	/* The "shmdt" call done below is not async-signal-safe so assert that we are not inside an os invoked signal handler
-	 * if ever we come to this function. The only exception we know of is in the "v61000/intrpt_wcs_wtstart" subtest where
-	 * we send 3 SIGTERMs in succession to terminate the process even if it is not safe to terminate and in that case we
-	 * can reach here. But that is a white-box test case and hence the "||" in the assert below.
+	/* If we are exiting, don't bother with SHMDT as all of this is going away anyways. This is also necessary
+	 * in the case we reach here while inside a signal handler as shmdt() is not async-signal safe.
 	 */
-	assert(!in_os_signal_handler || (WBTEST_SLEEP_IN_WCS_WTSTART == ydb_white_box_test_case_number));
+	if (process_exiting)
+		return TRUE;
+	/* The "shmdt" call (inside the SHMDT macro) done below is not async-signal-safe so assert that we are not
+	 * inside an os invoked signal handler if ever we come to this function.
+	 */
+	assert(!in_os_signal_handler);
 	assert(NULL != lcl_ss_ctx);
 	/* Note: CLOSEFILE_RESET can invoke "eintr_handling_check()" after the "close()" call succeeds. And that
 	 * can in turn recurse into "ss_destroy_context()" which would call CLOSEFILE_RESET again on the same fd
