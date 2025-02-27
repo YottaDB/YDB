@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2023-2024 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2023-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -151,9 +151,13 @@ LITREF gtmImageName		gtmImageNames[];
  *
  * Signal Handling for MUPIP/LKE/DSE
  * ---------------------------------
- * This case is much simpler: The signals are handled by readline first using its
+ * This case is much simpler. The signals used to be handled by readline first using its
  * native handler; this handler does what's needed by readline, and then forwards
- * the signals to YottaDB. SIGUSR1 (mupip interrupt) is not handled.
+ * the signals to YottaDB. SIGUSR1 (mupip interrupt) was not handled.
+ *
+ * But the above approach did not work (see YDB#1128 for more details) and so we instead
+ * choose the same approach for MUPIP/LKE/DSE as we did for Direct Mode. And that is to
+ * disable readline signal handling and enable YottaDB signal handling even for utilities.
  */
 
 /* This function checks the env var ydb_readline and then tries to dlopen libreadline.so.
@@ -269,6 +273,8 @@ void readline_init(void* handle) {
 				))
 		return;
 
+	*vrl_catch_signals = 0; /* disable readline signal handling for Direct Mode and MUPIP/LKE/DSE */
+
 	/* Allow conditional parsing of the ~/.inputrc file. */
 	*vrl_readline_name = "YottaDB";
 	/* Turn on history keeping */
@@ -353,9 +359,6 @@ void readline_read_mval(mval *v) {
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-
-	/* disable readline signal handling */
-	*vrl_catch_signals = 0;
 
 	io_ptr = io_curr_device.in;
 	tt_ptr = (d_tt_struct *)(io_ptr->dev_sp);
@@ -632,9 +635,6 @@ void readline_read_mval(mval *v) {
 void readline_read_charstar(char **output) {
 	int output_len;
 	char *prompt;
-
-	/* enable readline signal handling */
-	*vrl_catch_signals = 1;
 
 	prompt = gtm_malloc(gtmImageNames[image_type].imageNameLen + 3); // +3 = > , space , \0
 	memcpy(prompt, gtmImageNames[image_type].imageName, gtmImageNames[image_type].imageNameLen);
