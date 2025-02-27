@@ -22,7 +22,7 @@
 #include "gtm_string.h"
 #include "gtm_poll.h"
 #include "gtm_stdlib.h"
-
+#include "gtm_isanlp.h"  //kt added
 #include "io.h"
 #include "iottdef.h"
 #include "iott_edit.h"
@@ -69,13 +69,18 @@ int	iott_rdone (mint *v, uint8 nsec_timeout)	/* timeout in nanoseconds */
 	boolean_t	ch_set, first_time, ret = FALSE, timed, utf8_active, zint_restart;
 	char		dc1, dc3;
 	d_tt_struct	*tt_ptr;
+	fd_set		input_fd;  //kt
 	int		inchar_width, msk_in, msk_num, rdlen, selstat, status, utf8_more;
 	io_desc		*io_ptr;
 	mv_stent	*mv_zintdev;
 	short int	i;
+	boolean_t	echo_mode;  			//kt added
+	ttio_state	temp_io_state; 			//kt added
+	boolean_t	char_is_terminator;		//kt added
+	struct timeval	input_timeval;
 	TID		timer_id;
 	tt_interrupt	*tt_state;
-	uint4		mask;
+	//kt removed uint4		mask;
 	unsigned char	inbyte, *zb_ptr, *zb_top;
 	unsigned char	more_buf[GTM_MB_LEN_MAX + 1], *more_ptr;	/* to build up multi byte for character */
 	wint_t		inchar;
@@ -100,11 +105,14 @@ int	iott_rdone (mint *v, uint8 nsec_timeout)	/* timeout in nanoseconds */
 	assert(io_ptr->state == dev_open);
 	iott_flush(io_curr_device.out);
 	tt_ptr = (d_tt_struct*) io_ptr->dev_sp;
-	SETTERM_IF_NEEDED(io_ptr, tt_ptr);
+	//kt original --> SETTERM_IF_NEEDED(io_ptr, tt_ptr);
+	//kt NOTE: reading just 1 character is not compatible with canonical mode, which holds onto all input until LF (or CR) entered etc.
+	iott_setterm_for_no_canonical(io_ptr, &temp_io_state);	//kt added.  Establishes temp_io_state for use here in this function
+	echo_mode = temp_io_state.ydb_echo;  		//kt added
 	*v = -1;
 	dc1 = (char) 17;
 	dc3 = (char) 19;
-	mask = tt_ptr->term_ctrl;
+	//kt removed  --> mask = temp_io_state.term_ctrl;
 	utf8_active = gtm_utf8_mode ? (CHSET_M != io_ptr->ichset) : FALSE;
 	zint_restart = FALSE;
 	if (tt_ptr->mupintr)
@@ -166,9 +174,11 @@ int	iott_rdone (mint *v, uint8 nsec_timeout)	/* timeout in nanoseconds */
 		io_ptr->esc_state = START;
 		io_ptr->dollar.za = 0;
 		io_ptr->dollar.zeof = FALSE;
-		if (mask & TRM_NOTYPEAHD)
+		//kt original --> if (mask & TRM_NOTYPEAHD)
+		if (temp_io_state.no_type_ahead)  //kt mod
 			TCFLUSH(tt_ptr->fildes, TCIFLUSH, status);
-		if (mask & TRM_READSYNC)
+		//kt original --> if (mask & TRM_READSYNC)
+		if (temp_io_state.readsync)  //kt mod
 		{
 			DOWRITERC(tt_ptr->fildes, &dc1, 1, status);
 			if (0 != status)
@@ -309,9 +319,9 @@ int	iott_rdone (mint *v, uint8 nsec_timeout)	/* timeout in nanoseconds */
 #			ifdef UTF8_SUPPORTED
 			if (utf8_active)
 			{
-				if (tt_ptr->discard_lf)
+				if (temp_io_state.discard_lf)  				//kt mod  Added 'temp_io_state.'
 				{	/* saw CR last time so ignore following LF */
-					tt_ptr->discard_lf = FALSE;
+					temp_io_state.discard_lf = FALSE; 		//kt mod  Added 'temp_io_state.'
 					if (NATIVE_LF == inbyte)
 						continue;
 				}
@@ -362,13 +372,15 @@ int	iott_rdone (mint *v, uint8 nsec_timeout)	/* timeout in nanoseconds */
 						}
 					}
 				}
-				if (mask & TRM_CONVERT)
+				//kt original --> if (mask & TRM_CONVERT)
+				if (temp_io_state.case_convert) 		 //kt mod, using .case_convert to hold state.
 					inchar = u_toupper(inchar);
 				GTM_IO_WCWIDTH(inchar, inchar_width);
 			} else
 			{
 #			endif
-				if (mask & TRM_CONVERT)
+				//kt original --> if (mask & TRM_CONVERT)
+				if (temp_io_state.case_convert)  		//kt mod, using .case_convert to hold state.
 					NATIVE_CVT2UPPER(inbyte, inbyte);
 				inchar = inbyte;
 				inchar_width = 1;
@@ -388,9 +400,26 @@ int	iott_rdone (mint *v, uint8 nsec_timeout)	/* timeout in nanoseconds */
 				ret = FALSE;
 				break;
 			}
-			else if (   ((mask & TRM_ESCAPE) != 0)
+			//kt else if (   ((mask & TRM_ESCAPE) != 0)
+			else if ((temp_io_state.escape_processing)  //kt mod
 				 && (inchar == NATIVE_ESC  ||  io_ptr->esc_state != START))
 			{
+				//kt --- start mod ----
+				//Starting Subloop for escape sequence input
+				//
+				//Will change timeout to 100 milliseconds, because state is either:
+				//   1) in an escape sequence read -- in which case rest of sequence should quickly be in buffer, or...
+				//   2) we got isolated ESC from user.
+				//
+				//If input is a slow serial connection, then even 300 baud (very very slow), would deliver 1 char every 30 ms  (30 ms/char).
+				//   so if 100 ms pass, and nothing follows ESC, then it will be assumed to be an isolated ESC from user.
+				//NOTE: Even if an initial timeout was provided, we should override here.
+				//      For example:
+				//        If READ *C:30, and user presses isolated ESC, then poll() below would otherwise wait
+				//        30 seconds for further input--though it won't be coming. So input would seem to hang,
+				//        even though user has entered character (ESC).
+				poll_timeout = 100 * MILLISECS_IN_SEC;
+				//kt --- end mod ----
 				*v = INPUT_CHAR;
 				ret = FALSE;
 				do
@@ -422,6 +451,18 @@ int	iott_rdone (mint *v, uint8 nsec_timeout)	/* timeout in nanoseconds */
 						io_ptr->dollar.za = 2;
 						break;
 					}
+					//kt Start mod -----------
+					poll_fdlist[0].fd = tt_ptr->fildes;
+					poll_fdlist[0].events = POLLIN;
+					poll_nfds = 1;  //monitor only 1 entry in poll_fdlist
+					selstat = poll(&poll_fdlist[0], poll_nfds, poll_timeout);
+					if (0 == selstat) {
+						//IO buffer empty, nothing found during timeout interval. Bad escape sequence, or user entered isolated ESC key
+						io_ptr->esc_state == BADESC; //Is this needed?  Sequence is not technically "bad" if user wanted isolated ESC.  Copying 'Escape sequence failed parse' above.
+						io_ptr->dollar.za = 2;       //Is this needed?  Copying 'Escape sequence failed parse' above.
+						break;
+					}
+					//kt End mod -------------
 					DOREADRL(tt_ptr->fildes, &inbyte, 1, rdlen);
 					inchar = inbyte;
 					GETASCII(asc_inchar, inchar);
@@ -437,13 +478,19 @@ int	iott_rdone (mint *v, uint8 nsec_timeout)	/* timeout in nanoseconds */
 			} else
 			{	/* may need to deal with terminators > ASCII_MAX and/or LS and PS if default_mask_term */
 				ret = TRUE;
+				char_is_terminator = IS_TERMINATOR(temp_io_state.mask_term.mask, INPUT_CHAR, utf8_active);
+
+				/* //kt simplified with macro
 				if (!utf8_active || ASCII_MAX >= INPUT_CHAR)
 				{
 					msk_num = (uint4)INPUT_CHAR / NUM_BITS_IN_INT4;
 					msk_in = (1 << ((uint4)INPUT_CHAR % NUM_BITS_IN_INT4));
 				} else
-					msk_num = msk_in = 0;		/* force to not match terminator */
-				if ((!(msk_in & tt_ptr->mask_term.mask[msk_num]))  &&  (!(mask & TRM_NOECHO)))
+					msk_num = msk_in = 0;		// force to not match terminator
+				//kt original --> if ((!(msk_in & temp_io_state.mask_term.mask[msk_num]))  &&  (!(mask & TRM_NOECHO)))  //kt mod  Added 'temp_io_state.'
+				if ( (!(msk_in & temp_io_state.mask_term.mask[msk_num]))  &&  echo_mode )  //kt mod
+				*/
+				if (!char_is_terminator  &&  echo_mode) //kt mod
 				{
 					status = iott_write_raw(tt_ptr->fildes,
 						utf8_active ? (void *)&inchar : (void *)&inbyte, 1);
@@ -503,7 +550,8 @@ int	iott_rdone (mint *v, uint8 nsec_timeout)	/* timeout in nanoseconds */
 		if (0 == nsec_timeout)
 			iott_rterm(io_ptr);
 	}
-	if (mask & TRM_READSYNC)
+	//kt original --> if (mask & TRM_READSYNC)
+	if (temp_io_state.readsync)  //kt mod
 	{
 		DOWRITERC(tt_ptr->fildes, &dc3, 1, status);
 		if (0 != status)
@@ -523,7 +571,8 @@ int	iott_rdone (mint *v, uint8 nsec_timeout)	/* timeout in nanoseconds */
 	if (ret  &&  io_ptr->esc_state != FINI)
 	{
 		*v = INPUT_CHAR;
-		if ((TT_EDITING & tt_ptr->ext_cap) && !((TRM_PASTHRU|TRM_NOECHO) & mask))
+		//kt original --> if ((TT_EDITING & temp_io_state.ext_cap) && !((TRM_PASTHRU|TRM_NOECHO) & mask))  //kt mod  Added 'temp_io_state.'
+		if ( BIT_FLAG_IS_ON(TT_EDITING, temp_io_state.ext_cap) && (temp_io_state.passthru == FALSE) && echo_mode )	 //kt mod
 		{	/* keep above test in sync with iott_readfl */
 			if (!utf8_active)
 				iott_recall_array_add(tt_ptr, 1, inchar_width, 1, &INPUT_CHAR);
@@ -533,20 +582,25 @@ int	iott_rdone (mint *v, uint8 nsec_timeout)	/* timeout in nanoseconds */
 #			endif
 		}
 		/* SIMPLIFY THIS! */
+		/*  //kt
 		if (!utf8_active || ASCII_MAX >= INPUT_CHAR)
-		{	/* may need changes to allow terminator > MAX_ASCII and/or LS and PS if default_mask_term */
+		{	// may need changes to allow terminator > MAX_ASCII and/or LS and PS if default_mask_term
 			msk_num = (uint4)INPUT_CHAR / NUM_BITS_IN_INT4;
 			msk_in = (1 << ((uint4)INPUT_CHAR % NUM_BITS_IN_INT4));
 		} else
-			msk_num = msk_in = 0;		/* force no match to terminator */
-		if (msk_in & tt_ptr->mask_term.mask[msk_num])
+			msk_num = msk_in = 0;		// force no match to terminator
+		if (msk_in & temp_io_state.mask_term.mask[msk_num])  //kt mod  Added 'io_state.'
+		*/
+		char_is_terminator = IS_TERMINATOR(temp_io_state.mask_term.mask, INPUT_CHAR, utf8_active);
+		if (char_is_terminator) //kt mod
 		{
 			*zb_ptr++ = INPUT_CHAR;
 			*zb_ptr++ = 0;
 		}
 		else
 			io_ptr->dollar.zb[0] = '\0';
-		if ((!(msk_in & tt_ptr->mask_term.mask[msk_num])) && (!(mask & TRM_NOECHO)))
+		//kt original --> if ((!(msk_in & temp_io_state.mask_term.mask[msk_num])) && (!(mask & TRM_NOECHO)))  //kt mod  Added 'temp_io_state.'
+		if ( !char_is_terminator && echo_mode )  //kt mod
 		{
 			if ((io_ptr->dollar.x += inchar_width) >= io_ptr->width && io_ptr->wrap)
 			{
@@ -561,6 +615,8 @@ int	iott_rdone (mint *v, uint8 nsec_timeout)	/* timeout in nanoseconds */
 	}
 	memcpy(io_ptr->dollar.key, io_ptr->dollar.zb, (zb_ptr - io_ptr->dollar.zb));
 	REVERT_GTMIO_CH(&io_curr_device, ch_set);
-	RESETTERM_IF_NEEDED(io_ptr, EXPECT_SETTERM_DONE_TRUE);
+
+	iott_restoreterm(io_ptr); //kt added.  Restore ydb's current IO state, because this function modified the TTY IO subsystem.
+
 	return ret;
 }

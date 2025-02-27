@@ -66,6 +66,7 @@ GBLREF stack_frame		*frame_pointer;
 GBLREF unsigned char		*msp, *stackbase, *stacktop, *stackwarn;
 GBLREF volatile int4		outofband;
 GBLREF volatile boolean_t	dollar_zininterrupt, timer_in_handler;
+GBLREF io_termmask 		NULL_TERM_MASK;   //kt added
 
 LITREF unsigned char	lower_to_upper_table[];
 #ifdef UTF8_SUPPORTED
@@ -215,11 +216,15 @@ void	dm_read (mval *v)
 	int		outlen;			/* total characters in line so far */
 	int		match_length, msk_in, msk_num, right, selstat, status, up, home, end;
 	int		utf8_more = 0, utf8_seen;
+	boolean_t	echo_mode;  		//kt added for local convenience
+	ttio_state* 	dm_io_state_ptr;  	//kt for convenience.  Will really be same as &(tt_ptr->direct_mode_io_state)
+	boolean_t	char_is_terminator;	//kt added
+	boolean_t	char_is_special_terminator;	//kt added
 	io_desc 	*io_ptr;
 	io_termmask	mask_term;
 	mv_stent	*mvc, *mv_zintdev;
 	tt_interrupt	*tt_state;
-	uint4		mask;
+	//kt uint4		mask;
 	unsigned int	exp_length, len, length;
 	unsigned char	*buffer_start;		/* beginning of non UTF8 buffer */
 	unsigned char	escape_sequence[ESC_LEN];
@@ -246,15 +251,17 @@ void	dm_read (mval *v)
 	active_device = io_curr_device.in;
 	io_ptr = io_curr_device.in;
 	tt_ptr = (d_tt_struct *)(io_ptr->dev_sp);
-	SETTERM_IF_NEEDED(io_ptr, tt_ptr);
+	//kt original --> SETTERM_IF_NEEDED(io_ptr, tt_ptr);
+	dm_io_state_ptr = iott_setterm_for_direct_mode(io_ptr); //kt added.  For direct mode, we want IO to be in a safe state.  E.g. if NOECHO, we still want user typing to show.
 	assert (io_ptr->state == dev_open);
 	if (tt == io_curr_device.out->type)
 		iott_flush(io_curr_device.out);
-	insert_mode = !(TT_NOINSERT & tt_ptr->ext_cap);
+	insert_mode = !(TT_NOINSERT & dm_io_state_ptr->ext_cap);  //kt mod.  Added 'dm_io_state->'
 	utf8_active = gtm_utf8_mode ? (CHSET_M != io_ptr->ichset) : FALSE;
 	length = tt_ptr->in_buf_sz + ESC_LEN;	/* for possible escape sequence */
 	exp_length = utf8_active ? (uint4)((SIZEOF(wint_t) * length) + (GTM_MB_LEN_MAX * length) + SIZEOF(gtm_int64_t)) : length;
 	zint_restart = FALSE;
+	echo_mode = dm_io_state_ptr->ydb_echo; //kt added for convenience
 	if (tt_ptr->mupintr)
 	{	/* restore state to before job interrupt */
 		tt_state = &tt_ptr->tt_state_save;
@@ -330,19 +337,13 @@ void	dm_read (mval *v)
 		index = 0;
 		cl = clmod(comline_index - index);
 	}
-	mask = tt_ptr->term_ctrl;
 	if (dmterm_default)
 	{	/* $view("DMTERM") or ydb_dmterm is set. Ignore the customized terminators; use the default terinators */
-		memset(&mask_term.mask[0], 0, SIZEOF(io_termmask));
-		if (utf8_active)
-		{
-			mask_term.mask[0] = TERM_MSK_UTF8_0;
-			mask_term.mask[4] = TERM_MSK_UTF8_4;
-		} else
-			mask_term.mask[0] = TERM_MSK;
+		set_mask_term_conditional(io_ptr, &mask_term, utf8_active, FALSE);  //kt mod to unify redundant code
 	} else
-		mask_term = tt_ptr->mask_term;
-	mask_term.mask[ESC / NUM_BITS_IN_INT4] &= ~(1 << ESC);
+		mask_term = dm_io_state_ptr->mask_term;  //kt mod.  Added 'dm_io_state->'
+	//kt original --> mask_term.mask[ESC / NUM_BITS_IN_INT4] &= ~(1 << ESC);
+	TURN_MASK_BIT_OFF(mask_term.mask, ESC);  //kt mod
 	ioptr_width = io_ptr->width;
 	if (!zint_restart)
 	{
@@ -434,7 +435,7 @@ void	dm_read (mval *v)
 			if (EINTR != errno)
 			{	/* If error was EINTR, go to the top of the loop to check for outofband. */
 				HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
-				tt_ptr->discard_lf = FALSE;
+				dm_io_state_ptr->discard_lf = FALSE;  //kt mod.  Added 'dm_io_state->'
 				io_ptr->dollar.za = ZA_IO_ERR;
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) errno);
 			} else
@@ -446,7 +447,7 @@ void	dm_read (mval *v)
 		{	/* poll() says there's something to read, but read() found zero characters; assume connection dropped. */
 			HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 			ISSUE_NOPRINCIO_IF_NEEDED(io_ptr, FALSE, FALSE);		/* FALSE, FALSE: READ tt not socket */
-			tt_ptr->discard_lf = FALSE;
+			dm_io_state_ptr->discard_lf = FALSE;  		//kt mod.  Added 'dm_io_state->'
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_IOEOF);
 		} else if (0 < status)
 		{
@@ -456,9 +457,9 @@ void	dm_read (mval *v)
 #			ifdef UTF8_SUPPORTED
 			if (utf8_active)
 			{
-				if (tt_ptr->discard_lf)
+				if (dm_io_state_ptr->discard_lf) 			//kt mod.  Added 'dm_io_state->'
 				{	/* saw CR last time so ignore following LF */
-					tt_ptr->discard_lf = FALSE;
+					dm_io_state_ptr->discard_lf = FALSE;  		//kt mod.  Added 'dm_io_state->'
 					if (NATIVE_LF == inbyte)
 						continue;
 				}
@@ -513,43 +514,60 @@ void	dm_read (mval *v)
 					if (BOM_CODEPOINT == inchar)
 						continue;
 				}
-				if (mask & TRM_CONVERT)
+				//kt original --> if (mask & TRM_CONVERT)
+				if (dm_io_state_ptr->case_convert)  			//kt mod, using .case_convert to hold state.
 					inchar = u_toupper(inchar);
 				GTM_IO_WCWIDTH(inchar, inchar_width);
 			} else
 			{
 #			endif
-				if (mask & TRM_CONVERT)
+				//kt original--> if (mask & TRM_CONVERT)
+				if (dm_io_state_ptr->case_convert)  			//kt mod, using .case_convert to hold state.
 					NATIVE_CVT2UPPER(inbyte, inbyte);
 				inchar = inbyte;
 #			ifdef UTF8_SUPPORTED
 			}
 #			endif
 			GETASCII(asc_inchar,inchar);
-			if ((dx >= ioptr_width) && io_ptr->wrap && !(mask & TRM_NOECHO))
+			//kt original --> if ((dx >= ioptr_width) && io_ptr->wrap && !(mask & TRM_NOECHO))
+			if ((dx >= ioptr_width) && io_ptr->wrap && echo_mode)  		//kt mod
 			{
 				DOWRITE(tt_ptr->fildes, NATIVE_TTEOL, strlen(NATIVE_TTEOL));	/* BYPASSOK */
 				dx = 0;
 			}
 			terminator_seen = FALSE;
+			char_is_terminator = IS_TERMINATOR(mask_term.mask, INPUT_CHAR, utf8_active);  //kt
+			//Below, UTF and default terminators and UTF terminators above ASCII_MAX
+			char_is_special_terminator = utf8_active && ((u32_line_term[U32_LT_NL] == INPUT_CHAR ||  u32_line_term[U32_LT_LS] == INPUT_CHAR || u32_line_term[U32_LT_PS] == INPUT_CHAR));  //kt
+			if (char_is_terminator) //kt mod
+			{
+				terminator_seen = TRUE;
+			/* //kt original below
 			if (!utf8_active || (ASCII_MAX >= INPUT_CHAR))
 			{
 				msk_num = (uint4)INPUT_CHAR / NUM_BITS_IN_INT4;
 				msk_in = (1 << ((uint4)INPUT_CHAR % NUM_BITS_IN_INT4));
 				if (msk_in & mask_term.mask[msk_num])
 					terminator_seen = TRUE;
-			} else if (utf8_active && tt_ptr->default_mask_term && ((INPUT_CHAR == u32_line_term[U32_LT_NL])
-				 || (INPUT_CHAR == u32_line_term[U32_LT_LS]) || (INPUT_CHAR == u32_line_term[U32_LT_PS])))
-			{	/* UTF and default terminators and UTF terminators above ASCII_MAX */
+			*/
+			} else if (char_is_special_terminator && dm_io_state_ptr->default_mask_term)  //kt mod simplifying boolean logic.
+			{
 				terminator_seen = TRUE;
 			}
+			/* //kt original below.
+			} else if (utf8_active && dm_io_state_ptr->default_mask_term && ((INPUT_CHAR == u32_line_term[U32_LT_NL])  //kt mod.  Added 'dm_io_state->'
+				 || (INPUT_CHAR == u32_line_term[U32_LT_LS]) || (INPUT_CHAR == u32_line_term[U32_LT_PS])))
+			{	// UTF and default terminators and UTF terminators above ASCII_MAX
+				terminator_seen = TRUE;
+			}
+			*/
 			if (terminator_seen)
 			{	/* carriage return or other line terminator has been typed */
 				assert(!utf8_active || buffer_32_start);
 				STORE_OFF(0, outlen);
 				err_recall = NO_ERROR;
 				if (utf8_active && (ASCII_CR == INPUT_CHAR))
-					tt_ptr->discard_lf = TRUE;
+					dm_io_state_ptr->discard_lf = TRUE;  		//kt mod.  Added 'dm_io_state->'
 					/* exceeding the maximum length exits the while loop, so it must fit here . */
 #				ifdef UTF8_SUPPORTED
 				if (utf8_active)
@@ -681,9 +699,9 @@ void	dm_read (mval *v)
 				}
 				continue;	/* to allow more input */
 			}
-			if ((((int)inchar == tt_ptr->ttio_struct->c_cc[VERASE])
+			if ((((int)inchar == dm_io_state_ptr->ttio_struct.c_cc[VERASE])  //kt mod.  Added 'dm_io_state->' and change '->cc' to '.cc'
 			     || (((NULL != KEY_BACKSPACE) && ('\0' == KEY_BACKSPACE[1]) && (inchar == KEY_BACKSPACE[0]))))
-			    && !(mask & TRM_PASTHRU))
+			    && (dm_io_state_ptr->passthru == FALSE))  //kt mod     //kt original --> && !(mask & TRM_PASTHRU))
 			{
 				if (0 < instr)
 				{
@@ -898,7 +916,8 @@ void	dm_read (mval *v)
 					if (0 != instr)
 						write_str(BUFF_ADDR(0), instr, dx_start, TRUE, FALSE);
 				}
-			} else if (!(mask & TRM_NOECHO))
+			//kt original --> } else if (!(mask & TRM_NOECHO))
+			} else if (echo_mode)  //kt mod
 			{
 				if (instr != outlen)
 				{
@@ -941,7 +960,7 @@ void	dm_read (mval *v)
 		v->str.len = INTCAST(outptr - buffer_start);
 	} else
 #	endif
-		v->str.len = outlen;
+	v->str.len = outlen;
 	v->str.addr = (char *)buffer_start;
 	if (0 != v->str.len)
 	{
@@ -956,7 +975,9 @@ void	dm_read (mval *v)
 		if (IS_AT_END_OF_STRINGPOOL(buffer_start, 0))
 			stringpool.free += v->str.len;	/* otherwise using space from before interrupt */
 	}
-	if (!(mask & TRM_NOECHO))
+
+	//kt original --> if (!(mask & TRM_NOECHO))
+	if (echo_mode)  //kt mod
 	{
 		if ((io_ptr->dollar.x += dx_outlen) >= ioptr_width && io_ptr->wrap)
 		{
@@ -969,6 +990,6 @@ void	dm_read (mval *v)
 		}
 	}
 	active_device = 0;
-	RESETTERM_IF_NEEDED(io_ptr, EXPECT_SETTERM_DONE_TRUE);
+	//kt not needed --> RESETTERM_IF_NEEDED(io_ptr, EXPECT_SETTERM_DONE_TRUE);
 	return;
 }

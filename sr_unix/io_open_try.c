@@ -71,7 +71,8 @@ error_def(ERR_GETNAMEINFO);
 error_def(ERR_GTMEISDIR);
 error_def(ERR_TEXT);
 
-boolean_t io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, uint8 nsec_timeout, mval *mspace)	/* timeout in nanosec */
+boolean_t io_open_try(io_log_name * naml, io_log_name * tl, mval * devparms, uint8 nsec_timeout, mval * mspace)	/* timeout in nanosec */
+//kt NOTE: rename variable "pp" -> "devparms", here and many spots below.  Each change was not marked, so search for devparms for location of changes.
 {
 	uint4		status;
 	mstr		tn;		/* translated name */
@@ -141,14 +142,14 @@ boolean_t io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, uint8 nsec_t
 			temp_iod->trans_name = tl;
 			temp_iod->type = n_io_dev_types;
 			p_offset = 0;
-			while (iop_eol != *(pp->str.addr + p_offset))
+			while (iop_eol != *(devparms->str.addr + p_offset))
 			{
-				ch = *(pp->str.addr + p_offset++);
+				ch = *(devparms->str.addr + p_offset++);
 				if (iop_fifo == ch)
 					temp_iod->type = ff;
 				else  if (iop_sequential == ch)
 					temp_iod->type = rm;
-				UPDATE_P_OFFSET(p_offset, ch, pp);	/* updates "p_offset" using "ch" and "pp" */
+				UPDATE_P_OFFSET(p_offset, ch, devparms);	/* updates "p_offset" using "ch" and "devparms" */
 			}
 			if (ff == temp_iod->type)
 			{
@@ -348,16 +349,16 @@ boolean_t io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, uint8 nsec_t
 	{
 		oflag |= (O_RDWR | O_CREAT | O_NOCTTY);
 		p_offset = 0;
-		while ((iop_eol != *(pp->str.addr + p_offset)) && (pp->str.len > p_offset))
+		while ((iop_eol != *(devparms->str.addr + p_offset)) && (devparms->str.len > p_offset))
 		{
 			assert((0 <= p_offset) && (p_offset < MAXPOSINT4));
-			assert((params) *(pp->str.addr + p_offset) < (params)n_iops);
-			switch ((ch = *(pp->str.addr + p_offset++)))
+			assert((params) *(devparms->str.addr + p_offset) < (params)n_iops);
+			switch ((ch = *(devparms->str.addr + p_offset++)))
 			{
 				case iop_exception:
 				{
 					assert((0 < p_offset) && ((1 + p_offset) < MAXPOSINT4));
-					DEF_EXCEPTION(pp, p_offset, iod);
+					DEF_EXCEPTION(devparms, p_offset, iod);
 					break;
 				}
 				case iop_append:
@@ -390,10 +391,10 @@ boolean_t io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, uint8 nsec_t
 					{
 						ICONV_CLOSE_CD(iod->input_conv_cd);
 					}
-					SET_CODE_SET(iod->in_code_set, (char *)(pp->str.addr + p_offset + 1));
+					SET_CODE_SET(iod->in_code_set, (char *)(devparms->str.addr + p_offset + 1));
 					if (DEFAULT_CODE_SET != iod->in_code_set)
 						ICONV_OPEN_CD(iod->input_conv_cd,
-							(char *)(pp->str.addr + p_offset + 1), INSIDE_CH_SET);
+							(char *)(devparms->str.addr + p_offset + 1), INSIDE_CH_SET);
 #					endif
 					break;
 				case iop_opchset:
@@ -402,10 +403,10 @@ boolean_t io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, uint8 nsec_t
 					{
 						ICONV_CLOSE_CD(iod->output_conv_cd);
 					}
-					SET_CODE_SET(iod->out_code_set, (char *)(pp->str.addr + p_offset + 1));
+					SET_CODE_SET(iod->out_code_set, (char *)(devparms->str.addr + p_offset + 1));
 					if (DEFAULT_CODE_SET != iod->out_code_set)
 						ICONV_OPEN_CD(iod->output_conv_cd, INSIDE_CH_SET,
-							      (char *)(pp->str.addr + p_offset + 1));
+							      (char *)(devparms->str.addr + p_offset + 1));
 #					endif
 					break;
 				case iop_m:
@@ -417,7 +418,7 @@ boolean_t io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, uint8 nsec_t
 				default:
 					break;
 			}
-			UPDATE_P_OFFSET(p_offset, ch, pp);	/* updates "p_offset" using "ch" and "pp" */
+			UPDATE_P_OFFSET(p_offset, ch, devparms);	/* updates "p_offset" using "ch" and "devparms" */
 		}
 		/* Check the saved error from mknod() for fifo, also saved error from fstat() or stat()
 		   so error handler (if set)  can handle it */
@@ -535,16 +536,16 @@ boolean_t io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, uint8 nsec_t
 	 */
 	if ((rm == iod->type) && (dev_closed == iod->state) && ((d_rm_struct *)iod->dev_sp)->no_destroy)
 	{
-		for (p_offset = 0; iop_eol != *(pp->str.addr + p_offset); )
+		for (p_offset = 0; iop_eol != *(devparms->str.addr + p_offset); )
 		{
-			ch = *(pp->str.addr + p_offset++);
+			ch = *(devparms->str.addr + p_offset++);
 			assert((params)ch < (params)n_iops);
 			if ((iop_seek != ch) && (iop_append != ch))
 			{
 				((d_rm_struct *)iod->dev_sp)->no_destroy = FALSE;
 				break;
 			}
-			UPDATE_P_OFFSET(p_offset, ch, pp);	/* updates "p_offset" using "ch" and "pp" */
+			UPDATE_P_OFFSET(p_offset, ch, devparms);	/* updates "p_offset" using "ch" and "devparms" */
 		}
 	}
 	if (dev_never_opened == iod->state)
@@ -588,7 +589,7 @@ boolean_t io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, uint8 nsec_t
 			assert(io_ptr->state >= 0 && io_ptr->state < n_io_dev_states);
 			assert(ff == io_ptr->type);
 			dev_name.iod = tl->iod->pair.out;
-			if (TRUE == ioff_open(&dev_name, pp, file_des_w, mspace, nsec_timeout))
+			if (TRUE == ioff_open(&dev_name, devparms, file_des_w, mspace, nsec_timeout))
 				(tl->iod->pair.out)->state = dev_open;
 			else if (dev_open == (tl->iod->pair.out)->state)
 				(tl->iod->pair.out)->state = dev_closed;
@@ -600,7 +601,7 @@ boolean_t io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, uint8 nsec_t
 	}
 #	endif
 	iod->newly_created = filecreated;
-	status = (iod->disp_ptr->open)(naml, pp, file_des, mspace, nsec_timeout);
+	status = (iod->disp_ptr->open)(naml, devparms, file_des, mspace, nsec_timeout);
 	if (TRUE == status)
 		iod->state = dev_open;
 	else

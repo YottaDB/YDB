@@ -110,7 +110,7 @@ void op_use(mval *v, mval *p)
 	io_curr_device = nl->iod->pair;
 	io_curr_device.in->name = nl;
 	if (nl->iod->pair.in == nl->iod->pair.out)
-		(nl->iod->disp_ptr->use)(nl->iod, p);
+		(nl->iod->disp_ptr->use)(nl->iod, p);  //kt doc:  call use()
 	else
 	{
 		if (2 != dollar_zpselect)

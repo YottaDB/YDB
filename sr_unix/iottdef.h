@@ -41,6 +41,70 @@
 #define TT_NOINSERT		0x2000
 #define TT_EMPTERM		0x4000
 
+//kt added SET_TTY... lines below
+#define SET_TTY_CHECK_ERRORS_MODE_1	1
+#define SET_TTY_CHECK_ERRORS_MODE_2	2
+#define SET_TTY_CHECK_ERRORS_MODE_3	3
+#define SET_TTY_CHECK_ERRORS_MODE_4	4
+typedef int tty_err_mode_type;
+typedef int tty_getsetattr_status;
+#define GETSETATTR_SUCCESS 		0
+#define GETSETATTR_FAILURE 		-1
+//kt end addition
+
+
+//kt added macro
+//Is a bit ON for a given character in a bitmask array?
+// Doesn't address special terminators > MAX_ASCII and/or LS and PS if default_mask_term
+#define IS_TERMINATOR(MASK_ARRAY, INPUT_CHAR, utf8_active) 					\
+    ({ 												\
+        uint4 msk_num = 0; 									\
+        uint4 msk_in = 0; 									\
+        int result = 0; 									\
+        if (!(utf8_active) || (ASCII_MAX) >= (INPUT_CHAR)) { 					\
+            msk_num = (uint4)(INPUT_CHAR) / (NUM_BITS_IN_INT4); 				\
+            msk_in = (1U << ((uint4)(INPUT_CHAR) % (NUM_BITS_IN_INT4))); 			\
+            result = (msk_in & (MASK_ARRAY)[msk_num]); 						\
+        } 											\
+        result; 										\
+    })
+
+//kt added macro
+//Turn a bit OFF for a given character in a bitmask array
+#define TURN_MASK_BIT_OFF(MASK_ARRAY, ACHAR) 							\
+    (MASK_ARRAY[(ACHAR) / NUM_BITS_IN_INT4] &= ~(1U << ((ACHAR) % NUM_BITS_IN_INT4)))
+
+//kt added macro
+//Turn a bit ON for a given character in a bitmask array
+#define TURN_MASK_BIT_ON(MASK_ARRAY, ACHAR) 							\
+    (MASK_ARRAY[(ACHAR) / NUM_BITS_IN_INT4] |= (1U << ((char) % NUM_BITS_IN_INT4)))
+
+//kt added macro
+#define SET_BIT_FLAG_BY_BOOL(ABOOL, AFLAG, AVAR)					 	\
+MBSTART { 											\
+        if (ABOOL) { 										\
+            (AVAR) |= (AFLAG);  /* Set the flag */ 						\
+        } else { 										\
+            (AVAR) &= ~(AFLAG); /* Clear the flag */ 						\
+        } 											\
+} MBEND
+
+//kt added macro
+#define SET_BIT_FLAG_ON(AFLAG, AVAR)							 	\
+MBSTART { 											\
+            (AVAR) |= (AFLAG);  /* Set the flag */ 						\
+} MBEND
+
+//kt added macro
+#define SET_BIT_FLAG_OFF(AFLAG, AVAR)							 	\
+MBSTART { 											\
+            (AVAR) &= ~(AFLAG); /* Clear the flag */ 						\
+} MBEND
+
+//kt added macros
+#define BIT_FLAG_IS_ON(AFLAG, AVAR) (((AVAR) & (AFLAG)) != 0)
+#define BIT_FLAG_IS_OFF(AFLAG, AVAR) (((AVAR) & (AFLAG)) == 0)
+
 #define TERMHUP_NOPRINCIO_CHECK(WRITE)								\
 MBSTART {											\
 	assert(hup_on || prin_in_dev_failure);										\
@@ -123,6 +187,13 @@ typedef struct
 
 typedef struct
 {
+	/*   //kt doc:
+	In this array [0..7] of 32 bit integers, each bit is used as a flag for one character.  I.e. 32 bits can represent 32 different characters
+	For example, mask[0] is used for chars 0-31, i.e. the control chars.   E.g. if (mask & (1 << INPUT_CHAR)) ...
+	The index in the array can be calculated by: INPUT_CHAR / NUM_BITS_IN_INT4
+	The bit mask for the mask[index] element can be calculated by (1 << (INPUT_CHAR % NUM_BITS_IN_INT4))  The modulus(%) accounts for the index'd element.
+	Eight (8) elements, of 32 bits each gives total of 256 bits, allowing 1 bit for each of chars 0-255
+	*/
 	uint4	mask[8];
 } io_termmask;
 
@@ -136,7 +207,7 @@ typedef struct
 typedef struct
 {
 	uint4	x;
-	uint4	mask;
+	uint4	mask;  //kt doc: Each of 32 bits is a flag for one character (0-31, i.e. the control chars).   E.g. if (mask & (1 << INPUT_CHAR)) ...
 }io_terminator;
 
 typedef struct
@@ -151,41 +222,126 @@ typedef struct
 				 */
 } recall_ctxt_t;
 
+//kt begin addition ----------
+//NOTE: The goal of this is to locate everything related to the TTY IO state of a device into this struct.
+// See also additional documentation in iott_compile_ttio_struct() in setterm.c
+typedef struct
+//  NOTE:  For TTY IO signals that are never modified by YDB, e.g. ISIG (enable signals), the state will not
+//         be stored in separate tt_ptr->io_state.* variables.  Instead the combined state will be contained in
+//         tty_ptr->io_state.ttio_struct and tty_ptr->initial_io_state.ttio_struct
+{
+	//-------------------------------------------------------------------------------------
+	// !! NOTICE !! //kt changed 'ttio_struct' FROM a type 'struct*'     <--- pointer
+	//					     TO a type plain struct  <--- not a pointer
+	//-------------------------------------------------------------------------------------
+
+	struct termios 		ttio_struct;		/* This will be treated as a COMPILED state, ready to send to TTY IO system.  It is not the master state itself. */
+	uint4			ext_cap;
+	io_termmask		mask_term;		/* Array to mark which characters are input terminators */
+	boolean_t		canonical;		/* FYI: Canonical means tty system provides simple line editing (e.g. delete)*/
+	boolean_t		devparam_echo;		/* store device parameter echo/noecho state */
+	boolean_t		ydb_echo;		/* store if ydb should locally echo/noecho (distinct from TTY IO echo state) */
+	boolean_t		hostsync;		/* Store hostsync state */
+	boolean_t		ttsync;			/* store ttsync state */
+	boolean_t		discard_lf;		/* UTF8 mode - previous char was CR so ignore following LF */
+	boolean_t		case_convert;		/* Enables or disables YottaDB from converting lowercase input to uppercase during READs */
+	boolean_t		no_type_ahead;		/* store TYPEAHEAD state.  Enables or disables type-ahead buffering for a terminal. */
+	boolean_t		passthru;		/* store PASTHRU state.  Enables or disables interpretation of the ERASE character for a terminal. PASTHRU shifts management of handling and response to ERASE characters in the input stream from YottaDB to the application code.*/
+	boolean_t		readsync;		/* store READSYNC state.  Enables or disables automatic output of <XON> before a READ and <XOFF> after a READ.*/
+	boolean_t		escape_processing;	/* store ESCAPE state.  Enables or disables YottaDB processing of escape sequences.*/
+	boolean_t		default_mask_term;	/* mask_term is the default */
+} ttio_state;
+//kt end addition ----------
+
+typedef struct   //kt modified this struct.  Original below.
+{
+	uint4			in_buf_sz;		// size of read buffer
+	// unsigned short  	pg_width;		   width of output page
+	io_terminator		enbld_outofbands; 	// enabled out-of-band chars
+	int			fildes;
+	ttio_state		io_state;		//kt added -- IO state based on latest USE or OPEN device parameters
+	ttio_state		initial_io_state;	//kt added -- IO state from when ydb first started
+	ttio_state		direct_mode_io_state;	//kt added -- IO state for use when interacting with user in direct mode
+	tt_interrupt		tt_state_save;		// in case job interrupt
+	boolean_t		mupintr;		// read was interrupted
+	char *			ttybuff;		// buffer for tty
+	volatile char *		tbuffp;			// next open space in buffer
+	recall_ctxt_t *		recall_array;		// if EDITING enabled, this points to MAX_RECALL-sized array of
+							//   previously input strings.
+	int			recall_index;		// Offset into circular "recall_array" pointing one past
+							//   to most recent input.
+	volatile boolean_t	timer_set;		// text flush timer is set
+	volatile boolean_t	write_active;		// we are in write -- postpone flush by timer
+	boolean_t		done_1st_read;		// UTF8 mode - check for BOM if not
+	pid_t			setterm_done_by;	// if non-zero, points to pid that did "setterm";
+							//   used to later invoke "resetterm" if needed.
+}d_tt_struct;
+
+/*  //kt original block below.
 typedef struct
 {
-	uint4			in_buf_sz;		/* size of read buffer		*/
-	/* unsigned short  	pg_width;		   width of output page		*/
+	uint4			in_buf_sz;		// size of read buffer		//
+	// unsigned short  	pg_width;		   width of output page		//
 	uint4			ext_cap;
-	io_terminator		enbld_outofbands; 	/* enabled out-of-band chars	*/
+	io_terminator		enbld_outofbands; 	// enabled out-of-band chars	//
 	uint4			term_ctrl;
 	io_termmask		mask_term;
 	int			fildes;
 	struct termios		*ttio_struct;
-	tt_interrupt		tt_state_save;		/* in case job interrupt */
-	boolean_t		mupintr;		/* read was interrupted */
-	char			*ttybuff;		/* buffer for tty */
-	volatile char		*tbuffp;		/* next open space in buffer */
-	recall_ctxt_t		*recall_array;		/* if EDITING enabled, this points to MAX_RECALL-sized array of
-							 * previously input strings.
-							 */
-	int			recall_index;		/* Offset into circular "recall_array" pointing one past
-							 * to most recent input.
-							 */
-	volatile boolean_t	timer_set;		/* text flush timer is set */
-	volatile boolean_t	write_active;		/* we are in write -- postpone flush by timer */
+	tt_interrupt		tt_state_save;		// in case job interrupt //
+	boolean_t		mupintr;		// read was interrupted //
+	char			*ttybuff;		// buffer for tty //
+	volatile char		*tbuffp;		// next open space in buffer //
+	recall_ctxt_t		*recall_array;		// if EDITING enabled, this points to MAX_RECALL-sized array of
+							// previously input strings.
+							//
+	int			recall_index;		// Offset into circular "recall_array" pointing one past
+							// to most recent input.
+							//
+	volatile boolean_t	timer_set;		// text flush timer is set //
+	volatile boolean_t	write_active;		// we are in write -- postpone flush by timer //
 	boolean_t		canonical;
-	boolean_t		discard_lf;		/* UTF8 mode - previous char was CR so ignore following LF */
-	boolean_t		default_mask_term;	/* mask_term is the default */
-	boolean_t		done_1st_read;		/* UTF8 mode - check for BOM if not */
-	pid_t			setterm_done_by;	/* if non-zero, points to pid that did "iott_setterm";
-							 * used to later invoke "iott_resetterm" if needed.
-							 */
+	boolean_t		discard_lf;		// UTF8 mode - previous char was CR so ignore following LF //
+	boolean_t		default_mask_term;	// mask_term is the default //
+	boolean_t		done_1st_read;		// UTF8 mode - check for BOM if not //
+	pid_t			setterm_done_by;	// if non-zero, points to pid that did "iott_setterm";
+							//  used to later invoke "iott_resetterm" if needed.
+							//
 }d_tt_struct;
+*/  //kt end of original block
+
+//kt added macro
+//kt NOTE: attempt to use this in macro above caused problems -->     (_Static_assert(sizeof(STRUCT1) == sizeof(STRUCT2), "Structures must be of the same size"),
+#define STRUCTS_ARE_EQUAL(STRUCT1, STRUCT2) 				\
+    (memcmp(&(STRUCT1), &(STRUCT2), sizeof(STRUCT1)) == 0 ? 1 : 0)
 
 void iott_flush_buffer(io_desc *ioptr, boolean_t new_write_flag);
 void iott_mterm(io_desc *ioptr);
 void iott_rterm(io_desc *ioptr);
 void iott_readfl_badchar(mval *vmvalptr, wint_t *dataptr32, int datalen,
 			 int delimlen, unsigned char *delimptr, unsigned char *strend, unsigned char *buffer_start);
-void	iott_recall_array_add(d_tt_struct *tt_ptr, int nchars, int width, int bytelen, void *ptr);
+void iott_recall_array_add(d_tt_struct *tt_ptr, int nchars, int width, int bytelen, void *ptr);
+
+//BEGIN ADDITIONS BY //kt --------------------------------------------------------------------------------------------------------------
+typedef enum io_params io_params_type;
+typedef boolean_t (*devparam_validator)(io_params_type aparam);
+void iott_compile_ttio_struct(io_desc * io_ptr, ttio_state* io_state_ptr, cc_t vtime, cc_t vmin);
+tty_getsetattr_status iott_compile_state_and_set_tty_and_ydb_echo(io_desc* ioptr, cc_t vtime, cc_t vmin, tty_err_mode_type err_check_mode);
+tty_getsetattr_status iott_set_tty(io_desc* io_ptr, struct termios* ttio_struct_ptr, tty_err_mode_type err_check_mode);
+tty_getsetattr_status iott_set_tty_and_ydb_echo(io_desc* io_ptr, struct termios* ttio_struct_ptr, tty_err_mode_type err_check_mode);
+void iott_use_params_to_state(io_desc * io_ptr, mval * devparms);
+void iott_set_ydb_echo(io_desc* io_ptr, ttio_state* source_io_state_ptr, ttio_state* output_io_state_ptr);
+void iott_open_params_to_state(io_desc * io_ptr, mval * devparms, ttio_state* io_state_ptr);
+void iott_common_params_to_state(io_desc* io_ptr, ttio_state* io_state_ptr, mval * devparms, devparam_validator is_valid_dev_param);
+void iott_TTY_to_state(d_tt_struct * tt_ptr, ttio_state* an_io_state_ptr);
+void tio_struct_to_state(ttio_state* an_io_state_ptr, struct termios * ttio_struct_ptr);
+void iott_restoreterm(io_desc * io_ptr);
+boolean_t is_valid_use_param(io_params_type aparam);
+boolean_t is_valid_open_param(io_params_type aparam);
+void set_mask_term_conditional(io_desc* io_ptr, io_termmask*  mask_term_ptr, boolean_t utf8_active, boolean_t set_default);
+ttio_state*  iott_setterm_for_direct_mode(io_desc * io_ptr);
+void iott_setterm_for_no_canonical(io_desc * io_ptr,  ttio_state * temp_io_state_ptr);
+
+//END ADDITIONS BY //kt --------------------------------------------------------------------------------------------------------------
+
 #endif

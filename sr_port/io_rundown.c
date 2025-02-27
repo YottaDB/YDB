@@ -71,6 +71,7 @@ void io_rundown (int rundown_type)
 				 * If so do "iott_resetterm" to restore terminal to what it was (undo whatever stty settings
 				 * YottaDB changed in terminal).
 				 */
+				//kt doc:  Leaving application.  If terminal needs additional restoration, could add here...
 				RESETTERM_IF_NEEDED(ioptr, EXPECT_SETTERM_DONE_FALSE);
 			}
 		}

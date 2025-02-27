@@ -104,7 +104,7 @@ int mupip_main(int argc, char **argv, char **envp)
 	sig_init(ydb_os_signal_handler, NULL, suspsigs_handler, continue_handler);	/* Note: no ^C handler is defined (yet) */
 	licensed = TRUE;
 	in_backup = FALSE;
-	op_open_ptr = mu_op_open;
+	op_open_ptr = mu_op_open;		//kt doc: NOTE that this assigning a function pointer, not calling function()
 	INIT_FNPTR_GLOBAL_VARIABLES;
 	mu_get_term_characterstics();
 	ydb_chk_dist(argv[0]);

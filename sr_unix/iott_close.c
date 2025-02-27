@@ -54,6 +54,7 @@ void iott_close(io_desc *v, mval *pp)
 	assert((v->pair.in == v) || (v->pair.out == v));
 	ttptr = (d_tt_struct *)v->dev_sp;
 	v->state = dev_closed;
+	((d_tt_struct *)v->dev_sp)->setterm_done_by = process_id;  //kt added.  Set flag to ensure resetterm is actually done
 	iott_resetterm(v);
 
 	p_offset = 0;
