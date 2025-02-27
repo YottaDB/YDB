@@ -102,11 +102,14 @@
 	ADDR = (char *)(pp->str.addr + p_offset + 1);
 
 /* Obtain the key and IV from the KEY field, which is expected to be in the format <key><space><iv>, where iv is optional. */
-#define GET_KEY_AND_IV(DIRECTION)									\
+//kt CHANGED:	from 	GET_ADDR_AND_LEN(DIRECTION ## _key.addr, DIRECTION ## _key.len);
+//    		to 	GET_ADDR_AND_LEN(STRUCT, OFFSET, DIRECTION ## _key.addr, DIRECTION ## _key.len);
+//   Purpose of change" remove dependance on local scope
+#define GET_KEY_AND_IV(STRUCT, OFFSET, DIRECTION)									\
 {													\
 	int i, len, encr_key_delim_pos;									\
 													\
-	GET_ADDR_AND_LEN(DIRECTION ## _key.addr, DIRECTION ## _key.len);				\
+	GET_ADDR_AND_LEN(STRUCT, OFFSET, DIRECTION ## _key.addr, DIRECTION ## _key.len);				\
 	for (i = 0, encr_key_delim_pos = len = DIRECTION ## _key.len; i < DIRECTION ## _key.len; i++)	\
 	{												\
 		if (ENCR_KEY_DELIM_CHAR == *((char *)DIRECTION ## _key.addr + i))			\
@@ -612,7 +615,8 @@ void	iorm_use(io_desc *iod, mval *pp)
 #			endif
 			if (chset_allowed)
 			{
-				GET_ADDR_AND_LEN(chset_mstr.addr, chset_mstr.len);
+				//kt original --> GET_ADDR_AND_LEN(chset_mstr.addr, chset_mstr.len);
+				GET_ADDR_AND_LEN(pp, p_offset, chset_mstr.addr, chset_mstr.len);
 				SET_ENCODING(temp_chset, &chset_mstr);
 				if (!gtm_utf8_mode && IS_UTF_CHSET(temp_chset))
 					break;	/* ignore UTF chsets if not utf8_mode */
@@ -634,7 +638,8 @@ void	iorm_use(io_desc *iod, mval *pp)
 #			endif
 			if (chset_allowed)
 			{
-				GET_ADDR_AND_LEN(chset_mstr.addr, chset_mstr.len);
+				//kt original --> GET_ADDR_AND_LEN(chset_mstr.addr, chset_mstr.len);
+				GET_ADDR_AND_LEN(pp, p_offset, chset_mstr.addr, chset_mstr.len);
 				SET_ENCODING(temp_chset, &chset_mstr);
 				if (!gtm_utf8_mode && IS_UTF_CHSET(temp_chset))
 					break;	/* ignore UTF chsets if not utf8_mode */
@@ -649,7 +654,8 @@ void	iorm_use(io_desc *iod, mval *pp)
 		{
 			if (chset_allowed)
 			{
-				GET_ADDR_AND_LEN(chset_mstr.addr, chset_mstr.len);
+				//kt original --> GET_ADDR_AND_LEN(chset_mstr.addr, chset_mstr.len);
+				GET_ADDR_AND_LEN(pp, p_offset, chset_mstr.addr, chset_mstr.len);
 				SET_ENCODING(temp_chset, &chset_mstr);
 				if (!gtm_utf8_mode && IS_UTF_CHSET(temp_chset))
 					break;	/* ignore UTF chsets if not utf8_mode */
@@ -873,11 +879,11 @@ void	iorm_use(io_desc *iod, mval *pp)
 			break;
 		case iop_key:			/* CAUTION: fall-through */
 		case iop_input_key:
-			GET_KEY_AND_IV(input);
+			GET_KEY_AND_IV(pp, p_offset, input);  //kt mod
 			if (iop_key != c)	/* CAUTION: potential fall-through */
 				break;
 		case iop_output_key:
-			GET_KEY_AND_IV(output);
+			GET_KEY_AND_IV(pp, p_offset, output);  //kt mod
 			break;
 		case iop_buffered:
 			if (rm_ptr->fifo || rm_ptr->is_pipe)

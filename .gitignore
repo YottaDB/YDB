@@ -15,3 +15,5 @@
 /fuzzing/output/
 /fuzzing/env/
 /fuzzing/NotMinCorpus/
+.vscode/
+YDB_FATAL*

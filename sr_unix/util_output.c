@@ -49,6 +49,7 @@
 #include "gtm_multi_proc.h"
 #include "get_syslog_flags.h"
 #include "get_comm_info.h"
+#include "util_output.h"  			//kt created header file to achieve compilation
 
 #ifdef UTF8_SUPPORTED
 #include "gtm_icu_api.h"

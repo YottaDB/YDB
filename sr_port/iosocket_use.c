@@ -277,7 +277,8 @@ void	iosocket_use(io_desc *iod, mval *pp)
 				if (DEFAULT_CODE_SET != iod->in_code_set)
 					ICONV_OPEN_CD(iod->input_conv_cd, INSIDE_CH_SET, (char *)(pp->str.addr + p_offset + 1));
 #				endif
-				GET_ADDR_AND_LEN(chset_mstr.addr, chset_mstr.len);
+				//kt original --> GET_ADDR_AND_LEN(chset_mstr.addr, chset_mstr.len);
+				GET_ADDR_AND_LEN(pp, p_offset, chset_mstr.addr, chset_mstr.len);  //kt 
 				SET_ENCODING(temp_ichset, &chset_mstr);
 				if (!gtm_utf8_mode && IS_UTF_CHSET(temp_ichset))
 					break;	/* ignore UTF chsets if not utf8_mode */
@@ -293,7 +294,8 @@ void	iosocket_use(io_desc *iod, mval *pp)
 				if (DEFAULT_CODE_SET != iod->out_code_set)
 					ICONV_OPEN_CD(iod->output_conv_cd, (char *)(pp->str.addr + p_offset + 1), INSIDE_CH_SET);
 #				endif
-				GET_ADDR_AND_LEN(chset_mstr.addr, chset_mstr.len);
+				//kt original --> GET_ADDR_AND_LEN(chset_mstr.addr, chset_mstr.len);
+				GET_ADDR_AND_LEN(pp, p_offset, chset_mstr.addr, chset_mstr.len);  //kt
 				SET_ENCODING(temp_ochset, &chset_mstr);
 				if (!gtm_utf8_mode && IS_UTF_CHSET(temp_ochset))
 					break;	/* ignore UTF chsets if not utf8_mode */
@@ -302,7 +304,8 @@ void	iosocket_use(io_desc *iod, mval *pp)
 				break;
 			case iop_chset:
 				n_specified_dev++;
-				GET_ADDR_AND_LEN(chset_mstr.addr, chset_mstr.len);
+				//kt original --> GET_ADDR_AND_LEN(chset_mstr.addr, chset_mstr.len);
+				GET_ADDR_AND_LEN(pp, p_offset, chset_mstr.addr, chset_mstr.len);  //kt 
 				SET_ENCODING(temp_ochset, &chset_mstr);
 				SET_ENCODING(temp_ichset, &chset_mstr);
 				if (!gtm_utf8_mode && IS_UTF_CHSET(temp_ichset))

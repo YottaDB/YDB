@@ -34,7 +34,7 @@ LITREF unsigned char io_params_size[];
 short ionl_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, uint8 timeout)
 {
 	unsigned char	ch;
-	io_desc		*d_out, *ioptr;
+	io_desc		*d_out, *io_ptr;   //kt renamed "ioptr" to "io_ptr" for consistency across codebase.  Changes below not marked.  Just search for "io_ptr"
 	int		p_offset, status;
 	DCL_THREADGBL_ACCESS;
 
@@ -49,16 +49,16 @@ short ionl_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, uint8 tim
 		if (0 <= fd)
 		        CLOSEFILE_RESET(fd, status);	/* resets "fd" to FD_INVALID */
 	);
-	ioptr = dev_name->iod;
-	ioptr->state = dev_open;
-	d_out = ioptr->pair.out;
-	ioptr->length = DEF_NL_LENGTH;
-	ioptr->width = DEF_NL_WIDTH;
-	ioptr->wrap = TRUE;
-	ioptr->dollar.za = 0;
-	ioptr->dollar.zeof = FALSE;
-	ioptr->dollar.x = 0;
-	ioptr->dollar.y = 0;
+	io_ptr = dev_name->iod;
+	io_ptr->state = dev_open;
+	d_out = io_ptr->pair.out;
+	io_ptr->length = DEF_NL_LENGTH;
+	io_ptr->width = DEF_NL_WIDTH;
+	io_ptr->wrap = TRUE;
+	io_ptr->dollar.za = 0;
+	io_ptr->dollar.zeof = FALSE;
+	io_ptr->dollar.x = 0;
+	io_ptr->dollar.y = 0;
 	while (*(pp->str.addr + p_offset) != iop_eol)
 	{
 		ch = *(pp->str.addr + p_offset++);
@@ -71,7 +71,7 @@ short ionl_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, uint8 tim
 			d_out->wrap = FALSE;
 			break;
 		case iop_exception:
-			DEF_EXCEPTION(pp, p_offset, ioptr);
+			DEF_EXCEPTION(pp, p_offset, io_ptr);
 			break;
 		default:
 			break;

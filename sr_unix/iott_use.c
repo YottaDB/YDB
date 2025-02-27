@@ -25,6 +25,7 @@
 #include "gtm_unistd.h"
 #include "gtm_signal.h"	/* for SIGPROCMASK used inside Tcsetattr */
 #include "gtm_stdlib.h"
+#include "gtm_threadgbl.h"  	//kt added
 
 #include "io_params.h"
 #include "io.h"
@@ -67,6 +68,8 @@ LITDEF unsigned char filter_index[27] =
 	,4, 4, 4
 };
 
+GBLDEF io_termmask NULL_TERM_MASK = { {0, 0, 0, 0, 0, 0, 0, 0} };   //kt added
+
 GBLREF boolean_t		ctrlc_on, hup_on, prin_in_dev_failure, prin_out_dev_failure;
 GBLREF char			*CURSOR_ADDRESS, *CLR_EOL, *CLR_EOS;
 GBLREF io_pair			io_curr_device, io_std_device;
@@ -85,32 +88,25 @@ error_def(ERR_TTINVFILTER);
 error_def(ERR_WIDTHTOOSMALL);
 error_def(ERR_ZINTRECURSEIO);
 
-void iott_use(io_desc *iod, mval *pp)
+void iott_use(io_desc * io_ptr, mval * devparms)
+//kt NOTE: renamed variable "iod" -> "io_ptr" for consistency across codebase.  Each change was not marked, so search for io_ptr for location of changes.
+//kt NOTE: other places in codebase use name "io_ptr", "ioptr", and "iod".  These terms seem interchangable.
+//kt NOTE: renamed variable "pp" -> "devparms", here and many spots below.  Each change was not marked, so search for devparms for location of changes.
 {
-	boolean_t		flush_input, terminator_specified = FALSE;
-	char			dc1, *ttab;
-	d_tt_struct		*temp_ptr, *tt_ptr;
-	int			p_offset, fil_type, save_errno, status;
-	int4			length, width;
-	io_desc			*d_in, *d_out;
-	io_termmask		mask_term;
+	d_tt_struct *		tt_ptr;
+	int			p_offset;
 	struct sigaction	act;
-	struct termios		t;
-	mstr			chset_mstr;
-	gtm_chset_t		temp_chset = -1, old_ichset;
-	uint4			mask_in;
-	unsigned char		ch, len;
 	boolean_t		ch_set;
 	mval			mv;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	p_offset = 0;
-	assert(iod->state == dev_open);
-	ESTABLISH_GTMIO_CH(&iod->pair, ch_set);
-	iott_flush(iod);
-	tt_ptr = (d_tt_struct *)iod->dev_sp;
-	if (*(pp->str.addr + p_offset) != iop_eol)
+	assert(io_ptr->state == dev_open);
+	ESTABLISH_GTMIO_CH(&io_ptr->pair, ch_set);
+	iott_flush(io_ptr);
+	tt_ptr = (d_tt_struct *)io_ptr->dev_sp;
+	if (*(devparms->str.addr + p_offset) != iop_eol)
 	{
 		if (tt_ptr->mupintr)
 			if (dollar_zininterrupt)
@@ -119,39 +115,156 @@ void iott_use(io_desc *iod, mval *pp)
 			{	/* The interrupted read was not properly resumed so clear it now */
 				tt_ptr->mupintr = FALSE;
 				tt_ptr->tt_state_save.who_saved = ttwhichinvalid;
-				io_find_mvstent(iod, TRUE);
+				io_find_mvstent(io_ptr, TRUE);
 			}
-		status = tcgetattr(tt_ptr->fildes, &t);
-		if (0 != status)
+		//setup ydb IO state (but not TTY IO subsystem) based on device parameters
+		iott_use_params_to_state(io_ptr, devparms);  //kt moved block to function.
+
+		//kt Removed another block of code here, moving functionality into iott_compile_state_and_set_tty_and_ydb_echo(),
+		//kt   and calling below outside IF block, so that even if there are no devparams, it will still be called.
+
+
+	} else if (tt_ptr->mupintr && !dollar_zininterrupt)
+	{	/* The interrupted read was not properly resumed so clear it now */
+		tt_ptr->mupintr = FALSE;
+		tt_ptr->tt_state_save.who_saved = ttwhichinvalid;
+		io_find_mvstent(io_ptr, TRUE);	/* clear mv stack entry */
+	}
+
+	//kt  Send IO state to TTY IO subsystem.  8 is default time, 1 is minimum chars; can be changed later.
+	iott_compile_state_and_set_tty_and_ydb_echo(io_ptr, 8, 1, SET_TTY_CHECK_ERRORS_MODE_3);   //kt added, moving funcitonality down from above.
+
+	REVERT_GTMIO_CH(&io_ptr->pair, ch_set);
+	return;
+}
+
+
+void iott_use_params_to_state(io_desc * io_ptr, mval * devparms)
+//kt added function, using code from iott_use()
+//kt NOTE: This saves the IO state into ydb data structures, based on USE parameters.
+//         AND it also does some actions, if param calls for action.  It does NOT write anything out to the TTY IO subsystem.
+{
+	d_tt_struct * 		tt_ptr;
+	tt_ptr = (d_tt_struct *)io_ptr->dev_sp;
+	iott_common_params_to_state(io_ptr, &tt_ptr->io_state, devparms, is_valid_use_param);
+}
+
+boolean_t is_valid_use_param(io_params_type aparam)  // is aparam valid for USE command?
+//kt added function
+{
+	boolean_t	result;
+	result = (
+		(aparam == iop_canonical) 	||
+		(aparam == iop_nocanonical) 	||
+		(aparam == iop_empterm) 	||
+		(aparam == iop_noempterm) 	||
+		(aparam == iop_cenable) 	||
+		(aparam == iop_nocenable) 	||
+		(aparam == iop_clearscreen) 	||
+		(aparam == iop_convert) 	||
+		(aparam == iop_noconvert) 	||
+		(aparam == iop_ctrap) 		||
+		(aparam == iop_downscroll) 	||
+		(aparam == iop_echo) 		||
+		(aparam == iop_noecho) 		||
+		(aparam == iop_editing) 	||
+		(aparam == iop_noediting) 	||
+		(aparam == iop_escape) 		||
+		(aparam == iop_noescape) 	||
+		(aparam == iop_eraseline) 	||
+		(aparam == iop_exception) 	||
+		(aparam == iop_filter) 		||
+		(aparam == iop_nofilter) 	||
+		(aparam == iop_flush) 		||
+		(aparam == iop_hostsync) 	||
+		(aparam == iop_nohostsync) 	||
+		(aparam == iop_hupenable) 	||
+		(aparam == iop_nohupenable) 	||
+		(aparam == iop_insert) 		||
+		(aparam == iop_noinsert) 	||
+		(aparam == iop_length) 		||
+		(aparam == iop_pasthru) 	||
+		(aparam == iop_nopasthru) 	||
+		(aparam == iop_readsync) 	||
+		(aparam == iop_noreadsync) 	||
+		(aparam == iop_terminator) 	||
+		(aparam == iop_noterminator) 	||
+		(aparam == iop_ttsync) 		||
+		(aparam == iop_nottsync) 	||
+		(aparam == iop_typeahead) 	||
+		(aparam == iop_notypeahead) 	||
+		(aparam == iop_upscroll) 	||
+		(aparam == iop_width) 		||
+		(aparam == iop_wrap) 		||
+		(aparam == iop_nowrap) 		||
+		(aparam == iop_x) 		||
+		(aparam == iop_y) 		||
+		(aparam == iop_ipchset) 	||
+		(aparam == iop_opchset) 	||
+		(aparam == iop_chset)	  	||
+		//---- below are sometimes added to devparams in io_init, but apparently not processed.
+		(aparam == iop_newversion)	||
+		(aparam == iop_stream)		||
+		(aparam == iop_nl)		||
+		(aparam == iop_shared)		||
+		(aparam == iop_readonly)		);
+
+	return result;
+}
+
+void iott_common_params_to_state(io_desc* io_ptr, ttio_state* io_state_ptr, mval * devparms, devparam_validator is_valid_dev_param 		)
+//kt NOTE: This saves the IO state into ydb data structures, based on OPEN and USE parameters.
+//         AND it may also do some actions, if param calls for action.
+//	   It does NOT write anything out to the TTY IO subsystem.
+{
+	int			p_offset, fil_type, status;
+	int4			len, length, width;
+	int4			do_nothing; 			//kt added
+	unsigned char		ch;
+	io_params_type		aparam;  			//kt added
+	char			dc1;
+	char *			ttab;
+	gtm_chset_t		temp_chset, old_ichset;
+	d_tt_struct *		temp_ptr;
+	d_tt_struct * 		tt_ptr;
+	struct sigaction	act;
+	io_desc	*		d_in;
+	io_desc	*		d_out;
+	io_termmask		mask_term;
+	mstr			chset_mstr;
+	boolean_t		dev_is_tt; 			//kt added
+	boolean_t		flush_input = FALSE;
+	boolean_t		terminator_specified = FALSE;
+	DCL_THREADGBL_ACCESS;
+
+	SETUP_THREADGBL_ACCESS;
+	tt_ptr = (d_tt_struct *)io_ptr->dev_sp;
+	d_in = io_ptr->pair.in;
+	d_out = io_ptr->pair.out;
+	temp_ptr = (d_tt_struct *)d_in->dev_sp;
+	dev_is_tt = (tt == d_in->type); 			//kt added
+	mask_term = temp_ptr->io_state.mask_term;
+	old_ichset = io_ptr->ichset;
+	p_offset = 0;
+
+	while (iop_eol != (ch = *(devparms->str.addr + p_offset++)))
+	{
+		aparam = (io_params_type)ch;
+		if (is_valid_dev_param(aparam))
 		{
-			save_errno = errno;
-			ISSUE_NOPRINCIO_BEFORE_RTS_ERROR_IF_APPROPRIATE(iod);
-			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_TCGETATTR, 1, tt_ptr->fildes, save_errno);
-		}
-		flush_input = FALSE;
-		d_in = iod->pair.in;
-		d_out = iod->pair.out;
-		temp_ptr = (d_tt_struct *)d_in->dev_sp;
-		mask_in = temp_ptr->term_ctrl;
-		mask_term = temp_ptr->mask_term;
-		old_ichset = iod->ichset;
-		while (*(pp->str.addr + p_offset) != iop_eol)
-		{
-			switch (ch = *(pp->str.addr + p_offset++))
+			switch(aparam)
 			{
 				case iop_canonical:
-					tt_ptr->canonical = TRUE;
-					t.c_lflag |= ICANON;
+					io_state_ptr->canonical = TRUE;
 					break;
 				case iop_nocanonical:
-					tt_ptr->canonical = FALSE;
-					t.c_lflag &= ~(ICANON);
+					io_state_ptr->canonical = FALSE;
 					break;
 				case iop_empterm:
-					tt_ptr->ext_cap |= TT_EMPTERM;
+					SET_BIT_FLAG_ON(TT_EMPTERM, io_state_ptr->ext_cap);
 					break;
 				case iop_noempterm:
-					tt_ptr->ext_cap &= ~TT_EMPTERM;
+					SET_BIT_FLAG_OFF(TT_EMPTERM, io_state_ptr->ext_cap);
 					break;
 				case iop_cenable:
 					/* Note that this parameter is ignored in callin/simpleapi mode because ^C in this mode
@@ -211,13 +324,13 @@ void iott_use(io_desc *iod, mval *pp)
 						gtm_tputs(CLR_EOS, 1, outc);
 					break;
 				case iop_convert:
-					mask_in |= TRM_CONVERT;
+					if (dev_is_tt) io_state_ptr->case_convert = TRUE;  			//kt mod
 					break;
 				case iop_noconvert:
-					mask_in &= ~TRM_CONVERT;
+					if (dev_is_tt) io_state_ptr->case_convert = FALSE;  			//kt mod
 					break;
 				case iop_ctrap:
-					GET_LONG(tt_ptr->enbld_outofbands.mask, pp->str.addr + p_offset);
+					GET_LONG(tt_ptr->enbld_outofbands.mask, devparms->str.addr + p_offset);
 					if (!ctrlc_on)
 					{	/* if cenable, ctrlc_handler active anyway, otherwise, depends on ctrap=$c(3) */
 						sigemptyset(&act.sa_mask);
@@ -239,38 +352,37 @@ void iott_use(io_desc *iod, mval *pp)
 					}
 					break;
 				case iop_echo:
-					mask_in &= (~TRM_NOECHO);
+					if (dev_is_tt) io_state_ptr->devparam_echo = TRUE;  			//kt added
 					break;
 				case iop_noecho:
-					mask_in |= TRM_NOECHO;
+					if (dev_is_tt) io_state_ptr->devparam_echo = FALSE;  			//kt added
 					break;
 				case iop_editing:
-					if (io_curr_device.in == io_std_device.in)
-					{	/* $PRINCIPAL only */
-						tt_ptr->ext_cap |= TT_EDITING;
+					if (io_curr_device.in == io_std_device.in)     //$PRINCIPAL only
+					{
+						SET_BIT_FLAG_ON(TT_EDITING, io_state_ptr->ext_cap);   		//kt mod
 					}
 					break;
 				case iop_noediting:
-					if (io_curr_device.in == io_std_device.in)
-						tt_ptr->ext_cap &= ~TT_EDITING;	/* $PRINCIPAL only */
+					if (io_curr_device.in == io_std_device.in)  // $PRINCIPAL only
+						SET_BIT_FLAG_OFF(TT_EDITING, io_state_ptr->ext_cap);   		//kt mod
 					break;
 				case iop_escape:
-					mask_in |= TRM_ESCAPE;
+					if (dev_is_tt) io_state_ptr->escape_processing = TRUE;
 					break;
 				case iop_noescape:
-					mask_in &= (~TRM_ESCAPE);
-				default:
+					if (dev_is_tt) io_state_ptr->escape_processing = FALSE;
 					break;
 				case iop_eraseline:
 					if (NULL != CLR_EOL)
 						gtm_tputs(CLR_EOL, 1, outc);
 					break;
 				case iop_exception:
-					DEF_EXCEPTION(pp, p_offset, iod);
+					DEF_EXCEPTION(devparms, p_offset, io_ptr);
 					break;
 				case iop_filter:
-					len = *(pp->str.addr + p_offset);
-					ttab = pp->str.addr + p_offset + 1;
+					len = *(devparms->str.addr + p_offset);
+					ttab = devparms->str.addr + p_offset + 1;
 					if ((fil_type = namelook(filter_index, filter_names, ttab, len)) < 0)
 					{
 						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_TTINVFILTER);
@@ -279,30 +391,30 @@ void iott_use(io_desc *iod, mval *pp)
 					switch (fil_type)
 					{
 						case 0:
-							iod->write_filter |= CHAR_FILTER;
+							SET_BIT_FLAG_ON(CHAR_FILTER, io_ptr->write_filter);
 							break;
 						case 1:
-							iod->write_filter |= ESC1;
+							SET_BIT_FLAG_ON(ESC1, io_ptr->write_filter);
 							break;
 						case 2:
-							iod->write_filter &= ~CHAR_FILTER;
+							SET_BIT_FLAG_OFF(CHAR_FILTER, io_ptr->write_filter);
 							break;
 						case 3:
-							iod->write_filter &= ~ESC1;
+							SET_BIT_FLAG_OFF(ESC1, io_ptr->write_filter);
 							break;
 					}
 					break;
 				case iop_nofilter:
-					iod->write_filter = 0;
+					io_ptr->write_filter = 0;
 					break;
 				case iop_flush:
 					flush_input = TRUE;
 					break;
 				case iop_hostsync:
-					t.c_iflag |= IXOFF;
+					io_state_ptr->hostsync = TRUE;   					//kt mod
 					break;
 				case iop_nohostsync:
-					t.c_iflag &= ~IXOFF;
+					io_state_ptr->hostsync = FALSE;  					//kt mod
 					break;
 				case iop_hupenable:
 					if (!hup_on)
@@ -316,12 +428,12 @@ void iott_use(io_desc *iod, mval *pp)
 								act.sa_flags = YDB_SIGACTION_FLAGS;
 								act.sa_sigaction = ctrlc_handler_ptr;
 								sigaction(SIGHUP, &act, 0);
-													} else
+							} else
 							{
 								SET_ALTERNATE_SIGHANDLER(SIGHUP, &ydb_altmain_sighandler);
 							}
 							hup_on = TRUE;
-}
+						}
 					}
 					break;
 				case iop_nohupenable:
@@ -345,27 +457,27 @@ void iott_use(io_desc *iod, mval *pp)
 					}
 					break;
 				case iop_insert:
-					if (io_curr_device.in == io_std_device.in)
-						tt_ptr->ext_cap &= ~TT_NOINSERT;	/* $PRINCIPAL only */
+					if (io_curr_device.in == io_std_device.in)		// $PRINCIPAL only
+						SET_BIT_FLAG_OFF(TT_NOINSERT, io_state_ptr->ext_cap);		//kt mod turning OFF NOINSERT --> turns ON insert
 					break;
 				case iop_noinsert:
-					if (io_curr_device.in == io_std_device.in)
-						tt_ptr->ext_cap |= TT_NOINSERT;	/* $PRINCIPAL only */
+					if (io_curr_device.in == io_std_device.in)		//  $PRINCIPAL only
+						SET_BIT_FLAG_ON(TT_NOINSERT, io_state_ptr->ext_cap);		//kt mod turning ON NOINSERT --> turns OFF insert
 					break;
 				case iop_length:
-					GET_LONG(length, pp->str.addr + p_offset);
+					GET_LONG(length, devparms->str.addr + p_offset);
 					if (0 > length)
 						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_DEVPARMNEG);
 					d_out->length = length;
 					break;
 				case iop_pasthru:
-					mask_in |= TRM_PASTHRU;
+					if (dev_is_tt) io_state_ptr->passthru = TRUE;   			//kt mod
 					break;
 				case iop_nopasthru:
-					mask_in &= (~TRM_PASTHRU);
+					if (dev_is_tt) io_state_ptr->passthru = FALSE;  			//kt mod
 					break;
 				case iop_readsync:
-					mask_in |= TRM_READSYNC;
+					if (dev_is_tt) io_state_ptr->readsync = TRUE;
 					break;
 				case iop_noreadsync:
 					dc1 = (char)17;
@@ -373,12 +485,14 @@ void iott_use(io_desc *iod, mval *pp)
 					DOWRITERC(temp_ptr->fildes, &dc1, 1, status);
 					if (0 != status)
 						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
-					mask_in &= (~TRM_READSYNC);
+					if (dev_is_tt) io_state_ptr->readsync = FALSE;
 					break;
 				case iop_terminator:
-					memcpy(&mask_term.mask[0], (pp->str.addr + p_offset), SIZEOF(io_termmask));
+					memcpy(&mask_term.mask[0], (devparms->str.addr + p_offset), SIZEOF(io_termmask));
 					terminator_specified = TRUE;
 					temp_ptr = (d_tt_struct *)d_in->dev_sp;
+					temp_ptr->io_state.default_mask_term = (STRUCTS_ARE_EQUAL(mask_term, NULL_TERM_MASK));  //kt mod to simplify
+					/* //kt original below
 					if (mask_term.mask[0] == NUL &&
 					    mask_term.mask[1] == NUL &&
 					    mask_term.mask[2] == NUL &&
@@ -387,26 +501,28 @@ void iott_use(io_desc *iod, mval *pp)
 					    mask_term.mask[5] == NUL &&
 					    mask_term.mask[6] == NUL &&
 					    mask_term.mask[7] == NUL)
-						temp_ptr->default_mask_term = TRUE;
+						temp_ptr->io_state.default_mask_term = TRUE;
 					else
-						temp_ptr->default_mask_term = FALSE;
+						temp_ptr->io_state.default_mask_term = FALSE;
+					*/
 					break;
 				case iop_noterminator:
 					temp_ptr = (d_tt_struct *)d_in->dev_sp;
-					temp_ptr->default_mask_term = FALSE;
-					memset(&mask_term.mask[0], 0, SIZEOF(io_termmask));
+					temp_ptr->io_state.default_mask_term = FALSE;
+					//kt original --> memset(&mask_term.mask[0], 0, SIZEOF(io_termmask));
+					mask_term = NULL_TERM_MASK;  						//kt mod
 					break;
 				case iop_ttsync:
-					t.c_iflag |= IXON;
+					if (dev_is_tt) io_state_ptr->ttsync = TRUE; //  			//kt mod
 					break;
 				case iop_nottsync:
-					t.c_iflag &= ~IXON;
+					if (dev_is_tt) io_state_ptr->ttsync = FALSE; ;  			//kt mod
 					break;
 				case iop_typeahead:
-					mask_in &= (~TRM_NOTYPEAHD);
+					if (dev_is_tt) io_state_ptr->no_type_ahead = FALSE; 			//kt mod
 					break;
 				case iop_notypeahead:
-					mask_in |= TRM_NOTYPEAHD;
+					if (dev_is_tt) io_state_ptr->no_type_ahead = TRUE; 			//kt mod
 					break;
 				case iop_upscroll:
 					d_out->dollar.y++;
@@ -416,7 +532,7 @@ void iott_use(io_desc *iod, mval *pp)
 						gtm_tputs(gtm_tparm(CURSOR_ADDRESS, d_out->dollar.y, d_out->dollar.x), 1, outc);
 					break;
 				case iop_width:
-					GET_LONG(width, pp->str.addr + p_offset);
+					GET_LONG(width, devparms->str.addr + p_offset);
 					if (0 > width)
 						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_DEVPARMNEG);
 					/* Do not allow a WIDTH of 1 if UTF mode (ICHSET or OCHSET is not M) */
@@ -439,7 +555,7 @@ void iott_use(io_desc *iod, mval *pp)
 					d_out->wrap = FALSE;
 					break;
 				case iop_x:
-					GET_LONG(d_out->dollar.x, pp->str.addr + p_offset);
+					GET_LONG(d_out->dollar.x, devparms->str.addr + p_offset);
 					if (0 > (int4)d_out->dollar.x)
 						d_out->dollar.x = 0;
 					if (d_out->dollar.x > d_out->width && d_out->wrap)
@@ -453,7 +569,7 @@ void iott_use(io_desc *iod, mval *pp)
 						gtm_tputs(gtm_tparm(CURSOR_ADDRESS, d_out->dollar.y, d_out->dollar.x), 1, outc);
 					break;
 				case iop_y:
-					GET_LONG(d_out->dollar.y, pp->str.addr + p_offset);
+					GET_LONG(d_out->dollar.y, devparms->str.addr + p_offset);
 					if (0 > (int4)d_out->dollar.y)
 						d_out->dollar.y = 0;
 					if (d_out->length)
@@ -463,111 +579,134 @@ void iott_use(io_desc *iod, mval *pp)
 					break;
 				case iop_ipchset:
 				{
-#						ifdef KEEP_zOS_EBCDIC
-					if ((iconv_t)0 != iod->input_conv_cd)
+#					ifdef KEEP_zOS_EBCDIC
+					if ((iconv_t)0 != io_ptr->input_conv_cd)
 					{
-						ICONV_CLOSE_CD(iod->input_conv_cd);
+						ICONV_CLOSE_CD(io_ptr->input_conv_cd);
 					}
-					SET_CODE_SET(iod->in_code_set, (char *)(pp->str.addr + p_offset + 1));
-					if (DEFAULT_CODE_SET != iod->in_code_set)
-						ICONV_OPEN_CD(iod->input_conv_cd,
-							      (char *)(pp->str.addr + p_offset + 1), INSIDE_CH_SET);
-#						endif
-					GET_ADDR_AND_LEN(chset_mstr.addr, chset_mstr.len);
+					SET_CODE_SET(io_ptr->in_code_set, (char *)(devparms->str.addr + p_offset + 1));
+					if (DEFAULT_CODE_SET != io_ptr->in_code_set)
+						ICONV_OPEN_CD(io_ptr->input_conv_cd,
+							      (char *)(devparms->str.addr + p_offset + 1), INSIDE_CH_SET);
+#					endif
+					GET_ADDR_AND_LEN(devparms, p_offset, chset_mstr.addr, chset_mstr.len);	//kt mod
 					SET_ENCODING(temp_chset, &chset_mstr);
 					if (!gtm_utf8_mode && IS_UTF_CHSET(temp_chset))
 						break;	/* ignore UTF chsets if not utf8_mode. */
 					if (IS_UTF16_CHSET(temp_chset))		/* UTF16 is not valid for TTY */
 						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_BADCHSET, 2,
 							      chset_mstr.len, chset_mstr.addr);
-					iod->ichset = temp_chset;
+					io_ptr->ichset = temp_chset;
 					break;
 				}
 				case iop_opchset:
 				{
-#						ifdef KEEP_zOS_EBCDIC
-					if ((iconv_t)0 != iod->output_conv_cd)
+#					ifdef KEEP_zOS_EBCDIC
+					if ((iconv_t)0 != io_ptr->output_conv_cd)
 					{
-						ICONV_CLOSE_CD(iod->output_conv_cd);
+						ICONV_CLOSE_CD(io_ptr->output_conv_cd);
 					}
-					SET_CODE_SET(iod->out_code_set, (char *)(pp->str.addr + p_offset + 1));
-					if (DEFAULT_CODE_SET != iod->out_code_set)
-						ICONV_OPEN_CD(iod->output_conv_cd, INSIDE_CH_SET,
-							      (char *)(pp->str.addr + p_offset + 1));
-#						endif
-					GET_ADDR_AND_LEN(chset_mstr.addr, chset_mstr.len);
+					SET_CODE_SET(io_ptr->out_code_set, (char *)(devparms->str.addr + p_offset + 1));
+					if (DEFAULT_CODE_SET != io_ptr->out_code_set)
+						ICONV_OPEN_CD(io_ptr->output_conv_cd, INSIDE_CH_SET,
+							      (char *)(devparms->str.addr + p_offset + 1));
+#					endif
+					GET_ADDR_AND_LEN(devparms, p_offset, chset_mstr.addr, chset_mstr.len);	//kt mod
 					SET_ENCODING(temp_chset, &chset_mstr);
 					if (!gtm_utf8_mode && IS_UTF_CHSET(temp_chset))
 						break;	/* ignore UTF chsets if not utf8_mode. */
 					if (IS_UTF16_CHSET(temp_chset))		/* UTF16 is not valid for TTY */
 						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_BADCHSET, 2,
 							      chset_mstr.len, chset_mstr.addr);
-					iod->ochset = temp_chset;
+					io_ptr->ochset = temp_chset;
 					break;
 				}
 				case iop_chset:
 				{
-					GET_ADDR_AND_LEN(chset_mstr.addr, chset_mstr.len);
+					GET_ADDR_AND_LEN(devparms, p_offset, chset_mstr.addr, chset_mstr.len);	//kt mod
 					SET_ENCODING(temp_chset, &chset_mstr);
 					if (!gtm_utf8_mode && IS_UTF_CHSET(temp_chset))
 						break;	/* ignore UTF chsets if not utf8_mode. */
 					if (IS_UTF16_CHSET(temp_chset))		/* UTF16 is not valid for TTY */
 						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_BADCHSET, 2,
 							      chset_mstr.len, chset_mstr.addr);
-					iod->ichset = iod->ochset = temp_chset;
+					io_ptr->ichset = io_ptr->ochset = temp_chset;
 					break;
 				}
+				//---- below exclusively from iott_open params
+				case iop_m:
+					io_ptr->ichset = io_ptr->ochset = CHSET_M;
+					break;
+				case iop_utf8:
+					if (gtm_utf8_mode)
+						io_ptr->ichset = io_ptr->ochset = CHSET_UTF8;
+					break;
+				//---- below are sometimes added to devparams in io_init, but apparently not processed.
+				case iop_newversion:
+					do_nothing = 1; //kt added.  Just a stopping place for debugger
+					break;
+				case iop_stream:
+					do_nothing = 2; //kt added  Just a stopping place for debugger
+					break;
+				case iop_nl:
+					do_nothing = 3; //kt added  Just a stopping place for debugger
+					break;
+				case iop_shared:
+					do_nothing = 4; //kt added  Just a stopping place for debugger
+					break;
+				case iop_readonly:
+					do_nothing = 5; //kt added  Just a stopping place for debugger
+					break;
+				default:
+					break;
 			}
-			UPDATE_P_OFFSET(p_offset, ch, pp);	/* updates "p_offset" using "ch" and "pp" */
 		}
-		temp_ptr = (d_tt_struct *)d_in->dev_sp;
-		Tcsetattr(tt_ptr->fildes, TCSANOW, &t, status, save_errno, CHANGE_TERM_TRUE);
+		UPDATE_P_OFFSET(p_offset, ch, devparms);	// updates "p_offset" using "ch" and "devparms"
+
+	}
+
+	if (flush_input)
+	{
+		TCFLUSH(tt_ptr->fildes, TCIFLUSH, status);
 		if (0 != status)
 		{
-			assert(WBTEST_YDB_KILL_TERMINAL == ydb_white_box_test_case_number);
-			ISSUE_NOPRINCIO_BEFORE_RTS_ERROR_IF_APPROPRIATE(iod);
-			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_TCSETATTR, 1, tt_ptr->fildes, save_errno);
-		}
-		/* Store both t.c_lflag and t.c_iflag back in tt_ptr after calling Tcsetattr */
-		/* t.c_iflag used for show TTSYNC and NOTTSYNC when using ZSHOW "D" */
-		/* we may not need t.c_lflag because tt_ptr->canonical is currently responsible for CANONICAL output */
-		/* in sr_unix/zshow_devices.c but we might need it later so just store it both just in case */
-		tt_ptr->ttio_struct->c_iflag = t.c_lflag;
-		tt_ptr->ttio_struct->c_iflag = t.c_iflag;
-		if (tt == d_in->type)
-		{
-			temp_ptr->term_ctrl = mask_in;
-			/* reset the mask to default if chset was changed without specifying new terminators or Default */
-			if ((!terminator_specified && (old_ichset != iod->ichset)) ||
-			    (terminator_specified && temp_ptr->default_mask_term))
-			{
-				memset(&mask_term.mask[0], 0, SIZEOF(io_termmask));
-				if (CHSET_M != iod->ichset)
-				{
-					mask_term.mask[0] = TERM_MSK_UTF8_0;
-					mask_term.mask[4] = TERM_MSK_UTF8_4;
-				} else
-					mask_term.mask[0] = TERM_MSK;
-				temp_ptr->default_mask_term = TRUE;
-			}
-			memcpy(&temp_ptr->mask_term, &mask_term, SIZEOF(io_termmask));
-		}
-		if (flush_input)
-		{
-			TCFLUSH(tt_ptr->fildes, TCIFLUSH, status);
-			if (0 != status)
-			{
-				ISSUE_NOPRINCIO_BEFORE_RTS_ERROR_IF_APPROPRIATE(iod);
-				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("tcflush input"),
+			ISSUE_NOPRINCIO_BEFORE_RTS_ERROR_IF_APPROPRIATE(io_ptr);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("tcflush input"),
 					      CALLFROM, errno);
-			}
 		}
-	} else if (tt_ptr->mupintr && !dollar_zininterrupt)
-	{	/* The interrupted read was not properly resumed so clear it now */
-		tt_ptr->mupintr = FALSE;
-		tt_ptr->tt_state_save.who_saved = ttwhichinvalid;
-		io_find_mvstent(iod, TRUE);	/* clear mv stack entry */
 	}
-	REVERT_GTMIO_CH(&iod->pair, ch_set);
-	return;
+
+	if (dev_is_tt)
+	{
+		/* if chset was changed without specifying new terminators or Default, then reset the mask to default  */
+		if ((!terminator_specified && (old_ichset != io_ptr->ichset)) 		||
+		    ( terminator_specified && (tt_ptr->io_state.default_mask_term)))
+		{
+			set_mask_term_conditional(io_ptr, &mask_term, (CHSET_M != io_ptr->ichset), TRUE);  //kt mod combining duplicate code
+		}
+		//kt original --> memcpy(&temp_ptr->io_state.mask_term, &mask_term, SIZEOF(io_termmask));
+		tt_ptr->io_state.mask_term = mask_term;  //kt mod
+	}
+}
+
+void set_mask_term_conditional(io_desc* io_ptr, io_termmask*  mask_term_ptr, boolean_t utf8_active, boolean_t set_default)
+//kt added function to combine duplicate code.
+{
+	d_tt_struct * 		tt_ptr;
+	tt_ptr = (d_tt_struct *)io_ptr->dev_sp;
+
+	*mask_term_ptr = NULL_TERM_MASK;
+	if (utf8_active)
+	{
+		mask_term_ptr->mask[0] = TERM_MSK_UTF8_0;	//kt doc: "add FF"	Hex 0x08003400, or Binary 00001000 00000000 00110100 00000000 bits 10, 12, 13, 27 are ON
+		mask_term_ptr->mask[4] = TERM_MSK_UTF8_4;	//kt doc: "NL"		Hex 0x00000020, or Binary 00000000 00000000 00000000 00100000 bit 5 is ON
+	} else
+	{
+		mask_term_ptr->mask[0] = TERM_MSK;		//kt doc: "CR LF ESC"	Hex 0x08002400, or Binary 00001000 00000000 00100100 00000000 bits 10, 13, 27 are ON
+	}
+	if (set_default)
+	{
+		tt_ptr->io_state.default_mask_term = TRUE;
+	}
+
 }

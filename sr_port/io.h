@@ -149,7 +149,7 @@ typedef struct io_desc_struct
 		int		devicebufferlen;
 	}dollar;
 	unsigned char			esc_state;
-	void				*dev_sp;
+	void				*dev_sp;	//kt doc: used variantly to hold: d_us_struct*, d_rm_struct*, d_socket_struct*, or d_tt_struct*
 	struct dev_dispatch_struct	*disp_ptr;
 #if defined(KEEP_zOS_EBCDIC)
 	iconv_t				input_conv_cd;
@@ -191,7 +191,7 @@ typedef struct io_desc_struct
  * First WRITE: Do not WRITE BOM. All output in specified endian format
  */
 
-typedef struct io_log_name_struct
+typedef struct io_log_name_struct		//kt doc: "log" means *logical* record.
 {
 	io_desc		*iod;		/* io descriptor	*/
 	struct io_log_name_struct
@@ -226,7 +226,7 @@ typedef struct dev_dispatch_struct
 
 /* io_ prototypes */
 void io_rundown(int rundown_type);
-void io_init(boolean_t term_ctrl);
+void io_init(boolean_t ctrlc_enable);		//kt renamed "term_ctrl" to "ctrlc_enable" for consistency across codebase.
 bool io_is_rm(mstr *name);
 bool io_is_sn(mstr *tn);
 struct mv_stent_struct *io_find_mvstent(io_desc *io_ptr, boolean_t clear_mvstent);
@@ -397,10 +397,18 @@ LITREF unsigned char ebcdic_spaces_block[];
 }
 #define SET_ENCODING(CHSET, CHSET_MSTR)	SET_ENCODING_VALIDATE(CHSET, CHSET_MSTR,)
 
+/*  //kt Original version below.
 #define GET_ADDR_AND_LEN(ADDR, LEN)												\
 {																\
 	ADDR = (char *)(pp->str.addr + p_offset + 1);										\
 	LEN = (int)(*(pp->str.addr + p_offset));										\
+}
+*/
+//kt replaced macro above, changing to new version below, adding 2 additional input parameters to remove dependence on local scope
+#define GET_ADDR_AND_LEN(STRUCT, OFFSET, ADDR, LEN)  										\
+{                                             											\
+    ADDR = (char *)((STRUCT)->str.addr + OFFSET + 1); 										\
+    LEN = (int)(*(STRUCT)->str.addr + OFFSET);        										\
 }
 
 /* Set the UTF-16 variant IFF not already set. Use the UTF16 variant to set the new CHSET (for SOCKET devices) */
