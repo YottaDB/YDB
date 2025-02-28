@@ -94,7 +94,7 @@ MBSTART {													\
 				ERR_SYSCALL, 5, RTS_ERROR_LITERAL("semop()"), CALLFROM, save_errno);		\
 	}													\
 	udi->grabbed_access_sem = FALSE;									\
-	ERR |= gds_rundown(CLEANUP_UDI_TRUE); /* Rundown stops times for prior regions */			\
+	ERR |= gds_rundown(CLEANUP_UDI_TRUE); /* Rundown stops timers for prior regions */			\
 } MBEND
 
 GBLREF	bool			error_mupip;
@@ -376,6 +376,7 @@ void mupip_upgrade(void)
 			       TRUE, REG_LEN_STR(reg));
 			/* Start-up conditions */
 			mu_upgrade_in_prog = MUPIP_UPGRADE_IN_PROGRESS;
+			assert(csd->fully_upgraded);
 			csd->fully_upgraded = FALSE;
 			/* Extend the DB to accomodate the larger master map. Asking for 2x SVBN blocks is quick'n'dirty math */
 			if (SS_NORMAL != (status = upgrade_extend(START_VBN_CURRENT << 1, reg)))	/* WARNING assignment */

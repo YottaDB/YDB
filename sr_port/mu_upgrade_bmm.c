@@ -811,6 +811,11 @@ int4 upgrade_extend(gtm_int8 extension, gd_region *reg)
 		util_out_print("Region !AD: Extension size not set in database header.", TRUE, REG_LEN_STR(reg));
 		util_out_print("Region !AD: Perform a MUPIP EXTEND on this region,", FALSE, REG_LEN_STR(reg));
 		util_out_print(" otherwise free at least 0x!@XQ blocks to continue.", TRUE, &extension);
+		/* Caller function "mupip_upgrade()" would have set "csd->fully_upgraded" to FALSE just before calling us.
+		 * We have not modified the V6 database file at this point and are about to issue an error and abort the
+		 * upgrade process. So reset "csd->fully_upgraded" back to what it was at the start of the upgrade.
+		 */
+		cs_data->fully_upgraded = TRUE;
 		return ERR_MUNOFINISH;
 	}
 	util_out_print(" Attempting a file extension on the database.", TRUE, REG_LEN_STR(reg)); /* This print follows the entry */
