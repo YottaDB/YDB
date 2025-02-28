@@ -1666,7 +1666,7 @@ enum cdb_sc upgrade_dir_tree(block_id curr_blk, block_id offset, gd_region *reg,
 			assert(!starkey || (level && ((recBase + rec_sz) == blkEnd)));
 			*lost = 0;
 			/* There are 3 records of concern here:
-			 * recBaseP	- pointer to the record prior the one to be deleted. There is a placeholder only key_buffP
+			 * recBaseP	- pointer to record prior to the one to be deleted. There is a placeholder only key_buffP
 			 * 		  used because read_record() needs buffer backing. We don't use it, because it is used
 			 * 		  to find the pointer to turn the record into a *-key
 			 * recBase	- the active record to be deleted. The current key is in key_buff
@@ -1762,8 +1762,10 @@ enum cdb_sc upgrade_dir_tree(block_id curr_blk, block_id offset, gd_region *reg,
 				DEBUG_ONLY(recBase += starkey ? BSTAR_REC_SIZE_32 : ((rec_hdr_ptr_t)(recBase))->rsiz);
 				break;
 			}
-			recBaseP = recBase;							/* reprocess revised record */
-			rec_sz = ((rec_hdr_ptr_t)(recBase))->rsiz;
+			/* Since the current record is being deleted, "recBaseP" (which should be one record before
+			 * recBase when the next iteration starts) should be what it was at the start of this iteration
+			 * and so leave it untouched.
+			 */
 			continue;
 		}										/* done with KILL'd global name */
 		first_rec = FALSE;
