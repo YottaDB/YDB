@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019-2024 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -112,8 +112,14 @@ void zl_cmd_qlf(mstr *quals, command_qualifier *qualif, char *srcstr, unsigned s
 				!(status & 1) ? status : ERR_NORTN);
 		}
 		file.addr = pblk.l_name;
-		if ((pblk.b_ext != (SIZEOF(DOTM) - 1)) || memcmp(&pblk.l_name[pblk.b_name], DOTM, SIZEOF(DOTM) - 1))
-		{	/* Move any non-".m" extension over to be part of the file name */
+		/* If the specified file does not have an extension (i.e. the extension is "") OR if it has an extension
+		 * of length 1 (i.e. the extension is just "."), then treat whatever was specified as the base name and
+		 * add a ".m" extension to the base name. For extension lengths >= 2, leave the base name untouched.
+		 */
+		assert(2 == (SIZEOF(DOTM) - 1));	/* SIZEOF(DOTM) includes the trailing '\0' byte too hence the - 1 */
+		assert((1 != pblk.b_ext) || ('.' == *pblk.l_ext));
+		if (2 > pblk.b_ext)
+		{
 			pblk.b_name += pblk.b_ext;
 			pblk.b_ext = 0;
 			if ((pblk.buffer + MAX_FN_LEN) >= (pblk.l_name + pblk.b_name + SIZEOF(DOTM)))
