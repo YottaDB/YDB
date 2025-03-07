@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2020-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2020-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -58,12 +58,11 @@ void op_fntranslate_common(mval *src, mval *dst, mval *rplc, int4 *xlate, hash_t
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	/* callers using stringpool (compile_time) must already make sure there is space in the stringpool for the result */
-	if (!IS_IN_STRINGPOOL(xlate_hash, 1))					/* length not available but doesn't matter */
-	{
-		ENSURE_STP_FREE_SPACE(src->str.char_len * MAX_CHAR_LEN);
-	} else	/* nasty things can happen */
-		assertpro(IS_STP_SPACE_AVAILABLE_PRO(src->str.char_len * MAX_CHAR_LEN));
+	/* Callers using stringpool (compile_time) must already make sure there is space in the stringpool for the result.
+	 * But we will never reach here in that case. This is asserted below.
+	 */
+	assert(!IS_IN_STRINGPOOL(xlate_hash, 1));				/* length not available but doesn't matter */
+	ENSURE_STP_FREE_SPACE(src->str.char_len * MAX_CHAR_LEN);
 	srcptr = src->str.addr;
 	srctop = srcptr + src->str.len;
 	dstptr = stringpool.free;
@@ -150,7 +149,7 @@ void op_fntranslate_common(mval *src, mval *dst, mval *rplc, int4 *xlate, hash_t
 
 void op_fntranslate(mval *src, mval *srch, mval *rplc, mval *dst)
 {
-	int			dummy_len, maxLengthString, *xlate;
+	int			dummy_len, *xlate;
 	mstr			m_xlate;
 	static hash_table_int4	*xlate_hash = NULL;
 	static int4		xlate_array[NUM_CHARS];
@@ -184,18 +183,9 @@ void op_fntranslate(mval *src, mval *srch, mval *rplc, mval *dst)
 			op_fnztranslate(src, srch, rplc, dst);
 		return;
 	}
-	maxLengthString = srch->str.char_len;
-	if (!((srch->mvtype & MV_UTF_LEN) && (srch->str.len == srch->str.char_len)) && (NUM_CHARS < srch->str.char_len))
-	{	/* need more space */
-		m_xlate.len = srch->str.char_len;
-		m_xlate.addr = malloc(SIZEOF(int4) * maxLengthString);
-		maxLengthString += MIN((src->str.char_len * MAX_CHAR_LEN), MAX_STRLEN);
-	} else
-	{
-		m_xlate.len = SIZEOF(int4) * NUM_CHARS;
-		m_xlate.addr = (char *)xlate_array;
-	}
-	ENSURE_STP_FREE_SPACE(maxLengthString); /* do now because op_fntranslate_common must be paranoid about stp_gcol */
+	assert(srch->mvtype & MV_UTF_LEN);
+	m_xlate.len = SIZEOF(int4) * NUM_CHARS;
+	m_xlate.addr = (char *)xlate_array;
 	if (!((prev_gcols == stringpool.gcols) && (&xlate_array[0] == (int4 *)m_xlate.addr) && (srch->str.addr == prev_srch.addr)
 		&& (srch->str.len == prev_srch.len) && (rplc->str.addr == prev_rplc.addr) && (rplc->str.len == prev_rplc.len)))
 	{	/* not a repeat, so can't reuse the last tables; above: !&& fails quicker than || */
