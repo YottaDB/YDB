@@ -1,0 +1,89 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug yottadb",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/yottadb", // Path to yottadb executable
+            "args": ["-dir"], // Command-line arguments for yottadb
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}", // Working directory for the debugger
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "miDebuggerPath": "/usr/bin/gdb", // Or debugger's path
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ],
+            "preLaunchTask": "build" // Matches the label of build task in tasks.json
+        },
+        {
+            "name": "Debug DSE",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/dse", // Path to dse executable
+            "args": [], // Command-line arguments for dse
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}", // Working directory for the debugger
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "miDebuggerPath": "/usr/bin/gdb", // Or debugger's path
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ],
+            "preLaunchTask": "build" // Matches the label of build task in tasks.json
+        },
+        {
+            "name": "Debug LKE",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/lke", // Path to lke executable
+            "args": [], // Command-line arguments for dse
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}", // Working directory for the debugger
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "miDebuggerPath": "/usr/bin/gdb", // Or debugger's path
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ],
+            "preLaunchTask": "build" // Matches the label of build task in tasks.json
+        },
+        {
+            "name": "Debug mupip",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/mupip", // Path to mupip executable
+            "args": [], // Command-line arguments for mupip
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}", // Working directory for the debugger
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "miDebuggerPath": "/usr/bin/gdb", // Or debugger's path
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ],
+            "preLaunchTask": "build" // Matches the label of your build task in tasks.json
+        }
+    ]
+}

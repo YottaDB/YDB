@@ -1,0 +1,50 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "cmake",
+      "type": "shell",
+      "command": "cmake",
+      "args": [
+        "-D",
+        "CMAKE_BUILD_TYPE=Debug",
+        ".."
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}/build"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "build",
+      "type": "shell",
+      "command": "make",
+      "args": [
+        "-j",
+        "${env:NUMBER_OF_PROCESSORS}" // or "$(getconf _NPROCESSORS_ONLN)" if you prefer
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}/build"
+      },
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "dependsOn": "cmake",
+      "problemMatcher": ["$gcc"]
+    },
+    {
+      "label": "install",
+      "type": "shell",
+      "command": "make",
+      "args": [
+        "install"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}/build"
+      },
+      "problemMatcher": []
+    }
+  ]
+}
+

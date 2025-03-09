@@ -1,0 +1,4 @@
+#!/bin/bash
+
+find . -type f -exec grep -l "//kt" {} \; -exec cp --parents {}  /opt/worldvista/EHR/compile/tmg_code_backup/ \;
+

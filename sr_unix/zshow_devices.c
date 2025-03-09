@@ -256,29 +256,29 @@ void zshow_devices(zshow_out *output)
 						ZS_ONE_OUT(&v, rparen_text);
 						ZS_ONE_OUT(&v, space_text);
 					}
-					if ((int4)(tt_ptr->term_ctrl) & TRM_NOECHO)
+					if (tt_ptr->io_state.devparam_echo == FALSE)  //kt mod
 					{
 						ZS_PARM_SP(&v, zshow_noecho);
 					}
-					if (tt_ptr->term_ctrl & TRM_PASTHRU)
+					if (tt_ptr->io_state.passthru == TRUE)  //kt mod.
 					{
 						ZS_PARM_SP(&v, zshow_past);
 					} else
 					{
 						ZS_PARM_SP(&v, zshow_nopast);
 					}
-					if (!(tt_ptr->term_ctrl & TRM_ESCAPE))
+					if (!(tt_ptr->io_state.escape_processing))  //kt mod.
 					{
 						ZS_PARM_SP(&v, zshow_noesca);
 					}
-					if (tt_ptr->term_ctrl & TRM_READSYNC)
+					if (tt_ptr->io_state.readsync == TRUE)  //kt mod.
 					{
 						ZS_PARM_SP(&v, zshow_reads);
 					} else
 					{
 						ZS_PARM_SP(&v, zshow_noreads);
 					}
-					if (tt_ptr->term_ctrl & TRM_NOTYPEAHD)
+					if (tt_ptr->io_state.no_type_ahead)  //kt mod
 					{
 						ZS_PARM_SP(&v, zshow_notype);
 					} else
@@ -289,8 +289,8 @@ void zshow_devices(zshow_out *output)
 					{
 						ZS_PARM_SP(&v, zshow_nowrap);
 					}
-					mask_out = &tt_ptr->mask_term;
-					if (!tt_ptr->default_mask_term)
+					mask_out = &tt_ptr->io_state.mask_term;  //kt mod
+					if (!tt_ptr->io_state.default_mask_term)  //kt mod
 					{
 						ZS_PARM_EQU(&v, zshow_term);
 						ZS_STR_OUT(&v,dollarc_text);
@@ -345,13 +345,13 @@ void zshow_devices(zshow_out *output)
 							ZS_ONE_OUT(&v,rparen_text);
 						ZS_ONE_OUT(&v, space_text);
 					}
-					if (TT_EDITING & tt_ptr->ext_cap)
+					if BIT_FLAG_IS_ON(TT_EDITING, tt_ptr->io_state.ext_cap) //kt mod
 						ZS_PARM_SP(&v, zshow_edit);
-					if (TT_NOINSERT & tt_ptr->ext_cap)
+					if BIT_FLAG_IS_ON(TT_NOINSERT, tt_ptr->io_state.ext_cap) //kt mod
 						ZS_PARM_SP(&v, zshow_noinse);
-					if (TT_EMPTERM & tt_ptr->ext_cap)
+					if BIT_FLAG_IS_ON(TT_EMPTERM, tt_ptr->io_state.ext_cap)  //kt mod.
 						ZS_PARM_SP(&v, zshow_empterm);
-					if (tt_ptr->canonical)
+					if (tt_ptr->io_state.canonical)	//kt mod.
 						ZS_STR_OUT(&v, "CANONICAL ");
 					switch(tiod->ichset)
 					{
@@ -389,16 +389,16 @@ void zshow_devices(zshow_out *output)
 						ZS_STR_OUT(&v, interrupt_text);
 					if (hup_on)
 						ZS_STR_OUT(&v, hup_text);
-					if (tt_ptr->ttio_struct->c_iflag & IXON)
+					if (tt_ptr->io_state.ttsync)  //kt mod
 						ZS_PARM_SP(&v, zshow_ttsy);
 					else
 						ZS_PARM_SP(&v, zshow_nottsy);
-					if (tt_ptr->ttio_struct->c_iflag & IXOFF)
+					if (tt_ptr->io_state.hostsync)  //kt mod
 						ZS_PARM_SP(&v, zshow_host);
 					else
 						ZS_PARM_SP(&v, zshow_nohost);
 					/* CONVERT is like HUPENABLE which only show up when enable it */
-					if (tt_ptr->term_ctrl & TRM_CONVERT)
+					if (tt_ptr->io_state.case_convert)    //kt mod
 						ZS_PARM_SP(&v, zshow_conv);
 					break;
 				case rm:

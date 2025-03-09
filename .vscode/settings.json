@@ -1,0 +1,23 @@
+{
+        "files.associations": {
+                "errno.h": "c",
+                "io.h": "c",
+                "gtm_termios.h": "c",
+                "gtm_threadgbl.h": "c",
+                "gtm_threadgbl_deftypes.h": "c",
+                "mdef.h": "c",
+                "gtm_signal.h": "c",
+                "gtm_unistd.h": "c",
+                "io_params.h": "c",
+                "signal.h": "c",
+                "functional": "c",
+                "iott_open.h": "c",
+                "eintr_wrappers.h": "c",
+                "send_msg.h": "c",
+                "stringpool.h": "c",
+                "util_output.h": "c",
+                "release_name.h": "c",
+                "trmdef.h": "c",
+                "util.h": "c"
+        }
+}

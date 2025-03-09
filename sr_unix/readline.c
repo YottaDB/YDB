@@ -798,7 +798,7 @@ int readline_startup_hook(void) {
 	*vrl_already_prompted = 0;
 
 	/* Insert mode from ydb_principal_editing="[NO]INSERT" */
-	insert_mode = !(TT_NOINSERT & tt_ptr->ext_cap);
+	insert_mode = BIT_FLAG_IS_OFF(TT_NOINSERT, tt_ptr->io_state.ext_cap); 		//kt mod
 	if (!insert_mode) {
 		/* Activate OVERWRITE mode */
 		frl_overwrite_mode(1,0);

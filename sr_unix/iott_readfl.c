@@ -88,14 +88,15 @@ error_def(ERR_NOPRINCIO);
 error_def(ERR_TERMHANGUP);
 error_def(ERR_ZINTRECURSEIO);
 
-#define IOTT_MOVE_START_OF_LINE(TT_PTR_FILDES, DX, DX_INSTR, DX_START, IOPTR_WIDTH, MASK, TERM_ERROR_LINE, INSTR)	\
+//kt
+#define IOTT_MOVE_START_OF_LINE(TT_PTR_FILDES, ECHO_MODE, DX, DX_INSTR, DX_START, IOPTR_WIDTH, TERM_ERROR_LINE, INSTR)	\
 MBSTART {														\
 	int	num_lines_above;											\
 	int	num_chars_left;												\
 															\
 	num_lines_above = (dx_instr + dx_start) / ioptr_width;								\
 	num_chars_left = dx - dx_start;											\
-	if (!(mask & TRM_NOECHO))											\
+	if (ECHO_MODE)													\
 	{														\
 		if (0 != move_cursor(tt_ptr->fildes, num_lines_above, num_chars_left))					\
 		{													\
@@ -107,7 +108,8 @@ MBSTART {														\
 	dx = dx_start;													\
 } MBEND
 
-#define IOTT_MOVE_END_OF_LINE(TT_PTR_FILDES, DX, DX_INSTR, DX_START, DX_OUTLEN, IOPTR_WIDTH, MASK, TERM_ERROR_LINE, INSTR, OUTLEN)	\
+//kt
+#define IOTT_MOVE_END_OF_LINE(TT_PTR_FILDES, ECHO_MODE, DX, DX_INSTR, DX_START, DX_OUTLEN, IOPTR_WIDTH, TERM_ERROR_LINE, INSTR, OUTLEN)	\
 MBSTART {																\
 	int	num_lines_above;													\
 	int	num_chars_left;														\
@@ -124,7 +126,7 @@ MBSTART {																\
 	else																\
 		num_chars_left = - ((dx_outlen + dx_start) % ioptr_width);								\
 																	\
-	if (!(mask & TRM_NOECHO))													\
+	if (ECHO_MODE)															\
 	{																\
 		if (0 != move_cursor(tt_ptr->fildes, num_lines_above, num_chars_left))							\
 		{															\
@@ -210,7 +212,13 @@ int	iott_readfl(mval *v, int4 length, uint8 nsec_timeout)	/* timeout in millisec
 	io_termmask	mask_term;
 	mv_stent	*mvc, *mv_zintdev;
 	tt_interrupt	*tt_state;
-	uint4		mask;
+	boolean_t	echo_mode;  			//kt added  Local alias
+	uint4		ext_cap;  			//kt added
+	ttio_state	temp_io_state; 			//kt added
+	boolean_t	char_is_terminator;		//kt added
+	boolean_t	char_is_special_terminator; 	//kt added
+	boolean_t	char_is_erase;			//kt added
+	boolean_t	char_is_backspace;		//kt added
 	unsigned char	inbyte, *outptr, *outtop, *zb_ptr, *zb_top;
 	unsigned char	more_buf[GTM_MB_LEN_MAX + 1], *more_ptr;	/* to build up multi byte for character */
 	unsigned char	*buffer_start;		/* beginning of non UTF8 buffer */
@@ -236,11 +244,22 @@ int	iott_readfl(mval *v, int4 length, uint8 nsec_timeout)	/* timeout in millisec
 	}
 	ESTABLISH_RET_GTMIO_CH(&io_curr_device, -1, ch_set);
 	tt_ptr = (d_tt_struct *)(io_ptr->dev_sp);
-	SETTERM_IF_NEEDED(io_ptr, tt_ptr);
+	if ((length != tt_ptr->in_buf_sz) && (tt_ptr->io_state.canonical == true))   //kt added block
+	{
+		//Handle situation: READ X#123  <-- i.e. read particular number of characters.
+		//NOTE: Canonical is not compatible with reading a particular number of characters, because TTY IO subsystem will hold on to all chars until a terminator (e.g. LF or CR) encountered/
+		iott_setterm_for_no_canonical(io_ptr, &temp_io_state);	//kt added.  Establishes temp_io_state for use here in this function
+	} else
+	{
+		SETTERM_IF_NEEDED(io_ptr, tt_ptr);
+		temp_io_state = tt_ptr->io_state;  		//kt make temp_io_state to be same as normal state.
+	}
 	assert(dev_open == io_ptr->state);
 	iott_flush(io_curr_device.out);
-	insert_mode = !(TT_NOINSERT & tt_ptr->ext_cap);	/* get initial mode */
-	empterm	= (TT_EMPTERM & tt_ptr->ext_cap);
+	ext_cap =  temp_io_state.ext_cap; 			//kt added
+	insert_mode = BIT_FLAG_IS_OFF(TT_NOINSERT, ext_cap);	/* get initial mode */  		//kt mod
+	empterm	= BIT_FLAG_IS_ON(TT_EMPTERM, ext_cap); 							//kt mod
+	echo_mode = temp_io_state.ydb_echo; 								//kt
 	ioptr_width = io_ptr->width;
 	utf8_active = gtm_utf8_mode ? (CHSET_M != io_ptr->ichset) : FALSE;
 	/* if utf8_active, need room for multi byte characters plus wint_t buffer */
@@ -345,15 +364,14 @@ int	iott_readfl(mval *v, int4 length, uint8 nsec_timeout)	/* timeout in millisec
 	}
 	v->str.len = 0;
 	ret = TRUE;
-	mask = tt_ptr->term_ctrl;
-	mask_term = tt_ptr->mask_term;
+	mask_term = temp_io_state.mask_term;						//kt mod
 	/* keep test in next line in sync with test in iott_rdone.c */
-	edit_mode = (0 != (TT_EDITING & tt_ptr->ext_cap) && !((TRM_NOECHO|TRM_PASTHRU) & mask));
+	edit_mode = ( BIT_FLAG_IS_ON(TT_EDITING, ext_cap) && (temp_io_state.passthru == FALSE ) && echo_mode );  		//kt mod
 	if (!zint_restart)
 	{
-		if (mask & TRM_NOTYPEAHD)
+		if (temp_io_state.no_type_ahead)  					//kt mod
 			TCFLUSH(tt_ptr->fildes, TCIFLUSH, status);
-		if (mask & TRM_READSYNC)
+		if (temp_io_state.readsync)  						//kt mod
 		{
 			DOWRITERC(tt_ptr->fildes, &dc1, 1, status);
 			if (0 != status)
@@ -365,14 +383,14 @@ int	iott_readfl(mval *v, int4 length, uint8 nsec_timeout)	/* timeout in millisec
 	}
 	if (edit_mode)
 	{	/* remove ESC and editing control characters from terminator list */
-		mask_term.mask[ESC / NUM_BITS_IN_INT4] &= ~(1 << ESC);
-		mask_term.mask[EDIT_SOL / NUM_BITS_IN_INT4] &= ~(1 << EDIT_SOL);
-		mask_term.mask[EDIT_EOL / NUM_BITS_IN_INT4] &= ~(1 << EDIT_EOL);
-		mask_term.mask[EDIT_DEOL / NUM_BITS_IN_INT4] &= ~(1 << EDIT_DEOL);
-		mask_term.mask[EDIT_DELETE / NUM_BITS_IN_INT4] &= ~(1 << EDIT_DELETE);
-		mask_term.mask[EDIT_LEFT / NUM_BITS_IN_INT4] &= ~(1 << EDIT_LEFT);
-		mask_term.mask[EDIT_RIGHT / NUM_BITS_IN_INT4] &= ~(1 << EDIT_RIGHT);
-		mask_term.mask[EDIT_ERASE / NUM_BITS_IN_INT4] &= ~(1 << EDIT_ERASE);
+		TURN_MASK_BIT_OFF(mask_term.mask, ESC);
+		TURN_MASK_BIT_OFF(mask_term.mask, EDIT_SOL);
+		TURN_MASK_BIT_OFF(mask_term.mask, EDIT_EOL);
+		TURN_MASK_BIT_OFF(mask_term.mask, EDIT_DEOL);
+		TURN_MASK_BIT_OFF(mask_term.mask, EDIT_DELETE);
+		TURN_MASK_BIT_OFF(mask_term.mask, EDIT_LEFT);
+		TURN_MASK_BIT_OFF(mask_term.mask, EDIT_RIGHT);
+		TURN_MASK_BIT_OFF(mask_term.mask, EDIT_ERASE);
 		if (!zint_restart)
 		{
 			/* to turn keypad on if possible */
@@ -504,7 +522,7 @@ int	iott_readfl(mval *v, int4 length, uint8 nsec_timeout)	/* timeout in millisec
 			HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 			/* set prin_in_dev_failure to FALSE to indicate input device is working now */
 			prin_in_dev_failure = FALSE;
-			if (tt_ptr->canonical)
+			if (temp_io_state.canonical)  //kt mod
 			{
 				if (0 == inbyte)
 				{
@@ -516,7 +534,7 @@ int	iott_readfl(mval *v, int4 length, uint8 nsec_timeout)	/* timeout in millisec
 					io_ptr->dollar.x = 0;
 					io_ptr->dollar.za = ZA_IO_ERR;
 					io_ptr->dollar.y++;
-					tt_ptr->discard_lf = FALSE;
+					temp_io_state.discard_lf = FALSE; 		 //kt mod
 					if (io_ptr->error_handler.len > 0)
 						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_IOEOF);
 					break;
@@ -526,9 +544,9 @@ int	iott_readfl(mval *v, int4 length, uint8 nsec_timeout)	/* timeout in millisec
 #ifdef UTF8_SUPPORTED
 			if (utf8_active)
 			{
-				if (tt_ptr->discard_lf)
+				if (temp_io_state.discard_lf)  				//kt mod
 				{	/* saw CR last time so ignore following LF */
-					tt_ptr->discard_lf = FALSE;
+					temp_io_state.discard_lf = FALSE; 		 //kt mod
 					if (NATIVE_LF == inbyte)
 						continue;
 				}
@@ -590,13 +608,13 @@ int	iott_readfl(mval *v, int4 length, uint8 nsec_timeout)	/* timeout in millisec
 					if (BOM_CODEPOINT == inchar)
 						continue;
 				}
-				if (mask & TRM_CONVERT)
+				if (temp_io_state.case_convert)  		//kt mod
 					inchar = u_toupper(inchar);
 				GTM_IO_WCWIDTH(inchar, inchar_width);
 			} else
 			{
 #endif
-				if (mask & TRM_CONVERT)
+				if (temp_io_state.case_convert)  		//kt mod
 					NATIVE_CVT2UPPER(inbyte, inbyte);
 				inchar = inbyte;
 				inchar_width = 1;
@@ -604,7 +622,7 @@ int	iott_readfl(mval *v, int4 length, uint8 nsec_timeout)	/* timeout in millisec
 			}
 #endif
 			GETASCII(asc_inchar,inchar);
-			if (!edit_mode && (dx >= ioptr_width) && io_ptr->wrap && !(mask & TRM_NOECHO))
+			if ( !edit_mode && (dx >= ioptr_width) && io_ptr->wrap && echo_mode )  //kt mod
 			{
 				DOWRITE(tt_ptr->fildes, NATIVE_TTEOL, STRLEN(NATIVE_TTEOL));
 				dx = 0;
@@ -621,7 +639,7 @@ int	iott_readfl(mval *v, int4 length, uint8 nsec_timeout)	/* timeout in millisec
 				async_action(FALSE);
 				break;
 			}
-			if (((0 != (mask & TRM_ESCAPE)) || edit_mode)
+			if (((temp_io_state.escape_processing) || edit_mode)  			//kt mod
 			     && ((NATIVE_ESC == inchar) || (START != io_ptr->esc_state)))
 			{
 				if (zb_ptr >= zb_top UTF8_ONLY(|| (utf8_active && ASCII_MAX < inchar)))
@@ -644,20 +662,16 @@ int	iott_readfl(mval *v, int4 length, uint8 nsec_timeout)	/* timeout in millisec
 				 * --------------------------------------------------------------------
 				 */
 			} else
-			{	/* SIMPLIFY THIS! */
-				if (!utf8_active || ASCII_MAX >= INPUT_CHAR)
-				{	/* may need changes to allow terminator > MAX_ASCII and/or LS and PS if default_mask_term */
-					msk_num = (uint4)INPUT_CHAR / NUM_BITS_IN_INT4;
-					msk_in = (1 << ((uint4)INPUT_CHAR % NUM_BITS_IN_INT4));
-					if (msk_in & mask_term.mask[msk_num])
-					{
-						*zb_ptr++ = (unsigned char)INPUT_CHAR;
-						if (utf8_active && ASCII_CR == INPUT_CHAR)
-							tt_ptr->discard_lf = TRUE;
-						break;
-					}
-				} else if (utf8_active && tt_ptr->default_mask_term && (u32_line_term[U32_LT_NL] == INPUT_CHAR ||
-					u32_line_term[U32_LT_LS] == INPUT_CHAR || u32_line_term[U32_LT_PS] == INPUT_CHAR))
+			{
+				char_is_terminator = IS_TERMINATOR(mask_term.mask, INPUT_CHAR, utf8_active);
+				char_is_special_terminator = IS_SPECIAL_TERMINATOR(INPUT_CHAR, utf8_active);
+				if (char_is_terminator)	   //kt mod
+				{
+					*zb_ptr++ = (unsigned char)INPUT_CHAR;
+					if (utf8_active && ASCII_CR == INPUT_CHAR)
+						temp_io_state.discard_lf = TRUE;  //kt mod
+					break;
+				} else if (char_is_special_terminator && temp_io_state.default_mask_term)  //kt
 				{	/* UTF and default terminators and UTF terminators above ASCII_MAX */
 					zb_ptr = UTF8_WCTOMB(INPUT_CHAR, zb_ptr);
 					break;
@@ -667,10 +681,10 @@ int	iott_readfl(mval *v, int4 length, uint8 nsec_timeout)	/* timeout in millisec
 				assert(outlen >= instr);
 				/* For most of the terminal the 'kbs' string capability is a byte in length. It means that it is
 				  Not treated as escape sequence. So explicitly check if the input corresponds to the 'kbs' */
-				if ((((int)inchar == tt_ptr->ttio_struct->c_cc[VERASE]) ||
-				    (empterm && (NULL != KEY_BACKSPACE) && ('\0' == KEY_BACKSPACE[1])
-				     && (inchar == KEY_BACKSPACE[0])))
-				    && !(mask & TRM_PASTHRU))
+				char_is_erase = ((int)inchar == temp_io_state.ttio_struct.c_cc[VERASE]) ;	//kt added
+				char_is_backspace = ((NULL != KEY_BACKSPACE) && ('\0' == KEY_BACKSPACE[1]) && (inchar == KEY_BACKSPACE[0])); 	//kt added
+				if ( ( temp_io_state.passthru == FALSE ) &&
+				     ( char_is_erase || (empterm && char_is_backspace) ) )  //kt mod
 				{
 					if (0 < instr && (edit_mode || 0 < dx))
 					{
@@ -678,7 +692,7 @@ int	iott_readfl(mval *v, int4 length, uint8 nsec_timeout)	/* timeout in millisec
 						delchar_width = dx_instr - dx_prev;
 						if (edit_mode)
 						{
-							if (!(mask & TRM_NOECHO))
+							if (echo_mode)  					//kt
 								move_cursor_left(dx, delchar_width);
 							dx = (dx - delchar_width + ioptr_width) % ioptr_width;
 						} else
@@ -687,12 +701,12 @@ int	iott_readfl(mval *v, int4 length, uint8 nsec_timeout)	/* timeout in millisec
 						dx_instr -= delchar_width;
 						STORE_OFF(' ', outlen);
 						outlen--;
-						if (!(mask & TRM_NOECHO) && edit_mode)
+						if (echo_mode && edit_mode)  					//kt
 						{
 							IOTT_COMBINED_CHAR_CHECK;
 						}
 						MOVE_BUFF(instr, BUFF_ADDR(instr + 1), outlen - instr);
-						if (!(mask & TRM_NOECHO))
+						if (echo_mode)  						//kt
 						{
 							if (!edit_mode)
 							{
@@ -736,12 +750,12 @@ int	iott_readfl(mval *v, int4 length, uint8 nsec_timeout)	/* timeout in millisec
 					{
 						case EDIT_SOL:	/* ctrl A  start of line */
 						{
-							IOTT_MOVE_START_OF_LINE(tt_ptr->fildes, dx, dx_instr, dx_start, ioptr_width, mask, term_error_line, instr);
+							IOTT_MOVE_START_OF_LINE(tt_ptr->fildes, echo_mode, dx, dx_instr, dx_start, ioptr_width, term_error_line, instr);  //kt
 							break;
 						}
 						case EDIT_EOL:	/* ctrl E  end of line */
 						{
-							IOTT_MOVE_END_OF_LINE(tt_ptr->fildes, dx, dx_instr, dx_start, dx_outlen, ioptr_width, mask, term_error_line, instr, outlen);
+							IOTT_MOVE_END_OF_LINE(tt_ptr->fildes, echo_mode, dx, dx_instr, dx_start, dx_outlen, ioptr_width, term_error_line, instr, outlen);  //kt
 							break;
 						}
 						case EDIT_LEFT:	/* ctrl B  left one */
@@ -751,7 +765,7 @@ int	iott_readfl(mval *v, int4 length, uint8 nsec_timeout)	/* timeout in millisec
 								dx_prev = compute_dx(BUFF_ADDR(0), instr - 1,
 												ioptr_width, dx_start);
 								inchar_width = dx_instr - dx_prev;
-								if (!(mask & TRM_NOECHO))
+								if (echo_mode)  //kt mod
 								{
 									if (0 != move_cursor_left(dx, inchar_width))
 									{
@@ -772,7 +786,7 @@ int	iott_readfl(mval *v, int4 length, uint8 nsec_timeout)	/* timeout in millisec
 								dx_next = compute_dx(BUFF_ADDR(0), instr + 1,
 												ioptr_width, dx_start);
 								inchar_width = dx_next - dx_instr;
-								if (!(mask & TRM_NOECHO))
+								if (echo_mode)  //kt mod
 								{
 									if (0 != move_cursor_right(dx, inchar_width))
 									{
@@ -788,7 +802,7 @@ int	iott_readfl(mval *v, int4 length, uint8 nsec_timeout)	/* timeout in millisec
 						}
 						case EDIT_DEOL:	/* ctrl K  delete to end of line */
 						{
-							if (!(mask & TRM_NOECHO))
+							if (echo_mode)  //kt mod
 							{
 								if (0 != write_str_spaces(dx_outlen - dx_instr, dx, FALSE))
 								{
@@ -810,7 +824,7 @@ int	iott_readfl(mval *v, int4 length, uint8 nsec_timeout)	/* timeout in millisec
 											ioptr_width;
 							num_chars_left = dx - dx_start;
 							SET_BUFF(0, ' ', outlen);
-							if (!(mask & TRM_NOECHO))
+							if (echo_mode)  //kt mod
 							{
 								status = move_cursor(tt_ptr->fildes,
 									num_lines_above, num_chars_left);
@@ -833,12 +847,12 @@ int	iott_readfl(mval *v, int4 length, uint8 nsec_timeout)	/* timeout in millisec
 							{
 								STORE_OFF(' ', outlen);
 								outlen--;
-								if (!(mask & TRM_NOECHO))
+								if (echo_mode)  //kt mod
 								{
 									IOTT_COMBINED_CHAR_CHECK;
 								}
 								MOVE_BUFF(instr, BUFF_ADDR(instr + 1), outlen - instr);
-								if (!(mask & TRM_NOECHO))
+								if (echo_mode)  //kt mod
 								{	/* First write spaces on all the display columns that
 									 * the current string occupied. Then overwrite that
 									 * with the new string. This way we are guaranteed all
@@ -873,7 +887,7 @@ int	iott_readfl(mval *v, int4 length, uint8 nsec_timeout)	/* timeout in millisec
 								}
 							}
 							STORE_OFF(inchar, instr);
-							if (!(mask & TRM_NOECHO))
+							if (echo_mode)  //kt mod
 							{
 								if (!edit_mode)
 								{
@@ -919,7 +933,7 @@ int	iott_readfl(mval *v, int4 length, uint8 nsec_timeout)	/* timeout in millisec
 							{	/* Compute value of dollarx at the new cursor position */
 								dx_cur = compute_dx(BUFF_ADDR(0), instr, ioptr_width, dx_start);
 								inchar_width = dx_cur - dx_instr;
-								if (!(mask & TRM_NOECHO))
+								if (echo_mode)  //kt mod
 								{
 									term_error_line = __LINE__;
 									status = move_cursor_right(dx, inchar_width);
@@ -1019,7 +1033,7 @@ int	iott_readfl(mval *v, int4 length, uint8 nsec_timeout)	/* timeout in millisec
 				{	/* Move one character to the left */
 					dx_prev = compute_dx(BUFF_ADDR(0), instr - 1, ioptr_width, dx_start);
 					delchar_width = dx_instr - dx_prev;
-					if (!(mask & TRM_NOECHO))
+					if (echo_mode)  //kt mod
 					{
 						term_error_line = __LINE__;
 						status = move_cursor_left(dx, delchar_width);
@@ -1032,12 +1046,12 @@ int	iott_readfl(mval *v, int4 length, uint8 nsec_timeout)	/* timeout in millisec
 				{
 					STORE_OFF(' ', outlen);
 					outlen--;
-					if (!(mask & TRM_NOECHO))
+					if (echo_mode)  //kt mod
 					{
 						IOTT_COMBINED_CHAR_CHECK;
 					}
 					MOVE_BUFF(instr, BUFF_ADDR(instr + 1), outlen - instr);
-					if (!(mask & TRM_NOECHO))
+					if (echo_mode)  //kt mod
 					{	/* First write spaces on all the display columns that the current string occupied.
 						 * Then overwrite that with the new string. This way we are guaranteed all
 						 * display columns are clean.
@@ -1119,7 +1133,7 @@ int	iott_readfl(mval *v, int4 length, uint8 nsec_timeout)	/* timeout in millisec
 				dx = (unsigned)(dx_instr + dx_start) % ioptr_width;
 				outlen = instr;
 				escape_edit = TRUE;
-			} else if (!(mask & TRM_NOECHO))
+			} else if (echo_mode)  //kt mod
 			{
 				// When the cursor is at the beginning of the line, we can move it 1 position to the right or to the end of the line.
 				// I have grouped these possibilities in pair. This is more understandable and logical. Sergey Kamenev.
@@ -1138,7 +1152,7 @@ int	iott_readfl(mval *v, int4 length, uint8 nsec_timeout)	/* timeout in millisec
 						dx = (dx + inchar_width) % ioptr_width;
 						dx_instr += inchar_width;
 					} else if (0 == end) /* End - end of line */
-						IOTT_MOVE_END_OF_LINE(tt_ptr->fildes, dx, dx_instr, dx_start, dx_outlen, ioptr_width, mask, term_error_line, instr, outlen);
+						IOTT_MOVE_END_OF_LINE(tt_ptr->fildes, echo_mode, dx, dx_instr, dx_start, dx_outlen, ioptr_width, term_error_line, instr, outlen);  //kt
 				}
 				// When the cursor is at the end of the line, we can move it 1 position to the left or to the beginning of the line.
 				if (0 != instr)
@@ -1156,14 +1170,14 @@ int	iott_readfl(mval *v, int4 length, uint8 nsec_timeout)	/* timeout in millisec
 						dx = (dx - inchar_width + ioptr_width) % ioptr_width;
 						dx_instr -= inchar_width;
 					} else if (0 == home) /* Home - start of line */
-					    IOTT_MOVE_START_OF_LINE(tt_ptr->fildes, dx, dx_instr, dx_start, ioptr_width, mask, term_error_line, instr);
+					    IOTT_MOVE_START_OF_LINE(tt_ptr->fildes, echo_mode, dx, dx_instr, dx_start, ioptr_width, term_error_line, instr);  //kt
 				}
 			}
 			if (0 == insert_key)
 				insert_mode = !insert_mode;	/* toggle */
 			if (0 == right || 0 == left || 0 == insert_key)
 				escape_edit = TRUE;
-			if (escape_edit || (0 == (TRM_ESCAPE & mask)))
+			if (escape_edit || (temp_io_state.escape_processing == FALSE))   //kt mod
 			{	/* reset dollar zb if editing function or not trm_escape */
 				memset(io_ptr->dollar.zb, '\0', SIZEOF(io_ptr->dollar.zb));
 				io_ptr->esc_state = START;
@@ -1193,7 +1207,7 @@ int	iott_readfl(mval *v, int4 length, uint8 nsec_timeout)	/* timeout in millisec
 		if (0 == outlen && ((io_ptr->dollar.zb + 1) == zb_ptr)) /* No input and no delimiter seen */
 			ret = FALSE;
 	}
-	if (mask & TRM_READSYNC)
+	if (temp_io_state.readsync)  //kt mod
 	{
 		DOWRITERC(tt_ptr->fildes, &dc3, 1, status);
 		if (0 != status)
@@ -1228,7 +1242,7 @@ int	iott_readfl(mval *v, int4 length, uint8 nsec_timeout)	/* timeout in millisec
 	v->str.addr = (char *)buffer_start;
 	if (edit_mode)	/* store in recall buffer */
 		iott_recall_array_add(tt_ptr, outlen, dx_outlen, BUFF_CHAR_SIZE * outlen, BUFF_ADDR(0));
-	if (!(mask & TRM_NOECHO))
+	if (echo_mode)  //kt mod
 	{
 		if ((io_ptr->dollar.x += dx_outlen) >= ioptr_width && io_ptr->wrap)
 		{
@@ -1241,13 +1255,15 @@ int	iott_readfl(mval *v, int4 length, uint8 nsec_timeout)	/* timeout in millisec
 		}
 	}
 	REVERT_GTMIO_CH(&io_curr_device, ch_set);
-	RESETTERM_IF_NEEDED(io_ptr, EXPECT_SETTERM_DONE_TRUE);
+
+	iott_restoreterm(io_ptr); //kt added.  Restore ydb's current IO state, in case this function modified the TTY IO subsystem.
+
 	return ((short)ret);
 
 term_error:
 	save_errno = errno;
 	io_ptr->dollar.za = ZA_IO_ERR;
-	tt_ptr->discard_lf = FALSE;
+	temp_io_state.discard_lf = FALSE;  //kt mod  Added 'temp_io_state.
 	SEND_KEYPAD_LOCAL;	/* to turn keypad off if possible */
 	if (!nsec_timeout)
 		iott_rterm(io_ptr);
