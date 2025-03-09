@@ -67,7 +67,7 @@ LITDEF unsigned char filter_index[27] =
 	,4, 4, 4
 };
 
-const io_termmask NULL_TERM_MASK = { {0, 0, 0, 0, 0, 0, 0, 0} };   //kt added
+const io_termmask NULL_TERM_MASK = { {0, 0, 0, 0, 0, 0, 0, 0} };
 
 GBLREF boolean_t		ctrlc_on, hup_on, prin_in_dev_failure, prin_out_dev_failure;
 GBLREF char			*CURSOR_ADDRESS, *CLR_EOL, *CLR_EOS;
@@ -117,8 +117,8 @@ void iott_use(io_desc * io_ptr, mval * devparms)
 		//setup ydb IO state (but not TTY IO subsystem) based on device parameters
 		iott_use_params_to_state(io_ptr, devparms);
 
-		//kt Moved functionality of prior block of code into iott_compile_state_and_set_tty_and_ydb_echo(),
-		//kt   and calling below outside IF block, so that even if there are no devparams, it will still be called.
+		//Moved functionality of prior block of code into iott_compile_state_and_set_tty_and_ydb_echo(),
+		//  and calling below outside IF block, so that even if there are no devparams, it will still be called.
 	} else if (tt_ptr->mupintr && !dollar_zininterrupt)
 	{	/* The interrupted read was not properly resumed so clear it now */
 		tt_ptr->mupintr = FALSE;
@@ -126,15 +126,15 @@ void iott_use(io_desc * io_ptr, mval * devparms)
 		io_find_mvstent(io_ptr, TRUE);	/* clear mv stack entry */
 	}
 
-	//kt  Send IO state to TTY IO subsystem.  8 is default time, 1 is minimum chars; can be changed later.
-	iott_compile_state_and_set_tty_and_ydb_echo(io_ptr, 8, 1, handle_set_tty_err_mode_3);   //kt added, moving funcitonality down from above.
+	//Send IO state to TTY IO subsystem.  8 is default time, 1 is minimum chars; can be changed later.
+	iott_compile_state_and_set_tty_and_ydb_echo(io_ptr, 8, 1, handle_set_tty_err_mode_3);   //Moving funcitonality down from above.
 
 	REVERT_GTMIO_CH(&io_ptr->pair, ch_set);
 	return;
 }
 
 void handle_set_tty_err_mode_3(io_desc* io_ptr, int save_errno, int filedes)  //for SET_TTY_CHECK_ERRORS_MODE_3
-//kt added
+
 {
 	assert(WBTEST_YDB_KILL_TERMINAL == ydb_white_box_test_case_number);
 	ISSUE_NOPRINCIO_BEFORE_RTS_ERROR_IF_APPROPRIATE(io_ptr);
@@ -143,9 +143,8 @@ void handle_set_tty_err_mode_3(io_desc* io_ptr, int save_errno, int filedes)  //
 
 
 void iott_use_params_to_state(io_desc * io_ptr, mval * devparms)
-//kt added function, using code from iott_use()
-//kt NOTE: This saves the IO state into ydb data structures, based on USE parameters.
-//         AND it also does some actions, if param calls for action.  It does NOT write anything out to the TTY IO subsystem.
+//NOTE: This saves the IO state into ydb data structures, based on USE parameters.
+//       AND it also does some actions, if param calls for action.  It does NOT write anything out to the TTY IO subsystem.
 {
 	d_tt_struct * 		tt_ptr;
 	tt_ptr = (d_tt_struct *)io_ptr->dev_sp;
@@ -153,7 +152,7 @@ void iott_use_params_to_state(io_desc * io_ptr, mval * devparms)
 }
 
 boolean_t iott_is_valid_use_param(io_params_type aparam)  // is aparam valid for USE command?
-//kt added function
+
 {
 	boolean_t	result;
 	result = (
@@ -216,9 +215,9 @@ boolean_t iott_is_valid_use_param(io_params_type aparam)  // is aparam valid for
 }
 
 void iott_common_params_to_state(io_desc* io_ptr, ttio_state* io_state_ptr, mval * devparms, devparam_validator is_valid_dev_param 		)
-//kt NOTE: This saves the IO state into ydb data structures, based on OPEN and USE parameters.
-//         AND it may also do some actions, if param calls for action.
-//	   It does NOT write anything out to the TTY IO subsystem.
+//NOTE: This saves the IO state into ydb data structures, based on OPEN and USE parameters.
+//       AND it may also do some actions, if param calls for action.
+//       It does NOT write anything out to the TTY IO subsystem.
 {
 	int			p_offset, fil_type, status;
 	int4			len, length, width;
@@ -245,7 +244,7 @@ void iott_common_params_to_state(io_desc* io_ptr, ttio_state* io_state_ptr, mval
 	d_in = io_ptr->pair.in;
 	d_out = io_ptr->pair.out;
 	temp_ptr = (d_tt_struct *)d_in->dev_sp;
-	dev_is_tt = (tt == d_in->type); 			//kt added
+	dev_is_tt = (tt == d_in->type);
 	mask_term = temp_ptr->io_state.mask_term;
 	old_ichset = io_ptr->ichset;
 	p_offset = 0;
@@ -327,10 +326,10 @@ void iott_common_params_to_state(io_desc* io_ptr, ttio_state* io_state_ptr, mval
 						gtm_tputs(CLR_EOS, 1, outc);
 					break;
 				case iop_convert:
-					if (dev_is_tt) io_state_ptr->case_convert = TRUE;  			//kt mod
+					if (dev_is_tt) io_state_ptr->case_convert = TRUE;
 					break;
 				case iop_noconvert:
-					if (dev_is_tt) io_state_ptr->case_convert = FALSE;  			//kt mod
+					if (dev_is_tt) io_state_ptr->case_convert = FALSE;
 					break;
 				case iop_ctrap:
 					GET_LONG(tt_ptr->enbld_outofbands.mask, devparms->str.addr + p_offset);
@@ -355,20 +354,20 @@ void iott_common_params_to_state(io_desc* io_ptr, ttio_state* io_state_ptr, mval
 					}
 					break;
 				case iop_echo:
-					if (dev_is_tt) io_state_ptr->devparam_echo = TRUE;  			//kt added
+					if (dev_is_tt) io_state_ptr->devparam_echo = TRUE;
 					break;
 				case iop_noecho:
-					if (dev_is_tt) io_state_ptr->devparam_echo = FALSE;  			//kt added
+					if (dev_is_tt) io_state_ptr->devparam_echo = FALSE;
 					break;
 				case iop_editing:
 					if (io_curr_device.in == io_std_device.in)     //$PRINCIPAL only
 					{
-						SET_BIT_FLAG_ON(TT_EDITING, io_state_ptr->ext_cap);   		//kt mod
+						SET_BIT_FLAG_ON(TT_EDITING, io_state_ptr->ext_cap);
 					}
 					break;
 				case iop_noediting:
 					if (io_curr_device.in == io_std_device.in)  // $PRINCIPAL only
-						SET_BIT_FLAG_OFF(TT_EDITING, io_state_ptr->ext_cap);   		//kt mod
+						SET_BIT_FLAG_OFF(TT_EDITING, io_state_ptr->ext_cap);
 					break;
 				case iop_escape:
 					if (dev_is_tt) io_state_ptr->escape_processing = TRUE;
@@ -414,10 +413,10 @@ void iott_common_params_to_state(io_desc* io_ptr, ttio_state* io_state_ptr, mval
 					flush_input = TRUE;
 					break;
 				case iop_hostsync:
-					io_state_ptr->hostsync = TRUE;   					//kt mod
+					io_state_ptr->hostsync = TRUE;
 					break;
 				case iop_nohostsync:
-					io_state_ptr->hostsync = FALSE;  					//kt mod
+					io_state_ptr->hostsync = FALSE;
 					break;
 				case iop_hupenable:
 					if (!hup_on)
@@ -461,11 +460,11 @@ void iott_common_params_to_state(io_desc* io_ptr, ttio_state* io_state_ptr, mval
 					break;
 				case iop_insert:
 					if (io_curr_device.in == io_std_device.in)		// $PRINCIPAL only
-						SET_BIT_FLAG_OFF(TT_NOINSERT, io_state_ptr->ext_cap);		//kt mod turning OFF NOINSERT --> turns ON insert
+						SET_BIT_FLAG_OFF(TT_NOINSERT, io_state_ptr->ext_cap);		//turning OFF NOINSERT --> turns ON insert
 					break;
 				case iop_noinsert:
 					if (io_curr_device.in == io_std_device.in)		//  $PRINCIPAL only
-						SET_BIT_FLAG_ON(TT_NOINSERT, io_state_ptr->ext_cap);		//kt mod turning ON NOINSERT --> turns OFF insert
+						SET_BIT_FLAG_ON(TT_NOINSERT, io_state_ptr->ext_cap);		//turning ON NOINSERT --> turns OFF insert
 					break;
 				case iop_length:
 					GET_LONG(length, devparms->str.addr + p_offset);
@@ -474,10 +473,10 @@ void iott_common_params_to_state(io_desc* io_ptr, ttio_state* io_state_ptr, mval
 					d_out->length = length;
 					break;
 				case iop_pasthru:
-					if (dev_is_tt) io_state_ptr->passthru = TRUE;   			//kt mod
+					if (dev_is_tt) io_state_ptr->passthru = TRUE;
 					break;
 				case iop_nopasthru:
-					if (dev_is_tt) io_state_ptr->passthru = FALSE;  			//kt mod
+					if (dev_is_tt) io_state_ptr->passthru = FALSE;
 					break;
 				case iop_readsync:
 					if (dev_is_tt) io_state_ptr->readsync = TRUE;
@@ -499,19 +498,19 @@ void iott_common_params_to_state(io_desc* io_ptr, ttio_state* io_state_ptr, mval
 				case iop_noterminator:
 					temp_ptr = (d_tt_struct *)d_in->dev_sp;
 					temp_ptr->io_state.default_mask_term = FALSE;
-					mask_term = NULL_TERM_MASK;  						//kt mod
+					mask_term = NULL_TERM_MASK;
 					break;
 				case iop_ttsync:
-					if (dev_is_tt) io_state_ptr->ttsync = TRUE;  	 			//kt mod
+					if (dev_is_tt) io_state_ptr->ttsync = TRUE;
 					break;
 				case iop_nottsync:
-					if (dev_is_tt) io_state_ptr->ttsync = FALSE; ;  			//kt mod
+					if (dev_is_tt) io_state_ptr->ttsync = FALSE; ;
 					break;
 				case iop_typeahead:
-					if (dev_is_tt) io_state_ptr->no_type_ahead = FALSE; 			//kt mod
+					if (dev_is_tt) io_state_ptr->no_type_ahead = FALSE;
 					break;
 				case iop_notypeahead:
-					if (dev_is_tt) io_state_ptr->no_type_ahead = TRUE; 			//kt mod
+					if (dev_is_tt) io_state_ptr->no_type_ahead = TRUE;
 					break;
 				case iop_upscroll:
 					d_out->dollar.y++;
@@ -578,7 +577,7 @@ void iott_common_params_to_state(io_desc* io_ptr, ttio_state* io_state_ptr, mval
 						ICONV_OPEN_CD(io_ptr->input_conv_cd,
 							      (char *)(devparms->str.addr + p_offset + 1), INSIDE_CH_SET);
 #					endif
-					GET_ADDR_AND_LEN_V2(devparms, p_offset, chset_mstr.addr, chset_mstr.len);	//kt mod
+					GET_ADDR_AND_LEN_V2(devparms, p_offset, chset_mstr.addr, chset_mstr.len);
 					SET_ENCODING(temp_chset, &chset_mstr);
 					if (!gtm_utf8_mode && IS_UTF_CHSET(temp_chset))
 						break;	/* ignore UTF chsets if not utf8_mode. */
@@ -600,7 +599,7 @@ void iott_common_params_to_state(io_desc* io_ptr, ttio_state* io_state_ptr, mval
 						ICONV_OPEN_CD(io_ptr->output_conv_cd, INSIDE_CH_SET,
 							      (char *)(devparms->str.addr + p_offset + 1));
 #					endif
-					GET_ADDR_AND_LEN_V2(devparms, p_offset, chset_mstr.addr, chset_mstr.len);	//kt mod
+					GET_ADDR_AND_LEN_V2(devparms, p_offset, chset_mstr.addr, chset_mstr.len);
 					SET_ENCODING(temp_chset, &chset_mstr);
 					if (!gtm_utf8_mode && IS_UTF_CHSET(temp_chset))
 						break;	/* ignore UTF chsets if not utf8_mode. */
@@ -612,7 +611,7 @@ void iott_common_params_to_state(io_desc* io_ptr, ttio_state* io_state_ptr, mval
 				}
 				case iop_chset:
 				{
-					GET_ADDR_AND_LEN_V2(devparms, p_offset, chset_mstr.addr, chset_mstr.len);	//kt mod
+					GET_ADDR_AND_LEN_V2(devparms, p_offset, chset_mstr.addr, chset_mstr.len);
 					SET_ENCODING(temp_chset, &chset_mstr);
 					if (!gtm_utf8_mode && IS_UTF_CHSET(temp_chset))
 						break;	/* ignore UTF chsets if not utf8_mode. */
@@ -632,19 +631,19 @@ void iott_common_params_to_state(io_desc* io_ptr, ttio_state* io_state_ptr, mval
 					break;
 				//---- below are sometimes added to devparams in io_init, but apparently not processed.
 				case iop_newversion:
-					do_nothing = 1; //kt added.  Just a stopping place for debugger
+					do_nothing = 1; //Just a stopping place for debugger
 					break;
 				case iop_stream:
-					do_nothing = 2; //kt added  Just a stopping place for debugger
+					do_nothing = 2; //Just a stopping place for debugger
 					break;
 				case iop_nl:
-					do_nothing = 3; //kt added  Just a stopping place for debugger
+					do_nothing = 3; //Just a stopping place for debugger
 					break;
 				case iop_shared:
-					do_nothing = 4; //kt added  Just a stopping place for debugger
+					do_nothing = 4; //Just a stopping place for debugger
 					break;
 				case iop_readonly:
-					do_nothing = 5; //kt added  Just a stopping place for debugger
+					do_nothing = 5; //Just a stopping place for debugger
 					break;
 				default:
 					break;
@@ -670,14 +669,13 @@ void iott_common_params_to_state(io_desc* io_ptr, ttio_state* io_state_ptr, mval
 		if ((!terminator_specified && (old_ichset != io_ptr->ichset)) 		||
 		    ( terminator_specified && (tt_ptr->io_state.default_mask_term)))
 		{
-			iott_set_mask_term_conditional(io_ptr, &mask_term, (CHSET_M != io_ptr->ichset), TRUE);  //kt
+			iott_set_mask_term_conditional(io_ptr, &mask_term, (CHSET_M != io_ptr->ichset), TRUE);
 		}
-		tt_ptr->io_state.mask_term = mask_term;  //kt
+		tt_ptr->io_state.mask_term = mask_term;
 	}
 }
 
 void iott_set_mask_term_conditional(io_desc* io_ptr, io_termmask*  mask_term_ptr, boolean_t bool_test, boolean_t set_default)
-//kt added function, combining duplicate code.
 {
 	d_tt_struct * 		tt_ptr;
 	tt_ptr = (d_tt_struct *)io_ptr->dev_sp;

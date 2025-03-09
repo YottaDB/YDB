@@ -40,7 +40,6 @@ error_def(ERR_TCSETATTR);
 
 void  iott_resetterm(io_desc* io_ptr)
 /* ----------------------------------------------------------------------------------------------------------------------
-//kt ADDED NOTES
 PURPOSE: Initially restterm() was called at end of READ commands, which caused problems.  Text here will describe some of those
 	 problems and modifications applied to improve performance.
 
@@ -132,7 +131,6 @@ PURPOSE: Initially restterm() was called at end of READ commands, which caused p
 }
 
 void handle_reset_tty_err(io_desc* io_ptr, int save_errno, int filedes)
-//kt added
 {
 	assert(ENOTTY != save_errno);
 	// Skip TCSETATTR error for ENOTTY (in case fildes is no longer a terminal)
@@ -150,7 +148,6 @@ void handle_reset_tty_err(io_desc* io_ptr, int save_errno, int filedes)
 }
 
 void  iott_restoreterm(io_desc * io_ptr)
-//kt added function
 //Purpose: This will send currently compiled IO state to the TTY IO subsystem.
 //	   This is different from resetterm(), which will return IO state to same as when ydb first started.
 {

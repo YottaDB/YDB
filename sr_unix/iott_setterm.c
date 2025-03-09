@@ -30,7 +30,7 @@
 #include "gtm_isanlp.h"
 
 GBLREF	uint4		process_id;
-GBLREF	boolean_t	exit_handler_active;  			//kt added
+GBLREF	boolean_t	exit_handler_active;
 
 error_def(ERR_TCSETATTR);
 
@@ -60,20 +60,18 @@ void iott_setterm(io_desc *io_ptr)
 // iott_mterm sets the inter-character timer (t.c_cc[VTIME]) to 0.0 seconds so that a read with a zero timeout (ie.  Read x:0) will not wait.
 void iott_mterm(io_desc * io_ptr)
 {
-	cc_t 		vtime;  //kt added
+	cc_t 		vtime;
 	d_tt_struct	*tt_ptr;
 
 	tt_ptr = (d_tt_struct *) io_ptr->dev_sp;
 
-	//kt begin addition
 #ifdef __MVS__
 		vtime = 1;
 #else
 		vtime = 0;
 #endif
-	//kt end addition
 
-	iott_compile_state_and_set_tty_and_ydb_echo(io_ptr, vtime, 0, handle_set_tty_err_mode_2);  //kt moved block of code into function
+	iott_compile_state_and_set_tty_and_ydb_echo(io_ptr, vtime, 0, handle_set_tty_err_mode_2);
 
 	return;
 }
@@ -85,15 +83,13 @@ void iott_rterm(io_desc *io_ptr)
 	d_tt_struct  	*tt_ptr;
 	tt_ptr = (d_tt_struct *) io_ptr->dev_sp;
 
-	iott_compile_state_and_set_tty_and_ydb_echo(io_ptr, 8, 1, handle_set_tty_err_mode_2);  //kt moved block of code into function
+	iott_compile_state_and_set_tty_and_ydb_echo(io_ptr, 8, 1, handle_set_tty_err_mode_2);
 
 	return;
 }
 
 
-//kt begin additions ---------------
 void iott_setterm_for_no_canonical(io_desc * io_ptr,  ttio_state * temp_io_state_ptr)
-//kt added function.
 //Setup terminal with CANONICAL mode OFF.
 //  Needed for reading just one character, e.g. via READ *X command
 //  Also needed for reading fixed length, e.g. READ #1
@@ -108,7 +104,7 @@ void iott_setterm_for_no_canonical(io_desc * io_ptr,  ttio_state * temp_io_state
 	*temp_io_state_ptr = tt_ptr->io_state;  //start with current io_state
 	temp_io_state_ptr->canonical = FALSE;   //if canonical were left on, then TTY IO subsystem wouldn't return character until after NL (or CR) or EOL
 
-	//kt below does same as iott_compile_state_and_set_tty_and_ydb_echo(io_ptr, 8, 1, handle_set_tty_err_mode_1), but uses temp_io_state
+	//Below does same as iott_compile_state_and_set_tty_and_ydb_echo(io_ptr, 8, 1, handle_set_tty_err_mode_1), but uses temp_io_state
 	iott_compile_ttio_struct(io_ptr, temp_io_state_ptr, 8, 1);
 	iott_set_tty(io_ptr, &(temp_io_state_ptr->ttio_struct), handle_set_tty_err_mode_1);
 	iott_set_ydb_echo(io_ptr, temp_io_state_ptr, temp_io_state_ptr);
@@ -120,7 +116,7 @@ void iott_setterm_for_no_canonical(io_desc * io_ptr,  ttio_state * temp_io_state
 
 
 ttio_state* iott_setterm_for_direct_mode(io_desc* io_ptr)
-//kt added function.  Setup terminal for interaction with user at console in direct mode.
+//Setup terminal for interaction with user at console in direct mode.
 //NOTE: This function is different from iott_setterm_for_no_canonical().  That populates a structure passed in.
 //         Whereas this function returns a pointer to an existing structure.
 {
@@ -130,7 +126,7 @@ ttio_state* iott_setterm_for_direct_mode(io_desc* io_ptr)
 	tt_ptr = (d_tt_struct *)io_ptr->dev_sp;
 	direct_mode_io_state_ptr = &(tt_ptr->direct_mode_io_state);
 
-	//kt below does same as iott_compile_state_and_set_tty_and_ydb_echo(io_ptr, 8, 1, handle_set_tty_err_mode_1), but uses direct_mode_io_state
+	//Below does same as iott_compile_state_and_set_tty_and_ydb_echo(io_ptr, 8, 1, handle_set_tty_err_mode_1), but uses direct_mode_io_state
 	iott_compile_ttio_struct(io_ptr, direct_mode_io_state_ptr, 8, 1);
 	iott_set_tty(io_ptr, &(direct_mode_io_state_ptr->ttio_struct), handle_set_tty_err_mode_1);
 	iott_set_ydb_echo(io_ptr, direct_mode_io_state_ptr, direct_mode_io_state_ptr);
@@ -141,7 +137,7 @@ ttio_state* iott_setterm_for_direct_mode(io_desc* io_ptr)
 }
 
 void handle_set_tty_err_mode_1(io_desc* io_ptr, int save_errno, int filedes)  //for SET_TTY_CHECK_ERRORS_MODE_1
-//kt added
+
 {
 	if (gtm_isanlp(filedes) == 0)
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_TCSETATTR, 1, filedes, save_errno);
@@ -149,14 +145,13 @@ void handle_set_tty_err_mode_1(io_desc* io_ptr, int save_errno, int filedes)  //
 
 
 void handle_set_tty_err_mode_2(io_desc* io_ptr, int save_errno, int filedes)  //for SET_TTY_CHECK_ERRORS_MODE_2
-//kt added
+
 {
 	rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TCSETATTR, 1, filedes, save_errno);
 }
 
 
 void iott_compile_ttio_struct(io_desc * io_ptr, ttio_state* an_io_state_ptr, cc_t vtime, cc_t vmin)
-//kt added function
 //Purpose: to compile any state variables into ttio_struct, ready to be later passed to TTY IO system
 //         NOTE: Because tt_ptr->io_state.term_ctrl settings have to match TTY IO system, it should also
 //		 be set up -- but will not be handling here.  See iott_set_ydb_echo()
@@ -328,7 +323,8 @@ PARAM CANONICAL --> TTY CANONICAL  <-- direct sync between these two.
 
 The reason that io_state.ydb_echo is NOT set here is because there is a case where initial_io_state needs
   to be source instead of io_state. So this will be set in a separate function, iott_set_ydb_echo()
-  //kt update: after changing this function to accept arbitrary an_io_state_ptr, perhaps all could be done in this one function.  Would need to be researched.
+  //Update: after changing this function to accept arbitrary an_io_state_ptr, perhaps all could be done in this one function.
+  //        ... Would need to be researched.
 
 */
 {
@@ -382,7 +378,6 @@ The reason that io_state.ydb_echo is NOT set here is because there is a case whe
 }
 
 void iott_set_ydb_echo(io_desc* io_ptr, ttio_state* source_io_state_ptr, ttio_state* output_io_state_ptr)
-//kt added
 //Purpose: Setup output_io_state_ptr->ydb_echo settings have to match passed *source_io_state_ptr
 //
 //The reason that io_state.ydb_echo is set separately here is because there is a case where initial_io_state needs
@@ -413,7 +408,6 @@ void iott_set_ydb_echo(io_desc* io_ptr, ttio_state* source_io_state_ptr, ttio_st
 
 
 tty_getsetattr_status iott_compile_state_and_set_tty_and_ydb_echo(io_desc * io_ptr, cc_t vtime, cc_t vmin, set_tty_err_handler an_err_handler)
-//kt added function
 //PURPOSE: To create common function for compiling ydb IO state and then setting tty io system.
 //Input:  io_ptr -- 		pointer to relevant IO structure.  NOTE: other places in codebase used "iod" for this pointer
 //        vtime  -- 		timeout in deciseconds if noncanonical read (VTIME).  E.g. '8' --> 0.8 sec timeout.
@@ -431,7 +425,6 @@ tty_getsetattr_status iott_compile_state_and_set_tty_and_ydb_echo(io_desc * io_p
 }
 
 tty_getsetattr_status iott_set_tty_and_ydb_echo(io_desc* io_ptr, struct termios* ttio_struct_ptr, set_tty_err_handler an_err_handler)
-//kt added
 {
 	tty_getsetattr_status		status;
 	d_tt_struct *   		tt_ptr;
@@ -444,7 +437,6 @@ tty_getsetattr_status iott_set_tty_and_ydb_echo(io_desc* io_ptr, struct termios*
 }
 
 tty_getsetattr_status iott_set_tty(io_desc * io_ptr, struct termios * ttio_struct_ptr, set_tty_err_handler an_err_handler)
-//kt added function
 //PURPOSE: To create common function for actually setting tty io system.
 //Input:  io_ptr -- 		pointer to relevant IO structure.
 //        ttio_struct_ptr --	pointer to ttio_struct data structure to send to TTY IO subsystem

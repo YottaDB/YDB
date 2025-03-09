@@ -41,7 +41,7 @@
 #define TT_NOINSERT		0x2000
 #define TT_EMPTERM		0x4000
 
-//kt BEGIN additions -----------------------------------------------------------------------------------
+//BEGIN additions -----------------------------------------------------------------------------------
 
 typedef int tty_getsetattr_status;
 #define GETSETATTR_SUCCESS  0
@@ -109,7 +109,7 @@ MBSTART { 											\
 	 LEN = (int)(*(STRUCT)->str.addr + OFFSET);        					\
      }
 
-//kt END additions -----------------------------------------------------------------------------------
+//END additions -----------------------------------------------------------------------------------
 
 
 #define TERMHUP_NOPRINCIO_CHECK(WRITE)								\
@@ -230,7 +230,7 @@ typedef struct
 				 */
 } recall_ctxt_t;
 
-//kt begin addition ----------
+//Begin addition ----------
 // This struct will hold everything related to a particular TTY IO state of a device.
 // See also additional documentation in iott_compile_ttio_struct() in setterm.c
 // For TTY IO signals that are never modified by YDB, e.g. ISIG (enable signals), the state will not
@@ -257,7 +257,7 @@ typedef struct
 	boolean_t		escape_processing;	/* store ESCAPE state.  Enables or disables YottaDB processing of escape sequences.*/
 	boolean_t		default_mask_term;	/* mask_term is the default */
 } ttio_state;
-//kt end addition ----------
+//End addition ----------
 
 
 typedef struct
@@ -267,9 +267,9 @@ typedef struct
 	uint4			ext_cap;
 	io_terminator		enbld_outofbands; 	/* enabled out-of-band chars	*/
 	int			fildes;
-	ttio_state		io_state;		//kt added -- IO state based on latest USE or OPEN device parameters
-	ttio_state		initial_io_state;	//kt added -- IO state from when ydb first started
-	ttio_state		direct_mode_io_state;	//kt added -- IO state for use when interacting with user in direct mode
+	ttio_state		io_state;		//IO state based on latest USE or OPEN device parameters
+	ttio_state		initial_io_state;	//IO state from when ydb first started
+	ttio_state		direct_mode_io_state;	//IO state for use when interacting with user in direct mode
 	tt_interrupt		tt_state_save;		/* in case job interrupt */
 	boolean_t		mupintr;		/* read was interrupted */
 	char			*ttybuff;		/* buffer for tty */
@@ -295,7 +295,7 @@ void iott_readfl_badchar(mval *vmvalptr, wint_t *dataptr32, int datalen,
 			 int delimlen, unsigned char *delimptr, unsigned char *strend, unsigned char *buffer_start);
 void	iott_recall_array_add(d_tt_struct *tt_ptr, int nchars, int width, int bytelen, void *ptr);
 
-//BEGIN ADDITIONS BY //kt --------------------------------------------------------------------------------------------------------------
+//BEGIN ADDITIONS  --------------------------------------------------------------------------------------------------------------
 typedef enum io_params io_params_type;
 typedef boolean_t (*devparam_validator)(io_params_type aparam);
 typedef void (*set_tty_err_handler)(io_desc* io_ptr, int save_errno, int filedes);
@@ -322,6 +322,6 @@ void handle_set_tty_err_mode_2(io_desc* io_ptr, int save_errno, int filedes);
 void handle_set_tty_err_mode_3(io_desc* io_ptr, int save_errno, int filedes);
 void handle_reset_tty_err(io_desc* io_ptr, int save_errno, int filedes);
 
-//END ADDITIONS BY //kt --------------------------------------------------------------------------------------------------------------
+//END ADDITIONS --------------------------------------------------------------------------------------------------------------
 
 #endif

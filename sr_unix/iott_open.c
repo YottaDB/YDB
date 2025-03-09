@@ -63,7 +63,7 @@ short iott_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, uint8 tim
 	gtm_chset_t	temp_chset, old_ichset;
 	boolean_t	empt = FALSE;
 	boolean_t	ch_set;
-	boolean_t	initializing = FALSE; 		//kt added
+	boolean_t	initializing = FALSE;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -71,7 +71,7 @@ short iott_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, uint8 tim
 	ESTABLISH_RET_GTMIO_CH(&ioptr->pair, -1, ch_set);
 	if (ioptr->state == dev_never_opened)
 	{
-		//kt Large block change.  Putting state into separate structures, which are not a pointers....
+		//Large block change.  Putting state into separate structures, which are not a pointers....
 		//NOTE: d_tt_struct has been changed such that additional memory does not need to be allocated for ttio_struct's
 		dev_name->iod->dev_sp = (void *)malloc(SIZEOF(d_tt_struct));
 		memset(dev_name->iod->dev_sp, 0, SIZEOF(d_tt_struct)); // NOTE: by filling structure initially with 0's, this effects setting all booleans to FALSE. E.g. tt_ptr->io_state.canonical etc.
@@ -90,14 +90,14 @@ short iott_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, uint8 tim
 		//Start setup of device, starting io_state from initial_io_state
 		//Will be further modified below.
 		tt_ptr->io_state = tt_ptr->initial_io_state;
-		//kt end mod -------------
+		//end mod -------------
 	}
 	tt_ptr = (d_tt_struct *)dev_name->iod->dev_sp;
 	if (tt_ptr->mupintr)
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_ZINTRECURSEIO);
 	p_offset = 0;
 	old_ichset = ioptr->ichset;
-	iott_open_params_to_state(ioptr, pp, &(tt_ptr->io_state));  //kt centralizing param management to allow alternate IO states
+	iott_open_params_to_state(ioptr, pp, &(tt_ptr->io_state));  //centralizing param management to allow alternate IO states
 	if (ioptr->state != dev_open)
 	{
 		int	status;
@@ -105,7 +105,7 @@ short iott_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, uint8 tim
 
 		assert(fd >= 0);
 		tt_ptr->fildes = fd;
-		//kt NOTE: Moved the setting of TTY attribs to below.
+		//NOTE: Moved the setting of TTY attribs to below.
 		//         In iott_compile_state_and_set_tty_and_ydb_echo(), below, tt_ptr->io_state.ttio_struct will be properly set up.
 		status = getcaps(tt_ptr->fildes);
 		if (1 != status)
@@ -127,7 +127,7 @@ short iott_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, uint8 tim
 		ioptr->wrap = (0 == AUTO_RIGHT_MARGIN) ? FALSE : TRUE; /* defensive programming; till we are absolutely, positively
 									* certain that there are no uses of wrap == TRUE */
 		tt_ptr->tbuffp = tt_ptr->ttybuff;	/* Buffer is now empty */
-		tt_ptr->io_state.discard_lf = FALSE;  //kt
+		tt_ptr->io_state.discard_lf = FALSE;
 		if (!io_std_device.in || io_std_device.in == ioptr->pair.in)	/* io_std_device.in not set yet in io_init */
 		{	/* $PRINCIPAL */
 			tt_ptr->ext_cap = ydb_principal_editing_defaults;
@@ -137,9 +137,9 @@ short iott_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, uint8 tim
 		if (empt)
 			tt_ptr->ext_cap |= TT_EMPTERM;
 		/* Set terminal mask on the terminal not open, if default_term or if CHSET changes */
-		if (tt_ptr->io_state.default_mask_term || (old_ichset != ioptr->ichset))  //kt
+		if (tt_ptr->io_state.default_mask_term || (old_ichset != ioptr->ichset))
 		{
-			iott_set_mask_term_conditional(ioptr, &(tt_ptr->io_state.mask_term), (CHSET_M != ioptr->ichset), TRUE);  //kt
+			iott_set_mask_term_conditional(ioptr, &(tt_ptr->io_state.mask_term), (CHSET_M != ioptr->ichset), TRUE);
 		}
 		ioptr->state = dev_open;
 	} else
@@ -147,12 +147,12 @@ short iott_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, uint8 tim
 		/* Set terminal mask on the already open terminal, if CHSET changes */
 		if (old_ichset != ioptr->ichset)
 		{
-			iott_set_mask_term_conditional(ioptr, &(tt_ptr->io_state.mask_term), (CHSET_M != ioptr->ichset), TRUE);  //kt mod
+			iott_set_mask_term_conditional(ioptr, &(tt_ptr->io_state.mask_term), (CHSET_M != ioptr->ichset), TRUE);
 		}
 	}
 	//Compile ydb state and send this to TTY IO subsystem.  8  1 will be default time and minimum read; can be changed later.
-	iott_compile_state_and_set_tty_and_ydb_echo(ioptr, 8, 1, handle_set_tty_err_mode_3);  //kt added.
-	if (initializing)  //kt added block
+	iott_compile_state_and_set_tty_and_ydb_echo(ioptr, 8, 1, handle_set_tty_err_mode_3);  .
+	if (initializing)
 	{
 		//complete setup for initial io state.
 		iott_set_mask_term_conditional(ioptr, &(tt_ptr->initial_io_state.mask_term), (CHSET_M != ioptr->ichset), TRUE);
@@ -169,7 +169,6 @@ short iott_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, uint8 tim
 }
 
 void iott_TTY_to_state(d_tt_struct * tt_ptr, ttio_state* an_io_state_ptr)
-//kt added function
 //Purpose: Set ydb IO state based on state of TTY IO subsystem, esp when first opening TTY IO device.
 //
 //  Why needed? Because if the TTY IO initially has echo (+) mode but no devparam specifies state of echo,
@@ -197,7 +196,6 @@ void iott_TTY_to_state(d_tt_struct * tt_ptr, ttio_state* an_io_state_ptr)
 }
 
 void iott_tio_struct_to_state(ttio_state* an_io_state_ptr, struct termios * ttio_struct_ptr)
-//kt added function
 //Purpose: Set ydb IO state based on value of a ttio_struct_ptr
 {
 	an_io_state_ptr->ttio_struct = *ttio_struct_ptr;
@@ -211,9 +209,8 @@ void iott_tio_struct_to_state(ttio_state* an_io_state_ptr, struct termios * ttio
 }
 
 void iott_open_params_to_state(io_desc* io_ptr, mval* devparms, ttio_state* io_state_ptr)
-//kt added function
-//kt NOTE: This establishes the IO state into ydb data structures, based on USE device parameters.
-//	   It does NOT write anything out to the TTY IO subsystem.
+//NOTE: This establishes the IO state into ydb data structures, based on USE device parameters.
+//      It does NOT write anything out to the TTY IO subsystem.
 {
 	d_tt_struct* 		tt_ptr;
 	DCL_THREADGBL_ACCESS;
@@ -226,7 +223,6 @@ void iott_open_params_to_state(io_desc* io_ptr, mval* devparms, ttio_state* io_s
 }
 
 boolean_t iott_is_valid_open_param(io_params_type aparam)   //is aparam valid for OPEN command?
-//kt added function
 {
 	boolean_t	result;
 	result = (	(aparam == iop_exception) 	||

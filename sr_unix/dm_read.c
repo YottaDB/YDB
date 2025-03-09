@@ -215,12 +215,12 @@ void	dm_read (mval *v)
 	int		outlen;			/* total characters in line so far */
 	int		match_length, msk_in, msk_num, right, selstat, status, up, home, end;
 	int		utf8_more = 0, utf8_seen;
-	boolean_t	echo_mode;  			//kt local alias
-	ttio_state* 	dm_io_state_ptr;  		//kt Will really be same as &(tt_ptr->direct_mode_io_state)
-	boolean_t	char_is_terminator;		//kt added
-	boolean_t	char_is_special_terminator;	//kt added
-	boolean_t	char_is_erase;			//kt added
-	boolean_t	char_is_backspace;		//kt added
+	boolean_t	echo_mode;
+	ttio_state* 	dm_io_state_ptr;  		//Will really be same as &(tt_ptr->direct_mode_io_state)
+	boolean_t	char_is_terminator;
+	boolean_t	char_is_special_terminator;
+	boolean_t	char_is_erase;
+	boolean_t	char_is_backspace;
 	io_desc 	*io_ptr;
 	io_termmask	mask_term;
 	mv_stent	*mvc, *mv_zintdev;
@@ -251,16 +251,16 @@ void	dm_read (mval *v)
 	active_device = io_curr_device.in;
 	io_ptr = io_curr_device.in;
 	tt_ptr = (d_tt_struct *)(io_ptr->dev_sp);
-	dm_io_state_ptr = iott_setterm_for_direct_mode(io_ptr); //kt added.  For direct mode, we want IO to be in a safe state.  E.g. if NOECHO, we still want user typing to show.
+	dm_io_state_ptr = iott_setterm_for_direct_mode(io_ptr); //For direct mode, we want IO to be in a safe state.  E.g. if NOECHO, we still want user typing to show.
 	assert (io_ptr->state == dev_open);
 	if (tt == io_curr_device.out->type)
 		iott_flush(io_curr_device.out);
-	insert_mode = !(TT_NOINSERT & dm_io_state_ptr->ext_cap);  //kt mod
+	insert_mode = !(TT_NOINSERT & dm_io_state_ptr->ext_cap);
 	utf8_active = gtm_utf8_mode ? (CHSET_M != io_ptr->ichset) : FALSE;
 	length = tt_ptr->in_buf_sz + ESC_LEN;	/* for possible escape sequence */
 	exp_length = utf8_active ? (uint4)((SIZEOF(wint_t) * length) + (GTM_MB_LEN_MAX * length) + SIZEOF(gtm_int64_t)) : length;
 	zint_restart = FALSE;
-	echo_mode = dm_io_state_ptr->ydb_echo; //kt
+	echo_mode = dm_io_state_ptr->ydb_echo;
 	if (tt_ptr->mupintr)
 	{	/* restore state to before job interrupt */
 		tt_state = &tt_ptr->tt_state_save;
@@ -338,10 +338,10 @@ void	dm_read (mval *v)
 	}
 	if (dmterm_default)
 	{	/* $view("DMTERM") or ydb_dmterm is set. Ignore the customized terminators; use the default terinators */
-		iott_set_mask_term_conditional(io_ptr, &mask_term, utf8_active, FALSE);  //kt
+		iott_set_mask_term_conditional(io_ptr, &mask_term, utf8_active, FALSE);
 	} else
-		mask_term = dm_io_state_ptr->mask_term;  //kt mod.
-	TURN_MASK_BIT_OFF(mask_term.mask, ESC);  //kt mod
+		mask_term = dm_io_state_ptr->mask_term;
+	TURN_MASK_BIT_OFF(mask_term.mask, ESC);
 	ioptr_width = io_ptr->width;
 	if (!zint_restart)
 	{
@@ -433,7 +433,7 @@ void	dm_read (mval *v)
 			if (EINTR != errno)
 			{	/* If error was EINTR, go to the top of the loop to check for outofband. */
 				HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
-				dm_io_state_ptr->discard_lf = FALSE;  //kt mod.
+				dm_io_state_ptr->discard_lf = FALSE;
 				io_ptr->dollar.za = ZA_IO_ERR;
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) errno);
 			} else
@@ -445,7 +445,7 @@ void	dm_read (mval *v)
 		{	/* poll() says there's something to read, but read() found zero characters; assume connection dropped. */
 			HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 			ISSUE_NOPRINCIO_IF_NEEDED(io_ptr, FALSE, FALSE);		/* FALSE, FALSE: READ tt not socket */
-			dm_io_state_ptr->discard_lf = FALSE;  		//kt mod
+			dm_io_state_ptr->discard_lf = FALSE;
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_IOEOF);
 		} else if (0 < status)
 		{
@@ -455,9 +455,9 @@ void	dm_read (mval *v)
 #			ifdef UTF8_SUPPORTED
 			if (utf8_active)
 			{
-				if (dm_io_state_ptr->discard_lf)   //kt
+				if (dm_io_state_ptr->discard_lf)
 				{	/* saw CR last time so ignore following LF */
-					dm_io_state_ptr->discard_lf = FALSE;  //kt
+					dm_io_state_ptr->discard_lf = FALSE;
 					if (NATIVE_LF == inbyte)
 						continue;
 				}
@@ -512,32 +512,32 @@ void	dm_read (mval *v)
 					if (BOM_CODEPOINT == inchar)
 						continue;
 				}
-				if (dm_io_state_ptr->case_convert)  			//kt mod
+				if (dm_io_state_ptr->case_convert)
 					inchar = u_toupper(inchar);
 				GTM_IO_WCWIDTH(inchar, inchar_width);
 			} else
 			{
 #			endif
-				if (dm_io_state_ptr->case_convert)  			//kt mod
+				if (dm_io_state_ptr->case_convert)
 					NATIVE_CVT2UPPER(inbyte, inbyte);
 				inchar = inbyte;
 #			ifdef UTF8_SUPPORTED
 			}
 #			endif
 			GETASCII(asc_inchar,inchar);
-			if ((dx >= ioptr_width) && io_ptr->wrap && echo_mode)  		//kt mod
+			if ((dx >= ioptr_width) && io_ptr->wrap && echo_mode)
 			{
 				DOWRITE(tt_ptr->fildes, NATIVE_TTEOL, strlen(NATIVE_TTEOL));	/* BYPASSOK */
 				dx = 0;
 			}
 			terminator_seen = FALSE;
-			char_is_terminator = IS_TERMINATOR(mask_term.mask, INPUT_CHAR, utf8_active);  //kt
+			char_is_terminator = IS_TERMINATOR(mask_term.mask, INPUT_CHAR, utf8_active);
 			//Below, UTF and default terminators and UTF terminators above ASCII_MAX
 			char_is_special_terminator = IS_SPECIAL_TERMINATOR(INPUT_CHAR, utf8_active);
-			if (char_is_terminator) //kt mod
+			if (char_is_terminator)
 			{
 				terminator_seen = TRUE;
-			} else if (char_is_special_terminator && dm_io_state_ptr->default_mask_term)  //kt
+			} else if (char_is_special_terminator && dm_io_state_ptr->default_mask_term)
 			{
 				terminator_seen = TRUE;
 			}
@@ -547,7 +547,7 @@ void	dm_read (mval *v)
 				STORE_OFF(0, outlen);
 				err_recall = NO_ERROR;
 				if (utf8_active && (ASCII_CR == INPUT_CHAR))
-					dm_io_state_ptr->discard_lf = TRUE;  		//kt mod
+					dm_io_state_ptr->discard_lf = TRUE;
 					/* exceeding the maximum length exits the while loop, so it must fit here . */
 #				ifdef UTF8_SUPPORTED
 				if (utf8_active)
@@ -679,9 +679,9 @@ void	dm_read (mval *v)
 				}
 				continue;	/* to allow more input */
 			}
-			char_is_erase = ((int)inchar == dm_io_state_ptr->ttio_struct.c_cc[VERASE]) ;	//kt added
-			char_is_backspace = ((NULL != KEY_BACKSPACE) && ('\0' == KEY_BACKSPACE[1]) && (inchar == KEY_BACKSPACE[0])); 	 //kt added
-			if ( (dm_io_state_ptr->passthru == FALSE ) && (char_is_erase || char_is_backspace) )  //kt mod
+			char_is_erase = ((int)inchar == dm_io_state_ptr->ttio_struct.c_cc[VERASE]) ;
+			char_is_backspace = ((NULL != KEY_BACKSPACE) && ('\0' == KEY_BACKSPACE[1]) && (inchar == KEY_BACKSPACE[0]));
+			if ( (dm_io_state_ptr->passthru == FALSE ) && (char_is_erase || char_is_backspace) )
 			{
 				if (0 < instr)
 				{
@@ -896,7 +896,7 @@ void	dm_read (mval *v)
 					if (0 != instr)
 						write_str(BUFF_ADDR(0), instr, dx_start, TRUE, FALSE);
 				}
-			} else if (echo_mode)  //kt mod
+			} else if (echo_mode)
 			{
 				if (instr != outlen)
 				{
@@ -954,7 +954,7 @@ void	dm_read (mval *v)
 		if (IS_AT_END_OF_STRINGPOOL(buffer_start, 0))
 			stringpool.free += v->str.len;	/* otherwise using space from before interrupt */
 	}
-	if (echo_mode)  //kt mod
+	if (echo_mode)
 	{
 		if ((io_ptr->dollar.x += dx_outlen) >= ioptr_width && io_ptr->wrap)
 		{
@@ -967,6 +967,6 @@ void	dm_read (mval *v)
 		}
 	}
 	active_device = 0;
-	//kt not needed --> RESETTERM_IF_NEEDED(io_ptr, EXPECT_SETTERM_DONE_TRUE);
+	//not needed --> RESETTERM_IF_NEEDED(io_ptr, EXPECT_SETTERM_DONE_TRUE);
 	return;
 }

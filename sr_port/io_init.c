@@ -35,7 +35,7 @@ GBLREF io_log_name	*dollar_principal;	/* pointer to log name GTM$PRINCIPAL if de
 GBLREF io_pair		io_curr_device;		/* current device	*/
 GBLREF io_pair		io_std_device;		/* standard device	*/
 GBLREF mstr		gtm_principal, sys_input, sys_output;
-GBLREF enum gtmImageTypes	image_type;   		//kt added
+GBLREF enum gtmImageTypes	image_type;
 
 LITREF	mval	literal_zero;
 
@@ -62,13 +62,13 @@ static readonly unsigned char	shr_params[] =
 	(unsigned char)iop_readonly,
 	(unsigned char)iop_eol
 };
-static readonly unsigned char tty_nocanonical_open_params_list[] =    //kt added entire list
+static readonly unsigned char tty_nocanonical_open_params_list[] =    //list for initializing TTY device
 {
 	(unsigned char)iop_nocanonical,
 	(unsigned char)iop_echo,
 	(unsigned char)iop_eol
 };
-static readonly unsigned char tty_canonical_open_params_list[] =    //kt added entire list
+static readonly unsigned char tty_canonical_open_params_list[] =    //list for initializing TTY device
 {
 	(unsigned char)iop_canonical,
 	(unsigned char)iop_echo,
@@ -235,7 +235,7 @@ void io_init(boolean_t term_ctrl)
 		pars.str.len = SIZEOF(nowrap_params_list);
 		pars.str.addr = (char *)nowrap_params_list;
 	}
-	else if (tt == dev_type)    //kt added this block to initialize TTY (terminal) type devices
+	else if (tt == dev_type)    //initialize TTY (terminal) type devices
 	{
 		if (GTM_IMAGE == image_type)
 		{
