@@ -151,7 +151,7 @@ short iott_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, uint8 tim
 		}
 	}
 	//Compile ydb state and send this to TTY IO subsystem.  8  1 will be default time and minimum read; can be changed later.
-	iott_compile_state_and_set_tty_and_ydb_echo(ioptr, 8, 1, handle_set_tty_err_mode_3);  .
+	iott_compile_state_and_set_tty_and_ydb_echo(ioptr, 8, 1, handle_set_tty_err_mode_3);
 	if (initializing)
 	{
 		//complete setup for initial io state.
