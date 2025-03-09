@@ -51,7 +51,6 @@ hash_table_int4 *create_utf8_xlate_table(mval *srch, mval *rplc, mstr *m_xlate)
 	SETUP_THREADGBL_ACCESS;
 	xlate = (int4 *)m_xlate->addr;
 	xlate_len = m_xlate->len;
-	assertpro((xlate_len >= srch->str.char_len) && ((NUM_CHARS * SIZEOF(int4)) <= xlate_len));
 	memset(xlate, NO_VALUE, xlate_len);
 	if (!((srch->mvtype & MV_UTF_LEN) && srch->str.len == srch->str.char_len))
 	{	/* need hash table if srch contains multi-byte UTF-8 characters (i.e. is not an ASCII string) */
