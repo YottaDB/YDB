@@ -2,7 +2,7 @@
 #
 #################################################################
 #                                                               #
-# Copyright (c) 2021 YottaDB LLC and/or its subsidiaries.       #
+# Copyright (c) 2021-2025 YottaDB LLC and/or its subsidiaries.       #
 # All rights reserved.                                          #
 #                                                               #
 #       This source code contains the intellectual property     #
@@ -21,7 +21,7 @@ import sys
 import os.path
 from datetime import datetime
 
-YOTTADB = re.compile("Copyright \(c\) (?P<start_date>20[0-9][0-9])(?P<end_date>-20[0-9][0-9])? YottaDB")
+YOTTADB = re.compile(r"Copyright \(c\) (?P<start_date>20[0-9][0-9])(?P<end_date>-20[0-9][0-9])? YottaDB")
 
 # Goes through the file given by f one line at a time until it finds a copyright that needs to be updated.
 # f   -> file under consideration
@@ -80,7 +80,7 @@ def look_for_copyrights(f, ext):
             if matches.group("start_date") == current_year or matches.group("end_date") == "-{}".format(current_year):
                 print(line, end="")
                 return False
-            print(YOTTADB.sub("Copyright (c) \g<start_date>-{} YottaDB".format(current_year), line), end="")
+            print(YOTTADB.sub(r"Copyright (c) \g<start_date>-{} YottaDB".format(current_year), line), end="")
             return True
         # More difficult case: no YottaDB copyrights in the file, so we have to add them.
         # This assumes that 'This source code ...' comes after all copyrights.

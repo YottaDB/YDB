@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
@@ -142,7 +142,7 @@ ENV ydb_dir=/data \
     GOPATH=$HOME/go \
     GOPROXY=https://proxy.golang.org/cached-only \
     ydb_dist=/opt/yottadb/current
-RUN go version && go get -t -d lang.yottadb.com/go/yottadb && cd $GOPATH/src/lang.yottadb.com/go/yottadb && git checkout develop
+RUN go version && go get -t -d lang.yottadb.com/go/yottadb && cd $GOPATH/src/lang.yottadb.com/go/yottadb && git checkout master
 RUN git clone https://github.com/anet-be/lua-yottadb.git && cd lua-yottadb && make install && cd - && rm -rf lua-yottadb
 RUN . /opt/yottadb/current/ydb_env_set && git clone https://gitlab.com/oesiman/yottadb-perl.git && cd yottadb-perl && perl Makefile.PL && make test TEST_DB=1 && make install && cd - && rm -rf yottadb-perl
 RUN git clone https://gitlab.com/YottaDB/Lang/YDBPython.git && cd YDBPython && python3 setup.py install --user && cd - && rm -rf YDBPython
