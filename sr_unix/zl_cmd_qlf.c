@@ -112,14 +112,14 @@ void zl_cmd_qlf(mstr *quals, command_qualifier *qualif, char *srcstr, unsigned s
 				!(status & 1) ? status : ERR_NORTN);
 		}
 		file.addr = pblk.l_name;
-		/* If the specified file does not have an extension (i.e. the extension is "") OR if it has an extension
-		 * of length 1 (i.e. the extension is just "."), then treat whatever was specified as the base name and
-		 * add a ".m" extension to the base name. For extension lengths >= 2, leave the base name untouched.
+		/* If the specified file has an extension of length 1 (i.e. the extension is just "."), then treat whatever
+		 * was specified as the base name and add a ".m" extension to the base name. For extension lengths >= 2
+		 * (i.e. the extension is say ".a") or 0 (i.e. the extension is ""), leave the base name untouched.
 		 */
 		assert(2 == (SIZEOF(DOTM) - 1));	/* SIZEOF(DOTM) includes the trailing '\0' byte too hence the - 1 */
-		assert((1 != pblk.b_ext) || ('.' == *pblk.l_ext));
-		if (2 > pblk.b_ext)
+		if (1 == pblk.b_ext)
 		{
+			assert('.' == *pblk.l_ext);
 			pblk.b_name += pblk.b_ext;
 			pblk.b_ext = 0;
 			if ((pblk.buffer + MAX_FN_LEN) >= (pblk.l_name + pblk.b_name + SIZEOF(DOTM)))
