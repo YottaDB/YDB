@@ -187,6 +187,9 @@ boolean_t compiler_startup(void)
 		newtriple(OC_LINESTART);
 	newtriple(OC_RET);			/* always provide a default QUIT */
 	mline_root.externalentry = t_orig.exorder.fl;
+	start_fetches(OC_NOOP);
+	resolve_blocks();
+	errknt = resolve_ref(errknt);
 	assert(indr_stringpool.base == stringpool.base);
 	INVOKE_STP_GCOL(0);
 	/* The above invocation of stp_gcol with a parameter of 0 is a critical part of compilation
@@ -208,9 +211,12 @@ boolean_t compiler_startup(void)
 		}
 		DBG_MARK_STRINGPOOL_EXPANDABLE;
 	}
-	start_fetches(OC_NOOP);
-	resolve_blocks();
-	errknt = resolve_ref(errknt);
+	/* At this point, the stringpool (indr_stringpool) contains the M literals (and embedded source text if CQ_EMBED_SOURCE).
+	 * There should be no more activity on this stringpool as this is exactly what will get written out later to the
+	 * compiled object file as the literal pool. Therefore mark this unusability using the below macro call. Until the
+	 * stringpool is switched back to rts_stringpool (at the end of this function), we will keep it unusable.
+	 */
+	DBG_MARK_STRINGPOOL_UNUSABLE;
 	compile_w_err = (errknt <= HOPELESS_COMPILE && (cmd_qlf.qlf & CQ_IGNORE));
 	if (cmd_qlf.qlf & CQ_LIST || cmd_qlf.qlf & CQ_CROSS_REFERENCE)
 	{
@@ -266,6 +272,7 @@ boolean_t compiler_startup(void)
 	TREF(compile_time) = FALSE;
 	TREF(transform) = TRUE;
 	assert(indr_stringpool.base == stringpool.base);
+	DBG_MARK_STRINGPOOL_USABLE;	/* Now that we are about to switch stringpool back to rts_stringpool, make it usable */
 	indr_stringpool = stringpool;
 	stringpool = rts_stringpool;
 	REVERT;
