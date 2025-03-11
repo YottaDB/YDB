@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -35,7 +35,7 @@ MBSTART {	/* Input:													\
 		 * --- I:	whichever operand of REF0 we are STOTEMPing							\
 		 * --- T1:	STOTEMP triple. NOOPed if not needed								\
 		 * --- OPND:	operand referring to value we need need to pass as input into boolean operation			\
-		 * If OPND refers to a variable (OC_VAR), we need to STOTEMP it to protect it from subsequent side effects.	\
+		 * If OPND is OC_VAR or OC_GETINDX, we need to STOTEMP it to protect it from subsequent side effects.		\
 		 * If it refers to a literal, and dynamic literals are enabled, we need to insert an OC_LITC anyway. Doing it	\
 		 * here in bx_boolop is convenient and ensures the OC_LITC is not skipped at run time.				\
 		 */														\
@@ -43,6 +43,7 @@ MBSTART {	/* Input:													\
 	switch (OPND.oprval.tref->opcode)											\
 	{															\
 		case OC_VAR:													\
+		case OC_GETINDX:												\
 			T1->opcode = OC_STOTEMP;										\
 			T1->operand[0] = OPND;											\
 			/* Clear operand[1] in case it was set for previous opcode */						\
