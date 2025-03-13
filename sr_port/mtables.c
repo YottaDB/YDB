@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -43,6 +43,7 @@
 #include "mtables.h"
 #include "iotimer.h"
 #include "libyottadb_int.h"
+#include "vxi.h"
 
 LITDEF char ctypetab[NUM_CHARS] =
 {
@@ -527,13 +528,12 @@ LITDEF char *mdb_ver_names[] =
 };
 #undef	ENUM_ENTRY
 
-#ifdef DEBUG
 /* These instructions follow the definitions made
  * in vxi.h and were generated from them. Where
  * skips were made in the definitions, the string
  * "*N/A*  " is placed in the table.
  */
-LITDEF char vxi_opcode[][6] =
+LITDEF char vxi_opcode[][7] =
 {
 	"HALT  ",
 	"NOP   ",
@@ -1050,4 +1050,3 @@ void mtables_chk(void)
 	assert(SIZEOF(mvs_size) == (MVST_LAST + 1));
 	assert(SIZEOF(mvs_save) == (SIZEOF(boolean_t) * (MVST_LAST + 1)));
 }
-#endif

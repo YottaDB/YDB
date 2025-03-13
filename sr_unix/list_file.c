@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -88,8 +88,13 @@ void open_list_file(void)
 	for (cp = source_name_len - 1; cp && ('/' != source_file_name[cp]); cp--)
 		;	/* scan back from the end to find the source file name */
 	cp += cp ? 1 : 0;
-	pblk.def1_size = source_name_len - cp - SIZEOF(DOTM) + 1;
-	assert(pblk.def1_size <= MAX_MIDENT_LEN);
+	pblk.def1_size = source_name_len - cp;
+	/* Check if this name ends in .m. If so, replace the extension. Otherwise append to it. */
+	int ext_len = STR_LIT_LEN(DOTM);
+	if (ext_len < pblk.def1_size && !STRCMP((char*) &source_file_name[source_name_len - ext_len], DOTM))
+		pblk.def1_size -= ext_len;
+	/* filenames longer than the max are truncated. */
+	pblk.def1_size = MIN(pblk.def1_size, MAX_MIDENT_LEN);
 	memcpy(list_name, &source_file_name[cp], pblk.def1_size);
 	MEMCPY_LIT(&list_name[pblk.def1_size], LISTEXT);
 	pblk.def1_size += STR_LIT_LEN(LISTEXT);

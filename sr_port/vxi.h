@@ -2,6 +2,9 @@
  *								*
  *	Copyright 2001 Sanchez Computer Associates, Inc.	*
  *								*
+ * Copyright (c) 2025 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -318,3 +321,5 @@
 #define VXI_CVTFG  (0x199)
 #define VXI_CVTHF  (0x1F6)
 #define VXI_CVTHD  (0x1F7)
+
+extern const char vxi_opcode[][7];

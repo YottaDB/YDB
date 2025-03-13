@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018, 2025 YottaDB LLC and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  * Copyright (c) 2018 Stephen L Johnson. All rights reserved.	*
@@ -128,7 +128,6 @@
 #define AARCH64_HW_SHIFT_32		0x2 << AARCH64_HW_SHIFT
 #define AARCH64_HW_SHIFT_48		0x3 << AARCH64_HW_SHIFT
 
-#ifdef DEBUG
 #define GET_OPCODE(ains)		((ains >> AARCH64_SHIFT_OP) & AARCH64_MASK_OP)
 #define GET_RT(ains)			((ains >> AARCH64_SHIFT_RT) & AARCH64_MASK_REG)
 #define GET_RT2(ains)			((ains >> AARCH64_SHIFT_RT2) & AARCH64_MASK_REG)
@@ -178,4 +177,3 @@
 
 /* Space for op_code to be in */
 #define OPSPC		7
-#endif

@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -36,7 +36,6 @@
 #endif /* GTM64 */
 #endif /* SECTION_ALIGN_BOUNDARY */
 #define OBJECT_SIZE_ALIGNMENT 16
-#ifdef DEBUG
 #define MAX_CODE_COUNT 10000
 /* This structure holds the size of the code generated for every triple */
 struct inst_count
@@ -44,7 +43,6 @@ struct inst_count
 	int size;
 	int sav_in;
 };
-#endif /* DEBUG */
 
 /* Prototypes */
 #ifdef UNIX
@@ -62,5 +60,5 @@ void drop_object_file(void);
 void create_object_file(rhdtyp *rhead);
 void obj_init(void);
 VMS_ONLY(void close_object_file(rhdtyp *rhead);)
-DEBUG_ONLY(int output_symbol_size(void);)
+int output_symbol_size(void);
 #endif /* OBJ_FILE_INCLUDED */

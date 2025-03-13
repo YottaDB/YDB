@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  * Copyright (c) 2018 Stephen L Johnson. All rights reserved.	*
@@ -30,11 +30,9 @@ GBLREF int		jmp_offset;	/* Offset to jump target */
 GBLREF int		code_idx;	/* Index into code_buf */
 GBLREF char		cg_phase;	/* Current compiler phase */
 GBLREF int4		curr_addr;
-#ifdef DEBUG
 GBLREF unsigned char    *obpt;		/* output buffer index */
 GBLREF unsigned char    outbuf[];	/* assembly language output buffer */
 static unsigned int	ains;		/* assembler instruction (binary) */
-#endif
 
 void	emit_base_offset_addr(int base, int offset)
 {
@@ -42,9 +40,7 @@ void	emit_base_offset_addr(int base, int offset)
 
 	switch (cg_phase)
 	{
-#ifdef DEBUG
 		case CGP_ASSEMBLY:
-#endif
 		case CGP_ADDR_OPT:
 		case CGP_APPROX_ADDR:
 		case CGP_MACHINE:
@@ -75,9 +71,7 @@ void	emit_base_offset_load(int base, int offset)
 
 	switch (cg_phase)
 	{
-#ifdef DEBUG
 		case CGP_ASSEMBLY:
-#endif
 		case CGP_ADDR_OPT:
 		case CGP_APPROX_ADDR:
 		case CGP_MACHINE:
@@ -105,7 +99,6 @@ void	emit_base_offset_load(int base, int offset)
 }
 
 
-#ifdef DEBUG
 void fmt_reg(int reg, int size, int z_flag)
 {
 	switch(reg)
@@ -389,7 +382,6 @@ void 	format_machine_inst(void)
 
 	for (instindx = 0; instindx < code_idx; instindx++)
 	{
-		list_chkpage();
 		obpt = &outbuf[0];
 		memset(obpt, SP, ASM_OUT_BUFF);
 		obpt += 10;
@@ -622,5 +614,3 @@ void 	format_machine_inst(void)
 		emit_eoi();
 	}
 }
-#endif
-

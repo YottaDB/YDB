@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  * Copyright (c) 2017-2018 Stephen L Johnson.			*
@@ -20,10 +20,8 @@
 
 #include <emit_code_sp.h>
 
-#ifdef DEBUG
 void	emit_asmlist(triple *ct);
 void	emit_eoi(void);
-#endif
 void    trip_gen(triple *ct);
 short	*emit_vax_inst(short *inst, oprtype **fst_opr, oprtype **lst_opr);
 void	emit_jmp(uint4 branchop, short **instp, int reg);

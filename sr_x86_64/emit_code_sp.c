@@ -3,7 +3,7 @@
  * Copyright (c) 2007-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -175,7 +175,6 @@ void	emit_jmp(uint4 branch_op, short **instp, int reg) /* Note that the 'reg' pa
 	jmp_offset -= code_idx * SIZEOF(code_buf[0]);	/* size of this particular instruction */
 	switch (cg_phase)
 	{
-#		ifdef DEBUG
 		case CGP_ASSEMBLY:
 			*obpt++ = 'x';
 			*obpt++ = '^';
@@ -185,7 +184,6 @@ void	emit_jmp(uint4 branch_op, short **instp, int reg) /* Note that the 'reg' pa
 			*obpt++ = ',';
 			*obpt++ = ' ';
 		/***** WARNING - FALL THRU *****/
-#		endif
 		case CGP_ADDR_OPT:
 		case CGP_APPROX_ADDR:
 		case CGP_MACHINE:
@@ -311,8 +309,6 @@ void	emit_base_offset(int base_reg, int offset)
 		emit_base_info.flags.offset32_set = TRUE;
 	}
 }
-
-#ifdef DEBUG
 
 void reset_instruction()
 {
@@ -991,4 +987,3 @@ void format_machine_inst()
 		 }
 	}
 }
-#endif /* DEBUG */

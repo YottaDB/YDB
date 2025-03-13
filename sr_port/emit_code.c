@@ -62,29 +62,25 @@ GBLDEF int call_4lcldo_variant;	 /* used in emit_jmp for call[sp] and forlcldo *
 #  define JMP_OFFSET_NEXT_STMT	0
 #endif
 
-#ifdef DEBUG
-#  include "vdatsize.h"
 /* VAX DISASSEMBLER TEXT */
-static const char	vdat_bdisp[VDAT_BDISP_SIZE + 1] = "B^";
-static const char	vdat_wdisp[VDAT_WDISP_SIZE + 1] = "W^";
-static const char	vdat_r9[VDAT_R9_SIZE + 1] = "(r9)";
-static const char	vdat_r8[VDAT_R8_SIZE + 1] = "(r8)";
-static const char	vdat_gr[VDAT_GR_SIZE + 1] = "G^";
-static const char	vdat_immed[VDAT_IMMED_SIZE + 1] = "I^#";
-static const char	vdat_r11[VDAT_R11_SIZE + 1] = "(R11)";
-static const char	vdat_gtmliteral[VDAT_GTMLITERAL_SIZE + 1] = "GTM$LITERAL";
-static const char	vdat_def[VDAT_DEF_SIZE + 1] = "@";
+static const char	*vdat_bdisp = "B^";
+static const char	*vdat_wdisp = "W^";
+static const char	*vdat_r9 = "(r9)";
+static const char	*vdat_r8 = "(r8)";
+static const char	*vdat_gr = "G^";
+static const char	*vdat_immed = "I^#";
+static const char	*vdat_r11 = "(R11)";
+static const char	*vdat_gtmliteral = "GTM$LITERAL";
+static const char	*vdat_def = "@";
 
 IA64_ONLY(GBLDEF char	asm_mode = 0; /* 0 - disassembly mode. 1 - decode mode */)
-GBLDEF unsigned char	*obpt;	  /* output buffer index */
-GBLDEF unsigned char	outbuf[ASM_OUT_BUFF];	/* assembly language output buffer */
-static int		vaxi_cnt = 1;	/* Vax instruction count */
+GBLDEF char	*obpt;	  /* output buffer index */
+GBLDEF char	outbuf[ASM_OUT_BUFF];	/* assembly language output buffer */
+static int	vaxi_cnt = 1;	/* Vax instruction count */
 
 /* Disassembler text: */
 LITREF char		*xfer_name[];
-LITREF char		vxi_opcode[][6];
 GBLREF char 		*oc_tab_graphic[];
-#endif
 
 LITREF octabstruct	oc_tab[];	/* op-code table */
 LITREF short		ttt[];		/* triple templates */
@@ -96,11 +92,6 @@ LITREF int		sa_class_sizes[];
 
 GBLDEF CODE_TYPE	code_buf[NUM_BUFFERRED_INSTRUCTIONS];
 GBLDEF unsigned int	code_idx;
-#ifdef DEBUG
-GBLDEF struct inst_count generated_details[MAX_CODE_COUNT], calculated_details[MAX_CODE_COUNT];
-GBLDEF int4 generated_count, calculated_count;
-#endif /* DEBUG */
-GBLDEF int		calculated_code_size, generated_code_size;
 GBLDEF int		jmp_offset;	/* Offset to jump target */
 GBLDEF int		code_reference;	/* Offset from pgm start to current loc */
 /* On x86_64, the smaller offsets are encoded in 1 byte (4 bytes otherwise). But for some cases,
@@ -115,7 +106,7 @@ GBLREF int		curr_addr;
 GBLREF char		cg_phase;	/* code generation phase */
 GBLREF char		cg_phase_last;	/* the previous code generation phase */
 
-DEBUG_ONLY(static boolean_t	opcode_emitted;)
+static boolean_t	opcode_emitted;
 static int		stack_depth = 0;
 
 /* Variables for counting the arguments */
@@ -156,7 +147,7 @@ void trip_gen(triple *ct)
 #	if !defined(TRUTH_IN_REG) && (!(defined(__osf__) || defined(__x86_64__) || defined(Linux390) || defined(__armv6l__) || defined(__armv7l__)))
 	assertpro(FALSE);
 #	endif
-	DEBUG_ONLY(opcode_emitted = FALSE);
+	opcode_emitted = FALSE;
 	current_triple = ct;	/* save for possible use by internal rtns */
 	tp = ttt[ct->opcode];
 	if (0 >= tp)
@@ -312,10 +303,8 @@ void trip_gen(triple *ct)
 				{
 					tsp = repl;
 					tsp = emit_vax_inst((short *)tsp, &saved_opr[0], --sopr);
-#					ifdef DEBUG
 					if (CGP_ASSEMBLY == cg_phase)
 						emit_asmlist(ct);
-#					endif
 				} while (sopr > &saved_opr[repcnt]);
 			} else
 			{
@@ -326,10 +315,8 @@ void trip_gen(triple *ct)
 		{
 			assert((NULL != tsp) && (511 >= *tsp));
 			tsp = emit_vax_inst((short *)tsp, &saved_opr[0], sopr);
-#			ifdef DEBUG
 			if (CGP_ASSEMBLY == cg_phase)
 				emit_asmlist(ct);
-#			endif
 		} /* else */
 	} /* for */
 	if (CGP_APPROX_ADDR == cg_phase)
@@ -337,7 +324,6 @@ void trip_gen(triple *ct)
 			add_to_vax_push_list(vax_pushes_seen);
 }
 
-#ifdef DEBUG
 /* Create assembler listing for given triple showing both intermediate (VAX) code and generated native code */
 void emit_asmlist(triple *ct)
 {
@@ -376,7 +362,6 @@ void emit_eoi (void)
 	IA64_ONLY(})
 	return;
 }
-#endif
 
 /* Create generated code for the given intermediate language opcodes (similar to VAX instructions) */
 short *emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
@@ -393,7 +378,6 @@ short *emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
 	switch (cg_phase)
 	{
 		case CGP_ASSEMBLY:
-#			ifdef DEBUG
 			list_chkpage();
 			obpt = &outbuf[0];
 			memset(obpt, SP, SIZEOF(outbuf));
@@ -403,12 +387,11 @@ short *emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
 				instr = *inst;
 			else
 				instr = (*inst == VXT_IREPAB) ? VXI_PUSHAB : VXI_PUSHL;
-			memcpy(obpt, &vxi_opcode[instr][0], 6);
+			stpcpy(obpt, vxi_opcode[instr]);
 			obpt += 10;
 			*obpt++ = SP;
 			*obpt++ = SP;
 			/*****  WARNING - FALL THRU *****/
-#			endif
 		case CGP_ADDR_OPT:
 		case CGP_APPROX_ADDR:
 		case CGP_MACHINE:
@@ -841,28 +824,9 @@ short *emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
 	assert(NUM_BUFFERRED_INSTRUCTIONS > code_idx);
 	if (CGP_MACHINE == cg_phase)
 	{
-		generated_code_size += code_idx;
-#		ifdef DEBUG
-		if (MAX_CODE_COUNT > generated_count)
-		{
-			generated_details[generated_count].size = code_idx;
-			generated_details[generated_count++].sav_in = sav_in;
-		}
-#		endif /* DEBUG */
 		emit_immed ((char *)&code_buf[0], (uint4)(INST_SIZE * code_idx));
 	} else if (CGP_ASSEMBLY != cg_phase)
 	{
-		if (CGP_APPROX_ADDR == cg_phase)
-		{
-			calculated_code_size += code_idx;
-#			ifdef DEBUG
-			if (MAX_CODE_COUNT > calculated_count)
-			{
-				calculated_details[calculated_count].size = code_idx;
-				calculated_details[calculated_count++].sav_in = sav_in;
-			}
-#			endif /* DEBUG */
-		}
 		curr_addr += (INST_SIZE * code_idx);
 	}
 	code_reference += (INST_SIZE * code_idx);
@@ -894,7 +858,6 @@ void emit_jmp(uint4 branchop, short **instp, int reg)
 	EMIT_JMP_ADJUST_BRANCH_OFFSET;
 	switch (cg_phase)
 	{
-#		ifdef DEBUG
 		case CGP_ASSEMBLY:
 			*obpt++ = 'x';
 			*obpt++ = '^';
@@ -904,7 +867,6 @@ void emit_jmp(uint4 branchop, short **instp, int reg)
 			*obpt++ = ',';
 			*obpt++ = ' ';
 		/*****  WARNING - FALL THRU *****/
-#		endif
 		case CGP_ADDR_OPT:
 		case CGP_APPROX_ADDR:
 		case CGP_MACHINE:
@@ -1037,7 +999,6 @@ void emit_pcrel(void)
 	jmp_offset -= INTCAST((char *)&code_buf[code_idx] - (char *)&code_buf[0]);
 	switch (cg_phase)
 	{
-#		ifdef DEBUG
 		case CGP_ASSEMBLY:
 			*obpt++ = 'x';
 			*obpt++ = '^';
@@ -1047,7 +1008,6 @@ void emit_pcrel(void)
 			*obpt++ = ',';
 			*obpt++ = ' ';
 				/*****  WARNING - FALL THRU *****/
-#		endif
 		case CGP_ADDR_OPT:
 		case CGP_APPROX_ADDR:
 		case CGP_MACHINE:
@@ -1265,7 +1225,6 @@ void emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 				NON_AARCH64_RISC_ONLY(code_buf[code_idx++] |= IGEN_GENERIC_REG(generic_inst, trg_reg));
 			}
 			break;
-#		ifdef DEBUG
 		case CGP_ASSEMBLY:
 			offset = 0;
 			switch (opr->oprclass)
@@ -1279,10 +1238,8 @@ void emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 						case OC_LIT:
 							assert(MLIT_REF == ct->operand[0].oprclass);
 							offset = literal_offset(ct->operand[0].oprval.mlit->rt_addr);
-							memcpy(obpt, &vdat_def[0], VDAT_DEF_SIZE);
-							obpt += VDAT_DEF_SIZE;
-							memcpy(obpt, &vdat_gtmliteral[0], VDAT_GTMLITERAL_SIZE);
-							obpt += VDAT_GTMLITERAL_SIZE;
+							obpt = stpcpy(obpt, vdat_def);
+							obpt = stpcpy(obpt, vdat_gtmliteral);
 							*obpt++ = '+';
 							*obpt++ = '0';
 							*obpt++ = 'x';
@@ -1301,8 +1258,7 @@ void emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 						case OC_CDLIT:
 							if (val_output)
 							{
-								memcpy(obpt, &vdat_gr[0], VDAT_GR_SIZE);
-								obpt += VDAT_GR_SIZE;
+								obpt = stpcpy(obpt, vdat_gr);
 							}
 							memcpy(obpt, ct->operand[0].oprval.cdlt->addr,
 							       ct->operand[0].oprval.cdlt->len);
@@ -1325,23 +1281,21 @@ void emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 							assert(GENERIC_OPCODE_LOAD == generic_inst);
 							/* Fetch linkage table offset for symbol and convert to index */
 							immediate = find_linkage(ct->operand[0].oprval.cdidx) / SIZEOF(lnk_tabent);
-							memcpy(obpt, &vdat_immed[0], VDAT_IMMED_SIZE);
-							obpt += VDAT_IMMED_SIZE;
-							obpt = i2asc((uchar_ptr_t)obpt, immediate);
+							obpt = stpcpy(obpt, vdat_immed);
+							obpt = (char*)i2asc((uchar_ptr_t)obpt, immediate);
 							EMIT_TRIP_ILIT_GEN;
 							inst_emitted = TRUE;
 							break;
 						case OC_ILIT:
 							assert(GENERIC_OPCODE_LOAD == generic_inst);
 							immediate = ct->operand[0].oprval.ilit;
-							memcpy(obpt, &vdat_immed[0], VDAT_IMMED_SIZE);
-							obpt += VDAT_IMMED_SIZE;
-							obpt = i2asc((uchar_ptr_t)obpt, immediate);
+							obpt = stpcpy(obpt, vdat_immed);
+							obpt = (char*)i2asc((uchar_ptr_t)obpt, immediate);
 							*obpt++ = SP;
 							*obpt++ = '[';
 							*obpt++ = '0';
 							*obpt++ = 'x';
-							obpt = i2asclx((uchar_ptr_t)obpt, immediate);
+							obpt = (char*)i2asclx((uchar_ptr_t)obpt, immediate);
 							*obpt++ = ']';
 							EMIT_TRIP_ILIT_GEN;
 							inst_emitted = TRUE;
@@ -1366,16 +1320,13 @@ void emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 					NON_GTM64_ONLY(assertpro((0 <= offset) &&  (MAX_OFFSET >= offset)));
 					if (127 > offset)
 					{
-						memcpy(obpt, &vdat_bdisp[0], VDAT_BDISP_SIZE);
-						obpt += VDAT_BDISP_SIZE;
+						obpt = stpcpy(obpt, vdat_bdisp);
 					} else
 					{
-						memcpy(obpt, &vdat_wdisp[0], VDAT_WDISP_SIZE);
-						obpt += VDAT_WDISP_SIZE;
+						obpt = stpcpy(obpt, vdat_wdisp);
 					}
-					obpt = i2asc((uchar_ptr_t)obpt, offset);
-					memcpy(obpt, &vdat_r9[0], VDAT_R9_SIZE);
-					obpt += VDAT_R9_SIZE;
+					obpt = (char*)i2asc((uchar_ptr_t)obpt, offset);
+					obpt = stpcpy(obpt, vdat_r9);
 					/*
 					 * for 64 bit platforms, By default the loads/stores
 					 * are of 8 bytes, but if the value being dealt with
@@ -1398,27 +1349,22 @@ void emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 					offset -= (sa_temps[opr->oprclass] - opr->oprval.temp) * sa_class_sizes[opr->oprclass];
 					if (val_output)
 					{
-						memcpy(obpt, &vdat_def[0], VDAT_DEF_SIZE);
-						obpt += VDAT_DEF_SIZE;
+						obpt = stpcpy(obpt, vdat_def);
 					}
 					if (127 > offset)
 					{
-						memcpy(obpt, &vdat_bdisp[0], VDAT_BDISP_SIZE);
-						obpt += VDAT_BDISP_SIZE;
+						obpt = stpcpy(obpt, vdat_bdisp);
 					} else
 					{
-						memcpy(obpt, &vdat_wdisp[0], VDAT_WDISP_SIZE);
-						obpt += VDAT_WDISP_SIZE;
+						obpt = stpcpy(obpt, vdat_wdisp);
 					}
-					obpt = i2asc((uchar_ptr_t)obpt, offset);
+					obpt = (char*)i2asc((uchar_ptr_t)obpt, offset);
 					if (TVAR_REF == opr->oprclass)
 					{
-						memcpy(obpt, &vdat_r8[0], VDAT_R8_SIZE);
-						obpt += VDAT_R8_SIZE;
+						obpt = stpcpy(obpt, vdat_r8);
 					} else
 					{
-						memcpy(obpt, &vdat_r9[0], VDAT_R9_SIZE);
-						obpt += VDAT_R9_SIZE;
+						obpt = stpcpy(obpt, vdat_r9);
 					}
 					NON_GTM64_ONLY(assertpro((0 <= offset) &&  (MAX_OFFSET >= offset)));
 					if (TVAR_REF == opr->oprclass)
@@ -1481,7 +1427,6 @@ void emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 			*obpt++ = ',';
 			*obpt++ = ' ';
 			break;
-#		endif
 		case CGP_MACHINE:
 			switch (opr->oprclass)
 			{
@@ -1853,29 +1798,23 @@ void emit_call_xfer(int xfer)
 	int		offset;
 	unsigned char	*c;
 
-#	ifdef DEBUG
 	if (CGP_ASSEMBLY == cg_phase)
 	{
-		memcpy(obpt, &vdat_def[0], VDAT_DEF_SIZE);
-		obpt += VDAT_DEF_SIZE;
+		obpt = stpcpy(obpt, vdat_def);
 		if (127 > xfer)
 		{
-			memcpy(obpt, &vdat_bdisp[0], VDAT_BDISP_SIZE);
-			obpt += VDAT_BDISP_SIZE;
+			obpt = stpcpy(obpt, vdat_bdisp);
 		} else
 		{
-			memcpy(obpt, &vdat_wdisp[0], VDAT_WDISP_SIZE);
-			obpt += VDAT_WDISP_SIZE;
+			obpt = stpcpy(obpt, vdat_wdisp);
 		}
 		offset = (int)(xfer / SIZEOF(char *));
 		for (c = (unsigned char *)xfer_name[offset]; *c ; )
 			*obpt++ = *c++;
-		memcpy(obpt, &vdat_r11[0], VDAT_R11_SIZE);
-		obpt += VDAT_R11_SIZE;
+		obpt = stpcpy(obpt, vdat_r11);
 		*obpt++ = ',';
 		*obpt++ = ' ';
 	}
-#	endif
 	assert(0 == (xfer & 0x3));
 	offset = (int)(xfer / SIZEOF(char *));
 #	ifdef __x86_64__

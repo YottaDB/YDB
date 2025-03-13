@@ -2,7 +2,7 @@
  *								*
  * Copyright 2003, 2009 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  * Copyright (c) 2017-2018 Stephen L Johnson.			*
@@ -28,7 +28,6 @@ void	emit_base_offset_load(int base, int offset);
 void	emit_base_offset_addr(int base, int offset);
 int	encode_immed12(int offset);
 
-#ifdef DEBUG
 void    format_machine_inst(void);
 int	decode_immed12(int offset);
 void	fmt_ains(void);
@@ -53,7 +52,6 @@ void	fmt_rt(void);
 void	fmt_rt_rn_raw_imm12(void);
 void	fmt_sregs(void);
 void	tab_to_column(int col);
-#endif
 
 #define INST_SIZE (int)SIZEOF(uint4)
 #define BRANCH_OFFSET_FROM_IDX(idx_start, idx_end) (idx_end - (idx_start + 1))

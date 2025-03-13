@@ -3,7 +3,7 @@
  * Copyright (c) 2007-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  * Copyright (c) 2017 Stephen L Johnson. All rights reserved.	*
@@ -29,7 +29,6 @@
  *     references. This should be looked at again so we can eliminate the 4 byte "override" as it were which would
  *     again cause a significant decrease in generated code size.
  */
-#ifdef DEBUG
 void format_machine_inst(void);
 void initialize_registers(void);
 void reset_instruction(void);
@@ -39,7 +38,6 @@ void print_instruction(void);
 void set_memory_reg(void);
 void set_register_reg(void);
 void clear_memory_reg(void);
-#endif
 
 void emit_base_offset(int base, int offset);
 

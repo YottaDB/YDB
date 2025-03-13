@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -72,14 +72,15 @@ void get_cmd_qlf(command_qualifier *qualif)
 	if (cli_negated("ALIGN_STRINGS"))		/* ALIGN_STRINGS is undocument and unimplemented */
 		qualif->qlf &= ~CQ_ALIGN_STRINGS;
 
-	#ifdef DEBUG
-	if (CLI_PRESENT == cli_present("MACHINE_CODE"))
+	len = qualif->list_file.str.len; /* Save the capacity of the list. This was set at function entry by `zl_cmd_qlf`. */
+	if (CLI_PRESENT == cli_present("MACHINE_CODE")) {
 		qualif->qlf |= CQ_MACHINE_CODE;
-	else if (cli_negated("MACHINE_CODE"))
+		/* -machine implies -list. */
+		qualif->qlf |= CQ_LIST;
+		qualif->list_file.mvtype = MV_STR;
+		qualif->list_file.str.len = 0;
+	} else if (cli_negated("MACHINE_CODE"))
 		qualif->qlf &= ~CQ_MACHINE_CODE;
-	#else
-	qualif->qlf &= ~CQ_MACHINE_CODE;
-	#endif
 
 	if (cli_negated("WARNINGS"))
 		qualif->qlf &= ~CQ_WARNINGS;
@@ -90,19 +91,18 @@ void get_cmd_qlf(command_qualifier *qualif)
 	}
 
 	if (cli_negated("LIST"))
+		/* `-machine -nolist` is the same as `-nolist`. */
 		qualif->qlf &= (~CQ_LIST & ~CQ_MACHINE_CODE);
 	else if (CLI_PRESENT == cli_present("LIST"))
 	{
 		qualif->qlf |= CQ_LIST;
 		qualif->list_file.mvtype = MV_STR;
 		s = &qualif->list_file.str;	/* 4SCA: list_file is allocated MAX_FN_LEN bytes */
-		len = s->len;
 		if (FALSE == cli_get_str("LIST", s->addr, &len))
 			s->len = 0;
 		else
 			s->len = len;
-	} else if (!(qualif->qlf & CQ_LIST))
-		qualif->qlf &= ~CQ_MACHINE_CODE;
+	}
 	if (FALSE == cli_get_int("LENGTH",&temp_int))
 		temp_int = 66;
 	lst_param.lines_per_page = temp_int;
