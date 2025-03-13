@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -71,26 +71,13 @@ unsigned char *get_symb_line(unsigned char *out, int max_len, unsigned char **b_
 	 * generated code and could occur in most any of the utility modules - especially replication processes.
 	 * Or this could be in a simpleAPI process. Do what we can to indicate where the problem occurred.
 	 */
-<<<<<<< HEAD
 	/* Show which image is running */
-	memcpy(out, gtmImageNames[image_type].imageName, gtmImageNames[image_type].imageNameLen);
+	memcpy((void *)out, gtmImageNames[image_type].imageName, gtmImageNames[image_type].imageNameLen);
 	out_addr = out + gtmImageNames[image_type].imageNameLen;
 	if (process_exiting)
 	{	/* Add the information that this process was exiting */
 		MEMCPY_LIT(out_addr, PROCESS_EXITING);
 		out_addr += STR_LIT_LEN(PROCESS_EXITING);
-=======
-	if (process_exiting || !IS_MCODE_RUNNING)
-	{	/* Show which image is running */
-		memcpy((void *)out, gtmImageNames[image_type].imageName, gtmImageNames[image_type].imageNameLen);
-		out_addr = out + gtmImageNames[image_type].imageNameLen;
-		if (process_exiting)
-		{	/* Add the information that this process was exiting */
-			MEMCPY_LIT(out_addr, PROCESS_EXITING);
-			out_addr += STR_LIT_LEN(PROCESS_EXITING);
-		}
-		return out_addr;
->>>>>>> fdfdea1e (GT.M V7.1-002)
 	}
 	return out_addr;
 }

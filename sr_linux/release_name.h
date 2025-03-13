@@ -17,10 +17,9 @@
  ****************************************************************/
 
 #ifndef GTM_RELEASE_NAME
-<<<<<<< HEAD
 
 #define GTM_VERSION		"V7.1"
-#define	GTM_ZVERSION		"V7.1-001"
+#define	GTM_ZVERSION		"V7.1-002"
 #define	YDB_ZYRELEASE		"r2.03"		/* changes here should be reflected in YDB_RELEASE in sr_unix/libyottadb.h */
 
 /* This sets YDB_RELEASE_STAMP as part of the cmake build process.
@@ -48,20 +47,3 @@
 #define YDB_PRODUCT		"YottaDB"
 
 #endif
-=======
-#ifdef __CYGWIN__
-#define GTM_RELEASE_NAME 	"GT.M V7.1-002 CYGWIN x86"
-#elif defined(__ia64)
-#define GTM_RELEASE_NAME 	"GT.M V7.1-002 Linux IA64"
-#elif defined(__x86_64__)
-#define GTM_RELEASE_NAME 	"GT.M V7.1-002 Linux x86_64"
-#elif defined(__s390__)
-#define GTM_RELEASE_NAME 	"GT.M V7.1-002 Linux S390X"
-#else
-#define GTM_RELEASE_NAME 	"GT.M V7.1-002 Linux x86"
-#endif
-#endif
-#define GTM_PRODUCT 		"GT.M"
-#define GTM_VERSION		"V7.1"
-#define GTM_RELEASE_STAMP	"20230913 21:50"
->>>>>>> fdfdea1e (GT.M V7.1-002)

@@ -759,25 +759,9 @@
 3 VERSION
    VERSION
 
-<<<<<<< HEAD
-   V4 and V5 specifies file header format. For more information on the
+   V5 specifies file header format. For more information on the
    downgrade criteria for your database, refer to the release notes document
    of your current YottaDB version.
-
-   V4:
-
-     o It reduces the size from 8 bytes to 4 bytes for fields like current
-       transaction (CTN), maximum tn (MTN) and others that contain
-       transaction numbers.
-     o It removes the results of any prior DBCERTIFY run on the database.
-     o You cannot downgrade a V5 database which has standard null collation.
-       In such a case, perform a MUPIP EXTRACT -FORMAT=ZWR operation on the
-       V5 database and then perform a MUPIP LOAD operation on a V4 database.
-=======
-   V5 specifies file header format. For more information on the downgrade
-   criteria for your database, refer to the release notes document of your
-   current GT.M version.
->>>>>>> fdfdea1e (GT.M V7.1-002)
 
    V63000A:
 
@@ -1552,7 +1536,7 @@
    ID
 
    Specifies the signature use for the ftok; if unspecified, it defaults to
-   the signature for a GT.M database file. if a file is not valid and
+   the signature for a YottaDB database file. if a file is not valid and
    accessible, FTOK reports -1 values. By default, the utility provides
    additional information about the file, including its file ID which
    provides the basis for the FTOK.
@@ -1583,29 +1567,6 @@
    Specifies that the reported key is for the Receive Pool of the instance
    created by the current Global Directory.
 
-<<<<<<< HEAD
-3 ID
-   ID
-
-   Specifies the signature use for the ftok; if unspecified, it defaults to
-   the signature for a YottaDB database file.
-
-3 ONLY
-   ONLY
-
-   Restricts the output to only the FTOK Key; if a file is not valid and
-   accessible, FTOK reports -1 values. -ONLY does not report the table header
-   even when -HEADER is specified. If the database file is unavailable, the
-   utility defaults to the -ONLY behavior.
-
-3 HEADER
-   HEADER
-
-   Displays or omits the header of the table. By default, MUPIP FTOK displays
-   the header.
-
-=======
->>>>>>> fdfdea1e (GT.M V7.1-002)
 2 HASH
    HASH
 
@@ -3760,13 +3721,9 @@
 
    -PRO[BLKSPLIT]=integer
 
-<<<<<<< HEAD
-     o YottaDB never performs proactive block splitting inside a TP transaction.
-=======
      o Proactive consideration occurs when a mini-transaction retries
        updating an data block more than once due to contention.
-     o GT.M never performs proactive block splitting inside a TP transaction.
->>>>>>> fdfdea1e (GT.M V7.1-002)
+     o YottaDB never performs proactive block splitting inside a TP transaction.
      o Proactive block splits tend to make globals require more blocks and
        potentially deeper trees.
      o A value of one (1) indicates to always consider proactive splits,
@@ -7410,18 +7367,6 @@
 
    -buffsize=<Journal Pool size in bytes>
 
-<<<<<<< HEAD
-   Specifies the size of the Journal Pool. The server rounds the size up or
-   down to suit to align with other specified or implicit requirements. Any
-   size less than 1 MiB is rounded up to 1 MiB. If you do not specify a
-   qualifier, the size defaults to the YottaDB default value of 64 MiB. Remember
-   that you cannot exceed the system-provided maximum shared memory. For
-   systems with high update rates, specify a larger buffer size to avoid the
-   overflows and file I/O that occur when the Source Server reads journal
-   records from journal files. The maximum value is 68719476736 (64GiB).
-   MUPIP REPLICATE -SOURCE ignores -BUFFSIZE if the Journal Pool is already set up.
-   The first Source Server process started on an instance sets up the Journal Pool.
-=======
    On the Source Server, -BUFFSIZE specifies the size of the Journal Pool.
    The server rounds the size up or down to align with other specified or
    implicit requirements. Any size less than 1 MiB is rounded up to 1 MiB. If
@@ -7453,14 +7398,13 @@
 
    **Note**
 
-   On the Originating Instance, GT.M processes can access updates as soon as
-   any other GT.M process commits them. However, mumps processes on a
+   On the Originating Instance, YottaDB processes can access updates as soon as
+   any other YottaDB process commits them. However, mumps processes on a
    Replicating Instance cannot access updates from the Originating Instance
    until the Source Server sends them, the Receiver Process moves them to the
    Receive Pool and the Update Process picks and commits them. Please bear
    this distinction in mind while configuring replicating/reporting instances
    for your application.
->>>>>>> fdfdea1e (GT.M V7.1-002)
 
    -[no]jnlfileonly
 

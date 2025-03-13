@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -187,14 +187,9 @@ void gvcmz_doop(unsigned char query_code, unsigned char reply_code, mval *v)
 		else
 		{
 			if (*ptr++ != gv_cur_region->cmx_regnum)
-<<<<<<< HEAD
-				RTS_ERROR_ABT(VARLSTCNT(1) ERR_BADSRVRNETMSG);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_BADSRVRNETMSG);
 			keylen = (len - 1 - (3 * SIZEOF(unsigned short)));	/* 3 for gv_key->top, prev, end */
 #			ifdef DEBUG
-=======
-				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_BADSRVRNETMSG);
-#ifdef DEBUG
->>>>>>> fdfdea1e (GT.M V7.1-002)
 			CM_GET_USHORT(srv_buff_size, ptr, ((link_info *)(lnk->usr))->convert_byteorder);
 			assert(srv_buff_size == gv_altkey->top);
 			/* Check gv_altkey has enough size allocated for the data to be copied */
@@ -220,11 +215,7 @@ void gvcmz_doop(unsigned char query_code, unsigned char reply_code, mval *v)
 	}
 	assert((CMMS_R_GET == reply_code)
 		|| (CMMS_R_INCREMENT == reply_code)
-<<<<<<< HEAD
-		|| (CMMS_R_QUERY == reply_code) && ((link_info *)lnk->usr)->query_is_queryget && (1 < len));
-=======
 		|| ((CMMS_R_QUERY == reply_code) && ((link_info *)lnk->usr)->query_is_queryget && (1 < len)));
->>>>>>> fdfdea1e (GT.M V7.1-002)
 	CM_GET_SHORT(len, ptr, ((link_info *)(lnk->usr))->convert_byteorder);
 	ptr += SIZEOF(unsigned short);
 	assert((ptr >= stringpool.base) && ((ptr + len) < stringpool.top)); /* incoming message is in stringpool */

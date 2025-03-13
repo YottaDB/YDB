@@ -3,7 +3,7 @@
  * Copyright (c) 2004-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -116,16 +116,9 @@ void	gtm_env_init(void)
 		/* See if ydb_dbglvl has been specified. Do this first since ydbDebugLevel needs
 		 * to be initialized before any mallocs are done in the system.
 		 */
-<<<<<<< HEAD
 		ydbDebugLevel = INITIAL_DEBUG_LEVEL;
 		tdbglvl = ydb_trans_numeric(YDBENVINDX_DBGLVL, &is_defined, IGNORE_ERRORS_TRUE, NULL);
 		if (is_defined)
-=======
-		gtmDebugLevel = INITIAL_DEBUG_LEVEL;
-		val.addr = GTM_DEBUG_LEVEL_ENVLOG;
-		val.len = SIZEOF(GTM_DEBUG_LEVEL_ENVLOG) - 1;
-		if ((tdbglvl = trans_numeric(&val, &is_defined, TRUE))) /* Note assignment!! */
->>>>>>> fdfdea1e (GT.M V7.1-002)
 		{	/* Some kind of debugging was asked for.. */
 			tdbglvl |= GDL_Simple;			/* Make sure simple debugging turned on if any is */
 			if ((GDL_SmChkFreeBackfill | GDL_SmChkAllocBackfill) & tdbglvl)
@@ -303,7 +296,6 @@ void	gtm_env_init(void)
 			TREF(ydb_socket_keepalive_idle) = 0;
 		/* Initialize storage to allocate and keep in our back pocket in case run out of memory */
 		outOfMemoryMitigateSize = GTM_MEMORY_RESERVE_DEFAULT;
-<<<<<<< HEAD
 		reservesize = ydb_trans_numeric(YDBENVINDX_MEMORY_RESERVE, &is_defined, IGNORE_ERRORS_TRUE, NULL);
 		if (reservesize)
 			outOfMemoryMitigateSize = reservesize;
@@ -315,22 +307,6 @@ void	gtm_env_init(void)
 		max_cache_entries = DEFAULT_INRDCACHE_ENTRIES;
 		cachent = ydb_trans_numeric(YDBENVINDX_MAX_INDRCACHE_COUNT, &is_defined, IGNORE_ERRORS_TRUE, NULL);
 		if (cachent)
-=======
-		val.addr = GTM_MEMORY_RESERVE;
-		val.len = SIZEOF(GTM_MEMORY_RESERVE) - 1;
-		if ((reservesize = trans_numeric(&val, &is_defined, TRUE))) /* Note assignment!! */
-			outOfMemoryMitigateSize = reservesize;
-		/* Initialize indirect cache limits (max memory, max entries) */
-		max_cache_memsize = DEFAULT_INDRCACHE_KBSIZE * BIN_ONE_K;
-		val.addr = GTM_MAX_INDRCACHE_MEMORY;
-		val.len = SIZEOF(GTM_MAX_INDRCACHE_MEMORY) - 1;
-		if ((memsize = trans_numeric(&val, &is_defined, TRUE))) /* Note assignment!! */
-			max_cache_memsize = ((MAX_INDRCACHE_KBSIZE > memsize) ? memsize : MAX_INDRCACHE_KBSIZE) * BIN_ONE_K;
-		max_cache_entries = DEFAULT_INRDCACHE_ENTRIES;
-		val.addr = GTM_MAX_INDRCACHE_COUNT;
-		val.len = SIZEOF(GTM_MAX_INDRCACHE_COUNT) - 1;
-		if ((cachent = trans_numeric(&val, &is_defined, TRUE))) /* Note assignment!! */
->>>>>>> fdfdea1e (GT.M V7.1-002)
 			max_cache_entries = cachent;
 		/* Initialize ZQUIT to control funky QUIT compilation */
 		ret = ydb_logical_truth_value(YDBENVINDX_ZQUIT_ANYWAY, FALSE, &is_defined);

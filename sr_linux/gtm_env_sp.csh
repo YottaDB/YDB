@@ -263,13 +263,8 @@ if ( $?gtm_version_change == "1" ) then
 	# -ffloat-store for consistent results avoiding rounding differences
 	# -fno-omit-frame-pointer so %rbp always gets set up (required by caller_id()). Default changed in gcc 4.6.
 	if ( "ia64" != $mach_type ) then
-<<<<<<< HEAD
-		setenv	gt_cc_option_optimize	"-O2 -fno-defer-pop -fno-strict-aliasing -ffloat-store -fno-omit-frame-pointer"
-		if ( ( "32" == $gt_build_type ) && ( "armv6l" != $mach_type ) && ( "armv7l" != $mach_type ) ) then
-=======
 		setenv	gt_cc_option_optimize	"-O3 -fno-strict-aliasing -fno-defer-pop -ffloat-store -fno-omit-frame-pointer"
-		if ( "32" == $gt_build_type ) then
->>>>>>> fdfdea1e (GT.M V7.1-002)
+		if ( ( "32" == $gt_build_type ) && ( "armv6l" != $mach_type ) && ( "armv7l" != $mach_type ) ) then
 			# applies to 32bit x86_64, ia32 and cygwin
 			# Compile 32-bit x86 GT.M using 586 instruction set rather than 686 as the new Intel Quark
 			# low power system-on-a-chip uses the 586 instruction set rather than the 686 instruction set

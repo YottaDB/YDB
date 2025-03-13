@@ -2,7 +2,7 @@
  *								*
  * Copyright 2011, 2014 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -46,7 +46,6 @@ typedef struct
 	int		carry_bytes;
 } hash128_state_t;
 
-<<<<<<< HEAD
 /* Do not use MBSTART/MBEND as it requires "gtm_common_defs.h" which we would rather not require
  * as this file ("mmrhash.h") is an externally visible header file.
  */
@@ -55,42 +54,6 @@ typedef struct
 	(STATE).h.one = (STATE).h.two = (SEED);		\
 	(STATE).c.one = (STATE).c.two = 0;		\
 	(STATE).carry_bytes = 0;			\
-=======
-#define HASH128_STATE_INIT(STATE, SEED)							\
-MBSTART {										\
-	(STATE).h.one = (STATE).h.two = (SEED);						\
-	(STATE).c.one = (STATE).c.two = 0;						\
-	(STATE).carry_bytes = 0;							\
-} MBEND
-
-#define HASH128_EXTRACT_32(HASH)	((uint4)(HASH).one)
-
-/* Classic non-incremental, endian unstable, implementation. */
-void MurmurHash3_x86_32(const void *key, int len, uint4 seed, void *out);
-
-/* Incremental, endian stable implementation. */
-inline void	gtmmrhash_32(const void *key, int len, uint4 seed, uint4 *out4);
-inline void	gtmmrhash_128(const void *key, int len, uint4 seed, gtm_uint16 *out);
-int		gtmmrhash_128_ingest(hash128_state_t *state, const void *key, int len);
-void		gtmmrhash_128_result(hash128_state_t *state, uint4 total_len, gtm_uint16 *out);
-
-inline void	gtmmrhash_128_hex(const gtm_uint16 *hash, unsigned char *out);
-inline void	gtmmrhash_128_bytes(const gtm_uint16 *hash, unsigned char *out);
-
-/* Implementation */
-
-inline void gtmmrhash_128(const void *key, int len, uint4 seed, gtm_uint16 *out)
-{
-	hash128_state_t state;
-
-	HASH128_STATE_INIT(state, seed);
-#ifndef STATIC_ANALYSIS
-	/* Don't do this assert if SCA since we are inline & gtm_abrt() won't resolve */
-	assert((state.carry_bytes == 0) && (state.c.one == 0) && (state.c.two == 0));
-#endif
-	gtmmrhash_128_ingest(&state, key, len);
-	gtmmrhash_128_result(&state, len, out);
->>>>>>> fdfdea1e (GT.M V7.1-002)
 }
 
 /* Returns a 32-bit (4-byte) endian-independent murmur hash */

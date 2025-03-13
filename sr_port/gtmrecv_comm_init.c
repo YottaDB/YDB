@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -91,12 +91,9 @@ int gtmrecv_comm_init(in_port_t port)
 		RTS_ERROR_ADDRINFO_CTX(NULL, ERR_GETADDRINFO, errcode, "FAILED in obtaining IP address on receiver server.");
 		return -1;
 	}
-<<<<<<< HEAD
 	/* Note: Since the "dogetaddrinfo" call succeeded, "ai_ptr" would have been allocated.
 	 * So need to free it up (using "FREEADDRINFO") before returning normally or with an error.
 	 */
-=======
->>>>>>> fdfdea1e (GT.M V7.1-002)
 	gtmrecv_listen_sock_fd = temp_sock_fd;
 	if (0 > setsockopt(gtmrecv_listen_sock_fd, SOL_SOCKET, SO_LINGER, (const void *)&disable_linger, SIZEOF(disable_linger)))
 	{

@@ -625,12 +625,7 @@ STATICFNDEF int gtmrecv_est_conn(void)
 	gtmrecv_local_ptr_t	gtmrecv_local;
 	boolean_t     		keepalive;
 	GTM_SOCKLEN_TYPE	optlen;
-<<<<<<< HEAD
 	int			keepalive_opt, optval, save_errno;
-	int			send_buffsize, recv_buffsize, tcp_r_bufsize;
-=======
-	int			status, keepalive_opt, optval, save_errno;
->>>>>>> fdfdea1e (GT.M V7.1-002)
 	struct  linger  	disable_linger = {0, 0};
 	char			print_msg[1024];
 	struct addrinfo		primary_ai;
@@ -738,52 +733,9 @@ STATICFNDEF int gtmrecv_est_conn(void)
 	if (optval)
 		repl_log(gtmrecv_log_fp, FALSE, TRUE, "TCP_KEEPINTVL is %d.\n", optval);
 #	endif
-<<<<<<< HEAD
-	if (0 != get_send_sock_buff_size(gtmrecv_sock_fd, &send_buffsize))
+	if (0 != get_send_sock_buff_size(gtmrecv_sock_fd, &repl_max_send_buffsize))
 		ISSUE_REPLCOMM_ERROR("Error getting socket send buffsize", errno);
-	if (send_buffsize < GTMRECV_TCP_SEND_BUFSIZE)
-	{
-		int status;
-
-		if (0 != (status = set_send_sock_buff_size(gtmrecv_sock_fd, GTMRECV_TCP_SEND_BUFSIZE)))
-		{
-			if (send_buffsize < GTMRECV_MIN_TCP_SEND_BUFSIZE)
-			{
-				SNPRINTF(print_msg, SIZEOF(print_msg), "Could not set TCP send buffer size to %d : %s",
-						GTMRECV_MIN_TCP_SEND_BUFSIZE, STRERROR(status));
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) MAKE_MSG_INFO(ERR_REPLCOMM), 0,
-						ERR_TEXT, 2, LEN_AND_STR(print_msg));
-			}
-		}
-	}
-	if (0 != get_send_sock_buff_size(gtmrecv_sock_fd, &repl_max_send_buffsize)) /* may have changed */
-		ISSUE_REPLCOMM_ERROR("Error getting socket send buffsize", errno);
-	if (0 != get_recv_sock_buff_size(gtmrecv_sock_fd, &recv_buffsize))
-		ISSUE_REPLCOMM_ERROR("Error getting socket recv buffsize", errno);
-	if (recv_buffsize < GTMRECV_TCP_RECV_BUFSIZE)
-	{
-		int status;
-
-		for (tcp_r_bufsize = GTMRECV_TCP_RECV_BUFSIZE;
-		     tcp_r_bufsize >= MAX(recv_buffsize, GTMRECV_MIN_TCP_RECV_BUFSIZE)
-		     &&  0 != (status = set_recv_sock_buff_size(gtmrecv_sock_fd, tcp_r_bufsize));
-		     tcp_r_bufsize -= GTMRECV_TCP_RECV_BUFSIZE_INCR)
-			;
-		if (tcp_r_bufsize < GTMRECV_MIN_TCP_RECV_BUFSIZE)
-		{
-			SNPRINTF(print_msg, SIZEOF(print_msg), "Could not set TCP receive buffer size in range [%d, %d], last "
-					"known error : %s", GTMRECV_MIN_TCP_RECV_BUFSIZE, GTMRECV_TCP_RECV_BUFSIZE,
-					STRERROR(status));
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) MAKE_MSG_INFO(ERR_REPLCOMM), 0,
-					ERR_TEXT, 2, LEN_AND_STR(print_msg));
-		}
-	}
 	if (0 != get_recv_sock_buff_size(gtmrecv_sock_fd, &repl_max_recv_buffsize)) /* may have changed */
-=======
-	if (0 != (status = get_send_sock_buff_size(gtmrecv_sock_fd, &repl_max_send_buffsize)))
-		ISSUE_REPLCOMM_ERROR("Error getting socket send buffsize", errno);
-	if (0 != (status = get_recv_sock_buff_size(gtmrecv_sock_fd, &repl_max_recv_buffsize)))
->>>>>>> fdfdea1e (GT.M V7.1-002)
 		ISSUE_REPLCOMM_ERROR("Error getting socket recv buffsize", errno);
 	repl_log(gtmrecv_log_fp, TRUE, TRUE, "Connection established, using TCP send buffer size %d receive buffer size %d\n",
 			repl_max_send_buffsize, repl_max_recv_buffsize);

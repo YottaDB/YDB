@@ -378,11 +378,8 @@ void mupip_upgrade(void)
 			       TRUE, REG_LEN_STR(reg));
 			/* Start-up conditions */
 			mu_upgrade_in_prog = MUPIP_UPGRADE_IN_PROGRESS;
-<<<<<<< HEAD
 			assert(csd->fully_upgraded);
 			csd->fully_upgraded = FALSE;
-=======
->>>>>>> fdfdea1e (GT.M V7.1-002)
 			/* Extend the DB to accomodate the larger master map. Asking for 2x SVBN blocks is quick'n'dirty math */
 			if (SS_NORMAL != (status = upgrade_extend(START_VBN_CURRENT << 1, reg)))	/* WARNING assignment */
 			{	/* extension failed, try the next region */
@@ -398,7 +395,6 @@ void mupip_upgrade(void)
 				grab_crit(reg, WS_1);
 			/* Adjust starting VBN and block counts accordingly. See mu_upgrade_bmm for the explanation of the
 			 * calculations here */
-			csd->fully_upgraded = FALSE;
 			blks_in_way = START_VBN_CURRENT - csd->start_vbn;
 			blks_in_way = ROUND_UP2((blks_in_way / (blk_size / DISK_BLOCK_SIZE)), BLKS_PER_LMAP);
 			bmls_to_work = blks_in_way / BLKS_PER_LMAP;		/* on a small DB this is overkill, but simpler */

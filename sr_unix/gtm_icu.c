@@ -575,16 +575,12 @@ void gtm_icu_init(void)
 		 * an appropriate value in the environment then the version check would have happened before and there isn't any
 		 * need to repeat it again.
 		 */
-<<<<<<< HEAD
-		if (!ydb_icu_ver_defined && (FALSE == icu_getversion_found) && (0 == strcmp(cur_icu_fname, GET_ICU_VERSION_FNAME)))
-=======
 		if (!icu_getversion_found && (0 == strcmp(cur_icu_fname, GET_ICU_VERSION_FNAME)))
->>>>>>> fdfdea1e (GT.M V7.1-002)
 		{
 			icu_getversion_found = TRUE;
 			memset(icu_version, 0, MAX_ICU_VERSION_LENGTH);
 			fptr(icu_version);
-			if (!gtm_icu_ver_defined && !(IS_ICU_VER_GREATER_THAN_MIN_VER(icu_version[0], icu_version[1])))
+			if (!ydb_icu_ver_defined && !(IS_ICU_VER_GREATER_THAN_MIN_VER(icu_version[0], icu_version[1])))
 			{
 				ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 				/* Construct the first part of the ICUVERLT36 error message. */

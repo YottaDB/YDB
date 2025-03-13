@@ -349,27 +349,6 @@ static readonly CLI_PARM mup_integ_map_parm[] = {
 };
 
 static	CLI_ENTRY	mup_integ_qual[] = {		/* INTEG */
-<<<<<<< HEAD
-{ "ADJACENCY",   mupip_integ, 0, 0,                  0, 0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM, 0       },
-{ "ANALYZE",     mupip_integ, 0, 0,                  0, 0, 0, VAL_REQ,        1, NON_NEG, VAL_STR, 0       },
-{ "BLOCK",       mupip_integ, 0, 0,                  0, 0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM, VAL_HEX },
-{ "BRIEF",       mupip_integ, 0, 0,                  0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0       },
-{ "DBG",         mupip_integ, 0, 0,                  0, 0, 0, VAL_DISALLOWED, 2, NON_NEG, VAL_N_A, 0       },
-{ "FAST",        mupip_integ, 0, 0,                  0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0       },
-{ "FILE",        mupip_integ, 0, 0,                  0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0       },
-{ "FULL",        mupip_integ, 0, 0,                  0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0       },
-{ "KEYRANGES",   mupip_integ, 0, 0,                  0, 0, 0, VAL_DISALLOWED, 1, NEG,     VAL_N_A, 0       },
-{ "MAP",         mupip_integ, 0, mup_integ_map_parm, 0, 0, 0, VAL_NOT_REQ,    1, NEG,     VAL_NUM, 0       },
-{ "MAXKEYSIZE",  mupip_integ, 0, mup_integ_map_parm, 0, 0, 0, VAL_NOT_REQ,    1, NEG,     VAL_NUM, 0       },
-{ "ONLINE",      mupip_integ, 0, 0,                  0, 0, 0, VAL_DISALLOWED, 2, NEG,     VAL_N_A, 0       },
-{ "PRESERVE",    mupip_integ, 0, 0,                  0, 0, 0, VAL_NOT_REQ,    1, NON_NEG, VAL_N_A, 0       },
-{ "REGION",      mupip_integ, 0, 0,                  0, 0, 0, VAL_OR_PARAM,   1, NON_NEG, VAL_N_A, 0       },
-{ "STATS",       mupip_integ, 0, 0,                  0, 0, 0, VAL_DISALLOWED, 1, NEG,     VAL_N_A, 0       },
-{ "SUBSCRIPT",   mupip_integ, 0, 0,                  0, 0, 0, VAL_REQ,        1, NON_NEG, VAL_STR, 0       },
-{ "TN_RESET",    mupip_integ, 0, 0,                  0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0       },
-{ "TRANSACTION", mupip_integ, 0, mup_integ_map_parm, 0, 0, 0, VAL_NOT_REQ,    1, NEG,     VAL_NUM, 0       },
-{ "VERBOSE",     mupip_integ, 0, 0,                  0, 0, 0, VAL_DISALLOWED, 2, NON_NEG, VAL_N_A, 0       },
-=======
 { "ADJACENCY",     mupip_integ, 0, 0,                  0, 0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM, 0       },
 { "ANALYZE",       mupip_integ, 0, 0,                  0, 0, 0, VAL_REQ,        1, NON_NEG, VAL_STR, 0       },
 { "BLOCK",         mupip_integ, 0, 0,                  0, 0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM, VAL_HEX },
@@ -385,12 +364,12 @@ static	CLI_ENTRY	mup_integ_qual[] = {		/* INTEG */
 { "MAXKEYSIZE",    mupip_integ, 0, mup_integ_map_parm, 0, 0, 0, VAL_NOT_REQ,    1, NEG,     VAL_NUM, 0       },
 { "ONLINE",        mupip_integ, 0, 0,                  0, 0, 0, VAL_DISALLOWED, 2, NEG,     VAL_N_A, 0       },
 { "PRESERVE",      mupip_integ, 0, 0,                  0, 0, 0, VAL_NOT_REQ,    1, NON_NEG, VAL_N_A, 0       },
-{ "REGION",        mupip_integ, 0, 0,                  0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0       },
+{ "REGION",        mupip_integ, 0, 0,                  0, 0, 0, VAL_OR_PARAM,   1, NON_NEG, VAL_N_A, 0       },
 { "STATS",         mupip_integ, 0, 0,                  0, 0, 0, VAL_DISALLOWED, 1, NEG,     VAL_N_A, 0       },
 { "SUBSCRIPT",     mupip_integ, 0, 0,                  0, 0, 0, VAL_REQ,        1, NON_NEG, VAL_STR, 0       },
 { "TN_RESET",      mupip_integ, 0, 0,                  0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0       },
 { "TRANSACTION",   mupip_integ, 0, mup_integ_map_parm, 0, 0, 0, VAL_NOT_REQ,    1, NEG,     VAL_NUM, 0       },
->>>>>>> fdfdea1e (GT.M V7.1-002)
+{ "VERBOSE",       mupip_integ, 0, 0,                  0, 0, 0, VAL_DISALLOWED, 2, NON_NEG, VAL_N_A, 0       },
 { "" }
 };
 

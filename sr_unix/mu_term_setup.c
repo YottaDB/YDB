@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2020-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -42,7 +42,6 @@ void mu_get_term_characterstics(void)
 
 	assert(!mu_get_term_invoked);	/* No need to invoke this more than once per process. If assert fails fix second caller. */
 	mu_get_term_invoked = TRUE;
-<<<<<<< HEAD
 	/* Store terminal characteristics if at least one of stdin/stdout/stderr is a terminal.
 	 * Might be needed later in "mu_reset_term_characteristics" for restore (before the process terminates)
 	 * in case terminal settings got changed by the runtime logic after this function returns.
@@ -52,29 +51,14 @@ void mu_get_term_characterstics(void)
 			: isatty(STDERR_FILENO) ? STDERR_FILENO
 				: -1;
 	if (-1 != fd)
-=======
-	if ((get_stdout_charc_pass = isatty(STDOUT_FILENO)))
->>>>>>> fdfdea1e (GT.M V7.1-002)
 	{
 		assert(!terminal_settings_changed_fd);
 		if (-1 == tcgetattr(fd, &tty_settings))
 		{
 			PERROR("tcgetattr :");
 			FPRINTF(stderr, "Unable to get terminal characterstics for standard out\n");
-<<<<<<< HEAD
 		} else
 			tty_settings_initialized = TRUE;
-=======
-		}
-	} else if ((get_stderr_charc_pass = isatty(STDERR_FILENO)))
-	{
-		if (-1 == tcgetattr(STDERR_FILENO, &tty_settings))
-		{
-			get_stderr_charc_pass = FALSE;
-			PERROR("tcgetattr :");
-			FPRINTF(stderr, "Unable to get terminal characterstics for standard err\n");
-		}
->>>>>>> fdfdea1e (GT.M V7.1-002)
 	}
 }
 

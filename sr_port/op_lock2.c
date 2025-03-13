@@ -176,16 +176,7 @@ int	op_lock2_common(uint8 timeout, unsigned char laflag) /* timeout is in nanose
 	gotit = -1;
 	cm_action = laflag;
 	out_of_time = FALSE;
-<<<<<<< HEAD
 	if (NO_M_TIMEOUT != timeout)
-=======
-	timer_on = FALSE;
-	if (CM_ZALLOCATES == cm_action)		/* can't use ? : syntax here because of the way the macros nest */
-		MV_FORCE_MSTIMEOUT(timeout, msec_timeout, ZALLOCTIMESTR);
-	else
-		MV_FORCE_MSTIMEOUT(timeout, msec_timeout, LOCKTIMESTR);
-	if (NO_M_TIMEOUT != msec_timeout)
->>>>>>> fdfdea1e (GT.M V7.1-002)
 	{
 		if (0 == timeout)
 			out_of_time = TRUE;

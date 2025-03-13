@@ -1,10 +1,10 @@
-<<<<<<< HEAD
-/* md5hash.c is adapted to work with YottaDB (http://yottadb.com) and FIS GT.M (http://fis-gtm.com) from
-=======
 /****************************************************************
  *								*
  * Copyright (c) 2013-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+ *								*
+ * Copyright (c) 2025 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,8 +12,7 @@
  *	the license, please stop and do not read further.	*
  *								*
  ****************************************************************/
-/* md5hash.c is adapted to work with FIS GT.M (http://fis-gtm.com) from
->>>>>>> fdfdea1e (GT.M V7.1-002)
+/* md5hash.c is adapted to work with YottaDB (http://yottadb.com) and FIS GT.M (http://fis-gtm.com) from
  * source code at http://cvsweb.xfree86.org/cvsweb/cvs/lib/md5.c?rev=1.1.1.2
  * to which no claim of Copyright was made by the authors. No claim of
  * copyright is made by Fidelity Information Services, Inc. with respect

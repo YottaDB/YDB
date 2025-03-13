@@ -155,13 +155,15 @@ void db_auto_upgrade(gd_region *reg)
 					+= (int4)(ROUND_UP2(MAX_BITMAP_UPDATE_ARRAY_SIZE(csd), UPDATE_ARRAY_ALIGN_SIZE));
 			case GDSMV70001:
 			case GDSMV70002:
-<<<<<<< HEAD
 				/* GT.M V70002 added proactive block split option.
 				 * GT.M V71001 changed proactive block split default.
 				 * So just one line below to incorporate both those changes in one shot.
 				 */
 				csd->problksplit = DEFAULT_PROBLKSPLIT;
 			case GDSMV71001:
+				/* GT.M V7.1-002 implemented index reserved bytes and changed default to zero */
+				csd->i_reserved_bytes = 0;
+			case GDSMV71002:
 				if (GDSMR200_V70000 != csd->minor_dbver)
 				{
 					/* Do YottaDB r2.00 related auto upgrade operations.
@@ -202,8 +204,11 @@ void db_auto_upgrade(gd_region *reg)
 				 * So just one line below to incorporate both those changes in one shot.
 				 */
 				csd->problksplit = DEFAULT_PROBLKSPLIT;
-				break;		/* so a new "case" needs to be added BEFORE the assert. */
 			case GDSMR204_V71001:
+				/* GT.M V7.1-002 implemented index reserved bytes and changed default to zero */
+				csd->i_reserved_bytes = 0;
+				break;		/* so a new "case" needs to be added BEFORE the assert. */
+			case GDSMR204_V71002:
 				/* When adding a new minor version, the following template should be maintained
 				 * 1) Remove the penultimate 'break' (i.e. "break" in the PREVIOUS "case" block.
 				 * 2) If there are any file header fields added in the new minor version, initialize the fields
@@ -221,7 +226,6 @@ void db_auto_upgrade(gd_region *reg)
 				assert(FALSE);		/* When this assert fails, it means a new GDSMV* was created, */
 				break;			/* 	so a new "case" needs to be added BEFORE the assert. */
 			/* Remove the below cases one by one as later GT.M versions use up these minor db version enum values. */
-			case GDSMVFILLER29:
 			case GDSMVFILLER30:
 			case GDSMVFILLER31:
 			case GDSMVFILLER32:
@@ -441,18 +445,6 @@ void db_auto_upgrade(gd_region *reg)
 			case GDSMVFILLER253:
 			case GDSMVFILLER254:
 			case GDSMVFILLER255:
-=======
-				/* GT.M V70002 added proactive block split option */
-				/* GT.M V71001 changed proactive block split default */
-				csd->problksplit = DEFAULT_PROBLKSPLIT;
-			case GDSMV71001:
-				/* GT.M V7.1-002 implemented index reserved bytes and changed default to zero */
-				csd->i_reserved_bytes = 0;
-				break; /* so a new "case" needs to be added BEFORE the assert. */
-			case GDSMV71002:
-				assert(FALSE);
-				break;
->>>>>>> fdfdea1e (GT.M V7.1-002)
 			default:
 				/* Unrecognized version in the header */
 				assertpro(FALSE && csd->minor_dbver);
@@ -717,21 +709,16 @@ void v6_db_auto_upgrade(gd_region *reg)
 				   overwrite it on our way up */
 				csd->offset = 0;
 				csd->max_rec = 0;
-<<<<<<< HEAD
-				csd->i_reserved_bytes = 0;
-				/* the next four lines are because gvcst_init_sysops might have used an outdated assumption */
-=======
-				/*the next four lines are because gvcst_init_sysops might have used an outdated assumption */
->>>>>>> fdfdea1e (GT.M V7.1-002)
 				csd->max_update_array_size = csd->max_non_bm_update_array_size
 					= (int4)(ROUND_UP2(MAX_NON_BITMAP_UPDATE_ARRAY_SIZE(csd), UPDATE_ARRAY_ALIGN_SIZE));
 				csd->max_update_array_size
 					+= (int4)(ROUND_UP2(MAX_BITMAP_UPDATE_ARRAY_SIZE(csd), UPDATE_ARRAY_ALIGN_SIZE));
-				/* GT.M V70002 added proactive block split option */
-				if (csd->last_mdb_ver < GDSMV71001)
-					csd->problksplit = DEFAULT_PROBLKSPLIT;
-				if (csd->last_mdb_ver < GDSMV71002)
-					csd->i_reserved_bytes = 0;
+				/* GT.M V70002 added proactive block split option.
+				 * GT.M V71001 changed proactive block split default.
+				 */
+				csd->problksplit = DEFAULT_PROBLKSPLIT;
+				/* GT.M V7.1-002 implemented index reserved bytes and changed default to zero */
+				csd->i_reserved_bytes = 0;
 				break;
 			case GDSMV63015:
 				assert(FALSE);	/* if this should come to pass, add appropriate code above the assert */

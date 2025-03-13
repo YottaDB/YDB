@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  * Copyright (c) 2018 Stephen L Johnson.			*
@@ -498,19 +498,12 @@ void start_timer(TID tid, uint8 time_to_expir, void (*handler)(), int4 hdata_len
 			|| (INTRPT_IN_TRIGGER_NOMANS_LAND == intrpt_ok_state)
 			|| (mu_reorg_process && (INTRPT_IN_KILL_CLEANUP == intrpt_ok_state)));
 		safe_to_add = TRUE;
-<<<<<<< HEAD
-	} else if (jnl_file_close_timer_fptr == handler)
-	{	/* Account for known instances of the above function being called from within a deferred zone. */
-		assert((INTRPT_OK_TO_INTERRUPT == intrpt_ok_state) || (INTRPT_IN_DB_CSH_GETN == intrpt_ok_state)
-			|| (INTRPT_IN_GDS_RUNDOWN == intrpt_ok_state) || (INTRPT_IN_SS_INITIATE == intrpt_ok_state));
-=======
 	} else if (jnl_file_close_timer_ptr == handler)
 	{	/* Account for known instances of the above function being called from within a deferred zone. */
 		assert((INTRPT_OK_TO_INTERRUPT == intrpt_ok_state) || (INTRPT_IN_DB_CSH_GETN == intrpt_ok_state)
 			|| (INTRPT_IN_TRIGGER_NOMANS_LAND == intrpt_ok_state) || (INTRPT_IN_SS_INITIATE == intrpt_ok_state)
 			|| (INTRPT_IN_GDS_RUNDOWN == intrpt_ok_state)
 			|| (mu_reorg_process && (INTRPT_IN_KILL_CLEANUP == intrpt_ok_state)));
->>>>>>> fdfdea1e (GT.M V7.1-002)
 		safe_to_add = TRUE;
 	} else
 	{
@@ -626,7 +619,6 @@ void clear_timers(void)
 		 */
 		assert((FALSE == timer_in_handler) || process_exiting);
 		assert(FALSE == timer_active);
-<<<<<<< HEAD
 		/* Note: "oldjnlclose_started" could be TRUE in case a timer with TID=jnl_file_close_timer
 		 * was still active when the process decided to exit and cancel all unsafe
 		 * timers (CANCEL_TIMERS call in LOCK_RUNDOWN_MACRO in "gtm_exit_handler.c").
@@ -636,9 +628,6 @@ void clear_timers(void)
 		assert(!GET_DEFERRED_TIMERS_CHECK_NEEDED);
 		if (!timer_from_OS)
 			SIGPROCMASK(SIG_SETMASK, &savemask, NULL, rc);
-=======
-		assert(FALSE == deferred_timers_check_needed);
->>>>>>> fdfdea1e (GT.M V7.1-002)
 		return;
 	}
 	while (timeroot)

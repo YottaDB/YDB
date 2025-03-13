@@ -495,13 +495,8 @@ void gtmsecshr_init(char_ptr_t argv[], char **rundir, int *rundir_len)
 		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(10) MAKE_MSG_WARNING(ERR_GTMSECSHRSTART), 3,
 			RTS_ERROR_LITERAL("Server 8"), process_id, ERR_TEXT, 2,
 			RTS_ERROR_LITERAL("server already running"), errno);
-<<<<<<< HEAD
 		/* If ydb_tmp is not defined, show default path */
-		if (ydb_tmp_ptr = ydb_getenv(YDBENVINDX_TMP_ONLY, NULL_SUFFIX, NULL_IS_YDB_ENV_MATCH))	/* Warning - assignment */
-=======
-		/* If gtm_tmp is not defined, show default path */
-		if ((gtm_tmp_ptr = GETENV("gtm_tmp")))		/* Warning - assignment */
->>>>>>> fdfdea1e (GT.M V7.1-002)
+		if ((ydb_tmp_ptr = ydb_getenv(YDBENVINDX_TMP_ONLY, NULL_SUFFIX, NULL_IS_YDB_ENV_MATCH))) /* Warning - assignment */
 			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_GTMSECSHRTMPPATH, 2,
 				RTS_ERROR_TEXT(ydb_tmp_ptr), ERR_TEXT, 2, RTS_ERROR_TEXT("(from $ydb_tmp/$gtm_tmp)"));
 		else

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -164,15 +164,12 @@ GBLREF boolean_t		nct_err_type;
 GBLREF boolean_t		debug_mupip;
 GBLREF int			rec_len;
 GBLREF jnlpool_addrs_ptr_t	jnlpool;
-<<<<<<< HEAD
+GBLREF int4			max_data_blk_size;
+GBLREF int4			max_index_blk_size;
 #ifdef DEBUG
 GBLREF	block_id		ydb_skip_bml_num;
 #endif
 
-=======
-GBLREF int4			max_data_blk_size;
-GBLREF int4			max_index_blk_size;
->>>>>>> fdfdea1e (GT.M V7.1-002)
 error_def(ERR_DBBADKYNM);
 error_def(ERR_DBBADNSUB);
 error_def(ERR_DBBADPNTR);

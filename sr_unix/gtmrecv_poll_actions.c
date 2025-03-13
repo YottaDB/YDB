@@ -3,7 +3,7 @@
  * Copyright (c) 2008-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -274,11 +274,7 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 				; /* Empty Body */
 			if (SS_NORMAL != status)
 			{
-<<<<<<< HEAD
 				if (EREPL_SEND == repl_errno)
-=======
-				if (REPL_CONN_RESET(status) && (EREPL_SEND == repl_errno))
->>>>>>> fdfdea1e (GT.M V7.1-002)
 				{
 #					ifdef GTM_TLS
 					if (ERR_TLSIOERROR == status)
@@ -498,11 +494,7 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 												curr_conn_state.send_seqno);
 		} else
 		{
-<<<<<<< HEAD
 			if (EREPL_SEND == repl_errno)
-=======
-			if (REPL_CONN_RESET(status) && (EREPL_SEND == repl_errno))
->>>>>>> fdfdea1e (GT.M V7.1-002)
 			{
 #				ifdef GTM_TLS
 				if (ERR_TLSIOERROR == status)

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -76,7 +76,6 @@ void gvcmz_netopen_attempt(struct CLB *c)
 		prc_vec = malloc(SIZEOF(*prc_vec));
 		jnl_prc_vector(prc_vec);
 	}
-<<<<<<< HEAD
 	prc_vec_size = SIZEOF(*prc_vec);
 #	ifdef BIGENDIAN
 	memcpy((unsigned char *)&temp_vect, (unsigned char *)prc_vec, SIZEOF(jnl_process_vector));
@@ -88,10 +87,7 @@ void gvcmz_netopen_attempt(struct CLB *c)
 #	else
 	memcpy(ptr + S_PROTSIZE, (unsigned char *)prc_vec, prc_vec_size);
 #	endif
-	memcpy(ptr, proto_str, S_PROTSIZE);
-=======
 	memcpy((void *)ptr, proto_str, S_PROTSIZE);
->>>>>>> fdfdea1e (GT.M V7.1-002)
 	c->cbl = S_HDRSIZE + S_PROTSIZE + prc_vec_size;
 	status = cmi_write(c);	/* INITPROC */
 	if (CMI_ERROR(status))

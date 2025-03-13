@@ -587,13 +587,8 @@ void	op_fnzpeek(mval *structid, int offset, int len, mval *format, mval *ret)
 				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_BADZPEEKARG, 2,
 					RTS_ERROR_LITERAL("mnemonic argument (array index)"));
 			break;
-<<<<<<< HEAD
 		case PO_PEEK:			/* Argument is address of form 0Xhhhhhhhh[hhhhhhhh] so has to be at least 2 bytes */
-			if ((2 >= arglen) || (('0' != *cptr++) || ('x' != *cptr) && ('X' != *cptr)))
-=======
-		case PO_PEEK:			/* Argument is address of form 0Xhhhhhhhh[hhhhhhhh] */
-			if (('0' != *cptr++) || (('x' != *cptr) && ('X' != *cptr)))
->>>>>>> fdfdea1e (GT.M V7.1-002)
+			if ((2 >= arglen) || (('0' != *cptr++) || (('x' != *cptr) && ('X' != *cptr))))
 				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_BADZPEEKARG, 2,
 					      RTS_ERROR_LITERAL("mnemonic argument (peek base address)"));
 			cptr++;			/* Bump past 'x' or 'X' - rest of arg should be hex value */

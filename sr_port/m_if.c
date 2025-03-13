@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2020-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2020-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -115,11 +115,7 @@ int m_if(void)
 				REMOVE_BOOLEXPRSTART_AND_FINISH(boolexprfinish); /* Note: Will set "boolexprfinish" to NULL */
 				v = &triptr->operand[0].oprval.mlit->v;
 				unuse_literal(v);
-<<<<<<< HEAD
-				if (0 == MV_FORCE_BOOL(v))	/* WARNING: assignment */
-=======
-				if ((t_set = (0 == MV_FORCE_BOOL(v))))	/* WARNING: assignment */
->>>>>>> fdfdea1e (GT.M V7.1-002)
+				if (0 == MV_FORCE_BOOL(v))
 				{	/* it's FALSE, insert clear of $TEST */
 					newtriple(OC_CLRTEST);
 					if (TK_SPACE == TREF(director_token))			/* if there are trailing spaces */

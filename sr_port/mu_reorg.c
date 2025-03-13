@@ -300,12 +300,6 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 		dest_blk_id = 2; /* we know that first block is bitmap and next one is directory tree root */
 	file_extended = cs_data->trans_hist.total_blks;
 	blk_size = cs_data->blk_size;
-<<<<<<< HEAD
-	d_max_fill = (double)data_fill_factor * (blk_size - cs_data->reserved_bytes) / 100;
-	i_max_fill = (double)index_fill_factor * (blk_size - cs_data->reserved_bytes) / 100;
-	d_toler = (double) DATA_FILL_TOLERANCE * blk_size / 100.0;
-	i_toler = (double) INDEX_FILL_TOLERANCE * blk_size / 100.0;
-=======
 	/* Enforce a minimum *_max_fill. It would be simplest to make this the same as what we take as the smallest acceptable
 	 * FILL_FACTOR in mupip_reorg (30% of the block size), but there are cases where the smallest safe effective block size
 	 * given by (blk_size - MAX_RESERVE_B) is larger than that. So take into account the maximum reserved bytes and enforce
@@ -332,7 +326,6 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 	if ((i_split_toler + i_max_fill) > i_rsrvbytes_maxsz)
 		i_split_toler = i_rsrvbytes_maxsz - i_max_fill;
 
->>>>>>> fdfdea1e (GT.M V7.1-002)
 	blks_killed = blks_processed = blks_reused = lvls_reduced = blks_coalesced = blks_split = blks_swapped = 0;
 	level = pre_order_successor_level = MAX_BT_DEPTH + 1; /* Just some high value to initialize */
 
@@ -401,21 +394,14 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 					}
 					level = merge_split_level = gv_target->hist.depth;
 				}
-<<<<<<< HEAD
-				max_fill = (0 == level) ? d_max_fill : i_max_fill;
-				assert(0 <= max_fill);
-				toler = (0 == level) ? d_toler : i_toler;
-				cur_blk_size =  ((blk_hdr_ptr_t)(gv_target->hist.h[level].buffaddr))->bsiz;
-				if ((cur_blk_size > (max_fill + toler)) && (0 == (reorg_op & NOSPLIT))) /* SPLIT BLOCK */
-=======
 				assert(merge_split_level >= min_level);
 				max_fill = (0 == merge_split_level) ? d_max_fill : i_max_fill;
+				assert(0 <= max_fill);
 				toler = (0 == merge_split_level) ? d_split_toler : i_split_toler;
 				cur_blk_size =  ((blk_hdr_ptr_t)(gv_target->hist.h[merge_split_level].buffaddr))->bsiz;
 				if (!pending_levels			/* While levels need reprocessing, avoid block split */
 						&& (cur_blk_size > (max_fill + toler)) /* Check for block split */
 						&& (0 == (reorg_op & NOSPLIT))) /* SPLIT BLOCK is ON*/
->>>>>>> fdfdea1e (GT.M V7.1-002)
 				{
 
 					assert(merge_split_level == level);

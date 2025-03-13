@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -74,12 +74,8 @@ GBLREF	char 				**gtmenvp;
 GBLREF	boolean_t			shebang_invocation;	/* TRUE if yottadb is invoked through the "ydbsh" soft link */
 
 #define GTMCRYPT_ERRLIT			"during GT.M startup"
-<<<<<<< HEAD
 #define YDBXC_gblstat			"ydb_xc_gblstat=%s/gtmgblstat.xc"
-=======
-#define GTMXC_gblstat			"GTMXC_gblstat=%s/gtmgblstat.xc"
-#define GTMXC_gtmtlsfuncs		"GTMXC_gtmtlsfuncs=%s/plugin/gtmtlsfuncs.tab"
->>>>>>> fdfdea1e (GT.M V7.1-002)
+#define YDBXC_gtmtlsfuncs		"ydb_xc_gtmtlsfuncs=%s/plugin/gtmtlsfuncs.tab"
 #define	MUMPS				"MUMPS "
 
 error_def(ERR_CRYPTDLNOOPEN);
@@ -93,9 +89,8 @@ error_def(ERR_TLSINIT);
 
 int gtm_main(int argc, char **argv, char **envp)
 {
-<<<<<<< HEAD
 	char		*ptr, *eq, **p;
-	char		gtmlibxc[YDB_PATH_MAX];
+	char		gtmlibxc[YDB_PATH_MAX], gtmtlsfuncs[YDB_PATH_MAX];
 	int		eof, parse_ret, cli_ret;
 	int		gtmcrypt_errno;
 	int		status;
@@ -103,14 +98,6 @@ int gtm_main(int argc, char **argv, char **envp)
 	char		curr_exe_realpath[YDB_PATH_MAX];	/* this is similar to code in "dlopen_libyottadb.c" */
 	size_t		cplen;
 	char		*exe_basename;
-=======
-	char			*ptr, *eq, **p;
-	char			gtmlibxc[GTM_PATH_MAX], gtmtlsfuncs[GTM_PATH_MAX];
-	int             	eof, parse_ret;
-	int			gtmcrypt_errno;
-	int			status;
-	size_t			cplen;
->>>>>>> fdfdea1e (GT.M V7.1-002)
 
 #	ifdef GTM_SOCKET_SSL_SUPPORT
 	char			tlsid_env_name[MAX_TLSID_LEN * 2];
@@ -209,7 +196,7 @@ int gtm_main(int argc, char **argv, char **envp)
 	SNPRINTF(gtmlibxc, YDB_PATH_MAX, YDBXC_gblstat, ydb_dist);
 	PUTENV(status, gtmlibxc);
 #	ifdef GTM_TLS
-	SNPRINTF(gtmtlsfuncs, GTM_PATH_MAX, GTMXC_gtmtlsfuncs, gtm_dist);
+	SNPRINTF(gtmtlsfuncs, YDB_PATH_MAX, YDBXC_gtmtlsfuncs, ydb_dist);
 	PUTENV(status, gtmtlsfuncs);
 	if (MUMPS_COMPILE != invocation_mode)
 	{

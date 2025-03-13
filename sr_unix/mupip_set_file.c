@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -123,20 +123,6 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 	int4			dblksize;
 	gd_region		*temp_cur_region;
 	gd_segment		*seg;
-<<<<<<< HEAD
-	int			asyncio_status, defer_allocate_status, defer_status, disk_wait_status, encryptable_status,
-				encryption_complete_status, epoch_taper_status, extn_count_status, fd, fn_len, glbl_buff_status,
-				gtmcrypt_errno, hard_spin_status, inst_freeze_on_error_status, key_size_status, locksharesdbcrit,
-				lock_space_status, mutex_space_status, null_subs_status, qdbrundown_status, read_only_status,
-				rec_size_status, reg_exit_stat, reorg_sleep_nsec_status, rc, rsrvd_bytes_status, save_errno,
-				sleep_cnt_status, spin_sleep_status, stats_status, status, status1, stdb_alloc_status,
-				stdnullcoll_status, trigger_flush_limit_status, wrt_per_flu_status, full_blkwrt_status,
-				problksplit_status;
-	int4			defer_time, new_cache_size, new_disk_wait, new_extn_count, new_flush_trigger, new_hard_spin,
-				new_key_size, new_lock_space, new_mutex_space, new_null_subs = -1, new_rec_size, new_sleep_cnt,
-				new_spin_sleep, new_statsdb_alloc, new_stdnullcoll, new_wrt_per_flu, reserved_bytes,
-				new_full_blkwrt, new_problksplit;
-=======
 	int			asyncio_status, defer_allocate_status, defer_status, disk_wait_status, d_rsrvd_bytes_status,
 				encryptable_status,encryption_complete_status, epoch_taper_status, extn_count_status, fd,
 				fn_len, glbl_buff_status, gtmcrypt_errno, hard_spin_status, inst_freeze_on_error_status,
@@ -149,7 +135,7 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 				new_flush_trigger, new_hard_spin, new_key_size, new_lock_space, new_mutex_space, new_null_subs = -1,
 				new_rec_size, new_sleep_cnt, new_spin_sleep, new_statsdb_alloc, new_stdnullcoll, new_wrt_per_flu,
 				reserved_bytes, spin_sleep_status, read_only_status, new_full_blkwrt, new_problksplit;
->>>>>>> fdfdea1e (GT.M V7.1-002)
+	int			reorg_sleep_nsec_status;
 	sgmnt_data_ptr_t	csd, pvt_csd;
 	tp_region		*rptr, single;
 	uint4			reorg_sleep_nsec;
@@ -315,8 +301,7 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 		}
 		need_standalone = TRUE;
 	}
-<<<<<<< HEAD
-	if (reorg_sleep_nsec_status = cli_present("REORG_SLEEP_NSEC"))
+	if ((reorg_sleep_nsec_status = cli_present("REORG_SLEEP_NSEC")))
 	{
 		if (cli_get_int("REORG_SLEEP_NSEC", (int4 *)&reorg_sleep_nsec))
 		{
@@ -335,10 +320,7 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 			exit_stat |= EXIT_ERR;
 		}
 	}
-	if (locksharesdbcrit = cli_present("LCK_SHARES_DB_CRIT"))
-=======
 	if ((locksharesdbcrit = cli_present("LCK_SHARES_DB_CRIT")))
->>>>>>> fdfdea1e (GT.M V7.1-002)
 		need_standalone = TRUE;
 	if ((lock_space_status = cli_present("LOCK_SPACE")))
 	{

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019-2024 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -62,19 +62,12 @@ error_def(ERR_TEXT);
 int gtmsource_comm_init(boolean_t print_addresolve_error)
 {
 	/* Initialize communication stuff */
-<<<<<<< HEAD
 	struct addrinfo 	*ai_ptr = NULL, *ai_head = NULL, hints;
-=======
-	struct	linger	disable_linger = {0, 0};
-	char	error_string[1024];
-	int	err_status, send_buffsize, recv_buffsize, tcp_s_buffsize;
-	struct addrinfo *ai_ptr = NULL, *ai_head = NULL, hints;
->>>>>>> fdfdea1e (GT.M V7.1-002)
 	gtmsource_local_ptr_t   gtmsource_local;
 	intrpt_state_t  	prev_intrpt_state;
 	struct linger		disable_linger = {0, 0};
 	char			error_string[1024];
-	int			err_status;
+	int			err_status, send_buffsize, recv_buffsize, tcp_s_buffsize;
 	char			*host;
 	char			port_buffer[NI_MAXSERV];
 	char			hostinfo[SIZEOF(RESOLUTION_FAILURE_PREFIX) + MAX_HOST_NAME_LEN + NI_MAXSERV];

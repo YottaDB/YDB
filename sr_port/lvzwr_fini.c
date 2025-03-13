@@ -66,13 +66,8 @@ void lvzwr_fini(zshow_out *out, int t)
 		size = (lvzwrite_block->pat->str.len <= MAX_MIDENT_LEN) ? lvzwrite_block->pat->str.len : MAX_MIDENT_LEN;
 		temp_key.var_name = lvzwrite_block->pat->str;
 		COMPUTE_HASH_MNAME(&temp_key);
-<<<<<<< HEAD
 		tabent = lookup_hashtab_mname(&target_symval->h_symtab, &temp_key);
-		if (!tabent || !LV_IS_VAL_DEFINED(tabent->value) && !LV_HAS_CHILD(tabent->value))
-=======
-		tabent = lookup_hashtab_mname(&curr_symval->h_symtab, &temp_key);
 		if (!tabent || (!LV_IS_VAL_DEFINED(tabent->value) && !LV_HAS_CHILD(tabent->value)))
->>>>>>> fdfdea1e (GT.M V7.1-002)
 		{
 			lvzwrite_block->subsc_count = 0;
 			if (!undef_inhibit)

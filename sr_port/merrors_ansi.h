@@ -731,11 +731,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* GTMSECSHRSSIDF */
 	   0,	/* GTMSECSHRFORKF */
 	   0,	/* DBFSYNCERR */
-<<<<<<< HEAD:sr_port/merrors_ansi.h
-	   0,	/* UNUSEDMSG900 */
-=======
 	   0,	/* EXCEEDRCTLRNDWN */
->>>>>>> fdfdea1e (GT.M V7.1-002):sr_x86_64/merrors_ansi.h
 	   0,	/* SCNDDBNOUPD */
 	   0,	/* MUINFOUINT4 */
 	   0,	/* NLMISMATCHCALC */
@@ -847,11 +843,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* NOTALLDBOPN */
 	   0,	/* MUSELFBKUP */
 	   0,	/* DBDANGER */
-<<<<<<< HEAD:sr_port/merrors_ansi.h
-	   0,	/* UNUSEDMSG1012 */
-=======
 	   0,	/* ORLBKROLLED */
->>>>>>> fdfdea1e (GT.M V7.1-002):sr_x86_64/merrors_ansi.h
 	   0,	/* TCGETATTR */
 	   0,	/* TCSETATTR */
 	   0,	/* IOWRITERR */
@@ -892,11 +884,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* FILTERBADCONV */
 	   0,	/* PRIMARYISROOT */
 	   0,	/* GVQUERYGETFAIL */
-<<<<<<< HEAD:sr_port/merrors_ansi.h
-	   0,	/* UNUSEDMSG1053 */
-=======
 	   0,	/* BSIZTOOLARGE */
->>>>>>> fdfdea1e (GT.M V7.1-002):sr_x86_64/merrors_ansi.h
 	  19,	/* MERGEDESC */
 	   0,	/* MERGEINCOMPL */
 	   0,	/* DBNAMEMISMATCH */

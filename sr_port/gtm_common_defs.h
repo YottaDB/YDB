@@ -1,13 +1,9 @@
 /****************************************************************
  *								*
-<<<<<<< HEAD
- * Copyright (c) 2012-2022 Fidelity National Information	*
-=======
  * Copyright (c) 2012-2023 Fidelity National Information	*
->>>>>>> fdfdea1e (GT.M V7.1-002)
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  * Copyright (c) 2018 Stephen L Johnson. All rights reserved.	*

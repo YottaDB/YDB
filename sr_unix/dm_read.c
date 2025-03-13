@@ -286,19 +286,14 @@ void	dm_read (mval *v)
 					memmove(buffer_32_start, buffer_start + ((unsigned char *)tt_state->buffer_32_start
 						- tt_state->buffer_start), (SIZEOF(wint_t) * length));
 				utf8_more = tt_state->utf8_more;
-<<<<<<< HEAD
 				if (utf8_more)
 				{
 					utf8_seen = tt_state->utf8_seen;
 					assert(0 < utf8_seen);
 					assert(GTM_MB_LEN_MAX >= (utf8_seen + utf8_more));
-					memcpy(more_buf, tt_state->more_buf, utf8_seen);
+					memcpy((void*)more_buf, tt_state->more_buf, utf8_seen);
 					more_ptr = more_buf + utf8_seen;
 				}
-=======
-				more_ptr = tt_state->more_ptr;
-				memcpy((void*)more_buf, tt_state->more_buf, SIZEOF(more_buf));
->>>>>>> fdfdea1e (GT.M V7.1-002)
 			}
 			instr = tt_state->instr;
 			outlen = tt_state->outlen;
@@ -558,45 +553,10 @@ void	dm_read (mval *v)
 					/* exceeding the maximum length exits the while loop, so it must fit here . */
 #				ifdef UTF8_SUPPORTED
 				if (utf8_active)
-<<<<<<< HEAD
 				{
 					// Copy utf-32 string into buffer_start as utf-8
 					outptr = buffer_start;
 					for (match_length = 0; outlen > match_length; match_length++)
-=======
-				{	/* recall buffer kept as UTF-8 */
-					matched = TRUE;
-					for (match_length = 0; (SIZEOF(RECALL) - 1) > match_length && outlen > match_length;
-							match_length++)
-					{
-						if (ASCII_MAX < GET_OFF(match_length)
-								|| recptr[match_length] != (char)GET_OFF(match_length))
-						{
-							matched = FALSE;
-							break;
-						}
-					}
-					if (!matched && (outlen > match_length)
-						&& (((SIZEOF(REC) - 1) == match_length) || (SIZEOF(RECALL) == match_length))
-						&& ((' ' == GET_OFF(match_length)) || ('\t' == GET_OFF(match_length))))
-							matched = TRUE;		/* REC or RECALL then space or tab */
-					else if (matched)
-					{
-						if (((SIZEOF(RECALL) - 1) != match_length) && ((SIZEOF(REC) - 1) != match_length))
-							matched = FALSE;	/* wrong size */
-						else if ((outlen > match_length)
-							&& (' ' != GET_OFF(match_length) && ('\t' != GET_OFF(match_length))))
-								matched = FALSE;	/* or RECALL then not eol, space, or tab */
-					}
-					if (!matched)
-						break;		/* not RECALL so end of line */
-					match_length++;		/* get past space or tab */
-					if (outlen <= match_length)
-						argv[1] = NULL;		/* nothing after RECALL */
-					else
-						argv[1] = (char *)buffer_start;
-					for (outptr = buffer_start ; outlen > match_length; match_length++)
->>>>>>> fdfdea1e (GT.M V7.1-002)
 					{
 						inchar = GET_OFF(match_length);
 						outptr = UTF8_WCTOMB(inchar, outptr);

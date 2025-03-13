@@ -759,8 +759,10 @@ enum cdb_sc	gvcst_search_blk(gv_key *pKey, srch_blk_status *pStat)
 			break;
 		}
 	}
-<<<<<<< HEAD
-	assert(pPrevRec);
+#ifdef DEBUG
+	if (!pPrevRec)
+		TREF(donot_commit) |= DONOTCOMMIT_GVCST_BLK_SRCH;
+#endif
 	pStat->prev_rec.offset = (unsigned short)(pPrevRec - pBlkBase);
 	pStat->prev_rec.match = (unsigned short)nMatchCnt;
 	/* "gvcst_search" relies on the fact that PREV_REC_UNINITIALIZED is never a valid value
@@ -771,16 +773,6 @@ enum cdb_sc	gvcst_search_blk(gv_key *pKey, srch_blk_status *pStat)
 	pStat->curr_rec.offset = (unsigned short)(pRecBase - pBlkBase);
 	assert(pStat->curr_rec.offset >= SIZEOF(blk_hdr));
 	pStat->curr_rec.match = (unsigned short)nTargLen;
-=======
-#ifdef DEBUG
-	if (!pPrevRec)
-		TREF(donot_commit) |= DONOTCOMMIT_GVCST_BLK_SRCH;
-#endif
-	pStat->prev_rec.offset = (short)(pPrevRec - pBlkBase);
-	pStat->prev_rec.match = (short)nMatchCnt;
-	pStat->curr_rec.offset = (short)(pRecBase - pBlkBase);
-	pStat->curr_rec.match = (short)nTargLen;
->>>>>>> fdfdea1e (GT.M V7.1-002)
 	return cdb_sc_normal;
 }
 

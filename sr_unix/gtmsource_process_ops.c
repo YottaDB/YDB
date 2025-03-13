@@ -124,12 +124,7 @@ GBLREF	gtmsource_options_t	gtmsource_options;
 int gtmsource_est_conn()
 {
 	char			print_msg[PROC_OPS_PRINT_MSG_LEN], msg_str[1024], *errmsg;
-<<<<<<< HEAD
 	int			connection_attempts, save_errno, comminit_retval, status;
-	int			send_buffsize, recv_buffsize, tcp_s_bufsize;
-=======
-	int			connection_attempts, max_heartbeat_wait, save_errno, comminit_retval, status;
->>>>>>> fdfdea1e (GT.M V7.1-002)
 	int 			logging_period, logging_interval; /* logging period = soft_tries_period*logging_interval */
 	int			alert_period, hardtries_count, hardtries_period;
 	int 			max_shutdown_wait, max_sleep, soft_tries_period;

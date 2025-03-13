@@ -261,14 +261,9 @@ int4	mu_upgrade_bmm(gd_region *reg, size_t blocks_needed)
 		{	/* read failed */
 			assert(cdb_sc_normal == (enum cdb_sc)rdfail_detail);
 			mu_upgrade_in_prog = MUPIP_UPGRADE_OFF;
-<<<<<<< HEAD
-			util_out_print("Region !AD: Read of Bit map @x!@XQ failed.", TRUE, REG_LEN_STR(reg), &curbml);
-			util_out_print("Region !AD: not upgraded", TRUE,REG_LEN_STR(reg));
-			free(bml_lcl_buff);
-=======
 			util_out_print("Region !AD : Read of Bit map @x!@XQ failed.", TRUE, REG_LEN_STR(reg), &curbml);
 			util_out_print("Region !AD : Not upgraded.", TRUE, REG_LEN_STR(reg));
->>>>>>> fdfdea1e (GT.M V7.1-002)
+			free(bml_lcl_buff);
 			return ERR_MUNOFINISH;
 		}
 		memcpy(bml_lcl_buff, bml_buff, BM_SIZE(BLKS_PER_LMAP));
@@ -812,13 +807,8 @@ int4 upgrade_extend(gtm_int8 extension, gd_region *reg)
 		FALSE, REG_LEN_STR(reg));
 	if (0 == cs_data->extension_size)
 	{	/* no extension size in segment data to work with */
-<<<<<<< HEAD
-		util_out_print("Region !AD: Extension size not set in database header.", TRUE, REG_LEN_STR(reg));
-		util_out_print("Region !AD: Perform a MUPIP EXTEND on this region,", FALSE, REG_LEN_STR(reg));
-=======
 		util_out_print("!/Region !AD : Extension size not set in database header.", TRUE, REG_LEN_STR(reg));
 		util_out_print("Region !AD : Perform a MUPIP EXTEND on this region,", FALSE, REG_LEN_STR(reg));
->>>>>>> fdfdea1e (GT.M V7.1-002)
 		util_out_print(" otherwise free at least 0x!@XQ blocks to continue.", TRUE, &extension);
 		/* Caller function "mupip_upgrade()" would have set "csd->fully_upgraded" to FALSE just before calling us.
 		 * We have not modified the V6 database file at this point and are about to issue an error and abort the
@@ -1164,12 +1154,8 @@ enum cdb_sc ditch_dead_globals(block_id curr_blk, block_id offset, cache_rec_ptr
 		t_abort(gv_cur_region, cs_addrs);						/* do crit and other cleanup */
 		return status;								/* failed to read the indicated block */
 	}
-<<<<<<< HEAD
 	MU_UPGRADE_PIN_BLK(curr_blk, save_cw_stagnate_count);
-	if (is_bg = (dba_bg == cs_data->acc_meth))
-=======
 	if ((is_bg = (dba_bg == cs_data->acc_meth)))
->>>>>>> fdfdea1e (GT.M V7.1-002)
 	{
 		if (NULL == (bt = (bt_get(curr_blk))))
 		{
@@ -1560,11 +1546,7 @@ enum cdb_sc upgrade_dir_tree(block_id curr_blk, block_id offset, gd_region *reg,
 		else if (GDSV6p == blk_ver)
 		{
 			if (debug_mupip)
-<<<<<<< HEAD
-				util_out_print("reprocessing directory block 0x!@XQ with version !UL pointer 0x!@XQ", TRUE,
-=======
-				util_out_print("reproccessing directory block 0x!@XQ with version !UL pointer 0x!@XQ.", TRUE,
->>>>>>> fdfdea1e (GT.M V7.1-002)
+				util_out_print("reprocessing directory block 0x!@XQ with version !UL pointer 0x!@XQ.", TRUE,
 						&curr_blk, (char)blk_ver, &blk_pter);
 		} else
 		{
@@ -1834,12 +1816,8 @@ enum cdb_sc upgrade_dir_tree(block_id curr_blk, block_id offset, gd_region *reg,
 			tot_levl_cnt = 1 - level;
 		}
 		if (debug_mupip)
-<<<<<<< HEAD
-			util_out_print("dropping level !UL directory block @x!@XQ", TRUE, level, &curr_blk);
-		MU_UPGRADE_UNPIN_BLK(curr_blk, save_cw_stagnate_count);
-=======
 			util_out_print("dropping level !UL directory block @x!@XQ.", TRUE, level, &curr_blk);
->>>>>>> fdfdea1e (GT.M V7.1-002)
+		MU_UPGRADE_UNPIN_BLK(curr_blk, save_cw_stagnate_count);
 		return cdb_sc_normal;
 	}
 	assert((dirHist.buffaddr == blkBase) && (dirHist.level == level));

@@ -138,17 +138,8 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 	star_rec_hdr = long_blk_id ? star_rec_hdr64 : star_rec_hdr32;
 	level = cur_level;
 	max_fill_sav = max_fill = (0 == level) ? d_max_fill : i_max_fill;
-<<<<<<< HEAD
 	assert(0 <= max_fill);
-	if (create_root = ((level == gv_target->hist.depth) && (0 < level))) /* WARNING: assigment */
-	{	/* MUPIP REORG -UPGRADE starts from the top down as opposed to regular REORG which works from the
-		 * bottom up. As a result, the cur_level from the caller in a REORG -UPGRADE might be a root.
-		 */
-		assert(mu_upgrade_in_prog);
-	}
-=======
 	create_root = ((level == gv_target->hist.depth) && (0 < level));
->>>>>>> fdfdea1e (GT.M V7.1-002)
 	/*  -------------------
 	 *  Split working block.
 	 *  -------------------
@@ -1080,12 +1071,7 @@ Return :
 static inline enum cdb_sc locate_block_split_point(srch_blk_status *blk_stat, int level, int cur_blk_size, int max_fill,
 		int *last_rec_size, unsigned char *last_key, int *last_keysz, int *top_off)
 {
-<<<<<<< HEAD
-	int		rec_size, tkeycmpc;
-=======
-	block_id	blkid;
 	int		tkeycmpc;
->>>>>>> fdfdea1e (GT.M V7.1-002)
 	enum cdb_sc	status;
 	sm_uc_ptr_t 	blk_base, rec_base;
 
@@ -1094,7 +1080,6 @@ static inline enum cdb_sc locate_block_split_point(srch_blk_status *blk_stat, in
 	*last_rec_size = 0;
 	blk_base = blk_stat->buffaddr;
 	rec_base = blk_base + SIZEOF(blk_hdr);
-<<<<<<< HEAD
 	/* max_fill is computed based on the fill factor after taking reserved_bytes into account. But since MAX_RESERVED_B
 	 * macro (which is used by MUPIP SET to limit the reserved_bytes value to not go very close to the block_size value)
 	 * ensures we leave space for at least SIZEOF(blk_hdr) so we are guaranteed *top_off (which is == SIZEOF(blk_hdr))
@@ -1104,9 +1089,6 @@ static inline enum cdb_sc locate_block_split_point(srch_blk_status *blk_stat, in
 	 */
 	assert(*top_off < max_fill);
 	do
-=======
-	for (; *top_off < max_fill; )
->>>>>>> fdfdea1e (GT.M V7.1-002)
 	{
 		READ_RECORD(status, last_rec_size, &tkeycmpc, last_keysz, last_key,
 				level, blk_stat, rec_base);

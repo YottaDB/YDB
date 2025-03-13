@@ -203,6 +203,7 @@ MBSTART {														\
 															\
 	/* if new jnlpool, add to jnlpool_head list */									\
 	if (NEW_TMP_JNLPOOL)												\
+	{														\
 		if (NULL != JNLPOOL_HEAD)										\
 		{													\
 			for (last_jnlpool = jnlpool_head; last_jnlpool->next; last_jnlpool = last_jnlpool->next)	\
@@ -211,6 +212,7 @@ MBSTART {														\
 				last_jnlpool->next = JNLPOOL;								\
 		} else													\
 			jnlpool_head = JNLPOOL;										\
+	}														\
 	SET_JNLPOOL_PTR_IN_GLD(GD_PTR, JNLPOOL);									\
 } MBEND
 
@@ -626,26 +628,10 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_JNLPOOLSETUP, 0, ERR_TEXT, 2,
 			RTS_ERROR_LITERAL("Error with journal pool shmat"), save_errno);
 	}
-<<<<<<< HEAD
 	assert(jnlpool == tmp_jnlpool);
 	assert((NULL == gd_ptr) || (NULL == gd_ptr->gd_runtime->jnlpool)
 		|| (!new_tmp_jnlpool && (tmp_jnlpool == gd_ptr->gd_runtime->jnlpool) && !tmp_jnlpool->pool_init));
 	ADD_TO_JNLPOOL_HEAD_LIST(new_tmp_jnlpool, jnlpool, jnlpool_head, gd_ptr);
-=======
-	/* if new jnlpool, add to jnlpool_head list */
-	if (new_tmp_jnlpool)
-	{
-		if (NULL != jnlpool_head)
-		{
-			for (last_jnlpool = jnlpool_head; last_jnlpool->next; last_jnlpool = last_jnlpool->next)
-				;
-			if (tmp_jnlpool != last_jnlpool)
-				last_jnlpool->next = tmp_jnlpool;
-		} else
-			jnlpool_head = tmp_jnlpool;
-	}
-	jnlpool = tmp_jnlpool;
->>>>>>> fdfdea1e (GT.M V7.1-002)
 	jnlpool->jnlpool_ctl = tmp_jnlpool_ctl;
 	/* Now that we have attached to the journal pool, fix udi->counter_ftok_incremented back to an accurate value */
 	udi->counter_ftok_incremented = !ftok_counter_halted;

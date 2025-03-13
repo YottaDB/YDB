@@ -3,7 +3,7 @@
  * Copyright (c) 2008-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -305,11 +305,7 @@ int main()
 #	endif /* _AIX */
 	ret = 0; /* start positive */
 	/* get the ones we need */
-<<<<<<< HEAD
-	if (env_var_ptr = ydb_getenv(YDBENVINDX_DIST, NULL_SUFFIX, NULL_IS_YDB_ENV_MATCH))	/* Warning - assignment */
-=======
-	if ((env_var_ptr = getenv(GTM_DIST)))		/* Warning - assignment */
->>>>>>> fdfdea1e (GT.M V7.1-002)
+	if ((env_var_ptr = ydb_getenv(YDBENVINDX_DIST, NULL_SUFFIX, NULL_IS_YDB_ENV_MATCH)))	/* Warning - assignment */
 	{
 		if (MAX_ALLOWABLE_LEN <
 				SECSHR_PARENT_DIR_LEN(strlen(env_var_ptr)) + STR_LIT_LEN(GTMSECSHR_DIR_SUFFIX) + STR_LIT_LEN(GTMSECSHR_BASENAME))
@@ -334,11 +330,7 @@ int main()
 		SYSLOG(LOG_USER | LOG_INFO, ERR_SECSHRNOYDBDIST);
 		ret = -1;
 	}
-<<<<<<< HEAD
-	if (env_var_ptr = ydb_getenv(YDBENVINDX_TMP, NULL_SUFFIX, NULL_IS_YDB_ENV_MATCH))	/* Warning - assignment */
-=======
-	if ((env_var_ptr = getenv(GTM_TMP)))		/* Warning - assignment */
->>>>>>> fdfdea1e (GT.M V7.1-002)
+	if ((env_var_ptr = ydb_getenv(YDBENVINDX_TMP, NULL_SUFFIX, NULL_IS_YDB_ENV_MATCH)))	/* Warning - assignment */
 	{
 		if (MAX_ALLOWABLE_LEN < strlen(env_var_ptr))
 		{
@@ -350,31 +342,6 @@ int main()
 			strcpy(ydb_tmp_val, env_var_ptr);
 		}
 	}
-<<<<<<< HEAD
-=======
-#	ifdef DEBUG
-	/* Normally, all non-essential environment variables are cleared before calling the real
-	 * GTMSECSHR executable. For a very specific white box case, WBTEST_FORCE_SEMGETERROR,
-	 * the two environment variables used for the white box case are passed. This is only done
-	 * in debug and they are length checked. If another white box case is ever needed by GTMSECSHR
-	 * it needs to be added here and in gtmsecshr.c.
-	 */
-	if ((env_var_ptr = getenv(GTM_WHITE_BOX_TEST_CASE_NUMBER)))	/* Warning - assignment */
-	{
-		if (MAX_ALLOWABLE_LEN >= strlen(env_var_ptr))
-		{
-			strcpy(gtm_white_box_test_case_number_val, env_var_ptr);
-			if (WBTEST_FORCE_SEMGETERROR == atoi(gtm_white_box_test_case_number_val))
-				if ((env_var_ptr = getenv(GTM_WHITE_BOX_TEST_CASE_ENABLE)))	/* Warning - assignment */
-					if (MAX_ALLOWABLE_LEN >= strlen(env_var_ptr))
-					{
-						gtm_white_box_test_case_pass_envvars = TRUE;
-						strcpy(gtm_white_box_test_case_enable_val, env_var_ptr);
-					}
-		}
-	}
-#	endif
->>>>>>> fdfdea1e (GT.M V7.1-002)
 	if (!ret)
 	{	/* clear all */
 #		if defined(SUNOS) || defined(__CYGWIN__)

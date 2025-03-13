@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -160,11 +160,7 @@ void mupip_rundown(void)
 		if ((jnlpool_rndwn_required = (region && mu_star_specified)) || anticipatory_freeze_available) /* note:assigmnent */
 		{
 			/* sets replpool_id/full_len; note: assignment */
-<<<<<<< HEAD
-			if (DEBUG_ONLY(repl_inst_available = )REPL_INST_AVAILABLE(gd_header))
-=======
-			if ((DEBUG_ONLY(repl_inst_available = )REPL_INST_AVAILABLE(NULL)))
->>>>>>> fdfdea1e (GT.M V7.1-002)
+			if ((DEBUG_ONLY(repl_inst_available = )REPL_INST_AVAILABLE(gd_header)))
 			{
 				gd_id		instfilename_gdid;
 

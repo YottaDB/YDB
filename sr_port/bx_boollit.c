@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -59,12 +59,7 @@ void bx_boollit(triple *t, int depth)
 	if (OC_BOOLINIT == t->opcode)
 		return;
 	assert(TRIP_REF == t->operand[0].oprclass);
-<<<<<<< HEAD
-	assert(((OC_COBOOL != t->opcode) && (OC_COM != t->opcode))
-		|| (TRIP_REF == t->operand[1].oprclass));
-=======
-	assert(((OC_COBOOL != opercode) && (OC_COM != opercode)) || (TRIP_REF == t->operand[1].oprclass));
->>>>>>> fdfdea1e (GT.M V7.1-002)
+	assert(((OC_COBOOL != t->opcode) && (OC_COM != t->opcode)) || (TRIP_REF == t->operand[1].oprclass));
 	for (opr = t->operand, j = 0; opr < ARRAYTOP(t->operand); opr++, j++)
 	{	/* checkout an operand to see if we can simplify it */
 		p = opr;

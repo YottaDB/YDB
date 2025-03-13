@@ -247,28 +247,18 @@ boolean_t mu_truncate(int4 truncate_percent, mval *keep_mval)
 				bmphist.blk_num = lmap_blk_num;
 				bmphist.buffaddr = t_qread(bmphist.blk_num, &bmphist.cycle, &bmphist.cr);
 				lmap_blk_hdr = (blk_hdr_ptr_t)bmphist.buffaddr;
-<<<<<<< HEAD
-				if (!bmphist.buffaddr)
-				{	/* Could not read the block successfully. Retry. */
-=======
 				if (NULL == bmphist.buffaddr)
-				{ /* Could not read the block successfully. Retry. */
->>>>>>> fdfdea1e (GT.M V7.1-002)
+				{	/* Could not read the block successfully. Retry. */
 					t_retry((enum cdb_sc)rdfail_detail);
 					continue;
 				}
 				if (BM_SIZE(BLKS_PER_LMAP) != lmap_blk_hdr->bsiz)
-<<<<<<< HEAD
 				{	/* We asked for a bitmap block to be read but instead got back a non-bitmap block header.
 					 * The buffer holding the bitmap block must have been reused since we read it.
-					 * It is a restartable situation.
+					 * It is a restartable situation. So retry the transaction.
 					 */
 					assert(dba_bg == csd->acc_meth);
 					t_retry(cdb_sc_lostcr);
-=======
-				{ /* Lost the buffer. Retry. */
-					t_retry(cdb_sc_blkmod);
->>>>>>> fdfdea1e (GT.M V7.1-002)
 					continue;
 				}
 				lmap_addr = bmphist.buffaddr + SIZEOF(blk_hdr);

@@ -3,7 +3,7 @@
  * Copyright (c) 2012-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2021-2025 YottaDB LLC and/or its subsidiaries.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,11 +32,7 @@
 
 void gt_timers_add_safe_hndlrs(void)
 {
-<<<<<<< HEAD
 	add_safe_timer_handler(1, simple_timeout_timer);
-=======
-	add_safe_timer_handler(3, semwt2long_handler, client_timer_handler, simple_timeout_timer);
->>>>>>> fdfdea1e (GT.M V7.1-002)
 #	ifdef DEBUG
 	add_safe_timer_handler(2, fake_enospc, handle_deferred_syslog);
 	if (WBTEST_ENABLED(WBTEST_DEFERRED_TIMERS))

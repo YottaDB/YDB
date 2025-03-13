@@ -213,13 +213,8 @@ void jobexam_dump(mval *dump_filename_arg, mval *dump_file_spec, char *fatal_fil
 	 */
 	if (process_exiting)
 	{
-<<<<<<< HEAD
 		assert(YDB_PATH_MAX >= dump_file_spec->str.len);
-		memcpy(fatal_file_name_buff, dump_file_spec->str.addr, dump_file_spec->str.len);
-=======
-		assert(GTM_PATH_MAX >= dump_file_spec->str.len);
 		memcpy((void *)fatal_file_name_buff, dump_file_spec->str.addr, dump_file_spec->str.len);
->>>>>>> fdfdea1e (GT.M V7.1-002)
 		dump_file_spec->str.addr = fatal_file_name_buff;
 	}
 	/* Parms of file to be created (newversion) */

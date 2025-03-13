@@ -897,11 +897,7 @@ GTMSECSHRSGIDF	<gtmsecshr server setgid to root failed>/warning/fao=0!/ansi=0
 GTMSECSHRSSIDF	<gtmsecshr server setsid failed>/warning/fao=0!/ansi=0
 GTMSECSHRFORKF	<gtmsecshr server unable to fork off a child process>/fatal/fao=0!/ansi=0
 DBFSYNCERR	<Error synchronizing database file !AD to disk>/error/fao=2!/ansi=0
-<<<<<<< HEAD
-UNUSEDMSG900	<SECONDAHEAD last used in V7.0-000 Jan 2021>/error/fao=0!/ansi=0
-=======
 EXCEEDRCTLRNDWN	<Maximum relinkctl rundown retries limit of !UL exceeded>/error/fao=1!/ansi=0
->>>>>>> fdfdea1e (GT.M V7.1-002)
 SCNDDBNOUPD	<Database Updates not allowed on the secondary>/error/fao=0!/ansi=0
 MUINFOUINT4	<!AD : !UL [0x!XL]>/info/fao=4!/ansi=0
 NLMISMATCHCALC	<Location of !AD expected at 0x!XL, but found at 0x!XL>/error/fao=4!/ansi=0
@@ -1013,11 +1009,7 @@ MUDESTROYFAIL	<Global section (!AD) corresponding to file !AD failed to be destr
 NOTALLDBOPN	<Not all required database files were opened>/fatal/fao=0!/ansi=0
 MUSELFBKUP	<Database file !AD can not be backed upon itself>/error/fao=2!/ansi=0
 DBDANGER	<Process !UL [0x!XL] killed while committing update for database file !AD.  Possibility of damage to block 0x!16@XQ.>/warning/fao=5!/ansi=0
-<<<<<<< HEAD
-UNUSEDMSG1012	<TRUNCATEFAIL nixed in r1.20 because it is a VMS only error>/error/fao=0!/ansi=0
-=======
 ORLBKROLLED	<ONLINE ROLLBACK took the database for instance !AD region !AD corresponding to !AD to a prior state>/warning/fao=6!/ansi=0
->>>>>>> fdfdea1e (GT.M V7.1-002)
 TCGETATTR	<Error while getting terminal attributes on file descriptor !UL>/error/fao=1!/ansi=0
 TCSETATTR	<Error while setting terminal attributes on file descriptor !UL>/error/fao=1!/ansi=0
 IOWRITERR	<IO Write by pid 0x!XL to blk 0x!XL of database file !AD failed.  Pid 0x!XL retrying the IO.>/error/fao=5!/ansi=0
@@ -1058,11 +1050,7 @@ FILTERCOMM	<Error communicating seqno !16@XQ with the filter>/error/fao=1!/ansi=
 FILTERBADCONV	<Bad conversion of seqno !16@XQ by filter>/error/fao=1!/ansi=0
 PRIMARYISROOT	<Attempted operation not valid on root primary instance !AD>/error/fao=2!/ansi=0
 GVQUERYGETFAIL	<Global variable QUERY and GET failed.  Failure code: !AD.>/error/fao=2!/ansi=0
-<<<<<<< HEAD
-UNUSEDMSG1053	<DBCREC2BIGINBLK removed from code in V7.0-000 Nov 2020>/error/fao=0!/ansi=0
-=======
 BSIZTOOLARGE	<!AD Block larger than specified maximum size>/error/fao=2!/ansi=0/B
->>>>>>> fdfdea1e (GT.M V7.1-002)
 MERGEDESC	<Merge operation not possible.  !AD is descendent of !AD.>/error/fao=4!/ansi=19
 MERGEINCOMPL	<Error encountered during MERGE; operation may be incomplete>/warning/fao=0!/ansi=0
 DBNAMEMISMATCH	<Database file !AD points to shared memory (id = !UL) which in turn points to an inaccessible database file !AZ>/error/fao=4!/ansi=0

@@ -3,7 +3,7 @@
  * Copyright (c) 2018-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -48,21 +48,11 @@ int get_ztimeout(mval *result)
 	{	/* In theory, this should guard against exceeding 18 digit accuracy, but limits on time specification kick in 1st */
 		sys_get_curr_time(&cur_time);
 		cur_time = sub_abs_time(&(TREF(dollar_ztimeout)).end_time, &cur_time);
-<<<<<<< HEAD
 		if (0 <= cur_time.tv_sec)
-		{
-			ms = DIVIDE_ROUND_DOWN(cur_time.tv_nsec, NANOSECS_IN_MSEC);
 			time_len = SNPRINTF(full_ztimeout, ZTIMEOUTSTRLEN, (!ztimeout_vector_len ? "%ld.%ld" : "%ld.%ld:"),
-					cur_time.tv_sec, ms);
-		} else
-			time_len = SNPRINTF(full_ztimeout, ZTIMEOUTSTRLEN, (!ztimeout_vector_len ? "%ld" : "%ld:"), ms);
-=======
-		if (0 <= cur_time.at_sec)
-			time_len = SNPRINTF(full_ztimeout, ZTIMEOUTSTRLEN, (!ztimeout_vector_len ? "%ld.%ld" : "%ld.%ld:"),
-				cur_time.at_sec, cur_time.at_usec);
+				cur_time.tv_sec, DIVIDE_ROUND_UP(cur_time.tv_nsec, NANOSECS_IN_USEC));
 		else
 			time_len = SNPRINTF(full_ztimeout, ZTIMEOUTSTRLEN, (!ztimeout_vector_len ? "0" : "0:"));
->>>>>>> fdfdea1e (GT.M V7.1-002)
 	}
 	assert((0 < time_len) && (time_len <= ZTIMEOUTSTRLEN));
 	assert(((0 == ztimeout_vector_len) && (NULL == ztimeout_vector_ptr))
