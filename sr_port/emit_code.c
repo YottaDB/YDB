@@ -378,7 +378,6 @@ short *emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
 	switch (cg_phase)
 	{
 		case CGP_ASSEMBLY:
-			list_chkpage();
 			obpt = &outbuf[0];
 			memset(obpt, SP, SIZEOF(outbuf));
 			i2asc((uchar_ptr_t)obpt, vaxi_cnt++);
@@ -387,7 +386,8 @@ short *emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
 				instr = *inst;
 			else
 				instr = (*inst == VXT_IREPAB) ? VXI_PUSHAB : VXI_PUSHL;
-			stpcpy(obpt, vxi_opcode[instr]);
+			/* stpcpy overwrites the following space with a null terminator. Reset it so our lines aren't truncated. */
+			*stpcpy(obpt, vxi_opcode[instr]) = ' ';
 			obpt += 10;
 			*obpt++ = SP;
 			*obpt++ = SP;

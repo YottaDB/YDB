@@ -121,7 +121,6 @@ void open_list_file(void)
 	clock = time(0);
 	GTM_CTIME(p, &clock);
 	memcpy (print_time_buf, p + 4, SIZEOF(print_time_buf));
-	list_head(0);
 	return;
 }
 
@@ -142,63 +141,10 @@ void close_list_file(void)
 	RESTORE_IO_CURR_DEVICE(dev_in_use, in_is_curr_device, out_is_curr_device);
 }
 
-void list_head(bool newpage)
-{
-	short col_2 = 70;
-	static readonly unsigned char page_lit[] = "page ";
-	unsigned char page_no_buf[10];
-	mval head;
-
-	return;
-	if (newpage)
-		op_wtff();
-
-	head.mvtype = MV_STR;
-	head.str.addr = (char *)&ydb_release_name[0];
-	head.str.len = ydb_release_name_len;
-	op_write (&head);
-
-	op_wttab(col_2);
-	head.str.addr = print_time_buf;
-	head.str.len = 20;
-	op_write(&head);
-
-	op_wttab(100);
-	lst_param.page++;
-	head.str.addr = (char *)page_lit;
-	head.str.len = SIZEOF(page_lit) - 1;
-	op_write(&head);
-
-	head.str.addr = (char *)page_no_buf;
-	head.str.len = INTCAST(i2asc(page_no_buf, lst_param.page) - page_no_buf);
-	op_write(&head);
-	op_wteol(1);
-
-	head.str.addr = (char *)source_file_name;
-	head.str.len = source_name_len;
-	op_write(&head);
-	if (source_name_len >= col_2)
-		op_wteol(1);
-	op_wttab(col_2);
-	head.str.addr = rev_time_buf;
-	head.str.len = 20;
-	op_write(&head);
-	op_wteol(3);
-}
-
-
-#define BIG_PG 32
-#define BIG_PG_BOT_SP 10
-#define SMALL_PG_BOT_SP 3
-
 void list_line(char *c)
 {
 	short n, c_len, space_avail;
 	mval out;
-
-	if (io_curr_device.out->dollar.y >= lst_param.lines_per_page -
-	    ((lst_param.lines_per_page < BIG_PG) ? SMALL_PG_BOT_SP : BIG_PG_BOT_SP))
-		list_head(1);
 
 	out.mvtype = MV_STR;
 	c_len = (short)strlen(c);
@@ -219,13 +165,7 @@ void list_line(char *c)
 		}
 	}
 
-	if ((n = lst_param.lines_per_page - io_curr_device.out->dollar.y) <
-	    lst_param.space)
-	{
-		assert(n > 0);
-		op_wteol(n);
-	} else
-		op_wteol(lst_param.space);
+	op_wteol(lst_param.space);
 }
 
 void list_line_number(void)
@@ -236,9 +176,6 @@ void list_line_number(void)
 	mval out;
 
 	assert(cmd_qlf.qlf & CQ_LIST);
-	if (io_curr_device.out->dollar.y >= lst_param.lines_per_page -
-	    ((lst_param.lines_per_page < BIG_PG) ? SMALL_PG_BOT_SP : BIG_PG_BOT_SP))
-		list_head(1);
 
 	n = lst_param.list_line++;
 	pt = &buf[5];
@@ -255,15 +192,6 @@ void list_line_number(void)
 	out.str.len = SIZEOF(buf);
 	op_write(&out);
 }
-
-
-void list_chkpage(void)
-{
-	if (io_curr_device.out->dollar.y >= lst_param.lines_per_page -
-	    ((lst_param.lines_per_page < BIG_PG) ? SMALL_PG_BOT_SP : BIG_PG_BOT_SP))
-		list_head(1);
-}
-
 
 void list_tab(void)
 {

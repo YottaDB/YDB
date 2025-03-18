@@ -103,10 +103,7 @@ void get_cmd_qlf(command_qualifier *qualif)
 		else
 			s->len = len;
 	}
-	if (FALSE == cli_get_int("LENGTH",&temp_int))
-		temp_int = 66;
-	lst_param.lines_per_page = temp_int;
-	if ((FALSE == cli_get_int("SPACE",&temp_int)) || (0 >= temp_int) || (temp_int >= lst_param.lines_per_page))
+	if ((FALSE == cli_get_int("SPACE",&temp_int)) || (0 >= temp_int))
 		temp_int = 1;
 	lst_param.space = temp_int;
 	if (CLI_PRESENT == cli_present("LABELS"))

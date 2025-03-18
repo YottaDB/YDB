@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2025 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -15,8 +18,6 @@
 
 void open_list_file(void);
 void close_list_file(void);
-void list_chkpage(void);
-void list_head(bool newpage);
 void list_line(char *c);
 void list_line_number(void);
 void list_tab(void);

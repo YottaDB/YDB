@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -240,8 +240,6 @@ boolean_t compiler_startup(void)
 		list_line((char *)err_buf);
 		if (errknt > HOPELESS_COMPILE)
 			list_line((char *)compile_terminated);
-		if (cmd_qlf.qlf & CQ_MACHINE_CODE && compile_w_err)
-			list_head(1);
 	}
 	if ((!errknt || compile_w_err) && ((cmd_qlf.qlf & CQ_OBJECT) || (cmd_qlf.qlf & CQ_MACHINE_CODE)))
 	{

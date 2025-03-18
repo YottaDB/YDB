@@ -411,7 +411,6 @@ void print_destination_operand()
 
 void print_instruction()
 {
-	list_chkpage();
 	obpt = &outbuf[0];
 	memset(obpt, SP, ASM_OUT_BUFF);
 	obpt += 10;
