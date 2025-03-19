@@ -408,4 +408,5 @@ int	op_bxrelop_gt(mval *lhs, mval *rhs, int this_bool_depth, uint4 combined_opco
 int	op_bxrelop_ngt(mval *lhs, mval *rhs, int this_bool_depth, uint4 combined_opcode);
 int	op_bxrelop_lt(mval *lhs, mval *rhs, int this_bool_depth, uint4 combined_opcode);
 int	op_bxrelop_nlt(mval *lhs, mval *rhs, int this_bool_depth, uint4 combined_opcode);
+void    op_fnzycompile(mval *string, mval *ret);
 #endif

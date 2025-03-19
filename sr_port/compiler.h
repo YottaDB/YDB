@@ -937,6 +937,7 @@ int		f_ztrigger(oprtype *a, opctype op);
 int		f_ztrnlnm(oprtype *a, opctype op);
 int		f_zwidth(oprtype *a, opctype op);
 int		f_zwrite(oprtype *a, opctype op);
+int		f_zycompile(oprtype *a, opctype op);
 int		f_zyhash(oprtype *a, opctype op);
 int		f_zyissqlnull(oprtype *a, opctype op);
 int		f_zysuffix(oprtype *a, opctype op);

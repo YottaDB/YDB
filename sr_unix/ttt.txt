@@ -1275,3 +1275,6 @@ OC_BXRELOP_NLT:		pushl	val.4
 			pushab	val.2
 			pushab	val.1
 			jsb	xfer.xf_bxrelop_nlt
+OC_FNZYCOMPILE:		pushab  val.0
+			pushab  val.1
+			calls   #2,xfer.xf_fnzycompile

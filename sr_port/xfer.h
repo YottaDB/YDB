@@ -1,16 +1,16 @@
 /****************************************************************
- *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
- * Services, Inc. and/or its subsidiaries. All rights reserved.	*
- *								*
- * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries.	*
- * All rights reserved.						*
- *								*
- *	This source code contains the intellectual property	*
- *	of its copyright holder(s), and is made available	*
- *	under a license.  If you do not know the terms of	*
- *	the license, please stop and do not read further.	*
- *								*
+ *                                                              *
+ * Copyright (c) 2001-2023 Fidelity National Information        *
+ * Services, Inc. and/or its subsidiaries. All rights reserved. *
+ *                                                              *
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries. *
+ * All rights reserved.                                         *
+ *                                                              *
+ *      This source code contains the intellectual property     *
+ *      of its copyright holder(s), and is made available       *
+ *      under a license.  If you do not know the terms of       *
+ *      the license, please stop and do not read further.       *
+ *                                                              *
  ****************************************************************/
 
 /*  There is code that depends on the sequence in which entries
@@ -368,3 +368,4 @@ XFER(xf_bxrelop_gt, opp_bxrelop_gt),
 XFER(xf_bxrelop_ngt, opp_bxrelop_ngt),
 XFER(xf_bxrelop_lt, opp_bxrelop_lt),
 XFER(xf_bxrelop_nlt, opp_bxrelop_nlt),
+XFER(xf_fnzycompile, op_fnzycompile),
