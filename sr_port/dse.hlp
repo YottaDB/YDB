@@ -821,7 +821,7 @@
 
    -DATA[_RESERVED_BYTES]=data_reserved_bytes
 
-   Sets data reserved bytes. GT.M will not utilize whatever space is reserved
+   Sets data reserved bytes. YottaDB will not utilize whatever space is reserved
    in performing updates on data blocks in the database.
 
    Use only with: -FILEHEADER
@@ -901,7 +901,7 @@
 
    -INDEX[_RESERVED_BYTES]=index_reserved_bytes
 
-   Sets index reserved bytes. GT.M will not utilize whatever space is
+   Sets index reserved bytes. YottaDB will not utilize whatever space is
    reserved in performing updates on index blocks in the database.
 
    Use only with: -FILEHEADER
@@ -991,7 +991,7 @@
 
    -RESERVED_BYTES=reserved_bytes
 
-   Sets both data and index reserved bytes. GT.M will not utilize whatever
+   Sets both data and index reserved bytes. YottaDB will not utilize whatever
    space is reserved in a block.
 
    Use only with: -FILEHEADER

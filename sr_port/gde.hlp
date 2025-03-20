@@ -1928,7 +1928,7 @@
 
    -R[ESERVED_BYTES]=size
 
-   Specifies the size for GT.M to reserve in each database block.
+   Specifies the size for YottaDB to reserve in each database block.
    RESERVED_BYTES is generally used to reserve room for compatibility with
    other implementations of M or to observe communications protocol
    restrictions. RESERVED_BYTES may also be used as a user-managed fill

@@ -3433,7 +3433,7 @@
 3 DATA_reserved_bytes
    DATA_reserved_bytes
 
-   Specifies the size for GT.M to reserve in data-level database blocks.
+   Specifies the size for YottaDB to reserve in data-level database blocks.
    DATA_RESERVED_BYTES can be used as a user-managed fill factor when it is
    appropriate to have a different level of sparseness for data and index
    blocks. The format of the DATA_RESERVED_BYTES qualifier is:
@@ -3607,7 +3607,7 @@
 3 INDEX_reserved_bytes
    INDEX_reserved_bytes
 
-   Specifies the size for GT.M to reserve in index-level database blocks.
+   Specifies the size for YottaDB to reserve in index-level database blocks.
    INDEX_RESERVED_BYTES can be used as a user-managed fill factor when it is
    appropriate to have a different level of sparseness for data and index
    blocks. The format of the INDEX_RESERVED_BYTES qualifier is:
@@ -3825,7 +3825,7 @@
 3 REServed_bytes
    REServed_bytes
 
-   Specifies the size for GT.M to reserve in both data and index database
+   Specifies the size for YottaDB to reserve in both data and index database
    blocks. RESERVED_BYTES is generally used as a user-managed fill factor.
    The format of the RESERVED_BYTES qualifier is:
 
@@ -7338,17 +7338,17 @@
    -[NO]{SEND|RECV}BUFFSIZE[=n]
 
    Specifies the desired minimum TCP send and/or receive buffer sizes. This
-   affects the SO_SNDBUF and SO_RCVBUF socket options of the socket GT.M uses
+   affects the SO_SNDBUF and SO_RCVBUF socket options of the socket YottaDB uses
    for replication, not the journalpool or any other application-level
    buffer. n is a positive integer value indicating the desired minimum
-   buffer size. If GT.M finds that the specified buffer already has a
-   sufficient size when it is created, GT.M will avoid setting the buffer
+   buffer size. If YottaDB finds that the specified buffer already has a
+   sufficient size when it is created, YottaDB will avoid setting the buffer
    explicitly. The -NO{SEND|RECV}BUFFSIZE version of this qualifier instructs
-   GT.M to avoid setting the buffer sizes under any circumstance. In some
+   YottaDB to avoid setting the buffer sizes under any circumstance. In some
    environments, when the size of these buffers are dynamically adjusted
    except in cases where an application sets their size explicitly,
    -NO{SEND|RECV}BUFFSIZE can lead to good performance in a wide variety of
-   network conditions. By default and without passing this qualifier, GT.M
+   network conditions. By default and without passing this qualifier, YottaDB
    enforces a minimum size of approximately 1MiB for each buffer. This
    qualifier may only be passed to a -START command.
 
@@ -7356,7 +7356,7 @@
 
    The actual size of a tcp buffer depends on a variety of environmental
    conditions, including system configuration, operating system, and
-   available memory. Users of GT.M on Linux may observe that GT.M will report
+   available memory. Users of YottaDB on Linux may observe that YottaDB will report
    in the source and/or receiver logs buffers that are approximately twice
    what is requested, if the request has been honored by the OS. This is due
    to a quirk in the way that the Linux kernel reports TCP buffer sizes: the
