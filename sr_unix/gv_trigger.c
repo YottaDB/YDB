@@ -323,17 +323,11 @@ STATICFNDCL	boolean_t	gvtr_is_key_a_match(char *keysub_start[], gv_trigger_t *tr
 			LEN_AND_LIT(SUBSCRIPT), ERR_TEXT, 2, RTS_ERROR_TEXT(MOREINFO));	\
 }
 
-/* This macro is used to give SCA info on size of the buf used in the memcpy().
- * (More memory may be actually be allocated than is used by the "len" in the memcpy(), which is OK
- * Hinting to SCA is done with dynamic typedefs which are only in scope in the macro context */
-#define ASSIGN_GVTR_SUBS_RANGE_KEYS(LEN,KEY_FIELD)										\
-{																\
-	typedef char new_elem_block[DIVIDE_ROUND_UP(LEN, GVTR_LIST_ELE_SIZE)];							\
-	typedef new_elem_block *new_elem_block_p;										\
-	new_elem_block_p dststart;												\
-	dststart = (new_elem_block_p) get_new_element(gvt_trigger->gv_trig_list, DIVIDE_ROUND_UP(LEN, GVTR_LIST_ELE_SIZE));	\
-	memcpy((char *) dststart, out_key->base, LEN);										\
-	subsdsc->KEY_FIELD = (char *) dststart;											\
+#define ASSIGN_GVTR_SUBS_RANGE_KEYS(DSTSTART, LEN, OUT_KEY, KEY_FIELD)							\
+{															\
+	DSTSTART = (char *)get_new_element(gvt_trigger->gv_trig_list, DIVIDE_ROUND_UP(LEN, GVTR_LIST_ELE_SIZE));	\
+	memcpy(DSTSTART, OUT_KEY->base, LEN);										\
+	subsdsc->KEY_FIELD = DSTSTART;											\
 }
 
 /* This code is modeled around "updproc_ch" in updproc.c */
@@ -518,7 +512,7 @@ STATICFNDEF uint4	gvtr_process_range(gv_namehead *gvt, gvtr_subs_t *subsdsc, int
 			assert(gvt_trigger);
 			len = out_key->end;	/* keep trailing 0 */
 			subsdsc->gvtr_subs_point.len = len;
-			ASSIGN_GVTR_SUBS_RANGE_KEYS(len,gvtr_subs_point.subs_key);
+			ASSIGN_GVTR_SUBS_RANGE_KEYS(dststart, len, out_key, gvtr_subs_point.subs_key);
 			subsdsc->gvtr_subs_point.next_range = NULL;
 			subsdsc->gvtr_subs_type = GVTR_SUBS_POINT;
 			break;
@@ -529,7 +523,7 @@ STATICFNDEF uint4	gvtr_process_range(gv_namehead *gvt, gvtr_subs_t *subsdsc, int
 				assert(gvt_trigger);
 				len = out_key->end;	/* keep trailing 0 */
 				assert(len);
-				ASSIGN_GVTR_SUBS_RANGE_KEYS(len,gvtr_subs_range.subs_key1);
+				ASSIGN_GVTR_SUBS_RANGE_KEYS(dststart, len, out_key, gvtr_subs_range.subs_key1);
 				subsdsc->gvtr_subs_range.len1 = len;
 			} else
 				subsdsc->gvtr_subs_range.len1 = GVTR_RANGE_OPEN_LEN;
@@ -543,7 +537,7 @@ STATICFNDEF uint4	gvtr_process_range(gv_namehead *gvt, gvtr_subs_t *subsdsc, int
 				len = out_key->end;	/* keep trailing 0 */
 				assert(len);
 				assert(gvt_trigger);
-				ASSIGN_GVTR_SUBS_RANGE_KEYS(len,gvtr_subs_range.subs_key2);
+				ASSIGN_GVTR_SUBS_RANGE_KEYS(dststart, len, out_key, gvtr_subs_range.subs_key2);
 				subsdsc->gvtr_subs_range.len2 = len;
 				len1 = subsdsc->gvtr_subs_range.len1;
 				if (GVTR_RANGE_OPEN_LEN != len1)
