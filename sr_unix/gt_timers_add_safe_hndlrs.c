@@ -1,9 +1,9 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2023 Fidelity National Information	*
+ * Copyright (c) 2012-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2021-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2021 YottaDB LLC and/or its subsidiaries.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
