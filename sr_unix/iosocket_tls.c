@@ -459,8 +459,12 @@ void	iosocket_tls(mval *optionmval, int4 msec_timeout, mval *tlsid, mval *passwo
 							rel_quant();	/* allow resources to become available - likely nanosleep */
 							status2 = 0;	/* treat as timeout */
 						} else if (EINTR == save_errno)
+						{
+							eintr_handling_check();
 							status2 = 0;
+						}
 					}
+					HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 					status = gtm_tls_repeat_hand_shake((gtm_tls_socket_t *)socketptr->tlssocket);
 				} while ((GTMTLS_WANT_READ == status) || (GTMTLS_WANT_WRITE == status));
 				if (0 != status)
