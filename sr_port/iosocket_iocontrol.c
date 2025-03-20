@@ -246,7 +246,7 @@ void	iosocket_iocontrol(mstr *mn, int4 argcnt, va_list args)
 		} else
 			extraarg = NULL;
 		assert(option);
-		iosocket_tls(option, (int)(nsec_timeout / NANOSECS_IN_MSEC), tlsid, password, extraarg);
+		iosocket_tls(option, nsec_timeout, tlsid, password, extraarg);
 #	endif
 	} else if (0 == memcmp(action, "BLOCK", length))
 	{	/* OFF, CLEAR, COUNT .lvn, SENT .lvn */

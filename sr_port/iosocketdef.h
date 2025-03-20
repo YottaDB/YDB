@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -514,6 +514,6 @@ boolean_t iosocket_getsockopt(socket_struct *socketptr, char *optname, int optio
 int iosocket_setsockopt(socket_struct *socketptr, char *optname, int option,
 	int level, void *optvalue, GTM_SOCKLEN_TYPE optvaluelen, boolean_t freesocket);
 #ifdef GTM_TLS
-void    iosocket_tls(mval *optionmval, int4 timeoutarg, mval *tlsid, mval *password, mval *extraarg);
+void    iosocket_tls(mval *optionmval, uint8 nsec_timeout, mval *tlsid, mval *password, mval *extraarg);
 #endif
 #endif

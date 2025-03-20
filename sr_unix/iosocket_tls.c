@@ -77,7 +77,7 @@ typedef enum
 	tlsopt_renegotiate
 } tls_option;
 
-void	iosocket_tls(mval *optionmval, int4 msec_timeout, mval *tlsid, mval *password, mval *extraarg)
+void	iosocket_tls(mval *optionmval, uint8 nsec_timeout, mval *tlsid, mval *password, mval *extraarg)
 {
 	int4			devlen, extrastr_len, flags, len, length, save_errno, status, status2, timeout, tls_errno;
 	int4			errlen, errlen2;
@@ -94,6 +94,7 @@ void	iosocket_tls(mval *optionmval, int4 msec_timeout, mval *tlsid, mval *passwo
 	ABS_TIME		cur_time, end_time;
 	struct pollfd		fds;
 	boolean_t		ch_set;
+	int			poll_timeout;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -169,10 +170,10 @@ void	iosocket_tls(mval *optionmval, int4 msec_timeout, mval *tlsid, mval *passwo
 	else
 		option = tlsopt_invalid;
 	memcpy(iod->dollar.device, "0", SIZEOF("0"));
-	if (NO_M_TIMEOUT != (msec_timeout * (uint8)NANOSECS_IN_MSEC))
+	if (NO_M_TIMEOUT != nsec_timeout)
 	{
 		sys_get_curr_time(&cur_time);
-		add_int_to_abs_time(&cur_time, msec_timeout, &end_time);
+		add_uint8_to_abs_time(&cur_time, nsec_timeout, &end_time);
 	}
 	if ((tlsopt_client == option) || (tlsopt_server == option))
 	{	/* most of the setup is common */
@@ -196,7 +197,7 @@ void	iosocket_tls(mval *optionmval, int4 msec_timeout, mval *tlsid, mval *passwo
 				SET_DOLLARDEVICE_ONECOMMA_ERRSTR(iod, errp, errlen);
 				if (socketptr->ioerror)
 					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_TLSINIT, 0, ERR_TEXT, 2, LEN_AND_STR(errp));
-				if (NO_M_TIMEOUT != (msec_timeout * (uint8)NANOSECS_IN_MSEC))
+				if (NO_M_TIMEOUT != nsec_timeout)
 					dollar_truth = FALSE;
 				REVERT_GTMIO_CH(&iod->pair, ch_set);
 				return;
@@ -317,7 +318,7 @@ void	iosocket_tls(mval *optionmval, int4 msec_timeout, mval *tlsid, mval *passwo
 			SET_DOLLARDEVICE_ONECOMMA_ERRSTR(iod, errp, errlen);
 			if (socketptr->ioerror)
 				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_TLSCONVSOCK, 0, ERR_TEXT, 2, LEN_AND_STR(errp));
-			if (NO_M_TIMEOUT != (msec_timeout * (uint8)NANOSECS_IN_MSEC))
+			if (NO_M_TIMEOUT != nsec_timeout)
 				dollar_truth = FALSE;
 			REVERT_GTMIO_CH(&iod->pair, ch_set);
 			return;
@@ -329,7 +330,11 @@ void	iosocket_tls(mval *optionmval, int4 msec_timeout, mval *tlsid, mval *passwo
 			{
 				fds.fd = socketptr->sd;
 				fds.events = (GTMTLS_WANT_READ == status) ? POLLIN : POLLOUT;
-				if (-1 == (status2 = poll(&fds, 1, (NO_M_TIMEOUT == (msec_timeout * (uint8)NANOSECS_IN_MSEC)) ? -1 : msec_timeout)))
+				/* convert timeout to millisecs before passing to "poll()" */
+				poll_timeout = (NO_M_TIMEOUT == nsec_timeout)
+							? -1
+							: DIVIDE_ROUND_UP(nsec_timeout, NANOSECS_IN_MSEC);
+				if (-1 == (status2 = poll(&fds, 1, poll_timeout)))
 				{
 					save_errno = errno;
 					if (EAGAIN == save_errno)
@@ -368,18 +373,18 @@ void	iosocket_tls(mval *optionmval, int4 msec_timeout, mval *tlsid, mval *passwo
 				if (socketptr->ioerror)
 					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_TLSHANDSHAKE, 0,
 						      ERR_TEXT, 2, LEN_AND_STR(errp));
-				if (NO_M_TIMEOUT != (msec_timeout * (uint8)NANOSECS_IN_MSEC))
+				if (NO_M_TIMEOUT != nsec_timeout)
 					dollar_truth = FALSE;
 				REVERT_GTMIO_CH(&iod->pair, ch_set);
 				return;
 			}
 			if ((0 != status) && (0 <= status2))	/* not accepted/connected and not error */
 			{	/* check for timeout if not error or want read or write */
-				if ((0 != msec_timeout) && (NO_M_TIMEOUT != (msec_timeout * (uint8)NANOSECS_IN_MSEC)))
+				if ((0 != nsec_timeout) && (NO_M_TIMEOUT != nsec_timeout))
 				{
 					sys_get_curr_time(&cur_time);
 					cur_time = sub_abs_time(&end_time, &cur_time);
-					if (0 >= cur_time.tv_sec)
+					if (0 > cur_time.tv_sec)
 					{	/* no more time */
 						gtm_tls_session_close((gtm_tls_socket_t **)&socketptr->tlssocket);
 						socketptr->tlsenabled = FALSE;
@@ -387,11 +392,10 @@ void	iosocket_tls(mval *optionmval, int4 msec_timeout, mval *tlsid, mval *passwo
 						REVERT_GTMIO_CH(&iod->pair, ch_set);
 						return;
 					} else
-					{	/* adjust msec_timeout for poll */
-						msec_timeout = (cur_time.tv_sec * MILLISECS_IN_SEC) +
-								DIVIDE_ROUND_UP(cur_time.tv_nsec, NANOSECS_IN_MSEC);
+					{	/* adjust nsec_timeout to remaining time */
+						nsec_timeout = (cur_time.tv_sec * (uint8)NANOSECS_IN_SEC) + cur_time.tv_nsec;
 					}
-				} else if (0 == msec_timeout)
+				} else if (0 == nsec_timeout)
 				{	/* only one chance */
 					gtm_tls_session_close((gtm_tls_socket_t **)&socketptr->tlssocket);
 					socketptr->tlsenabled = FALSE;
@@ -414,7 +418,7 @@ void	iosocket_tls(mval *optionmval, int4 msec_timeout, mval *tlsid, mval *passwo
 					if (socketptr->ioerror)
 						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_TLSHANDSHAKE, 0,
 							ERR_TEXT, 2, errlen, errp);
-					if (NO_M_TIMEOUT != msec_timeout)
+					if (NO_M_TIMEOUT != nsec_timeout)
 						dollar_truth = FALSE;
 					REVERT_GTMIO_CH(&iod->pair, ch_set);
 					return;
@@ -426,11 +430,11 @@ void	iosocket_tls(mval *optionmval, int4 msec_timeout, mval *tlsid, mval *passwo
 					/* Check timeout after each handshake attempt. Note that gtm_tls_do_post_hand_shake()
 					 * includes a hand-shake attempt, hence timeout checks are done first
 					 */
-					if ((0 != msec_timeout) && (NO_M_TIMEOUT != msec_timeout))
+					if ((0 != nsec_timeout) && (NO_M_TIMEOUT != nsec_timeout))
 					{
 						sys_get_curr_time(&cur_time);
 						cur_time = sub_abs_time(&end_time, &cur_time);
-						if (0 >= cur_time.at_sec)
+						if (0 > cur_time.tv_sec)
 						{	/* no more time */
 							gtm_tls_session_close((gtm_tls_socket_t **)&socketptr->tlssocket);
 							socketptr->tlsenabled = FALSE;
@@ -438,11 +442,11 @@ void	iosocket_tls(mval *optionmval, int4 msec_timeout, mval *tlsid, mval *passwo
 							REVERT_GTMIO_CH(&iod->pair, ch_set);
 							return;
 						} else
-						{	/* adjust msec_timeout for poll */
-							msec_timeout = (cur_time.at_sec * MILLISECS_IN_SEC) +
-								DIVIDE_ROUND_UP(cur_time.at_usec, MICROSECS_IN_MSEC);
+						{	/* adjust nsec_timeout to remaining time */
+							nsec_timeout = (cur_time.tv_sec * (uint8)NANOSECS_IN_SEC)
+										+ cur_time.tv_nsec;
 						}
-					} else if (0 == msec_timeout)
+					} else if (0 == nsec_timeout)
 					{	/* only one chance */
 						gtm_tls_session_close((gtm_tls_socket_t **)&socketptr->tlssocket);
 						socketptr->tlsenabled = FALSE;
@@ -451,7 +455,11 @@ void	iosocket_tls(mval *optionmval, int4 msec_timeout, mval *tlsid, mval *passwo
 						return;
 					}
 					fds.events = (GTMTLS_WANT_READ == status) ? POLLIN : POLLOUT;
-					if (-1 == (status2 = poll(&fds, 1, (NO_M_TIMEOUT == msec_timeout) ? -1 : msec_timeout)))
+					/* convert timeout to millisecs before passing to "poll()" */
+					poll_timeout = (NO_M_TIMEOUT == nsec_timeout)
+								? -1
+								: DIVIDE_ROUND_UP(nsec_timeout, NANOSECS_IN_MSEC);
+					if (-1 == (status2 = poll(&fds, 1, poll_timeout)))
 					{
 						save_errno = errno;
 						if (EAGAIN == save_errno)
@@ -474,7 +482,7 @@ void	iosocket_tls(mval *optionmval, int4 msec_timeout, mval *tlsid, mval *passwo
 					if (socketptr->ioerror)
 						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_TLSHANDSHAKE, 0,
 							ERR_TEXT, 2, errlen, errp);
-					if (NO_M_TIMEOUT != msec_timeout)
+					if (NO_M_TIMEOUT != nsec_timeout)
 						dollar_truth = FALSE;
 					REVERT_GTMIO_CH(&iod->pair, ch_set);
 					return;
@@ -505,7 +513,7 @@ void	iosocket_tls(mval *optionmval, int4 msec_timeout, mval *tlsid, mval *passwo
 			SET_DOLLARDEVICE_ONECOMMA_ERRSTR(iod, errp, errlen);
 			if (socketptr->ioerror)
 				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_TLSRENEGOTIATE, 0,	ERR_TEXT, 2, LEN_AND_STR(errp));
-			if (NO_M_TIMEOUT != (msec_timeout * (uint8)NANOSECS_IN_MSEC))
+			if (NO_M_TIMEOUT != nsec_timeout)
 				dollar_truth = FALSE;
 			REVERT_GTMIO_CH(&iod->pair, ch_set);
 			return;
@@ -524,7 +532,7 @@ void	iosocket_tls(mval *optionmval, int4 msec_timeout, mval *tlsid, mval *passwo
 				if (socketptr->ioerror)
 					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(10) ERR_TLSRENEGOTIATE, 0,
 						      ERR_TEXT, 2, LEN_AND_STR(errp), ERR_TEXT, 2, LEN_AND_STR(errp2));
-				if (NO_M_TIMEOUT != (msec_timeout * (uint8)NANOSECS_IN_MSEC))
+				if (NO_M_TIMEOUT != nsec_timeout)
 					dollar_truth = FALSE;
 				REVERT_GTMIO_CH(&iod->pair, ch_set);
 				return;
@@ -553,8 +561,9 @@ void	iosocket_tls(mval *optionmval, int4 msec_timeout, mval *tlsid, mval *passwo
 			assert(len == extrastr_len - 1);	/* snprintf excludes null terminator in return value */
 		} else
 			extrastr = NULL;
-		status = gtm_tls_renegotiate_options((gtm_tls_socket_t *)socketptr->tlssocket, msec_timeout, idstr,
-						     extrastr, (NULL != tlsid));
+		status = gtm_tls_renegotiate_options((gtm_tls_socket_t *)socketptr->tlssocket,
+					DIVIDE_ROUND_UP(nsec_timeout, NANOSECS_IN_MSEC),	/* pass timeout in milliseconds */
+					idstr, extrastr, (NULL != tlsid));
 		if (NULL != extrastr)
 			free(extrastr);
 		if (0 != status)
@@ -568,7 +577,7 @@ void	iosocket_tls(mval *optionmval, int4 msec_timeout, mval *tlsid, mval *passwo
 			if (socketptr->ioerror)
 				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_TLSRENEGOTIATE, 0,
 					      ERR_TEXT, 2, LEN_AND_STR(errp));
-			if (NO_M_TIMEOUT != (msec_timeout * (uint8)NANOSECS_IN_MSEC))
+			if (NO_M_TIMEOUT != nsec_timeout)
 				dollar_truth = FALSE;
 			REVERT_GTMIO_CH(&iod->pair, ch_set);
 			return;
@@ -576,7 +585,7 @@ void	iosocket_tls(mval *optionmval, int4 msec_timeout, mval *tlsid, mval *passwo
 	} else
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_TLSPARAM, 4, LEN_AND_STR(optionstr),
 			LEN_AND_LIT("not a valid option"));
-	if (NO_M_TIMEOUT != (msec_timeout * (uint8)NANOSECS_IN_MSEC))
+	if (NO_M_TIMEOUT != nsec_timeout)
 		dollar_truth = TRUE;
 	REVERT_GTMIO_CH(&iod->pair, ch_set);
 	return;
