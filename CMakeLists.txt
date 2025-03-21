@@ -874,11 +874,6 @@ add_custom_command(
   )
 list(APPEND files_to_place GTMDEFINEDTYPESTODB.o)
 
-configure_file(sr_unix/gpgagent.tab.in plugin/gpgagent.tab @ONLY)
-set(YDB_TOP "$ENV{PWD}/${YDB_INSTALL_DIR}")
-configure_file(sr_unix/gpgagent.tab.in CMakeFiles/plugin/gpgagent.tab @ONLY)
-install(FILES ${YDB_BINARY_DIR}/CMakeFiles/plugin/gpgagent.tab DESTINATION ${YDB_INSTALL_DIR}/plugin)
-
 install(FILES sr_unix/configure.gtc DESTINATION ${YDB_INSTALL_DIR}
   PERMISSIONS ${install_permissions_script}
   RENAME configure

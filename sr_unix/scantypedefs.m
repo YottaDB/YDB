@@ -3,7 +3,7 @@
 ; Copyright (c) 2010-2022 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
-; Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	;
+; Copyright (c) 2019-2025 YottaDB LLC and/or its subsidiaries.	;
 ; All rights reserved.						;
 ; 								;
 ; 	This source code contains the intellectual property	;
@@ -490,6 +490,7 @@
 	Do ExclInclude("gtmcrypt_ref.h")
 	Do ExclInclude("gtmcrypt_sym_ref.h")
 	Do ExclInclude("gtmcrypt_util.h")
+	Do ExclInclude("gtm_tls_externalcalls.h")
 	Do ExclInclude("gtm_tls_impl.h")
 	Do ExclInclude("gtmcrypt_funclist.h")
 	Do ExclInclude("gtm_tls_funclist.h")

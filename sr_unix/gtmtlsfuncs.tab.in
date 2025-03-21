@@ -1,5 +1,0 @@
-@GTM_TOP@/plugin/libgtmtls.so
-getversion:			xc_long_t gtm_tls_get_version(O:xc_char_t*[2048])
-gettlslibsslversion:		xc_long_t gtm_tls_get_TLS_lib_version(O:xc_char_t*[2048],I:xc_char_t*,O:xc_char_t*[2048])
-getdefaultciphers:		xc_long_t gtm_tls_get_defaultciphers(O:xc_char_t*[4096],I:xc_char_t*,O:xc_char_t*[2048])
-getciphers:			xc_long_t gtm_tls_get_ciphers(O:xc_char_t*[4096],I:xc_char_t*,I:xc_char_t*,I:xc_char_t*,I:xc_char_t*,O:xc_char_t*[2048])
