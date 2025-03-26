@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-; Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	;
+; Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	;
 ; All rights reserved.						;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -212,30 +212,17 @@ set	; Intended to be the most common entry point to this routine (with unset lik
 	. ;       YottaDB version gets installed with execute permissions for the world, a ydb_env_set invocation using
 	. ;       that version might not be able to access /tmp/yottadb with the restricted chmod. Hence we first do the
 	. ;       mkdir with a "umask 0" and later do a chmod of just the subdirectory /tmp/yottadb/r1.23_x86_64.
-	. open "mkdir":(shell="/bin/sh":command="umask 0; mkdir -p "_tmp4:readonly:writeonly)::"pipe"
+	. open "mkdir":(shell="/bin/sh":command="umask 0; mkdir -p "_tmp4_"; chmod +t "_tmp4:readonly:writeonly)::"pipe"
 	. close "mkdir"
 	. new line,worldexecute,ydbgroup
 	. open "file":(shell="/bin/sh":command="ls -l "_dist_"/libyottadb.so":readonly)::"pipe"
 	. use "file" read line use io close "file"
 	. set worldexecute=$zextract(line,10)	; permissions are the first word in "line" so no need to do $zpiece before $zextract
 	. set ydbgroup=$zpiece(line," ",4)
-	. if "x"'=worldexecute do
-	. . ; $ydb_dist/libyottadb.so does not have world execute permissions, restrict directory access to only user and group
-	. . open "chmod":(shell="/bin/sh":command="chmod o-rwx "_tmp4:readonly:writeonly)::"pipe"
+	. do:"x"'=worldexecute
+	. . ; $ydb_dist/libyottadb.so does not have world execute permissions, restrict directory access to group only
+	. . open "chmod":(shell="/bin/sh":command="chmod o-rwx "_tmp4_"; chgrp "_ydbgroup_" "_tmp4:readonly:writeonly)::"pipe"
 	. . close "chmod"
-	. . ; ---------------------------------------------------------------------------------
-	. . ; If currently running user is part of the group that libyottadb.so belongs to,
-	. . ; then change the group of the created directory to the yottadb group. If not,
-	. . ; we cannot change the group (chgrp would error out) so skip this step in that case.
-	. . new user,index,membergroup
-	. . open "file":(shell="/bin/sh":command="id":readonly)::"pipe"
-	. . use "file" read line use io close "file"
-	. . set user=$zpiece($zpiece(line,")",1),"(",2)
-	. . set grouplist=$zpiece(line," groups=",2)	; gets list of group names that "user" is a member of
-	. . ; Since every group is surrounded by parentheses all we need to do is check if "(ydbgroup)" exists in "grouplist"
-	. . do:$zfind(grouplist,"("_ydbgroup_")")
-	. . . open "chgrp":(shell="/bin/sh":command="chgrp "_ydbgroup_" "_tmp4:readonly:writeonly)::"pipe"
-	. . . close "chgrp"
 	do ExportEnv("ydb_log",tmp4),ExportEnv("gtm_log",tmp4),ExportEnv("ydb_tmp",tmp4),ExportEnv("gtm_tmp",tmp4)
 	; Set ydb_tmp env var before any calls to Robustify/PEEKBYNAME (YDB#1112)
 	view "setenv":"ydb_tmp":tmp4
