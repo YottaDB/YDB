@@ -520,8 +520,8 @@ enum cdb_sc find_gvt_roots(block_id *curr_blk, gd_region *reg, cache_rec_ptr_t *
 			if ((1 >= blk_pter) || (blk_pter > cs_data->trans_hist.total_blks)) /* block_id out of range, retry */
 				return cdb_sc_blknumerr;
 			if (debug_mupip)
-				util_out_print("Region !AD: Global: !AD block 0x!@XQ\tstarted",
-						TRUE, REG_LEN_STR(reg), gvname.var_name.len, gvname.var_name.addr, &blk_pter);
+				util_out_print("Region !AD: Global: !AZ block 0x!@XQ\tstarted",
+						TRUE, REG_LEN_STR(reg), gvname.var_name.addr, &blk_pter);
 			blocks_left = csd->blks_to_upgrd;	/* Remaining blocks to upgrade counter prevents a infinite loop */
 			lcnt = MAX_BLK_TRIES;
 			do
@@ -538,8 +538,8 @@ enum cdb_sc find_gvt_roots(block_id *curr_blk, gd_region *reg, cache_rec_ptr_t *
 					delete_hashtab_int8(&cw_stagnate, (ublock_id *)&blk_pter);
 				}
 				if (debug_mupip)
-					util_out_print("Region !AD: Global: !AD block 0x!@XQ\tstatus:!UL\tRemaining:!UL",
-							TRUE, REG_LEN_STR(reg), gvname.var_name.len, gvname.var_name.addr,
+					util_out_print("Region !AD: Global: !AZ block 0x!@XQ\tstatus:!UL\tRemaining:!UL",
+							TRUE, REG_LEN_STR(reg), gvname.var_name.addr,
 							&blk_pter, status, csd->blks_to_upgrd);
 				if ((cdb_sc_normal == status) || mu_ctrlc_occurred)
 					break;
@@ -742,7 +742,7 @@ enum cdb_sc upgrade_idx_block(block_id *curr_blk, gd_region *reg, mname_entry *g
 	assert(!csa->now_crit || (CDB_STAGNATE <= t_tries));
 	assert(!update_trans && !need_kip_incr);
 	if (debug_mupip)
-		util_out_print("In index block 0x!@XQ keyed with !AD", TRUE, curr_blk, gvname->var_name.len, gvname->var_name.addr);
+		util_out_print("In index block 0x!@XQ keyed with !AZ", TRUE, curr_blk, gvname->var_name.addr);
 	gvt_name.var_name.addr = (char *)key_buff;
 	gvt_name.var_name.len = 0;
 	blkHist.blk_num = *curr_blk;
@@ -765,8 +765,8 @@ enum cdb_sc upgrade_idx_block(block_id *curr_blk, gd_region *reg, mname_entry *g
 	if (0 == level)	/* Caller intended to change an index block. The parent needs to be reprocessed */
 		return cdb_sc_badlvl;
 	if (debug_mupip)
-		util_out_print("!UL:0x!@XQ keyed with !AD from !@XQ", TRUE,
-				level, curr_blk, gvname->var_name.len, gvname->var_name.addr, &lcl_tn);
+		util_out_print("!UL:0x!@XQ keyed with !AZ from !@XQ", TRUE,
+				level, curr_blk, gvname->var_name.addr, &lcl_tn);
 	status = cdb_sc_normal;
 	if (GDSV7m > blk_ver)
 	{	/* block needs pointers upgraded */
