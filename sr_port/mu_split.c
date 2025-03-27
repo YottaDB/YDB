@@ -406,9 +406,7 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 				CLEAR_BLKFMT_AND_RETURN(cdb_sc_blkmod);
 			}
 			/* We're now guaranteed at least one loop, though not that this loop will turn up anything valid */
-			for ( ; (curr_blk1_top_off < old_blk1_sz)
-					&& (curr_new_blk1_size <= max_fill)
-					&& (curr_new_blk1_size <= (blk_size - reserve_bytes)); )
+			for ( ; ; )
 			{
 				/* Store the results of the last iteration so we have something to compare against */
 				prev_blk2_frec_base = curr_blk2_frec_base;
@@ -549,8 +547,43 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 					curr_new_blk2_size += EVAL_CMPC((rec_hdr_ptr_t)curr_blk2_frec_base);
 					/* Calculate expansion of first record of block 2 end */
 				} /* Finish calculation of new blk1 and blk2 sizes */
+				/* curr_new_blk1_size includes 1 MORE record (the current record) in the block as compared
+				 * to prev_new_blk1_size. So we expect it to be always greater. The only exception is if
+				 * we are not in the final retry. In that case, it is possible the buffer we are looking at
+				 * changes concurrently. Hence the CDB_STAGNATE check in the assert.
+				 */
+				assert((curr_new_blk1_size > prev_new_blk1_size) || (CDB_STAGNATE > t_tries));
+				/* Similarly, curr_new_blk2_size includes 1 LESS record (the current record) in the block
+				 * as compared to prev_new_blk1_size. So we expect it to be always lesser. The only exception
+				 * is if we are not in the final retry. In that case, it is possible the buffer we are looking
+				 * at changes concurrently. Hence the CDB_STAGNATE check in the assert.
+				 */
+				assert((curr_new_blk2_size < prev_new_blk2_size) || (CDB_STAGNATE > t_tries));
+				if (MUPIP_REORG_UPGRADE_IN_PROGRESS == mu_upgrade_in_prog)
+				{	/* In case of "mupip reorg -upgrade", ignore the "max_fill", which is an
+					 * arbitrary heuristic of 50% (set in caller). Instead, locate the split
+					 * point based on where both new blocks are more or less the same size.
+					 * And that is determined by the following reasoning. At the start of the
+					 * "for" loop, "curr_new_blk1_size" has 0 records and "curr_new_blk2_size"
+					 * has all the records. Each iteration moves 1 record from blk2 to blk1
+					 * and so "curr_new_blk1_size" keeps increasing whereas "curr_new_blk2_size"
+					 * keeps decreasing. At some point, we expect the former to become greater than
+					 * the latter. And that switchover point is what we choose as the split point.
+					 * This might not necessarily honor the fill factor but will avoid skewed
+					 * block splits (which in turn can cause "mupip reorg -upgrade" failures
+					 * with a MUUPGRDNRDY error).
+					 */
+					if (curr_new_blk1_size > curr_new_blk2_size)
+						break;
+				} else if ((curr_blk1_top_off >= old_blk1_sz)
+						|| (curr_new_blk1_size > max_fill)
+						|| (curr_new_blk1_size > (blk_size - reserve_bytes)))
+					break;
 			} /* Finish READ_RECORD for-loop */
-			if (prev_new_blk1_size > max_fill)
+			/* Note that we do not honor the fill factor in case of "mupip reorg -upgrade" hence the
+			 * "(MUPIP_REORG_UPGRADE_IN_PROGRESS != mu_upgrade_in_prog)" check below.
+			 */
+			if ((MUPIP_REORG_UPGRADE_IN_PROGRESS != mu_upgrade_in_prog) && (prev_new_blk1_size > max_fill))
 			{
 				/* If the loop overran its goal somehow, something has gone wrong in the READ_RECORD loop.
 				 * Still, this is not known to be possible.
