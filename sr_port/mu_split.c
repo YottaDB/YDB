@@ -352,6 +352,9 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 		}
 		if ((old_blk1_sz + delta) > (blk_size - reserve_bytes))
 		{
+			boolean_t	split_point_found = FALSE;
+			int		prev_diff = old_blk1_sz, curr_diff;
+
 			split_required = TRUE;
 			/* Note that now the delta can no longer be taken at face value. There are three options for this split:
 			 * 	1) The split point will occur before the ancestor cur_rec such and it and the newly inserted rec
@@ -571,10 +574,30 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 					 * the latter. And that switchover point is what we choose as the split point.
 					 * This might not necessarily honor the fill factor but will avoid skewed/uneven
 					 * block splits (which in turn can cause "mupip reorg -upgrade" failures
-					 * with a MUUPGRDNRDY error).
+					 * with a MUUPGRDNRDY error). At the switchover point, we compare the difference
+					 * in sizes of the left and right hand side blocks with prev record as the
+					 * last record of the left hand side block AND with curr record as the last record
+					 * of the left hand side block. If the difference is smaller in the prev record
+					 * case, we break out of the for loop (since the later logic anyways assumes the
+					 * curr_rec starts the right hand side block). If the difference is greater in the
+					 * prev record case, we do one more iteration of the for loop (that way the curr
+					 * record variables get copied over to the prev record variables at the start of
+					 * the next iteration) and then break out of the for loop. That way the split will
+					 * happen with curr record as the last record in the left hand side block. The
+					 * variable "split_point_found" helps implement this one more for-loop iteration.
 					 */
-					if (curr_new_blk1_size > curr_new_blk2_size)
+					if (split_point_found)
 						break;
+					else if (curr_new_blk1_size <= curr_new_blk2_size)
+						prev_diff = curr_new_blk2_size - curr_new_blk1_size;
+					else
+					{
+						curr_diff = curr_new_blk1_size - curr_new_blk2_size;
+						if (prev_diff <= curr_diff)
+							break;
+						else
+							split_point_found = TRUE;	/* do one more iteration */
+					}
 				} else if ((curr_blk1_top_off >= old_blk1_sz)
 						|| (curr_new_blk1_size > max_fill)
 						|| (curr_new_blk1_size > (blk_size - reserve_bytes)))
@@ -584,8 +607,7 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 			 * "(MUPIP_REORG_UPGRADE_IN_PROGRESS != mu_upgrade_in_prog)" check below.
 			 */
 			if ((MUPIP_REORG_UPGRADE_IN_PROGRESS != mu_upgrade_in_prog) && (prev_new_blk1_size > max_fill))
-			{
-				/* If the loop overran its goal somehow, something has gone wrong in the READ_RECORD loop.
+			{	/* If the loop overran its goal somehow, something has gone wrong in the READ_RECORD loop.
 				 * Still, this is not known to be possible.
 				 */
 				assert(t_tries < CDB_STAGNATE);
@@ -1107,15 +1129,12 @@ static inline enum cdb_sc locate_block_split_point(srch_blk_status *blk_stat, in
 	int		tkeycmpc;
 	enum cdb_sc	status;
 	sm_uc_ptr_t 	blk_base, rec_base;
-	int		bstar_rec_sz, left_blk_size, right_blk_size;
-	boolean_t	long_blk_id;
+	boolean_t	split_point_found = FALSE;	/* See "split_point_found" variable use in "mu_split()" for purpose */
 
 	*last_keysz = 0;
 	*top_off = SIZEOF(blk_hdr);
 	*last_rec_size = 0;
 	blk_base = blk_stat->buffaddr;
-	long_blk_id = IS_64_BLK_ID(blk_base);
-	bstar_rec_sz = bstar_rec_size(long_blk_id);
 	rec_base = blk_base + SIZEOF(blk_hdr);
 	/* max_fill is computed based on the fill factor after taking reserved_bytes into account. But since MAX_RESERVED_B
 	 * macro (which is used by MUPIP SET to limit the reserved_bytes value to not go very close to the block_size value)
@@ -1143,22 +1162,62 @@ static inline enum cdb_sc locate_block_split_point(srch_blk_status *blk_stat, in
 		/* Just like in "mu_split()", we do not honor the fill factor in case of "mupip reorg -upgrade"
 		 * to avoid creating uneven/skewed splits. Just like there, we check for when the block size
 		 * corresponding to the left hand side of the split point becomes greater than the block size
-		 * corresponding to the right hand side of the split point. And stop there as the split point.
+		 * corresponding to the right hand side of the split point. And stop there as the split point
+		 * (and choose one of 2 options based on whichever produces a more even split).
 		 */
 		if (MUPIP_REORG_UPGRADE_IN_PROGRESS == mu_upgrade_in_prog)
 		{
-			left_blk_size = (level ? *top_off - *last_rec_size + bstar_rec_sz : *top_off);
-			if (*top_off > cur_blk_size)
+			boolean_t	long_blk_id;
+			int		bstar_rec_sz;
+			int		left_blk_size1, right_blk_size1;
+			int		left_blk_size2, right_blk_size2;
+			rec_hdr_ptr_t	rp, next_rp;
+			unsigned short	rsiz, next_rsiz;
+			sm_uc_ptr_t 	blk_top;
+
+			if (split_point_found)
 				break;
-			if ((blk_base + cur_blk_size) <= (rec_base + SIZEOF(rec_hdr)))
+			blk_top = blk_base + cur_blk_size;
+			if (blk_top <= (rec_base + SIZEOF(rec_hdr)))
 			{
 				assert(t_tries < CDB_STAGNATE);
 				NONTP_TRACE_HIST_MOD(blk_stat, t_blkmod_mu_split);
 				return cdb_sc_blkmod; /* block became invalid */
 			}
-			right_blk_size = (cur_blk_size - *top_off) + EVAL_CMPC((rec_hdr_ptr_t)rec_base);
-			if (left_blk_size > right_blk_size)
-				break;
+			rp = (rec_hdr_ptr_t)rec_base;
+			GET_USHORT(rsiz, &rp->rsiz);
+			if (blk_top <= (rec_base + rsiz + SIZEOF(rec_hdr)))
+			{
+				assert(t_tries < CDB_STAGNATE);
+				NONTP_TRACE_HIST_MOD(blk_stat, t_blkmod_mu_split);
+				return cdb_sc_blkmod; /* block became invalid */
+			}
+			next_rp = (rec_hdr_ptr_t)(rec_base + rsiz);
+			GET_USHORT(next_rsiz, &next_rp->rsiz);
+			if (level)
+			{
+				long_blk_id = IS_64_BLK_ID(blk_base);
+				bstar_rec_sz = bstar_rec_size(long_blk_id);
+				left_blk_size1 = *top_off - *last_rec_size + bstar_rec_sz;
+				left_blk_size2 = *top_off + bstar_rec_sz;
+			} else
+			{
+				left_blk_size1 = *top_off;
+				left_blk_size2 = *top_off + rsiz;
+			}
+			right_blk_size1 = (cur_blk_size - *top_off) + EVAL_CMPC(rp) + SIZEOF(blk_hdr);
+			right_blk_size2 = (cur_blk_size - *top_off - rsiz) + EVAL_CMPC(next_rp) + SIZEOF(blk_hdr);
+			if ((left_blk_size1 <= right_blk_size1) && (left_blk_size2 >= right_blk_size2))
+			{
+				int	diff1, diff2;
+
+				diff1 = right_blk_size1 - left_blk_size1;
+				diff2 = left_blk_size2 - right_blk_size2;
+				if (diff1 < diff2)
+					break;
+				else
+					split_point_found = TRUE;	/* Need to go one more iteration */
+			}
 		} else if (*top_off >= max_fill)
 			break;
 	} while (TRUE);
