@@ -569,7 +569,7 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 					 * and so "curr_new_blk1_size" keeps increasing whereas "curr_new_blk2_size"
 					 * keeps decreasing. At some point, we expect the former to become greater than
 					 * the latter. And that switchover point is what we choose as the split point.
-					 * This might not necessarily honor the fill factor but will avoid skewed
+					 * This might not necessarily honor the fill factor but will avoid skewed/uneven
 					 * block splits (which in turn can cause "mupip reorg -upgrade" failures
 					 * with a MUUPGRDNRDY error).
 					 */
@@ -1107,11 +1107,15 @@ static inline enum cdb_sc locate_block_split_point(srch_blk_status *blk_stat, in
 	int		tkeycmpc;
 	enum cdb_sc	status;
 	sm_uc_ptr_t 	blk_base, rec_base;
+	int		bstar_rec_sz, left_blk_size, right_blk_size;
+	boolean_t	long_blk_id;
 
 	*last_keysz = 0;
 	*top_off = SIZEOF(blk_hdr);
 	*last_rec_size = 0;
 	blk_base = blk_stat->buffaddr;
+	long_blk_id = IS_64_BLK_ID(blk_base);
+	bstar_rec_sz = bstar_rec_size(long_blk_id);
 	rec_base = blk_base + SIZEOF(blk_hdr);
 	/* max_fill is computed based on the fill factor after taking reserved_bytes into account. But since MAX_RESERVED_B
 	 * macro (which is used by MUPIP SET to limit the reserved_bytes value to not go very close to the block_size value)
@@ -1136,7 +1140,28 @@ static inline enum cdb_sc locate_block_split_point(srch_blk_status *blk_stat, in
 			NONTP_TRACE_HIST_MOD(blk_stat, t_blkmod_mu_split);
 			return cdb_sc_blkmod; /* block became invalid */
 		}
-	} while (*top_off < max_fill);
+		/* Just like in "mu_split()", we do not honor the fill factor in case of "mupip reorg -upgrade"
+		 * to avoid creating uneven/skewed splits. Just like there, we check for when the block size
+		 * corresponding to the left hand side of the split point becomes greater than the block size
+		 * corresponding to the right hand side of the split point. And stop there as the split point.
+		 */
+		if (MUPIP_REORG_UPGRADE_IN_PROGRESS == mu_upgrade_in_prog)
+		{
+			left_blk_size = (level ? *top_off - *last_rec_size + bstar_rec_sz : *top_off);
+			if (*top_off > cur_blk_size)
+				break;
+			if ((blk_base + cur_blk_size) <= (rec_base + SIZEOF(rec_hdr)))
+			{
+				assert(t_tries < CDB_STAGNATE);
+				NONTP_TRACE_HIST_MOD(blk_stat, t_blkmod_mu_split);
+				return cdb_sc_blkmod; /* block became invalid */
+			}
+			right_blk_size = (cur_blk_size - *top_off) + EVAL_CMPC((rec_hdr_ptr_t)rec_base);
+			if (left_blk_size > right_blk_size)
+				break;
+		} else if (*top_off >= max_fill)
+			break;
+	} while (TRUE);
 	if (*top_off > cur_blk_size
 		|| (((blk_hdr_ptr_t)blk_base)->levl != level)
 		|| (((blk_hdr_ptr_t)blk_base)->bsiz != cur_blk_size))
