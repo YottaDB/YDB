@@ -71,9 +71,9 @@
 	quit			; should never get here because previous line should terminate process
 
 set	; Intended to be the most common entry point to this routine (with unset likely not as common)
-	new $test,aimflag,chset,cmd,currenv,dbfname,dist,env,err,errflag,errpat,file,gtmgbldir,i,io,jnlfflag,line,localeflag,octoflag,out,path,ppid
-	new prefix,region,setcmd,setsep,tmp1,tmp2,tmp3,tmp4,unset,unsetcmd,ydbgbldir,ydbreplinst,ydbretention,ydbroutines
-	new ydbtmpdir,zstmp
+	new $test,aimflag,chset,cmd,currenv,dbfname,dist,env,err,errflag,errpat,file,gtmgbldir,i,io
+	new jnlfflag,line,localeflag,octoflag,out,path,ppid,prefix,region,setcmd,setsep,tmp1,tmp2,tmp3
+	new unset,unsetcmd,ydbgbldir,ydbreplinst,ydbretention,ydbroutines,ydbtmp,ydbtmptmp,zstmp
 	do Etrap
 	set io=$io
 	use io:nowrap
@@ -93,7 +93,7 @@ set	; Intended to be the most common entry point to this routine (with unset lik
 	; whereas $ztrnlnm() will.
 	set dist=$zparse($ztrnlnm("ydb_dist"),,,,"symlink")
 	set:'$zlength(dist) dist=$zparse($ztrnlnm("gtm_dist"),,,,"symlink")
-	set ydbtmpdir=currenv("ydb_tmp_env")_"/"
+	set ydbtmptmp=currenv("ydb_tmp_env")_"/"
 	do FileTypeEnsure("ydb_dir")	; if $ydb_dir exists, ensure that it is a directory or a link
 	do:'$data(env("ydb_dir","path"))&$data(env("ydb_dir"))&$zfind(env("ydb_dir"),"/")
 	. set tmp1=$zparse(env("ydb_dir")),tmp2=$zlength(tmp1,"/")
@@ -188,44 +188,52 @@ set	; Intended to be the most common entry point to this routine (with unset lik
 	; set ydb_readline
 	do ExportEnv("ydb_readline",1)
 	; ------------------------------------------------------------------------------
-	; Set ydb_log/gtm_log/ydb_tmp/gtm_tmp env vars. Note that we need to do this
-	; BEFORE any Robustify or PEEKBYNAME call as that can require gtmseshr to remove
-	; an ipc (e.g. ftok semaphore of gtmhelp.dat created by another user) and in that
-	; case ydb_tmp env var needs to be set to the appropriate value for the correct
-	; socket file to be used to communicate with gtmsecshr (YDB#1112).
+	; Set ydb_tmp/gtm_tmp env vars. Note that we need to do this BEFORE any Robustify
+	; or PEEKBYNAME call as that can require gtmseshr to remove an ipc (e.g. ftok
+	; semaphore of gtmhelp.dat created by another user) and in that case $ydb_tmp/$gtm_tmp
+	; needs to be set to the appropriate value for the correct socket file to be used to
+	; communicate with gtmsecshr (YDB#1112).
 	;
-	; ydb_log is set here, with the directory structure created if it does not exist
-	; ydb_tmp is set to the same value as ydb_log if not already set.
-	set tmp1=$get(currenv(("ydb_log"))),tmp2=$get(currenv(("gtm_log")))
-	set (tmp3,tmp4)=$select($zlength(tmp1):tmp1,$zlength(tmp2):tmp2,1:"/tmp/yottadb/"_env("ydb_rel"))
-	set tmp1=$get(currenv(("ydb_tmp_rel"))),tmp2=$get(currenv(("ydb_tmp_gtmver")))
-	do:$zlength(tmp1)
-	. set tmp4=$zpiece(tmp3,tmp1,1) for i=2:1:$zlength(tmp3,tmp1) set tmp4=tmp4_env("ydb_rel")_$zpiece(tmp3,tmp1,i)
-	. set tmp3=tmp4
-	if $zlength(tmp2) set tmp4=$zpiece(tmp3,tmp2,1) for i=2:1:$zlength(tmp3,tmp2) set tmp4=tmp4_env("gtmver")_$zpiece(tmp3,tmp2,i)
-	do:""=$zsearch(tmp4,-1)
-	. ; Release-specific directory (e.g. /tmp/yottadb/r1.23_x86_64) does not exist. Create it.
-	. ; Note: One might be tempted to combine the "umask" and "chmod o-rwx" commands below into one "umask command
-	. ;       But that might not be correct in case we also create /tmp/yottadb as part of the below "mkdir".
-	. ;       In that case, we do not want to create /tmp/yottadb with no world execute permissions because the
-	. ;       current YottaDB version is installed with no execute permissions for the world. Later if a different
-	. ;       YottaDB version gets installed with execute permissions for the world, a ydb_env_set invocation using
-	. ;       that version might not be able to access /tmp/yottadb with the restricted chmod. Hence we first do the
-	. ;       mkdir with a "umask 0" and later do a chmod of just the subdirectory /tmp/yottadb/r1.23_x86_64.
-	. open "mkdir":(shell="/bin/sh":command="umask 0; mkdir -p "_tmp4_"; chmod +t "_tmp4:readonly:writeonly)::"pipe"
-	. close "mkdir"
-	. new line,worldexecute,ydbgroup
-	. open "file":(shell="/bin/sh":command="ls -l "_dist_"/libyottadb.so":readonly)::"pipe"
-	. use "file" read line use io close "file"
-	. set worldexecute=$zextract(line,10)	; permissions are the first word in "line" so no need to do $zpiece before $zextract
-	. set ydbgroup=$zpiece(line," ",4)
-	. do:"x"'=worldexecute
-	. . ; $ydb_dist/libyottadb.so does not have world execute permissions, restrict directory access to group only
-	. . open "chmod":(shell="/bin/sh":command="chmod o-rwx "_tmp4_"; chgrp "_ydbgroup_" "_tmp4:readonly:writeonly)::"pipe"
-	. . close "chmod"
-	do ExportEnv("ydb_log",tmp4),ExportEnv("gtm_log",tmp4),ExportEnv("ydb_tmp",tmp4),ExportEnv("gtm_tmp",tmp4)
+	; NOTE: All users of a YottaDB installation ($ydb_dist) must use the same value for
+	; $ydb_tmp, otherwise YotaDB may not function as expected.
+	;
+	; - If $ydb_tmp/$gtm_tmp are not set, they default to /tmp/yottadb/$ydb_rel.
+	; The code makes its best efforts to ensure that the directories exist and have
+	; the appropriate permissions. Unless the system is really misconfigured, or $ydb_tmp
+	; is an inappropriate value, %YDBENV can ensure that the directories exist. If this
+	; process is neither root, nor the user that created /tmp/yottadb, it can't change
+	; the permissions, but at least it tries.
+	set tmp1=$get(currenv("ydb_tmp"))
+	set ydbtmp=$select($zlength(tmp1):tmp1,1:"/tmp/yottadb/"_env("ydb_rel"))
+	do mkdir(ydbtmp,0)
+	; $ydb_tmp should have permissions drwxrwxrwx if YottaDB was installed as world
+	; executable, and drwxrwx--- if YottaDB was installed with execution restricted to
+	; a group. In the latter case, the group should be the group to which YottaDB is
+	; restricted; in the former case, it does not matter. So %YDBENV tries to set the
+	; group, but moves on if it cannot.
+	open "ls":(shell="/bin/sh":command="ls -l "_dist_"/libyottadb.so":readonly)::"pipe"
+	use "ls" read line use io close "ls"
+	open "ydb_tmp_prop":(shell="/bin/sh":command="/bin/sh":writeonly)::"pipe" use "ydb_tmp_prop"
+	write "chgrp ",$zpiece(line," ",4)," ",ydbtmp,!		; set group to YottaDB group
+	write "chmod o"_$select("x"=$zextract(line,10):"+",1:"-")_"rwx ",ydbtmp,!	; set/remove world execute permission
+	close "ydb_tmp_prop"
+	do ExportEnv("ydb_tmp",ydbtmp),ExportEnv("gtm_tmp",ydbtmp)
+	; If $ydb_tmp/$gtm_tmp is a path that ends in $ydb_rel (e.g., the default), the
+	; parent directory is assumed to be one that has subdirectories for multiple
+	; releases of YottaDB. In that case, the parent directory should have drwxrwxrwt
+	; as its permissions to minimize the probability of inadvertent interaction
+	; between processes of different YottaDB releases.
+	do:$zfind(ydbtmp,"/"_env("ydb_rel"))-1=$zlength(ydbtmp)
+	. set tmp1=$zparse(ydbtmp,"directory")
+	. open "setprop":(shell="/bin/sh":command="chmod a+rwx,+t "_tmp1:readonly:writeonly)::"pipe"
+	. close "setprop"
+	; As YottaDB no longer uses ydb_log/gtm_log, if they are not alread set, %YDBENV
+	; sets them to the same values as ydb_tmp/gtm_tmp, in case there is application
+	; scripting that relies on those values.
+	set tmp1=$get(currenv("ydb_log")),tmp2=$get(currenv("gtm_log"))
+	do ExportEnv("ydb_log",$select($zlength(tmp1):tmp1,1:ydbtmp)),ExportEnv("gtm_log",$select($zlength(tmp1):tmp1,1:ydbtmp))
 	; Set ydb_tmp env var before any calls to Robustify/PEEKBYNAME (YDB#1112)
-	view "setenv":"ydb_tmp":tmp4
+	view "setenv":"ydb_tmp":ydbtmp
 	; ------------------------------------------------------------------------------
 	; ydb_gbldir is set here after setting ydb_repl_instance and
 	; ydb_retention because if an environment exists (determined
@@ -238,8 +246,8 @@ set	; Intended to be the most common entry point to this routine (with unset lik
 	else  set ydbgbldir=path_"/g/yottadb.gld"				; Default ydbgbldir if undefined
 	if $zlength($zsearch(ydbgbldir,-1)) do Robustify			; Existing global directory, robustify database
 	else  do								; No global directory, create database
-	. set err=ydbtmpdir_"CreateEnv.err",errflag=0
-	. set out=ydbtmpdir_"CreateEnv.out"
+	. set err=ydbtmptmp_"CreateEnv.err",errflag=0
+	. set out=ydbtmptmp_"CreateEnv.out"
 	. open out:newversion,err:newversion
 	. set cmd="export ydb_gbldir="_ydbgbldir_";export gtmgbldir=$ydb_gbldir"
 	. set cmd=cmd_";export ydb_dir="_env("ydb_dir")_";export gtmdir="_env("gtmdir")
@@ -343,11 +351,11 @@ CreateRegion(region)
 	; the directory for the DEFAULT region, they should also be used for the
 	; directory for the region being created.
 	; Uses variable dist from caller
-	; Sets parent's defaultfhead & ydbtmpdir local variables
+	; Sets parent's defaultfhead & ydbtmptmp local variables
 	new $test,dbdir,defaultfile,err,gdedefault,i,io,line,out,regpatt,tmp
 	set io=$io
-	set ydbtmpdir=$ztrnlnm("ydb_tmp_env")_"/"
-	set:1=$zlength(ydbtmpdir) ydbtmpdir="/tmp/"
+	set ydbtmptmp=$ztrnlnm("ydb_tmp_env")_"/"
+	set:1=$zlength(ydbtmptmp) ydbtmptmp="/tmp/"
 	set defaultfile=$zpiece($$^%PEEKBYNAME("gd_segment.fname","DEFAULT"),$zchar(0),1)
 	; Finding the directory of the database file for the DEFAULT region has to
 	; deal with the cases where the database file is in the current directory,
@@ -370,10 +378,10 @@ CreateRegion(region)
 	. use gdedefault
 	use "gde" write "exit",! write /eof
 	; Save GDE command stdout & stderr for potential debugging
-	set out=ydbtmpdir_"GDE_"_region_".out"
+	set out=ydbtmptmp_"GDE_"_region_".out"
 	open out:newversion
 	for  read line quit:$zeof  use out write line,! use "gde"
-	set err=ydbtmpdir_"GDE_"_region_".err"
+	set err=ydbtmptmp_"GDE_"_region_".err"
 	open err:newversion
 	use "err" for  read line quit:$zeof  use err write line,! use "err"
 	use io close "err",err,"gde",gdedefault,out
@@ -409,11 +417,11 @@ DBJnlEnsure(region)
 	. ; https://gitlab.com/YottaDB/DB/YDB/-/merge_requests/1125#note_843861584
 	. write "$ydb_dist/mupip set",replstate," -journal=""",jnlstate,","_jnlbefore_""" -region ""*""",!
 	write /eof
-	set out=ydbtmpdir_"MUPIP_"_region_".out"
+	set out=ydbtmptmp_"MUPIP_"_region_".out"
 	open out:newversion
 	for  read line quit:$zeof  use out write line,! use "mupip"
 	; Raise error for any MUPIP CREATE error
-	set err=ydbtmpdir_"MUPIP_"_region_".err",errflag=0
+	set err=ydbtmptmp_"MUPIP_"_region_".err",errflag=0
 	open err:newversion use "err"
 	for  read line quit:$zeof  use err write line,! use "err" set:line?@errpat errflag=1
 	use io close "err",err,"mupip",out
@@ -626,8 +634,8 @@ Robustify	; rollback / recover an existing database if needed
 	view "setenv":"ydb_dir":env("ydb_dir"),"setenv":"ydb_rel":env("ydb_rel"),"setenv":"ydb_gbldir":ydbgbldir,"setenv":"ydb_repl_instance":ydbreplinst
 	; Open the global direcory file, and exit, which will automatically upgrade the global directory
 	; if it is from an older version of the software.
-	set err=ydbtmpdir_"GDE_upgrade.err"
-	set out=ydbtmpdir_"GDE_upgrade.out"
+	set err=ydbtmptmp_"GDE_upgrade.err"
+	set out=ydbtmptmp_"GDE_upgrade.out"
 	open err:newversion,out:newversion
 	open "gde":(shell="/bin/sh":command=dist_"/yottadb -run GDE":stderr="gdeerr")::"pipe"
 	use "gde" write "exit",! write /eof
@@ -666,7 +674,7 @@ Robustify	; rollback / recover an existing database if needed
 	. . kill line
 	. . for i=1:1 read line(i) quit:$zeof  set:line(i)?@errpat errflag=1
 	. . do:errflag
-	. . . set err=ydbtmpdir_"MUPIP_CREATE_temp_reg.err"
+	. . . set err=ydbtmptmp_"MUPIP_CREATE_temp_reg.err"
 	. . . open err:newversion use err
 	. . . for j=1:1:i-1 write line(j),!
 	. . . use io close err,"create","mupiperr"
@@ -771,13 +779,14 @@ createdirs:(envvar)
 	quit
 
 ; Internally called function to create one directory if it does not already exist
-mkdir:(dir)
-	new $test
-	if (""=$zsearch(dir,-1)) do
-	. ; Avoid zsystem. Though it is simpler to use, it is costly. Pipes are cheaper so use that instead.
-	. open "create":(shell="/bin/sh":command="mkdir -p "_dir:writeonly)::"pipe"
+mkdir:(dir,umask)
+	new $test,mask
+	set umask=$get(umask),mask=$select($zlength(umask):"umask "_umask_";",1:"")
+	do:'$zlength($zsearch(dir,-1))
+	. open "create":(shell="/bin/sh":command=mask_"mkdir -p "_dir:writeonly:readonly:stderr="stderr")::"pipe"
 	. use "create"
 	. close "create"
+	. set:$zclose $ecode=",U237,"
 	quit
 
 ; End of code in routines - what follows are defaults and errors
@@ -790,6 +799,7 @@ Defaults
 	; gtmver:::env(ydbvar)#/g#/o#/o/utf8#/r:"ln -s "_env(ydbvar)_" "_env(gtmvar):$zpiece($zversion," ",2)_"_"_$zpiece($zversion," ",4)
 
 ;	Error message texts
+U237	;"-F-CREATEFAIL unable to create directory "_dir
 U238	;"-F-GLDCREATEERR Create global directory failed, stderr at ",err
 U239	;"-F-NOTAPATH Path "_file_" does not exist"
 U240	;"-F-NOTAGLDFILE "_file_ " is not a global directory file"
