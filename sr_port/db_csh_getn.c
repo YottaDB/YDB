@@ -282,10 +282,17 @@ cache_rec_ptr_t	db_csh_getn(block_id block)
 				tp_srch_status->blk_target->clue.end = 0;
 			}
 			if (mu_reorg_more_tries && mu_upgrade_pin_blkarray_idx)
-			{
+			{	/* Special case used by MUPIP UPGRADE or MUPIP REORG -UPGRADE to prevent global buffers
+				 * from being recycled even if it is not the final retry.
+				 */
 				int	i;
 
-				assert(MUPIP_UPGRADE_IN_PROGRESS == mu_upgrade_in_prog);
+				/* When caller is MUPIP UPGRADE, we expect "mu_upgrade_in_prog" to be MUPIP_UPGRADE_IN_PROGRESS.
+				 * When caller is MUPIP REORG -UPGRADE, one would expect "mu_upgrade_in_prog" to normally be
+				 * MUPIP_REORG_UPGRADE_IN_PROGRESS, but in the currently known code paths, this variable would
+				 * be MUPIP_UPGRADE_OFF. Hence the formulation of the below assert.
+				 */
+				assert(MUPIP_REORG_UPGRADE_IN_PROGRESS != mu_upgrade_in_prog);
 				for (i = 0; i < mu_upgrade_pin_blkarray_idx; i++)
 				{
 					if (cr->blk == mu_upgrade_pin_blkarray[i])

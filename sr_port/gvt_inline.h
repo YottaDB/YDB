@@ -162,7 +162,7 @@ static inline void gv_append_max_subs_key(gv_key *gvkey, gv_namehead *gvt)
 	unsigned char		*ptr;
 
 	assert(gvt->clue.top || (NULL == gvt->gd_csa));
-	assert(!gvt->clue.top || (NULL != gvt->gd_csa) && (gvt->gd_csa == cs_addrs));
+	assert(!gvt->clue.top || ((NULL != gvt->gd_csa) && (gvt->gd_csa == cs_addrs)));
 	/* keysize can be obtained from GVT->clue.top in case of GT.M.
 	 * But for GT.CM client, clue will be uninitialized. So we would need to
 	 * compute keysize from gv_cur_region->max_key_size. Since this is true for
