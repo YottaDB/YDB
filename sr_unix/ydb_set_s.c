@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -86,7 +86,7 @@ int ydb_set_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *su
 }
 
 void ydb_set_value(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *subsarray, const ydb_buffer_t *value,
-		ydb_var_types set_type, int set_svn_index, char *ydb_caller_fn)
+			ydb_var_types set_type, int set_svn_index, char *ydb_caller_fn)
 {
 	gparam_list	plist;
 	ht_ent_mname	*tabent;

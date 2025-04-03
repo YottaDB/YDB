@@ -43,6 +43,8 @@ RUN apt-get update && \
                     libreadline-dev \
                     libssl-dev \
                     libgcrypt-dev \
+                    libjansson4 \
+                    libjansson-dev \
                     && \
     apt-get clean
 

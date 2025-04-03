@@ -61,7 +61,7 @@ INVVALUE	<!AD is invalid !AD value for !AD>/error/fao=6
 INVZCONVERT	<Translation supported only between DEC/HEX OR between UTF-8/UTF-16/UTF-16LE/UTF-16BE>/error/fao=0
 ZYSQLNULLNOTVALID	<$ZYSQLNULL cannot be used as an integer, numeric, gvn subscript/value or lock subscript>/error/fao=0
 BOOLEXPRTOODEEP	<Boolean expression depth exceeds maximum supported limit of 2047>/error/fao=0
-TPCALLBACKINVRETVAL     <Invalid return type for TP callback function>/error/fao=0
+TPCALLBACKINVRETVAL	<Invalid return type for TP callback function>/error/fao=0
 INVMAINLANG	<Invalid main routine language id specified: !UL>/error/fao=1
 WCSFLUFAILED	<!AD error while flushing buffers at transaction number 0x!16@XQ for database file !AD>/info/fao=5
 WORDEXPFAILED	<wordexp() call for string [!AD] returned !AZ error. See wordexp() man pages for details>/error/fao=3
@@ -82,7 +82,9 @@ ZCPREALLVALSTR	<Pre-allocation allowed only for output or input/output variables
 ZSHOWSTACKRANGE	<Invalid stack level value !SL for ZSHOW "V">/error/fao=1
 GVDBGNAKEDUNSET	<Invalid GVNAKED in gv_optimize: $REFERENCE was unset. Opcodes seen: !AD>/error/fao=2
 GVDBGNAKEDMISMATCH	<Invalid GVNAKED in gv_optimize: $REFERENCE did not match OP_GVNAKED: !AD !!= !AD. Opcodes seen: !AD>/error/fao=6
-JANSSONDLNOOPEN	<Attempt to open jansson JSON library failed.>/error/fao=0
+JANSSONDLERROR	<Attempt to load Jansson JSON library failed: !AD - in !AD call>/error/fao=4
+JANSSONINVALIDJSON	<Invalid JSON: !AD - in !AD call>/error/fao=4
+JANSSONENCODEERROR	<JSON encoding error: Key "!AD"  Value "!AD" - in !AD call>/error/fao=6
 !
 ! If there are UNUSEDMSG* lines unused for more than one year and at least two non-patch releases, use them before adding new lines.
 !

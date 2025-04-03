@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -83,15 +83,14 @@ int ydb_data_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *s
 	if (NULL == ret_value)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,
 			LEN_AND_LIT("NULL ret_value"), LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_DATA)));
-
-	*ret_value = get_value_and_subtree(varname, subs_used, subsarray, data_type, (char *)LYDBRTNNAME(LYDB_RTN_DATA));
+	*ret_value = ydb_data_value(varname, subs_used, subsarray, data_type, (char *)LYDBRTNNAME(LYDB_RTN_DATA));
 	assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* the counter should have never become non-zero in this function */
 	LIBYOTTADB_DONE;
 	REVERT;
 	return YDB_OK;
 }
 
-unsigned int get_value_and_subtree(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *subsarray,
+unsigned int ydb_data_value(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *subsarray,
 			ydb_var_types data_type, char *ydb_caller_fn)
 {
 	mname_entry	var_mname;

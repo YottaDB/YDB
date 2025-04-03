@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -47,7 +47,7 @@ GBLREF	volatile int4	outofband;
  * YottaDB runtime routines.
  */
 int ydb_node_next_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *subsarray,
-		    int *ret_subs_used, ydb_buffer_t *ret_subsarray)
+			int *ret_subs_used, ydb_buffer_t *ret_subsarray)
 {
 	boolean_t	error_encountered;
 	int		nodenext_svn_index, status;
@@ -80,13 +80,15 @@ int ydb_node_next_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer
 	if (NULL == ret_subs_used)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,
 			      LEN_AND_LIT("NULL ret_subs_used"), LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_NODE_NEXT)));
-	status = get_next_node(varname, subs_used, subsarray, ret_subs_used, ret_subsarray, nodenext_type,  (char *)LYDBRTNNAME(LYDB_RTN_NODE_NEXT));
+	status = ydb_node_next_value(varname, subs_used, subsarray, ret_subs_used, ret_subsarray, nodenext_type,
+		(char *)LYDBRTNNAME(LYDB_RTN_NODE_NEXT));
+	assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* the counter should have never become non-zero in this function */
 	LIBYOTTADB_DONE;
 	REVERT;
 	return status;
 }
 
-int get_next_node(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *subsarray, int *ret_subs_used,
+int ydb_node_next_value(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *subsarray, int *ret_subs_used,
 			ydb_buffer_t *ret_subsarray, ydb_var_types nodenext_type, char *ydb_caller_fn)
 {
 	gparam_list	plist;
@@ -155,7 +157,6 @@ int get_next_node(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t
 			assertpro(FALSE);
 			break;
 	}
-	assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* the counter should have never become non-zero in this function */
 	TREF(sapi_query_node_subs_cnt) = 0;
 	return status;
 }

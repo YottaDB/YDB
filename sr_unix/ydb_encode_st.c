@@ -1,14 +1,14 @@
 /****************************************************************
-*								*
-* Copyright (c) 2019-2020 YottaDB LLC and/or its subsidiaries.	*
-* All rights reserved.						*
-*								*
-*	This source code contains the intellectual property	*
-*	of its copyright holder(s), and is made available	*
-*	under a license.  If you do not know the terms of	*
-*	the license, please stop and do not read further.	*
-*								*
-****************************************************************/
+ *								*
+ * Copyright (c) 2019-2025 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
+ *	This source code contains the intellectual property	*
+ *	of its copyright holder(s), and is made available	*
+ *	under a license.  If you do not know the terms of	*
+ *	the license, please stop and do not read further.	*
+ *								*
+ ****************************************************************/
 
 #include "mdef.h"
 
@@ -24,7 +24,7 @@ GBLREF	boolean_t	caller_func_is_stapi;
  * Parms and return - same as ydb_encode_s() except for the addition of tptoken and errstr.
  */
 int ydb_encode_st(uint64_t tptoken, ydb_buffer_t *errstr, const ydb_buffer_t *varname, int subs_used,
-			const ydb_buffer_t *subsarray, const char *format, ydb_buffer_t *ret_value)
+				const ydb_buffer_t *subsarray, const char *format, ydb_buffer_t *ret_value)
 {
 	libyottadb_routines	save_active_stapi_rtn;
 	ydb_buffer_t		*save_errstr;
@@ -35,12 +35,12 @@ int ydb_encode_st(uint64_t tptoken, ydb_buffer_t *errstr, const ydb_buffer_t *va
 	SETUP_THREADGBL_ACCESS;
 	LIBYOTTADB_RUNTIME_CHECK((int), errstr);
 	VERIFY_THREADED_API((int), errstr);
-	THREADED_API_YDB_ENGINE_LOCK(tptoken, errstr, LYDB_RTN_ENCODE, save_active_stapi_rtn, save_errstr, get_lock, retval);
+	threaded_api_ydb_engine_lock(tptoken, errstr, LYDB_RTN_ENCODE, &save_active_stapi_rtn, &save_errstr, &get_lock, &retval);
 	if (YDB_OK == retval)
 	{
 		caller_func_is_stapi = TRUE;	/* used to inform below SimpleAPI call that caller is SimpleThreadAPI */
 		retval = ydb_encode_s(varname, subs_used, subsarray, format, ret_value);
-		THREADED_API_YDB_ENGINE_UNLOCK(tptoken, errstr, save_active_stapi_rtn, save_errstr, get_lock);
+		threaded_api_ydb_engine_unlock(tptoken, errstr, save_active_stapi_rtn, save_errstr, get_lock);
 	}
 	return (int)retval;
 }

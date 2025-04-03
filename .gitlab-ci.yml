@@ -72,6 +72,8 @@ commit-verify:
         zlib1g-dev
         libreadline-dev
         gawk
+        libjansson4
+        libjansson-dev
     - ci/build.sh
 
 clang-tidy-amd64:

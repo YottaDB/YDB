@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -85,7 +85,7 @@ int ydb_get_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *su
 	if (NULL == ret_value)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,
 			LEN_AND_LIT("NULL ret_value"), LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_GET)));
-	ydb_get_value(varname, subs_used, subsarray, ret_value, get_type, get_svn_index, YDB_GET_VALUE_FULL_VALUE, (char *)LYDBRTNNAME(LYDB_RTN_GET));
+	ydb_get_value(varname, subs_used, subsarray, ret_value, get_type, get_svn_index, (char *)LYDBRTNNAME(LYDB_RTN_GET));
 	assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* the counter should have never become non-zero in this function */
 	LIBYOTTADB_DONE;
 	REVERT;
@@ -93,7 +93,7 @@ int ydb_get_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *su
 }
 
 void ydb_get_value(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *subsarray, ydb_buffer_t *ret_value,
-		ydb_var_types get_type, int get_svn_index, boolean_t only_return_size, char *ydb_caller_fn)
+			ydb_var_types get_type, int get_svn_index, char *ydb_caller_fn)
 {
 	boolean_t	gotit, nospace;
 	gparam_list	plist;
@@ -102,8 +102,6 @@ void ydb_get_value(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_
 	lv_val		*lvvalp, *src_lv;
 	mname_entry	var_mname;
 	mval		get_value, gvname, plist_mvals[YDB_MAX_SUBS + 1];
-	unsigned char	lvundef_buff[512], *ptr;
-	unsigned int	avail_len, len;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -188,10 +186,7 @@ void ydb_get_value(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_LVUNDEF, 2, ptr - lvundef_buff, lvundef_buff);
 			}
 			/* Copy value to return buffer */
-			if (only_return_size)
-				GET_REQUIRED_YDB_BUFF_T_SIZE_FROM_MVAL(ret_value, &src_lv->v, "NULL ret_value->buf_addr", ydb_caller_fn);
-			else
-				SET_YDB_BUFF_T_FROM_MVAL(ret_value, &src_lv->v, "NULL ret_value->buf_addr", ydb_caller_fn);
+			SET_YDB_BUFF_T_FROM_MVAL(ret_value, &src_lv->v, "NULL ret_value->buf_addr", ydb_caller_fn);
 			break;
 		case LYDB_VARREF_GLOBAL:
 			/* Fetch the given global variable value. We do this by:
@@ -213,19 +208,13 @@ void ydb_get_value(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_
 									 */
 			assert(gotit);
 			/* Copy value to return buffer */
-			if (only_return_size)
-				GET_REQUIRED_YDB_BUFF_T_SIZE_FROM_MVAL(ret_value, &get_value, "NULL ret_value->buf_addr", ydb_caller_fn);
-			else
-				SET_YDB_BUFF_T_FROM_MVAL(ret_value, &get_value, "NULL ret_value->buf_addr", ydb_caller_fn);
+			SET_YDB_BUFF_T_FROM_MVAL(ret_value, &get_value, "NULL ret_value->buf_addr", ydb_caller_fn);
 			break;
 		case LYDB_VARREF_ISV:
 			/* Fetch the given ISV value (no subscripts supported) */
 			op_svget(get_svn_index, &get_value);
 			/* Copy value to return buffer */
-			if (only_return_size)
-				GET_REQUIRED_YDB_BUFF_T_SIZE_FROM_MVAL(ret_value, &get_value, "NULL ret_value->buf_addr", ydb_caller_fn);
-			else
-				SET_YDB_BUFF_T_FROM_MVAL(ret_value, &get_value, "NULL ret_value->buf_addr", ydb_caller_fn);
+			SET_YDB_BUFF_T_FROM_MVAL(ret_value, &get_value, "NULL ret_value->buf_addr", ydb_caller_fn);
 			break;
 		default:
 			assertpro(FALSE);
