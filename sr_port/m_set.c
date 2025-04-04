@@ -40,9 +40,11 @@
 #ifdef UTF8_SUPPORTED
 #include "gtm_utf8.h"
 #endif
+#include "cgp.h"
 
 GBLREF boolean_t	badchar_inhibit;
 GBLREF boolean_t	gtm_utf8_mode;
+GBLREF char		cg_phase;
 
 error_def(ERR_ALIASEXPECTED);
 error_def(ERR_COMMA);
@@ -370,10 +372,15 @@ int m_set(void)
 					put->operand[0] = put_ilit(svn_data[index].opcode);
 					put->operand[1] = resptr;
 					dqrins(&targchain, exorder, put);
-				} else
+				} else if (CGP_NOSTATE != cg_phase)
 				{	/* OC_RTERROR triple would have been inserted in curtchain by ins_errtriple
 					 * (invoked by stx_error). To maintain consistency with the "if" portion of
-					 * this code, we need to move this triple to the "targchain".
+					 * this code, we need to move this triple to the "targchain". Note that in
+					 * case of "$zycompile()", the variable "cg_phase" would be set to "CGP_NOSTATE"
+					 * and so "ins_errtriple()" invocation would not have happened inside "stx_error_va()"
+					 * (see "else if ((CGP_PARSE == cg_phase)...)" check there). Therefore, no triple
+					 * move to "targchain" needs to happen in that case and is why we have the
+					 * "else if (CGP_NOSTATE != cg_phase)" check above.
 					 */
 					tmp = (TREF(curtchain))->exorder.bl; /* corresponds to put_ilit(FALSE) in ins_errtriple */
 					tmp = tmp->exorder.bl;	/* corresponds to put_ilit(in_error) in ins_errtriple */

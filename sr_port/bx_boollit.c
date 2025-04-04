@@ -221,10 +221,11 @@ void bx_boollit(triple *t, int depth)
 				 * of the literal optimization since a NUMOFLOW error is going to be issued anyways as we are
 				 * guaranteed to see an OC_RTERROR triple (added by the "UNARY_TAIL" macro call at the top
 				 * of this file) at the end of the "curtchain" triple execution chain in this case (asserted
-				 * by the ALREADY_RTERROR macro below).
+				 * by the ALREADY_RTERROR macro below). But this is guaranteed only if "run_time" is TRUE.
+				 * If it is FALSE (e.g. $zycompile()), this is not guaranteed hence the "!run_time" check below.
 				 */
 				assert(((OC_NEG != ref0->opcode) && (OC_FORCENUM != ref0->opcode) && (OC_COM != ref0->opcode))
-					|| ALREADY_RTERROR);
+					|| !run_time || ALREADY_RTERROR);
 				dqdel(ref0, exorder);
 				t->operand[j].oprval.tref = ref0->operand[0].oprval.tref;
 			}

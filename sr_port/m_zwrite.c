@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2025 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -136,8 +139,13 @@ int m_zwrite(void)
 						ref = maketriple(OC_ZWRITESVN);
 						ref->operand[0] = put_ilit(svn_data[index].opcode);
 						ins_triple(ref);
-					} else	/*  ins_errtriple should have already provided an OC_RTERROR */
+					} else if (run_time)
+					{	/* ins_errtriple() should have already provided an OC_RTERROR. But that
+						 * happens only if "run_time" is TRUE and not if it is FALSE (e.g. $ZYCOMPILE).
+						 * Hence the "else if (run_time)" check above.
+						 */
 						assert(ALREADY_RTERROR);
+					}
 					return TRUE;
 				default:
 					stx_error(ERR_SVNEXPECTED);

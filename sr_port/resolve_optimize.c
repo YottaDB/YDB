@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -74,7 +74,6 @@ boolean_t resolve_optimize(triple *curtrip)
 				break;
 			}
 		}
-		assert(&src_head != cur_line);					/* code line should have been there */
 		curtrip->opcode = OC_NOOP;						/* this is real opimization */
 		break;								/* could fall through, but might add other cases */
 	case OC_FNTEXT:

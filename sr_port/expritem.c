@@ -328,7 +328,7 @@ LITDEF nametabent fun_names[] =
 	,{7, "ZTRNLNM"}
 	,{6, "ZWIDTH"}
 	,{6, "ZWRITE"}
-	,{4, "ZYCO"}, {8, "ZYCOMPILE"}
+	,{4, "ZYCO"}, {9, "ZYCOMPILE"}
 	,{6, "ZYHASH"}
 	,{11, "ZYISSQLNULL"}
 	,{4, "ZYSU"}, {8, "ZYSUFFIX"}

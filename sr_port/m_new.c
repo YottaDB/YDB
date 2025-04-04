@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -27,9 +27,11 @@
 #include "namelook.h"
 #include "start_fetches.h"
 
-LITREF nametabent 	svn_names[];
-LITREF svn_data_type 	svn_data[];
-LITREF unsigned char 	svn_index[];
+GBLREF	boolean_t	run_time;
+
+LITREF	nametabent	svn_names[];
+LITREF	svn_data_type	svn_data[];
+LITREF	unsigned char	svn_index[];
 
 error_def(ERR_INVSVN);
 error_def(ERR_RPARENMISSING);
@@ -110,9 +112,11 @@ int m_new(void)
 			{
 				assert(tmp);
 				ins_triple(tmp);
-			} else
+			} else if (run_time)
 			{	/* OC_RTERROR triple would have been inserted in curtchain by ins_errtriple
-				 * (invoked by stx_error). No need to do anything else.
+				 * (invoked by stx_error). No need to do anything else in that case. But that
+				 * happens only if "run_time" is TRUE and not if it is FALSE (e.g. $ZYCOMPILE).
+				 * Hence the "else if (run_time)" check above.
 				 */
 				assert(ALREADY_RTERROR);
 			}
