@@ -1516,7 +1516,7 @@
    FTOK
 
    Produces the "public" (system generated) IPC Keys (essentially hash
-   values) of a given file-list or the journal/receiver pool in a table form.
+   values) of a given file-list or the journal/receive pool in a table form.
 
    The format of the MUPIP FTOK command is:
 
@@ -7379,20 +7379,20 @@
    the Journal Pool. MUPIP REPLICATE -SOURCE ignores -BUFFSIZE if the Journal
    Pool is already set up.
 
-   On the Receiver Server, -BUFFSIZE specifies the size of the Receiver Pool.
+   On the Receiver Server, -BUFFSIZE specifies the size of the Receive pool.
    For applications having periodic spikes in the replication volume, FIS
-   recommends having a larger Receiver Pool. The Receiver Pool is a memory
+   recommends having a larger Receive pool. The Receive pool is a memory
    structure that temporarily holds updates coming from the Source Server.
    The Update Process transfers these updates to permanent storage so that
    they can become accessible by mumps processes. As long as the Update
    Process is alive and running, it is safe to assume that updates in the
-   Receiver Pool will eventually get transferred to permanent storage even if
+   Receive pool will eventually get transferred to permanent storage even if
    a network failure happens between the Source and Receiver Servers. The
-   Receiver Pool becomes full when the speed of applying updates by the
+   Receive pool becomes full when the speed of applying updates by the
    Update Process is slower than the speed of receiving updates from the
-   Source Server. When the Receiver Pool becomes full, the network refuses to
+   Source Server. When the Receive pool becomes full, the network refuses to
    accept more updates from the Source Server which increases the backlog on
-   the Source Server. Therefore, a larger size Receiver Pool delays this
+   the Source Server. Therefore, a larger size Receive pool delays this
    condition and helps cushion the impact of periodic spike in replication
    volumes.
 
@@ -8061,7 +8061,7 @@
 
    The backlog is the difference between the second and third fields. When
    backlog is 0 and the remaining three fields have the same value, it means
-   that all Source Server updates have reached the Receiver Pool and there
+   that all Source Server updates have reached the Receive pool and there
    are no in-flight updates.
 
    **Important**
@@ -8240,7 +8240,7 @@
    |-----------------------------+----------------------------------------------------------|
    |replication_filter_qualifier |  o -filter=<filter command>                              |
    |-----------------------------+----------------------------------------------------------|
-   |recvpool_setup_qualifiers    |  o -buffsize=<Receiver Pool size in bytes>               |
+   |recvpool_setup_qualifiers    |  o -buffsize=<Receive pool size in bytes>                |
    |-----------------------------+----------------------------------------------------------|
    |si_replication_qualifiers    |  o [-initialize]                                         |
    |                             |  o [{-resume=<strm_num>|-reuse=<instname>}]              |

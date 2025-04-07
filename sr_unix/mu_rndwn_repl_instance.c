@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -230,7 +230,7 @@ boolean_t mu_rndwn_repl_instance(replpool_identifier *replpool_id, boolean_t imm
 							 * MURPOOLRNDWNSUC message as it indicates that the semaphore was orphaned
 							 * and we removed it when in fact there was no orphaned semaphore and we
 							 * created it as part of mu_replpool_grab_sem to get standalone access to
-							 * rundown the receiver pool (which may or may not exist)
+							 * rundown the receive pool (which may or may not exist)
 							 */
 							ipcs_ptr = i2asc((uchar_ptr_t)ipcs_buff, sem_id);
 							*ipcs_ptr = '\0';

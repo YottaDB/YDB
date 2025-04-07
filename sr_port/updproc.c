@@ -1075,7 +1075,7 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 					}
 					DEBUG_ONLY(donot_INVOKE_MUMTSTART = FALSE);
 					/* Following two changes to dollar_ztwormhole reset the value of $ztwormhole to
-					 * "undefined" which is important since it points into the receiver pool area
+					 * "undefined" which is important since it points into the receive pool area
 					 * that is about to be allowed to be overwritten. Prior to the next reference,
 					 * to dollar_ztwormhole, it should be included in a journal record. Note since
 					 * the ISV must always be defined op_svget will turn this state into an empty

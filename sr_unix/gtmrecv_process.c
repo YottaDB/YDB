@@ -2497,7 +2497,7 @@ STATICFNDEF void	gtmrecv_process_need_histinfo_msg(repl_needhistinfo_msg_ptr_t n
 			 *   side should do a rollback (REPL_ROLLBACK_FIRST message). That is why it is enough to maintain
 			 *   recvpool_ctl->last_valid_histinfo and not pointers to all the unprocessed histories.
 			 * NOTE2: There is one exception to this and that is if the receiver server had already connected
-			 *   to a source server and placed records in the receiver pool and then lost the connection and
+			 *   to a source server and placed records in the receive pool and then lost the connection and
 			 *   reestablished connection (with the same or a different source server) AND had been started with
 			 *   the -noresync option. In this case, it will not see a REPL_ROLLBACK_FIRST message but instead
 			 *   will go back in history to find the first matching history. But in this case, the -noresync is

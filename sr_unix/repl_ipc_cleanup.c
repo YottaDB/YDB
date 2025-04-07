@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -117,11 +117,11 @@ int	gtmsource_ipc_cleanup(boolean_t auto_shutdown, int *exit_status, int4 *num_s
 			if (INVALID_SEMID != jnlpool->repl_inst_filehdr->recvpool_semid DEBUG_ONLY(&&
 						!(ydb_white_box_test_case_enabled &&
 							(WBTEST_UPD_PROCESS_ERROR == ydb_white_box_test_case_number))))
-				repl_log(stderr, TRUE, TRUE, "Receiver pool semaphore IDs were not removed\n");
+				repl_log(stderr, TRUE, TRUE, "Receive pool semaphore IDs were not removed\n");
 			if ((INVALID_SHMID != jnlpool->repl_inst_filehdr->recvpool_shmid) DEBUG_ONLY(&&
 						!(ydb_white_box_test_case_enabled &&
 							 (WBTEST_UPD_PROCESS_ERROR == ydb_white_box_test_case_number))))
-							 repl_log(stderr, TRUE, TRUE, "Receiver pool shared memory not removed\n");
+							 repl_log(stderr, TRUE, TRUE, "Receive pool shared memory not removed\n");
 			repl_inst_flush_jnlpool(TRUE, TRUE);
 		}
 	}

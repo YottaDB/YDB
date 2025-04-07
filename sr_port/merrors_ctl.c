@@ -898,7 +898,7 @@ LITDEF	err_msg merrors[] = {
 	{ "REPLINSTUNDEF", "Replication instance environment variable $ydb_repl_instance/$gtm_repl_instance is undefined", 0, 0 },
 	{ "REPLINSTACC", "Error accessing replication instance file !AD", 2, 0 },
 	{ "NOJNLPOOL", "No journal pool info found in the replication instance of !AD", 2, 0 },
-	{ "NORECVPOOL", "No receiver pool info found in the replication instance of !AD", 2, 0 },
+	{ "NORECVPOOL", "No receive pool info found in the replication instance of !AD", 2, 0 },
 	{ "FTOKERR", "Error getting ftok of the file !AD", 2, 0 },
 	{ "REPLREQRUNDOWN", "Error accessing replication instance !AD.  Must be rundown on cluster node !AD.", 4, 0 },
 	{ "BLKCNTEDITFAIL", "Mupip recover or rollback failed to correct the block count field in the file header for file !AD", 2, 0 },

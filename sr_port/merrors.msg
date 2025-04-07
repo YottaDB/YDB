@@ -1062,7 +1062,7 @@ MURAIMGFAIL	<Mupip recover or rollback failed while processing an after-image jo
 REPLINSTUNDEF	<Replication instance environment variable $ydb_repl_instance/$gtm_repl_instance is undefined>/error/fao=0!/ansi=0
 REPLINSTACC	<Error accessing replication instance file !AD>/error/fao=2!/ansi=0
 NOJNLPOOL	<No journal pool info found in the replication instance of !AD>/error/fao=2!/ansi=0
-NORECVPOOL	<No receiver pool info found in the replication instance of !AD>/error/fao=2!/ansi=0
+NORECVPOOL	<No receive pool info found in the replication instance of !AD>/error/fao=2!/ansi=0
 FTOKERR		<Error getting ftok of the file !AD>/error/fao=2!/ansi=0
 REPLREQRUNDOWN	<Error accessing replication instance !AD.  Must be rundown on cluster node !AD.>/error/fao=4!/ansi=0
 BLKCNTEDITFAIL	<Mupip recover or rollback failed to correct the block count field in the file header for file !AD>/info/fao=2!/ansi=0
