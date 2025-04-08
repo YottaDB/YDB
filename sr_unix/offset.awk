@@ -2,6 +2,9 @@
 #								#
 #	Copyright 2002, 2004 Sanchez Computer Associates, Inc.	#
 #								#
+# Copyright (c) 2025 YottaDB LLC and/or its subsidiaries.	#
+# All rights reserved.						#
+#								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
 #	under a license.  If you do not know the terms of	#
@@ -51,10 +54,10 @@ BEGIN	{
 						for (j = 1; j <= i; j++)
 							printf "%s ", $j;
 						if (found_struct) printf "\ntypedef struct %s_type %s;\n",c_struct,c_struct;
-						printf "\n#undef offsetof\n#define	offsetof(TYPE, MEMBER) ((int) &((TYPE *)0)->MEMBER)";
-						printf "\n#define	PRINT_OFFSET(TYPE, MEMBER)	printf(\"\\toffset = %%.4d [0x%%.4x]      size = %%.4d [0x%%.4x]    ----> \"#MEMBER\" \\n\", offsetof(TYPE,MEMBER), offsetof(TYPE,MEMBER), sizeof(temp_##TYPE.MEMBER), sizeof(temp_##TYPE.MEMBER))\n";
-						printf "\nmain()\n{\n\t%s\ttemp_%s;\n\n", c_struct, c_struct;
-						printf "\tprintf (\"\\nStructure ----> %s <---- \tsize = %%d [0x%%x] \\n\\n\", sizeof(temp_%s), sizeof(temp_%s));\n", c_struct, c_struct, c_struct;
+						printf "\n#undef offsetof\n#define	offsetof(TYPE, MEMBER) ((int)(intptr_t)&((TYPE *)0)->MEMBER)";
+						printf "\n#define	PRINT_OFFSET(TYPE, MEMBER)	printf(\"\\toffset = %%.4d [0x%%.4x]      size = %%.4ld [0x%%.4lx]    ----> \"#MEMBER\" \\n\", offsetof(TYPE,MEMBER), offsetof(TYPE,MEMBER), sizeof(temp_##TYPE.MEMBER), sizeof(temp_##TYPE.MEMBER))\n";
+						printf "\nvoid main()\n{\n\t%s\ttemp_%s;\n\n", c_struct, c_struct;
+						printf "\tprintf (\"\\nStructure ----> %s <---- \tsize = %%ld [0x%%lx] \\n\\n\", sizeof(temp_%s), sizeof(temp_%s));\n", c_struct, c_struct, c_struct;
 						for (i = 0; i < fieldcount; i++)
 						{
 							gsub(/[)(]*/,"",structarray[i]);

@@ -3,7 +3,7 @@
 #								#
 # Copyright 2001, 2010 Fidelity Information Services, Inc	#
 #								#
-# Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
@@ -87,7 +87,7 @@ if ($srcfile:e != "c") then
 endif
 
 (gtcc -E $gtm_src/$srcfile > ${TMPFILE}_$srcfile:r.lis) >& ${TMPFILE}_$srcfile:r.err1
-awk -v c_struct=${c_struct} -f $gtm_tools/offset.awk ${TMPFILE}_$srcfile:r.lis > ${TMPFILE}_$srcfile
+awk -v c_struct=${c_struct} -f $gtm_tools/offset.awk ${TMPFILE}_$srcfile:r.lis | grep -v "^\# " > ${TMPFILE}_$srcfile
 gtcc ${TMPFILE}_$srcfile -o ${TMPFILE}_$srcfile.o >& ${TMPFILE}_$srcfile:r.err2
 
 if ($status != 0) then
