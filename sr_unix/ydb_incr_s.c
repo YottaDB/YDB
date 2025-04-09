@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -30,6 +30,7 @@
 #include "gdsfhead.h"
 #include "mvalconv.h"
 #include "deferred_events_queue.h"
+#include "mv_stent.h"
 
 GBLREF	volatile int4	outofband;
 
@@ -53,7 +54,7 @@ int ydb_incr_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *s
 	lv_val		*lvvalp, *dst_lv;
 	mname_entry	var_mname;
 	mval		gvname, plist_mvals[YDB_MAX_SUBS + 1];
-	mval		*lv_mv, *increment_mv, increment_mval, *ret_mv, ret_mval;
+	mval		*lv_mv, *increment_mv, increment_mval, *ret_mv;
 	ydb_var_types	incr_type;
 	DCL_THREADGBL_ACCESS;
 
@@ -93,6 +94,9 @@ int ydb_incr_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *s
 	increment_mv = &increment_mval;
 	MV_FORCE_NUM(increment_mv);
 	/* Separate actions depending on type of INCREMENT being done */
+
+	PUSH_MV_STENT(MVST_MVAL);
+	ret_mv = &mv_chain->mv_st_cont.mvs_mval;
 	switch(incr_type)
 	{
 		case LYDB_VARREF_LOCAL:
@@ -125,8 +129,7 @@ int ydb_incr_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *s
 				s2pool(&(lv_mv->str));	/* Rebuffer in stringpool to avoid lv tree pointing to caller buffer
 							 * that is not guaranteed to stay after this call.
 							 */
-			ret_mval = *lv_mv;
-			ret_mv = &ret_mval;
+			*ret_mv = *lv_mv;
 			break;
 		case LYDB_VARREF_GLOBAL:
 			/* Find dstatus of the given global variable value. We do this by:
@@ -146,7 +149,7 @@ int ydb_incr_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *s
 				callg((callgfnptr)op_gvname, &plist);	/* Drive "op_gvname" to  key */
 			} else
 				op_gvname(1, &gvname);			/* Single parm call to get next global */
-			ret_mv = &ret_mval;
+			ret_mv->mvtype = 0;
 			INIT_MVAL_BEFORE_USE_IN_M_CODE(ret_mv);	/* Do additional initialization of result mval as it could
 								 * be used in database trigger M code (if one gets driven).
 								 */
@@ -162,6 +165,7 @@ int ydb_incr_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *s
 	{	/* Copy value to return buffer */
 		SET_YDB_BUFF_T_FROM_MVAL(ret_value, ret_mv, "NULL ret_value->buf_addr", LYDBRTNNAME(LYDB_RTN_INCR));
 	}
+	POP_MV_STENT();		/* ret_mv */
 	TREF(sapi_mstrs_for_gc_indx) = 0; /* mstrs in this array (added by RECORD_MSTR_FOR_GC) no longer need to be protected */
 	LIBYOTTADB_DONE;
 	REVERT;

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -20,10 +20,14 @@ typedef struct
 	unsigned int	strpllim;	/* non-zero value is user specified guard on expansion */
 	boolean_t	strpllimwarned;	/* if limit is in place, has been exceeded, and not recovered from */
 	unsigned char	prvprt;		/* stores memory protections used in guarding stp space */
+	boolean_t	stp_gcol_nosort;	/* FALSE => stp_gcol() is invoked, TRUE => stp_gcol_nosort() is invoked */
 } spdesc;
 
 void	stp_expand_array(void);
 void	stp_gcol(size_t space_needed);										/* BYPASSOK */
+void	stp_gcol_nosort(size_t space_needed);
+void	stp_gcol_sort(size_t space_needed);
+void	stp_gcol_spsize(size_t space_needed);
 void	stp_move(char *from, char *to);
 void	stp_init(size_t size);
 void	s2pool(mstr *a);
@@ -50,6 +54,16 @@ GBLREF	spdesc		stringpool;
 #define	INVOKE_STP_GCOL(SPC)		stp_gcol(SPC);								/* BYPASSOK */
 #define	IS_IN_UNUSED_STRINGPOOL(PTR, LEN)		\
 		((LEN) && ((((unsigned char *)PTR + (int)(LEN)) <= stringpool.top) && ((unsigned char *)PTR >= stringpool.free)))
+
+#define	ENSURE_IS_AT_END_OF_STRINGPOOL(PTR, LEN, EXTRALEN)	\
+{								\
+	assert(!IS_AT_END_OF_STRINGPOOL(PTR, LEN));		\
+	/* Need to move it to the top */			\
+	assert(stringpool.stp_gcol_nosort);			\
+	ENSURE_STP_FREE_SPACE(LEN + EXTRALEN);			\
+	memcpy(stringpool.free, PTR, LEN);			\
+	PTR = (char *)stringpool.free;				\
+}
 
 #ifdef DEBUG
 #define STRINGPOOL_UNUSABLE_AT_BUFFER_SIZE	128

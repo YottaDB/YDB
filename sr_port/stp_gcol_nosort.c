@@ -1,7 +1,5 @@
 /****************************************************************
  *								*
- *	Copyright 2002 Sanchez Computer Associates, Inc.	*
- *								*
  * Copyright (c) 2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
@@ -13,15 +11,7 @@
  ****************************************************************/
 
 #undef STP_MOVE
-#undef STP_GCOL_NOSORT
 #undef STP_GCOL_SPSIZE
+#define STP_GCOL_NOSORT
 #include "stp_gcol_src.h"
-
-void stp_gcol(size_t space_asked)
-{
-	if (stringpool.stp_gcol_nosort && (stringpool.base == rts_stringpool.base))
-		stp_gcol_nosort(space_asked);
-	else
-		stp_gcol_sort(space_asked);
-}
-
+#undef STP_GCOL_NOSORT

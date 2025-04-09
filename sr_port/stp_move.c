@@ -2,6 +2,9 @@
  *								*
  *	Copyright 2002 Sanchez Computer Associates, Inc.	*
  *								*
+ * Copyright (c) 2025 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -9,6 +12,8 @@
  *								*
  ****************************************************************/
 
+#undef STP_GCOL_NOSORT
+#undef STP_GCOL_SPSIZE
 #define STP_MOVE
 #include "stp_gcol_src.h"
 #undef STP_MOVE

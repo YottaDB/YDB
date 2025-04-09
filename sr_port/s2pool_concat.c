@@ -2,6 +2,9 @@
  *								*
  *	Copyright 2013 Fidelity Information Services, Inc	*
  *								*
+ * Copyright (c) 2025 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -36,7 +39,11 @@ void s2pool_concat(mval *dst, mstr *a)
 	} else
 	{
 		ENSURE_STP_FREE_SPACE(dstlen + alen);
-		memcpy(stringpool.free, dstaddr, dstlen);
+		/* Note: The above macro could update "dst->str.addr" if "stp_gcol()" was invoked.
+		 * In that case, "dstaddr" would still be pointing to the pre-stp_gcol() stringpool
+		 * and so cannot be assumed to be valid anymore. Hence the "dst->str.addr" use below.
+		 */
+		memcpy(stringpool.free, dst->str.addr, dstlen);
 		memcpy(stringpool.free + dstlen, a->addr, alen);
 		dst->str.addr = (char *)stringpool.free;
 		stringpool.free += dstlen + alen;

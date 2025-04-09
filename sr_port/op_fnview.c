@@ -67,7 +67,7 @@
 #include "gvt_inline.h"
 #include "restrict.h"
 
-GBLREF spdesc			stringpool;
+GBLREF spdesc			stringpool, rts_stringpool;
 GBLREF int4			cache_hits, cache_fails;
 GBLREF uint4			max_cache_entries;
 GBLREF unsigned char		*stackbase, *stacktop;
@@ -100,6 +100,7 @@ GBLREF mstr			env_ydb_gbldir_xlate;
 GBLREF mval			dollar_zgbldir;
 GBLREF boolean_t		ydb_ztrigger_output;
 GBLREF bool			jobpid;
+GBLREF ssize_t			sp_totspace, sp_totspace_nosort;
 
 error_def(ERR_COLLATIONUNDEF);
 error_def(ERR_GBLNOMAPTOREG);
@@ -241,6 +242,25 @@ void	op_fnview(int numarg, mval *dst, ...)
 			MV_FORCE_MVAL(arg2, (int)(stringpool.top - stringpool.invokestpgcollevel));
 			MV_FORCE_STR(arg2);
 			s2pool_concat(dst, &arg2->str);
+			break;
+		case VTK_SPSIZESORT:
+			assert(stringpool.base == rts_stringpool.base);
+			stp_gcol_spsize(0);	/* this would have initialized "sp_totspace" and "sp_totspace_nosort" */
+			commastr.len = 1;
+			commastr.addr = ",";
+			ENSURE_STP_FREE_SPACE((STATS_MAX_DIGITS * 2) + 1);
+			MV_FORCE_MVAL(dst, sp_totspace_nosort);
+			MV_FORCE_STR(dst);
+			dst->mvtype = vtp->restype;
+			s2pool_concat(dst, &commastr);
+			arg2 = &tmpmval;
+			MV_FORCE_MVAL(arg2, sp_totspace);
+			MV_FORCE_STR(arg2);
+			s2pool_concat(dst, &arg2->str);
+			break;
+		case VTK_STPGCOLNOSORT:
+			assert(stringpool.base == rts_stringpool.base);
+			n = stringpool.stp_gcol_nosort;
 			break;
 		case VTK_GDSCERT:
 			if (certify_all_blocks)
@@ -1092,7 +1112,7 @@ void	op_fnview(int numarg, mval *dst, ...)
 			break;
 	}
 
-	if(MV_NM == vtp->restype)
+	if (MV_NM == vtp->restype)
 	{
 		if (n_int8)
 			MV_FORCE_64MVAL(dst, n2); /* need to use this macro as it returns 64-bit numbers even on 32-bit systems */

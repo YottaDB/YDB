@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -430,8 +430,11 @@ int	iosocket_readfl(mval *v, int4 width, uint8 nsec_timeout)
 				assert(stringpool.free <= stringpool.top);					/* BYPASSOK */
 				INVOKE_STP_GCOL(max_bufflen);
 				DEBUG_ONLY(old_stringpool_free = stringpool.free);				/* BYPASSOK */
-				assert(IS_AT_END_OF_STRINGPOOL(v->str.addr, v->str.len));
-				stringpool.free = (unsigned char *)v->str.addr;
+				if (!IS_AT_END_OF_STRINGPOOL(v->str.addr, v->str.len))
+				{
+					ENSURE_IS_AT_END_OF_STRINGPOOL(v->str.addr, v->str.len, 0);
+				} else
+					stringpool.free = (unsigned char *)v->str.addr;
 				v->str.len = 0; /* If interrupted, don't hold onto old space */
 				TRCTBL_ENTRY(SOCKRFL_EXPBUFGC, bytes_read, stringpool.free, old_stringpool_free, /* BYPASSOK */
 					     (UINTPTR_T)max_bufflen);
@@ -489,8 +492,11 @@ int	iosocket_readfl(mval *v, int4 width, uint8 nsec_timeout)
 							assert(stringpool.free <= stringpool.top);
 							INVOKE_STP_GCOL(max_bufflen);
 							DEBUG_ONLY(old_stringpool_free = stringpool.free);
-							assert(IS_AT_END_OF_STRINGPOOL(v->str.addr, v->str.len));
-							stringpool.free = (unsigned char *)v->str.addr;
+							if (!IS_AT_END_OF_STRINGPOOL(v->str.addr, v->str.len))
+							{
+								ENSURE_IS_AT_END_OF_STRINGPOOL(v->str.addr, v->str.len, 0);
+							} else
+								stringpool.free = (unsigned char *)v->str.addr;
 							v->str.len = 0; /* If interrupted, don't hold onto old space */
 							TRCTBL_ENTRY(SOCKRFL_EXPBUFGC, bytes_read, stringpool.free, /* BYPASSOK */
 								     old_stringpool_free, (UINTPTR_T)max_bufflen);

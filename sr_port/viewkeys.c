@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2025 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -61,7 +64,11 @@ viewtab_entry *viewkeys(mstr *v)
 			}
 			else if (n == 0)
 			{
-				if (vt_ptr < vt_top - 1 && memcmp(cmpbuf, (vt_ptr + 1)->keyword, len) == 0)
+				/* If a keyword is a complete substring of another keyword,
+				 * require specifying the full keyword and not a prefix.
+				 */
+				if (('\0' != vt_ptr->keyword[len]) && (vt_ptr < (vt_top - 1))
+						&& !memcmp(cmpbuf, (vt_ptr + 1)->keyword, len))
 					vt_ptr = (viewtab_entry *)-1L;
 				break;
 			}

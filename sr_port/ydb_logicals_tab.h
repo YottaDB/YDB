@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -132,6 +132,7 @@ YDBENVINDX_TABLE_ENTRY (YDBENVINDX_SNAPTMPDIR,                 "$ydb_snaptmpdir"
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_STATSDIR,                   "$ydb_statsdir",                   "$gtm_statsdir")
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_STATSHARE,                  "$ydb_statshare",                  "$gtm_statshare")
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_STDXKILL,                   "$ydb_stdxkill",                   "$gtm_stdxkill")
+YDBENVINDX_TABLE_ENTRY (YDBENVINDX_STP_GCOL_NOSORT,            "$ydb_stp_gcol_nosort",            "")
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_STRING_POOL_LIMIT,          "$ydb_string_pool_limit",          "$gtm_string_pool_limit")
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_SYSID,                      "$ydb_sysid",                      "$gtm_sysid")
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_TREAT_SIGUSR2_LIKE_SIGUSR1, "$ydb_treat_sigusr2_like_sigusr1", "")

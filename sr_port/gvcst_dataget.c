@@ -3,6 +3,9 @@
  * Copyright (c) 2010-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2025 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -229,7 +232,6 @@ enum cdb_sc gvcst_dataget2(mint *dollar_data, mval *val, unsigned char *sn_ptr)
 			return status;
 		} else if (DG_DATAONLY != dg2_info)
 		{
-			val->str.len = data_len;
 			if (!sn_ptr)
 			{
 				ENSURE_STP_FREE_SPACE(data_len);
@@ -241,6 +243,7 @@ enum cdb_sc gvcst_dataget2(mint *dollar_data, mval *val, unsigned char *sn_ptr)
 				memcpy(sn_ptr, (sm_uc_ptr_t)rp + rsiz - data_len, data_len);
 				val->str.addr = (char *)sn_ptr;
 			}
+			val->str.len = data_len;
 		}
 		/* --------------------- end code lifted from gvcst_get ---------------------------- */
 		rp = (rec_hdr_ptr_t)((sm_uc_ptr_t)rp + rsiz);

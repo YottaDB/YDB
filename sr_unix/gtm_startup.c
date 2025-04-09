@@ -157,6 +157,7 @@ void gtm_startup(struct startup_vector *svec)
 	stack_frame 		*frame_pointer_lcl;
 	static char 		other_mode_buf[] = "OTHER";
 	int			i, status;
+	boolean_t		ret;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -222,6 +223,9 @@ void gtm_startup(struct startup_vector *svec)
 	/* Initialize alignment requirement for the runtime stringpool */
 	/* mstr_native_align = ydb_logical_truth_value(YDBENVINDX_DISABLE_ALIGNSTR, FALSE, NULL) ? FALSE : TRUE; */
 	mstr_native_align = FALSE; /* TODO: remove this line and uncomment the above line */
+	/* See if $ydb_stp_gcol_nosort is set */
+	ret = ydb_logical_truth_value(YDBENVINDX_STP_GCOL_NOSORT, FALSE, &is_defined);
+	stringpool.stp_gcol_nosort = (is_defined ? ret : FALSE);
 	/* See if $ydb_string_pool_limit is set */
 	temp_ydb_strpllim = ydb_trans_numeric(YDBENVINDX_STRING_POOL_LIMIT,  &is_defined, IGNORE_ERRORS_FALSE, NULL);
 	if (0 < temp_ydb_strpllim)

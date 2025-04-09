@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -50,55 +50,62 @@ error_def(ERR_STACKCRIT);
 #define TEST_FAKE_STRINGPOOL_FULL
 #endif
 
-#define COPY_ARG_TO_STP(ARG)							\
-{										\
-	boolean_t	has_str_repsn;						\
-										\
-	has_str_repsn = MV_IS_STRING(ARG) || !MV_DEFINED(ARG);			\
-	TEST_FAKE_STRINGPOOL_FULL;						\
-	mval_lex(ARG, &format_out);						\
-	if (MV_IS_CANONICAL(ARG))						\
-	{ /*  mval_lex doesn't create string representation for canonical arg	\
-	   * that already has a string representation. */			\
-		assert(ARG->str.len  == format_out.len );			\
-		assert(ARG->str.addr == format_out.addr);			\
-		TEST_FAKE_STRINGPOOL_FULL;					\
-		ENSURE_STP_FREE_SPACE(ARG->str.len);				\
-		memcpy(stringpool.free, ARG->str.addr, ARG->str.len);		\
-			/* use ARG 'coz gcol doesn't preserve format_out  */	\
-	}									\
-	if (has_str_repsn)							\
-	{	/* mval_lex copies ARG at stringpool.free and USUALLY leaves	\
-		 * stringpool.free unchanged. Caller (us) has to update		\
-		 * stringpool.free to keep dst protected. EXCEPT: MV_FORCE_STR	\
-		 * in mval_lex creates string representation for canonical	\
-		 * numbers that did not have string representation and updates	\
-		 * stringpool.free as that representation "belongs" to the mval	\
-		 * in question - no need to update stringpool.free for such	\
-		 * cases. Lucky for us, it sits in the perfect place in the	\
-		 * middle of our work has_str_repsn includes not defined check	\
-		 * in case of noundef - if undef it comes back as empty string.	\
-		 */								\
-		stringpool.free += format_out.len;				\
-	}									\
-}										\
+#define COPY_ARG_TO_STP(ARG, SPACE_NEEDED, FORMAT_OUT, DST)							\
+{														\
+	TEST_FAKE_STRINGPOOL_FULL;										\
+	assert(IS_AT_END_OF_STRINGPOOL(DST->str.addr, DST->str.len));						\
+	mval_lex(ARG, &FORMAT_OUT);										\
+	if (IS_AT_END_OF_STRINGPOOL(DST->str.addr, DST->str.len))						\
+	{	/* DST is already at stringpool end. All that is needed is to copy FORMAT_OUT after it. */	\
+		memcpy(stringpool.free, FORMAT_OUT.addr, FORMAT_OUT.len);					\
+		stringpool.free += FORMAT_OUT.len;								\
+		DST->str.len += FORMAT_OUT.len;									\
+	} else if (IS_AT_END_OF_STRINGPOOL(FORMAT_OUT.addr, FORMAT_OUT.len)					\
+			&& ((DST->str.addr + DST->str.len) == FORMAT_OUT.addr))					\
+	{	/* DST is no longer at stringpool end but it is immediately followed by FORMAT_OUT and		\
+		 * together they are in sequence leading to stringpool end. Even less to do.			\
+		 */												\
+		DST->str.len += FORMAT_OUT.len;									\
+	} else													\
+	{	/* "DST" and FORMAT_OUT point to strings that are not in stringpool end. This is possible	\
+		 * if "mval_lex()" invoked "stp_gcol()" and that in turn invoked "stp_gcol_nosort()".		\
+		 * Need to move "DST" and "FORMAT_OUT" back to the end of the stringpool. We expect the		\
+		 * caller to have already protected DST from garbage collection. But FORMAT_OUT would not	\
+		 * so protect it by doing the PUSH_MV_STENT below.						\
+		 */												\
+		mval    *v2;											\
+														\
+		PUSH_MV_STENT(MVST_MVAL);									\
+		v2 = &mv_chain->mv_st_cont.mvs_mval;								\
+		v2->mvtype = MV_STR;										\
+		v2->str = FORMAT_OUT;										\
+		if (FORMAT_OUT.addr == (char *)stringpool.free)							\
+			stringpool.free += FORMAT_OUT.len;							\
+		ENSURE_IS_AT_END_OF_STRINGPOOL(DST->str.addr, DST->str.len, FORMAT_OUT.len + SPACE_NEEDED);	\
+		stringpool.free += DST->str.len;								\
+		FORMAT_OUT = v2->str;										\
+		POP_MV_STENT();         /* v2 */								\
+		memcpy(stringpool.free, FORMAT_OUT.addr, FORMAT_OUT.len);					\
+		stringpool.free += FORMAT_OUT.len;								\
+		DST->str.len += FORMAT_OUT.len;									\
+	}													\
+}														\
 
-#define COPY_SUBSCRIPTS 								\
+#define COPY_SUBSCRIPTS(SPACE_NEEDED, FORMAT_OUT, DST)					\
 	for ( ; ; ) 									\
 	{										\
 		arg = va_arg(var, mval *);						\
-		COPY_ARG_TO_STP(arg);							\
-		dst->str.len += format_out.len;						\
+		COPY_ARG_TO_STP(arg, SPACE_NEEDED, FORMAT_OUT, DST);			\
 		depth_count--;								\
 		if (0 == depth_count)							\
 			break;								\
 		*stringpool.free++ = ',';						\
-		dst->str.len++;								\
+		DST->str.len++;								\
 	}
 
 /* Implementation note: $NAME does not edit check the result, such as if the key size exceeds the maximum for a global.
-* So, the result if used in other operations (such as SET, KILL) may generate run time errors (GVSUBOFLOW, etc)
-*/
+ * So, the result if used in other operations (such as SET, KILL) may generate run time errors (GVSUBOFLOW, etc)
+ */
 void op_fnname(UNIX_ONLY_COMMA(int sub_count) mval *finaldst, ...)
 {
 	int 		depth_count, fnname_type, len, space_needed;;
@@ -112,7 +119,7 @@ void op_fnname(UNIX_ONLY_COMMA(int sub_count) mval *finaldst, ...)
 	fnname_type = va_arg(var, int);
 	depth = va_arg(var, mval *); /* if second arg to $NAME not specified, compiler sets depth_count to MAXPOSINT4 */
 	depth_count = MV_FORCE_INT(depth);
-	sub_count -=3;
+	sub_count -= 3;
 	if (depth_count < 0)
 	{
 		va_end(var);
@@ -185,7 +192,7 @@ void op_fnname(UNIX_ONLY_COMMA(int sub_count) mval *finaldst, ...)
 			depth_count = ((sub_count < depth_count) ? sub_count : depth_count);
 			if (0 != depth_count)
 			{
-				COPY_SUBSCRIPTS;
+				COPY_SUBSCRIPTS(space_needed, format_out, dst);
 			} else
 			{ /* take off extra , if depth doesn't go into new subs */
 				stringpool.free--;
@@ -218,16 +225,14 @@ void op_fnname(UNIX_ONLY_COMMA(int sub_count) mval *finaldst, ...)
 			*stringpool.free++ = ((fnname_type & FNVBAR) ? '|' : '[');
 			dst->str.len++;
 			arg = va_arg(var, mval *);
-			COPY_ARG_TO_STP(arg);
-			dst->str.len += format_out.len;
+			COPY_ARG_TO_STP(arg, space_needed, format_out, dst);
 			sub_count--;
 			if (fnname_type & FNEXTGBL2)
 			{
 				*stringpool.free++ = ',';
 				dst->str.len++;
 				arg = va_arg(var, mval *);
-				COPY_ARG_TO_STP(arg);
-				dst->str.len += format_out.len;
+				COPY_ARG_TO_STP(arg, space_needed, format_out, dst);
 				sub_count--;
 			}
 			*stringpool.free++ = ((fnname_type & FNVBAR) ? '|' : ']');
@@ -244,7 +249,7 @@ void op_fnname(UNIX_ONLY_COMMA(int sub_count) mval *finaldst, ...)
 		{
 			*stringpool.free++ = '(';
 			dst->str.len++;
-			COPY_SUBSCRIPTS;
+			COPY_SUBSCRIPTS(space_needed, format_out, dst);
 			*stringpool.free++ = ')';
 			dst->str.len++;
 		}

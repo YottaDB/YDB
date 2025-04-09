@@ -37,6 +37,7 @@
 #include "gdsbt.h"
 #include "have_crit.h"
 #include "op_fnzsearch.h"
+#include "mv_stent.h"
 
 LITREF		mval	literal_null;
 
@@ -324,7 +325,16 @@ STATICFNDEF int pop_top(lv_val *src, mval *res, mint mfunc)
 	struct stat	statbuf;
 	int		stat_res;
 	char		file_name[MAX_FN_LEN + 1];
+	mval		*save_res;
 
+	if (!mfunc)
+	{	/* If caller is not M function (i.e. generated code), then "res" is not safe from stp_gcol().
+		 * To make it safe, make "res" point to the M stack. Save the incoming "res" in a local variable.
+		 */
+		save_res = res;
+		PUSH_MV_STENT(MVST_MVAL);
+		res = &mv_chain->mv_st_cont.mvs_mval;
+	}
 	while (TRUE)
 	{
 		op_fnorder(src, (mval *)&literal_null, res);
@@ -353,6 +363,11 @@ STATICFNDEF int pop_top(lv_val *src, mval *res, mint mfunc)
 			op_kill(src);
 		}
 		break;
+	}
+	if (!mfunc)
+	{
+		*save_res = *res;
+		POP_MV_STENT();
 	}
 	return pret.p.pint;
 }

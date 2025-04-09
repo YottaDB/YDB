@@ -182,7 +182,7 @@ STATICFNDCL	boolean_t	gvtr_is_key_a_match(char *keysub_start[], gv_trigger_t *tr
 	TREF(gv_some_subsc_null) = save_gv_some_subsc_null;								\
 }
 
-#define	GVTR_POOL2BUDDYLIST(GVT_TRIGGER, DST_MSTR)									\
+#define	GVTR_POOL2BUDDYLIST(GVT_TRIGGER, DST_MSTR, RESERVED_SPACE)							\
 {															\
 	int4	len;													\
 	char	*addr;													\
@@ -192,7 +192,17 @@ STATICFNDCL	boolean_t	gvtr_is_key_a_match(char *keysub_start[], gv_trigger_t *tr
 	addr = dst_mstr->addr;												\
 	len = dst_mstr->len;												\
 	dst_mstr->addr = (char *)get_new_element(GVT_TRIGGER->gv_trig_list, DIVIDE_ROUND_UP(len, GVTR_LIST_ELE_SIZE));	\
-	memcpy(dst_mstr->addr, addr, len);										\
+	if (! RESERVED_SPACE)												\
+		memcpy(dst_mstr->addr, addr, len);									\
+	else														\
+	{	/* This is a call where extra space has been reserved when trigger name is placed			\
+		 * in buddy list. See caller of this macro for comment before this macro call.				\
+		 * In this case, "addr" only points to valid memory for "len" bytes minus the reserved space.		\
+		 * So do "memcpy" only for that length. The reserved space will be filled in later by "gtm_trigger()".	\
+		 */													\
+		assert(TRIGGER_NAME_RESERVED_SPACE < len);								\
+		memcpy(dst_mstr->addr, addr, len - TRIGGER_NAME_RESERVED_SPACE);					\
+	}														\
 }
 
 #define	GVTR_PROCESS_GVSUBS(PTR, END, SUBSDSC, COLON_IMBALANCE, GVT, SUBSCSTRLEN, SUBSCSTR)			\
@@ -840,7 +850,7 @@ void	gvtr_db_read_hasht(sgmnt_addrs *csa)
 		 * name until an unused name is found.
 		 */
 		trigdsc->rtn_desc.rt_name.len += TRIGGER_NAME_RESERVED_SPACE;
-		GVTR_POOL2BUDDYLIST(gvt_trigger, &trigdsc->rtn_desc.rt_name);
+		GVTR_POOL2BUDDYLIST(gvt_trigger, &trigdsc->rtn_desc.rt_name, TRUE);
 		trigdsc->rtn_desc.rt_name.len -= TRIGGER_NAME_RESERVED_SPACE;	/* Not using the space yet */
 		/* Read in ^#t("GBL",1,"CMD")="S,K,ZK,ZTK,ZTR" */
 		is_defined = gvtr_get_hasht_gblsubs((mval *)&literal_cmd, ret_mval);
@@ -1048,7 +1058,7 @@ void	gvtr_db_read_hasht(sgmnt_addrs *csa)
 		if (is_defined)
 		{
 			trigdsc->options = ret_mval->str;
-			GVTR_POOL2BUDDYLIST(gvt_trigger, &trigdsc->options);
+			GVTR_POOL2BUDDYLIST(gvt_trigger, &trigdsc->options, FALSE);
 		}
 		/* Read in ^#t("GBL",1,"DELIM")=<undefined>	*/
 		delim_defined = gvtr_get_hasht_gblsubs((mval *)&literal_delim, ret_mval);
@@ -1067,7 +1077,7 @@ void	gvtr_db_read_hasht(sgmnt_addrs *csa)
 		{
 			/* Initialize trigdsc->delimiter */
 			trigdsc->delimiter = *ret_mval;
-			GVTR_POOL2BUDDYLIST(gvt_trigger, &trigdsc->delimiter.str);
+			GVTR_POOL2BUDDYLIST(gvt_trigger, &trigdsc->delimiter.str, FALSE);
 		}
 		/* Read in ^#t("GBL",1,"PIECES")="2:6;8"	*/
 		is_defined = gvtr_get_hasht_gblsubs((mval *)&literal_pieces, ret_mval);

@@ -66,16 +66,20 @@
 #include "iormdef.h"
 #include "localvarmonitor.h"
 
-#ifndef STP_MOVE
+#ifdef STP_MOVE
 GBLDEF int	indr_stp_low_reclaim_passes = 0;
 GBLDEF int	rts_stp_low_reclaim_passes = 0;
 GBLDEF int	indr_stp_incr_factor = 1;
 GBLDEF int	rts_stp_incr_factor = 1;
+GBLDEF mstr	**sp_topstr, **sp_array, **sp_arraytop;
+GBLDEF ssize_t	sp_totspace, sp_totspace_nosort;
 #else
 GBLREF int	indr_stp_low_reclaim_passes;
 GBLREF int	rts_stp_low_reclaim_passes;
 GBLREF int	indr_stp_incr_factor;
 GBLREF int	rts_stp_incr_factor;
+GBLREF mstr	**sp_topstr, **sp_array, **sp_arraytop;
+GBLREF ssize_t	sp_totspace, sp_totspace_nosort;
 #endif
 
 GBLREF mvar 			*mvartab;
@@ -112,10 +116,21 @@ GTMTRIG_ONLY(GBLREF mval 	dollar_ztwormhole;)
 GTMTRIG_ONLY(GBLREF mval 	dollar_ztslate;)
 DEBUG_ONLY(GBLREF   boolean_t	ok_to_UNWIND_in_exit_handling;)
 
-
 OS_PAGE_SIZE_DECLARE
 
-static mstr			**topstr, **array, **arraytop;
+#if defined(STP_GCOL_NOSORT) || defined(STP_GCOL_SPSIZE)
+#	define	STP_GCOL_NOSORT_OR_SPSIZE_ONLY(X)		X
+#else
+#	define	STP_GCOL_NOSORT_OR_SPSIZE_ONLY(X)
+#endif
+
+#ifdef STP_MOVE
+#	define	STP_MOVE_ONLY(X)		X
+#	define	STP_NMOVE_ONLY(X)
+#else
+#	define	STP_MOVE_ONLY(X)
+#	define	STP_NMOVE_ONLY(X)		X
+#endif
 
 error_def(ERR_STPEXPFAIL);
 error_def(ERR_STPCRIT);
@@ -168,80 +183,96 @@ MBSTART {														\
 		MSTR_STPG_ADD(&lcl_mval->str);					\
 }
 
-#define MSTR_STPG_PUT(MSTR1)							\
-{										\
-	int		stp_put_int;						\
-										\
-	TREE_DEBUG_ONLY(							\
-	/* assert that we never add a duplicate mstr as otherwise we will	\
-	 * face problems later in PROCESS_CONTIGUOUS_BLOCK macro.		\
-	 * this code is currently commented out as it slows down stp_gcol	\
-	 * tremendously (O(n^2) algorithm where n is # of mstrs added)		\
-	 */									\
-		mstr	**curstr;						\
-										\
-		for (curstr = array; curstr < topstr; curstr++)			\
-			assert(*curstr != (MSTR1));				\
-	)									\
-	assert(topstr < arraytop);						\
-	assert(0 < (MSTR1)->len);						\
-	/* It would be nice to test for maxlen as well here but that causes	\
-	 * some usages of stringpool to fail as other types of stuff are	\
-	 * built into the stringppool besides strings.				\
-	 */									\
-	*topstr++ = MSTR1;							\
-	if (topstr >= arraytop)							\
-	{									\
-		stp_put_int = (int)(topstr - array);				\
-		stp_expand_array();						\
-		array = stp_array;						\
-		topstr = array + stp_put_int;					\
-		arraytop = array + stp_array_size;				\
-		assert(topstr < arraytop);					\
-	}									\
-}										\
+#define MSTR_STPG_PUT(MSTR1)									\
+{												\
+	int		stp_put_int;								\
+												\
+	TREE_DEBUG_ONLY(									\
+	/* assert that we never add a duplicate mstr as otherwise we will			\
+	 * face problems later in PROCESS_CONTIGUOUS_BLOCK macro.				\
+	 * this code is currently commented out as it slows down stp_gcol			\
+	 * tremendously (O(n^2) algorithm where n is # of mstrs added)				\
+	 */											\
+		mstr	**curstr;								\
+												\
+		for (curstr = sp_array; curstr < sp_topstr; curstr++)				\
+			assert(*curstr != (MSTR1));						\
+	)											\
+	assert(sp_topstr < sp_arraytop);							\
+	assert(0 < (MSTR1)->len);								\
+	STP_NMOVE_ONLY(assert(((MSTR1)->addr + (MSTR1)->len) <= (char *)stringpool.free));	\
+	/* It would be nice to test for maxlen as well here but that causes			\
+	 * some usages of stringpool to fail as other types of stuff are			\
+	 * built into the stringppool besides strings.						\
+	 */											\
+	*sp_topstr++ = MSTR1;									\
+	STP_GCOL_NOSORT_OR_SPSIZE_ONLY(sp_totspace += (MSTR1)->len);				\
+	if (sp_topstr >= sp_arraytop)								\
+	{											\
+		stp_put_int = (int)(sp_topstr - sp_array);					\
+		stp_expand_array();								\
+		sp_array = stp_array;								\
+		sp_topstr = sp_array + stp_put_int;						\
+		sp_arraytop = sp_array + stp_array_size;					\
+		assert(sp_topstr < sp_arraytop);						\
+	}											\
+}												\
+
+#define PROCESS_CONTIGUOUS_BLOCK(begaddr, endaddr, cstr, delta)						\
+{													\
+	for (; cstr < sp_topstr; cstr++)								\
+	{ 	/* Note having same mstr in array more than once can cause following assert to fail */	\
+		assert((*cstr)->addr >= (char *)begaddr);						\
+		if ((*cstr)->addr > (char *)endaddr)							\
+			break;										\
+		tmpaddr = (unsigned char *)(*cstr)->addr + (*cstr)->len;				\
+		if (tmpaddr > endaddr)									\
+			endaddr = tmpaddr;								\
+		(*cstr)->addr -= delta;									\
+	}												\
+}
 
 #ifdef STP_MOVE
-
-#define	MSTR_STPG_ADD(MSTR1)										\
-{													\
-	mstr		*lcl_mstr;									\
-	char		*lcl_addr;									\
-													\
-	GBLREF	spdesc	stringpool;									\
-													\
-	lcl_mstr = MSTR1;										\
-	if (lcl_mstr->len)										\
-	{												\
-		lcl_addr = lcl_mstr->addr;								\
-		if (IS_PTR_IN_RANGE(lcl_addr, stringpool.base, stringpool.free))	/* BYPASSOK */	\
-		{											\
-			MSTR_STPG_PUT(lcl_mstr);							\
-		} else if (IS_PTR_IN_RANGE(lcl_addr, stp_move_from, stp_move_to))			\
-		{											\
-			MSTR_STPG_PUT(lcl_mstr);							\
-			stp_move_count++;								\
-		}											\
-	}												\
-}
+	/* stp_move() */
+	#define	MSTR_STPG_ADD(MSTR1)										\
+	{													\
+		mstr		*lcl_mstr;									\
+		char		*lcl_addr;									\
+														\
+		GBLREF	spdesc	stringpool;									\
+														\
+		lcl_mstr = MSTR1;										\
+		if (lcl_mstr->len)										\
+		{												\
+			lcl_addr = lcl_mstr->addr;								\
+			if (IS_PTR_IN_RANGE(lcl_addr, stringpool.base, stringpool.free))	/* BYPASSOK */	\
+			{											\
+				MSTR_STPG_PUT(lcl_mstr);							\
+			} else if (IS_PTR_IN_RANGE(lcl_addr, stp_move_from, stp_move_to))			\
+			{											\
+				MSTR_STPG_PUT(lcl_mstr);							\
+				stp_move_count++;								\
+			}											\
+		}												\
+	}
 
 #else
-
-#define	MSTR_STPG_ADD(MSTR1)										\
-{													\
-	mstr		*lcl_mstr;									\
-	char		*lcl_addr;									\
-													\
-	GBLREF spdesc	stringpool;									\
-													\
-	lcl_mstr = MSTR1;										\
-	if (lcl_mstr->len)										\
-	{												\
-		lcl_addr = lcl_mstr->addr;								\
-		if (IS_PTR_IN_RANGE(lcl_addr, stringpool.base, stringpool.free))	/* BYPASSOK */	\
-			MSTR_STPG_PUT(lcl_mstr);							\
-	}												\
-}
+	/* stp_gcol(), stp_gcol_nosort() and stp_gcol_spsize() */
+	#define	MSTR_STPG_ADD(MSTR1)										\
+	{													\
+		mstr		*lcl_mstr;									\
+		char		*lcl_addr;									\
+														\
+		GBLREF spdesc	stringpool;									\
+														\
+		lcl_mstr = MSTR1;										\
+		if (lcl_mstr->len)										\
+		{												\
+			lcl_addr = lcl_mstr->addr;								\
+			if (IS_PTR_IN_RANGE(lcl_addr, stringpool.base, stringpool.free))	/* BYPASSOK */	\
+				MSTR_STPG_PUT(lcl_mstr);							\
+		}												\
+	}
 
 #endif
 
@@ -268,57 +299,101 @@ MBSTART {														\
 		}								\
 	}
 
-#define PROCESS_CONTIGUOUS_BLOCK(begaddr, endaddr, cstr, delta)						\
-{													\
-	padlen = 0;											\
-	for (; cstr < topstr; cstr++)									\
-	{ 	/* Note having same mstr in array more than once can cause following assert to fail */	\
-		assert((*cstr)->addr >= (char *)begaddr);						\
-		if (((*cstr)->addr > (char *)endaddr) && ((*cstr)->addr != (char *)endaddr + padlen))	\
-			break;										\
-		tmpaddr = (unsigned char *)(*cstr)->addr + (*cstr)->len;				\
-		if (tmpaddr > endaddr)									\
-			endaddr = tmpaddr;								\
-		padlen = mstr_native_align ? PADLEN((*cstr)->len, NATIVE_WSIZE) : 0;			\
-		(*cstr)->addr -= delta;									\
-	}												\
-}
+/* 1) MOVE_WITHIN_STPOOL macro modifies mstr->addr values from one value to a different value in the same
+ *    stringpool memory when we are sure the memory is not expanded. If "stpg_sort()" has happened, we can be sure
+ *    the mstrs are sorted based on "addr" and so we can use "memmove()" to move the strings around inline. Otherwise
+ *    we cannot use "memmove()" as the order of mstrs that we process is arbitrary and copying one mstr from say the
+ *    end of the stringpool to the beginning could overwrite memory that is pointed to by a later mstr in the array.
+ *    Therefore this macro has a different implementation for the "stp_gcol_nosort()" case where we copy from one
+ *    stringpool memory to another stringpool memory (of the same size) (consolation is we can use "memcpy()" instead
+ *    of "memmove()" because these are not copies into the same region of memory).
+ * 2) The COPY2STPOOL macro, on the other hand, can be a lot simpler for the "stp_gcol_nosort()" case as it can do
+ *    a blind copy of the mstrs (in an arbitrary unsorted order). Whereas in the sorted case, this macro needs to
+ *    go through the PROCESS_CONTIGUOUS_BLOCK macro to detect memory overlap across the sorted mstr addr values
+ *    and preserve overlap after the copy.
+ */
+#ifndef STP_GCOL_NOSORT
+	/* stp_gcol(), stp_gcol_spsize() and stp_move() */
+	#define COPY2STPOOL(CSTR, TOPSTR)										\
+	{														\
+		while (CSTR < TOPSTR)											\
+		{													\
+			/* Determine extent of next contiguous block and copy it into new stringpool.base. */		\
+			begaddr = endaddr = (unsigned char *)((*CSTR)->addr);						\
+			delta = (*CSTR)->addr - (char *)stringpool.free;						\
+			PROCESS_CONTIGUOUS_BLOCK(begaddr, endaddr, CSTR, delta);					\
+			blklen = endaddr - begaddr;									\
+			memcpy(stringpool.free, begaddr, blklen);							\
+			stringpool.free += blklen;									\
+		}													\
+	}
+	#define MOVE_WITHIN_STPOOL(CSTR, TOPSTR)									\
+	{														\
+		while (CSTR < TOPSTR)											\
+		{													\
+			/* Determine extent of next contiguous block to move and move it. */				\
+			begaddr = endaddr = (unsigned char *)((*CSTR)->addr);						\
+			delta = (*CSTR)->addr - (char *)stringpool.free;						\
+			PROCESS_CONTIGUOUS_BLOCK(begaddr, endaddr, CSTR, delta);					\
+			blklen = endaddr - begaddr;									\
+			if (delta)											\
+			{												\
+				assert((stringpool.free + blklen) <= stringpool.top);					\
+				memmove(stringpool.free, begaddr, blklen);						\
+			}												\
+			stringpool.free += blklen;									\
+		}													\
+	}
 
-#define COPY2STPOOL(cstr, topstr)										\
-{														\
-	while (cstr < topstr)											\
-	{													\
-		if (mstr_native_align)										\
-			stringpool.free = (unsigned char *)ROUND_UP2((INTPTR_T)stringpool.free, NATIVE_WSIZE);	\
-		/* Determine extent of next contiguous block and copy it into new stringpool.base. */		\
-		begaddr = endaddr = (unsigned char *)((*cstr)->addr);						\
-		delta = (*cstr)->addr - (char *)stringpool.free;						\
-		PROCESS_CONTIGUOUS_BLOCK(begaddr, endaddr, cstr, delta);					\
-		blklen = endaddr - begaddr;									\
-		memcpy(stringpool.free, begaddr, blklen);							\
-		stringpool.free += blklen;									\
-	}													\
-}
-
-#define MOVE_WITHIN_STPOOL(cstr, topstr)									\
-{														\
-	while (cstr < topstr)											\
-	{													\
-		/* Determine extent of next contiguous block to move and move it. */				\
-		if (mstr_native_align)										\
-			stringpool.free = (unsigned char *)ROUND_UP2((INTPTR_T)stringpool.free, NATIVE_WSIZE);	\
-		begaddr = endaddr = (unsigned char *)((*cstr)->addr);						\
-		delta = (*cstr)->addr - (char *)stringpool.free;						\
-		PROCESS_CONTIGUOUS_BLOCK(begaddr, endaddr, cstr, delta);					\
-		blklen = endaddr - begaddr;									\
-		if (delta)											\
-		{												\
-			assert((stringpool.free + blklen) <= stringpool.top);					\
-			memmove(stringpool.free, begaddr, blklen);						\
-		}												\
-		stringpool.free += blklen;									\
-	}													\
-}
+#else
+	/* stp_gcol_nosort() */
+	#define COPY2STPOOL(CSTR, TOPSTR)										\
+	{														\
+		while (CSTR < TOPSTR)											\
+		{													\
+			int	mStrLen;										\
+			mstr	*mStr;											\
+															\
+			mStr = *CSTR;											\
+			mStrLen = mStr->len;										\
+			memcpy(stringpool.free, mStr->addr, mStrLen);							\
+			mStr->addr = (char *)stringpool.free;								\
+			stringpool.free += mStrLen;									\
+			CSTR++;												\
+		}													\
+	}
+	#define MOVE_WITHIN_STPOOL(CSTR, TOPSTR)									\
+	{														\
+		unsigned char	*strpool_base;										\
+		ssize_t		size;											\
+															\
+		assert(CSTR < TOPSTR);											\
+		strpool_base = stringpool.base;										\
+		assert(strpool_base == rts_stringpool.base);								\
+		size = stringpool.top - stringpool.base;								\
+		stringpool.base = stringpool.free = malloc(size);							\
+		stringpool.top = stringpool.base + size;								\
+		stringpool.invokestpgcollevel = stringpool.invokestpgcollevel + (stringpool.base - strpool_base);	\
+		while (CSTR < TOPSTR)											\
+		{													\
+			int	mStrLen;										\
+			char	*mStrAddr;										\
+			mstr	*mStr;											\
+															\
+			mStr = *CSTR;											\
+			mStrAddr = mStr->addr;										\
+			mStrLen = mStr->len;										\
+			assert(mStrAddr != (char *)stringpool.free);							\
+			assert((stringpool.free + mStrLen) <= stringpool.top);						\
+			memcpy(stringpool.free, mStrAddr, mStrLen);							\
+			mStr->addr = (char *)stringpool.free;								\
+			stringpool.free += mStrLen;									\
+			CSTR++;												\
+		}													\
+		rts_stringpool = stringpool;										\
+		free(strpool_base);											\
+	}
+#endif
 
 #define LVZWRITE_BLOCK_GC(LVZWRITE_BLOCK)									\
 {														\
@@ -384,7 +459,11 @@ static void expand_stp(size_t new_size)	/* BYPASSOK */
 	return;
 }
 
-#ifndef STP_MOVE
+#if !defined(STP_MOVE)
+void mv_parse_tree_collect(mvar *node);
+#endif
+
+#if !defined(STP_MOVE) && !defined(STP_GCOL_NOSORT) && !defined(STP_GCOL_SPSIZE)
 #ifdef DEBUG
 /* Verify the current symbol table that we will be processing later in "stp_gcol". This version is callable from anywhere
  * and is a great debuging tool for corrupted mstrs in local variable trees. Uncomment the call near the top of stp_gcol to
@@ -439,8 +518,6 @@ boolean_t is_stp_space_available(ssize_t space_needed)
 
 #endif  /* DEBUG */
 
-void mv_parse_tree_collect(mvar *node);
-
 void mv_parse_tree_collect(mvar *node)
 {
 	int stp_put_int;
@@ -456,18 +533,27 @@ void mv_parse_tree_collect(mvar *node)
 #ifdef STP_MOVE
 /* garbage collect and move range [from,to) to stringpool adjusting all mvals/mstrs pointing in this range */
 void stp_move(char *stp_move_from, char *stp_move_to)
+#elif defined(STP_GCOL_SPSIZE)
+/* garbage collect but as a side effect compute $VIEW("SPSIZE") space requirements with vs without sorting */
+void stp_gcol_spsize(size_t space_asked)
+#elif defined(STP_GCOL_NOSORT)
+/* garbage collect and create enough space for space_asked bytes (DO NOT use stpg_sort()) */
+void stp_gcol_nosort(size_t space_asked)
 #else
-/* garbage collect and create enough space for space_asked bytes */
-void stp_gcol(size_t space_asked)	/* BYPASSOK */
+/* garbage collect and create enough space for space_asked bytes (DO use stpg_sort()) */
+void stp_gcol_sort(size_t space_asked)	/* BYPASSOK */
 #endif
 {
 #	ifdef STP_MOVE
 	int			space_asked = 0, stp_move_count = 0;
 #	endif
-	unsigned char		*strpool_base, *straddr, *tmpaddr, *begaddr, *endaddr;
+	unsigned char		*strpool_base, *straddr, *tmpaddr;
+#	ifndef STP_GCOL_NOSORT
+	unsigned char		*begaddr, *endaddr;
+#	endif
 	int			index, fixup_cnt;
-	ssize_t			space_before_compact, space_after_compact, blklen, delta, space_reclaim, padlen;
-	ssize_t			totspace, space_needed, tmplen, tmplen2;
+	ssize_t			space_before_compact, space_after_compact, blklen, delta, space_reclaim;
+	ssize_t			space_needed, tmplen, tmplen2;
 	io_log_name		*l;		/* logical name pointer		*/
 	lv_blk			*lv_blk_ptr;
 	lv_val			*lvp, *lvlimit;
@@ -510,7 +596,13 @@ void stp_gcol(size_t space_asked)	/* BYPASSOK */
 	assert(!stringpool_unusable);
 	assert(!stringpool_unexpandable);
 	stringpool.gcols++;
+	assert(!mstr_native_align);
+	assert((stringpool.base == indr_stringpool.base) || (stringpool.base == rts_stringpool.base));
 #	ifndef STP_MOVE
+#	ifdef STP_GCOL_NOSORT
+	/* Assert that we use "stp_gcol_nosort()" only in case of the runtime stringpool and not the indirection stringpool */
+	assert(stringpool.base == rts_stringpool.base);
+#	endif	/* STP_GCOL_NOSORT */
 	/* Before we get cooking with our stringpool GC, check if it is appropriate to call lv_val garbage collection.
 	 * This is data that can get orphaned with no way to access it when aliases are used. This form of GC is only done
 	 * if aliases are actively being used. It is not called with every stringpool garbage collection but every "N"
@@ -569,14 +661,12 @@ void stp_gcol(size_t space_asked)	/* BYPASSOK */
 	{
 		low_reclaim_passes = &indr_stp_low_reclaim_passes;
 		incr_factor = &indr_stp_incr_factor;
-	} else
-	{
-		assertpro(FALSE && stringpool.base);	/* neither rts_stringpool, nor indr_stringpool */
 	}
 	if (NULL == stp_array)
 		stp_array = (mstr **)malloc((stp_array_size = STP_MAXITEMS) * SIZEOF(mstr *));
-	topstr = array = stp_array;
-	arraytop = topstr + stp_array_size;
+	sp_topstr = sp_array = stp_array;
+	sp_arraytop = sp_topstr + stp_array_size;
+	sp_totspace = 0;
 	/* If dqloop == 0 then we got here from mcompile. If literal_chain.que.fl == 0 then put_lit was never
 	 * done as is true in gtcm_server. Test for cache_table.size is to check that we have not done a
 	 * cache_init() which would be true if doing mumps standalone compile.
@@ -939,12 +1029,23 @@ void stp_gcol(size_t space_asked)	/* BYPASSOK */
 	 * incorrect view of available stringpool space) resulting in memory corruption.
 	 */
 	stringpool.free = stringpool.base;
-	if (topstr != array)
+	assert(0 <= sp_totspace);
+	assert((sp_topstr != sp_array) || (0 == sp_totspace));
+	if (sp_topstr != sp_array)
 	{
-		stpg_sort(array, topstr - 1);
-		for (totspace = 0, cstr = array, straddr = (unsigned char *)(*cstr)->addr; (cstr < topstr); cstr++ )
+		/* Note: For the STP_GCOL_NOSORT case, "sp_totspace" would already be set to the sum
+		 * of the lengths of all mstrs pointing to the stringpool.
+		 */
+#		ifndef STP_GCOL_NOSORT
+#		ifdef STP_GCOL_SPSIZE
+		assert(0 < sp_totspace);
+		sp_totspace_nosort = sp_totspace;
+		sp_totspace = 0;
+#		endif
+		stpg_sort(sp_array, sp_topstr - 1);
+		for (cstr = sp_array, straddr = (unsigned char *)(*cstr)->addr; (cstr < sp_topstr); cstr++)
 		{
-			assert((cstr == array) || ((*cstr)->addr >= ((*(cstr - 1))->addr)));
+			assert((cstr == sp_array) || ((*cstr)->addr >= ((*(cstr - 1))->addr)));
 			tmpaddr = (unsigned char *)(*cstr)->addr;
 			tmplen = (*cstr)->len;
 			assert(0 < tmplen);
@@ -952,23 +1053,27 @@ void stp_gcol(size_t space_asked)	/* BYPASSOK */
 			{
 				tmplen2 = ((tmpaddr >= straddr) ? tmplen : (ssize_t)(tmpaddr + tmplen - straddr));
 				assert(0 < tmplen2);
-				totspace += tmplen2;
-				if (mstr_native_align)
-					totspace += PADLEN(totspace, NATIVE_WSIZE);
+				sp_totspace += tmplen2;
 				straddr = tmpaddr + tmplen;
 			}
 		}
-		/* Now totspace is the total space needed for all the current entries and any stp_move entries.
-		 * Note that because of not doing exact calculation with substring, totspace may be little more
-		 * than what is needed.
-		 */
-		space_after_compact = stringpool.top - stringpool.base - totspace; /* can be -ve number */
+#		endif
+		/* Now "sp_totspace" is the total space needed for all the current entries and any stp_move entries */
+		space_after_compact = stringpool.top - stringpool.base - sp_totspace;
 	} else
 		space_after_compact = stringpool.top - stringpool.free;
-#	ifndef STP_MOVE
-	assert(mstr_native_align || space_after_compact >= space_before_compact);
+	/* Note: For the STP_GCOL_NOSORT case, the space after compaction could be negative since mstrs that overlap
+	 * in stringpool memory get their lengths counted separately and so their total could exceed the currently
+	 * available free space in the stringpool. For the STP_MOVE case, the space after compaction includes literals
+	 * from the object code (that is about to be moved into the stringpool and could be arbitrary in length) and so that
+	 * could also exceed the currently available free space in the stringpool. Hence skip the below assert in those cases.
+	 */
+#	if !defined(STP_MOVE) && !defined(STP_GCOL_NOSORT)
+	assert(0 <= (signed)space_before_compact);
+	assert(0 <= (signed)space_after_compact);
+	assert((signed)space_after_compact >= (signed)space_before_compact);
 #	endif
-	space_reclaim = space_after_compact - space_before_compact; /* this can be -ve, if alignment causes expansion */
+	space_reclaim = space_after_compact - space_before_compact;
 	space_needed -= (ssize_t)space_after_compact;
 	DBGSTPGCOL((stderr, "space_needed=%li\n", space_needed));
 	/* After compaction if less than 31.25% of space is avail, consider it a low reclaim pass */
@@ -1058,10 +1163,10 @@ void stp_gcol(size_t space_asked)	/* BYPASSOK */
 					stp_incr = stp_incr / 2;
 			}
 		} while (TRUE);
-		cstr = array;
+		cstr = sp_array;
 		if (strpool_base != stringpool.base) /* expanded successfully */
 		{
-			COPY2STPOOL(cstr, topstr);
+			COPY2STPOOL(cstr, sp_topstr);
 			/* NOTE: rts_stringpool must be kept up-to-date because it tells whether the current
 			 * stringpool is the run-time or indirection stringpool.
 		 	 */
@@ -1079,7 +1184,7 @@ void stp_gcol(size_t space_asked)	/* BYPASSOK */
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_STPEXPFAIL, 1,
 					      (stp_incr + stringpool.top - stringpool.base));
 			}
-			MOVE_WITHIN_STPOOL(cstr, topstr);
+			MOVE_WITHIN_STPOOL(cstr, sp_topstr);
 		}
 		*low_reclaim_passes = 0;
 	} else
@@ -1089,42 +1194,41 @@ void stp_gcol(size_t space_asked)	/* BYPASSOK */
 		if (*incr_factor > 1)
 			*incr_factor = *incr_factor - 1;
 		DBGSTPGCOL((stderr, "incr_factor=%i space_needed=%li\n", *incr_factor, space_needed));
-		if (topstr != array)
+		if (sp_topstr != sp_array)
 		{
 #			ifdef STP_MOVE
 			if (0 != stp_move_count)
-			{	/* All stp_move elements must be contiguous in the 'array'. They point outside
-				 * the range of stringpool.base and stringpool.top. In the 'array' of (mstr *) they
+			{	/* All stp_move elements must be contiguous in the 'sp_array'. They point outside
+				 * the range of stringpool.base and stringpool.top. In the 'sp_array' of (mstr *) they
 				 * must be either at the beginning, or at the end.
 				 */
 				DBGSTPGCOL((stderr, "STP_MOVE defined\n"));
-				tmpaddr = (unsigned char *)(*array)->addr;
+				tmpaddr = (unsigned char *)(*sp_array)->addr;
 				if (IS_PTR_IN_RANGE(tmpaddr, stringpool.base, stringpool.top))	/* BYPASSOK */
-					topstr -= stp_move_count;/* stringpool elements before move elements in stp_array */
+					sp_topstr -= stp_move_count;/* stringpool elements before move elements in stp_array */
 				else
-					array += stp_move_count;/* stringpool elements after move elements or no stringpool
+					sp_array += stp_move_count;/* stringpool elements after move elements or no stringpool
 								 * elements in stp_array */
 			}
 #			endif
 			/* Skip over contiguous block, if any, at beginning of stringpool.
 			 * Note that here we are not considering any stp_move() elements.
 			 */
-			cstr = array;
-			begaddr = endaddr = (unsigned char *)((*cstr)->addr);
-			MOVE_WITHIN_STPOOL(cstr, topstr);
+			cstr = sp_array;
+			MOVE_WITHIN_STPOOL(cstr, sp_topstr);
 		}
 #		ifdef STP_MOVE
 		if (0 != stp_move_count)
 		{	/* Copy stp_move elements into stringpool now */
-			assert(topstr == cstr); /* all stringpool elements garbage collected */
-			if (array == stp_array) /* stringpool elements before move elements in stp_array */
-				topstr += stp_move_count;
+			assert(sp_topstr == cstr); /* all stringpool elements garbage collected */
+			if (sp_array == stp_array) /* stringpool elements before move elements in stp_array */
+				sp_topstr += stp_move_count;
 			else
 			{ /* stringpool elements after move elements OR no stringpool elements in stp_array */
 				cstr = stp_array;
-				topstr = array;
+				sp_topstr = sp_array;
 			}
-			COPY2STPOOL(cstr, topstr);
+			COPY2STPOOL(cstr, sp_topstr);
 		}
 #		endif
 	}
@@ -1149,6 +1253,6 @@ void stp_gcol(size_t space_asked)	/* BYPASSOK */
 		stringpool.strpllimwarned =  TRUE;
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STPCRIT);
 	}
-	#	endif	/* !STP_MOVE */
+#	endif		/* !STP_MOVE */
 	return;
 }

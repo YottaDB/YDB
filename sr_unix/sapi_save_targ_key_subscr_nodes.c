@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -58,6 +58,7 @@ void sapi_save_targ_key_subscr_nodes(void)
 		;
 	/* The following asserts (in the for loop) assume that a global name will be able to fit in completely into any key. */
 	assert(gvkey_char_ptr <= gvkey_top_ptr);
+	subs_cnt = 0;
 	for ( ; gvkey_char_ptr < gvkey_top_ptr; )
 	{
 		if (SUBSCRIPT_STDCOL_NULL == *gvkey_char_ptr)	/* This is a null string in Standard Null Collation format */
@@ -81,11 +82,11 @@ void sapi_save_targ_key_subscr_nodes(void)
 		}
 		assert(gvkey_char_ptr <= gvkey_top_ptr);
 		subcur++;
-	}
-	subs_cnt = subcur - TREF(sapi_query_node_subs);
-	if (subs_cnt)
+		subs_cnt++;
 		TREF(sapi_query_node_subs_cnt) = subs_cnt;
-	else
+	}
+	assert(!subs_cnt || (TREF(sapi_query_node_subs_cnt) == subs_cnt));
+	if (!subs_cnt)
 	{	/* Returning just the name (no subscripts) so set the subscript count to -1 to
 		 * differentiate it from a subs_cnt=0 return which signals the end of the list (YDB_ERR_NODEEND).
 		 * Similar code exists in "sr_port/op_fnreversequery.c" for local variables.

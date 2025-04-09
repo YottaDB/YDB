@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -114,7 +114,7 @@ GBLREF	int			gv_fillfactor;
 GBLREF	symval			*curr_symval;
 GBLREF	uint4			ydbDebugLevel;
 GBLREF	boolean_t		lvamon_enabled;
-GBLREF	spdesc			stringpool;
+GBLREF	spdesc			stringpool, rts_stringpool;
 GBLREF	boolean_t		is_updproc;
 GBLREF	uint4			process_id;
 GBLREF	uint4			dollar_tlevel;
@@ -721,6 +721,23 @@ void	op_view(int numarg, mval *keyword, ...)
 			break;
 		case VTK_STPGCOL:
 			INVOKE_STP_GCOL(INTCAST(stringpool.top - stringpool.free) + 1);/* Computation to avoid assert in stp_gcol */
+			break;
+		case VTK_STPGCOLNOSORT:
+			/* The below usages of "stringpool.stp_gcol_nosort" assume that the current stringpool is the runtime
+			 * stringpool (as "stp_gcol_nosort" is maintained only for that stringpool and not for the indirection
+			 * stringpool). This is asserted below.
+			 */
+			assert(stringpool.base == rts_stringpool.base);
+			if (1 == numarg)
+			{
+				testvalue = MV_FORCE_INT(parmblk.value);
+				if (0 < testvalue)
+					stringpool.stp_gcol_nosort = TRUE;
+				else if (FALSE == testvalue)
+					stringpool.stp_gcol_nosort = FALSE;
+			} else
+				rts_error_csa(CSA_ARG(NULL)
+					VARLSTCNT(4) ERR_VIEWARGCNT, 2, STRLEN((const char *)vtp->keyword), vtp->keyword);
 			break;
 		case VTK_LVGCOL:
 			als_lvval_gc();

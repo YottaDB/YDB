@@ -90,6 +90,7 @@ void op_fnquery_va(int sbscnt, mval *dst, va_list var)
 				*last_fnquery_ret, *varname, *v1, *v2;
 	mval			xform_args[MAX_LVSUBSCRIPTS];	/* for lclcol */
 	mstr			format_out, *retsub;
+	int			v2_mvtype;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -461,7 +462,11 @@ void op_fnquery_va(int sbscnt, mval *dst, va_list var)
 				{
 					v1->str.len = INTCAST((char *)stringpool.free - v1->str.addr);
 					INVOKE_STP_GCOL(MAX_NUM_SIZE);
-					assert(IS_AT_END_OF_STRINGPOOL(v1->str.addr, v1->str.len));
+					if (!IS_AT_END_OF_STRINGPOOL(v1->str.addr, v1->str.len))
+					{	/* Need to move it to the top */
+						ENSURE_IS_AT_END_OF_STRINGPOOL(v1->str.addr, v1->str.len, MAX_NUM_SIZE);
+						stringpool.free += v1->str.len;
+					}
 				}
 				*v2 = *mv;
 				/* Now that we have ensured enough space in the stringpool, we dont expect any more
@@ -497,7 +502,8 @@ void op_fnquery_va(int sbscnt, mval *dst, va_list var)
 				 * order could cause "stp_gcol" (if invoked in between) to get confused since v2->str is
 				 * not yet initialized with current subscript (in the M-stack).
 				 */
-				v2->mvtype = (!is_sqlnull ? MV_STR : (MV_STR | MV_SQLNULL));
+				v2_mvtype = (!is_sqlnull ? MV_STR : (MV_STR | MV_SQLNULL));
+				v2->mvtype = v2_mvtype;
 				mval_lex(v2, &format_out);
 				if (format_out.addr != (char *)stringpool.free)	/* BYPASSOK */
 				{	/* We must put the string on the string pool ourself - mval_lex didn't do it
@@ -507,7 +513,11 @@ void op_fnquery_va(int sbscnt, mval *dst, va_list var)
 					{
 						v1->str.len = INTCAST((char *)stringpool.free - v1->str.addr);
 						INVOKE_STP_GCOL(v2->str.len + 2);
-						assert((char *)stringpool.free - v1->str.addr == v1->str.len);
+						if (!IS_AT_END_OF_STRINGPOOL(v1->str.addr, v1->str.len))
+						{	/* Need to move it to the top */
+							ENSURE_IS_AT_END_OF_STRINGPOOL(v1->str.addr, v1->str.len, v2->str.len + 2);
+							stringpool.free += v1->str.len;
+						}
 					}
 					*stringpool.free++ = '\"';
 					memcpy(stringpool.free, v2->str.addr, v2->str.len);
@@ -523,10 +533,21 @@ void op_fnquery_va(int sbscnt, mval *dst, va_list var)
 					*stringpool.free++ = '\"';
 				} else
 				{
+					if (!IS_AT_END_OF_STRINGPOOL(v1->str.addr, v1->str.len))
+					{	/* "mval_lex()" invoked "stp_gcol()" and "v1" is no longer at the end.
+						 * Need to move "v1" back to the end/top of the stringpool.
+						 */
+						v2->str = format_out;
+						stringpool.free += format_out.len;
+						ENSURE_IS_AT_END_OF_STRINGPOOL(v1->str.addr, v1->str.len, format_out.len);
+						stringpool.free += v1->str.len;
+						assert(v2->str.len == format_out.len);
+						memcpy(stringpool.free, v2->str.addr, format_out.len);
+					}
 					if (last_sub_null)
 					{
 						TAREF1(last_fnquery_return_sub,(TREF(last_fnquery_return_subcnt))).mvtype
-							= v2->mvtype;
+							= v2_mvtype;
 						TAREF1(last_fnquery_return_sub,(TREF(last_fnquery_return_subcnt))).str.addr
 							= (char *)stringpool.free;
 						TAREF1(last_fnquery_return_sub,(TREF(last_fnquery_return_subcnt))++).str.len
@@ -539,7 +560,11 @@ void op_fnquery_va(int sbscnt, mval *dst, va_list var)
 			{
 				v1->str.len = INTCAST((char *)stringpool.free - v1->str.addr);
 				INVOKE_STP_GCOL(1);
-				assert(IS_AT_END_OF_STRINGPOOL(v1->str.addr, v1->str.len));
+				if (!IS_AT_END_OF_STRINGPOOL(v1->str.addr, v1->str.len))
+				{	/* Need to move it to the top */
+					ENSURE_IS_AT_END_OF_STRINGPOOL(v1->str.addr, v1->str.len, 1);
+					stringpool.free += v1->str.len;
+				}
 			}
 			*stringpool.free++ = (h2 < h1 ? ',' : ')');
 		}
