@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -438,7 +438,7 @@ void repl_inst_jnlpool_reset(void)
 }
 
 /* Description:
- *	Reset receiver pool shmid and semid in replication instance file.
+ *	Reset receive pool shmid and semid in replication instance file.
  * Parameters:
  *	None
  * Return Value:

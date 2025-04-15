@@ -856,7 +856,7 @@ boolean_t mur_close_files(void)
 		ASSERT_HOLD_REPLPOOL_SEMS;
 		/* repl_inst_read and mu_replpool_release_sem expects that the caller holds the ftok semaphore as it is about to
 		 * read the replication instance file and assumes there are no concurrent writers. However, ROLLBACK grabs all the
-		 * access control semaphores of both jnlpool and receiver pool as well as the replication locks in mur_open_files.
+		 * access control semaphores of both jnlpool and receive pool as well as the replication locks in mur_open_files.
 		 * This means -
 		 * (a) No replication servers can startup as they cannot go beyond obtaining ftok lock in jnlpool_init or
 		 *     recvpool_init as they will be hung waiting for the access control semaphores to be released by ROLLBACK
