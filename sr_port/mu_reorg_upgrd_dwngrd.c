@@ -238,8 +238,7 @@ void	mu_reorg_upgrd_dwngrd(void)
 		if (SS_NORMAL != status)
 		{
 			error = TRUE;					/* move on to the next region */
-			if (csa->now_crit)
-				rel_crit(reg);
+			assert(!csa->now_crit);
 			continue;
 		}
 		if (IS_ONLNRLBK_ACTIVE(csa))
@@ -266,15 +265,18 @@ void	mu_reorg_upgrd_dwngrd(void)
 				mupip_exit(ERR_MUNOFINISH);
 			}
 		}
+		grab_crit(reg, WS_9);			/* Grab crit and update the file header in crit */
 		if ((0 != csa->nl->reorg_upgrade_pid) && (is_proc_alive(csa->nl->reorg_upgrade_pid, 0)))
 		{
 			util_out_print("!/Region !AD : MUPIP REORG -UPGRADE of !AD in progress, skipping",
 					TRUE, REG_LEN_STR(reg), DB_LEN_STR(reg));
+			rel_crit(reg);
 			continue;
 		}
 		mu_upgrade_in_prog = MUPIP_REORG_UPGRADE_IN_PROGRESS;
 		mu_reorg_more_tries = TRUE;
 		csa->nl->reorg_upgrade_pid = process_id;
+		rel_crit(reg);
 		util_out_print("!/Region !AD : MUPIP REORG -UPGRADE of !AD started (!UL of !UL)", TRUE,
 					REG_LEN_STR(reg), DB_LEN_STR(reg), csd->blks_to_upgrd, csd->trans_hist.total_blks);
 		gv_target = targ_alloc(csa->hdr->max_key_size, NULL, reg);
