@@ -88,6 +88,9 @@
 #include "tp.h"
 #include "mlkdef.h"
 #include "mlk_ops.h"
+#ifdef DEBUG
+#include "mu_upgrade_bmm.h"
+#endif
 
 GBLREF	VSIG_ATOMIC_T		forced_exit;
 GBLREF	boolean_t		mupip_jnl_recover;
@@ -233,7 +236,17 @@ int4 gds_rundown(boolean_t cleanup_udi)
 		}
 	}
 	if (mu_upgrade_in_prog)
+	{
+		uint4	reorg_upgrade_pid;
+
+		reorg_upgrade_pid = csa->nl->reorg_upgrade_pid;
+		/* We do not allow concurrent MUPIP REORG -UPGRADEs (see code in "sr_port/mu_reorg_upgrd_dwngrd.c"
+		 * where "csa->nl->reorg_upgrade_pid" gets set after a "grab_crit()" call). Therefore we expect
+		 * to see only our process id in shared memory at this point. Assert accordingly.
+		 */
+		assert((MUPIP_REORG_UPGRADE_IN_PROGRESS != mu_upgrade_in_prog) || (process_id == reorg_upgrade_pid));
 		csa->nl->reorg_upgrade_pid = 0;
+	}
 	csa->regcnt--;
 	if (csa->regcnt)
 	{	/* There is at least one more region pointing to the same db file as this region.
