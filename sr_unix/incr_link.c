@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -849,12 +849,21 @@ boolean_t incr_link(int *file_desc, zro_ent *zro_entry, uint4 fname_len, char *f
 		 */
 		old_rhead->lnrtab_adr = hdr->lnrtab_adr;
 		old_rhead->lnrtab_len = hdr->lnrtab_len;
+		/* Note: GT.M V6.3-007 had added the following code. But I don't see the need for it.
+		 * 1) If the routine is not in the stack, then the call graph
+		 *    "zlput_rname()" -> "zr_unlink_rtn()" -> "stp_move()" would have already taken care of the "stp_move()".
+		 * 2) If the routine is in the stack, then the "zr_unlink_rtn" would have been deferred to when the routine
+		 *    gets unwound from the M stack. So until then we anyways don't need to be doing a "stp_move()".
+		 * Therefore I have enclosed this seemingly unnecessary code inside a "#ifdef UNUSED_CODE" block.
+		 */
+#		ifdef UNUSED_CODE
 		if (0 < old_rhead->literal_text_len)	/* section added Jan. 2019; seems right, but no test case proving need */
 		{	/* move any string literals used by current mvals to the string pool before we lose track of them */
 			assert(old_rhead->literal_text_adr);
 			stp_move((char *)old_rhead->literal_text_adr,
 				 (char *)(old_rhead->literal_text_adr + old_rhead->literal_text_len));
 		}
+#		endif
 		old_rhead->literal_text_adr = hdr->literal_text_adr;
 		old_rhead->literal_text_len = hdr->literal_text_len;	/* added Jan. 2019 */
 		/* shared_object should characterize this old header */
