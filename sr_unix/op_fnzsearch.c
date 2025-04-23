@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -206,6 +206,18 @@ int op_fnzsearch(mval *pattern, mint indx, mint mfunc, mval *ret)
 						var_ref->v.mvtype = MV_STR;
 						var_ref->v.str.len = 0;
 						match_len = (plength *)&(var_ref->v.m[1]);
+						/* Note that "file.str.addr" could have changed if a "stp_gcol()" call
+						 * happened inside "op_putindx()" above in which case the pointer could
+						 * no longer be valid memory (could have even be freed). Additionally,
+						 * "file.str.addr" could point to a string that is the output of a collation
+						 * transform (do_xform() call if TREF(local_collseq) is TRUE). But the
+						 * SET_LENGTHS macro invocation below relies on "file.str.addr" pointing to
+						 * the pre-transformed string value (in order to determine the basename and
+						 * the extension of the file name, none of which is valid if we parse the
+						 * collation transformed string value) so reset "file.str.addr" to "match"
+						 * before invoking the "SET_LENGTHS" macro.
+						 */
+						file.str.addr = match;
 						SET_LENGTHS(match_len, file.str.addr, length, TRUE);
 					}
 #					ifdef _AIX
