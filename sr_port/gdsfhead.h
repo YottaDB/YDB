@@ -34,6 +34,8 @@
 #include "gtm_reservedDB.h"
 #include "proc_wait_stat.h"
 #include "region_freeze_multiproc.h"
+#include "gdsroot.h"
+#include "gdsbt.h"
 
 #define CACHE_STATE_OFF SIZEOF(que_ent)
 

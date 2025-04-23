@@ -3,7 +3,7 @@
  * Copyright (c) 2018-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -244,8 +244,9 @@ void empty_xfer_queue_entries(void)
 	save_xfer_entry	*entry;
 	DCL_THREADGBL_ACCESS;
 
-	DBGDFRDEVNT((stderr, "%d %s: empty_xfer_queue_entries event_type: %d\n", __LINE__, __FILE__, entry->outofband));
 	SETUP_THREADGBL_ACCESS;
+	DBGDFRDEVNT((stderr, "%d %s: empty_xfer_queue_entries event_type: %d\n", __LINE__, __FILE__,
+	     (TREF(save_xfer_root_ptr))->outofband));
 	dqloop((TREF(save_xfer_root_ptr)), ev_que, entry)
 	{
 		if (not_in_play == entry->event_state)

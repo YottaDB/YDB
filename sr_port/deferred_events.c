@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2023-2024 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2023-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -94,8 +94,8 @@ boolean_t xfer_set_handlers(int4  event_type, int4 param_val, boolean_t popped_e
 	{	/* events already in flux - stash this "as is" in the record for this event */
 		if (not_in_play == entry->event_state)
 			entry->event_state = signaled;
-		DBGDFRDEVNT((stderr, "%d %s: xfer_set_handlers - stashed: %d with state: %d\n", __LINE__, __FILE__, e_type,
-			TAREF1(save_xfer_root, e_type).event_state));
+		DBGDFRDEVNT((stderr, "%d %s: xfer_set_handlers - stashed: %d with state: %d\n", __LINE__, __FILE__, event_type,
+			TAREF1(save_xfer_root, event_type).event_state));
 		return TRUE;						/* return value currently only used by tp_timeout.c */
 	}
 	/* WARNING! AIO sets multi_thread_in_use which disables DEFER_INTERRUPTS, treat it like an active event */

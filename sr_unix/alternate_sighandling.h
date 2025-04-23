@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2020-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -13,6 +13,7 @@
 #define ALTERNATE_SIGHANDLING_H_INCLUDED
 
 #include "libyottadb.h"
+#include "gtm_semaphore.h"
 
 /* A word about alternate signal handling - In normal signal handling, there are times that signals need to be bounded to
  * another thread to be properly processed. This is done by the FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED() macro but this

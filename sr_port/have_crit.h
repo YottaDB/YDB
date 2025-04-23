@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -28,7 +28,6 @@
 #include "gtmsiginfo.h"
 #include "xfer_enum.h"
 #include "deferred_signal_set.h"
-#include "deferred_events.h"
 
 /* states of CRIT passed as argument to have_crit() */
 #define CRIT_HAVE_ANY_REG	0x00000001
@@ -325,7 +324,9 @@ GBLREF	boolean_t	multi_thread_in_use;		/* TRUE => threads are in use. FALSE => n
 }
 
 /* Can't include sig_init.h until the definitions above were done ([DEFER|ENABLE]_INTERRUPTS) */
+#include "alternate_sighandling.h"
 #include "sig_init.h"
+#include "deferred_events.h"
 
 /* This macro used to previously check if the global variable "intrpt_ok_state" holds any of the following values.
  *

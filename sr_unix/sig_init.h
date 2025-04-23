@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -20,6 +20,13 @@
 
 #include "memcoherency.h"
 #include "libyottadb.h"
+
+/* The below macro gets the latch value. It does not do any interlocked operations but is named BIT_GET_INTERLOCKED
+ * to be consistent with the related BIT_SET_INTERLOCKED macro.
+ */
+#define	BIT_GET_INTERLOCKED(LATCH) (DBG_ASSERT(0 <= GLOBAL_LATCH_VALUE(&LATCH))	GLOBAL_LATCH_VALUE(&LATCH))
+
+/* can't include this until we define BIT_GET_INTERLOCKED */
 #include "generic_signal_handler.h"
 #include "alternate_sighandling.h"
 #include "interlock.h"
@@ -129,11 +136,6 @@ GBLREF	void			(*ydb_stm_thread_exit_fnptr)(void);
 	}												\
 	assert(0 <= GLOBAL_LATCH_VALUE(&LATCH));							\
 }
-
-/* The below macro gets the latch value. It does not do any interlocked operations but is named BIT_GET_INTERLOCKED
- * to be consistent with the related BIT_SET_INTERLOCKED macro.
- */
-#define	BIT_GET_INTERLOCKED(LATCH) (DBG_ASSERT(0 <= GLOBAL_LATCH_VALUE(&LATCH))	GLOBAL_LATCH_VALUE(&LATCH))
 
 /* The below macro needs to invoke BIT_SET_INTERLOCKED since multliple threads can invoke it at the same time.
  */
