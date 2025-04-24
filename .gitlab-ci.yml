@@ -86,7 +86,7 @@ build-test:
     when: always
   script:
     - docker build -f Dockerfile-test -t ydbtest .
-    - docker run --init -t -v ${PWD}/testarea/:/testarea1/ --cap-add SYS_ADMIN --cap-add SYS_TIME -e CI_PIPELINE_ID -e CI_COMMIT_BRANCH --rm ydbtest -pipelineydb
+    - docker run --init -t -v ${PWD}/testarea/:/testarea1/ --cap-add SYS_ADMIN --cap-add SYS_TIME --cap-add IPC_LOCK -e CI_PIPELINE_ID -e CI_COMMIT_BRANCH --rm ydbtest -pipelineydb
 
 # docker images creation mechanism.
 .docker-create:
