@@ -3,6 +3,9 @@
  * Copyright (c) 2013-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2025 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -147,6 +150,12 @@ enum cdb_sc read_record(int *rec_size_ptr, int *key_cmpc_ptr, int *key_len_ptr, 
 	}
 	GET_USHORT(temp_ushort, &(((rec_hdr_ptr_t)rec_base)->rsiz));
 	rec_size = temp_ushort;
+	if ((rec_base + rec_size) > blk_end)
+	{	/* Record overflows block end. Restartable situation. */
+		assert(CDB_STAGNATE > t_tries);
+		NONTP_TRACE_HIST_MOD(blk_stat, t_blkmod_reorg_funcs);
+		return cdb_sc_blkmod;
+	}
 	key_cmpc = EVAL_CMPC((rec_hdr_ptr_t)rec_base);
 	if ((0 != level) && (bstar_rec_size(long_blk_id) == rec_size))
 	{
