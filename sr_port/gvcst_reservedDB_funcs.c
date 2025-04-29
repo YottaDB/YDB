@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2016-2024 Fidelity National Information	*
+ * Copyright (c) 2016-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -199,6 +199,8 @@ void gvcst_init_statsDB(gd_region *baseDBreg, boolean_t do_statsdb_init)
 			if (statsDBreg_located->open)		/* do the check just in case */
 			{
 				statsDBcsa = &FILE_INFO(statsDBreg_located)->s_addrs;
+				statsDBreg_located->read_only = TRUE;
+				statsDBcsa->read_write = FALSE;
 				/* Database was opened read/only as this process has no privs to write to it.
 				 * Even though we do not need to do the statsdb init now, we know we cannot do the init
 				 * successfully and since the caller in this case is in a better position to turn off
@@ -311,6 +313,7 @@ void gvcst_init_statsDB(gd_region *baseDBreg, boolean_t do_statsdb_init)
 				 */
 			assert(IS_STATSDB_REG(statsDBreg_located));
 			ygs_map->reg.addr = statsDBreg_located;
+			ygs_map->old_reg.addr = NULL;
 			gvname.var_name.addr = STATSDB_GBLNAME;
 			gvname.var_name.len = STATSDB_GBLNAME_LEN;
 			COMPUTE_HASH_MSTR(gvname.var_name, gvname.hash_code);
@@ -392,6 +395,7 @@ void gvcst_init_statsDB(gd_region *baseDBreg, boolean_t do_statsdb_init)
 		}
 		statsDBreg->statsDB_setup_started = FALSE;
 		statsDBreg->statsDB_setup_completed = TRUE;
+		baseDBreg->statshare = STATSHARE;
 		REVERT;
 		/* Restore previous region's setup */
 		RESTORE_SAVED_VALUES;
@@ -608,6 +612,8 @@ void gvcst_remove_statsDB_linkage(gd_region *baseDBreg)
 		statsDBcsa->read_write = FALSE;				/* Maintain read_only/read_write in parallel */
 		statsDBcsa->statsDB_setup_completed = FALSE;
 	}
+	statsDBreg->statsDB_setup_completed = FALSE;
+	baseDBreg->statshare = NOSTATSHARE;
 	/* Restore previous region's setup */
 	TP_CHANGE_REG(save_cur_region);
 	jnlpool = save_jnlpool;

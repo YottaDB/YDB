@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2020 Fidelity National Information	*
+ * Copyright (c) 2003-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -42,7 +42,7 @@
 GBLREF	gv_key		*gv_currkey;
 GBLREF	mur_gbls_t	murgbl;
 GBLREF	mur_opt_struct	mur_options;
-GBLREF	boolean_t	is_updproc;
+GBLREF	boolean_t	is_updproc, uupd_tstart, in_tstart;
 GBLREF	char		muext_code[][2];
 LITREF	char		*jrt_label[JRT_RECTYPES];
 
@@ -53,6 +53,7 @@ error_def(ERR_TEXT);
 #define LAB_LEN		7
 #define LAB_TERM	"\\"
 #define LAB_TERM_SZ	(SIZEOF(LAB_TERM) - 1)
+#define WS_BUFF_LEN	23
 
 /* This routine formats and outputs journal extract records
  * corresponding to M SET, KILL, ZKILL, TSTART, ZTSTART, and ZTRIGGER commands, $ZTRIGGER function (LGTRIG) and $ZTWORMHOLE
@@ -70,26 +71,28 @@ void	mur_extract_set(jnl_ctl_list *jctl, enum broken_type recstat, jnl_record *r
 	else
 		EXT_DET_COMMON_PREFIX(jctl);
 	rectype = (enum jnl_record_type)rec->prefix.jrec_type;
-	if (IS_FUPD_TUPD(rectype))
+	if (IS_FUPD_TUPD(rectype) || (IS_GUPD_UUPD(rectype) && uupd_tstart))
 	{
 		if (!mur_options.detail)
 		{
-			if (IS_TUPD(rectype))
+			if (IS_TUPD(rectype) || IS_UUPD(rectype))
 			{
 				EXT2BYTES(&muext_code[MUEXT_TSTART][0]); /* TSTART */
 				is_ztstart = FALSE;
-			} else /* if (IS_FUPD(rectype)) */
+				in_tstart = TRUE;
+			} else /* if (IS_FUPD(rectype) || IS_GUPD(rectype) record) */
 			{
 				EXT2BYTES(&muext_code[MUEXT_ZTSTART][0]); /* ZTSTART */
 				is_ztstart = TRUE;
 			}
 		} else
 		{
-			if (IS_TUPD(rectype))
+			if (IS_TUPD(rectype) || IS_UUPD(rectype))
 			{
 				strcpy(murgbl.extr_buff + extract_len, "TSTART \\");
 				is_ztstart = FALSE;
-			} else /* if (IS_FUPD(rectype)) */
+				in_tstart = TRUE;
+			} else /* if (IS_FUPD(rectype) || IS_GUPD(rectype) record) */
 			{
 				strcpy(murgbl.extr_buff + extract_len, "ZTSTART\\");
 				is_ztstart = TRUE;
@@ -134,10 +137,10 @@ void	mur_extract_set(jnl_ctl_list *jctl, enum broken_type recstat, jnl_record *r
 			assert(FALSE);	/* The assert will disappear in pro but not the ";" to properly terminate the else */
 	} else
 	{
-		if (IS_FUPD_TUPD(rectype))
+		if (IS_FUPD_TUPD(rectype) || (IS_GUPD_UUPD(rectype) && uupd_tstart))
 		{
-			memcpy(murgbl.extr_buff, "                       ", 23);
-			extract_len = 23;
+			memcpy(murgbl.extr_buff, "                       ", WS_BUFF_LEN);
+			extract_len = WS_BUFF_LEN;
 		} else
 			extract_len = STRLEN(murgbl.extr_buff);
 		strcpy(murgbl.extr_buff + extract_len, "       \\");
@@ -479,7 +482,6 @@ void	mur_extract_tcom(jnl_ctl_list *jctl, enum broken_type recstat, jnl_record *
 {
 	int	actual, extract_len = 0;
 	char	*ptr;
-
 	if (!mur_options.detail)
 	{
 		if (rec->prefix.jrec_type == JRT_ZTCOM)

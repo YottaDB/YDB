@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2009-2023 Fidelity National Information	*
+ * Copyright (c) 2009-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -16,12 +16,16 @@
 #include <stdlib.h>
 #include <stdarg.h>
 #include <sys/stat.h>
+#include <sys/types.h>
 #include <ctype.h>
 #include <assert.h>
+#include <fcntl.h>
 #include <errno.h>
 #include <gpgme.h>				/* gpgme functions */
 #include <gpg-error.h>				/* gcry*_err_t */
 #include <libconfig.h>
+
+#include <openssl/evp.h>
 
 #include "gtmxc_types.h"
 
@@ -44,6 +48,11 @@
 #define CONFIG_FILE_UNREAD			('\0' == gc_config_filename[0])
 #define GPG_MESSAGE				"Verify encrypted key file and your GNUPGHOME settings"
 #define NON_GPG_MESSAGE				"Verify encryption key in configuration file pointed to by $gtmcrypt_config"
+
+/* libconfig project renamed the function */
+#if (LIBCONFIG_VER_MAJOR <= 1) && (LIBCONFIG_VER_MINOR < 5)
+#define config_setting_lookup	config_lookup_from
+#endif
 
 /* On certain platforms the st_mtime field of the stat structure got replaced by a timespec st_mtim field, which in turn has tv_sec
  * and tv_nsec fields. For compatibility reasons, those platforms define an st_mtime macro which points to st_mtim.tv_sec. Whenever
@@ -480,7 +489,7 @@ STATICFNDEF gtm_keystore_t *keystore_lookup_by_unres_key(char *search_field1, in
 					 * duplicate device keyname, which, unlike a database one, cannot be associated with
 					 * multiple keys.
 					 */
-					name_length = strlen(curr->key_name);
+					name_length = (int)strlen(curr->key_name);
 					assert(name_length < GTM_PATH_MAX);
 					if (database)
 						node = keystore_lookup_by_keyname_plus(curr->key_name,
@@ -513,8 +522,9 @@ STATICFNDEF gtm_keystore_t *keystore_lookup_by_unres_key(char *search_field1, in
 				if (((NULL == name_search_field_ptr) || (!strcmp(curr->key_name, name_search_field_ptr)))
 					&& ((NULL == path_search_field_ptr) || (!strcmp(curr->key_path, path_search_field_ptr))))
 				{
-					path_length = strlen(curr->key_path);
-					node = gtmcrypt_decrypt_key(curr->key_path, path_length, curr->key_name, name_length);
+					path_length = (int)strlen(curr->key_path);
+					node = gtmcrypt_decrypt_key(curr->key_path, path_length,
+							curr->key_name, name_length, curr->encryptor);
 					if (NULL == node)
 					{
 						*error = TRUE;
@@ -543,29 +553,39 @@ STATICFNDEF gtm_keystore_t *keystore_lookup_by_unres_key(char *search_field1, in
  *		path_length	Length of the keypath.
  *		key_name	Name of the key.
  *		name_length	Length of the keyname.
+ *		encryptor	DB key encryption plugin
  *
  * Returns:	Pointer to the key, if created; NULL otherwise.
  */
-STATICFNDEF gtm_keystore_t *gtmcrypt_decrypt_key(char *key_path, int path_length, char *key_name, int name_length)
+STATICFNDEF gtm_keystore_t *gtmcrypt_decrypt_key(char *key_path, int path_length, char *key_name, int name_length,
+		enum key_encr_mech encryptor)
 {
 	gtm_keystore_t		*node;
-	unsigned char		raw_key[SYMMETRIC_KEY_MAX];
-	int			raw_key_length;
+	unsigned char		raw_key[SYMMETRIC_KEY_MAX], *ptr;
+	int			raw_key_length = 0;
 	int			gpgerr, gpg_attempt;
+	int			fd, save_errno, size, status, toread;
+	char			c;
 
 	/* If we have seen a key with the same path, do not re-read it. */
 	if (NULL == (node = keystore_lookup_by_keypath(key_path)))
 	{	/* Now that we have the name of the symmetric key file, try to decrypt it. If gc_pk_get_decrypted_key returns a
 		 * non-zero status, it should have already populated the error string.
 		 */
-		gpg_attempt = 2;				/* Retry the libgpgme decryption request once */
-		do {
-			gpgerr = gc_pk_get_decrypted_key(key_path, raw_key, &raw_key_length);
-			if (GPG_ERR_DECRYPT_FAILED == gpgerr)	/* Cipher is not valid, which cannot be the case. */
-				gpg_attempt--;			/* Assume it's a gpg bug and retry */
-			else
-				gpg_attempt = 0;
-		} while (gpg_attempt);
+		if (key_encr_mech_openssl_pkcs8 == encryptor)
+			gpgerr = gc_pk_get_decrypted_key_pkcs(key_path, raw_key, &raw_key_length);
+		else
+		{	/* key_encr_mech_gnupg */
+			gpg_attempt = 2;				/* Retry the libgpgme decryption request once */
+			/* Read key. Note: skip fgets() as that could cause mixing of streams (buffered vs non-buffered). */
+			do {
+				gpgerr = gc_pk_get_decrypted_key(key_path, raw_key, &raw_key_length);
+				if (GPG_ERR_DECRYPT_FAILED == gpgerr)	/* Cipher is not valid, which cannot be the case. */
+					gpg_attempt--;			/* Assume it's a gpg bug and retry */
+				else
+					gpg_attempt = 0;
+			} while (gpg_attempt);
+		}
 		if (0 != gpgerr)
 			return NULL;
 		if (0 == raw_key_length)
@@ -608,11 +628,12 @@ STATICFNDEF gtm_keystore_t *gtmcrypt_decrypt_key(char *key_path, int path_length
  */
 STATICFNDEF int keystore_refresh(void)
 {
-	int		n_mappings, status, just_read;
+	int		cfg_version = 1, n_mappings, status, just_read;
 	size_t		envvar_len;
 	char		*config_env;
 	struct stat	stat_info;
 	static long	last_modified_s, last_modified_ns;
+	config_setting_t	*setting, *elem;
 
 	just_read = FALSE;
 	/* Check and update the value of gtm_passwd if it has changed since we last checked. This way, if the user had originally
@@ -679,13 +700,27 @@ STATICFNDEF int keystore_refresh(void)
 	}
 	/* Clear the entire unresolved keys list because it will be rebuilt. */
 	gtm_keystore_cleanup_unres_key_list();
-	n_keys = 0;
-	if (-1 == (status = read_database_section(&gtmcrypt_cfg)))
-		return -1;
-	n_keys += status;
-	if (-1 == (status = read_files_section(&gtmcrypt_cfg)))
-		return -1;
-	n_keys += status;
+	if (NULL != (setting = config_lookup(&gtmcrypt_cfg, "database.keys")))
+	{	/* Read legacy database keys section */
+		if (-1 == (status = read_database_section(setting, key_encr_mech_gnupg)))
+			return -1;
+		n_keys += status;
+	}
+	if (NULL != (setting = config_lookup(&gtmcrypt_cfg, "files")))
+	{	/* Read legacy file IO encryption section */
+		if (-1 == (status = read_files_section(setting, key_encr_mech_gnupg)))
+			return -1;
+		n_keys += status;
+	}
+	/* Read plugin configuration last so those keys take precedence */
+	if (NULL != config_lookup(&gtmcrypt_cfg, "version"))
+		config_lookup_int(&gtmcrypt_cfg, "version", &cfg_version);
+	if (1 < cfg_version && (setting = config_lookup(&gtmcrypt_cfg, "plugins")))
+	{	/* Process plugins configuration if version 2+ */
+		if (-1 == (status = read_plugins_section(setting)))
+			return -1;
+	}
+	/* Now capture modified times */
 	last_modified_s = (long)stat_info.st_mtime;
 	last_modified_ns = (long)stat_info.st_nmtime;
 	if (0 == n_keys)
@@ -700,23 +735,22 @@ STATICFNDEF int keystore_refresh(void)
 /*
  * Read the 'files' section of the configuration file, storing any previously unseen key in the unresolved list.
  *
- * Arguments:	cfgp		Pointer to the configuration object as populated by libconfig.
+ * Arguments:	parent		Pointer to the configuration object as populated by libconfig.
+ *		encryptor	DB key encryption plugin
  *
  * Returns:	0 if successfully processed the 'files' section; -1 otherwise.
  */
-STATICFNDEF int read_files_section(config_t *cfgp)
+STATICFNDEF int read_files_section(config_setting_t *parent, enum key_encr_mech encryptor)
 {
 	int			i, name_length, lcl_n_maps;
 	config_setting_t	*setting, *elem;
 	gtm_keystore_t		*node;
 	char			*key_name, *key_path;
 
-	if (NULL == (setting = config_lookup(cfgp, "files")))
-		return 0;
-	lcl_n_maps = config_setting_length(setting);
+	lcl_n_maps = config_setting_length(parent);
 	for (i = 0; i < lcl_n_maps; i++)
 	{
-		elem = config_setting_get_elem(setting, i);
+		elem = config_setting_get_elem(parent, i);
 		assert(NULL != elem);
 		if (CONFIG_TYPE_STRING != config_setting_type(elem))
 		{
@@ -730,7 +764,7 @@ STATICFNDEF int read_files_section(config_t *cfgp)
 					"key attribute", ELLIPSIZE(gc_config_filename), i + 1);
 			return -1;
 		}
-		/* Length should be under GTM_PATH_MAX because that is the size of the array where the name of a key is stored. */
+		/* Length should be under GTM_PATH_MAX, that is the size of the array where the name of a key is stored. */
 		name_length = strlen(key_name) + 1;
 		if (GTM_PATH_MAX <= name_length)
 		{
@@ -763,7 +797,7 @@ STATICFNDEF int read_files_section(config_t *cfgp)
 			} else
 				continue;
 		}
-		insert_unresolved_key_link(key_name, path_array, i + 1, UNRES_KEY_FILE);
+		insert_unresolved_key_link(key_name, path_array, i + 1, UNRES_KEY_FILE, encryptor);
 	}
 	return lcl_n_maps;
 }
@@ -771,35 +805,34 @@ STATICFNDEF int read_files_section(config_t *cfgp)
 /*
  * Process the 'database' section of the configuration file, storing any previously unseen key in the unresolved list.
  *
- * Arguments:	cfgp	Pointer to the configuration object as populated by libconfig.
+ * Arguments:	parent		Pointer to the configuration object as populated by libconfig.
+ *		encryptor	DB key encryption plugin
  *
  * Returns:	0 if successfully processed the 'database' section; -1 otherwise.
  */
-STATICFNDEF int read_database_section(config_t *cfgp)
+STATICFNDEF int read_database_section(config_setting_t *parent, enum key_encr_mech encryptor)
 {
 	int			i, name_length, lcl_n_maps;
 	config_setting_t	*setting, *elem;
 	gtm_keystore_t		*node;
 	char			*key_name, *key_path;
 
-	if (NULL == (setting = config_lookup(cfgp, "database.keys")))
-		return 0;
-	lcl_n_maps = config_setting_length(setting);
+	lcl_n_maps = config_setting_length(parent);
 	/* The following code makes sure that having an empty last entry in the database section is not required and does not cause
 	 * errors, as GTM-7948's original implementation would have it.
 	 */
 	if (lcl_n_maps > 1)
 	{
-		elem = config_setting_get_elem(setting, lcl_n_maps - 1);
+		elem = config_setting_get_elem(parent, lcl_n_maps - 1);
 		if (0 == config_setting_length(elem))
 		{
-			config_setting_remove_elem(setting, lcl_n_maps - 1);
+			config_setting_remove_elem(parent, lcl_n_maps - 1);
 			lcl_n_maps--;
 		}
 	}
 	for (i = 0; i < lcl_n_maps; i++)
 	{
-		elem = config_setting_get_elem(setting, i);
+		elem = config_setting_get_elem(parent, i);
 		assert(NULL != elem);
 		if (!config_setting_lookup_string(elem, "dat", (const char **)&key_name))
 		{
@@ -832,10 +865,71 @@ STATICFNDEF int read_database_section(config_t *cfgp)
 		/* Duplicate names with different keys are allowed for databases, though they are prohibited for files. */
 		if (NULL != (node = keystore_lookup_by_keyname_plus(key_name, path_array, SEARCH_BY_KEYPATH)))
 			continue;
-		insert_unresolved_key_link(key_name, path_array, i + 1, UNRES_KEY_UNRES_DB);
+		insert_unresolved_key_link(key_name, path_array, i + 1, UNRES_KEY_UNRES_DB, encryptor);
 	}
 	return lcl_n_maps;
 }
+
+/*
+ * Process the 'plugins' section of the configuration file, storing any previously unseen key in the unresolved list.
+ *
+ * Arguments:	parent	Pointer to the configuration object as populated by libconfig.
+ *
+ * Returns:	0 if successfully processed the 'plugins' section; -1 otherwise.
+ */
+STATICFNDEF int read_plugins_section(config_setting_t *parent)
+{
+	int			i, keyi, name_length, status;
+	int			dbkey_cnt, enabled, filekey_cnt, plugin_cnt, plugin_cfgd, plugindx;
+	config_setting_t	*setting, *elem;
+	gtm_keystore_t		*node;
+	char			*key_name, *key_path;
+	const char		*plugin_name;
+
+	plugin_cnt = config_setting_length(parent);
+	/* The following code makes sure that having an empty last entry is not required and does not cause errors */
+	if (plugin_cnt > 1)
+	{
+		elem = config_setting_get_elem(parent, plugin_cnt - 1);
+		if (0 == config_setting_length(elem))
+		{
+			config_setting_remove_elem(parent, plugin_cnt - 1);
+			plugin_cnt--;
+		}
+	}
+	for (plugin_cfgd = i = 0; i < plugin_cnt; i++)
+	{	/* Iterate over plugins */
+		elem = config_setting_get_elem(parent, i);
+		assert(NULL != elem);
+		if (NULL == (plugin_name = config_setting_name(elem)))
+			continue; /* Skip issuing an error that could stop processes that previously parsed the configuration */
+		/* Plugin enabled? Only gnupg defaults to yes. At the moment, even if disabled, gnupg is initialized */
+		enabled = (0 == strncmp("gnupg", plugin_name, sizeof("gnupg"))) ? 1 : 0;
+		if (NULL != config_setting_lookup(elem, "enabled"))
+			config_setting_lookup_int(elem, "enabled", &enabled);
+		if (!enabled)
+			continue;
+		/* Extract Plugin details */
+		if (-1 == gc_pk_establish_pkcs_cfg(elem, gc_config_filename))
+			return -1;
+		if (NULL != (setting = config_setting_lookup(elem, "database.keys")))
+		{	/* Process database keys */
+			status = read_database_section(setting, key_encr_mech_openssl_pkcs8);
+			if (-1 == status)
+				return -1;
+			n_keys += status;
+		}
+		if (NULL != (setting = config_setting_lookup(elem, "files")))
+		{	/* Process file I/O keys */
+			status = read_files_section(setting, key_encr_mech_openssl_pkcs8);
+			if (-1 == status)
+				return -1;
+			n_keys += status;
+		}
+	}
+	return plugin_cnt;
+}
+
 
 /*
  * Create new encryption / decryption state object with the specified IV.
@@ -906,7 +1000,7 @@ int keystore_remove_cipher_ctx(gtm_cipher_ctx_t *ctx)
 }
 
 /* Insert a new gtm_keystore_unres_key_link_t element in the unresolved keys list. */
-STATICFNDEF void insert_unresolved_key_link(char *keyname, char *keypath, int index, int status)
+STATICFNDEF void insert_unresolved_key_link(char *keyname, char *keypath, int index, int status, enum key_encr_mech encryptor)
 {
 	gtm_keystore_unres_key_link_t *node;
 
@@ -920,6 +1014,7 @@ STATICFNDEF void insert_unresolved_key_link(char *keyname, char *keypath, int in
 	node->next = keystore_by_unres_key_head;
 	node->index = index;
 	node->status = status;
+	node->encryptor = encryptor;
 	keystore_by_unres_key_head = node;
 }
 

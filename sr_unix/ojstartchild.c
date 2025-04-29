@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -238,6 +238,7 @@ STATICFNDEF int io_rename(job_params_msg *params, const int jobid)
 
 	STRNCPY_STR(path, params->output.buffer, params->output.len);
 	SNPRINTF(&path[params->output.len], MAX_STDIOE_LEN - params->output.len, ".%d", jobid);
+	path[sizeof(path) - 1] = '\0';
 	if (rename(params->output.buffer, path))
 	{
 		job_errno = errno;
@@ -249,6 +250,7 @@ STATICFNDEF int io_rename(job_params_msg *params, const int jobid)
 		return 0;
 	STRNCPY_STR(path, params->error.buffer, params->error.len);
 	SNPRINTF(&path[params->error.len], MAX_STDIOE_LEN - params->error.len,  ".%d", jobid);
+	path[sizeof(path) - 1] = '\0';
 	if (rename(params->error.buffer, path))
 	{
 		job_errno = errno;
@@ -581,7 +583,7 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 				joberr = joberr_rtn;	/* Assume routine error if there is a problem getting the report */
 			if (joberr_ok != joberr)
 			{
-				job_errno = errno;
+				job_errno = (0 < rc) ? rc : joberr; /* non-zero rc is an errno */
 				DOWRITERC(pipe_fds[1], &job_errno, SIZEOF(job_errno), pipe_status);
 				UNDERSCORE_EXIT(joberr);
 			}

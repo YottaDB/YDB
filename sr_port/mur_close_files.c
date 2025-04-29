@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2024 Fidelity National Information	*
+ * Copyright (c) 2003-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -840,7 +840,7 @@ boolean_t mur_close_files(void)
 		/* If this was a RECOVER/ROLLBACK and rctl->standalone is FALSE, then gvcst_init/mu_rndwn_file did not happen in
 		 * successfully for this region. Increment wrn_count in this case
 		 */
-		assert(!mur_options.update || rctl->standalone || !murgbl.clean_exit);
+		assert(!mur_options.update || rctl->standalone || !murgbl.clean_exit || (!rctl->db_present && IS_AUTODB_REG(reg)));
 		if (rctl->standalone && (EXIT_NRM == rundown_status))
 			/* Avoid db_ipcs_reset if "gds_rundown" did not remove shared memory */
 			if ((NULL != udi) && udi->shm_deleted && !db_ipcs_reset(reg))

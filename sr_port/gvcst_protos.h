@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2004-2024 Fidelity National Information	*
+ * Copyright (c) 2004-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -45,8 +45,8 @@ void		gvcst_init_statsDB(gd_region *baseDBreg, boolean_t do_statsdb_init);
 void		gvcst_kill(boolean_t do_subtree);
 void		gvcst_kill2(boolean_t do_subtree, boolean_t *span_status, boolean_t killing_chunks);
 enum cdb_sc	gvcst_lftsib(srch_hist *full_hist);
-boolean_t	gvcst_order(void);
-boolean_t	gvcst_order2(void);
+boolean_t	gvcst_order(srch_blk_status **bh_p);
+boolean_t	gvcst_order2(srch_blk_status **bh_p);
 void		gvcst_put(mval *v);
 void		gvcst_put2(mval *val, span_parms *parms);
 boolean_t	gvcst_query(void);

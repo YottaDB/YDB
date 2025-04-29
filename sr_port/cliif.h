@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -38,8 +38,11 @@ int		cli_get_string_token(int *eof);
 int		cli_gettoken(int *eof);
 int		cli_is_assign(char *p);
 int		cli_is_dcm(char *p);
+int		cli_is_dcm_negok(char *p);
 int		cli_is_hex(char *p);
 int		cli_is_hex_explicit(char *p);
+int		cli_is_hex_negok(char *p);
+int		cli_is_hex_explicit_negok(char *p);
 int		cli_is_qualif(char *p);
 int		cli_look_next_string_token(int *eof);
 int		cli_look_next_token(int *eof);

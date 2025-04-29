@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -24,10 +24,12 @@
 #include "int_namelook.h"
 #include "cvtparm.h"
 #include "deviceparameters.h"
+#include "arit.h"
 
 error_def(ERR_DEVPARINAP);
 error_def(ERR_DEVPARUNK);
 error_def(ERR_DEVPARVALREQ);
+error_def(ERR_NUMOFLOW);
 error_def(ERR_RPARENMISSING);
 
 LITREF unsigned char io_params_size[];
@@ -512,6 +514,11 @@ int deviceparameters(oprtype *c, char who_calls)
 			break;
 		}
 		advancewindow();
+		if (EXPHI < (TREF(director_mval)).e)
+		{
+			stx_error(ERR_NUMOFLOW);
+			break;
+		}
 		*parptr++ = n;
 		if (io_params_size[n])
 		{

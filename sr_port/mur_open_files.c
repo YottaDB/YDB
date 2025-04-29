@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2024 Fidelity National Information	*
+ * Copyright (c) 2003-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -240,7 +240,7 @@ void release_all_locks(unix_db_info *udi, gtmsource_local_ptr_t gtmsourcelocal_p
 			REMOVE_CSA_FROM_CSADDRSLIST(csa); /* List of open csa modified in gvcst_init */
 		}
 		rctl->gd->open = rctl->gd->was_open = FALSE;
-		rctl->gd->file_initialized = rctl->gd->did_file_initialization = FALSE;
+		rctl->gd->file_initialized = FALSE;
 	}
 	/* Before this point the access semaphore for DB has been released in mur_close_files too*/
 	/* We would have attached to the journal pool, grabbed the JNLPOOL and RECVPOOL segment locks,
@@ -435,7 +435,7 @@ int4 mur_open_files(boolean_t retry)
 		if (!mupfndfil(rctl->gd, NULL, LOG_ERROR_FALSE))
 		{
 			rctl->db_present = FALSE;
-			if (mur_options.update || star_specified)
+			if ((mur_options.update || star_specified) && !(star_specified && IS_AUTODB_REG(rctl->gd)))
 			{
 				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_FILENOTFND, 2, DB_LEN_STR(rctl->gd));
 				return FALSE;
@@ -488,7 +488,7 @@ int4 mur_open_files(boolean_t retry)
 				}
 			}
 		}
-		assert(!mur_options.update || rctl->standalone);
+		assert(!mur_options.update || (rctl->standalone || !rctl->db_present));
 		assert(mur_options.update || !rctl->standalone);
 	}
 	assert(murgbl.reg_full_total == max_reg_total);
@@ -541,11 +541,14 @@ int4 mur_open_files(boolean_t retry)
 		 */
 		for (rctl = mur_ctl, rctl_top = mur_ctl + max_reg_total; rctl < rctl_top; rctl++)
 		{
-			assert(rctl->gd->open); /* region should have been opened by now */
-			rl_new = (onln_rlbk_reg_list *)insert_region(rctl->gd,
-					(tp_region **)(&reglist), NULL, SIZEOF(onln_rlbk_reg_list));
-			assert(NULL != rl_new);
-			rl_new->rctl = rctl; /* store the backward link to rctl */
+			if (rctl->db_present)
+			{
+				assert(rctl->gd->open); /* region should have been opened by now */
+				rl_new = (onln_rlbk_reg_list *)insert_region(rctl->gd,
+						(tp_region **)(&reglist), NULL, SIZEOF(onln_rlbk_reg_list));
+				assert(NULL != rl_new);
+				rl_new->rctl = rctl; /* store the backward link to rctl */
+			}
 		}
 		/* The following loop is mostly borrowed from tp_crit_all_regions() */
 		TREF(donot_write_inctn_in_wcs_recover) = TRUE; /* donot write INCTN if wcs_recover is called below */
@@ -646,6 +649,8 @@ int4 mur_open_files(boolean_t retry)
 		/* Indicate to all other processes that ONLINE ROLLBACK is now in progress */
 		for (rctl = mur_ctl, rctl_top = mur_ctl + max_reg_total; rctl < rctl_top; rctl++)
 		{
+			if (!rctl->db_present)
+				continue;
 			reg = rctl->gd;
 			TP_CHANGE_REG(reg);
 #			ifdef DEBUG

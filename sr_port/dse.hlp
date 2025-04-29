@@ -1695,12 +1695,14 @@
 
    Example:
 
-   $ dse evaluate -number=10
+   DSE> evaluate -number=10
    Hex:  10   Dec:  16
+   Hex:  A    Dec:  10
 
-   This command displays the decimal equivalent of Hexadecimal 10. Note that
-   if you do not specify an qualifier with -NAME, then EVALUATE assumes
-   Hexadecimal input.
+   Note that If neither -decimal nor -hexadecimal is provided, DSE first
+   treats the number as hexadecimal and performs the conversion. If the
+   number is a valid decimal, DSE performs a second conversion, treating it
+   as decimal.
 
 2 EXit
    EXit
@@ -2944,7 +2946,7 @@
 1 Copyright
    Copyright
 
-   Copyright 2024
+   Copyright 2025
 
    Fidelity National Information Services, Inc. and/or its subsidiaries. All
    rights reserved.

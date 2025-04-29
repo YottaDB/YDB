@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -43,6 +43,27 @@ int cli_is_dcm(char *p)
 
         if (*p) return (FALSE);
         else return (TRUE);
+}
+
+/*
+*-------------------------------------------------------
+* Check if string is a decimal number
+* It also accepts negative decimal integer
+*
+* Return:
+*	TRUE    - only decimal digits
+*	FALSE   - otherwise
+* -------------------------------------------------------
+*/
+int cli_is_dcm_negok(char *p)
+{
+	if (('+' == *p) || ('-' == *p))
+	    p++;
+	while (*p && ISDIGIT_ASCII(*p))
+		p++;
+
+	if (*p) return (FALSE);
+	else return (TRUE);
 }
 
 /*

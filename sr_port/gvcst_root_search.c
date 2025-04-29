@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -307,7 +307,7 @@ enum cdb_sc gvcst_root_search(boolean_t donot_restart)
 				}
 				if (dollar_tlevel)
 				{
-					status = tp_hist(NULL);
+					status = tp_hist(NULL, ERR_GVGETFAIL);
 					if (cdb_sc_normal != status)
 					{
 						T_RETRY_AND_CLEANUP(status, donot_restart);
@@ -322,7 +322,7 @@ enum cdb_sc gvcst_root_search(boolean_t donot_restart)
 					break;
 			} else
 			{
-				status = tp_hist(NULL);
+				status = tp_hist(NULL, ERR_GVGETFAIL);
 				if (cdb_sc_normal == status)
 					break;
 				T_RETRY_AND_CLEANUP(status, donot_restart);

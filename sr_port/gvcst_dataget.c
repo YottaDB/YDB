@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2023 Fidelity National Information	*
+ * Copyright (c) 2010-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -270,7 +270,7 @@ enum cdb_sc gvcst_dataget2(mint *dollar_data, mval *val, unsigned char *sn_ptr)
 			dlr_data += 10;
 		}
 	}
-	status = tp_hist(0 == rt_history->h[0].blk_num ? NULL : rt_history);
+	status = tp_hist(0 == rt_history->h[0].blk_num ? NULL : rt_history, ERR_GVDATAGETFAIL);
 	if (cdb_sc_normal != status)
 		return status;
 	*dollar_data = (DG_GETONLY != dg2_info) ? dlr_data : (dlr_data % 10);

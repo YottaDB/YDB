@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2023 Fidelity National Information	*
+ * Copyright (c) 2006-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -2685,10 +2685,6 @@ STATICFNDEF boolean_t gtmrecv_exchange_tls_info(uint4 remote_API_ver, uint4 remo
 		do
 		{
 			status = repl_do_tls_handshake(gtmrecv_log_fp, gtmrecv_sock_fd, TRUE, &poll_dir);
-			assert(0 == data_len);
-			gtmrecv_poll_actions(data_len, buff_unprocessed, buffp);
-			if (repl_connection_reset || gtmrecv_wait_for_jnl_seqno)
-				return FALSE;
 		} while ((GTMTLS_WANT_READ == status) || (GTMTLS_WANT_WRITE == status));
 		if (SS_NORMAL == status) /* Where enabled, do post handshake auth */
 			status = repl_do_tls_post_handshake(gtmrecv_log_fp, gtmrecv_sock_fd);
@@ -2708,7 +2704,8 @@ STATICFNDEF boolean_t gtmrecv_exchange_tls_info(uint4 remote_API_ver, uint4 remo
 		}
 		errp = (0 > status) ? (char *)gtm_tls_get_error(repl_tls.sock) : STRERROR(status);
 		if (OUT_BUFF_SIZE > (errlen = strlen(errp))) /* Append version information in one message */
-			snprintf(errp + errlen, OUT_BUFF_SIZE - errlen, "; Local API:0x%08x, LIB:0x%08x; Remote API:0x%08x, LIB:0x%08x",
+			snprintf(errp + errlen, OUT_BUFF_SIZE - errlen,
+					"; Local API:0x%08x, LIB:0x%08x; Remote API:0x%08x, LIB:0x%08x",
 					GTM_TLS_API_VERSION, (uint4)tls_ctx->runtime_version, remote_API_ver, remote_lib_ver);
 		pha_fallback = ((GTMTLS_OP_PHA_EXT_FALLBACK & repl_tls.sock->flags) && (-2 == status)
 					&& !(GTMTLS_OP_PHA_EXT_NOT_RECEIVED & flags));

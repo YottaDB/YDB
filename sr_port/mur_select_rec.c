@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2023 Fidelity National Information	*
+ * Copyright (c) 2003-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -36,6 +36,8 @@
 
 GBLREF	mur_opt_struct		mur_options;
 GBLREF	mur_gbls_t		murgbl;
+GBLREF	boolean_t		in_tstart, uupd_tstart;
+GBLREF 	jnl_gbls_t		jgbl;
 
 error_def(ERR_JNLEXTRCTSEQNO);
 
@@ -67,6 +69,7 @@ boolean_t	mur_select_rec(jnl_ctl_list *jctl)
 	boolean_t		exc_item_seen, inc_item_seen, inc_seen, wildcard_match, exact_match;
 	char			key_buff[MAX_KEY_SZ + 1 + SIZEOF(uint4) * 2], asc_key_buff[MAX_ZWR_KEY_SZ], *ptr, *val_ptr;
 	int			i, key_len = 0;
+	static int		uupd_cnt = 0;
 	uint4			pini_addr;
 	gv_key			*key;
 	jnl_record		*rec;
@@ -88,6 +91,16 @@ boolean_t	mur_select_rec(jnl_ctl_list *jctl)
 	key = NULL;
 	if ((JRT_NULL == rectype) || (JRT_ALIGN == rectype))
 		return TRUE;
+	if (mur_options.global && jgbl.mur_extract)
+	{
+		if (JRT_TCOM == rectype)
+		{
+			if (!in_tstart)
+				return FALSE;
+			in_tstart = FALSE;
+			uupd_cnt = 0;
+		}
+	}
 	pini_addr = rec->prefix.pini_addr;	/* Since rectype != JRT_ALIGN, we can safely use "prefix.pini_addr" */
 	status = mur_get_pini(jctl, pini_addr, &plst);
 	if (SS_NORMAL != status)
@@ -162,6 +175,8 @@ boolean_t	mur_select_rec(jnl_ctl_list *jctl)
 					&& (('(' == asc_key_buff[i]) || (')' == asc_key_buff[i]) || (',' == asc_key_buff[i]))))
 			{
 					SET_INCFLAG_OR_RETURN(sl_ptr);
+					if(IS_FUPD_TUPD(rectype) || IS_GUPD_UUPD(rectype))
+						uupd_tstart = (0 == uupd_cnt++) ? TRUE : FALSE;
 			}
 		}
 		RETURN_IF_ITEM_DOESNT_MATCH_ANY_INCLUDE_PATTERN;

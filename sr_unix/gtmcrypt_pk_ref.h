@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2009-2023 Fidelity National Information	*
+ * Copyright (c) 2009-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -22,11 +22,14 @@ int 			gc_pk_crypt_passphrase_callback(void *opaque,
 							int last_was_bad,
 							int fd);
 int 			gc_pk_crypt_retrieve_plain_text(gpgme_data_t plain_data, unsigned char *plain_text);
+unsigned char *		gc_pk_get_symmetric_key(const char *key_path, size_t *rawkey_length);
 gpgme_error_t 		gc_pk_get_decrypted_key(const char *cipher_file, unsigned char *plain_text, int *plain_text_length);
+gpgme_error_t		gc_pk_get_decrypted_key_pkcs(const char *key_path, unsigned char *plain_text, int *plain_text_length);
 void			gc_pk_scrub_passwd(void);
 void			gc_pk_crypt_load_gtmci_env(void);
 int			gc_pk_scrub_plaintext_keys_from_c_stack(void);
 int			gc_pk_gpghome_has_permissions(void);
+int			gc_pk_establish_pkcs_cfg(config_setting_t *parent, char *config_fn);
 
 #ifdef USE_GPGME_PINENTRY_MODE_LOOPBACK
 /* Tell GPGME to set the pinentry mode to LOOPBACK. Note that turning this on implies that the

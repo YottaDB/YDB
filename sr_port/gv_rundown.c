@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -119,7 +119,7 @@ void gv_rundown(void)
 				rundown_status |= gds_rundown(CLEANUP_UDI_TRUE, FALSE);
 			}
 			r_local->open = r_local->was_open = FALSE;
-			r_local->file_initialized = r_local->did_file_initialization = FALSE;
+			r_local->file_initialized = FALSE;
 		}
 	}
 	rc_close_section();

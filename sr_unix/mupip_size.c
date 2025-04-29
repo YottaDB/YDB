@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2023 Fidelity National Information	*
+ * Copyright (c) 2012-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -201,7 +201,8 @@ void mupip_size(void)
 			boolean_t valid = TRUE;
 			if (cli_get_str("HEURISTIC.LEVEL", buff, &BUFF_LEN))
 			{
-				if (cli_is_hex_explicit(buff))
+
+				if (cli_is_hex_explicit_negok(buff))
 				{	/* buff starts with 0x or -0x or +0x. Remove the 0x, and retain the +/- */
 					if (('+' == *buff) || ('-' == *buff))
 						*(buff + 2) = *buff;	/* Overwrite the X with +/- */

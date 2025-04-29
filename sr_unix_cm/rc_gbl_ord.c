@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -60,7 +60,7 @@ void rc_gbl_ord(rc_rsp_page *rsp)
 	for (;;)
 	{
 		gv_target = cs_addrs->dir_tree;
-		found = gvcst_order();
+		found = gvcst_order(NULL);
 		if (!found)
 		{
 			rsp->hdr.a.erc.value = RC_NETERRDBEDGE;

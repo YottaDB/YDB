@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2005-2022 Fidelity National Information	*
+ * Copyright (c) 2005-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -120,7 +120,7 @@ void updhelper_init(recvpool_user who)
 	reg_top = gd_header->regions + gd_header->n_regions;
 	for (reg = gd_header->regions; reg < reg_top; reg++)
 	{	/* Use gvcst_init to set statsdb up, and enable statistics to reader and writer helpers */
-		if (!(reg->open))
+		if ((! IS_STATSDB_REG(reg)) && (! reg->open))
 		{
 			gvcst_init(reg, NULL);
 		}

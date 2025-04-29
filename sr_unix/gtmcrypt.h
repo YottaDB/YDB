@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2009-2022 Fidelity National Information	*
+ * Copyright (c) 2009-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -224,7 +224,7 @@ MBSTART {															\
 		if (0 == (RC = gtmcrypt_entry()))										\
 		{	/* dlopen succeeded */											\
 			DEFER_INTERRUPTS(INTRPT_IN_CRYPT_SECTION, prev_intrpt_state);						\
-			if (0 != gtmcrypt_init(IS_INTERACTIVE_MODE ? GTMCRYPT_OP_INTERACTIVE_MODE : 0))				\
+			if (0 != gtmcrypt_init(IS_INTERACTIVE_MODE ? GTMCRYPT_OP_INTERACTIVE_MODE : 0, GTM_DB_ENCRYPTION_VER))	\
 				RC = SET_CRYPTERR_MASK(ERR_CRYPTINIT);								\
 			else													\
 				gtmcrypt_initialized = TRUE; /* Intialization is done for this process. */			\

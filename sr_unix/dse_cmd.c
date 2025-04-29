@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -273,7 +273,7 @@ static readonly CLI_ENTRY dse_dump_qual[] = {
 static readonly CLI_ENTRY dse_eval_qual[] = {
 { "DECIMAL",     0, 0, 0, 0, 0, 0, VAL_N_A, 0, NON_NEG, 0,       0       },
 { "HEXADECIMAL", 0, 0, 0, 0, 0, 0, VAL_N_A, 0, NON_NEG, 0,       0       },
-{ "NUMBER",      0, 0, 0, 0, 0, 0, VAL_REQ, 0, NON_NEG, VAL_NUM, VAL_HEX },
+{ "NUMBER",      0, 0, 0, 0, 0, 0, VAL_REQ, 0, NON_NEG, VAL_STR, 0       },
 { "" }
 };
 

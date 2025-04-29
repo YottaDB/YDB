@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2007-2024 Fidelity National Information	*
+ * Copyright (c) 2007-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -555,14 +555,14 @@ enum cdb_sc bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 			{
 				assert(gtm_white_box_test_case_enabled);
 #				ifdef DEBUG
-				if (NULL != save_cr)
+				if ((NULL != save_cr) && ((cache_rec_ptr_t)CR_NOTVALID != save_cr))
 				{	/* release the r_epid lock on the valid cache-record returned from db_csh_getn */
 					assert(save_cr->r_epid == process_id);
 					save_cr->r_epid = 0;
 					assert(0 == save_cr->read_in_progress);
 					RELEASE_BUFF_READ_LOCK(save_cr);
-					TREF(block_now_locked) = NULL;
 				}
+				TREF(block_now_locked) = NULL;
 #				endif
 				BG_TRACE_PRO(wcb_t_end_sysops_nocr_invcr);
 				send_msg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_WCBLOCKED, 6, LEN_AND_LIT("wcb_t_end_sysops_nocr_invcr"),
@@ -740,7 +740,7 @@ enum cdb_sc bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 				{
 					assert(gtm_white_box_test_case_enabled);
 #					ifdef DEBUG
-					if (NULL != save_cr)
+					if ((NULL != save_cr) && ((cache_rec_ptr_t)CR_NOTVALID != save_cr))
 					{	/* Since we are simulating a "db_csh_getn" failure return,
 						 * undo all changes in db_csh_getn that would otherwise persist.
 						 */
@@ -752,8 +752,8 @@ enum cdb_sc bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 						RELEASE_BUFF_READ_LOCK(save_cr);
 						assert(blkid == save_cr->blk);
 						save_cr->blk = CR_BLKEMPTY;
-						TREF(block_now_locked) = NULL;
 					}
+					TREF(block_now_locked) = NULL;
 #					endif
 					BG_TRACE_PRO(wcb_t_end_sysops_dirty_invcr);
 					send_msg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_WCBLOCKED, 6,

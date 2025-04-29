@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -254,7 +254,7 @@ int4 gds_rundown(boolean_t cleanup_udi, boolean_t delete_statsdb)
 		 * Defer rundown of this "csa" until the last region corresponding to this csa is called for rundown.
 		 */
 		reg->open = FALSE;
-		reg->file_initialized = reg->did_file_initialization = FALSE;
+		reg->file_initialized = FALSE;
 		return EXIT_NRM;
 	}
 	/* If the process has standalone access, it has udi->grabbed_access_sem set to TRUE at this point. Note that down in a local
@@ -867,7 +867,7 @@ int4 gds_rundown(boolean_t cleanup_udi, boolean_t delete_statsdb)
 #			endif
 		}
 		/* If this is a autodelete region and we are the last one out, unlink/remove it */
-		if (we_are_last_user && IS_AUTODELETE_REG(reg))
+		if (we_are_last_user && IS_AUTODELETE_REG(reg) && udi->grabbed_ftok_sem)
 			AUTODELETE_AT_RUNDOWN(reg, delete_statsdb);
 	}
 	/* Detach our shared memory while still under lock so reference counts will be correct for the next process to run down
@@ -932,7 +932,7 @@ int4 gds_rundown(boolean_t cleanup_udi, boolean_t delete_statsdb)
 			     LEN_AND_LIT("Error during shmdt"), errno);
 	REMOVE_CSA_FROM_CSADDRSLIST(csa);	/* remove "csa" from list of open regions (cs_addrs_list) */
 	reg->open = reg->was_open = FALSE;
-	reg->file_initialized = reg->did_file_initialization = FALSE;
+	reg->file_initialized = FALSE;
 	assert(!is_statsDB || process_exiting || IS_GTCM_GNP_SERVER_IMAGE);
 	/* If file is still not in good shape, die here and now before we get rid of our storage */
 	assertpro(0 == csa->wbuf_dqd);

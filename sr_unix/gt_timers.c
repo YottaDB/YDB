@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -47,6 +47,7 @@
 #include "gtm_time.h"
 #include "gtm_string.h"
 #include "gtmimagename.h"
+#include "invocation_mode.h"
 
 #include <errno.h>
 #include <stddef.h>
@@ -403,6 +404,13 @@ void start_timer(TID tid, int4 time_to_expir, void (*handler)(), int4 hdata_len,
 
 	assertpro(0 <= time_to_expir);			/* Callers should verify non-zero time */
 	DUMP_TIMER_INFO("At the start of start_timer()");
+	/* Assert the jnl_file_close_timer_ptr is initialized so it correctly tags the "safe" timer as safe.
+	 * We can detect this now rather that waiting much later when the process is exiting and SAFE_FOR_TIMER_START
+	 * comes up FALSE and we hit the assert(FALSE). This provides a validation for the fix for when, previously,
+	 * the jnl_file_close_time_ptr was not initialized by the gtcm_gnp_server.
+	 */
+	/* gtmsecshr and the compiler do not use the timers being checked */
+	assert(jnl_file_close_timer_ptr || IS_GTMSECSHR_IMAGE || MUMPS_COMPILE == invocation_mode);
 	if (NULL == handler)
 	{
 		safe_to_add = TRUE;

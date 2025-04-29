@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -110,8 +110,6 @@ int gtmsource_poll_actions(boolean_t poll_secondary)
 			repl_log(gtmsource_log_fp, TRUE, TRUE, print_msg);
 		}
 	}
-	if (GTMSOURCE_START == gtmsource_state)
-		return (SS_NORMAL);
 	if (GTMSOURCE_CHANGING_MODE != gtmsource_state && GTMSOURCE_MODE_PASSIVE_REQUESTED == gtmsource_local->mode)
 	{
 		repl_log(gtmsource_log_fp, TRUE, TRUE, "Changing mode from ACTIVE to PASSIVE\n");
@@ -201,6 +199,11 @@ int gtmsource_poll_actions(boolean_t poll_secondary)
 	{
 		gtmsource_logstats = FALSE;
 		repl_log(gtmsource_log_fp, TRUE, TRUE, "End statistics logging\n");
+	}
+	if ((gtmsource_filter & ENABLE_FILTER) && ('\0' == gtmsource_local->filter_cmd[0]))
+	{
+		repl_log(gtmsource_log_fp, TRUE, TRUE, "Disabling filter\n");
+		gtmsource_filter &= ~ENABLE_FILTER;
 	}
 	if ((gtmsource_filter & EXTERNAL_FILTER) && ('\0' == gtmsource_local->filter_cmd[0]))
 	{

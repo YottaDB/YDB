@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2017 Fidelity National Information	*
+ * Copyright (c) 2012-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -51,8 +51,11 @@ int gtmsource_setfreeze(void)
 		assert(!holds_sem[SOURCE][JNL_POOL_ACCESS_SEM]);
 	jnlpool->jnlpool_ctl->freeze = gtmsource_options.freezeval;
 	if (gtmsource_options.setcomment)
+	{
 		STRNCPY_STR(jnlpool->jnlpool_ctl->freeze_comment, gtmsource_options.freeze_comment,
 			SIZEOF(jnlpool->jnlpool_ctl->freeze_comment));
+		jnlpool->jnlpool_ctl->freeze_comment[sizeof(jnlpool->jnlpool_ctl->freeze_comment) - 1] = '\0';
+	}
 	if (gtmsource_options.freezeval)
 	{
 		send_msg_csa(NULL, VARLSTCNT(3) ERR_REPLINSTFROZEN, 1, jnlpool->repl_inst_filehdr->inst_info.this_instname);

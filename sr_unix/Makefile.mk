@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2013-2024 Fidelity National Information		#
+# Copyright (c) 2013-2025 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -234,7 +234,7 @@ gcrypt: libgtmcrypt_gcrypt_AES256CFB.so
 libgtmcrypt_gcrypt_AES256CFB.so: $(crypt_srcfiles) $(crypt_hdrfiles) libgtmcryptutil.so
 	@echo ; echo "Compiling $@..."
 	$(CC) $(CFLAGS) -DUSE_GCRYPT -DUSE_AES256CFB $(gcrypt_nofips_flag) $(crypt_srcfiles) $(LDSHR)		\
-		$(RPATHFLAGS) $(LDFLAGS) $@ -lgcrypt -lgpgme -lgpg-error $(COMMON_LIBS)
+		$(RPATHFLAGS) $(LDFLAGS) $@ -lssl -lcrypto -lgcrypt -lgpgme -lgpg-error $(COMMON_LIBS)
 
 openssl: libgtmcrypt_openssl_AES256CFB.so
 
@@ -242,7 +242,7 @@ libgtmcrypt_openssl_AES256CFB.so: $(crypt_srcfiles) $(crypt_hdrfiles) libgtmcryp
 	@echo ; echo "Compiling $@..."
 	$(CC) $(CFLAGS) -DUSE_OPENSSL -DOPENSSL_API_COMPAT=0x10000000L -DUSE_AES256CFB	\
 		$(crypt_srcfiles) $(LDSHR) $(RPATHFLAGS) $(LDFLAGS)	\
-		$@ -lcrypto -lgpgme -lgpg-error $(COMMON_LIBS)
+		$@ -lssl -lcrypto -lgpgme -lgpg-error $(COMMON_LIBS)
 
 libgtmtls.so: $(tls_srcfiles) $(tls_hdrfiles) libgtmcryptutil.so
 	@echo ; echo "Compiling $@..."

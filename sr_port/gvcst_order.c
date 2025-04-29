@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -64,16 +64,18 @@ error_def(ERR_GVORDERFAIL);
 
 DEFINE_NSB_CONDITION_HANDLER(gvcst_order_ch)
 
-boolean_t	gvcst_order(void)
+boolean_t	gvcst_order(srch_blk_status **bh_p)
 {	/* See gvcst_query.c */
 	boolean_t	found, is_hidden, sn_tpwrapped;
 	boolean_t	est_first_pass;
 	gv_key_buf	save_currkey;
 	int		end, prev, oldend;
 	int		save_dollar_tlevel;
+	srch_blk_status *bh, **bh_p2;
 
 	DEBUG_ONLY(save_dollar_tlevel = dollar_tlevel);
-	found = gvcst_order2();
+	bh_p2 = bh_p ? bh_p : &bh;
+	found = gvcst_order2(bh_p2);
 	INCR_GVSTATS_COUNTER(cs_addrs, cs_addrs->nl, n_order, (gtm_uint64_t) 1);
 	WBTEST_ONLY(WBTEST_QUERY_HANG,
 		LONG_SLEEP(2);
@@ -90,7 +92,7 @@ boolean_t	gvcst_order(void)
 		op_tstart((IMPLICIT_TSTART), TRUE, &literal_batch, 0);
 		ESTABLISH_NORET(gvcst_order_ch, est_first_pass);
 		GVCST_ROOT_SEARCH_AND_PREP(est_first_pass);
-		found = gvcst_order2();
+		found = gvcst_order2(bh_p2);
 	} else
 		sn_tpwrapped = FALSE;
 	if (found)
@@ -104,7 +106,7 @@ boolean_t	gvcst_order(void)
 			WBTEST_ONLY(WBTEST_QUERY_HANG,
 				LONG_SLEEP(2);
 			);
-			found = gvcst_order2();
+			found = gvcst_order2(bh_p2);
 		}
 	}
 	if (sn_tpwrapped)
@@ -118,7 +120,7 @@ boolean_t	gvcst_order(void)
 	return found;
 }
 
-boolean_t	gvcst_order2(void)
+boolean_t	gvcst_order2(srch_blk_status **bh_p)
 {
 	blk_hdr_ptr_t	bp;
 	boolean_t	found, two_histories;
@@ -131,6 +133,7 @@ boolean_t	gvcst_order2(void)
 	int		tmp_cmpc;
 
 	T_BEGIN_READ_NONTP_OR_TP(ERR_GVORDERFAIL);
+	*bh_p = gv_target->hist.h;
 	for (;;)
 	{
 		assert(t_tries < CDB_STAGNATE || cs_addrs->now_crit);	/* we better hold crit in the final retry (TP & non-TP) */
@@ -146,7 +149,7 @@ boolean_t	gvcst_order2(void)
 		if (cdb_sc_normal == (status = gvcst_search(gv_currkey, NULL)))
 		{
 			found = TRUE;
-			bh = gv_target->hist.h;
+			*bh_p = bh = gv_target->hist.h;
 			rp = (rec_hdr_ptr_t)(bh->buffaddr + bh->curr_rec.offset);
 			bp = (blk_hdr_ptr_t)bh->buffaddr;
 			if ((rec_hdr_ptr_t)CST_TOB(bp) <= rp)
@@ -156,7 +159,7 @@ boolean_t	gvcst_order2(void)
 				status = gvcst_rtsib(rt_history, 0);
 				if (cdb_sc_normal == status)
 				{
-					bh = rt_history->h;
+					*bh_p = bh = rt_history->h;
 			       		if (cdb_sc_normal != (status = gvcst_search_blk(gv_currkey, bh)))
 					{
 						t_retry(status);
@@ -227,7 +230,7 @@ boolean_t	gvcst_order2(void)
 					continue;
 			} else
 			{
-				status = tp_hist(two_histories ? rt_history : NULL);
+				status = tp_hist(two_histories ? rt_history : NULL, ERR_GVORDERFAIL);
 				if (cdb_sc_normal != status)
 				{
 					t_retry(status);

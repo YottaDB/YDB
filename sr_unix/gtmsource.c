@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -389,6 +389,7 @@ int gtmsource()
 	 * here to force setting image type with the new value of is_src_server. */
 	is_src_server = first_syslog = TRUE;
 	TREF(error_on_jnl_file_lost) = JNL_FILE_LOST_ERRORS; /* source server should never switch journal files even on errors */
+	TREF(enable_autodelete) = TRUE; /* Autodelete autodeletable files on exit if the last one out */
 	OPERATOR_LOG_MSG;
 	process_id = getpid();
 	/* Initialize mutex socket, memory semaphore etc. before any "grab_lock" is done by this process on the journal pool.
@@ -553,23 +554,20 @@ int gtmsource()
 	}
 #	endif
 	gtmsource_local->read_algo = gtmsource_options.jnlfileonly ? JNLFILE_DATA : JNLPOOL_DATA;
+	if ((gtmsource_local->mode == GTMSOURCE_MODE_PASSIVE) && ('\0' != gtmsource_local->filter_cmd[0]))
+	{
+		repl_log(gtmsource_log_fp, TRUE, TRUE, "Enabling filter\n");
+		gtmsource_filter |= ENABLE_FILTER;
+	}
 	do
 	{ 	/* If mode is passive, go to sleep. Wakeup every now and then and check to see if I have to become active. */
 		assert(!SRC_NEEDS_JPLWRITES(jnlpool,gtmsource_local));
 		gtmsource_state = gtmsource_local->gtmsource_state = GTMSOURCE_START;
-		if ((gtmsource_local->mode == GTMSOURCE_MODE_PASSIVE) && (gtmsource_local->shutdown == NO_SHUTDOWN))
+		if (gtmsource_local->mode == GTMSOURCE_MODE_PASSIVE)
 		{
 			gtmsource_poll_actions(FALSE);
 			SHORT_SLEEP(GTMSOURCE_WAIT_FOR_MODE_CHANGE);
 			continue;
-		}
-		if (GTMSOURCE_MODE_PASSIVE == gtmsource_local->mode)
-		{	/* Shutdown initiated */
-			assert(gtmsource_local->shutdown == SHUTDOWN);
-			sgtm_putmsg(print_msg, OUT_BUFF_SIZE - 1, VARLSTCNT(4) ERR_REPLINFO, 2,
-				    RTS_ERROR_LITERAL("GTM Replication Source Server Shutdown signalled"));
-			repl_log(gtmsource_log_fp, TRUE, TRUE, print_msg);
-			break;
 		}
 		gtmsource_poll_actions(FALSE);
 		if (GTMSOURCE_CHANGING_MODE == gtmsource_state)
@@ -641,6 +639,7 @@ int gtmsource()
 		gtmsource_filter = NO_FILTER;
 		if ('\0' != gtmsource_local->filter_cmd[0])
 		{
+			repl_log(gtmsource_log_fp, TRUE, TRUE, "Starting filter\n");
 			if (SS_NORMAL == (status = repl_filter_init(gtmsource_local->filter_cmd)))
 				gtmsource_filter |= EXTERNAL_FILTER;
 			else

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -229,8 +229,8 @@ unsigned char mu_init_file(gd_region *reg, boolean_t has_ftok)
 	assert((-(SIZEOF(uint4) * 2) & SIZEOF_FILE_HDR_DFLT) == SIZEOF_FILE_HDR_DFLT);
 	assert(NULL == mu_init_cs_data);
 	mu_init_region = reg;
+	FILE_CNTL_INIT_IF_NULL(reg);
 	seg = reg->dyn.addr;
-	FILE_CNTL_INIT_IF_NULL(seg);
 	udi = FILE_INFO(reg);
 	mu_init_cs_addrs = &udi->s_addrs;
 	assert(NULL == mu_init_cs_addrs->hdr);
@@ -688,8 +688,7 @@ unsigned char mu_init_file(gd_region *reg, boolean_t has_ftok)
 			return EXIT_ERR;
 		}
 		REVERT;
-		reg->file_initialized = true;
-		reg->did_file_initialization = true;
+		reg->file_initialized = TRUE;
 		CLEANUP(EXIT_WRN);
 		return EXIT_WRN;
 	}
@@ -716,8 +715,7 @@ unsigned char mu_init_file(gd_region *reg, boolean_t has_ftok)
 		return EXIT_ERR;
 	}
 	REVERT;
-	reg->file_initialized = true;
-	reg->did_file_initialization = true;
+	reg->file_initialized = TRUE;
 	CLEANUP(EXIT_NRM);
 	if (IS_STATSDB_REG(reg))
 	{

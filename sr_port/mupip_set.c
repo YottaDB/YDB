@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -38,6 +38,7 @@ GBLREF	boolean_t	jnlpool_init_needed;
 error_def(ERR_GTMCURUNSUPP);
 error_def(ERR_MUNOACTION);
 error_def(ERR_MUNODBNAME);
+error_def(ERR_QUALEXP);
 
 void mupip_set(void)
 {
@@ -89,6 +90,7 @@ void mupip_set(void)
 		|| (CLI_PRESENT == cli_present("DATA_RESERVED_BYTES"))
 		|| (CLI_NEGATED == cli_present("DEFER_ALLOCATE"))
 		|| (CLI_PRESENT == cli_present("DEFER_ALLOCATE"))
+		|| (CLI_NEGATED == cli_present("DEFER_TIME"))
 		|| (CLI_PRESENT == cli_present("DEFER_TIME"))
 		|| (CLI_PRESENT == cli_present("ENCRYPTABLE"))
 		|| (CLI_NEGATED == cli_present("ENCRYPTABLE"))
@@ -131,10 +133,9 @@ void mupip_set(void)
 	{
 		if (SS_NORMAL != (status = mupip_set_file(db_fn_len, db_fn)))
 			mupip_exit(status);
-	}
+	} else if (!(set_journal || set_replication))
+		mupip_exit(ERR_QUALEXP);
 	if (set_journal || set_replication)
 		status = mupip_set_journal(db_fn_len, db_fn);
-	else
-		status = SS_NORMAL;
 	mupip_exit(status);
 }

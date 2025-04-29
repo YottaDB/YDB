@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2009-2021 Fidelity National Information	*
+ * Copyright (c) 2009-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -12,6 +12,12 @@
 
 #ifndef GTMCRYPT_DBK_REF_H
 #define GTMCRYPT_DBK_REF_H
+
+enum key_encr_mech {
+	key_encr_mech_gnupg,
+	key_encr_mech_openssl_pkcs8,
+	max_key_mech
+};
 
 /*
  * This file defines several structures that store information about every symmetric key that we load as well the encryption /
@@ -148,12 +154,14 @@ typedef struct gtm_keystore_unres_key_link_struct
 	int						index;				/* Index in the configuration file */
 	int						status;				/* Indication of whether it is for a device,
 											 * unresolved, or resolved database. */
+	int						encryptor;			/* Service that encrypts the key */
 	struct gtm_keystore_unres_key_link_struct	*next;				/* Pointer to next element. */
 } gtm_keystore_unres_key_link_t;
 
 STATICFNDEF int			keystore_refresh(void);
-STATICFNDEF int 		read_files_section(config_t *cfgp);
-STATICFNDEF int 		read_database_section(config_t *cfgp);
+STATICFNDEF int 		read_files_section(config_setting_t *parent, enum key_encr_mech encryptor);
+STATICFNDEF int 		read_database_section(config_setting_t *parent, enum key_encr_mech encryptor);
+STATICFNDEF int			read_plugins_section(config_setting_t *parent);
 STATICFNDEF int			gtm_keystore_cleanup_node(gtm_keystore_t *);
 int				gtm_keystore_cleanup_all(void);
 STATICFNDEF int			gtm_keystore_cleanup_hash_tree(gtm_keystore_hash_link_t *entry);
@@ -162,8 +170,8 @@ STATICFNDEF void		gtm_keystore_cleanup_keypath_tree(gtm_keystore_keypath_link_t 
 STATICFNDEF void		gtm_keystore_cleanup_unres_key_list(void);
 int				gtmcrypt_getkey_by_keyname(char *keyname, char *keypath, gtm_keystore_t **entry, int database);
 int				gtmcrypt_getkey_by_hash(unsigned char *hash, char *dbpath, gtm_keystore_t **entry);
-STATICFNDEF gtm_keystore_t	*gtmcrypt_decrypt_key(char *key_path, int path_length, char *key_name, int name_length);
-STATICFNDEF void		insert_unresolved_key_link(char *keyname, char *keypath, int index, int status);
+STATICFNDEF gtm_keystore_t	*gtmcrypt_decrypt_key(char *key_path, int path_length, char *key_name, int name_length, enum key_encr_mech encryptor);
+STATICFNDEF void		insert_unresolved_key_link(char *keyname, char *keypath, int index, int status, enum key_encr_mech encryptor);
 STATICFNDEF gtm_keystore_t	*keystore_lookup_by_hash(unsigned char *hash);
 STATICFNDEF gtm_keystore_t 	*keystore_lookup_by_keyname(char *keyname);
 STATICFNDEF gtm_keystore_t 	*keystore_lookup_by_keyname_plus(char *keyname, char *search_field, int search_type);
@@ -174,4 +182,120 @@ int 				keystore_new_cipher_ctx(gtm_keystore_t *entry, char *iv, unsigned int le
 int				keystore_remove_cipher_ctx(gtm_cipher_ctx_t *ctx);
 STATICFNDEF void		print_debug(void);
 
+/* This is an in-code representation of the $gtmcrypt_config configuration file. It is accurate as of version 2
+ * of the configuration file that added a simpler OpenSSL based public-key cryptography alternative to GnuPG's keyring.
+ *
+ * ///////////////////////////
+ * // Global configuration
+ * version: 2;					// Default is 1 which disables "plugins" section parsing
+ * ///////////////////////////
+ * // GT.M encryption plugin support
+ * // This defaults to GnuPG when not present. At the moment, the encryption plugin supports only one context at a time,
+ * // but each context is an option in separate processes.
+ * plugins: {
+ * 	// Place GnuPG related configuration changes here. This section is proposed and NOT YET IMPLEMENTED
+ * 	gnupg:	{
+ * 		enabled:	1; // Default
+ * 		loadbalance:	0; // Default - no load balancing
+ * 		retries:	2; // Default
+ * 		keys:	{	// OPTIONAL Default uses the first available key per gpg's keyring logic
+ * 			keyID1: "keygrip1";	// Each ID must be a valid keygrip
+ * 			keyID2: "keygrip2";
+ * 		};
+ * 		env:	{
+ * 			GNUPGHOME: "/path/to/gnupg/home/directory";	// Overrides default $GNUPGHOME
+ * 			GTMXC_gpgagent: "/path/to/xc/file";		// Establishes GTMXC_gpgagent
+ * 		};
+ * 	};
+ * 	// When using PKCS8, only one key can protect all keys. Ideally, this is a corporate issued key+certificate that
+ * 	// shares a common root CA. With this setup, users can share database envryption keys. Without it, users should
+ * 	// fail to verify other users when attempting to share the encrypted database symmetric key
+ * 	openssl-pkcs8:	{
+ * 		protected:	"yes";			// Default - indicates that the private key is password protected
+ * 		enabled:	1;			// Disabled by default
+ * 		format:		"PEM";
+ * 		key:		"/path/to/key/one.key";
+ * 		cert:		"/path/to/key/one.crt";
+ *		// Each key name can be referenced from a MUMPS application. These keys are encrypted using the enabled plugin
+ *		files:	{
+ *			version: 1;	// Default
+ *			pkcs8name1: "/path/to/symmetric/pkcs8key1";
+ *			pkcs8name2: "/path/to/symmetric/pkcs8key2";
+ *		};
+ *		///////////////////////////
+ *		// GT.M Database Encryption Settings for this plugin. Key paths must be distinct from keys used by other plugins
+ *		database: {
+ *			// Key entries are assumed to be encrypted 32byte symmetric keys
+ *			keys: (
+ *			{	// Database file ONE
+ *				dat: "/path/to/database/file/dbONE.dat";	// Encrypted database file.
+ *				key: "/path/to/database/key/pkcs8dbONE.key";	// Encrypted symmetric key.
+ *			},
+ *			{	// Database file TWO
+ *				dat: "/path/to/database/file/dbTWO.dat";
+ *				key: "/path/to/database/key/pkcs8dbTWO.key";
+ *			},
+ *			{	// Database file ONE using a new key. Note the DB name remains the same
+ *				dat: "/path/to/database/file/dbONE.dat";	// Encrypted database file.
+ *				key: "/path/to/database/key/pkcs8dbONEnew.key";	// Encrypted symmetric key.
+ *			},
+ *			// Database symmetric key priority is last-in-first-used
+ *			...
+ *			);
+ *		};
+ * 	};
+ * };
+ * ///////////////////////////
+ * // TLS related configuration
+ * tls:	{
+ * 	version: 1;	// Default
+ * 	// Global TLS configuration settings
+ * 	// Each of the below settings are optional at every level
+ * 	verify-depth: N;
+ * 	CAfile: "/path/to/CAFile.crt";
+ * 	CApath:	"/path/to/CA/certs/";
+ * 	crl: "/path/to/revocation.crl";
+ * 	session-timeout: NNN;
+ * 	ssl-options: "SSL_OP_NO_SSLv2:SSL_OP_NO_SSLv3";
+ * 	///////
+ * 	// Application instances can be referred to by name. These names are used
+ * 	// by GT.M replication servers and MUMPS SOCKET devices to refer to a
+ * 	// configuration by name. Configuration options at the name level take
+ * 	// precendence over global settings
+ * 	Application_Instance_Name {
+ * 		format: "PEM"; // Only supported option
+ * 		cert: "/path/to/tls/certification.crt";
+ * 		key: "/path/to/tls/key.key";
+ * 	};
+ * };
+ * ///////////////////////////
+ * // GT.M File I/O encryption
+ * // Each key name can be referenced from a MUMPS application. Name/key pair is unique
+ * files:	{
+ * 	version: 1;	// Default
+ * 	name1: "/path/to/symmetric/key1";
+ * 	name2: "/path/to/symmetric/key2";
+ * };
+ * ///////////////////////////
+ * // GT.M Database Encryption Settings
+ * database: {
+ * 	// Key entries are assumed to be encrypted 32byte symmetric keys
+ * 	keys: (
+ * 	{	// Database file ONE
+ * 		dat: "/path/to/database/file/dbONE.dat";	// Encrypted database file.
+ * 		key: "/path/to/database/key/dbONE.key";		// Encrypted symmetric key.
+ * 	},
+ * 	{	// Database file TWO
+ * 		dat: "/path/to/database/file/dbTWO.dat";
+ * 		key: "/path/to/database/key/dbTWO.key";
+ * 	},
+ * 	{	// Database file ONE using a new key. Note the DB name remains the same
+ * 		dat: "/path/to/database/file/dbONE.dat";	// Encrypted database file.
+ * 		key: "/path/to/database/key/dbONEnew.key";	// Encrypted symmetric key.
+ * 	},
+ *	// Database symmetric key priority is last-in-first-used
+ * 	...
+ *	);
+ * };
+ */
 #endif /* GTMCRYPT_DBK_REF_H */

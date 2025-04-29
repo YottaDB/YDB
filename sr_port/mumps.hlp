@@ -120,7 +120,7 @@
 2 Copyright
    Copyright
 
-   Copyright 2024
+   Copyright 2025
 
    Fidelity National Information Services, Inc. and/or its subsidiaries. All
    rights reserved.
@@ -8570,12 +8570,12 @@
 
    Example:
 
-   GTM>write $replace("********","***","ABE")
-   ****ABE*
+   GTM>write $replace("alphabet","abe","ABE")
+   alphABEt
    GTM>
 
-   $REPLACE() searches for the second expression "***" in the first
-   expression "********". Since "***" exists in the first expression, it
+   $REPLACE() searches for the second expression "abe" in the first
+   expression "alphabet". Since "abe" exists in the first expression, it
    replaces the occurrence with the third expression "ABE".
 
 2 $REverse()
@@ -16547,17 +16547,6 @@
    can change the character set of an already OPENed device, it can help deal
    with binary data intermixed with character data.
 
-5 INDEPENDENT
-   INDEPENDENT
-
-   INDEPENDENT Applies to: PIPE
-
-   The INDEPENDENT deviceparameter specifies that the newly created process
-   will not be terminated by the CLOSE of the device. The input and output of
-   INDEPENDENT processes should be handled in such a way that it runs
-   independently even after the CLOSE of the device. By default, CLOSE waits
-   for the termination of the process associated with the PIPE device.
-
 5 IKEY
    IKEY
 
@@ -16575,6 +16564,27 @@
 
    For more information, refer to the description of KEY deviceparameter of
    OPEN or USE.
+
+5 INDEPENDENT
+   INDEPENDENT
+
+   INDEPENDENT Applies to: PIPE
+
+   The INDEPENDENT deviceparameter specifies that the newly created process
+   will not be terminated by the CLOSE of the device. The input and output of
+   INDEPENDENT processes should be handled in such a way that it runs
+   independently even after the CLOSE of the device. By default, CLOSE waits
+   for the termination of the process associated with the PIPE device.
+
+5 INREWIND
+   INREWIND
+
+   Applies to: FIFO PIPE SD
+
+   Performs a REWIND on input when $PRINCIPAL identifies a device that
+   supports REWIND. Use this deviceparameter with $PRINCIPAL when redirected
+   from a file. For FIFO or PIPE devices, REWIND only sets $X, $Y, and $ZEOF
+   to zero.
 
 5 IOERROR
    IOERROR
@@ -16909,6 +16919,16 @@
    Please review the man page for setsockopt for more information on the use
    of these options. On Linux, "man 7 socket" and "man 7 tcp" provide
    additional information.
+
+5 OUTREWIND
+   OUTREWIND
+
+   Applies to: FIFO PIPE SD
+
+   Performs a REWIND on output when $PRINCIPAL identifies a device that
+   supports REWIND. Use this deviceparameter with $PRINCIPAL when redirected
+   to a file. For FIFO or PIPE devices, REWIND only sets $X, $Y, and $ZEOF to
+   zero.
 
 5 OWNER
    OWNER
@@ -18171,7 +18191,8 @@
 
    Performs a REWIND on input when $PRINCIPAL identifies a device that
    supports REWIND. Use this deviceparameter with $PRINCIPAL when redirected
-   from a file.
+   from a file. For FIFO or PIPE devices, REWIND only sets $X, $Y, and $ZEOF
+   to zero.
 
 5 INSEEK=strexpr
    INSEEK=strexpr
@@ -18347,7 +18368,8 @@
 
    Performs a REWIND on output when $PRINCIPAL identifies a device that
    supports REWIND. Use this deviceparameter with $PRINCIPAL when redirected
-   to a file.
+   to a file. For FIFO or PIPE devices, REWIND only sets $X, $Y, and $ZEOF to
+   zero.
 
 5 OUTSEEK=strexpr
    OUTSEEK=strexpr

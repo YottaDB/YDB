@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -226,7 +226,7 @@ boolean_t gvcst_get2(mval *v, unsigned char *sn_ptr)
 							continue;
 					} else
 					{
-						status = tp_hist(NULL);
+						status = tp_hist(NULL, ERR_GVGETFAIL);
 						if (cdb_sc_normal != status)
 						{
 							t_retry(status);
@@ -255,7 +255,7 @@ boolean_t gvcst_get2(mval *v, unsigned char *sn_ptr)
 					}
 				} else
 				{
-					status = tp_hist(NULL);
+					status = tp_hist(NULL, ERR_GVGETFAIL);
 					if (cdb_sc_normal != status)
 					{
 						assert(FALSE == TREF(ready2signal_gvundef)); /* tp_hist should have reset this */

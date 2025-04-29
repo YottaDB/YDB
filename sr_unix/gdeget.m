@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-; Copyright (c) 2006-2024 Fidelity National Information		;
+; Copyright (c) 2006-2025 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -33,7 +33,12 @@ LOAD
 	i gldfmt>6 s reghasv550fields=TRUE
 	s reghasv600fields=FALSE
 	i gldfmt>7 s reghasv600fields=TRUE
-	if (label="GTCGBDUNX015")!(label="GTCGBDUNX115") set label=hdrlab,update=1  ;autoconvert
+	s maphasv716fields=FALSE
+	i gldfmt>16 s maphasv716fields=TRUE
+	s v716=0
+	if (label="GTCGBDUNX016")!(label="GTCGBDUNX116") set label=hdrlab,update=1,v716=1  ;autoconvert
+	if (label="GTCGBDUNX015")!(label="GTCGBDUNX115") set label=hdrlab,update=1,v716=1  ;autoconvert
+	if (v716=1) new SIZEOF do v716init
 	s v6312=0
 	if (label="GTCGBDUNX014")!(label="GTCGBDUNX114") set label=hdrlab,v6312=1,update=1  ;autoconvert
 	if (v6312=1) new SIZEOF do v6312init
@@ -276,6 +281,7 @@ mapfixed:(i)
 	i $zl(rec)-(rel-1)<SIZEOF("gd_map") d nextrec
 	s keyoffset=$$bin2num($ze(rec,rel,rel+3)),rel=rel+ptrsize ; read 4 bytes, but skip 8 bytes if gtm64
 	s regoffset=$$bin2num($ze(rec,rel,rel+3)),rel=rel+ptrsize ; read 4 bytes, but skip 8 bytes if gtm64
+	s:(maphasv716fields=TRUE) rel=rel+ptrsize ; oldregaddr
 	s gvnamelen=$$bin2num($ze(rec,rel,rel+3)),rel=rel+4
 	s gvkeylen=$$bin2num($ze(rec,rel,rel+3)),rel=rel+4
 	s maparray(i,1)=keyoffset
@@ -894,4 +900,37 @@ v6312init:
         d gvstats^GDEINIT
         s MAXNAMLN=SIZEOF("mident")-1,MAXREGLN=32,MAXSEGLN=32   ; maximum name length allowed is 31 characters
         s PARNAMLN=31,PARREGLN=31,PARSEGLN=31
+	q
+v716init:
+	i ((olabel="GTCGBDUNX015")!(olabel="GTCGBDUNX016")) d
+	. s SIZEOF("am_offset")=336		; --> offset of "acc_meth" field in the "gd_segment" structure
+	. s SIZEOF("file_spec")=256		; --> maximum size (in bytes) of a file name specified in gde command line
+	. s SIZEOF("gd_contents")=80		; --> size of the "gd_addr" structure (defined in gdsfhead.h)
+	. s SIZEOF("gd_header")=16		; --> 16-byte header structure at offset 0 of .gld (12 byte label, 4-byte filesize)
+	. s SIZEOF("gd_map")=16			; --> size of the "gd_binding" structure (defined in gdsfhead.h)
+	. s SIZEOF("gd_region")=416		; --> size of the "gd_region"  structure (defined in gdsfhead.h)
+	. s SIZEOF("gd_region_padding")=0	; --> padding at end of "gd_region" structure (4-bytes for 64-bit platforms)
+	. s SIZEOF("gd_segment")=372		; --> size of the "gd_segment" structure (defined in gdsfhead.h)
+	e  d
+	. s SIZEOF("am_offset")=340		; --> offset of "acc_meth" field in the "gd_segment" structure
+	. s SIZEOF("file_spec")=256		; --> maximum size (in bytes) of a file name specified in gde command line
+	. s SIZEOF("gd_contents")=120		; --> size of the "gd_addr" structure (defined in gdsfhead.h)
+	. s SIZEOF("gd_header")=16		; --> 16-byte header structure at offset 0 of .gld (12 byte label, 4-byte filesize)
+	. s SIZEOF("gd_map")=24			; --> size of the "gd_binding" structure (defined in gdsfhead.h)
+	. s SIZEOF("gd_region")=432		; --> size of the "gd_region"  structure (defined in gdsfhead.h)
+	. s SIZEOF("gd_region_padding")=8	; --> padding at end of "gd_region" structure (4-bytes for 64-bit platforms)
+	. s SIZEOF("gd_segment")=384		; --> size of the "gd_segment" structure (defined in gdsfhead.h)
+	s SIZEOF("blk_hdr")=16
+	s SIZEOF("dsk_blk")=512
+	s SIZEOF("gd_gblname")=40
+	s SIZEOF("gd_inst_info")=SIZEOF("file_spec")	; --> size of the "gd_inst_info" structure (defined in gdsfhead.h)
+	s SIZEOF("max_str")=1048576
+	s SIZEOF("mident")=32
+	s SIZEOF("reg_jnl_deq")=4
+	s SIZEOF("rec_hdr")=4	;GTM-6941
+	d gvstats^GDEINIT
+	s MAXGVSUBS=31						; needs to be equal to (MAX_GVSUBSCRIPTS-1) in mdef.h at all times
+	s MAXNAMLN=SIZEOF("mident")-1,MAXREGLN=32,MAXSEGLN=32	; maximum name length allowed is 31 characters
+	s MAXSTRLEN=(2**20)					; needs to be equal to MAX_STRLEN in mdef.h at all times
+	s (PARNAMLN,PARREGLN,PARSEGLN)=MAXNAMLN
 	q

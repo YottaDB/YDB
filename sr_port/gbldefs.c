@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -1217,3 +1217,6 @@ GBLDEF	void		(*mupip_exit_fp)(int4 errnum);	/* Function pointer to mupip_exit() 
 GBLDEF	boolean_t	gtm_nofflf;			/* GTM-9136 TRUE only to suppress LF after FF in "write #" */
 GBLDEF	void 		(*primary_exit_handler)(void);	/* If non-NULL, may be used to reestablish atexit() handler */
 GBLDEF	dm_audit_info	audit_conn[MAX_AUD_CONN];	/* AUdit logging connection information */
+/* For JOURNAL EXTRACT GLOBAL*/
+GBLDEF	boolean_t	in_tstart;	/*keep track of tstart block while printing records with journal extract global*/
+GBLDEF	boolean_t	uupd_tstart;	/*keep track if the record is UUPD and require TSTART record*/

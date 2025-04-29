@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -58,7 +58,7 @@ void gvcmz_error(char code, uint4 status)
 			break;
 		default:
 			gv_cur_region->open = FALSE;
-			gv_cur_region->file_initialized = gv_cur_region->did_file_initialization = FALSE;
+			gv_cur_region->file_initialized = FALSE;
 			gv_cur_region->dyn.addr->acc_meth = dba_bg;
 			memset(gv_currkey->base,0,gv_currkey->end + 1);
 			break;

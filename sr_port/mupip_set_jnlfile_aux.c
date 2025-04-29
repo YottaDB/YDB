@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -48,6 +48,7 @@ error_def(ERR_JNLFNF);
 error_def(ERR_MUSTANDALONE);
 error_def(ERR_PREVJNLLINKSET);
 error_def(ERR_FILENAMETOOLONG);
+error_def(ERR_QUALEXP);
 
 uint4 mupip_set_jnlfile_aux(jnl_file_header *header, char *jnl_fname)
 {
@@ -59,6 +60,15 @@ uint4 mupip_set_jnlfile_aux(jnl_file_header *header, char *jnl_fname)
 	mstr		jnlfile, jnldef;
 
 	buf_len = SIZEOF(buf);
+	/* check for jnlfile qualifiers */
+	if (!((CLI_PRESENT == cli_present("BYPASS"))
+		|| (CLI_PRESENT == cli_present("PREVJNLFILE"))
+		|| (CLI_NEGATED == cli_present("PREVJNLFILE"))
+		|| (CLI_PRESENT == cli_present("DBFILENAME"))
+		|| (CLI_PRESENT == cli_present("REPL_STATE"))))
+	{
+		return((uint4)ERR_QUALEXP);
+	}
 	/* check for standalone */
 	need_no_standalone = cli_present("BYPASS");
 	if (!need_no_standalone)

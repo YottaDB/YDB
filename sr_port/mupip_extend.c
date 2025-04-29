@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -102,7 +102,7 @@ void mupip_extend(void)
 #	if !defined(MM_FILE_EXT_OK)
 	if (dba_mm == gv_cur_region->dyn.addr->acc_meth)
 	{
-		FILE_CNTL_INIT(gv_cur_region->dyn.addr);
+		FILE_CNTL_INIT(gv_cur_region);
 		if (!STANDALONE(gv_cur_region))
 		{
 			util_out_print("Can't get standalone access to database file !AD with MM access method, no extension done.",

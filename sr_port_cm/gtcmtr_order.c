@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -111,7 +111,7 @@ bool gtcmtr_order(void)
 			} else
 				gv_currkey->base[gv_currkey->prev] = 1;
 		}
-		found = (0 == gv_target->root) ? FALSE : gvcst_order();
+		found = (0 == gv_target->root) ? FALSE : gvcst_order(NULL);
 		gv_altkey->prev = gv_currkey->prev;
 	} else
 	{	/* name level */
@@ -124,7 +124,7 @@ bool gtcmtr_order(void)
 			reset_gv_target = gv_target;	/* for restoration, just in case something goes wrong before
 							 * gtcm_bind_name() is called */
 			gv_target = cs_addrs->dir_tree;
-			found = gvcst_order();
+			found = gvcst_order(NULL);
 			if (!found)
 				break;
 			assert(2 <= gv_altkey->end);			/* at least one character of name and a <NUL> delimiter */

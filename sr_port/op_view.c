@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -915,7 +915,7 @@ STATICFNDEF void view_dbop(unsigned char keycode, viewparm *parmblkptr, mval *th
 	{
 		reg = rg->reg;
 		assert(!(IS_STATSDB_REG(reg)));		/* taken care of by view_arg_convert */
-		assert(reg->open);			/* taken care of by view_arg_convert */
+		assert(reg->open || (VTK_STATSHARE == keycode) || (VTK_NOSTATSHARE == keycode));
 		TP_CHANGE_REG(reg);
 		/* note that the jnlpool needs to be initialized and validated for options which could write to the database
 		 * so instance freeze can be honored.  No data is writtern just file header, etc. so OK on secondary
@@ -1039,26 +1039,61 @@ STATICFNDEF void view_dbop(unsigned char keycode, viewparm *parmblkptr, mval *th
 #endif	/* DEBUG */
 				break;
 			case VTK_STATSHARE:
+				/* VIEW "STATSHARE" enables shared statistics on any region where this sharing is not
+				 * prohibited by the fileheader. This needs to be applied to both opened and unopened
+				 * base databases.
+				 * 	- Base region is open
+				 * 		- This is straightforward: open and initialize the statsDB unless the
+				 * 		  fileheader has a hard prohibition on stats sharing.
+				 * 	- Base region is not yet open
+				 * 		- Ensure that reg->reservedDBFlags does NOT have NOSTATS and set the
+				 * 		  statshare_specified bool. Any subsequent open of the base region will open
+				 * 		  the stats region if the flag hasn't been modified by a NOSTATSHARE
+				 * 		  and the fileheader does not prohibit statshare with an RDBF_NOSTATS.
+				 */
 				assert(!IS_STATSDB_REG(reg));
+				if (IS_STATSDB_REG(reg))
+					break; /* Consequences of messing up statsDB's reservedDBflags if wrong; be safe in pro */
+				if (!TREF(ok_to_see_statsdb_regs))
+					break;
 				BASEDBREG_TO_STATSDBREG(reg, statsDBreg);
-				if (!(RDBF_NOSTATS & cs_addrs->hdr->reservedDBFlags))
+				if (reg->open && !(RDBF_NOSTATS & cs_addrs->hdr->reservedDBFlags))
 				{
 					cs_addrs->reservedDBFlags &= ~RDBF_NOSTATS;
+					reg->reservedDBFlags &= ~RDBF_NOSTATS;
 					if (0 < dollar_tlevel)		/* Can't do this in TP */
 						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_TPNOSTATSHARE);
 					gvcst_init_statsDB(reg, DO_STATSDB_INIT_TRUE);
-				}
+				} else if (!reg->open)
+				{ /* Will proactively open statsdb during basedb open even if statshare_opted_in == SOME */
+					reg->statshare = STATSHARE;
+				} /* Else if open but header says nostats, don't do anything */
 				break;
 			case VTK_NOSTATSHARE:
 				assert(!IS_STATSDB_REG(reg));
-				cs_addrs->reservedDBFlags |= RDBF_NOSTATS;
-				BASEDBREG_TO_STATSDBREG(reg, statsDBreg);
-				if (statsDBreg->statsDB_setup_completed)
-				{	/* Don't bother to opt-out if not set up - it just confuses things */
-					if (0 < dollar_tlevel)		/* Can't do this in TP */
-						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_TPNOSTATSHARE);
-					gvcst_remove_statsDB_linkage(reg);
+				if (IS_STATSDB_REG(reg))
+					break; /* Consequences of messing up statsDB's reservedDBflags if wrong; be safe in pro */
+				/* VIEW "NOSTATSHARE" disables shared statistics on any region. This needs to be applied to both
+				 * opened and unopened base databases.
+				 * 	- Base region is open
+				 * 		- Straightforward: remove the statsDB linkage if it exists and disable stats in the
+				 * 		  base region.
+				 * 	- Base region is not yet open
+				 * 		- Set NOSTATS in the reservedDB flags and set statshare_specified to ensure that it
+				 * 		  will be respected on any subsequent gvcst_init.
+				 */
+				if (reg->open)
+				{
+					BASEDBREG_TO_STATSDBREG(reg, statsDBreg);
+					if (statsDBreg->statsDB_setup_completed)
+					{
+						if (0 < dollar_tlevel)		/* Can't do this in TP */
+							RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_TPNOSTATSHARE);
+						gvcst_remove_statsDB_linkage(reg);
+					}
 				}
+				/* Can still open statsdb file on direct YGS reference, but will not share stats */
+				reg->statshare = NOSTATSHARE;
 				break;
 		}
 	}

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -848,7 +848,7 @@ MBSTART {															\
 			rc = UNLINK((char *)(REG)->dyn.addr->fname);								\
 			assert(0 == rc);											\
 		}														\
-	} else if IS_AUTODELETE_REG((REG))											\
+	} else if (IS_AUTODELETE_REG((REG)) && (IS_GTM_IMAGE || TREF(enable_autodelete)))					\
 	{															\
 		DBGRDB((stderr, "%s:%d:%s: process id %d autodeleting autodb file %s for region %s\n", __FILE__,		\
 					__LINE__, __func__, process_id, (REG)->dyn.addr->fname, (REG)->rname));			\

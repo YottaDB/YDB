@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2005-2022 Fidelity National Information	*
+ * Copyright (c) 2005-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -103,6 +103,7 @@ int updhelper_writer(void)
 
 	SETUP_THREADGBL_ACCESS;
 	TREF(ok_to_see_statsdb_regs) = TRUE;
+	TREF(enable_autodelete) = TRUE; /* Autodelete autodeletable files if the last one out */
 	call_on_signal = updhelper_writer_sigstop;
 	updhelper_init(UPD_HELPER_WRITER);
 	repl_log(updhelper_log_fp, TRUE, TRUE, "Helper writer started. PID %d [0x%X]\n", process_id, process_id);

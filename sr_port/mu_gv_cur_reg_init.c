@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -35,11 +35,9 @@ void mu_gv_cur_reg_init(void)
 
 	gdhdr = create_dummy_gbldir();
 	basedb_reg = gdhdr->regions;
-	basedb_seg = basedb_reg->dyn.addr;
 	statsdb_reg = basedb_reg + 1;
-	statsdb_seg = statsdb_reg->dyn.addr;
-	FILE_CNTL_INIT(basedb_seg);
-	FILE_CNTL_INIT(statsdb_seg);
+	FILE_CNTL_INIT(basedb_reg);
+	FILE_CNTL_INIT(statsdb_reg);
 	gv_cur_region = gdhdr->regions;
 }
 

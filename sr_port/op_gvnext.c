@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -91,7 +91,7 @@ void op_gvnext(mval *v)
 	{
 		gvnh_reg = TREF(gd_targ_gvnh_reg);
 		if (NULL == gvnh_reg)
-			found = (gv_target->root ? gvcst_order() : FALSE);
+			found = (gv_target->root ? gvcst_order(NULL) : FALSE);
 		else
 			INVOKE_GVCST_SPR_XXX(gvnh_reg, found = gvcst_spr_order());
 	} else if (acc_meth == dba_cm)

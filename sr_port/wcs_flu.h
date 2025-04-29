@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -30,28 +30,29 @@ boolean_t wcs_flu(uint4 options);
 	SET_CACHE_FAIL_STATUS(status, csd);								\
 }
 
-#define SET_CACHE_FAIL_STATUS(status, csd)								\
-{													\
-	if ((CDB_STAGNATE <= t_tries) && (dba_bg == csd->acc_meth))					\
-	{	/* We are in final retry but have to restart because some other process encountered	\
-		 * an error in phase2 of commit and has set wc_blocked to TRUE causing us (in-crit	\
-		 * process) not to be able to flush the cache. We do not want to increase t_tries in 	\
-		 * this case as that will cause us to error out of the transaction. Instead treat this	\
-		 * like a helped out case. This will cause us to retry the transaction and as part of	\
-		 * that we'll perform a cache-recovery that should reset cnl->wc_blocked to FALSE.	\
-		 * This should cause the wcs_flu() done in the next retry to succeed unless yet another	\
-		 * process set wc_blocked to TRUE as part of its phase2 commit. In the worst case we	\
-		 * could restart as many times as there are processes concurrently running phase2 	\
-		 * commits. Since we dont release crit throughout this final-retry restart loop, we	\
-		 * are guaranteed not to do infinite retries.						\
-		 */											\
-		assert(gtm_white_box_test_case_enabled							\
-			&& (WB_PHASE2_COMMIT_ERR							\
-				|| (WBTEST_JNL_FILE_LOST_DSKADDR == gtm_white_box_test_case_number)	\
-				|| (WBTEST_SLEEP_IN_WCS_WTSTART  == gtm_white_box_test_case_number)));	\
-		status = (enum cdb_sc)cdb_sc_helpedout;							\
-	} else												\
-		status = (enum cdb_sc)cdb_sc_cacheprob;							\
+#define SET_CACHE_FAIL_STATUS(status, csd)									\
+{														\
+	if ((CDB_STAGNATE <= t_tries) && (dba_bg == csd->acc_meth))						\
+	{	/* We are in final retry but have to restart because some other process encountered		\
+		 * an error in phase2 of commit and has set wc_blocked to TRUE causing us (in-crit		\
+		 * process) not to be able to flush the cache. We do not want to increase t_tries in 		\
+		 * this case as that will cause us to error out of the transaction. Instead treat this		\
+		 * like a helped out case. This will cause us to retry the transaction and as part of		\
+		 * that we'll perform a cache-recovery that should reset cnl->wc_blocked to FALSE.		\
+		 * This should cause the wcs_flu() done in the next retry to succeed unless yet another		\
+		 * process set wc_blocked to TRUE as part of its phase2 commit. In the worst case we		\
+		 * could restart as many times as there are processes concurrently running phase2 		\
+		 * commits. Since we dont release crit throughout this final-retry restart loop, we		\
+		 * are guaranteed not to do infinite retries.							\
+		 */												\
+		assert(gtm_white_box_test_case_enabled								\
+			&& (WB_PHASE2_COMMIT_ERR								\
+				|| (WBTEST_JNL_FILE_LOST_DSKADDR	 == gtm_white_box_test_case_number)	\
+				|| (WBTEST_SLEEP_IN_WCS_WTSTART  	 == gtm_white_box_test_case_number)	\
+				|| (WBTEST_FORCE_WCS_GET_SPACE_CACHEVRFY == gtm_white_box_test_case_number)));	\
+		status = (enum cdb_sc)cdb_sc_helpedout;								\
+	} else													\
+		status = (enum cdb_sc)cdb_sc_cacheprob;								\
 }
 
 #endif

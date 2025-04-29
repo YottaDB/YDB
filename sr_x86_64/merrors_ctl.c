@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information 	*
+ * Copyright (c) 2001-2025 Fidelity National Information 	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -1455,7 +1455,7 @@ LITDEF	err_msg merrors[] = {
 	{ "LOCKTIMINGINTP", "A LOCK at !AD within a TP transaction is waiting in a final TP retry, which may lead to a general response gap", 2, 0 },
 	{ "PBNUNSUPTYPE", "$ZPEEK() does not support type !AD", 2, 0 },
 	{ "DBFHEADLRU", "Database file !AD LRU pointer: 0x!16@XQ is outside of range: 0x!16@XQ to 0x!16@XQ or misaligned", 5, 0 },
-	{ "UNUSEDMSG1626", "ASYNCIONOV4 last used in V7.0-004 Feb 2023", 0, 0 },
+	{ "JNLNOTALLOWED", "Did not enable journaling on !AD region !AD", 4, 0 },
 	{ "AIOCANCELTIMEOUT", "Pid [0x!XL] timed out waiting for pending async io to complete/cancel in database file !AD", 3, 0 },
 	{ "DBGLDMISMATCH", "Database file !AD has !AZ whereas !AZ !AD in global directory !AD has !AZ", 9, 0 },
 	{ "DBBLKSIZEALIGN", "Database file !AD has AIO=ON and block_size=!UL which is not a multiple of filesystem block size !UL", 4, 0 },
@@ -3009,7 +3009,7 @@ LITDEF	int ERR_JNLPOOLRECOVERY = 150383866;
 LITDEF	int ERR_LOCKTIMINGINTP = 150383872;
 LITDEF	int ERR_PBNUNSUPTYPE = 150383882;
 LITDEF	int ERR_DBFHEADLRU = 150383891;
-LITDEF	int ERR_UNUSEDMSG1626 = 150383898;
+LITDEF	int ERR_JNLNOTALLOWED = 150383896;
 LITDEF	int ERR_AIOCANCELTIMEOUT = 150383906;
 LITDEF	int ERR_DBGLDMISMATCH = 150383914;
 LITDEF	int ERR_DBBLKSIZEALIGN = 150383922;

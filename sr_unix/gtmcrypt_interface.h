@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2009-2020 Fidelity National Information	*
+ * Copyright (c) 2009-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -16,6 +16,13 @@
 #define GTMCRYPT_INTERFACE_H
 
 /* This module defines the interface for a GT.M encryption plug-in implementation. Refer to the function comments for details. */
+
+/* GT.M Reference Encryption Plugin versions */
+#define GTM_DB_ENCRYPTION_VER		0x00000002
+#define GTM_DB_ENCRYPTION_VER_DBKEYS	0x00000000	/* Original encryption implementation only use $gtm_dbkeys */
+#define GTM_DB_ENCRYPTION_VER_CONFIG	0x00000001	/* Configuration file is $gtmcrypt_config */
+#define GTM_DB_ENCRYPTION_VER_PLUGINS	0x00000002	/* First references to "plugins" section */
+#define GTM_DB_ENCRYPTION_VER_PKCSALL	0x00000003	/* Plugins sections for GnuPG, PKCS11 and PKCS12 */
 
 /* Environment variable containing the obfuscated password for the key ring with which the symmetric keys are encrypted. */
 #define GTM_PASSWD_ENV			"gtm_passwd"
@@ -52,10 +59,11 @@ typedef	void * gtmcrypt_key_t;
  * options. Upon a successful return this function is never invoked again.
  *
  * Arguments:	flags	Encryption flags to use.
+ * 		version	Encryption plugin version minimum version
  *
  * Returns:	0 if encryption was initialized successfully; -1 otherwise.
  */
-extern gtm_status_t	gtmcrypt_init(gtm_int_t flags);
+extern gtm_status_t	gtmcrypt_init(gtm_int_t flags, gtm_int_t version);
 
 /*
  * Return the error string. Use this function to provide the current error status. The function is normally invoked following a

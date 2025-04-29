@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -88,6 +88,7 @@ error_def(ERR_PREVJNLLINKCUT);
 error_def(ERR_REPLSTATE);
 error_def(ERR_TEXT);
 error_def(ERR_UNIMPLOP);
+error_def(ERR_JNLNOTALLOWED);
 
 uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 {
@@ -119,7 +120,7 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 	jnl_file_header		header;
 	int4			status1;
 	uint4			status2;
-	boolean_t		header_is_usable = FALSE, noprevlink_requested;
+	boolean_t		header_is_usable = FALSE, noprevlink_requested, saw_ok_region = FALSE;
 	boolean_t		jnl_buffer_updated = FALSE, jnl_buffer_invalid = FALSE;
 	int			jnl_buffer_size;
 	char			s[JNLBUFFUPDAPNDX_SIZE];	/* JNLBUFFUPDAPNDX_SIZE is defined in jnl.h */
@@ -237,9 +238,34 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 							 * and do not process this region anymore. */
 			continue;
 		}
+		if (IS_AUTODB_REG(gv_cur_region) && (jnl_notallowed != rptr->jnl_new_state))
+		{
+			/* Don't need to check for repl_new_state since jnl_new_state != jnl_notallowed would be a prerequisite
+			 * for any autodb-incompatible repl change.
+			 */
+			if (rptr->fPtr || ((rptr != grlist) && saw_ok_region))
+			{
+				/* If this is one of several regions we are targeting, don't change the exit status.
+				 * Just do a gds_rundown and continue. Only change the exit status if ALL of the regions
+				 * were AUTODBs, we targeted one specific autodb region, or it's a set -file.
+				 */
+				gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(6) MAKE_MSG_INFO(ERR_JNLNOTALLOWED), 4,
+						LEN_AND_LIT("AUTODB"), DB_LEN_STR(gv_cur_region));
+			} else
+			{
+				gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(6) ERR_JNLNOTALLOWED, 4, LEN_AND_LIT("AUTODB"),
+						DB_LEN_STR(gv_cur_region));
+				exit_status |= EXIT_WRN;
+			}
+			gds_rundown_status = gds_rundown(CLEANUP_UDI_TRUE, FALSE);
+			exit_status |= gds_rundown_status;
+			rptr->sd = NULL;
+			rptr->state = NONALLOCATED;
+			continue;
+		}
+		saw_ok_region = TRUE;
 		jnl_curr_state = (enum jnl_state_codes)csd->jnl_state;
 		repl_curr_state = (enum repl_state_codes)csd->repl_state;
-
 		/* Following is the transition table for replication states:
 		 *
 		 *			repl_close	repl_was_open	repl_open

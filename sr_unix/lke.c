@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -108,6 +108,7 @@ int main (int argc, char *argv[])
 	gtm_chk_dist(argv[0]);
 	prealloc_gt_timers();
 	gt_timers_add_safe_hndlrs();
+	INIT_FNPTR_GLOBAL_VARIABLES;
 	initialize_pattern_table();
 	if (RESTRICTED(lke))
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_RESTRICTEDOP, 1, "LKE");

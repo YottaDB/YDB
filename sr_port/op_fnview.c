@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -856,10 +856,17 @@ void	op_fnview(int numarg, mval *dst, ...)
 			if (!(n = TREF(statshare_opted_in)) || (NULL == parmblk.gv_ptr))	/* WARNING assignment */
 				break;								/* no region - use general result */
 			assert(gd_header);
-			if (!(n = parmblk.gv_ptr->open))
-			{
-				if (!(n = (ALL_STATS_OPTIN != TREF(statshare_opted_in))))
+			if (!(n = (NOSTATSHARE != parmblk.gv_ptr->statshare))) /* WARNING - assignment */
 					break;
+			if (!(n = parmblk.gv_ptr->open)) /* WARNING - assignment */
+			{
+				/* Did the user previously perform a view "STATSHARE":reg? Did the user default to statshare on all
+				 * regions using gtm_statshare? If the answer to both questions is no, break.
+				 */
+				if ((STATSHARE != parmblk.gv_ptr->statshare) && (ALL_STATS_OPTIN != TREF(statshare_opted_in)))
+					break;
+				/* Only remaining situations: ALL_STATS_OPTIN or specified stats, or both */
+				assert((ALL_STATS_OPTIN == TREF(statshare_opted_in)) || (STATSHARE == parmblk.gv_ptr->statshare));
 				gv_init_reg(parmblk.gv_ptr, NULL);
 			}
 			csa = &FILE_INFO(parmblk.gv_ptr)->s_addrs;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2017 Fidelity National Information	*
+ * Copyright (c) 2003-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -37,6 +37,7 @@ gld_dbname_list *read_db_files_from_gld(gd_addr *addr)
 	gld_dbname_list		head, *dblist = &head;
 	char 			filename[MAX_FN_LEN];
 	mstr 			file, def, ret, *retptr;
+	int			err;
 
 	head.next = NULL;
 	for (reg = addr->regions, reg_top = reg + addr->n_regions; reg < reg_top; reg++)
@@ -44,8 +45,8 @@ gld_dbname_list *read_db_files_from_gld(gd_addr *addr)
 		assert(reg < reg_top);
 		if (IS_STATSDB_REG(reg))
 			continue;	/* Do not open statsdb regions directly. They will get opened as needed */
-		seg = (gd_segment *)reg->dyn.addr;
-		FILE_CNTL_INIT_IF_NULL(seg);
+		FILE_CNTL_INIT_IF_NULL(reg);
+		seg = reg->dyn.addr;
 		ret.len = SIZEOF(filename);
 		ret.addr = filename;
 		retptr = &ret;
@@ -61,10 +62,13 @@ gld_dbname_list *read_db_files_from_gld(gd_addr *addr)
 			def.addr = DEF_DBEXT;	/* UNIX need to pass "*.dat" but reg->dyn.addr->defext has "DAT" */
 			def.len = SIZEOF(DEF_DBEXT) - 1;
 		}
-		if (FILE_PRESENT != gtm_file_stat(&file, &def, retptr, FALSE, &ustatus))
+		if (FILE_PRESENT != (err = gtm_file_stat(&file, &def, retptr, FALSE, &ustatus)))
 		{
-			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_FILENOTFND, 2, file.len, file.addr, ustatus);
-			return NULL;
+			if (!(IS_AUTODB_REG(reg) && (FILE_NOT_FOUND == err)))
+			{
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_FILENOTFND, 2, file.len, file.addr, ustatus);
+				return NULL;
+			}
 		}
 		assert(0 == filename[retptr->len]);
 		seg->fname_len = retptr->len;

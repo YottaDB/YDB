@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -158,7 +158,7 @@ tp_region	*insert_region(	gd_region	*reg,
 			tr_new->fid_index = tr->fid_index;
 			for (tr_resort = tr, local_fid_index = tr_resort->fid_index; NULL != tr_resort; tr_resort = tr_resort->fPtr)
 			{
-				if (tr->reg->open)
+				if (tr_resort->reg->open)
 					tr_resort->fid_index = local_fid_index = FILE_INFO(tr_resort->reg)->s_addrs.fid_index;
 				else
 					tr_resort->fid_index = ++local_fid_index;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -212,7 +212,7 @@ boolean_t gvcst_queryget2(mval *val, unsigned char *sn_ptr)
 					continue;
 			} else
 			{
-				status = tp_hist(!two_histories ? NULL : rt_history);
+				status = tp_hist(!two_histories ? NULL : rt_history, ERR_GVQUERYGETFAIL);
 				if (cdb_sc_normal != status)
 				{
 					t_retry(status);

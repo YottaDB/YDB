@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2012-2024 Fidelity National Information		#
+# Copyright (c) 2012-2025 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -29,7 +29,7 @@ foreach(lang ${languages})
 endforeach()
 
 # Defaults
-set(version ${V7.1-006})
+set(version ${V7.1-007})
 if("${version}" STREQUAL "")
         set(version V9.9-0)
 endif()
@@ -578,7 +578,7 @@ set_target_properties(libgtmcrypt_gcrypt_AES256CFB.so PROPERTIES
   LIBRARY_OUTPUT_DIRECTORY ${GTM_BINARY_DIR}/plugin
   )
 add_dependencies(libgtmcrypt_gcrypt_AES256CFB.so gen_gtm_threadgbl_deftypes)
-target_link_libraries(libgtmcrypt_gcrypt_AES256CFB.so ${GPG_LIBRARIES})
+target_link_libraries(libgtmcrypt_gcrypt_AES256CFB.so ${GPG_LIBRARIES} ${TLS_LIBRARIES})
 install(TARGETS libgtmcrypt_gcrypt_AES256CFB.so DESTINATION ${GTM_INSTALL_DIR}/plugin)
 
 # Establish the default encryption link

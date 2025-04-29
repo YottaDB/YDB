@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -25,6 +25,9 @@
 #include "fullbool.h"
 #include "show_source_line.h"
 #include "op.h"
+#ifdef DEBUG
+#include "arit.h"
+#endif
 
 GBLREF	bool		devctlexp;
 GBLREF	boolean_t	run_time;
@@ -496,6 +499,7 @@ int expritem(oprtype *a)
 	triple		*argtrip, *functrip, *ref, *t1, *t2, *t3;
 	unsigned char	type;
 	unsigned int	argcnt;
+	char		tok_temp;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -621,12 +625,28 @@ int expritem(oprtype *a)
 					}
 				}
 				advancewindow();
-				if (((OC_FNZCHAR == fun_data[index].opcode) || (OC_FNCHAR == fun_data[index].opcode))
-					&& (MV_NUM_APPROX == ((MV_NM | MV_NUM_APPROX) & (TREF(director_mval)).mvtype)))
-				{	/* [z]f_char need an error based s2n failing to create a valid numeric argument */
-					assert((0 == (TREF(director_mval)).e) && !val_iscan(&(TREF(director_mval))));
-					TREF(last_source_column) += (TK_EOL == TREF(director_token)) ? -2 : 2;  /* improve hints */
-					stx_error(ERR_NUMOFLOW);
+				if (MV_NUM_APPROX == ((MV_NM | MV_NUM_APPROX) & (TREF(director_mval)).mvtype))
+				{	/* [z]f_char and [z]f_justify need an error based s2n failing to create
+					 * a valid numeric argument
+					 */
+					switch (fun_data[index].opcode)
+					{
+					case OC_FNJ2:
+					case OC_FNJ3:
+					case OC_FNZJ2:
+						if ((TK_NUMLIT != TREF(director_token)) && (TK_INTLIT != TREF(director_token)))
+							break;	/* WARNING else fallthrough */
+						/* Prevent coercion of the first argument to $[Z]JUSTIFY() */
+					case OC_FNCHAR:
+					case OC_FNZCHAR:
+						assert(((0 == (TREF(director_mval)).e) || ((EXPHI + 1) == (TREF(director_mval)).e))
+								&& !val_iscan(&(TREF(director_mval))));
+						/* improve hints */
+						TREF(last_source_column) += (TK_EOL == TREF(director_token)) ? -2 : 2;
+						stx_error(ERR_NUMOFLOW);
+						break;
+					default: break;
+					}
 				}
 				advancewindow();
 				if (!parse_warn)

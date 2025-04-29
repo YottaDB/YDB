@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2024 Fidelity National Information	*
+ * Copyright (c) 2010-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -522,6 +522,7 @@ THREADGBLDEF(in_bm_getfree_gdsfilext,           boolean_t)	/* bm_getfree() did a
 								 * file extension.
 								 */
 THREADGBLDEF(ok_to_leave_statsdb_unopened,	boolean_t)	/* Whether or not it is okay to leave a statsdb unopened */
+THREADGBLDEF(enable_autodelete,			boolean_t)	/* Enables autodelete if MUPIP/DSE/LKE */
 /* Debug values */
 #ifdef DEBUG
 THREADGBLDEF(donot_commit,			boolean_t)			/* debug-only - see gdsfhead.h for purpose */

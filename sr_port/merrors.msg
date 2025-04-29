@@ -1,6 +1,6 @@
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !								!
-! Copyright (c) 2001-2024 Fidelity National Information		!
+! Copyright (c) 2001-2025 Fidelity National Information		!
 ! Services, Inc. and/or its subsidiaries. All rights reserved.	!
 !								!
 !	This source code contains the intellectual property	!
@@ -1623,7 +1623,7 @@ JNLPOOLRECOVERY	<The size of the data written to the journal pool (!UL) does not
 LOCKTIMINGINTP	<A LOCK at !AD within a TP transaction is waiting in a final TP retry, which may lead to a general response gap>/warning/fao=2!/ansi=0
 PBNUNSUPTYPE	<$ZPEEK() does not support type !AD>/error/fao=2!/ansi=0
 DBFHEADLRU	<Database file !AD LRU pointer: 0x!16@XQ is outside of range: 0x!16@XQ to 0x!16@XQ or misaligned>/info/fao=5!/ansi=0
-UNUSEDMSG1626	<ASYNCIONOV4 last used in V7.0-004 Feb 2023>/error/fao=0!/ansi=0
+JNLNOTALLOWED	<Did not enable journaling on !AD region !AD>/warning/fao=4!/ansi=0
 AIOCANCELTIMEOUT	<Pid [0x!XL] timed out waiting for pending async io to complete/cancel in database file !AD>/error/fao=3!/ansi=0
 DBGLDMISMATCH	<Database file !AD has !AZ whereas !AZ !AD in global directory !AD has !AZ>/error/fao=9!/ansi=0
 DBBLKSIZEALIGN	<Database file !AD has AIO=ON and block_size=!UL which is not a multiple of filesystem block size !UL>/error/fao=4!/ansi=0

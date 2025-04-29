@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -594,7 +594,7 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 			if (dba_mm == access_new)
 			{
 				if (CLI_NEGATED == defer_status)
-					pvt_csd->defer_time = 0;
+					pvt_csd->defer_time = -1;
 				else  if (CLI_PRESENT == defer_status)
 				{
 					if (cli_get_defertime("DEFER_TIME", &defer_time))

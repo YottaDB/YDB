@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -207,7 +207,7 @@ mint	gvcst_data2(void)
 				continue;
 		} else
 		{
-			status = tp_hist(0 == rt_history->h[0].blk_num ? NULL : rt_history);
+			status = tp_hist(0 == rt_history->h[0].blk_num ? NULL : rt_history, ERR_GVDATAFAIL);
 			if (cdb_sc_normal != status)
 			{
 				t_retry(status);

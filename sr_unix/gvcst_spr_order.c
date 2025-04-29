@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -52,7 +52,7 @@ boolean_t	gvcst_spr_order(void)
 	boolean_t	spr_tpwrapped;
 	boolean_t	est_first_pass;
 	boolean_t	found, result_found;
-	boolean_t	do_atorder_search;
+	boolean_t	do_atorder_search, is_hidden;
 	boolean_t	currkey_orig_saved = FALSE;
 	int		reg_index;
 	int		prev;
@@ -109,7 +109,7 @@ boolean_t	gvcst_spr_order(void)
 		 * Hence cannot use latter like is used in other gvcst_spr_* modules.
 		 */
 		if (gv_target->root)
-			found = gvcst_order();
+			found = gvcst_order(NULL);
 		if (gv_target != start_map_gvt)
 		{	/* Restore gv_cur_region/gv_target etc. */
 			gv_target = start_map_gvt;
@@ -161,11 +161,10 @@ boolean_t	gvcst_spr_order(void)
 		if (gv_target->root)
 		{
 			matchkey = gv_altkey;
-			found = gvcst_order();
+			found = gvcst_order(&bh);
 			assert(!found || !memcmp(&gv_altkey->base[0], &gv_currkey->base[0], prev));
 			if (do_atorder_search)
 			{
-				bh = gv_target->hist.h;
 				if (gv_currkey->end <= bh->curr_rec.match)
 				{	/* The history indicates that the gvcst_search() performed by gvcst_order() actually found
 					 * the key marking the end of a previous map, so try that first.
@@ -173,6 +172,10 @@ boolean_t	gvcst_spr_order(void)
 					matchkey = gv_currkey;
 					found = TRUE;
 				}
+#				ifdef DEBUG
+				CHECK_HIDDEN_SUBSCRIPT(matchkey, is_hidden);
+				assert(!found || !is_hidden);
+#				endif
 			}
 			if (found)
 			{	/* For accurate results, we need to see if the node found by gvcst_order() has data or that its

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -455,7 +455,7 @@ int repl_ctl_close(repl_ctl_element *ctl)
 	uint	size;
 #	ifdef DEBUG
 	FILE	*pf;
-	char	buff[50], line[20], *fgets_res;
+	char	buff[35], line[20], *fgets_res;
 #	endif
 
 	if (NULL != ctl)
@@ -469,14 +469,14 @@ int repl_ctl_close(repl_ctl_element *ctl)
 #					ifdef DEBUG
 					if (WBTEST_ENABLED(WBTEST_MUNMAP_FREE) && (1 == gtm_white_box_test_case_count))
 					{
-						SNPRINTF(buff, SIZEOF(buff), "ps -p %u -o rssize | grep -v RSS", getpid());
+						SNPRINTF(buff, SIZEOF(buff), "ps -p %u -o 'rssize='", getpid());
 						if (NULL == (pf = POPEN(buff ,"r")))
 						{
 							save_errno = errno;
 							send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
 										LEN_AND_LIT("popen()"), CALLFROM, save_errno);
 						}
-						FGETS(line, SIZEOF(line), pf, fgets_res);
+						FGETS_FILE(line, SIZEOF(line), pf, fgets_res);
 						assert(NULL != fgets_res);
 						/* Record the memory "pick", before deallocating memory with munmap() */
 						util_out_print("WBTEST_MUNMAP_FREE : VmRSS !UL kB", TRUE,

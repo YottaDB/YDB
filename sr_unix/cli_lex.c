@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -230,12 +230,55 @@ void cli_strupper(char *sp)
  */
 int cli_is_hex_explicit(char *p)
 {	/* The number is HEX, and it explicitly starts with a '0x' */
+	if ('+' == *p)
+		p++;
+	if (('0' == *p) && ('X' == TOUPPER(*(p + 1))))
+                p = p + 2;
+	else
+		return FALSE;
+	while (*p && ISXDIGIT_ASCII(*p))
+		p++;
+	return ((*p) ? FALSE : TRUE);
+}
+
+/*
+ * -------------------------------------------------------
+ * Check if string is a Hex number.
+ * It also accepts negative hexadecimal number.
+ *
+ * Return:
+ *	TRUE	- identifier
+ *	FALSE	- otherwise
+ * -------------------------------------------------------
+ */
+int cli_is_hex_negok(char *p)
+{
 	if (('+' == *p) || ('-' == *p))
 		p++;
 	if (('0' == *p) && ('X' == TOUPPER(*(p + 1))))
-        {
-                p = p + 2;
-        } else
+		p = p + 2;
+	while (*p && ISXDIGIT_ASCII(*p))
+		p++;
+	return ((*p) ? FALSE : TRUE);
+}
+
+/*
+ * -------------------------------------------------------
+ * Check if string is a Hex number prefixed by '0X'
+ * Validates whether the input is a valid hexadecimal number.
+ * It also accepts negative hexadecimal number.
+ * Return:
+ *      TRUE    - identifier
+ *      FALSE   - otherwise
+ * -------------------------------------------------------
+ */
+int cli_is_hex_explicit_negok(char *p)
+{       /* The number is HEX, and it explicitly starts with a '0x' */
+	if (('+' == *p) || ('-' == *p))
+		p++;
+	if (('0' == *p) && ('X' == TOUPPER(*(p + 1))))
+		p = p + 2;
+	else
 		return FALSE;
 	while (*p && ISXDIGIT_ASCII(*p))
 		p++;
@@ -253,15 +296,12 @@ int cli_is_hex_explicit(char *p)
  */
 int cli_is_hex(char *p)
 {
-	if (('+' == *p) || ('-' == *p))
+	if ('+' == *p)
 		p++;
 	if (('0' == *p) && ('X' == TOUPPER(*(p + 1))))
-        {
-                p = p + 2;
-        }
+		p = p + 2;
 	while (*p && ISXDIGIT_ASCII(*p))
 		p++;
-
 	return ((*p) ? FALSE : TRUE);
 }
 

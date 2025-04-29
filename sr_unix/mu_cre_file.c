@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -58,8 +58,8 @@ unsigned char mu_cre_file(gd_region *reg)
 
 	SETUP_THREADGBL_ACCESS;
 	assert((-(SIZEOF(uint4) * 2) & SIZEOF_FILE_HDR_DFLT) == SIZEOF_FILE_HDR_DFLT);
+	FILE_CNTL_INIT_IF_NULL(reg);
 	seg = reg->dyn.addr;
-	FILE_CNTL_INIT_IF_NULL(seg);
 	udi = FILE_INFO(reg);
 	pblk.fop = (F_SYNTAXO | F_PARNODE);
 	pblk.buffer = path;

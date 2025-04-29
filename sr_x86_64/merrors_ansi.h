@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information 	*
+ * Copyright (c) 2001-2025 Fidelity National Information 	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -1453,7 +1453,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* LOCKTIMINGINTP */
 	   0,	/* PBNUNSUPTYPE */
 	   0,	/* DBFHEADLRU */
-	   0,	/* UNUSEDMSG1626 */
+	   0,	/* JNLNOTALLOWED */
 	   0,	/* AIOCANCELTIMEOUT */
 	   0,	/* DBGLDMISMATCH */
 	   0,	/* DBBLKSIZEALIGN */

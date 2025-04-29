@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -160,6 +160,7 @@ CONDITION_HANDLER(gtcm_ch)
 	if (WARNING == orig_severity || ERROR == orig_severity)
 	{
 		preemptive_db_clnup(orig_severity);
+		have_crit(CRIT_HAVE_ANY_REG | CRIT_RELEASE); /* Ensure we do not have crit */
 		UNWIND(x,y);
 	}
 	NEXTCH;

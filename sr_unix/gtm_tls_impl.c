@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2013-2023 Fidelity National Information	*
+ * Copyright (c) 2013-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -598,6 +598,7 @@ gtm_tls_ctx_t *gtm_tls_init(int version, int flags)
 	SSL_library_init();
 	SSL_load_error_strings();
 	ERR_load_BIO_strings();
+	OpenSSL_add_all_ciphers();
 	OpenSSL_add_all_algorithms();
 #endif
 	/* Turn on FIPS mode if requested. */

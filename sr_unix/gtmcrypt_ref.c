@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2009-2024 Fidelity National Information	*
+ * Copyright (c) 2009-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -26,6 +26,7 @@
 #include <gpg-error.h>			/* gcry*_err_t */
 
 #include <openssl/err.h>
+#include <openssl/ssl.h>
 #include <libconfig.h>
 
 #include "gtmxc_types.h"		/* gtm_string, gtm_status_t and other callin interfaces gtm_fileid */
@@ -67,6 +68,7 @@ GBLDEF	int			gtmcrypt_inited;
 GBLDEF	int			gtmcrypt_init_flags;
 
 GBLREF	passwd_entry_t		*gtmcrypt_pwent;
+GBLREF	EVP_PKEY		*evp_pkey;
 
 /*
  * Initialize encryption if not yet initialized.
@@ -75,12 +77,19 @@ GBLREF	passwd_entry_t		*gtmcrypt_pwent;
  *
  * Returns:	0 if encryption was initialized successfully; -1 otherwise.
  */
-gtm_status_t gtmcrypt_init(gtm_int_t flags)
+gtm_status_t gtmcrypt_init(gtm_int_t flags, gtm_int_t version)
 {
 	int fips_requested, fips_enabled, rv;
 
+	assert(GTM_DB_ENCRYPTION_VER >= version); /* Make sure the caller is using the right API version */
 	if (gtmcrypt_inited)
 		return 0;
+	if (GTM_DB_ENCRYPTION_VER < version)
+	{
+		UPDATE_ERROR_STRING("Version of libgtmcrypt.so plugin (%d) older than needed by caller (%d).",
+					GTM_DB_ENCRYPTION_VER, version);
+		return -1;
+	}
 	if (0 != gc_load_gtmshr_symbols())
 		return -1;
 	IS_FIPS_MODE_REQUESTED(fips_requested);
@@ -104,6 +113,35 @@ gtm_status_t gtmcrypt_init(gtm_int_t flags)
 #	ifdef USE_GCRYPT
 	if (0 != gc_sym_init())
 		return -1;
+#	endif
+	/* Initialize OpenSSL library */
+#	if OPENSSL_VERSION_NUMBER >= 0x10100000L
+	/* The following options are initialzied by default:
+	 * 	OPENSSL_INIT_LOAD_CRYPTO_STRINGS
+	 * 	OPENSSL_INIT_ADD_ALL_CIPHERS
+	 * 	OPENSSL_INIT_ADD_ALL_DIGESTS
+	 *	OPENSSL_INIT_LOAD_CONFIG as of 1.1.1 - second parameter is path to file; NULL means OS default
+	 *	OPENSSL_INIT_ASYNC
+	 *
+	 * The following are manually added:
+	 * 	OPENSSL_INIT_NO_ATEXIT - suppress OpenSSL's "atexit" handler (new OpenSSL 3.0)
+	 */
+#	ifndef OPENSSL_INIT_NO_ATEXIT
+#	define OPENSSL_INIT_NO_ATEXIT 0
+#	endif
+#	define GTMTLS_STARTUP_OPTIONS	(OPENSSL_INIT_NO_ATEXIT)
+	if (!OPENSSL_init_ssl(GTMTLS_STARTUP_OPTIONS, NULL))
+	{	/* Can't use SET_AND_APPEND_OPENSSL_ERROR which needs the above to initialize error reporting functions */
+		UPDATE_ERROR_STRING("OpenSSL library initialization failed");
+		return -1;
+	}
+#	else
+	/* Initialize the SSL/TLS library, the algorithms/cipher suite and error strings. */
+	SSL_library_init();
+	SSL_load_error_strings();
+	ERR_load_BIO_strings();
+	OpenSSL_add_all_ciphers();
+	OpenSSL_add_all_algorithms();
 #	endif
 	GC_PK_INIT;
 	/* Update $gtm_passwd for future invocation */
@@ -318,8 +356,9 @@ gtm_status_t gtmcrypt_release_cipher_context(gtmcrypt_key_t handle)
 }
 
 /*
- * Perform encryption or decryption of the provided data based on the specified encryption / decryption state. If the target buffer
- * pointer is NULL, the operation is done in-place. It is also possible to set the initialization vector (IV) to a particular value,
+ * Perform encryption or decryption of the provided data based on the specified encryption / decryption state. If the target
+ * buffer pointer is NULL, the operation is done in-place. It is also possible to set the initialization vector (IV) to a
+ * particular value,
  * or reset it to the original value, before attempting the operation. Note that the changes are persistent.
  *
  * Arguments:	handle			Encryption state object to use.
@@ -368,8 +407,8 @@ gtm_status_t gtmcrypt_encrypt_decrypt(gtmcrypt_key_t handle, gtm_char_t *src_blo
 				return -1;
 			break;
 		case GTMCRYPT_IV_CONTINUE:
-			/* For devices, encryption and decryption state should be maintained right from the first byte, and for this
-			 * purpose the IV should not be touched.
+			/* For devices, encryption and decryption state should be maintained right from the first byte, and for
+			 * this purpose the IV should not be touched.
 			 */
 			break;
 		default:

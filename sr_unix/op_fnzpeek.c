@@ -43,6 +43,7 @@ error_def(ERR_BADZPEEKARG);
 error_def(ERR_BADZPEEKFMT);
 error_def(ERR_BADZPEEKRANGE);
 error_def(ERR_MAXSTRLEN);
+error_def(ERR_NOGTCMDB);
 error_def(ERR_ZPEEKNOJNLINFO);
 error_def(ERR_ZPEEKNORPLINFO);
 
@@ -579,6 +580,10 @@ void	op_fnzpeek(mval *structid, int offset, int len, mval *format, mval *ret)
 		default:
 			assert(FALSE);		/* Only the above types should ever have an argument */
 		}
+	}
+	if (r_ptr && r_ptr->dyn.addr->acc_meth == dba_cm)
+	{	/* PEEKBYNAME invocation is not supported for the GT.CM database. */
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_NOGTCMDB, 4, LEN_AND_LIT("PEEKBYNAME"), REG_LEN_STR(r_ptr));
 	}
 	/* Figure out the address of each block to return */
 	switch(mnemonic_opcode)

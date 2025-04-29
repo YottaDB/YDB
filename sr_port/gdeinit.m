@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-; Copyright (c) 2001-2024 Fidelity National Information		;
+; Copyright (c) 2001-2025 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -82,7 +82,7 @@ GDEINIT
 	. s SIZEOF("file_spec")=256		; --> maximum size (in bytes) of a file name specified in gde command line
 	. s SIZEOF("gd_contents")=80		; --> size of the "gd_addr" structure (defined in gdsfhead.h)
 	. s SIZEOF("gd_header")=16		; --> 16-byte header structure at offset 0 of .gld (12 byte label, 4-byte filesize)
-	. s SIZEOF("gd_map")=16			; --> size of the "gd_binding" structure (defined in gdsfhead.h)
+	. s SIZEOF("gd_map")=20			; --> size of the "gd_binding" structure (defined in gdsfhead.h)
 	. s SIZEOF("gd_region")=416		; --> size of the "gd_region"  structure (defined in gdsfhead.h)
 	. s SIZEOF("gd_region_padding")=0	; --> padding at end of "gd_region" structure (4-bytes for 64-bit platforms)
 	. s SIZEOF("gd_segment")=372		; --> size of the "gd_segment" structure (defined in gdsfhead.h)
@@ -91,7 +91,7 @@ GDEINIT
 	. s SIZEOF("file_spec")=256		; --> maximum size (in bytes) of a file name specified in gde command line
 	. s SIZEOF("gd_contents")=120		; --> size of the "gd_addr" structure (defined in gdsfhead.h)
 	. s SIZEOF("gd_header")=16		; --> 16-byte header structure at offset 0 of .gld (12 byte label, 4-byte filesize)
-	. s SIZEOF("gd_map")=24			; --> size of the "gd_binding" structure (defined in gdsfhead.h)
+	. s SIZEOF("gd_map")=32			; --> size of the "gd_binding" structure (defined in gdsfhead.h)
 	. s SIZEOF("gd_region")=432		; --> size of the "gd_region"  structure (defined in gdsfhead.h)
 	. s SIZEOF("gd_region_padding")=8	; --> padding at end of "gd_region" structure (4-bytes for 64-bit platforms)
 	. s SIZEOF("gd_segment")=384		; --> size of the "gd_segment" structure (defined in gdsfhead.h)
@@ -443,8 +443,8 @@ syntabi:
 	s syntab("VERIFY","TEMPLATE")=""
 	q
 UNIX:
-	s hdrlab="GTCGBDUNX016"         ; must be concurrently maintained in gbldirnam.h!!!
-	i (gtm64=TRUE) s hdrlab="GTCGBDUNX116" ; the high order digit is a 64-bit flag
+	s hdrlab="GTCGBDUNX017"         ; must be concurrently maintained in gbldirnam.h!!!
+	i (gtm64=TRUE) s hdrlab="GTCGBDUNX117" ; the high order digit is a 64-bit flag
 	s tfile="$gtmgbldir"
 	s accmeth="\BG\MM"
 	s helpfile="$gtm_dist/gdehelp.gld"

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2023 Fidelity National Information	*
+ * Copyright (c) 2010-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -1495,6 +1495,7 @@ int	gvtr_match_n_invoke(gtm_trigger_parms *trigparms, gvtr_invoke_parms_t *gvtr_
 	mval			tmpmval;
 	unsigned char		util_buff[MAX_TRIG_UTIL_LEN];
 	int4			util_len;
+	uint4			save_t_err;
 #	ifdef DEBUG
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
@@ -1509,6 +1510,7 @@ int	gvtr_match_n_invoke(gtm_trigger_parms *trigparms, gvtr_invoke_parms_t *gvtr_
 	DEBUG_ONLY(save_targ = gv_target);
 	assert(gv_target != csa->dir_tree);
 	assert(dollar_tlevel);
+	save_t_err = t_err;
 	/* Initialize trigger parms that dont depend on the context of the matching trigger */
 	gvtr_cmd = gvtr_parms->gvtr_cmd;
 	gvt_trigger = gvtr_parms->gvt_trigger;
@@ -1697,6 +1699,7 @@ int	gvtr_match_n_invoke(gtm_trigger_parms *trigparms, gvtr_invoke_parms_t *gvtr_
 				if (0 != gtm_trig_status)
 				{
 					gvtr_parms->num_triggers_invoked = num_triggers_invoked;
+					/* Leave t_err as last value for more accurate error reporting */
 					return gtm_trig_status;
 				}
 			}
@@ -1724,6 +1727,7 @@ int	gvtr_match_n_invoke(gtm_trigger_parms *trigparms, gvtr_invoke_parms_t *gvtr_
 	assert(0 == memcmp(save_gv_currkey, gv_currkey, OFFSETOF(gv_key, base[0]) + gv_currkey->end));
 	DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC(CHECK_CSA_TRUE);
 	gvtr_parms->num_triggers_invoked = num_triggers_invoked;
+	t_err = save_t_err;
 	return 0;
 }
 #endif /* GTM_TRIGGER */

@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-; Copyright (c) 2015-2022 Fidelity National Information		;
+; Copyright (c) 2015-2025 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -88,7 +88,7 @@
 	.	set:(""=format)&(1=length) format=$select((type="unsigned-char"):"U",(type="char"):"I",1:"")
 	.	set:""=format format=$select(type["char":"C",1:"")
 	.	set:""=format format=$select(type["addr":"X",type["ptr":"X",type["void":"X",1:"")
-	.	set:""=format format=$select(type["uint64":"X",type["int64":"X",type["long":"X",1:"")
+	.	set:""=format format=$select(type["uint64":"X",type["int64":"X",type["int_least64":"X",type["long":"X",1:"")
 	.	set:""=format format=$select(type["uint":"U",type["unsigned":"U",1:"")
 	.	set:""=format format=$select(type["int":"I",1:"")
 	.	; miscellaneous whitelist of non-standard types

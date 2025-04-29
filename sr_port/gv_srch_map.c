@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2013-2023 Fidelity National Information	*
+ * Copyright (c) 2013-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -15,6 +15,7 @@
 #include "gdsroot.h"
 #include "gdsbt.h"
 #include "gdsfhead.h"
+#include "filestruct.h"
 #include "gvcst_protos.h"	/* needed by OPEN_BASEREG_IF_STATSREG */
 
 GBLREF	uint4	mu_upgrade_in_prog;

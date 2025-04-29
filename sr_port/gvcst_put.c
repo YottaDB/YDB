@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -1045,7 +1045,7 @@ tn_restart:
 					}
 				} else
 				{
-					status = tp_hist(dir_hist);
+					status = tp_hist(dir_hist, ERR_GVPUTFAIL);
 					if (NULL != dir_hist)
 						ADD_TO_GVT_TP_LIST(dir_tree, RESET_FIRST_TP_SRCH_STATUS_FALSE);
 					if (cdb_sc_normal != status)
@@ -2756,7 +2756,7 @@ tn_restart:
 		}
 	} else
 	{
-		status = tp_hist(dir_hist);
+		status = tp_hist(dir_hist, ERR_GVPUTFAIL);
 		if (NULL != dir_hist)
 		{	/* Note that although "tp_hist" processes the "dir_hist" history, it only adds "gv_target" to gvt_tp_list.
 			 * But csa->dir_tree might have had clue, blk-split related info etc. modified as part of this

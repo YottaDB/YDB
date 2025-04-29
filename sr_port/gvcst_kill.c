@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -515,7 +515,7 @@ research:
 							return;
 						} else
 						{
-							cdb_status = tp_hist(NULL);
+							cdb_status = tp_hist(NULL, ERR_GVKILLFAIL);
 							if (cdb_sc_normal != cdb_status)
 								GOTO_RETRY(cdb_status, SKIP_ASSERT_FALSE);
 							*span_status = TRUE;
@@ -787,7 +787,7 @@ research:
 			assert(csd == cs_data); /* To ensure they are the same even if MM extensions happened in between */
 		} else
 		{
-			cdb_status = tp_hist(alt_hist);
+			cdb_status = tp_hist(alt_hist, ERR_GVKILLFAIL);
 			if (cdb_sc_normal != cdb_status)
 				GOTO_RETRY(cdb_status, SKIP_ASSERT_FALSE);
 		}

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -320,6 +320,8 @@ gd_addr *gd_load(mstr *v)
 		for (reg = table->regions, reg_top = reg + n_regions; reg < reg_top; reg++)
 		{
 			reg->reservedDBFlags |= RDBF_NOSTATS;
+			/* Assert that csa has not been allocated yet so that reservedDBFlags can stay in sync */
+			assert(!reg->dyn.addr->file_cntl || !reg->dyn.addr->file_cntl->file_info);
 			if ((NULL == first_stats_reg) && IS_STATSDB_REGNAME(reg))
 			{
 				first_stats_reg = reg;

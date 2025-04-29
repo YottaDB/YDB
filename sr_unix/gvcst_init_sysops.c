@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -477,7 +477,7 @@ gd_region *dbfilopn(gd_region *reg)
 			/* This latch shall only protect against inconsistent reading of and/or writing to the statsdb fields in
 			 * the basedb shared memory. It is not meant to be broader auto-create/initialize concurrency control
 			 */
-			if ((IS_DSE_IMAGE || IS_LKE_IMAGE) && TREF(ok_to_leave_statsdb_unopened))
+			if (TREF(ok_to_leave_statsdb_unopened))
 			{
 				rel_latch(&baseDBnl->statsdb_field_latch);
 				ENABLE_INTERRUPTS(INTRPT_IN_GVCST_INIT, prev_intrpt_state);
@@ -563,7 +563,7 @@ gd_region *dbfilopn(gd_region *reg)
 		}
 	}
 	assert(IS_ACC_METH_BG_OR_MM(seg->acc_meth));
-	FILE_CNTL_INIT_IF_NULL(seg);
+	FILE_CNTL_INIT_IF_NULL(reg);
 	udi = FILE_INFO(reg);
 	csa = &udi->s_addrs;
 	file.addr = (char *)seg->fname;
@@ -647,8 +647,13 @@ gd_region *dbfilopn(gd_region *reg)
 			 */
 			if ((FD_INVALID == udi->fd) && (ENOENT == save_errno) && IS_AUTODB_REG(reg))
 			{
-				assert(!did_one_loop);
-				if (is_statsDB && ((IS_DSE_IMAGE || IS_LKE_IMAGE) && TREF(ok_to_leave_statsdb_unopened)))
+				if (did_one_loop)
+				{
+					/* Alert caller that this call needs to be redone but should be counted as an attempt */
+					reg->file_initialized = FALSE;
+					return (gd_region *)-2L;
+				}
+				if (is_statsDB && TREF(ok_to_leave_statsdb_unopened))
 				{
 					/* Should never create a statsdb file */
 					return (gd_region *)NULL;
@@ -686,6 +691,21 @@ gd_region *dbfilopn(gd_region *reg)
 						autodb_rcerr = AUTODB_INITERR;
 						break;
 					}
+#					ifdef DEBUG
+					/* This logic is not MT-safe and is intended only for the whitebox testing case,
+					 * which should be single threaded
+					 */
+					if (WBTEST_ENABLED(WBTEST_REPEAT_DBFILOPN) && IS_AUTODELETE_REG(reg))
+					{
+						if (gtm_white_box_test_case_count > gtm_wbox_input_test_case_count)
+						{
+							gtm_wbox_input_test_case_count++;
+							/* Delete file out from under ourself (as if done by another process) */
+							rc = UNLINK((char *)reg->dyn.addr->fname);
+							assert(0 == rc);
+						}
+					}
+#					endif
 					did_one_loop = TRUE;
 					continue;
 				} else if (EEXIST != save_errno)
@@ -816,6 +836,12 @@ gd_region *dbfilopn(gd_region *reg)
 					"settings\n", __FILE__, __LINE__, __func__, process_id, reg->dyn.addr->fname, reg->rname));
 		CLOSEFILE_RESET(udi->fd, rc);	/* close file and reopen it with correct asyncio setting */
 		udi->fd_opened_with_o_direct = FALSE;
+		if (did_one_loop)
+		{
+			/* Alert caller that this call needs to be redone but should be counted as an attempt */
+			reg->file_initialized = FALSE;
+			return (gd_region *)-2L;
+		}
 		did_one_loop = TRUE;
 	}
 	if (AUTODB_NOERR != autodb_rcerr)

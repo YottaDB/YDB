@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -32,6 +32,7 @@
 #define NO_FILTER			0
 #define INTERNAL_FILTER			0x00000001
 #define EXTERNAL_FILTER			0x00000002
+#define ENABLE_FILTER			0x00000004
 #define JNL_EXTRACT_DELIM		'\\'
 #define TCOM_EXTR_JNLSEQNO_FIELDNUM	4
 #define FILTER_EOT			"99\n"

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -126,6 +126,7 @@ int main(int argc, char_ptr_t argv[])
 		);
 	OPERATOR_LOG_MSG;
 	omi_conns = &conns;
+	INIT_FNPTR_GLOBAL_VARIABLES;
 	/*  Should be forever, unless an error occurs */
 	gtcm_loop(&conns);
 	/*  Clean up */

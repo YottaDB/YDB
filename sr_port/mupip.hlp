@@ -6900,7 +6900,7 @@
    -name
 
    Specifies the instance name that uniquely identifies the instance and is
-   immutable. The instance name can be from 1 to 16 characters. GT.M takes
+   immutable. The instance name can be from 1 to 15 characters. GT.M takes
    the instance name (not the same as instance file name) from the
    environment variable gtm_repl_instname. If either gtm_repl_instname is not
    set or -name is not specified, GT.M produces an error.
@@ -9387,7 +9387,7 @@
 1 Copyright
    Copyright
 
-   Copyright 2024
+   Copyright 2025
 
    Fidelity National Information Services, Inc. and/or its subsidiaries. All
    rights reserved.

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2017 Fidelity National Information	*
+ * Copyright (c) 2006-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -59,6 +59,9 @@ int gtmsource_stopfilter(void)
 		return (ABNORMAL_SHUTDOWN);
 	}
 	jnlpool->gtmsource_local->filter_cmd[0] = '\0';
-	util_out_print("Stop filter initiated", TRUE);
+	if (GTMSOURCE_MODE_PASSIVE == jnlpool->gtmsource_local->mode)
+		util_out_print("Disabling filter on passive source server", TRUE);
+	else
+		util_out_print("Stop filter initiated", TRUE);
 	return (NORMAL_SHUTDOWN);
 }

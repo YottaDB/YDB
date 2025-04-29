@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -533,14 +533,24 @@ MBSTART {											\
 #define	OPEN_BASEREG_IF_STATSREG(MAP)										\
 {														\
 	gd_region	*baseDBreg, *statsDBreg;								\
+	DEBUG_ONLY(gd_region	*debug_basereg = NULL;)								\
+	sgmnt_addrs	*baseDBcsa = NULL;									\
 														\
-	statsDBreg = MAP->reg.addr;										\
+	statsDBreg = (MAP)->reg.addr;										\
+	if ((MAP)->old_reg.addr)										\
+	{													\
+		DEBUG_ONLY(debug_basereg = statsDBreg;)								\
+		statsDBreg = (MAP)->old_reg.addr;								\
+	}													\
 	if (IS_STATSDB_REGNAME(statsDBreg))									\
 	{													\
 		STATSDBREG_TO_BASEDBREG(statsDBreg, baseDBreg);							\
+		assert(!debug_basereg || (baseDBreg == debug_basereg));						\
 		if (!baseDBreg->open)										\
 			gv_init_reg(baseDBreg, NULL);								\
-		if (!statsDBreg->open && IS_ACC_METH_BG_OR_MM(baseDBreg->dyn.addr->acc_meth))			\
+		baseDBcsa = &FILE_INFO(baseDBreg)->s_addrs;							\
+		if (!statsDBreg->open && IS_ACC_METH_BG_OR_MM(baseDBreg->dyn.addr->acc_meth)			\
+				&& !(RDBF_NOSTATS & baseDBcsa->reservedDBFlags))				\
 		{	/* statsDB did not get opened as part of baseDB open above. Possible if gtm_statshare	\
 			 * is not set to 1. But user could still do a ZWR ^%YGS which would try to open		\
 			 * statsDB in caller (who is not equipped to handle errors) so do the open of the	\
@@ -556,8 +566,16 @@ MBSTART {											\
 		 * This will prevent FILENOTFOUND errors on the statsdb file (.gst file) on access to ^%YGS	\
 		 * nodes that map to non-existent statsdb regions.						\
 		 */												\
-		if (RDBF_NOSTATS & baseDBreg->reservedDBFlags)							\
-			MAP->reg.addr = baseDBreg;								\
+		if ((RDBF_NOSTATS & baseDBcsa->reservedDBFlags) || !statsDBreg->open)				\
+		{												\
+			assert(!(MAP)->old_reg.addr || (statsDBreg == (MAP)->old_reg.addr));			\
+			(MAP)->old_reg.addr = statsDBreg;							\
+			(MAP)->reg.addr = baseDBreg;								\
+		} else												\
+		{												\
+			(MAP)->reg.addr = statsDBreg;								\
+			(MAP)->old_reg.addr = NULL;								\
+		}												\
 	}													\
 }
 
@@ -1729,37 +1747,35 @@ n_db_csh_acct_rec_types
 #include "gvstats_rec.h"
 #include "probecrit_rec.h"
 
+DEFINE_ATOMIC_OP(gtm_atomic_ulong, ATOMIC_FETCH_ADD, memory_order_relaxed);
+DEFINE_ATOMIC_OP(gtm_atomic_ulong, ATOMIC_STORE, memory_order_relaxed);
+
 #define	GVSTATS_SET_CSA_STATISTIC(CSA, COUNTER, VALUE)							\
 MBSTART {												\
-	if (0 == (RDBF_NOSTATS & (CSA)->reservedDBFlags))						\
-		(CSA)->gvstats_rec_p->COUNTER = VALUE;							\
+	ATOMIC_STORE(&(CSA)->gvstats_rec_p->COUNTER, VALUE, memory_order_relaxed);			\
 } MBEND
 
-#define	INCR_GVSTATS_COUNTER(CSA, CNL, COUNTER, INCREMENT)						\
-MBSTART {												\
-	if (0 == (RDBF_NOSTATS & (CSA)->reservedDBFlags))						\
-	{												\
-		(CSA)->gvstats_rec_p->COUNTER += INCREMENT;		/* private or shared stats */	\
-		(CNL)->gvstats_rec.COUNTER += INCREMENT;		/* database stats */		\
-	}												\
+#define	INCR_GVSTATS_COUNTER(CSA, CNL, COUNTER, INCREMENT)									\
+MBSTART {															\
+	ATOMIC_FETCH_ADD(&(CSA)->gvstats_rec_p->COUNTER, INCREMENT, memory_order_relaxed);	/* private or shared stats */	\
+	ATOMIC_FETCH_ADD(&(CNL)->gvstats_rec.COUNTER, INCREMENT, memory_order_relaxed);		/* database stats */		\
 } MBEND
 
 #define	SYNC_RESERVEDDBFLAGS_REG_CSA_CSD(REG, CSA, CSD, CNL)								\
 MBSTART {														\
 	uint4			reservedDBFlags;									\
+	/* By default, sync local reservedDBFlags so that it reflects what is in the fileheader. The one exception	\
+	 * is if we've specifically requested not to see statsdb regions, in which case adopt the most restrictive	\
+	 * observed nostats flag but sync everything else.								\
+	 */														\
 															\
-	if (TREF(ok_to_see_statsdb_regs))										\
+	reservedDBFlags = (CSD)->reservedDBFlags;	/* sgmnt_data is flag authority */				\
+	if (!IS_RDBF_STATSDB(CSD))											\
 	{														\
-		reservedDBFlags = (CSD)->reservedDBFlags;	/* sgmnt_data is flag authority */			\
-		/* If this is a base DB (i.e. not a statsdb), but we could not successfully create the statsdb		\
-		 * (e.g. $gtm_statsdir issues etc.) then disable RDBF_STATSDB in the region. So this db continues	\
-		 * without statistics gathering.									\
-		 */													\
-		if (!IS_RDBF_STATSDB(CSD) && (NULL != (CNL)) && !(CNL)->statsdb_fname_len)				\
-			reservedDBFlags &= (~RDBF_STATSDB);								\
-		(REG)->reservedDBFlags = (CSA)->reservedDBFlags = reservedDBFlags;					\
+		if (!TREF(ok_to_see_statsdb_regs))									\
+			reservedDBFlags |= (RDBF_NOSTATS & (((REG)->reservedDBFlags | (CSA)->reservedDBFlags)));	\
 	}														\
-	/* else : "gd_load" would have already set RDBF_NOSTATS etc. so don't override that */				\
+	(REG)->reservedDBFlags = (CSA)->reservedDBFlags = reservedDBFlags;						\
 } MBEND
 
 /* Although this macro is called CLRGVSTATS, it clears a number of other fields as well.  Originally, these were
@@ -2663,6 +2679,12 @@ typedef union
 	gd_segment	*addr;	/* absolute address of segment */
 } gd_seg_addr;
 
+enum wanted_statshare {
+	UNSPECIFIED,
+	STATSHARE,
+	NOSTATSHARE
+};
+
 typedef struct	gd_region_struct
 {
 	unsigned short		rname_len;
@@ -2717,12 +2739,11 @@ typedef struct	gd_region_struct
 	 */
 	bool			statsDB_setup_started;
 	gd_addr			*owning_gd;
-	bool			statsDB_setup_completed;
-	bool			privateDB_rename_completed;
-	bool			file_initialized;
-	bool			did_file_initialization;
 	unsigned int		statsdb_init_cycle;
-	char			filler[32];	/* filler to store runtime structures without changing gdeget/gdeput.m */
+	enum wanted_statshare	statshare;
+	bool			statsDB_setup_completed;
+	bool			file_initialized;
+	char			filler[30];	/* filler to store runtime structures without changing gdeget/gdeput.m */
 } gd_region;
 
 typedef struct	sgmnt_addrs_struct
@@ -2902,6 +2923,11 @@ typedef struct gd_binding_struct
 		gd_region	*addr;
 		uint4		offset;
 	} reg;
+	union
+	{
+		gd_region	*addr;
+		uint4		offset;
+	} old_reg;
 	uint4		gvname_len;	/* the unsubscripted global name length */
 	uint4		gvkey_len;	/* the subscripted global name length excluding the second terminating null byte.
 					 *	Is equal to "gvname_len" + 1 if there are no subscripts.
@@ -4226,40 +4252,49 @@ MBSTART {											\
 	assert(IS_PTR_IN_RANGE(bp, bp_lo, bp_top) && IS_PTR_ALIGNED(bp, bp_lo, csd->blk_size));	\
 } MBEND
 
-#define FILE_CNTL_INIT_IF_NULL(SEG)								\
+#define FILE_CNTL_INIT_IF_NULL(REG)								\
 MBSTART {											\
 	file_control	*lcl_fc;								\
+	gd_segment	*seg;									\
 	sgmnt_addrs	*csa;									\
 	unix_db_info	*udi;									\
 												\
-	lcl_fc = SEG->file_cntl;								\
+	assert(REG);										\
+	seg = (REG)->dyn.addr;									\
+	assert(seg);										\
+	lcl_fc = seg->file_cntl;								\
 	if (NULL == lcl_fc)									\
 	{											\
 		MALLOC_INIT(lcl_fc, SIZEOF(file_control));					\
-		SEG->file_cntl = lcl_fc;							\
+		seg->file_cntl = lcl_fc;							\
 	}											\
 	if (NULL == lcl_fc->file_info)								\
 	{											\
 		MALLOC_INIT(lcl_fc->file_info, SIZEOF(unix_db_info));				\
-		SEG->file_cntl->file_info = lcl_fc->file_info;					\
+		seg->file_cntl->file_info = lcl_fc->file_info;					\
 		csa = &((unix_db_info *)(lcl_fc->file_info))->s_addrs;				\
 		csa->gvstats_rec_p = &csa->gvstats_rec;						\
+		csa->reservedDBFlags = (REG)->reservedDBFlags;					\
 		udi = (unix_db_info *)lcl_fc->file_info;					\
 		udi->fd = FD_INVALID;								\
 	}											\
 } MBEND
 
-#define FILE_CNTL_INIT(SEG)						\
+#define FILE_CNTL_INIT(REG)						\
 MBSTART {								\
 	file_control	*lcl_fc;					\
+	gd_segment	*seg;						\
 	sgmnt_addrs	*csa;						\
 	unix_db_info	*udi;						\
 									\
+	assert(REG);							\
+	seg = (REG)->dyn.addr;						\
 	MALLOC_INIT(lcl_fc, SIZEOF(file_control));			\
 	MALLOC_INIT(lcl_fc->file_info, SIZEOF(unix_db_info));		\
-	SEG->file_cntl = lcl_fc;					\
+	seg->file_cntl = lcl_fc;					\
 	csa = &((unix_db_info *)(lcl_fc->file_info))->s_addrs;		\
 	csa->gvstats_rec_p = &csa->gvstats_rec;				\
+	csa->reservedDBFlags = (REG)->reservedDBFlags;			\
 	udi = (unix_db_info *)lcl_fc->file_info;			\
 	udi->fd = FD_INVALID;						\
 } MBEND
@@ -5385,7 +5420,7 @@ void db_csh_ref(sgmnt_addrs *cs_addrs, boolean_t init);
 cache_rec_ptr_t db_csh_get(block_id block);
 cache_rec_ptr_t db_csh_getn(block_id block);
 
-enum cdb_sc tp_hist(srch_hist *hist1);
+enum cdb_sc tp_hist(srch_hist *hist1, uint4 curr_err);
 tp_region	*insert_region(gd_region *reg, tp_region **reg_list, tp_region **reg_free_list, int4 size);
 
 sm_uc_ptr_t get_lmap(block_id blk, unsigned char *bits, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr);

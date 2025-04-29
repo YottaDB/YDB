@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2023 Fidelity National Information	*
+ * Copyright (c) 2006-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -117,7 +117,9 @@ int gtmrecv(void)
 	int			updresync_instfile_fd;	/* fd of the instance file name specified in -UPDATERESYNC= */
 	boolean_t		cross_endian, dummy_ftok_counter_halted;
 	int			null_fd, rc;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	call_on_signal = gtmrecv_sigstop;
 	ESTABLISH_RET(gtmrecv_ch, SS_NORMAL);
 	memset((uchar_ptr_t)&recvpool, 0, SIZEOF(recvpool));
@@ -451,6 +453,7 @@ int gtmrecv(void)
 	upd_proc_local->log_interval = gtmrecv_options.upd_log_interval;
 	upd_helper_ctl->start_helpers = FALSE;
 	upd_helper_ctl->start_n_readers = upd_helper_ctl->start_n_writers = 0;
+	TREF(enable_autodelete) = TRUE; /* Autodelete autodeletable files if the last one out */
 	/* Detached from the initiating process, now detach from the starting IO */
 	io_rundown(RUNDOWN_EXCEPT_STD);
 	log_init_status = repl_log_init(REPL_GENERAL_LOG, &gtmrecv_log_fd, gtmrecv_options.log_file);
@@ -581,6 +584,7 @@ int gtmrecv(void)
 	gtmrecv_filter = NO_FILTER;
 	if ('\0' != gtmrecv_local->filter_cmd[0])
 	{
+		repl_log(gtmrecv_log_fp, TRUE, TRUE, "Starting filter\n");
 		if (SS_NORMAL == (status = repl_filter_init(gtmrecv_local->filter_cmd)))
 			gtmrecv_filter |= EXTERNAL_FILTER;
 		else

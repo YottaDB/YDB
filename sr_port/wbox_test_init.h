@@ -236,7 +236,9 @@ typedef enum {
 	WBTEST_MUNMAP_FREE,			/* 186 : Verify that munmap() returns memory to the OS */
 	WBTEST_JNL_CLEANUP,			/* 187 : Various asynchronous events in a jnl cleanup */
 	WBTEST_ZTTEST,				/* 188 : Inject garbage collection at awkward place in sv_put.c SV_ZTRAP code */
-	WBTEST_JNL_PREAD			/* 189 : Benchmark pread() against lseek()+read() */
+	WBTEST_JNL_PREAD,			/* 189 : Benchmark pread() against lseek()+read() */
+	WBTEST_INTEG_RTS_ERR,			/* 190 : Force an RTS_ERROR inside of mu_int_maps */
+	WBTEST_REPEAT_DBFILOPN			/* 191 : force dbfilopn to return -2 to the parent to call for a repeat. */
 
 	/* Note 1: when adding new white box test cases, please make use of WBTEST_ENABLED and WBTEST_ASSIGN_ONLY (defined below)
 	 * whenever applicable

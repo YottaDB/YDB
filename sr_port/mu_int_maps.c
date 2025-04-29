@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -94,6 +94,11 @@ void mu_int_maps(void)
 		util_out_print("!/MUPIP INFO: mu_int_maps: !AD : Start kill-in-prog wait.", TRUE,
 			CTIME_BEFORE_NL, time_str);
 	}
+#	ifdef DEBUG
+	if (WBTEST_ENABLED(WBTEST_INTEG_RTS_ERR))
+		RTS_ERROR_CSA_ABT(CSA_ARG(NULL) VARLSTCNT(4) MAKE_MSG_ERROR(ERR_TEXT), 2,
+				RTS_ERROR_TEXT("White Box integ rts_error"));
+#	endif
 	while (((cs_data && cs_data->kill_in_prog) || mu_int_data.kill_in_prog) && (MAX_CRIT_TRY > crit_counter++))
 	{
 		if (cs_addrs)

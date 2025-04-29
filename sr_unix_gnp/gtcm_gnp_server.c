@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -484,6 +484,7 @@ int main(int argc, char **argv, char **envp)
 	OPERATOR_LOG_MSG;
 	/* ... now we are ready! */
 	ntd_root->crq = gtcm_init_ast;
+	INIT_FNPTR_GLOBAL_VARIABLES;
 	while (!cm_shutdown)
 	{
 		gtcm_gnp_server_actions();

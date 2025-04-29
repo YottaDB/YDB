@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -40,6 +40,7 @@ MBSTART { 															\
 	MAP->gvkey.addr = MAPKEY_PTR;												\
 	MEMCPY_LIT(MAPKEY_PTR, WHICH_MAP);											\
 	MAP->reg.addr = REG;													\
+	MAP->old_reg.addr = NULL;												\
 	MAP->gvname_len = DUMMY_GBLDIR_MAP_GVN_SIZE(WHICH_MAP);									\
 	MAP->gvkey_len =  DUMMY_GBLDIR_MAP_KEY_SIZE(WHICH_MAP) - 1;								\
 	MAPKEY_PTR += MAP->gvkey_len;												\
@@ -70,8 +71,8 @@ gd_addr *create_dummy_gbldir(void)
 #	endif
 
 	/* The below code might need corresponding changes if ever the gld format changes hence the GDE_LABEL_LITERAL assert */
-	GTM64_ONLY(assert(!MEMCMP_LIT(GDE_LABEL_LITERAL, "GTCGBDUNX116"));)
-	NON_GTM64_ONLY(assert(!MEMCMP_LIT(GDE_LABEL_LITERAL, "GTCGBDUNX016"));)
+	GTM64_ONLY(assert(!MEMCMP_LIT(GDE_LABEL_LITERAL, "GTCGBDUNX117"));)
+	NON_GTM64_ONLY(assert(!MEMCMP_LIT(GDE_LABEL_LITERAL, "GTCGBDUNX017"));)
 	addr = (gd_addr *)malloc(DUMMY_GBLDIR_SIZE);
 	assert(NULL != addr);
 	memset(addr, 0, DUMMY_GBLDIR_SIZE);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -256,7 +256,6 @@ STATICFNDEF boolean_t mu_rndwn_file_statsdb(gd_region *statsDBreg, boolean_t *st
 {
 	boolean_t	statsDBrundown_status;
 	gd_region	*save_gv_cur_region, *save_ftok_sem_reg;
-	gd_segment	*statsDBseg;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -270,9 +269,7 @@ STATICFNDEF boolean_t mu_rndwn_file_statsdb(gd_region *statsDBreg, boolean_t *st
 	if (mupfndfil(statsDBreg, NULL, LOG_ERROR_FALSE))
 	{	/* statsDB exists. Do its rundown first. */
 		*statsdb_exists = TRUE;
-		statsDBseg = statsDBreg->dyn.addr;
-		if (NULL == statsDBseg->file_cntl)
-			FILE_CNTL_INIT(statsDBseg);
+		FILE_CNTL_INIT_IF_NULL(statsDBreg);
 		/* Since this function is called only from "mu_rndwn_file", we hold the ftok lock on the basedb at this point.
 		 * But the "mu_rndwn_file" call below is going to get the ftok lock on the statsdb and "ftok_sem_get" does not
 		 * like holding more than one ftok at any point in time. So fix structures to indicate no ftok lock is held
@@ -360,7 +357,6 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone, boolean_t delete_s
 	uint4			statsdb_fname_len;
 	gd_addr			*owning_gd;
 	gd_region		*statsDBreg, *save_ftok_sem_reg;
-	gd_segment		*statsDBseg;
 	jnl_buffer_ptr_t	jbp;
 	int			mlk_shmid;
 #	ifdef DEBUG
@@ -535,9 +531,7 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone, boolean_t delete_s
 			ftok_sem_reg = NULL;
 			/* Now that statsdb region has been setup, transfer parent "mu_rndwn_file" udi info to it */
 			BASEDBREG_TO_STATSDBREG(gv_cur_region, statsDBreg);
-			statsDBseg = statsDBreg->dyn.addr;
-			if (NULL == statsDBseg->file_cntl)
-				FILE_CNTL_INIT(statsDBseg);
+			FILE_CNTL_INIT_IF_NULL(statsDBreg);
 			statsDBudi = FILE_INFO(statsDBreg);
 			memcpy(statsDBudi, udi, SIZEOF(*udi));
 			NESTED_MU_RNDWN_FILE_CALL(gv_cur_region, FALSE, delete_statsdb, baseDBrundown_status);
@@ -861,8 +855,6 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone, boolean_t delete_s
 					}
 				}
 				CLOSEFILE_RESET(udi->fd, rc);	/* resets "udi->fd" to FD_INVALID */
-				if (IS_AUTODELETE_REG(reg))
-					AUTODELETE_AT_RUNDOWN(reg, delete_statsdb);
 				if (!ftok_sem_release(reg, FALSE, FALSE))
 				{
 					RNDWN_ERR("!AD -> Error from ftok_sem_release.", reg);
@@ -1598,9 +1590,9 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone, boolean_t delete_s
 	 */
 	udi->counter_ftok_incremented = !ftok_counter_halted;
 	CLOSEFILE_RESET(udi->fd, rc);	/* resets "udi->fd" to FD_INVALID */
-	if (IS_AUTODELETE_REG(reg))
+	if (!standalone && IS_AUTODELETE_REG(reg))
 		AUTODELETE_AT_RUNDOWN(reg, delete_statsdb);
-	reg->file_initialized = reg->did_file_initialization = FALSE;
+	reg->file_initialized = FALSE;
 	if (!ftok_sem_release(reg, udi->counter_ftok_incremented && !standalone, !standalone))
 		return FALSE;
 	/* if "standalone" we better leave this function with standalone access */
@@ -1639,7 +1631,7 @@ CONDITION_HANDLER(mu_rndwn_file_ch)
 	}
 	RESET_GV_CUR_REGION;
 	rundown_reg->open = FALSE;
-	rundown_reg->file_initialized = rundown_reg->did_file_initialization = FALSE;
+	rundown_reg->file_initialized = FALSE;
 	/* We want to proceed to the next condition handler in case we have stand-alone access, because if an error happens on one
 	 * region, we should signal an issue and not proceed to the next region. Otherwise, we try to rundown the next region.
 	 */

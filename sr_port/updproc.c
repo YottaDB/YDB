@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -396,6 +396,7 @@ int updproc(void)
 	trap_env_init();
 	is_replicator = TRUE;	/* as update process goes through t_end() and can write jnl recs to the jnlpool for replicated db */
 	TREF(ok_to_see_statsdb_regs) = TRUE;
+	TREF(enable_autodelete) = TRUE; /* Autodelete autodeletable files if the last one out */
 	gv_play_duplicate_kills = TRUE;	/* needed to ensure seqnos are kept in sync between source and receiver instances */
 	NON_GTMTRIG_ONLY(skip_dbtriggers = TRUE;)
 	memset((uchar_ptr_t)&recvpool, 0, SIZEOF(recvpool)); /* For util_base_ch and mupip_exit */

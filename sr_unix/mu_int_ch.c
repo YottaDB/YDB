@@ -34,6 +34,8 @@ CONDITION_HANDLER(mu_int_ch)
 	sgmnt_addrs *stats_csa = NULL;
 	node_local_ptr_t stats_nl = NULL;
 	unix_db_info	*stats_udi = NULL;
+	gd_segment	*stats_seg = NULL;
+	file_control	*stats_fc = NULL;
 
 	START_CH(TRUE);
 	if (gv_cur_region)
@@ -44,7 +46,11 @@ CONDITION_HANDLER(mu_int_ch)
 			BASEDBREG_TO_STATSDBREG(gv_cur_region, stats_reg);
 	}
 	if (stats_reg)
-		stats_udi = FILE_INFO(stats_reg);
+		stats_seg = stats_reg->dyn.addr;
+	if (stats_seg)
+		stats_fc = stats_seg->file_cntl;
+	if (stats_fc)
+		stats_udi = FC2UDI(stats_fc);
 	if (stats_udi)
 		stats_csa = &stats_udi->s_addrs;
 	if (stats_csa)

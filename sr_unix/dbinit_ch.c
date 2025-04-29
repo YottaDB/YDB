@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -181,7 +181,7 @@ void db_init_err_cleanup(boolean_t retry_dbinit)
 	 */
 	if (!retry_dbinit)
 	{
-		db_init_region->did_file_initialization = db_init_region->file_initialized = FALSE;
+		db_init_region->file_initialized = FALSE;
 		ENABLE_INTERRUPTS(INTRPT_IN_GVCST_INIT, INTRPT_OK_TO_INTERRUPT);
 	}
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -362,7 +362,7 @@ void gvcst_init(gd_region *reg, gd_addr *addr)
 			 *		would silently adjust gld map entries so they do not point to this statsDB anymore
 			 *		(NOSTATS should already be set in the baseDB in this case, assert that).
 			 */
-			if ((ALL_STATS_OPTIN == TREF(statshare_opted_in)) && !baseDBreg->was_open)
+			if ((ALL_STATS_OPTIN == TREF(statshare_opted_in) || (STATSHARE == reg->statshare)) && !baseDBreg->was_open)
 			{
 				assert(RDBF_NOSTATS & baseDBreg->reservedDBFlags);
 				return;
@@ -493,8 +493,8 @@ void gvcst_init(gd_region *reg, gd_addr *addr)
 			 * we need to finish committing the connection to the basedb before returning, or restart
 			 * if the cycle has changed.
 			 */
-			db_init_ret = DB_VALID;
-			if (is_statsDB)
+			db_init_ret = ((gd_region *)-2L == prev_reg) ? DB_INVALID : DB_VALID;
+			if (is_statsDB && ((gd_region *)-2L != prev_reg))
 			{
 				/* Some fields, like rname, will continue to use 'reg', others, like ->dyn.addr.fname,
 				 * will use prev_reg. This is intentional and due to the fact that successful cases will
@@ -597,7 +597,7 @@ void gvcst_init(gd_region *reg, gd_addr *addr)
 					 */
 					memcpy(baseDBnl->statsdb_fname, reg->dyn.addr->fname, reg->dyn.addr->fname_len);
 					assert(SIZEOF(baseDBnl->statsdb_fname) > reg->dyn.addr->fname_len);
-					assert((!IS_DSE_IMAGE && !IS_LKE_IMAGE) || !TREF(ok_to_leave_statsdb_unopened));
+					assert(!TREF(ok_to_leave_statsdb_unopened));
 					baseDBnl->statsdb_fname[reg->dyn.addr->fname_len] = '\0';
 					baseDBnl->statsdb_fname_len = reg->dyn.addr->fname_len;
 					baseDBnl->statsdb_created = TRUE;
@@ -616,12 +616,14 @@ void gvcst_init(gd_region *reg, gd_addr *addr)
 						db_init_ret, 0);
 			}
 			/* Found same database already open - prev_reg contains addr of originally opened region */
+			assert(NULL == FILE_CNTL(reg));
 			FILE_CNTL(reg) = FILE_CNTL(prev_reg);
 			/* Do not change or prevent the overwriting of reg->dyn.addr->fname by prev_reg->dyn.addr->fname without
 			 * corresponding changes to the DBGRDB and non-DBGRDB code above which assumes this overwriting will occur.
 			 */
 			memcpy(reg->dyn.addr->fname, prev_reg->dyn.addr->fname, prev_reg->dyn.addr->fname_len);
 			reg->dyn.addr->fname_len = prev_reg->dyn.addr->fname_len;
+			reg->dyn.addr->fname[MIN((ARRAYSIZE(reg->dyn.addr->fname) - 1), reg->dyn.addr->fname_len)] = '\0';
 			csa = (sgmnt_addrs *)&FILE_INFO(reg)->s_addrs;
 			if (NULL == csa->gvt_hashtab)
 				gvt_hashtab_init(csa);	/* populate csa->gvt_hashtab; needed BEFORE PROCESS_GVT_PENDING_LIST */
@@ -847,7 +849,7 @@ void gvcst_init(gd_region *reg, gd_addr *addr)
 						 */
 						memcpy(baseDBnl->statsdb_fname, reg->dyn.addr->fname, reg->dyn.addr->fname_len);
 						assert(SIZEOF(baseDBnl->statsdb_fname) > reg->dyn.addr->fname_len);
-						assert((!IS_DSE_IMAGE && !IS_LKE_IMAGE) || !TREF(ok_to_leave_statsdb_unopened));
+						assert(!TREF(ok_to_leave_statsdb_unopened));
 						baseDBnl->statsdb_fname[reg->dyn.addr->fname_len] = '\0';
 						baseDBnl->statsdb_fname_len = reg->dyn.addr->fname_len;
 						baseDBnl->statsdb_created = TRUE;
@@ -912,9 +914,10 @@ void gvcst_init(gd_region *reg, gd_addr *addr)
 	}
 	if (db_init_ret)
 	{
-		assert(FALSE);	/* we don't know of a practical way to get errors in each of the for-loop attempts above */
+		/* we don't know of a practical way except wbox to get errors in each of the for-loop attempts above */
+		assert(WBTEST_ENABLED(WBTEST_REPEAT_DBFILOPN));
 		/* "db_init" returned with an unexpected error. Issue a generic error to note this out-of-design state */
-		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_REGOPENFAIL, 4, REG_LEN_STR(reg), DB_LEN_STR(reg));
+		RTS_ERROR_CSA_ABT(CSA_ARG(NULL) VARLSTCNT(6) ERR_REGOPENFAIL, 4, REG_LEN_STR(reg), DB_LEN_STR(reg));
 	} else
 		DBGRDB((stderr, "%s:%d:%s: process id %d finished db_init of file %s for region %s\n", __FILE__, __LINE__, __func__,
 					process_id, reg->dyn.addr->fname, reg->rname));
@@ -1250,7 +1253,8 @@ void gvcst_init(gd_region *reg, gd_addr *addr)
 		{
 			if (!is_statsDB)
 			{	/* This is a baseDB - so long if all in, we should initialize the statsDB */
-				if (!(RDBF_NOSTATS & reg->reservedDBFlags) && (ALL_STATS_OPTIN == TREF(statshare_opted_in)))
+				if (!(RDBF_NOSTATS & reg->reservedDBFlags)
+						&& ((ALL_STATS_OPTIN == TREF(statshare_opted_in) || (STATSHARE == reg->statshare))))
 				{
 					BASEDBREG_TO_STATSDBREG(reg, statsDBreg);
 					assert(NULL != statsDBreg);
@@ -1263,7 +1267,7 @@ void gvcst_init(gd_region *reg, gd_addr *addr)
 						gvcst_init_statsDB(reg, DO_STATSDB_INIT_TRUE);
 					}
 				} else
-					csa->reservedDBFlags |= RDBF_NOSTATS;
+					reg->statshare = NOSTATSHARE;
 			}
 		} else if (is_statsDB)
 		{	/* We are opening a statsDB file but not as a statsDB (i.e. not opted-in) but we still need to set the

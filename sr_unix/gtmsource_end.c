@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2023 Fidelity National Information	*
+ * Copyright (c) 2006-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -134,6 +134,8 @@ int gtmsource_end1(boolean_t auto_shutdown)
 	repl_log(gtmsource_log_fp, FALSE, TRUE, "  Number of unsent Seqno : %llu\n", 0 < diff_seqno ? diff_seqno : 0);
 	repl_log(gtmsource_log_fp, TRUE, TRUE, "REPL INFO - Jnl Total : %llu  Msg Total : %llu  CmpMsg Total : %llu\n",
 		 repl_source_data_sent, repl_source_msg_sent, repl_source_cmp_sent);
+	if (gtmsource_filter & ENABLE_FILTER)
+		repl_log(gtmsource_log_fp, TRUE, TRUE, "Disabling filter\n");
 	if (gtmsource_filter & EXTERNAL_FILTER)
 		repl_stop_filter();
 	if (auto_shutdown)

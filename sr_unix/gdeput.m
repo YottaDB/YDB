@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-; Copyright (c) 2006-2024 Fidelity National Information		;
+; Copyright (c) 2006-2025 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -193,6 +193,8 @@ mapfixed:(i,key)
 	i (gtm64=TRUE) s rec=rec_$$num2bin(4,0) 	; add padding
 	s reg=map(key)
 	s rec=rec_$$num2bin(4,cregs(reg,"offset"))	; reg.offset
+	i (gtm64=TRUE) s rec=rec_$$num2bin(4,0)		; add padding
+	s rec=rec_$$num2bin(4,0)			; old_reg.addr
 	i (gtm64=TRUE) s rec=rec_$$num2bin(4,0)		; add padding
 	s tmpnamelen=vargblnamelen(i)
 	s rec=rec_$$num2bin(4,tmpnamelen)		; gvname_len

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -81,7 +81,7 @@ error_def(ERR_GVPUTFAIL);
 
 void	gds_tp_hist_moved(sgm_info *si, srch_hist *hist1);
 
-enum cdb_sc tp_hist(srch_hist *hist1)
+enum cdb_sc tp_hist(srch_hist *hist1, uint4 curr_err)
 {
 	int			hist_index;
 	srch_hist		*hist;
@@ -114,20 +114,21 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 	)
 	is_mm = (dba_mm == cs_addrs->hdr->acc_meth);
 	assert((NULL != sgm_info_ptr) && (cs_addrs->sgm_info_ptr == sgm_info_ptr));
+	assert(curr_err == t_err);
 	si = sgm_info_ptr;
 	csa = si->tp_csa;
 	cnl = csa->nl;
 	gvt = gv_target;
-	store_history = (!gvt->noisolation || ERR_GVKILLFAIL == t_err || ERR_GVPUTFAIL == t_err);
+	store_history = (!gvt->noisolation || ERR_GVKILLFAIL == curr_err || ERR_GVPUTFAIL == curr_err);
 	assert(hist1 != &gvt->hist);
 	/* Ideally, store_history should be computed separately for blk_targets of gv_target->hist and hist1,
-	 * i.e. within the outer for loop below. But this is not needed since if t_err is ERR_GVPUTFAIL,
+	 * i.e. within the outer for loop below. But this is not needed since if curr_err is ERR_GVPUTFAIL,
 	 * store_history is TRUE both for gv_target->hist and hist1 (which is cs_addrs->dir_tree if non-NULL)
 	 * (in the latter case, TRUE because cs_addrs->dir_tree always has NOISOLATION turned off) and if not,
 	 * we should have the same blk_target for both the histories and hence the same value for
 	 * !blk_target->noisolation and hence the same value for store_history. We assert this is the case below.
 	 */
-	assert(((ERR_GVPUTFAIL == t_err) && ((NULL == hist1) || ((hist1 == &cs_addrs->dir_tree->hist)
+	assert(((ERR_GVPUTFAIL == curr_err) && ((NULL == hist1) || ((hist1 == &cs_addrs->dir_tree->hist)
 									&& !cs_addrs->dir_tree->noisolation)))
 			|| !hist1 || (hist1->h[0].blk_target == gvt));
 	/* We are going to reference fields from shared memory including cr->in_tend and t1->buffaddr->tn in that order (as part
@@ -259,7 +260,7 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 						 * the restart because we suspect this case is very infrequent that it is better
 						 * to avoid the performance hit of a check in this frequently used code.
 						 */
-						assert((ERR_GVPUTFAIL == t_err) && (0 == t1->level)
+						assert((ERR_GVPUTFAIL == curr_err) && (0 == t1->level)
 							&& (t1->blk_target->noisolation || t2->blk_target->noisolation));
 						if (t1->blk_target != t2->blk_target)
 							TREF(donot_commit) |= DONOTCOMMIT_TPHIST_BLKTARGET_MISMATCH;
@@ -379,8 +380,8 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 					 *	global variable) is turned on at the very least.
 					 */
 					assert(!t1->blk_target->noisolation || t1->level || t1->cse
-						|| ((ERR_GVKILLFAIL == t_err)
-							|| ((ERR_GVPUTFAIL == t_err) && gvdupsetnoop)));
+						|| ((ERR_GVKILLFAIL == curr_err)
+							|| ((ERR_GVPUTFAIL == curr_err) && gvdupsetnoop)));
 				} else
 				{	/* While it is almost always true that local_hash_entry is non-NULL here, there
 					 * is a very rare case when it can be NULL. That is when two histories are passed
