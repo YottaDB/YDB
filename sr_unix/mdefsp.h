@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  * Copyright (c) 2017-2018 Stephen L Johnson.			*
@@ -267,8 +267,8 @@ typedef union mval_gen_union
 #define VAR_START(a, b)	va_start(a, b)
 #define VARLSTCNT(a)	a,		/* push count of arguments*/
 
-#define malloc gtm_malloc
-#define free gtm_free
+#define malloc(size) gtm_malloc(size)
+#define free(ptr) gtm_free(ptr)
 
 /* gtm_shmget either calls the native shmget or requests Huge Pages to back the
  * shared memory segment if the environment variable gtm_hugetlb_shm is set.

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -27,17 +27,14 @@
 
 typedef	int	(*int_fptr)();
 
-/* Note the malloc and free calls below are turned into gtm_malloc/gtm_free respectively by the #defines for those names
- * in mdefsp.h.
- */
 GBLDEF int (*callintogtm_vectortable[])()=
 {
 	(int_fptr)hiber_start,
 	(int_fptr)hiber_start_wait_any,
 	(int_fptr)gtm_start_timer,
 	(int_fptr)cancel_timer,
-	(int_fptr)malloc,
-	(int_fptr)free,
+	(int_fptr)gtm_malloc,
+	(int_fptr)gtm_free,
 	(int_fptr)-1L
 };
 
