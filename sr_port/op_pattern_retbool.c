@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2024 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2024-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *                                                              *
  *      This source code contains the intellectual property     *
@@ -25,7 +25,7 @@ int	op_pattern_retbool(mval *u, mval *v)
 
 	if (MV_IS_SQLNULL(u))
 	{
-		assert(MV_FORCE_DEFINED(v));
+		assert(MV_DEFINED(v));
 		return FALSE;
 	}
 	assert(!MV_IS_SQLNULL(v));

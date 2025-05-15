@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -133,7 +133,14 @@ static uint4 jnl_sub_write_attempt(jnl_private_control *jpc, unsigned int *lcnt,
 			wcs_sleep(*lcnt);
 			break;
 		}
-		if ((writer == CURRENT_JNL_IO_WRITER(jb)) DEBUG_ONLY(|| (WBTEST_ENABLED(WBTEST_JNLPROCSTUCK_FORCE))))
+		/* Note: The "#ifdef DBEUG" logic is needed below (as opposed to a DEBUG_ONLY macro surrounding just the ||)
+		 * to silence an otherwise unavoidable [-Wparentheses-equality] warning.
+		 */
+#		ifdef DEBUG
+		if ((writer == CURRENT_JNL_IO_WRITER(jb)) || (WBTEST_ENABLED(WBTEST_JNLPROCSTUCK_FORCE)))
+#		else
+		if (writer == CURRENT_JNL_IO_WRITER(jb))
+#		endif
 		{	/* It isn't strictly necessary to hold crit here since we are doing an atomic operation on
 			 * io_in_prog_latch, which won't have any effect if the writer changed. If things are in a bad state,
 			 * though, grabbing crit will call wcs_recover() for us.

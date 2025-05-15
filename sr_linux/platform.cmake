@@ -99,7 +99,7 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsigned-char -Wmissing-prototypes -Wreturn-
 #		set desired_warnings = ( $desired_warnings -Wconversion -Wsign-compare )
 #	We should also look into how hard these would be to restore. Some of the warnings come from generated
 #	code and macro use, making them harder to deal with.
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wno-unused-result -Wno-parentheses -Wno-unused-value -Wno-unused-variable")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wno-unused-result -Wno-unused-value -Wno-unused-variable")
 # Note: -Wimplicit is enabled by -Wall currently but is explicitly mentioned in case it goes out of the -Wall list in later
 # versions of the compiler.
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wimplicit")

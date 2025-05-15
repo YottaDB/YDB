@@ -110,7 +110,7 @@ void op_fnfnumber(mval *src, mval *fmt, boolean_t use_fract, int fract, mval *ds
 		}
 	}
 	/* Error checks */
-	if ((0 != (fncode & PAREN)) && (0 != (fncode & NOTWITHPAREN))		/* Test for invalid options given with PAREN */
+	if (((0 != (fncode & PAREN)) && (0 != (fncode & NOTWITHPAREN)))		/* Test for invalid options given with PAREN */
 	    || ((0 != (fncode & DOT)) && (0 != (fncode & NOTWITHDOT))))		/* Test for invalid option(s) given with DOT */
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_FNARGINC, 2, fmt->str.len, fmt->str.addr);
 	/* Formatting - the number is already formatted as a standard numeric string by the MV_FORCE_STR() macros above so

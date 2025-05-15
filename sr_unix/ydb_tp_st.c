@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -135,8 +135,8 @@ int ydb_tp_st(uint64_t tptoken, ydb_buffer_t *errstr, ydb_tp2fnptr_t tpfn, void 
 					rlbk_retval = ydb_tp_s_common(LYDB_RTN_TP_ROLLBACK, (ydb_basicfnptr_t)NULL, (void *)NULL,
 								(const char *)NULL, (int)0, (ydb_buffer_t *)NULL);
 					assert((YDB_TP_ROLLBACK == rlbk_retval)
-						|| (YDB_ERR_CALLINAFTERXIT == rlbk_retval)
-							&& (retval == rlbk_retval) && dollar_tlevel);
+						|| ((YDB_ERR_CALLINAFTERXIT == rlbk_retval)
+							&& (retval == rlbk_retval) && dollar_tlevel));
 				}
 				assert(1 <= dollar_tlevel);
 				break;
@@ -174,8 +174,8 @@ int ydb_tp_st(uint64_t tptoken, ydb_buffer_t *errstr, ydb_tp2fnptr_t tpfn, void 
 					 * do the needed "op_trollback".
 					 */
 					assert((YDB_TP_ROLLBACK == rlbk_retval)
-						|| (YDB_ERR_CALLINAFTERXIT == rlbk_retval)
-							&& (retval == rlbk_retval) && dollar_tlevel);
+						|| ((YDB_ERR_CALLINAFTERXIT == rlbk_retval)
+							&& (retval == rlbk_retval) && dollar_tlevel));
 				}
 				assert(LYDB_RTN_NONE == TREF(libyottadb_active_rtn));
 				/* Note: "retval" records the primary error code while

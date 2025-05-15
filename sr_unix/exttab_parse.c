@@ -851,8 +851,8 @@ struct extcall_package_list *exttab_parse(mval *package)
 			/* Scanned colon--now get type */
 			pr = scan_keyword(&tbp);
 			// Check that it's a legal parameter type
-			if (is_input[parameter_count] && !(parm_allowed_callout[pr] & IN)
-			  || is_output[parameter_count] && !(parm_allowed_callout[pr] & OUT))
+			if ((is_input[parameter_count] && !(parm_allowed_callout[pr] & IN))
+					|| (is_output[parameter_count] && !(parm_allowed_callout[pr] & OUT)))
 				ext_stx_error(ERR_ZCUNTYPE, ext_table_file_name);
 			parameter_types[parameter_count] = pr;
 			if ('[' == *tbp)
@@ -1107,8 +1107,8 @@ ci_tab_entry_t *ci_tab_entry_open(boolean_t internal_use, const char *fname)
 		}
 	} else
 	{
-		assert((INTERNAL_USE_FALSE == internal_use) && (NULL == TREF(ci_table_curr))
-			|| (INTERNAL_USE_FALSE != internal_use) && (NULL == TREF(ci_table_internal_filter)));
+		assert(((INTERNAL_USE_FALSE == internal_use) && (NULL == TREF(ci_table_curr)))
+			|| ((INTERNAL_USE_FALSE != internal_use) && (NULL == TREF(ci_table_internal_filter))));
 		ci_tab = TREF(ci_table_curr);
 	}
 	if (NULL == ci_tab)

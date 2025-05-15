@@ -129,7 +129,7 @@ void bx_boolop(triple *t, boolean_t jmp_type_one, boolean_t jmp_to_next, boolean
 	 * avoid unnecessary global references - again, not expecting that many in a typical boolean expresion.
 	 */
 	assert(TREF(shift_side_effects));
-	if (expr_fini = (NULL == TREF(boolchain_ptr)))				/* NOTE assignment */
+	if ((expr_fini = (NULL == TREF(boolchain_ptr))))			/* NOTE assignment */
 	{									/* initialize work on boolean section of the AST */
 		TREF(boolchain_ptr) = &(TREF(boolchain));
 		dqinit(TREF(boolchain_ptr), exorder);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2020-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *                                                              *
  *      This source code contains the intellectual property     *
@@ -41,7 +41,7 @@ void bx_insert_oc_andor(opctype andor_opcode, int depth, triple *leftmost[NUM_TR
 		 */
 		for (t1 = leftmost[opridx];
 			((OC_ANDOR == t1->exorder.bl->opcode)
-				|| (0 != opridx) && (OC_BOOLINIT == t1->exorder.bl->opcode));
+				|| ((0 != opridx) && (OC_BOOLINIT == t1->exorder.bl->opcode)));
 			t1 = t1->exorder.bl)
 		{	/* Assert that OC_ANDOR triples (if any found) correspond to deeper expressions */
 #			ifdef DEBUG

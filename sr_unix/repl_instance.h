@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -212,7 +212,7 @@ typedef struct gtmsrc_lcl_struct
 		log_nam.len = STRLEN(log_nam.addr);										\
 	} else															\
 		status = trans_log_name(&log_nam, &trans_name, temp_inst_fn, SIZEOF(temp_inst_fn), sendmsg);			\
-	if ((SS_NORMAL == status) || (inst_from_gld && (SS_NOLOGNAM == status)) && (0 != trans_name.len))			\
+	if ((SS_NORMAL == status) || ((inst_from_gld && (SS_NOLOGNAM == status)) && (0 != trans_name.len)))			\
 	{															\
 		boolean_t path_found;												\
 																\

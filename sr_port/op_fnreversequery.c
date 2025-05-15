@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -142,7 +142,7 @@ void op_fnreversequery_va(int sbscnt, mval *dst, va_list var)
 					va_end(var);
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_LVNULLSUBS);
 				}
-				if (is_num = MV_IS_CANONICAL(arg1))
+				if ((is_num = MV_IS_CANONICAL(arg1)))
 					MV_FORCE_NUM(arg1);
 				else if ((nexti == sbscnt) && !is_sqlnull && (0 == arg1->str.len))
 				{	/* The last search argument is a null string. See op_fnquery for comment on this situation.

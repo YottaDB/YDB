@@ -547,7 +547,7 @@ void gtmsecshr_init(char_ptr_t argv[], char **rundir, int *rundir_len)
 	 * Will later help in case other clients with different values of $ydb_tmp try starting the server. They will
 	 * log another GTMSECSHRTMPPATH message and that can be compared against this original GTMSECSHRTMPPATH syslog message.
 	 */
-	if (ydb_tmp_ptr = ydb_getenv(YDBENVINDX_TMP_ONLY, NULL_SUFFIX, NULL_IS_YDB_ENV_MATCH))	/* Warning - assignment */
+	if ((ydb_tmp_ptr = ydb_getenv(YDBENVINDX_TMP_ONLY, NULL_SUFFIX, NULL_IS_YDB_ENV_MATCH)))	/* Warning - assignment */
 		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_GTMSECSHRTMPPATH, 2,
 			RTS_ERROR_TEXT(ydb_tmp_ptr), ERR_TEXT, 2, RTS_ERROR_TEXT("(from $ydb_tmp/$gtm_tmp)"));
 	else

@@ -104,7 +104,8 @@ void open_list_file(void)
 	pblk.fop = F_SYNTAXO;
 	fstr.len = (MV_DEFINED(&cmd_qlf.list_file) ? cmd_qlf.list_file.str.len : 0);
 	fstr.addr = cmd_qlf.list_file.str.addr;
-	if (!(status = parse_file(&fstr, &pblk)) & 1)
+	status = parse_file(&fstr, &pblk);
+	if (!(status & 1))
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 
 	file.mvtype = parms.mvtype = MV_STR;
