@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -272,7 +272,7 @@ MBSTART {											\
 	char ctype;										\
 	     											\
 	assert(0 < (VARNAMELEN));								\
-	ctype = ctypetab[(VARNAMESTR)[0]];							\
+	ctype = ctypetab[(unsigned char)(VARNAMESTR)[0]];					\
 	ISVALID = TRUE;										\
 	switch(ctype)										\
 	{											\
@@ -301,7 +301,7 @@ MBSTART {											\
 	assert(ISVALID);									\
 	for (cptr = (VARNAMESTR), ctop = (VARNAMESTR) + (VARNAMELEN); cptr < ctop; cptr++)	\
 	{	    			     	    			  		      	\
-		ctype = ctypetab[*cptr];							\
+		ctype = ctypetab[(unsigned char)*cptr];						\
 		switch(ctype)									\
 		{										\
 			case TK_LOWER:								\
@@ -354,7 +354,7 @@ MBSTART {														\
 	if (0 == lenUsed)												\
 		ydb_issue_invvarname_error(VARNAMEP);									\
 	/* Characterize first char of name ($, ^, %, or letter) */							\
-	ctype = ctypetab[(VARNAMEP)->buf_addr[0]];									\
+	ctype = ctypetab[(unsigned char)(VARNAMEP)->buf_addr[0]];							\
 	switch(ctype)													\
 	{														\
 		case TK_CIRCUMFLEX:											\
