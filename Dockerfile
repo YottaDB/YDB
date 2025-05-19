@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.2
 #################################################################
 #                                                               #
-# Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.  #
+# Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.  #
 # All rights reserved.                                          #
 #                                                               #
 #       This source code contains the intellectual property     #
@@ -26,6 +26,7 @@ FROM ubuntu:${OS_VSN} as ydb-release-builder
 
 ARG CMAKE_BUILD_TYPE=Release
 ARG DEBIAN_FRONTEND=noninteractive
+ARG ENABLE_ASAN
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
                     file \
@@ -79,6 +80,7 @@ RUN mkdir -p /tmp/yottadb-build \
       -D CMAKE_INSTALL_PREFIX:PATH=/tmp \
       -D YDB_INSTALL_DIR:STRING=yottadb-release \
       -D CMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} \
+      -D ENABLE_ASAN=${ENABLE_ASAN} \
       /tmp/yottadb-src \
  && make -j $(nproc) \
  && make install
@@ -87,6 +89,7 @@ RUN mkdir -p /tmp/yottadb-build \
 FROM ubuntu:${OS_VSN} as ydb-gui
 
 ARG DEBIAN_FRONTEND=noninteractive
+ARG ENABLE_ASAN
 RUN --mount=type=bind,from=ydb-release-builder,source=/tmp/yottadb-release,target=/tmp/staging \
     # This is a strange step: The mount volume is readonly; and we actually write to it in ydbinstall
     # So we need to copy the mount contents to a seperate folder
@@ -118,6 +121,10 @@ RUN --mount=type=bind,from=ydb-release-builder,source=/tmp/yottadb-release,targe
 FROM ubuntu:${OS_VSN} as ydb-release
 
 ARG DEBIAN_FRONTEND=noninteractive
+ARG ENABLE_ASAN
+
+ENV ASAN_OPTIONS=${ENABLE_ASAN:+detect_leaks=0:disable_coredump=0:unmap_shadow_on_exit=1:abort_on_error=1}
+
 RUN --mount=type=bind,from=ydb-release-builder,source=/tmp/yottadb-release,target=/tmp/staging \
     --mount=type=bind,from=ydb-gui,source=/opt/yottadb/current/plugin/,target=/tmp/plugin \
     # This is a strange step: The mount volume is readonly; and we actually write to it in ydbinstall
@@ -138,6 +145,7 @@ RUN --mount=type=bind,from=ydb-release-builder,source=/tmp/yottadb-release,targe
                     libcurl4 \
 		    nodejs \
                     && \
+    if [ "$ENABLE_ASAN" = "ON" ]; then apt-get install -y --no-install-recommends libasan6; fi && \
     /tmp/ydb-release/ydbinstall --utf8 --installdir /opt/yottadb/current && \
     cp -R /tmp/plugin /opt/yottadb/current/ && \
     apt-get remove -y wget && \

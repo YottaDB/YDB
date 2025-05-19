@@ -203,6 +203,13 @@ docker-create-ubuntu-debug-amd64:
     REPO: yottadb-debug
     ARGS: --build-arg CMAKE_BUILD_TYPE=Debug
 
+docker-create-ubuntu-asan-amd64:
+  extends: .docker-create-amd64
+  variables:
+    DOCKERFILE: Dockerfile
+    REPO: yottadb-asan
+    ARGS: --build-arg CMAKE_BUILD_TYPE=Debug --build-arg ENABLE_ASAN=ON
+
 docker-create-rocky-amd64:
   extends: .docker-create-amd64
   variables:
@@ -230,6 +237,13 @@ docker-create-ubuntu-debug-aarch64:
     REPO: yottadb-debug
     ARGS: --build-arg CMAKE_BUILD_TYPE=Debug
 
+docker-create-ubuntu-asan-aarch64:
+  extends: .docker-create-aarch64
+  variables:
+    DOCKERFILE: Dockerfile
+    REPO: yottadb-asan
+    ARGS: --build-arg CMAKE_BUILD_TYPE=Debug --build-arg ENABLE_ASAN=ON
+
 docker-create-rocky-aarch64:
   extends: .docker-create-aarch64
   variables:
@@ -253,6 +267,11 @@ docker-manifest-ubuntu-debug:
   extends: .docker-manifest-commit
   variables:
     REPO: yottadb-debug
+
+docker-manifest-ubuntu-asan:
+  extends: .docker-manifest-commit
+  variables:
+    REPO: yottadb-asan
 
 docker-manifest-rocky:
   extends: .docker-manifest-commit
@@ -278,6 +297,13 @@ docker-create-release-ubuntu-debug-amd64:
     DOCKERFILE: Dockerfile
     REPO: yottadb-debug
     ARGS: --build-arg CMAKE_BUILD_TYPE=Debug
+
+docker-create-release-ubuntu-asan-amd64:
+  extends: .docker-create-amd64-release
+  variables:
+    DOCKERFILE: Dockerfile
+    REPO: yottadb-asan
+    ARGS: --build-arg CMAKE_BUILD_TYPE=Debug --build-arg ENABLE_ASAN=ON
 
 docker-create-release-rocky-amd64:
   extends: .docker-create-amd64-release
@@ -306,6 +332,13 @@ docker-create-release-ubuntu-debug-aarch64:
     REPO: yottadb-debug
     ARGS: --build-arg CMAKE_BUILD_TYPE=Debug
 
+docker-create-release-ubuntu-asan-aarch64:
+  extends: .docker-create-aarch64-release
+  variables:
+    DOCKERFILE: Dockerfile
+    REPO: yottadb-asan
+    ARGS: --build-arg CMAKE_BUILD_TYPE=Debug --build-arg ENABLE_ASAN=ON
+
 docker-create-release-rocky-aarch64:
   extends: .docker-create-aarch64-release
   variables:
@@ -330,6 +363,11 @@ docker-manifest-ubuntu-debug-release:
   variables:
     REPO: yottadb-debug
 
+docker-manifest-ubuntu-asan-release:
+  extends: .docker-manifest-release
+  variables:
+    REPO: yottadb-asan
+
 docker-manifest-rocky-release:
   extends: .docker-manifest-release
   variables:
@@ -351,6 +389,11 @@ docker-manifest-ubuntu-debug-tag:
   extends: .docker-manifest-tag-with-version
   variables:
     REPO: yottadb-debug
+
+docker-manifest-ubuntu-asan-tag:
+  extends: .docker-manifest-tag-with-version
+  variables:
+    REPO: yottadb-asan
 
 docker-manifest-rocky-tag:
   extends: .docker-manifest-tag-with-version
