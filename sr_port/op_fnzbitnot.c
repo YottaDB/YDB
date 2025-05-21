@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2025 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -39,7 +42,7 @@ void op_fnzbitnot(mval *dst,mval *bitstr)
 	dist_byte++;
 
 	n = bitstr->str.len;
-	for (byte_n = byte_1 + 1; byte_n <= (byte_1 + n); byte_n++, dist_byte++)
+	for (byte_n = byte_1 + 1; byte_n < (byte_1 + n); byte_n++, dist_byte++)
 		*dist_byte = ~(*byte_n);
 
 	dst->mvtype = MV_STR;
