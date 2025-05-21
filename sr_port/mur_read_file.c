@@ -3,7 +3,7 @@
  * Copyright (c) 2003-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -320,7 +320,6 @@ uint4 mur_prev(jnl_ctl_list *jctl, off_jnl_t dskaddr)
 					 */
 					if (mur_options.update)
 					{
-						assert(FALSE);
 						gtm_putmsg_csa(CSA_ARG(JCTL2CSA(jctl)) VARLSTCNT(9) ERR_JNLUNXPCTERR, 3,
 							jctl->jnl_fn_len, jctl->jnl_fn, dskaddr, ERR_TEXT, 2,
 							LEN_AND_LIT("Requested offset beyond end of file [prev] (dskaddr > 0)"));
