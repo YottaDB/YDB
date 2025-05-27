@@ -78,15 +78,19 @@ clang-tidy-amd64:
   extends: .clang-tidy
 
 build-test:
+  image:
+    name: registry.gitlab.com/yottadb/db/ydbtest
+    entrypoint: [""]
   stage: build
   artifacts:
     paths:
-      - testarea/
+      - testarea1/
+      - testarea2/
+      - testarea3/
     expire_in: 1 month
     when: always
   script:
-    - docker build -f Dockerfile-test -t ydbtest .
-    - docker run --init -t -v ${PWD}/testarea/:/testarea1/ --cap-add SYS_ADMIN --cap-add SYS_TIME --cap-add IPC_LOCK -e CI_PIPELINE_ID -e CI_COMMIT_BRANCH --rm ydbtest -pipelineydb
+    - /usr/library/gtm_test/T999/docker/pipeline-test-ydb.csh
 
 # docker images creation mechanism.
 .docker-create:
