@@ -124,7 +124,6 @@ GBLREF	command_qualifier	glb_cmd_qlf, cmd_qlf;
 GBLREF	symval			*curr_symval;
 GBLREF	boolean_t		is_replicator;
 GBLREF	void			(*ctrlc_handler_ptr)();
-GBLREF	boolean_t		mstr_native_align;
 GBLREF	boolean_t		gtm_utf8_mode;
 GBLREF	casemap_t		casemaps[];
 GBLREF	void             	(*cache_table_relobjs)(void);   /* Function pointer to call cache_table_rebuild() */
@@ -220,9 +219,6 @@ void gtm_startup(struct startup_vector *svec)
 	}
 #	endif
 	gtm_utf8_init(); /* Initialize the runtime for UTF8 */
-	/* Initialize alignment requirement for the runtime stringpool */
-	/* mstr_native_align = ydb_logical_truth_value(YDBENVINDX_DISABLE_ALIGNSTR, FALSE, NULL) ? FALSE : TRUE; */
-	mstr_native_align = FALSE; /* TODO: remove this line and uncomment the above line */
 	/* See if $ydb_stp_gcol_nosort is set */
 	ret = ydb_logical_truth_value(YDBENVINDX_STP_GCOL_NOSORT, FALSE, &is_defined);
 	stringpool.stp_gcol_nosort = (is_defined ? ret : FALSE);

@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -28,7 +28,6 @@ void comp_lits(rhead)
 rhdtyp *rhead;
 {
 	uint4 offset, cnt;
-	uint4  align_pad;
 	mliteral *p;
 
 	offset = stringpool.free - stringpool.base;

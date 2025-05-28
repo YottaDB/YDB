@@ -69,9 +69,6 @@ void get_cmd_qlf(command_qualifier *qualif)
 	if (cli_negated("INLINE_LITERALS"))
 		qualif->qlf &= ~CQ_INLINE_LITERALS;
 
-	if (cli_negated("ALIGN_STRINGS"))		/* ALIGN_STRINGS is undocument and unimplemented */
-		qualif->qlf &= ~CQ_ALIGN_STRINGS;
-
 	len = qualif->list_file.str.len; /* Save the capacity of the list. This was set at function entry by `zl_cmd_qlf`. */
 	if (CLI_PRESENT == cli_present("MACHINE_CODE")) {
 		qualif->qlf |= CQ_MACHINE_CODE;

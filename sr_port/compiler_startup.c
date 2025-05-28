@@ -43,7 +43,6 @@
 
 GBLREF int	source_column;
 
-GBLREF boolean_t		mstr_native_align, save_mstr_native_align;
 GBLREF char			cg_phase;	/* code generation phase */
 GBLREF command_qualifier	cmd_qlf;
 GBLREF hash_table_str		*complits_hashtab;
@@ -113,20 +112,12 @@ boolean_t compiler_startup(void)
 	reinit_compilation_externs();
 	memset(&null_mident, 0, SIZEOF(null_mident));
 	ESTABLISH_RET(compiler_ch, FALSE);
-	/* Since the stringpool alignment is solely based on mstr_native_align, we need to initialize it based
-	 * on the ALIGN_STRINGS qualifier so that all strings in the literal text pool are aligned.
-	 * However, when a module is compiled at runtime, we need to preserve the existing runtime setting
-	 * (that was initialized at GT.M startup) once the compilation is done.  save_mstr_native_align is used for
-	 * this purpose. */
 	/* If last compile errored out, it may have left stuff - find out how much space we have in mcalloc blocks */
 	for (mcallocated = 0, nextmca = mcavailptr; nextmca; nextmca = nextmca->link)
 		mcallocated += nextmca->size;
 	if (0 == mcallocated)
 		mcallocated = MC_DSBLKSIZE - MCALLOC_HDR_SZ;	/* Min size is one default block size */
 	COMPILE_HASHTAB_CLEANUP;
-	save_mstr_native_align = mstr_native_align;
-	/* mstr_native_align = (cmd_qlf.qlf & CQ_ALIGN_STRINGS) ? TRUE : FALSE; */
-	mstr_native_align = FALSE; /* TODO: remove this line and  uncomment the above line */
 	cg_phase = CGP_NOSTATE;
 	TREF(source_error_found) = errknt = 0;
 	open_source_file();
@@ -277,7 +268,6 @@ boolean_t compiler_startup(void)
 	assert(indr_stringpool.base == stringpool.base);
 	indr_stringpool = stringpool;
 	stringpool = rts_stringpool;
-	mstr_native_align = save_mstr_native_align;
 	REVERT;
 	return errknt ? TRUE : FALSE;
 }

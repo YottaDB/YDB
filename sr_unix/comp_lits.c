@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -28,7 +28,6 @@ void comp_lits(rhdtyp *rhead)
 {
   	size_t			offset;
 	uint4			cnt;
-	uint4 			align_pad;
 	mliteral		*p;
 	struct linkage_entry	*linkagep;
 	DCL_THREADGBL_ACCESS;

@@ -66,22 +66,12 @@
 #include "iormdef.h"
 #include "localvarmonitor.h"
 
-#ifdef STP_MOVE
-GBLDEF int	indr_stp_low_reclaim_passes = 0;
-GBLDEF int	rts_stp_low_reclaim_passes = 0;
-GBLDEF int	indr_stp_incr_factor = 1;
-GBLDEF int	rts_stp_incr_factor = 1;
-GBLDEF mstr	**sp_topstr, **sp_array, **sp_arraytop;
-GBLDEF ssize_t	sp_totspace, sp_totspace_nosort;
-#else
-GBLREF int	indr_stp_low_reclaim_passes;
-GBLREF int	rts_stp_low_reclaim_passes;
-GBLREF int	indr_stp_incr_factor;
-GBLREF int	rts_stp_incr_factor;
-GBLREF mstr	**sp_topstr, **sp_array, **sp_arraytop;
-GBLREF ssize_t	sp_totspace, sp_totspace_nosort;
-#endif
-
+GBLREF int			indr_stp_low_reclaim_passes;
+GBLREF int			rts_stp_low_reclaim_passes;
+GBLREF int			indr_stp_incr_factor;
+GBLREF int			rts_stp_incr_factor;
+GBLREF mstr			**sp_topstr, **sp_array, **sp_arraytop;
+GBLREF ssize_t			sp_totspace, sp_totspace_nosort;
 GBLREF mvar 			*mvartab;
 GBLREF mlabel 			*mlabtab;
 GBLREF int 			mvmax;
@@ -104,7 +94,6 @@ GBLREF stack_frame		*frame_pointer;
 GBLREF symval			*curr_symval;
 GBLREF tp_frame			*tp_pointer;
 GBLREF boolean_t		stop_non_mandatory_expansion, expansion_failed, retry_if_expansion_fails;
-GBLREF boolean_t		mstr_native_align;
 GBLREF zwr_hash_table		*zwrhtab;				/* How we track aliases during zwrites */
 GBLREF int4			SPGC_since_LVGC;			/* stringpool GCs since the last dead-data GC */
 GBLREF int4			LVGC_interval;				/* dead data GC done every LVGC_interval stringpool GCs */
@@ -596,7 +585,6 @@ void stp_gcol_sort(size_t space_asked)	/* BYPASSOK */
 	assert(!stringpool_unusable);
 	assert(!stringpool_unexpandable);
 	stringpool.gcols++;
-	assert(!mstr_native_align);
 	assert((stringpool.base == indr_stringpool.base) || (stringpool.base == rts_stringpool.base));
 #	ifndef STP_MOVE
 #	ifdef STP_GCOL_NOSORT

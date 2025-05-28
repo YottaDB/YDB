@@ -42,7 +42,6 @@ error_def(ERR_UNKNOWNSYSERR);
 error_def(ERR_INDRMAXLEN);
 
 GBLREF int			source_column;
-GBLREF boolean_t		mstr_native_align, save_mstr_native_align;
 GBLREF char			cg_phase;	/* phase code generator */
 GBLREF command_qualifier	cmd_qlf;	/* you need to reset it to work in "quiet" mode */
 GBLREF int			mlmax;
@@ -114,8 +113,6 @@ void op_fnzycompile(mval *string, mval *ret)
 		out++;
 	}
 	COMPILE_HASHTAB_CLEANUP;
-	save_mstr_native_align = mstr_native_align;
-	mstr_native_align = FALSE;
 	TREF(source_error_found) = errknt = 0;
 	/* Note: Setting "cg_phase" below to CGP_PARSE will cause warnings like SVNOSET to be ignored as valid M code
 	 * by $ZYCOMPILE and so we set it to CGP_NOSTATE below. Example invocation is [$zycompile(" set (x,$TEST)=1")].
@@ -152,7 +149,6 @@ void op_fnzycompile(mval *string, mval *ret)
 		indr_stringpool = stringpool;
 		stringpool = rts_stringpool;
 	}
-	mstr_native_align = save_mstr_native_align;
 	(TREF(source_buffer)).len = 0;
 	cmd_qlf = cmd_qlf_save;
 	REVERT;

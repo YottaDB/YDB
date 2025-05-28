@@ -2,6 +2,9 @@
  *								*
  *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
+ * Copyright (c) 2025 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -23,7 +26,6 @@
 #include "stack_frame.h"
 #include "stringpool.h"
 
-GBLREF	boolean_t		mstr_native_align;
 GBLREF	hash_table_objcode	cache_table;
 GBLREF	stack_frame		*frame_pointer;
 
@@ -40,7 +42,7 @@ void	op_indlvadr(mval *target)
 	mval		*saved_indx;
 	oprtype		v;
 	triple		*s;
-	uint4		align_padlen, len;
+	uint4		len;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;

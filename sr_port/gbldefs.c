@@ -745,11 +745,6 @@ GBLDEF	boolean_t	is_dollar_incr;		/* valid only if gvcst_put is in the call-stac
 GBLDEF	int		indir_cache_mem_size;	/* Amount of memory currently in use by indirect cache */
 GBLDEF	hash_table_objcode cache_table;
 GBLDEF	int		cache_hits, cache_fails;
-/* The alignment feature is disabled due to some issues in stringpool garbage collection.
- * TODO: When we sort out stringpool issues, change mstr_native_align to TRUE below
- */
-GBLDEF	boolean_t	mstr_native_align;
-GBLDEF boolean_t	save_mstr_native_align;
 GBLDEF	mvar		*mvartab;
 GBLDEF	mvax		*mvaxtab,*mvaxtab_end;
 GBLDEF	mlabel		*mlabtab;
@@ -1490,4 +1485,12 @@ GBLDEF	block_id	mu_upgrade_pin_blkarray[MAX_BT_DEPTH + 1]; /* List of block numb
 								    * "t_abort()" call whereas "mu_upgrade_pin_blkarray[]" is not.
 								    */
 GBLDEF	int		mu_upgrade_pin_blkarray_idx;	/* Index into the next available slot in mu_upgrade_pin_blkarray[] */
+
+/* stp_gcol.c / stringpool related global variables */
+GBLDEF	int		indr_stp_low_reclaim_passes = 0;
+GBLDEF	int		rts_stp_low_reclaim_passes = 0;
+GBLDEF	int		indr_stp_incr_factor = 1;
+GBLDEF	int		rts_stp_incr_factor = 1;
+GBLDEF	mstr		**sp_topstr, **sp_array, **sp_arraytop;
+GBLDEF	ssize_t		sp_totspace, sp_totspace_nosort;
 

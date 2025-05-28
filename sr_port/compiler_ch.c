@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -28,7 +28,6 @@
 #include "stp_parms.h"
 #include "stringpool.h"
 
-GBLREF boolean_t		mstr_native_align, save_mstr_native_align;
 GBLREF char			cg_phase;
 GBLREF command_qualifier	cmd_qlf;
 GBLREF spdesc			indr_stringpool, rts_stringpool, stringpool;
@@ -59,7 +58,6 @@ CONDITION_HANDLER(compiler_ch)
 		PRN_ERROR;
 	COMPILE_HASHTAB_CLEANUP;
 	reinit_compilation_externs();
-	mstr_native_align = save_mstr_native_align;
 	if (CGP_MACHINE == cg_phase)
 		drop_object_file();
 	if (CGP_NOSTATE < cg_phase)
