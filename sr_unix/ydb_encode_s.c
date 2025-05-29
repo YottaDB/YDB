@@ -17,10 +17,16 @@
 #include "libyottadb_int.h"
 #include "ydb_encode_decode.h"
 #include "namelook.h"
-#include "dlopen_handle_array.h"
 #include "deferred_events_queue.h"
 
 GBLREF	volatile int4	outofband;
+GBLREF	boolean_t	yed_dl_complete;
+/* Jansson function pointers */
+GBLREF	void		(*object_delete)(json_t *);
+GBLREF	json_t		*(*new_object)(void), *(*new_string)(const char *, size_t), *(*new_integer)(long long),
+			*(*new_real)(double), *(*new_true)(void), *(*new_false)(void), *(*new_null)(void);
+GBLREF	size_t		(*output_json)(const json_t *, char *, size_t, size_t);
+GBLREF	int		(*set_object)(json_t *, const char *, json_t *);
 
 /* Routine to encode a local or global in to a formatted string
  *
@@ -36,12 +42,10 @@ int	ydb_encode_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t 
 {
 	boolean_t	error_encountered;
 	ydb_var_types	encode_type;
-	void		*handle;
 	unsigned int	data_value;
 	int		encode_svn_index, status;
-	json_t		*(*new_object)(void), *obj;
-	size_t		(*output_json)(const json_t *, char *, size_t, size_t), json_size;
-	char		*dlerror_val, err_msg[YDB_MAX_ERRORMSG];
+	json_t		*jansson_object;
+	size_t		size;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -106,39 +110,25 @@ int	ydb_encode_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t 
 				break;
 		}
 	}
-	handle = dlopen("libjansson.so", RTLD_LAZY);
-	if (NULL == handle)
-	{
-		strncpy(err_msg, dlerror(), YDB_MAX_ERRORMSG);
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_JANSSONDLERROR, 4,
-			LEN_AND_STR(err_msg), LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_ENCODE)));
-	}
-	dlopen_handle_array_add(handle);
-	new_object = dlsym(handle, "json_object");
-	if (NULL == new_object)
-	{
-		strncpy(err_msg, dlerror(), YDB_MAX_ERRORMSG);
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_JANSSONDLERROR, 4,
-			LEN_AND_STR(err_msg), LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_ENCODE)));
-	}
-	output_json = dlsym(handle, "json_dumpb");
-	if (NULL == output_json)
-	{
-		strncpy(err_msg, dlerror(), YDB_MAX_ERRORMSG);
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_JANSSONDLERROR, 4,
-			LEN_AND_STR(err_msg), LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_ENCODE)));
-	}
-	obj = new_object();
-	status = encode_tree(varname, subs_used, subsarray, encode_type, encode_svn_index, data_value, obj, NULL, NULL, handle);
+	if (!yed_dl_complete)
+		yed_dl_load((char *)LYDBRTNNAME(LYDB_RTN_ENCODE));
+	jansson_object = new_object();
+	status = encode_tree(varname, subs_used, subsarray, encode_type, encode_svn_index, data_value, jansson_object, NULL, NULL);
 	if (YDB_OK != status)
 		return status;
-	json_size = output_json(obj, ret_value->buf_addr, ret_value->len_alloc, 0);
-	if (0 == json_size)
+	size = output_json(jansson_object, ret_value->buf_addr, ret_value->len_alloc, 0);
+	/* This code is from json_decref() in jansson.h, it calls json_delete() - but we can't call it directly.
+	 * object_delete() is a function pointer that is set by dlsym(3) to point to json_delete(), but since json_decref()
+	 * is a static function defined in jansson.h, it calls json_delete() and we can't redefine symbols
+	 */
+	if (jansson_object && jansson_object->refcount != (size_t)-1 && JSON_INTERNAL_DECREF(jansson_object) == 0)
+		object_delete(jansson_object);
+	if (0 == size)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_JANSSONINVALIDJSON, 4,
 			LEN_AND_LIT("Empty JSON returned"), LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_ENCODE)));
-	if (ret_value->len_alloc < json_size + 1)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_INVSTRLEN, 2, json_size + 1, ret_value->len_alloc);
-	ret_value->len_used = json_size;
+	if (ret_value->len_alloc < size + 1)
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_INVSTRLEN, 2, size + 1, ret_value->len_alloc);
+	ret_value->len_used = size;
 	ret_value->buf_addr[ret_value->len_used] = '\0';
 	assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* the counter should have never become non-zero in this function */
 	LIBYOTTADB_DONE;
@@ -147,19 +137,16 @@ int	ydb_encode_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t 
 }
 
 int encode_tree(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *subsarray, ydb_var_types encode_type,
-			int encode_svn_index, unsigned int data_value, json_t *obj, int *ret_subs_used,
-			ydb_buffer_t *ret_subsarray, void *handle)
+			int encode_svn_index, unsigned int data_value, json_t *obj, int *ret_subs_used, ydb_buffer_t *ret_subsarray)
 {
 	ydb_buffer_t	cur_subsarray[YDB_MAX_SUBS] = {0}, next_subsarray[YDB_MAX_SUBS] = {0}, cur_value = {0};
 	const char	*root;
 	long long	value_ll;
 	double		value_d;
 	unsigned int	size;
-	int		status, return_code, cur_subs_used = 0, next_subs_used = 0, i, string_size,
-			(*set_object)(json_t *, const char *, json_t *);
-	json_t		*(*new_object)(void), *(*new_string)(const char *, size_t), *(*new_integer)(long long),
-			*(*new_real)(double), *(*new_true)(void), *(*new_false)(void), *(*new_null)(void), *cur, *val;
-	char		err_msg[YDB_MAX_ERRORMSG], *curpool, *nextpool, *valuepool;
+	int		status, return_code, cur_subs_used = 0, next_subs_used = 0, i, string_size;
+	json_t		*cur, *val;
+	char		*curpool, *nextpool, *valuepool;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -167,62 +154,6 @@ int encode_tree(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *
 	root = "";	/* Used as a special JSON key to hold values at M array nodes that also have children at higher levels.
 			 * An empty string is allowed as a key in JSON, but not as a subscript in M (by default).
 			 */
-	new_object = dlsym(handle, "json_object");
-	if (NULL == new_object)
-	{
-		strncpy(err_msg, dlerror(), YDB_MAX_ERRORMSG);
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_JANSSONDLERROR, 4,
-			LEN_AND_STR(err_msg), LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_ENCODE)));
-	}
-	new_string = dlsym(handle, "json_stringn");
-	if (NULL == new_string)
-	{
-		strncpy(err_msg, dlerror(), YDB_MAX_ERRORMSG);
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_JANSSONDLERROR, 4,
-			LEN_AND_STR(err_msg), LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_ENCODE)));
-	}
-	new_integer = dlsym(handle, "json_integer");
-	if (NULL == new_integer)
-	{
-		strncpy(err_msg, dlerror(), YDB_MAX_ERRORMSG);
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_JANSSONDLERROR, 4,
-			LEN_AND_STR(err_msg), LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_ENCODE)));
-	}
-	new_real = dlsym(handle, "json_real");
-	if (NULL == new_real)
-	{
-		strncpy(err_msg, dlerror(), YDB_MAX_ERRORMSG);
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_JANSSONDLERROR, 4,
-			LEN_AND_STR(err_msg), LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_ENCODE)));
-	}
-	new_true = dlsym(handle, "json_true");
-	if (NULL == new_true)
-	{
-		strncpy(err_msg, dlerror(), YDB_MAX_ERRORMSG);
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_JANSSONDLERROR, 4,
-			LEN_AND_STR(err_msg), LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_ENCODE)));
-	}
-	new_false = dlsym(handle, "json_false");
-	if (NULL == new_false)
-	{
-		strncpy(err_msg, dlerror(), YDB_MAX_ERRORMSG);
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_JANSSONDLERROR, 4,
-			LEN_AND_STR(err_msg), LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_ENCODE)));
-	}
-	new_null = dlsym(handle, "json_null");
-	if (NULL == new_null)
-	{
-		strncpy(err_msg, dlerror(), YDB_MAX_ERRORMSG);
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_JANSSONDLERROR, 4,
-			LEN_AND_STR(err_msg), LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_ENCODE)));
-	}
-	set_object = dlsym(handle, "json_object_set_new");
-	if (NULL == set_object)
-	{
-		strncpy(err_msg, dlerror(), YDB_MAX_ERRORMSG);
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_JANSSONDLERROR, 4,
-			LEN_AND_STR(err_msg), LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_ENCODE)));
-	}
 	if (LYDB_VARREF_GLOBAL == encode_type)
 		string_size = MAX_KEY_SZ;
 	else
@@ -252,15 +183,15 @@ int encode_tree(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *
 			(char *)LYDBRTNNAME(LYDB_RTN_ENCODE));
 		if (0 == cur_value.len_used)
 			val = new_string(cur_value.buf_addr, cur_value.len_used);
-		else if (is_integer(cur_value, &value_ll))
+		else if (yed_is_integer(cur_value, &value_ll))
 			val = new_integer(value_ll);
-		else if (is_real(cur_value, &value_d))
+		else if (yed_is_real(cur_value, &value_d))
 			val = new_real(value_d);
-		else if (is_true(cur_value))
+		else if (yed_is_true(cur_value))
 			val = new_true();
-		else if (is_false(cur_value))
+		else if (yed_is_false(cur_value))
 			val = new_false();
-		else if (is_null(cur_value))
+		else if (yed_is_null(cur_value))
 			val = new_null();
 		else
 			val = new_string(cur_value.buf_addr, cur_value.len_used);
@@ -278,7 +209,7 @@ int encode_tree(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *
 	while (0 != next_subs_used)
 	{
 		assert(YDB_OK == status);
-		if (!is_descendant_of(subs_used, subsarray, next_subs_used, next_subsarray))
+		if (!yed_is_descendant_of(subs_used, subsarray, next_subs_used, next_subsarray))
 		{	/* The next node is not part of this subtree. Return. */
 			if (NULL != ret_subs_used)
 			{	/* If this isn't the top level call to this function,
@@ -299,7 +230,7 @@ int encode_tree(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *
 		assert(next_subs_used > subs_used);
 		data_value = ydb_data_value(varname, next_subs_used, next_subsarray,
 			encode_type, (char *)LYDBRTNNAME(LYDB_RTN_ENCODE));
-		if (!is_direct_child_of(subs_used, subsarray, next_subs_used, next_subsarray))
+		if (!yed_is_direct_child_of(subs_used, subsarray, next_subs_used, next_subsarray))
 		{	/* The next node is not a direct child of this one. The nodes in between should be represented as objects */
 			data_value = ydb_data_value(varname, subs_used + 1, next_subsarray,
 				encode_type, (char *)LYDBRTNNAME(LYDB_RTN_ENCODE));
@@ -311,7 +242,7 @@ int encode_tree(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *
 					LEN_AND_STR(next_subsarray[subs_used].buf_addr), LEN_AND_LIT("{}"),
 					LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_ENCODE)));
 			status = encode_tree(varname, subs_used + 1, next_subsarray, encode_type,
-				encode_svn_index, data_value, val, &cur_subs_used, cur_subsarray, handle);
+					encode_svn_index, data_value, val, &cur_subs_used, cur_subsarray);
 			assert(YDB_OK == status);
 		}
 		else if (9 < data_value)
@@ -324,7 +255,7 @@ int encode_tree(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *
 					LEN_AND_STR(next_subsarray[subs_used].buf_addr), LEN_AND_LIT("{}"),
 					LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_ENCODE)));
 			status = encode_tree(varname, next_subs_used, next_subsarray, encode_type,
-				encode_svn_index, data_value, val, &cur_subs_used, cur_subsarray, handle);
+					encode_svn_index, data_value, val, &cur_subs_used, cur_subsarray);
 			assert(YDB_OK == status);
 		}
 		else
@@ -333,15 +264,15 @@ int encode_tree(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *
 				(char *)LYDBRTNNAME(LYDB_RTN_ENCODE));
 			if (0 == cur_value.len_used)
 				val = new_string(cur_value.buf_addr, cur_value.len_used);
-			else if (is_integer(cur_value, &value_ll))
+			else if (yed_is_integer(cur_value, &value_ll))
 				val = new_integer(value_ll);
-			else if (is_real(cur_value, &value_d))
+			else if (yed_is_real(cur_value, &value_d))
 				val = new_real(value_d);
-			else if (is_true(cur_value))
+			else if (yed_is_true(cur_value))
 				val = new_true();
-			else if (is_false(cur_value))
+			else if (yed_is_false(cur_value))
 				val = new_false();
-			else if (is_null(cur_value))
+			else if (yed_is_null(cur_value))
 				val = new_null();
 			else
 				val = new_string(cur_value.buf_addr, cur_value.len_used);
@@ -381,7 +312,7 @@ int encode_tree(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *
 	return YDB_OK;
 }
 
-boolean_t is_integer(ydb_buffer_t buff, long long *value)
+inline boolean_t yed_is_integer(ydb_buffer_t buff, long long *value)
 {
 	char	*str, *endptr, ptr;
 
@@ -400,7 +331,7 @@ boolean_t is_integer(ydb_buffer_t buff, long long *value)
 	return (0 == strcmp(endptr, "\0"));
 }
 
-boolean_t is_real(ydb_buffer_t buff, double *value)
+inline boolean_t yed_is_real(ydb_buffer_t buff, double *value)
 {
 	char	*str, *endptr, ptr;
 
@@ -419,7 +350,7 @@ boolean_t is_real(ydb_buffer_t buff, double *value)
 	return (0 == strcmp(endptr, "\0"));
 }
 
-inline boolean_t is_true(ydb_buffer_t buff)
+inline boolean_t yed_is_true(ydb_buffer_t buff)
 {
 	if (buff.len_used != 4)
 		return FALSE;
@@ -428,7 +359,7 @@ inline boolean_t is_true(ydb_buffer_t buff)
 	return TRUE;
 }
 
-inline boolean_t is_false(ydb_buffer_t buff)
+inline boolean_t yed_is_false(ydb_buffer_t buff)
 {
 	if (buff.len_used != 5)
 		return FALSE;
@@ -437,7 +368,7 @@ inline boolean_t is_false(ydb_buffer_t buff)
 	return TRUE;
 }
 
-inline boolean_t is_null(ydb_buffer_t buff)
+inline boolean_t yed_is_null(ydb_buffer_t buff)
 {
 	if (buff.len_used != 4)
 		return FALSE;
@@ -446,7 +377,8 @@ inline boolean_t is_null(ydb_buffer_t buff)
 	return TRUE;
 }
 
-boolean_t is_direct_child_of(int subs_used, const ydb_buffer_t *subsarray, int next_subs_used, ydb_buffer_t *next_subsarray)
+inline boolean_t yed_is_direct_child_of(int subs_used, const ydb_buffer_t *subsarray,
+		int next_subs_used, ydb_buffer_t *next_subsarray)
 {
 	if ((subs_used + 1) != next_subs_used)
 		return FALSE;
@@ -460,7 +392,8 @@ boolean_t is_direct_child_of(int subs_used, const ydb_buffer_t *subsarray, int n
 	return TRUE;
 }
 
-boolean_t is_descendant_of(int subs_used, const ydb_buffer_t *subsarray, int next_subs_used, ydb_buffer_t *next_subsarray)
+inline boolean_t yed_is_descendant_of(int subs_used, const ydb_buffer_t *subsarray,
+		int next_subs_used, ydb_buffer_t *next_subsarray)
 {
 	if (subs_used > next_subs_used)
 		return FALSE;
