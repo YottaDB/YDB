@@ -19,8 +19,7 @@ typedef struct
 	unsigned int	gcols;		/* some optimizations need to know if the stringpool garbage collected  */
 	unsigned int	strpllim;	/* non-zero value is user specified guard on expansion */
 	boolean_t	strpllimwarned;	/* if limit is in place, has been exceeded, and not recovered from */
-	unsigned char	prvprt;		/* stores memory protections used in guarding stp space */
-	boolean_t	stp_gcol_nosort;	/* FALSE => stp_gcol() is invoked, TRUE => stp_gcol_nosort() is invoked */
+	boolean_t	stp_gcol_nosort;	/* FALSE => stp_gcol_sort() is invoked, TRUE => stp_gcol_nosort() is invoked */
 } spdesc;
 
 void	stp_expand_array(void);
