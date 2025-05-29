@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -62,14 +62,14 @@ boolean_t ydb_logical_truth_value(ydbenvindx_t envindx, boolean_t negate, boolea
 		}
 		if (!negate)
 		{ /* regular mode */
-			return (!is_num ? (0 == STRNCASECMP(buf, LOGICAL_TRUE, MIN(STR_LIT_LEN(LOGICAL_TRUE), tn.len))
-						|| 0 == STRNCASECMP(buf, LOGICAL_YES, MIN(STR_LIT_LEN(LOGICAL_YES), tn.len)))
-					: !zero);
+			return (!is_num
+				? (!STRNCASECMP(buf, LOGICAL_TRUE, tn.len) || !STRNCASECMP(buf, LOGICAL_YES, tn.len))
+				: !zero);
 		} else
 		{ /* negative mode */
-			return (!is_num ? (0 == STRNCASECMP(buf, LOGICAL_FALSE, MIN(STR_LIT_LEN(LOGICAL_FALSE), tn.len))
-						|| 0 == STRNCASECMP(buf, LOGICAL_NO, MIN(STR_LIT_LEN(LOGICAL_NO), tn.len)))
-					: zero);
+			return (!is_num
+				? (!STRNCASECMP(buf, LOGICAL_FALSE, tn.len) || !STRNCASECMP(buf, LOGICAL_NO, tn.len))
+				: zero);
 		}
 	} else
 	{
