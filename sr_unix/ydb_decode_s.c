@@ -21,6 +21,7 @@
 #include "deferred_events_queue.h"
 
 GBLREF	volatile int4	outofband;
+GBLDEF	boolean_t	yed_lydb_rtn = FALSE;
 GBLDEF	boolean_t	yed_dl_complete = FALSE;
 /* Jansson function pointers */
 GBLDEF	json_t		*(*decode_json)(const char *, size_t, json_error_t *), *(*obj_next_value)(void *),
@@ -70,12 +71,14 @@ int ydb_decode_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t 
 	if (error_encountered)
 	{
 		assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* Should have been cleared by "ydb_simpleapi_ch" */
+		yed_lydb_rtn = FALSE;
 		REVERT;
 		return ((ERR_TPRETRY == SIGNAL) ? YDB_TP_RESTART : -(TREF(ydb_error_code)));
 	}
 	/* Check if an outofband action that might care about has popped up */
 	if (outofband)
 		outofband_action(FALSE);
+	yed_lydb_rtn = TRUE;
 	/* Do some validation */
 	VALIDATE_VARNAME(varname, subs_used, FALSE, LYDB_RTN_DECODE, -1, decode_type, decode_svn_index);
 	if (0 > subs_used)
@@ -138,6 +141,7 @@ int ydb_decode_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t 
 	if (jansson_object && jansson_object->refcount != (size_t)-1 && JSON_INTERNAL_DECREF(jansson_object) == 0)
 		object_delete(jansson_object);
 	assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* the counter should have never become non-zero in this function */
+	yed_lydb_rtn = FALSE;
 	LIBYOTTADB_DONE;
 	REVERT;
 	return YDB_OK;
@@ -285,8 +289,7 @@ int decode_string(const ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subs
 	value_buffer.buf_addr = system_malloc(value_buffer.len_alloc);
 	YDB_COPY_STRING_TO_BUFFER(value, &value_buffer, done);
 	assert(TRUE == done);
-	ydb_set_value(varname, subs_used, subsarray, &value_buffer, decode_type,
-		decode_svn_index, (char *)LYDBRTNNAME(LYDB_RTN_DECODE));
+	ydb_set_s(varname, subs_used, subsarray, &value_buffer);
 	system_free(value_buffer.buf_addr);
 	return YDB_OK;
 }
@@ -302,8 +305,7 @@ int decode_integer(const ydb_buffer_t *varname, int subs_used, ydb_buffer_t *sub
 	value_buffer.len_alloc = 21;	/* Jansson uses long long to store integers */
 	value_buffer.buf_addr = (char *)&buffer[0];
 	value_buffer.len_used = snprintf(value_buffer.buf_addr, value_buffer.len_alloc, "%lld", value);
-	ydb_set_value(varname, subs_used, subsarray, &value_buffer, decode_type,
-		decode_svn_index, (char *)LYDBRTNNAME(LYDB_RTN_DECODE));
+	ydb_set_s(varname, subs_used, subsarray, &value_buffer);
 	return YDB_OK;
 }
 
@@ -318,8 +320,7 @@ int decode_real(const ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsar
 	value_buffer.len_alloc = 21;	/* Jansson uses double to store reals with a default precision of 17 */
 	value_buffer.buf_addr = (char *)&buffer[0];
 	value_buffer.len_used = snprintf(value_buffer.buf_addr, value_buffer.len_alloc, "%g", value);
-	ydb_set_value(varname, subs_used, subsarray, &value_buffer, decode_type,
-		decode_svn_index, (char *)LYDBRTNNAME(LYDB_RTN_DECODE));
+	ydb_set_s(varname, subs_used, subsarray, &value_buffer);
 	return YDB_OK;
 }
 
@@ -353,8 +354,7 @@ int decode_bool(const ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsar
 			value_buffer.buf_addr = "NULL";
 			break;
 	}
-	ydb_set_value(varname, subs_used, subsarray, &value_buffer, decode_type,
-		decode_svn_index, (char *)LYDBRTNNAME(LYDB_RTN_DECODE));
+	ydb_set_s(varname, subs_used, subsarray, &value_buffer);
 	return YDB_OK;
 }
 

@@ -158,7 +158,8 @@ MBSTART	{													\
 /* Initialization and cleanup macros for main simpleAPI calls. Having a value in TREF(libyottadb_active_rtn)
  * denotes a simpleAPI routine is active and no other simpleAPI routine can be started - i.e. calls cannot be
  * nested with the exception of ydb_tp_s() which clears this indicator just before it engages the call-back
- * routine which has a high probability of calling more simpleAPI routines.
+ * routine which has a high probability of calling more simpleAPI routines, and ydb_encode_s()/ydb_decode_s(),
+ * which rely upon ydb_data_s(), ydb_get_s(), ydb_node_next_s(), and ydb_set_s() to do some of their work.
  *
  * We need two flavors - one for use in routines with a return value and one without.
  */
@@ -938,16 +939,6 @@ void	ydb_stm_thread_exit(void);
 void	ydb_stm_atfork_prepare(void);
 void	ydb_stm_atfork_parent(void);
 void	ydb_stm_atfork_child(void);
-
-/* Declarations for other functions from the Simple API that are used by ydb_decode_s()/ydb_encode_s() */
-unsigned int	ydb_data_value(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *subsarray,
-			ydb_var_types data_type, char *ydb_caller_fn);
-void		ydb_get_value(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *subsarray, ydb_buffer_t *ret_value,
-			ydb_var_types get_type, int get_svn_index, char *ydb_caller_fn);
-int		ydb_node_next_value(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *subsarray, int *ret_subs_used,
-			ydb_buffer_t *ret_subsarray, ydb_var_types nodenext_type, char *ydb_caller_fn);
-void		ydb_set_value(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *subsarray,
-			const ydb_buffer_t *value, ydb_var_types set_type, int set_svn_index, char *ydb_caller_fn);
 
 void	ydb_issue_invvarname_error(const ydb_buffer_t *varname);
 

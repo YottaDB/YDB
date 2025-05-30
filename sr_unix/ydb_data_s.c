@@ -32,6 +32,7 @@
 #include "deferred_events_queue.h"
 
 GBLREF	volatile int4	outofband;
+GBLREF	boolean_t	yed_lydb_rtn;
 
 LITREF	mval		literal_zero;
 
@@ -50,7 +51,12 @@ LITREF	mval		literal_zero;
 int ydb_data_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *subsarray, unsigned int *ret_value)
 {
 	boolean_t	error_encountered;
+	gparam_list	plist;
+	ht_ent_mname	*tabent;
 	int		data_svn_index;
+	lv_val		*lvvalp, *src_lv;
+	mname_entry	var_mname;
+	mval		data_value, gvname, plist_mvals[YDB_MAX_SUBS + 1];
 	ydb_var_types	data_type;
 	DCL_THREADGBL_ACCESS;
 
@@ -59,48 +65,34 @@ int ydb_data_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *s
 		*ret_value = YDB_DATA_ERROR;	/* Initialize in case an error causes a premature return before we set a
 						 * meaningful value.
 						 */
-	VERIFY_NON_THREADED_API;	/* clears a global variable "caller_func_is_stapi" set by SimpleThreadAPI caller
-					 * so needs to be first invocation after SETUP_THREADGBL_ACCESS to avoid any error
-					 * scenarios from not resetting this global variable even though this function returns.
-					 */
-	/* Verify entry conditions, make sure YDB CI environment is up etc. */
-	LIBYOTTADB_INIT(LYDB_RTN_DATA, (int));		/* Note: macro could return from this function in case of errors */
-	assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* previously unused entries should have been cleared by that
-							 * corresponding ydb_*_s() call.
-							 */
-	ESTABLISH_NORET(ydb_simpleapi_ch, error_encountered);
-	if (error_encountered)
+	if (FALSE == yed_lydb_rtn)
 	{
-		assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* Should have been cleared by "ydb_simpleapi_ch" */
-		REVERT;
-		return ((ERR_TPRETRY == SIGNAL) ? YDB_TP_RESTART : -(TREF(ydb_error_code)));
+		VERIFY_NON_THREADED_API;	/* clears a global variable "caller_func_is_stapi" set by SimpleThreadAPI caller
+						 * so needs to be first invocation after SETUP_THREADGBL_ACCESS to avoid any
+						 * error scenarios from not resetting this global variable even though this
+						 * function returns.
+						 */
+		/* Verify entry conditions, make sure YDB CI environment is up etc. */
+		LIBYOTTADB_INIT(LYDB_RTN_DATA, (int));		/* Note: macro could return from this function in case of errors */
+		assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* previously unused entries should have been cleared by that
+								 * corresponding ydb_*_s() call.
+								 */
+		ESTABLISH_NORET(ydb_simpleapi_ch, error_encountered);
+		if (error_encountered)
+		{
+			assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* Should have been cleared by "ydb_simpleapi_ch" */
+			REVERT;
+			return ((ERR_TPRETRY == SIGNAL) ? YDB_TP_RESTART : -(TREF(ydb_error_code)));
+		}
+		/* Check if an outofband action that might care about has popped up */
+		if (outofband)
+			outofband_action(FALSE);
 	}
-	/* Check if an outofband action that might care about has popped up */
-	if (outofband)
-		outofband_action(FALSE);
 	/* Do some validation */
-	VALIDATE_VARNAME(varname, subs_used, FALSE, LYDB_RTN_DATA, -1, data_type, data_svn_index);
+	VALIDATE_VARNAME(varname, subs_used, FALSE, TREF(libyottadb_active_rtn), -1, data_type, data_svn_index);
 	if (NULL == ret_value)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,
-			LEN_AND_LIT("NULL ret_value"), LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_DATA)));
-	*ret_value = ydb_data_value(varname, subs_used, subsarray, data_type, (char *)LYDBRTNNAME(LYDB_RTN_DATA));
-	assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* the counter should have never become non-zero in this function */
-	LIBYOTTADB_DONE;
-	REVERT;
-	return YDB_OK;
-}
-
-unsigned int ydb_data_value(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *subsarray,
-			ydb_var_types data_type, char *ydb_caller_fn)
-{
-	mname_entry	var_mname;
-	ht_ent_mname	*tabent;
-	lv_val		*lvvalp, *src_lv;
-	mval		data_value, gvname, plist_mvals[YDB_MAX_SUBS + 1];
-	gparam_list	plist;
-	DCL_THREADGBL_ACCESS;
-
-	SETUP_THREADGBL_ACCESS;
+			LEN_AND_LIT("NULL ret_value"), LEN_AND_STR(LYDBRTNNAME(TREF(libyottadb_active_rtn))));
 	/* Separate actions depending on type of DATA being done */
 	switch(data_type)
 	{
@@ -122,7 +114,8 @@ unsigned int ydb_data_value(const ydb_buffer_t *varname, int subs_used, const yd
 				 */
 				plist.arg[0] = lvvalp;				/* First arg is lv_val of the base var */
 				/* Setup plist (which would point to plist_mvals[] array) for callg invocation of op_getindx */
-				COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals, FALSE, 1, ydb_caller_fn);
+				COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals, FALSE, 1,
+											LYDBRTNNAME(TREF(libyottadb_active_rtn)));
 				src_lv = (lv_val *)callg((callgfnptr)op_srchindx, &plist);	/* Locate node */
 			}
 			op_fndata(src_lv, &data_value);
@@ -140,7 +133,8 @@ unsigned int ydb_data_value(const ydb_buffer_t *varname, int subs_used, const yd
 			if (0 < subs_used)
 			{
 				plist.arg[0] = &gvname;
-				COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals, FALSE, 1, ydb_caller_fn);
+				COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals, FALSE, 1,
+											LYDBRTNNAME(TREF(libyottadb_active_rtn)));
 				callg((callgfnptr)op_gvname, &plist);	/* Drive "op_gvname" to  key */
 			} else
 				op_gvname(1, &gvname);			/* Single parm call to get next global */
@@ -152,5 +146,12 @@ unsigned int ydb_data_value(const ydb_buffer_t *varname, int subs_used, const yd
 			assertpro(FALSE);
 			break;
 	}
-	return mval2i(&data_value);
+	*ret_value = mval2i(&data_value);
+	if (FALSE == yed_lydb_rtn)
+	{
+		assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* the counter should have never become non-zero in this function */
+		LIBYOTTADB_DONE;
+		REVERT;
+	}
+	return YDB_OK;
 }

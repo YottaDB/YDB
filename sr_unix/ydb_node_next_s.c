@@ -32,6 +32,7 @@
 #include "deferred_events_queue.h"
 
 GBLREF	volatile int4	outofband;
+GBLREF	boolean_t	yed_lydb_rtn;
 
 /* Routine to locate the next node at any level (i.e. forward $query).
  *
@@ -50,56 +51,45 @@ int ydb_node_next_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer
 			int *ret_subs_used, ydb_buffer_t *ret_subsarray)
 {
 	boolean_t	error_encountered;
+	gparam_list	plist;
+	ht_ent_mname	*tabent;
 	int		nodenext_svn_index, status;
+	lv_val		*lvvalp, *next_lv;
+	mname_entry	var_mname;
+	mval		varnamemv, gvname, plist_mvals[YDB_MAX_SUBS + 1];
 	ydb_var_types	nodenext_type;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	VERIFY_NON_THREADED_API;	/* clears a global variable "caller_func_is_stapi" set by SimpleThreadAPI caller
-					 * so needs to be first invocation after SETUP_THREADGBL_ACCESS to avoid any error
-					 * scenarios from not resetting this global variable even though this function returns.
-					 */
-	/* Verify entry conditions, make sure YDB CI environment is up etc. */
-	LIBYOTTADB_INIT(LYDB_RTN_NODE_NEXT, (int));	/* Note: macro could "return" from this function in case of errors */
-	assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* previously unused entries should have been cleared by that
-							 * corresponding ydb_*_s() call.
-							 */
-	ESTABLISH_NORET(ydb_simpleapi_ch, error_encountered);
-	if (error_encountered)
+	if (FALSE == yed_lydb_rtn)
 	{
-		assert(0 == TREF(sapi_query_node_subs_cnt));	/* should have been cleared by "ydb_simpleapi_ch" */
-		assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* Should have been cleared by "ydb_simpleapi_ch" */
-		REVERT;
-		return ((ERR_TPRETRY == SIGNAL) ? YDB_TP_RESTART : -(TREF(ydb_error_code)));
+		VERIFY_NON_THREADED_API;	/* clears a global variable "caller_func_is_stapi" set by SimpleThreadAPI caller
+						 * so needs to be first invocation after SETUP_THREADGBL_ACCESS to avoid any
+						 * error scenarios from not resetting this global variable even though this
+						 * function returns.
+						 */
+		/* Verify entry conditions, make sure YDB CI environment is up etc. */
+		LIBYOTTADB_INIT(LYDB_RTN_NODE_NEXT, (int));	/* Note: macro could return from this function in case of errors */
+		assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* previously unused entries should have been cleared by that
+								 * corresponding ydb_*_s() call.
+								 */
+		ESTABLISH_NORET(ydb_simpleapi_ch, error_encountered);
+		if (error_encountered)
+		{
+			assert(0 == TREF(sapi_query_node_subs_cnt));	/* should have been cleared by "ydb_simpleapi_ch" */
+			assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* Should have been cleared by "ydb_simpleapi_ch" */
+			REVERT;
+			return ((ERR_TPRETRY == SIGNAL) ? YDB_TP_RESTART : -(TREF(ydb_error_code)));
+		}
+		/* Check if an outofband action that might care about has popped up */
+		if (outofband)
+			outofband_action(FALSE);
 	}
-	/* Check if an outofband action that might care about has popped up */
-	if (outofband)
-		outofband_action(FALSE);
 	/* Do some validation */
-	VALIDATE_VARNAME(varname, subs_used, FALSE, LYDB_RTN_NODE_NEXT, -1, nodenext_type, nodenext_svn_index);
+	VALIDATE_VARNAME(varname, subs_used, FALSE, TREF(libyottadb_active_rtn), -1, nodenext_type, nodenext_svn_index);
 	if (NULL == ret_subs_used)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,
-			      LEN_AND_LIT("NULL ret_subs_used"), LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_NODE_NEXT)));
-	status = ydb_node_next_value(varname, subs_used, subsarray, ret_subs_used, ret_subsarray, nodenext_type,
-		(char *)LYDBRTNNAME(LYDB_RTN_NODE_NEXT));
-	assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* the counter should have never become non-zero in this function */
-	LIBYOTTADB_DONE;
-	REVERT;
-	return status;
-}
-
-int ydb_node_next_value(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *subsarray, int *ret_subs_used,
-			ydb_buffer_t *ret_subsarray, ydb_var_types nodenext_type, char *ydb_caller_fn)
-{
-	gparam_list	plist;
-	ht_ent_mname	*tabent;
-	int		status;
-	lv_val		*lvvalp;
-	mname_entry	var_mname;
-	mval		varnamemv, gvname, plist_mvals[YDB_MAX_SUBS + 1];
-	DCL_THREADGBL_ACCESS;
-
-	SETUP_THREADGBL_ACCESS;
+			      LEN_AND_LIT("NULL ret_subs_used"), LEN_AND_STR(LYDBRTNNAME(TREF(libyottadb_active_rtn))));
 	status = YDB_OK;
 	/* Separate actions depending on type of variable for which the next subscript is being located */
 	switch(nodenext_type)
@@ -124,10 +114,12 @@ int ydb_node_next_value(const ydb_buffer_t *varname, int subs_used, const ydb_bu
 				plist.arg[0] = NULL;			/* arg1: destination mval not supplied in simpleAPI mode */
 				plist.arg[1] = &varnamemv;		/* arg2: varname mval */
 				plist.arg[2] = lvvalp;			/* arg3: varname lv_val */
-				COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals, FALSE, 3, ydb_caller_fn);
+				COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals, FALSE, 3,
+							LYDBRTNNAME(TREF(libyottadb_active_rtn)));
 				callg((callgfnptr)op_fnquery, &plist);	/* Drive "op_fnquery" to locate next node */
 			}
-			status = sapi_return_subscr_nodes(ret_subs_used, ret_subsarray, ydb_caller_fn);
+			status = sapi_return_subscr_nodes(ret_subs_used, ret_subsarray,
+							(char *)LYDBRTNNAME(TREF(libyottadb_active_rtn)));
 			break;
 		case LYDB_VARREF_GLOBAL:
 			/* Global variable subscript-next processing is the same regardless of argument count:
@@ -144,12 +136,14 @@ int ydb_node_next_value(const ydb_buffer_t *varname, int subs_used, const ydb_bu
 			if (0 < subs_used)
 			{
 				plist.arg[0] = &gvname;
-				COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals, FALSE, 1, ydb_caller_fn);
+				COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals, FALSE, 1,
+							LYDBRTNNAME(TREF(libyottadb_active_rtn)));
 				callg((callgfnptr)op_gvname, &plist);	/* Drive "op_gvname" to create key */
 			} else
 				op_gvname(1, &gvname);			/* Single parm call to get next global */
 			op_gvquery(NULL);				/* Locate next subscript this level */
-			status = sapi_return_subscr_nodes(ret_subs_used, ret_subsarray, ydb_caller_fn);
+			status = sapi_return_subscr_nodes(ret_subs_used, ret_subsarray,
+							(char *)LYDBRTNNAME(TREF(libyottadb_active_rtn)));
 			break;
 		case LYDB_VARREF_ISV:
 			/* The VALIDATE_VARNAME macro call done above should have already issued an error in this case */
@@ -158,5 +152,11 @@ int ydb_node_next_value(const ydb_buffer_t *varname, int subs_used, const ydb_bu
 			break;
 	}
 	TREF(sapi_query_node_subs_cnt) = 0;
+	if (FALSE == yed_lydb_rtn)
+	{
+		assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* the counter should have never become non-zero in this function */
+		LIBYOTTADB_DONE;
+		REVERT;
+	}
 	return status;
 }
