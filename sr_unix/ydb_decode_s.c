@@ -20,14 +20,11 @@
 #include "namelook.h"
 #include "deferred_events_queue.h"
 
-GBLREF	volatile int4	outofband;
-GBLDEF	boolean_t	yed_lydb_rtn = FALSE;
-GBLDEF	boolean_t	yed_dl_complete = FALSE;
 /* Jansson function pointers */
 GBLDEF	json_t		*(*decode_json)(const char *, size_t, json_error_t *), *(*obj_next_value)(void *),
 			*(*get_value)(const json_t *, size_t), *(*new_object)(void),
 			*(*new_string)(const char *, size_t), *(*new_integer)(long long), *(*new_real)(double),
-			*(*new_true)(void), *(*new_false)(void), *(*new_null)(void);
+			*(*new_false)(void), *(*new_true)(void), *(*new_null)(void);
 GBLDEF	void		*(*get_obj_iter)(json_t *), *(*obj_iter_next)(json_t *, void *), (*object_delete)(json_t *);
 GBLDEF	const char	*(*obj_next_key)(void *), *(*get_string_value)(const json_t *);
 GBLDEF	size_t		(*get_size)(const json_t *), (*output_json)(const json_t *, char *, size_t, size_t);
@@ -51,10 +48,10 @@ int ydb_decode_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t 
 	ydb_buffer_t	cur_subsarray[YDB_MAX_SUBS] = {0};
 	boolean_t	error_encountered;
 	ydb_var_types	decode_type;
-	json_t		*jansson_object;
+	json_t		*jansson_object = NULL;
 	json_error_t	jansson_error;
 	int		decode_svn_index, json_type, i, string_size;
-	char		*curpool;
+	char		*curpool = NULL;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -70,6 +67,14 @@ int ydb_decode_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t 
 	ESTABLISH_NORET(ydb_simpleapi_ch, error_encountered);
 	if (error_encountered)
 	{
+		if (NULL != curpool)
+			system_free(curpool);
+		/* This code is from json_decref() in jansson.h, it calls json_delete() - but we can't call it directly.
+		 * object_delete() is a function pointer that is set by dlsym(3) to point to json_delete(), but since json_decref()
+		 * is a static inline function defined in jansson.h, it calls json_delete() and we can't redefine symbols
+		 */
+		if (jansson_object && jansson_object->refcount != (size_t)-1 && JSON_INTERNAL_DECREF(jansson_object) == 0)
+			object_delete(jansson_object);
 		assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* Should have been cleared by "ydb_simpleapi_ch" */
 		yed_lydb_rtn = FALSE;
 		REVERT;
@@ -129,14 +134,13 @@ int ydb_decode_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t 
 		decode_array(varname, subs_used, cur_subsarray, max_subs, jansson_object, decode_type, decode_svn_index);
 	else
 	{
-		system_free(curpool);
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_JANSSONINVALIDJSON, 4,
 			LEN_AND_LIT("Invalid JSON"), LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_DECODE)));
 	}
 	system_free(curpool);
 	/* This code is from json_decref() in jansson.h, it calls json_delete() - but we can't call it directly.
 	 * object_delete() is a function pointer that is set by dlsym(3) to point to json_delete(), but since json_decref()
-	 * is a static function defined in jansson.h, it calls json_delete() and we can't redefine symbols
+	 * is a static inline function defined in jansson.h, it calls json_delete() and we can't redefine symbols
 	 */
 	if (jansson_object && jansson_object->refcount != (size_t)-1 && JSON_INTERNAL_DECREF(jansson_object) == 0)
 		object_delete(jansson_object);
@@ -324,7 +328,7 @@ int decode_real(const ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsar
 	return YDB_OK;
 }
 
-/* This function handles JSON keys with a value of true, false or null (not strings).
+/* This function handles JSON keys with a value of false, true, or null (not strings).
  * These values are stored as "TRUE", "FALSE", and "NULL" in M arrays.
  *	bool_types are:
  *		0 for false
@@ -339,19 +343,19 @@ int decode_bool(const ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsar
 	switch (bool_type)
 	{
 		case 0:
-			value_buffer.len_alloc = 6;
-			value_buffer.len_used = 5;
-			value_buffer.buf_addr = "FALSE";
+			value_buffer.len_alloc = 7;
+			value_buffer.len_used = 6;
+			value_buffer.buf_addr = "\0false";
 			break;
 		case 1:
-			value_buffer.len_alloc = 5;
-			value_buffer.len_used = 4;
-			value_buffer.buf_addr = "TRUE";
+			value_buffer.len_alloc = 6;
+			value_buffer.len_used = 5;
+			value_buffer.buf_addr = "\0true";
 			break;
 		default:
-			value_buffer.len_alloc = 5;
-			value_buffer.len_used = 4;
-			value_buffer.buf_addr = "NULL";
+			value_buffer.len_alloc = 6;
+			value_buffer.len_used = 5;
+			value_buffer.buf_addr = "\0null";
 			break;
 	}
 	ydb_set_s(varname, subs_used, subsarray, &value_buffer);
@@ -463,14 +467,14 @@ void yed_dl_load(char *ydb_caller_fn)
 		strncpy(err_msg, dlerror(), YDB_MAX_ERRORMSG);
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_JANSSONDLERROR, 4, LEN_AND_STR(err_msg), LEN_AND_STR(ydb_caller_fn));
 	}
-	new_true = dlsym(handle, "json_true");
-	if (NULL == new_true)
+	new_false = dlsym(handle, "json_false");
+	if (NULL == new_false)
 	{
 		strncpy(err_msg, dlerror(), YDB_MAX_ERRORMSG);
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_JANSSONDLERROR, 4, LEN_AND_STR(err_msg), LEN_AND_STR(ydb_caller_fn));
 	}
-	new_false = dlsym(handle, "json_false");
-	if (NULL == new_false)
+	new_true = dlsym(handle, "json_true");
+	if (NULL == new_true)
 	{
 		strncpy(err_msg, dlerror(), YDB_MAX_ERRORMSG);
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_JANSSONDLERROR, 4, LEN_AND_STR(err_msg), LEN_AND_STR(ydb_caller_fn));

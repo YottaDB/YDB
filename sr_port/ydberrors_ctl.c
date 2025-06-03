@@ -75,7 +75,7 @@ LITDEF	err_msg ydberrors[] = {
 	{ "GVDBGNAKEDMISMATCH", "Invalid GVNAKED in gv_optimize: $REFERENCE did not match OP_GVNAKED: !AD !!= !AD. Opcodes seen: !AD", 6, 0 },
 	{ "JANSSONDLERROR", "Attempt to load Jansson JSON library failed: !AD - in !AD call", 4, 0 },
 	{ "JANSSONINVALIDJSON", "Invalid JSON: !AD - in !AD call", 4, 0 },
-	{ "JANSSONENCODEERROR", "JSON encoding error: Key \"!AD\"  Value \"!AD\" - in !AD call", 6, 0 }
+	{ "JANSSONENCODEERROR", "JSON encoding error at node: !AD - in !AD call", 4, 0 },
 };
 
 
