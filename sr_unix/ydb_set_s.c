@@ -51,31 +51,32 @@ int ydb_set_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *su
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	if (FALSE == yed_lydb_rtn)
+
+	if (!yed_lydb_rtn)	/* yed_lydb_rtn is TRUE if called by ydb_decode_s() */
 	{
 		VERIFY_NON_THREADED_API;	/* clears a global variable "caller_func_is_stapi" set by SimpleThreadAPI caller
-						 * so needs to be first invocation after SETUP_THREADGBL_ACCESS to avoid any
-						 * error scenarios from not resetting this global variable even though this
-						 * function returns.
+						 * so needs to be first invocation after SETUP_THREADGBL_ACCESS to avoid any error
+						 * scenarios from not resetting this global variable even though this function
+						 * returns.
 						 */
 		/* Verify entry conditions, make sure YDB CI environment is up etc. */
-		LIBYOTTADB_INIT(LYDB_RTN_SET, (int));		/* Note: macro could return from this function in case of errors */
-		assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* previously unused entries should have been cleared by that
-								 * corresponding ydb_*_s() call.
-								 */
-		ESTABLISH_NORET(ydb_simpleapi_ch, error_encountered);
-		if (error_encountered)
-		{
-			assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* should have been cleared by "ydb_simpleapi_ch" */
-			REVERT;
-			return ((ERR_TPRETRY == SIGNAL) ? YDB_TP_RESTART : -(TREF(ydb_error_code)));
-		}
-		/* Check if an outofband action that might care about has popped up */
-		if (outofband)
-			outofband_action(FALSE);
+		LIBYOTTADB_INIT(LYDB_RTN_SET, (int));	/* Note: macro could "return" from this function in  case of errors */
 	}
+	assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* previously unused entries should have been cleared by that
+							 * corresponding ydb_*_s() call.
+							 */
+	ESTABLISH_NORET(ydb_simpleapi_ch, error_encountered);
+	if (error_encountered)
+	{
+		assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* should have been cleared by "ydb_simpleapi_ch" */
+		REVERT;
+		return ((ERR_TPRETRY == SIGNAL) ? YDB_TP_RESTART : -(TREF(ydb_error_code)));
+	}
+	/* Check if an outofband action that might care about has popped up */
+	if (outofband)
+		outofband_action(FALSE);
 	/* Do some validation */
-	VALIDATE_VARNAME(varname, subs_used, TRUE, TREF(libyottadb_active_rtn), -1, set_type, set_svn_index);
+	VALIDATE_VARNAME(varname, subs_used, TRUE, LYDB_RTN_SET, -1, set_type, set_svn_index);
 	if (NULL == value)
 	{	/* Treat it as the null string */
 		null_ydb_buff.len_used = 0;
@@ -86,7 +87,7 @@ int ydb_set_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *su
 	{
 		if (IS_INVALID_YDB_BUFF_T(value))
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,
-				      LEN_AND_LIT("Invalid value"), LEN_AND_STR(LYDBRTNNAME(TREF(libyottadb_active_rtn))));
+				      LEN_AND_LIT("Invalid value"), LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_SET)));
 		CHECK_MAX_STR_LEN(value);		/* Generates error is value is too long */
 	}
 	/* Separate actions depending on the type of SET being done */
@@ -110,7 +111,7 @@ int ydb_set_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *su
 				plist.arg[0] = lvvalp;				/* First arg is lv_val of the base var */
 				/* Setup plist (which would point to plist_mvals[] array) for callg invocation of op_putindx */
 				COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals, TRUE, 1,
-											LYDBRTNNAME(TREF(libyottadb_active_rtn)));
+											LYDBRTNNAME(LYDB_RTN_SET));
 				dst_lv = (lv_val *)callg((callgfnptr)op_putindx, &plist);	/* Locate/create node */
 			}
 			SET_MVAL_FROM_YDB_BUFF_T(&dst_lv->v, value);	/* Set value into located/created node */
@@ -129,7 +130,7 @@ int ydb_set_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *su
 			plist.arg[0] = &gvname;
 			/* Setup plist (which would point to plist_mvals[] array) for callg invocation of op_gvname */
 			COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals, FALSE, 1,
-											LYDBRTNNAME(TREF(libyottadb_active_rtn)));
+											LYDBRTNNAME(LYDB_RTN_SET));
 			callg((callgfnptr)op_gvname, &plist);		/* Drive "op_gvname" to create key */
 			SET_MVAL_FROM_YDB_BUFF_T(&set_value, value);	/* Put value to set into mval for "op_gvput" */
 			INIT_MVAL_BEFORE_USE_IN_M_CODE(&set_value);	/* Do additional initialization of result mval as it could
@@ -150,10 +151,8 @@ int ydb_set_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *su
 			assertpro(FALSE);
 	}
 	TREF(sapi_mstrs_for_gc_indx) = 0; /* mstrs in this array (added by RECORD_MSTR_FOR_GC) no longer need to be protected */
-	if (FALSE == yed_lydb_rtn)
-	{
+	if (!yed_lydb_rtn)	/* yed_lydb_rtn is TRUE if called by ydb_decode_s() */
 		LIBYOTTADB_DONE;
-		REVERT;
-	}
+	REVERT;
 	return YDB_OK;
 }

@@ -1516,3 +1516,6 @@ GBLDEF	boolean_t	caller_id_flag = TRUE;
 #	endif
 #endif
 
+/* ydb_encode_s() and ydb_decode_s() related global variables */
+GBLDEF	boolean_t	yed_lydb_rtn = FALSE;
+GBLDEF	boolean_t	yed_dl_complete = FALSE;

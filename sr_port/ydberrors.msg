@@ -84,7 +84,7 @@ GVDBGNAKEDUNSET	<Invalid GVNAKED in gv_optimize: $REFERENCE was unset. Opcodes s
 GVDBGNAKEDMISMATCH	<Invalid GVNAKED in gv_optimize: $REFERENCE did not match OP_GVNAKED: !AD !!= !AD. Opcodes seen: !AD>/error/fao=6
 JANSSONDLERROR	<Attempt to load Jansson JSON library failed: !AD - in !AD call>/error/fao=4
 JANSSONINVALIDJSON	<Invalid JSON: !AD - in !AD call>/error/fao=4
-JANSSONENCODEERROR	<JSON encoding error at node: !AD - in !AD call>/error/fao=4
+JANSSONENCODEERROR	<JSON encoding error: !AD - in !AD call>/error/fao=4
 !
 ! If there are UNUSEDMSG* lines unused for more than one year and at least two non-patch releases, use them before adding new lines.
 !
