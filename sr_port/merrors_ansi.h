@@ -180,7 +180,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* VIEWGVN */
 	   0,	/* RTSLOC */
 	   0,	/* RWARG */
-	   0,	/* RWFORMAT */
+	   0,	/* UNUSEDMSG349 */
 	   0,	/* JNLWRTDEFER */
 	   4,	/* SELECTFALSE */
 	   0,	/* SPOREOL */

@@ -346,7 +346,7 @@ RTNNAME		<Routine name expected here>/error/fao=0!/ansi=0
 VIEWGVN		<Invalid global key name used with VIEW/$VIEW(): !AD>/error/fao=2!/ansi=0
 RTSLOC		<!_!_At M source location !AD>/info/fao=2!/ansi=0
 RWARG		<This is not a legal argument for a READ command>/error/fao=0!/ansi=0
-RWFORMAT	<A valid format expression (!!, #, or ?expr) expected here>/error/fao=0!/ansi=0
+UNUSEDMSG349	<RWFORMAT nixed in r2.04 because it can never occur>/error/fao=0!/ansi=0
 JNLWRTDEFER	<Journal write start deferred>/info/fao=0!/ansi=0
 SELECTFALSE	<No argument to $SELECT was true>/error/fao=0!/ansi=4
 SPOREOL		<Either a space or an end-of-line was expected but not found>/error/fao=0!/ansi=0

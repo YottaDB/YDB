@@ -182,7 +182,7 @@ LITDEF	err_msg merrors[] = {
 	{ "VIEWGVN", "Invalid global key name used with VIEW/$VIEW(): !AD", 2, 0 },
 	{ "RTSLOC", "!_!_At M source location !AD", 2, 0 },
 	{ "RWARG", "This is not a legal argument for a READ command", 0, 0 },
-	{ "RWFORMAT", "A valid format expression (!!, #, or ?expr) expected here", 0, 0 },
+	{ "UNUSEDMSG349", "RWFORMAT nixed in r2.04 because it can never occur", 0, 0 },
 	{ "JNLWRTDEFER", "Journal write start deferred", 0, 0 },
 	{ "SELECTFALSE", "No argument to $SELECT was true", 0, 0 },
 	{ "SPOREOL", "Either a space or an end-of-line was expected but not found", 0, 0 },

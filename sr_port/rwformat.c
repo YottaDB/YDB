@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2015 Fidelity National Information 	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2025 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -32,7 +35,7 @@ int rwformat(void)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	ref = 0;
+	ref = NULL;
 	for (;;)
 	{
 		switch (TREF(window_token))
@@ -121,10 +124,8 @@ int rwformat(void)
 			ref->operand[1] = put_tref(argcnt);
 			return TRUE;
 		default:
-			if (ref)
-				return TRUE;
-			stx_error(ERR_RWFORMAT);
-			return FALSE;
+			assert(NULL != ref); /* Callers must not call `rwformat()` unless they see a format character. */
+			return TRUE;
 		}
 	}
 }
