@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -322,7 +322,7 @@ void EXPAND_HASHTAB(HASH_TABLE *table, int minsize);
 boolean_t ADD_HASHTAB(HASH_TABLE *table, HT_KEY_T *key, void *value,  HT_ENT **tabentptr);
 STATICFNDCL boolean_t ADD_HASHTAB_INTL(HASH_TABLE *table, HT_KEY_T *key, void *value,  HT_ENT **tabentptr,
 		boolean_t changing_table_size);
-void *LOOKUP_HASHTAB(HASH_TABLE *table, HT_KEY_T *key);
+HT_ENT *LOOKUP_HASHTAB(HASH_TABLE *table, HT_KEY_T *key);
 void DELETE_HASHTAB_ENT(HASH_TABLE *table, HT_ENT *tabent);
 boolean_t DELETE_HASHTAB(HASH_TABLE *table, HT_KEY_T *key);
 void FREE_HASHTAB(HASH_TABLE *table);
@@ -592,7 +592,7 @@ STATICFNDEF boolean_t ADD_HASHTAB_INTL(HASH_TABLE *table, HT_KEY_T *key, void *v
  *	Returns pointer to the value corresponding to key, if found.
  *	Otherwise, it returns null.
  */
-void *LOOKUP_HASHTAB(HASH_TABLE *table, HT_KEY_T *key)
+HT_ENT *LOOKUP_HASHTAB(HASH_TABLE *table, HT_KEY_T *key)
 {
 #	ifdef INT8_HASH
 	gtm_uint64_t 	hash, ht_index, save_ht_index, prime, rhfact;

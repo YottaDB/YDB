@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2020-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -55,7 +55,7 @@ typedef struct hash_table_int4_struct
 void init_hashtab_int4(hash_table_int4 *table, int minsize, boolean_t dont_compact, boolean_t dont_keep_spare_table);
 void expand_hashtab_int4(hash_table_int4 *table, int minsize);
 boolean_t add_hashtab_int4(hash_table_int4 *table, uint4 *key, void *value,  ht_ent_int4 **tabentptr);
-void *lookup_hashtab_int4(hash_table_int4 *table, uint4 *key);
+ht_ent_int4 *lookup_hashtab_int4(hash_table_int4 *table, uint4 *key);
 void delete_hashtab_ent_int4(hash_table_int4 *table, ht_ent_int4 *tabent);
 boolean_t delete_hashtab_int4(hash_table_int4 *table, uint4 *key);
 void free_hashtab_int4(hash_table_int4 *table);

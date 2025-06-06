@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2020-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -68,7 +68,7 @@ void init_hashtab_mname(hash_table_mname *table, int minsize, boolean_t dont_com
 void expand_hashtab_mname(hash_table_mname *table, int minsize);
 boolean_t add_hashtab_mname(hash_table_mname *table, mname_entry *key, void *value, ht_ent_mname **tabentptr);
 boolean_t add_hashtab_mname_symval(hash_table_mname *table, mname_entry *key, void *value, ht_ent_mname **tabentptr);
-void *lookup_hashtab_mname(hash_table_mname *table, mname_entry *key);
+ht_ent_mname *lookup_hashtab_mname(hash_table_mname *table, mname_entry *key);
 void delete_hashtab_ent_mname(hash_table_mname *table, ht_ent_mname *tabent);
 boolean_t delete_hashtab_mname(hash_table_mname *table, mname_entry *key);
 void free_hashtab_mname(hash_table_mname *table);

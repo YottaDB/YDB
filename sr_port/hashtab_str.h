@@ -3,7 +3,7 @@
  * Copyright (c) 2009-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2020-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -73,7 +73,7 @@ typedef struct hash_table_str_struct
 void init_hashtab_str(hash_table_str *table, int minsize, boolean_t dont_compact, boolean_t dont_keep_spare_table);
 void expand_hashtab_str(hash_table_str *table, int minsize);
 boolean_t add_hashtab_str(hash_table_str *table, stringkey *key, void *value,  ht_ent_str **tabentptr);
-void *lookup_hashtab_str(hash_table_str *table, stringkey *key);
+ht_ent_str *lookup_hashtab_str(hash_table_str *table, stringkey *key);
 void delete_hashtab_ent_str(hash_table_str *table, ht_ent_str *tabent);
 boolean_t delete_hashtab_str(hash_table_str *table, stringkey *key);
 void free_hashtab_str(hash_table_str *table);

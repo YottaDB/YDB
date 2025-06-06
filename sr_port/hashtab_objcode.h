@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2020-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -70,7 +70,7 @@ typedef struct hash_table_objcode_struct
 void init_hashtab_objcode(hash_table_objcode *table, int minsize, boolean_t dont_compact, boolean_t dont_keep_spare_table);
 void expand_hashtab_objcode(hash_table_objcode *table, int minsize);
 boolean_t add_hashtab_objcode(hash_table_objcode *table, icode_str *key, void *value, ht_ent_objcode **tabentptr);
-void *lookup_hashtab_objcode(hash_table_objcode *table, icode_str *key);
+ht_ent_objcode *lookup_hashtab_objcode(hash_table_objcode *table, icode_str *key);
 void delete_hashtab_ent_objcode(hash_table_objcode *table, ht_ent_objcode *tabent);
 boolean_t delete_hashtab_objcode(hash_table_objcode *table, icode_str *key);
 void free_hashtab_objcode(hash_table_objcode *table);
