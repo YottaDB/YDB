@@ -36,17 +36,17 @@ int	ydb_encode_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t 
 	boolean_t	error_encountered;
 	ydb_var_types	encode_type;
 	unsigned int	data_value;
-	int		encode_svn_index, status = YDB_OK;
+	int		encode_svn_index, status;
 	json_t		*jansson_object = NULL;
 	size_t		size;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	assert(!yed_lydb_rtn);	/* ydb_encode_s() and ydb_decode_s() set to TRUE, and they should never be nested */
 	VERIFY_NON_THREADED_API;	/* clears a global variable "caller_func_is_stapi" set by SimpleThreadAPI caller
 					 * so needs to be first invocation after SETUP_THREADGBL_ACCESS to avoid any error
 					 * scenarios from not resetting this global variable even though this function returns.
 					 */
+	assert(!yed_lydb_rtn);	/* ydb_encode_s() and ydb_decode_s() set to TRUE, and they should never be nested */
 	/* Verify entry conditions, make sure YDB CI environment is up etc. */
 	LIBYOTTADB_INIT(LYDB_RTN_ENCODE, (int));	/* Note: macro could return from this function in case of errors */
 	assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* previously unused entries should have been cleared by that
@@ -56,14 +56,11 @@ int	ydb_encode_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t 
 	if (error_encountered)
 	{
 		if (NULL != errmsg)
+		{
 			system_free(errmsg);
-		/* This code is from json_decref() in jansson.h, it calls json_delete() - but we can't call it directly.
-		 * yed_object_delete() is a function pointer that is set by dlsym(3) to point to json_delete(), but since
-		 * json_decref() is a static inline function defined in jansson.h, it calls json_delete() and we can't
-		 * redefine symbols.
-		 */
-		if (jansson_object && jansson_object->refcount != (size_t)-1 && JSON_INTERNAL_DECREF(jansson_object) == 0)
-			yed_object_delete(jansson_object);
+			errmsg = NULL;
+		}
+		YED_OBJECT_DELETE(jansson_object);
 		assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* Should have been cleared by "ydb_simpleapi_ch" */
 		yed_lydb_rtn = FALSE;
 		REVERT;
@@ -126,20 +123,23 @@ int	ydb_encode_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t 
 		{
 			case ERR_MINNRSUBSCRIPTS:
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MINNRSUBSCRIPTS);
+				break;
 			case ERR_MAXNRSUBSCRIPTS:
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXNRSUBSCRIPTS);
+				break;
 			case ERR_JANSSONENCODEERROR:
+				assert(NULL != errmsg);
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_JANSSONENCODEERROR, 4,
 					LEN_AND_STR(errmsg), LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_ENCODE)));
+				break;
 			default:
-				if (jansson_object && jansson_object->refcount != (size_t)-1 &&
-					JSON_INTERNAL_DECREF(jansson_object) == 0)
-						yed_object_delete(jansson_object);
+				YED_OBJECT_DELETE(jansson_object);
 				assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* Should have been cleared by "ydb_simpleapi_ch" */
 				yed_lydb_rtn = FALSE;
 				REVERT;
-				return status;
+				break;
 		}
+		return status;
 	}
 	size = yed_output_json(jansson_object, ret_value->buf_addr, ret_value->len_alloc, 0);
 	if (0 == size)
@@ -147,13 +147,7 @@ int	ydb_encode_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t 
 			LEN_AND_LIT("Empty JSON returned"), LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_ENCODE)));
 	if (ret_value->len_alloc < size + 1)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_INVSTRLEN, 2, size + 1, ret_value->len_alloc);
-	/* This code is from json_decref() in jansson.h, it calls json_delete() - but we can't call it directly.
-	 * yed_object_delete() is a function pointer that is set by dlsym(3) to point to json_delete(), but since
-	 * json_decref() is a static inline function defined in jansson.h, it calls json_delete() and we can't
-	 * redefine symbols.
-	 */
-	if (jansson_object && jansson_object->refcount != (size_t)-1 && JSON_INTERNAL_DECREF(jansson_object) == 0)
-		yed_object_delete(jansson_object);
+	YED_OBJECT_DELETE(jansson_object);
 	ret_value->len_used = size;
 	ret_value->buf_addr[ret_value->len_used] = '\0';
 	assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* the counter should have never become non-zero in this function */
@@ -171,7 +165,7 @@ int yed_encode_tree(const ydb_buffer_t *varname, int subs_used, const ydb_buffer
 	long long	value_ll;
 	double		value_d;
 	unsigned int	size;
-	int		return_code, cur_subs_used = 0, next_subs_used = 0, i, string_size, status = YDB_OK;
+	int		return_code, cur_subs_used = 0, next_subs_used = 0, i, string_size, status;
 	json_t		*cur, *val;
 	char		*curpool, *nextpool, *valuepool;
 	DCL_THREADGBL_ACCESS;
@@ -225,7 +219,7 @@ int yed_encode_tree(const ydb_buffer_t *varname, int subs_used, const ydb_buffer
 		if (-1 == return_code)
 		{
 			char	*errsrc;
-			int	len;
+			int	len, errmsg_len;
 			mval	src, dst;
 
 			len = cur_value.len_used;
@@ -235,16 +229,10 @@ int yed_encode_tree(const ydb_buffer_t *varname, int subs_used, const ydb_buffer
 			src.str.len = len;
 			src.str.addr = errsrc;
 			op_fnzwrite(FALSE, &src, &dst); /* convert to ZWRITE format to show control characters */
-			errmsg = system_malloc(varname->len_used + dst.str.len + 22); /* 22 for string literals & NUL */
-			memcpy(errmsg, "variable = ", 11);
-			len = 11;
-			memcpy(&errmsg[len], varname->buf_addr, varname->len_used);
-			len += varname->len_used;
-			memcpy(&errmsg[len], " : data = ", 10);
-			len += 10;
-			memcpy(&errmsg[len], dst.str.addr, dst.str.len);
-			len += dst.str.len;
-			errmsg[len] = '\0';
+			errmsg_len = varname->len_used + dst.str.len + 22;	/* 22 for string literals & NUL */
+			errmsg = system_malloc(errmsg_len);
+			SNPRINTF(errmsg, errmsg_len, "variable = %.*s : data = %.*s",
+				varname->len_used, varname->buf_addr, dst.str.len, dst.str.addr);
 			system_free(errsrc);
 			system_free(curpool);
 			system_free(nextpool);
@@ -299,7 +287,7 @@ int yed_encode_tree(const ydb_buffer_t *varname, int subs_used, const ydb_buffer
 			if (-1 == return_code)
 			{
 				char	*errsrc;
-				int	len;
+				int	len, errmsg_len;
 				mval	src, dst;
 
 				len = next_subsarray[subs_used].len_used;
@@ -309,16 +297,10 @@ int yed_encode_tree(const ydb_buffer_t *varname, int subs_used, const ydb_buffer
 				src.str.len = len;
 				src.str.addr = errsrc;
 				op_fnzwrite(FALSE, &src, &dst); /* convert to ZWRITE format to show control characters */
-				errmsg = system_malloc(varname->len_used + dst.str.len + 27); /* 27 for string literals & NUL */
-				memcpy(errmsg, "variable = ", 11);
-				len = 11;
-				memcpy(&errmsg[len], varname->buf_addr, varname->len_used);
-				len += varname->len_used;
-				memcpy(&errmsg[len], " : subscript = ", 15);
-				len += 15;
-				memcpy(&errmsg[len], dst.str.addr, dst.str.len);
-				len += dst.str.len;
-				errmsg[len] = '\0';
+				errmsg_len = varname->len_used + dst.str.len + 27;	/* 27 for string literals & NUL */
+				errmsg = system_malloc(errmsg_len);
+				SNPRINTF(errmsg, errmsg_len, "variable = %.*s : subscript = %.*s",
+					varname->len_used, varname->buf_addr, dst.str.len, dst.str.addr);
 				system_free(errsrc);
 				system_free(curpool);
 				system_free(nextpool);
@@ -343,7 +325,7 @@ int yed_encode_tree(const ydb_buffer_t *varname, int subs_used, const ydb_buffer
 			if (-1 == return_code)
 			{
 				char	*errsrc;
-				int	len;
+				int	len, errmsg_len;
 				mval	src, dst;
 
 				len = next_subsarray[subs_used].len_used;
@@ -353,16 +335,10 @@ int yed_encode_tree(const ydb_buffer_t *varname, int subs_used, const ydb_buffer
 				src.str.len = len;
 				src.str.addr = errsrc;
 				op_fnzwrite(FALSE, &src, &dst); /* convert to ZWRITE format to show control characters */
-				errmsg = system_malloc(varname->len_used + dst.str.len + 27); /* 27 for string literals & NUL */
-				memcpy(errmsg, "variable = ", 11);
-				len = 11;
-				memcpy(&errmsg[len], varname->buf_addr, varname->len_used);
-				len += varname->len_used;
-				memcpy(&errmsg[len], " : subscript = ", 15);
-				len += 15;
-				memcpy(&errmsg[len], dst.str.addr, dst.str.len);
-				len += dst.str.len;
-				errmsg[len] = '\0';
+				errmsg_len = varname->len_used + dst.str.len + 27;	/* 27 for string literals & NUL */
+				errmsg = system_malloc(errmsg_len);
+				SNPRINTF(errmsg, errmsg_len, "variable = %.*s : subscript = %.*s",
+					varname->len_used, varname->buf_addr, dst.str.len, dst.str.addr);
 				system_free(errsrc);
 				system_free(curpool);
 				system_free(nextpool);
@@ -401,7 +377,7 @@ int yed_encode_tree(const ydb_buffer_t *varname, int subs_used, const ydb_buffer
 			if (-1 == return_code)
 			{
 				char	*errsrc, *errtmp;
-				int	len, tmplen;
+				int	len, tmplen, errmsg_len;
 				mval	src, dst;
 
 				len = next_subsarray[next_subs_used - 1].len_used;
@@ -422,21 +398,10 @@ int yed_encode_tree(const ydb_buffer_t *varname, int subs_used, const ydb_buffer
 				src.str.len = len;
 				src.str.addr = errsrc;
 				op_fnzwrite(FALSE, &src, &dst); /* convert to ZWRITE format to show control characters */
-				/* 37 for string literals & NUL */
-				errmsg = system_malloc(varname->len_used + tmplen + dst.str.len + 37);
-				memcpy(errmsg, "variable = ", 11);
-				len = 11;
-				memcpy(&errmsg[len], varname->buf_addr, varname->len_used);
-				len += varname->len_used;
-				memcpy(&errmsg[len], " : subscript = ", 15);
-				len += 15;
-				memcpy(&errmsg[len], errtmp, tmplen);
-				len += tmplen;
-				memcpy(&errmsg[len], " : data = ", 10);
-				len += 10;
-				memcpy(&errmsg[len], dst.str.addr, dst.str.len);
-				len += dst.str.len;
-				errmsg[len] = '\0';
+				errmsg_len = varname->len_used + tmplen + dst.str.len + 37;	/* 37 for string literals & NUL */
+				errmsg = system_malloc(errmsg_len);
+				SNPRINTF(errmsg, errmsg_len, "variable = %.*s : subscript = %.*s : data = %.*s",
+					varname->len_used, varname->buf_addr, tmplen, errtmp, dst.str.len, dst.str.addr);
 				system_free(errsrc);
 				system_free(errtmp);
 				system_free(curpool);
@@ -487,7 +452,7 @@ inline boolean_t yed_is_integer(ydb_buffer_t buff, long long *value)
 {
 	char	*str, *endptr, ptr;
 
-	if (buff.len_used > 16)
+	if (YED_DEFAULT_PRECISION < buff.len_used)
 		return FALSE;
 	if ('-' != buff.buf_addr[0] && '.' != buff.buf_addr[0] && !isdigit(buff.buf_addr[0]))
 		return FALSE;
@@ -506,7 +471,7 @@ inline boolean_t yed_is_real(ydb_buffer_t buff, double *value)
 {
 	char	*str, *endptr, ptr;
 
-	if (buff.len_used > 16)
+	if (YED_DEFAULT_PRECISION < buff.len_used)
 		return FALSE;
 	if ('-' != buff.buf_addr[0] && '.' != buff.buf_addr[0] && !isdigit(buff.buf_addr[0]))
 		return FALSE;
@@ -521,29 +486,38 @@ inline boolean_t yed_is_real(ydb_buffer_t buff, double *value)
 	return (0 == strcmp(endptr, "\0"));
 }
 
+/* The JSON false type is prefaced by a null byte to disambiguate it from the string "false"
+ * when stored in M arrays. See note at yed_decode_bool() in ydb_decode_s.c.
+ */
 inline boolean_t yed_is_false(ydb_buffer_t buff)
 {
-	if (buff.len_used != 6)
+	if (STR_LIT_LEN(YED_FALSE) != buff.len_used)
 		return FALSE;
-	if (0 != memcmp(buff.buf_addr, "\0false", buff.len_used))
+	if (0 != MEMCMP_LIT(buff.buf_addr, YED_FALSE))
 		return FALSE;
 	return TRUE;
 }
 
+/* The JSON true type is prefaced by a null byte to disambiguate it from the string "true"
+ * when stored in M arrays. See note at yed_decode_bool() in ydb_decode_s.c.
+ */
 inline boolean_t yed_is_true(ydb_buffer_t buff)
 {
-	if (buff.len_used != 5)
+	if (STR_LIT_LEN(YED_TRUE) != buff.len_used)
 		return FALSE;
-	if (0 != memcmp(buff.buf_addr, "\0true", buff.len_used))
+	if (0 != MEMCMP_LIT(buff.buf_addr, YED_TRUE))
 		return FALSE;
 	return TRUE;
 }
 
+/* The JSON null type is prefaced by a null byte to disambiguate it from the string "null"
+ * when stored in M arrays. See note at yed_decode_bool() in ydb_decode_s.c.
+ */
 inline boolean_t yed_is_null(ydb_buffer_t buff)
 {
-	if (buff.len_used != 5)
+	if (STR_LIT_LEN(YED_NULL) != buff.len_used)
 		return FALSE;
-	if (0 != memcmp(buff.buf_addr, "\0null", buff.len_used))
+	if (0 != MEMCMP_LIT(buff.buf_addr, YED_NULL))
 		return FALSE;
 	return TRUE;
 }
