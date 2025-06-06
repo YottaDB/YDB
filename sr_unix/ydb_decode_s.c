@@ -389,125 +389,16 @@ void yed_dl_load(char *ydb_caller_fn)
 	dlopen_handle_array_add(handle);
 	dlerror();	/* Clear any errors that may have been hanging around */
 	/* Get the function pointers from the library */
-	yed_decode_json = dlsym(handle, "json_loads");
-	if (NULL == yed_decode_json)
-	{
-		strncpy(err_msg, dlerror(), YDB_MAX_ERRORMSG);
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_JANSSONDLERROR, 4, LEN_AND_STR(err_msg), LEN_AND_STR(ydb_caller_fn));
+#	define	YDB_ENCODE_DECODE_FNPTR(YED_FNPTR, SYMBOL_NAME)							\
+	{													\
+		YED_FNPTR = dlsym(handle, SYMBOL_NAME);								\
+		if (NULL == YED_FNPTR)										\
+		{												\
+			strncpy(err_msg, dlerror(), YDB_MAX_ERRORMSG);						\
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6)						\
+				ERR_JANSSONDLERROR, 4, LEN_AND_STR(err_msg), LEN_AND_STR(ydb_caller_fn));	\
+		}												\
 	}
-	yed_obj_iter_next = dlsym(handle, "json_object_iter_next");
-	if (NULL == yed_obj_iter_next)
-	{
-		strncpy(err_msg, dlerror(), YDB_MAX_ERRORMSG);
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_JANSSONDLERROR, 4, LEN_AND_STR(err_msg), LEN_AND_STR(ydb_caller_fn));
-	}
-	yed_obj_next_key = dlsym(handle, "json_object_iter_key");
-	if (NULL == yed_obj_next_key)
-	{
-		strncpy(err_msg, dlerror(), YDB_MAX_ERRORMSG);
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_JANSSONDLERROR, 4, LEN_AND_STR(err_msg), LEN_AND_STR(ydb_caller_fn));
-	}
-	yed_obj_next_value = dlsym(handle, "json_object_iter_value");
-	if (NULL == yed_obj_next_value)
-	{
-		strncpy(err_msg, dlerror(), YDB_MAX_ERRORMSG);
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_JANSSONDLERROR, 4, LEN_AND_STR(err_msg), LEN_AND_STR(ydb_caller_fn));
-	}
-	yed_get_obj_iter = dlsym(handle, "json_object_iter");
-	if (NULL == yed_get_obj_iter)
-	{
-		strncpy(err_msg, dlerror(), YDB_MAX_ERRORMSG);
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_JANSSONDLERROR, 4, LEN_AND_STR(err_msg), LEN_AND_STR(ydb_caller_fn));
-	}
-	yed_get_size = dlsym(handle, "json_array_size");
-	if (NULL == yed_get_size)
-	{
-		strncpy(err_msg, dlerror(), YDB_MAX_ERRORMSG);
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_JANSSONDLERROR, 4, LEN_AND_STR(err_msg), LEN_AND_STR(ydb_caller_fn));
-	}
-	yed_get_value = dlsym(handle, "json_array_get");
-	if (NULL == yed_get_value)
-	{
-		strncpy(err_msg, dlerror(), YDB_MAX_ERRORMSG);
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_JANSSONDLERROR, 4, LEN_AND_STR(err_msg), LEN_AND_STR(ydb_caller_fn));
-	}
-	yed_get_string_value = dlsym(handle, "json_string_value");
-	if (NULL == yed_get_string_value)
-	{
-		strncpy(err_msg, dlerror(), YDB_MAX_ERRORMSG);
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_JANSSONDLERROR, 4, LEN_AND_STR(err_msg), LEN_AND_STR(ydb_caller_fn));
-	}
-	yed_get_int_value = dlsym(handle, "json_integer_value");
-	if (NULL == yed_get_int_value)
-	{
-		strncpy(err_msg, dlerror(), YDB_MAX_ERRORMSG);
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_JANSSONDLERROR, 4, LEN_AND_STR(err_msg), LEN_AND_STR(ydb_caller_fn));
-	}
-	yed_get_real_value = dlsym(handle, "json_real_value");
-	if (NULL == yed_get_real_value)
-	{
-		strncpy(err_msg, dlerror(), YDB_MAX_ERRORMSG);
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_JANSSONDLERROR, 4, LEN_AND_STR(err_msg), LEN_AND_STR(ydb_caller_fn));
-	}
-	yed_new_object = dlsym(handle, "json_object");
-	if (NULL == yed_new_object)
-	{
-		strncpy(err_msg, dlerror(), YDB_MAX_ERRORMSG);
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_JANSSONDLERROR, 4, LEN_AND_STR(err_msg), LEN_AND_STR(ydb_caller_fn));
-	}
-	yed_output_json = dlsym(handle, "json_dumpb");
-	if (NULL == yed_output_json)
-	{
-		strncpy(err_msg, dlerror(), YDB_MAX_ERRORMSG);
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_JANSSONDLERROR, 4, LEN_AND_STR(err_msg), LEN_AND_STR(ydb_caller_fn));
-	}
-	yed_new_string = dlsym(handle, "json_stringn");
-	if (NULL == yed_new_string)
-	{
-		strncpy(err_msg, dlerror(), YDB_MAX_ERRORMSG);
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_JANSSONDLERROR, 4, LEN_AND_STR(err_msg), LEN_AND_STR(ydb_caller_fn));
-	}
-	yed_new_integer = dlsym(handle, "json_integer");
-	if (NULL == yed_new_integer)
-	{
-		strncpy(err_msg, dlerror(), YDB_MAX_ERRORMSG);
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_JANSSONDLERROR, 4, LEN_AND_STR(err_msg), LEN_AND_STR(ydb_caller_fn));
-	}
-	yed_new_real = dlsym(handle, "json_real");
-	if (NULL == yed_new_real)
-	{
-		strncpy(err_msg, dlerror(), YDB_MAX_ERRORMSG);
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_JANSSONDLERROR, 4, LEN_AND_STR(err_msg), LEN_AND_STR(ydb_caller_fn));
-	}
-	yed_new_false = dlsym(handle, "json_false");
-	if (NULL == yed_new_false)
-	{
-		strncpy(err_msg, dlerror(), YDB_MAX_ERRORMSG);
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_JANSSONDLERROR, 4, LEN_AND_STR(err_msg), LEN_AND_STR(ydb_caller_fn));
-	}
-	yed_new_true = dlsym(handle, "json_true");
-	if (NULL == yed_new_true)
-	{
-		strncpy(err_msg, dlerror(), YDB_MAX_ERRORMSG);
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_JANSSONDLERROR, 4, LEN_AND_STR(err_msg), LEN_AND_STR(ydb_caller_fn));
-	}
-	yed_new_null = dlsym(handle, "json_null");
-	if (NULL == yed_new_null)
-	{
-		strncpy(err_msg, dlerror(), YDB_MAX_ERRORMSG);
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_JANSSONDLERROR, 4, LEN_AND_STR(err_msg), LEN_AND_STR(ydb_caller_fn));
-	}
-	yed_set_object = dlsym(handle, "json_object_set_new");
-	if (NULL == yed_set_object)
-	{
-		strncpy(err_msg, dlerror(), YDB_MAX_ERRORMSG);
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_JANSSONDLERROR, 4, LEN_AND_STR(err_msg), LEN_AND_STR(ydb_caller_fn));
-	}
-	yed_object_delete = dlsym(handle, "json_delete");
-	if (NULL == yed_object_delete)
-	{
-		strncpy(err_msg, dlerror(), YDB_MAX_ERRORMSG);
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_JANSSONDLERROR, 4, LEN_AND_STR(err_msg), LEN_AND_STR(ydb_caller_fn));
-	}
+#	include "ydb_encode_decode_fnptr_table.h"
 	yed_dl_complete = TRUE;
 }
