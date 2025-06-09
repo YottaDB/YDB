@@ -49,7 +49,7 @@ int get_ztimeout(mval *result)
 		sys_get_curr_time(&cur_time);
 		cur_time = sub_abs_time(&(TREF(dollar_ztimeout)).end_time, &cur_time);
 		if (0 <= cur_time.tv_sec)
-			time_len = SNPRINTF(full_ztimeout, ZTIMEOUTSTRLEN, (!ztimeout_vector_len ? "%ld.%ld" : "%ld.%ld:"),
+			time_len = SNPRINTF(full_ztimeout, ZTIMEOUTSTRLEN, (!ztimeout_vector_len ? "%ld.%06ld" : "%ld.%06ld:"),
 				cur_time.tv_sec, DIVIDE_ROUND_UP(cur_time.tv_nsec, NANOSECS_IN_USEC));
 		else
 			time_len = SNPRINTF(full_ztimeout, ZTIMEOUTSTRLEN, (!ztimeout_vector_len ? "0" : "0:"));
