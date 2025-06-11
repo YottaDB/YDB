@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -30,7 +30,6 @@
 #include "gvcst_protos.h"	/* for gvcst_reversequery prototype */
 #include "format_targ_key.h"
 #include "gvcmx.h"
-#include "gvusr.h"
 #include "libyottadb_int.h"
 #include "gvt_inline.h"
 
@@ -58,7 +57,7 @@ void op_gvreversequery(mval *v)
 {
 	int4			size;
 	unsigned char		buff[MAX_ZWR_KEY_SZ], *end, *glob_begin;
- 	boolean_t		currkey_has_special_meaning, found, ok_to_change_currkey, last_subsc_is_null;
+ 	boolean_t		currkey_has_special_meaning, found, last_subsc_is_null;
 	boolean_t		is_simpleapi_mode;
 	enum db_acc_method 	acc_meth;
 	unsigned char		ch1, ch2, *extnamsrc, *extnamdst, *extnamtop;
@@ -79,56 +78,42 @@ void op_gvreversequery(mval *v)
 	}
 	acc_meth = REG_ACC_METH(gv_cur_region);
 	/* Modify gv_currkey such that a gvcst_search of the resulting key will find the previous available record in
-	 * collation order. But in case of dba_usr (the custom implementation of $ORDER which is overloaded for DDP now
-	 * but could be more in the future) it is better to hand over gv_currkey as it is so the custom implementation
-	 * can decide what to do with it.
+	 * collation order.
 	 */
-	ok_to_change_currkey = (dba_usr != acc_meth);
-	if (ok_to_change_currkey)
+	assert(dba_usr != acc_meth);
+	if (TREF(gv_last_subsc_null) && (NEVER == gv_cur_region->std_null_coll)
+	    && ((last_gvquery_key->end != gv_currkey->end)
+		|| memcmp(last_gvquery_key->base, gv_currkey->base, last_gvquery_key->end)))
+	{	/* Treat null subscript specification as a special meaning (to get the last subscript) */
+		currkey_has_special_meaning = TRUE;
+		assert(STR_SUB_PREFIX == gv_currkey->base[gv_currkey->prev]);
+		assert(KEY_DELIMITER == gv_currkey->base[gv_currkey->prev + 1]);
+		assert(gv_currkey->end == gv_currkey->prev + 2);
+		assert(gv_currkey->end < gv_currkey->top); /* need "<" (not "<=") to account for terminating 0x00 */
+		gv_currkey->base[gv_currkey->prev] = 01;
+		gv_append_max_subs_key(gv_currkey, gv_target);
+	} else
+		currkey_has_special_meaning = FALSE;	/* Input key is to be treated as is.
+							 * No special meaning like is the case for a null subscript.
+							 */
+	if (IS_ACC_METH_BG_OR_MM(acc_meth))
 	{
-		if (TREF(gv_last_subsc_null) && (NEVER == gv_cur_region->std_null_coll)
-		    && ((last_gvquery_key->end != gv_currkey->end)
-			|| memcmp(last_gvquery_key->base, gv_currkey->base, last_gvquery_key->end)))
-		{	/* Treat null subscript specification as a special meaning (to get the last subscript) */
-			currkey_has_special_meaning = TRUE;
-			assert(STR_SUB_PREFIX == gv_currkey->base[gv_currkey->prev]);
-			assert(KEY_DELIMITER == gv_currkey->base[gv_currkey->prev + 1]);
-			assert(gv_currkey->end == gv_currkey->prev + 2);
-			assert(gv_currkey->end < gv_currkey->top); /* need "<" (not "<=") to account for terminating 0x00 */
-			gv_currkey->base[gv_currkey->prev] = 01;
-			gv_append_max_subs_key(gv_currkey, gv_target);
+		gvnh_reg = TREF(gd_targ_gvnh_reg);
+		if (NULL == gvnh_reg)
+		{	/* Entire global maps to a single region */
+			found = ((0 != gv_target->root) ? gvcst_reversequery() : FALSE);/* global does not exist
+											 * if root is 0.
+											 */
 		} else
-			currkey_has_special_meaning = FALSE;	/* Input key is to be treated as is.
-								 * No special meaning like is the case for a null subscript.
-								 */
-	}
-	switch (acc_meth)
+		{	/* Global maps to multiple regions in the gld. Use spr (spanning regions) logic. */
+			INVOKE_GVCST_SPR_XXX(gvnh_reg, found = gvcst_spr_reversequery());
+		}
+	} else
 	{
-		case dba_bg:
-		case dba_mm:
-			gvnh_reg = TREF(gd_targ_gvnh_reg);
-			if (NULL == gvnh_reg)
-			{	/* Entire global maps to a single region */
-				found = ((0 != gv_target->root) ? gvcst_reversequery() : FALSE);/* global does not exist
-												 * if root is 0.
-												 */
-			} else
-			{	/* Global maps to multiple regions in the gld. Use spr (spanning regions) logic. */
-				INVOKE_GVCST_SPR_XXX(gvnh_reg, found = gvcst_spr_reversequery());
-			}
-			break;
-		case dba_cm:
-			found = gvcmx_reversequery(&val); /* val ignored currently just like "gvcmx_query" */
-			break;
-		case dba_usr:
-			found = gvusr_reversequery(v); /* $Q result in v for dba_usr, for others, in gv_altkey */
-			break;
-		default:
-			assert(FALSE); /* why didn't we cover all access methods? */
-			found = FALSE;
-			break;
+		assert(acc_meth == dba_cm);
+		found = gvcmx_reversequery(&val); /* val ignored currently just like "gvcmx_query" */
 	}
-	if (ok_to_change_currkey && currkey_has_special_meaning)
+	if (currkey_has_special_meaning)
 	{	/* Restore gv_currkey to what it was at function entry time */
 		gv_undo_append_max_subs_key(gv_currkey, gv_cur_region);
 	}
@@ -140,26 +125,19 @@ void op_gvreversequery(mval *v)
 				*/
 	if (found)
 	{
-		if (acc_meth != dba_usr)
-		{	/* We have a known access method - save the subscript path appropriately for the mode we are in */
-			if (!is_simpleapi_mode)
-			{	/* MM/BG mode - do a normal ASCII format of the reference for return */
-				if (0 == (end = format_targ_key(&buff[0], MAX_ZWR_KEY_SZ, gv_altkey, TRUE)))
-					end = &buff[MAX_ZWR_KEY_SZ - 1];
-				size = (int)(end - &buff[0] - 1); /* exclude ^ */
-				glob_begin = &buff[1]; /* skip ^ */
-			} else
-			{	/* In simpleAPI mode, the subscripts are just stored in the TREF(sapi_query_node_subs) array
-				 * which the calling ydb_* routine will use to rebuffer the subscripts into its caller's
-				 * output subscript array.
-				 */
-				sapi_save_targ_key_subscr_nodes();
-			}
+		/* We have a known access method - save the subscript path appropriately for the mode we are in */
+		if (!is_simpleapi_mode)
+		{	/* MM/BG mode - do a normal ASCII format of the reference for return */
+			if (0 == (end = format_targ_key(&buff[0], MAX_ZWR_KEY_SZ, gv_altkey, TRUE)))
+				end = &buff[MAX_ZWR_KEY_SZ - 1];
+			size = (int)(end - &buff[0] - 1); /* exclude ^ */
+			glob_begin = &buff[1]; /* skip ^ */
 		} else
-		{
-			assert(!is_simpleapi_mode);
-			size = v->str.len - 1; /* exclude ^ */
-			glob_begin = (unsigned char *)v->str.addr + 1; /* skip ^ */
+		{	/* In simpleAPI mode, the subscripts are just stored in the TREF(sapi_query_node_subs) array
+			 * which the calling ydb_* routine will use to rebuffer the subscripts into its caller's
+			 * output subscript array.
+			 */
+			sapi_save_targ_key_subscr_nodes();
 		}
 		if (!is_simpleapi_mode)
 		{	/* When returning the "normal" M code global reference string, we need to return a double-quote for

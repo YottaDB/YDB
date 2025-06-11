@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -23,7 +23,6 @@
 #include "gvcst_protos.h"	/* for gvcst_kill prototype */
 #include "change_reg.h"
 #include "gvcmx.h"
-#include "gvusr.h"
 #include "sgnl.h"
 #include "op.h"
 #ifdef GTM_TRIGGER
@@ -83,10 +82,11 @@ void op_gvkill(void)
 				gvcst_kill(TRUE);
 		} else
 			INVOKE_GVCST_SPR_XXX(gvnh_reg, gvcst_spr_kill());
-	} else if (REG_ACC_METH(gv_cur_region) == dba_cm)
+	} else
+	{
+		assert(REG_ACC_METH(gv_cur_region) == dba_cm);
 		gvcmx_kill(TRUE);
-	else
-		gvusr_kill(TRUE);
+	}
 	if (gv_cur_region->dyn.addr->repl_list)
 	{
 		gv_replication_error = gv_replopen_error;

@@ -3,6 +3,9 @@
  * Copyright (c) 2004-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2025 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -23,7 +26,6 @@
 #include "change_reg.h"
 #include "format_targ_key.h"
 #include "gvcmx.h"
-#include "gvusr.h"
 #include "gvcst_protos.h"	/* for gvcst_incr prototype */
 #include "sgnl.h"		/* for sgnl_gvundef prototype */
 
@@ -53,26 +55,12 @@ void	op_gvincr(mval *increment, mval *result)
 		sgnl_gvnulsubsc(NONULLSUBS);
 	assert(gv_currkey->end + 1 <= gv_cur_region->max_key_size);
 	MV_FORCE_NUM(increment);
-	switch (gv_cur_region->dyn.addr->acc_meth)
+	if (IS_REG_BG_OR_MM(gv_cur_region))
+		gvcst_incr(increment, result);
+	else
 	{
-		case dba_bg:
-		case dba_mm:
-			gvcst_incr(increment, result);
-			break;
-		case dba_cm:
-			gvcmx_increment(increment, result);
-			break;
-		case dba_usr:
-			/* $INCR not supported for DDP/USR access method */
-			if (0 == (end = format_targ_key(buff, MAX_ZWR_KEY_SZ, gv_currkey, TRUE)))
-				end = &buff[MAX_ZWR_KEY_SZ - 1];
-			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(10) ERR_UNIMPLOP, 0,
-				ERR_TEXT, 2, LEN_AND_LIT("GTCM DDP server does not support $INCREMENT"),
-				ERR_GVIS, 2, end - buff, buff,
-				ERR_TEXT, 2, REG_LEN_STR(gv_cur_region));
-			break;
-		default:
-			assertpro(FALSE);
+		assert(REG_ACC_METH(gv_cur_region) == dba_cm);
+		gvcmx_increment(increment, result);
 	}
 	assert(MV_DEFINED(result));
 }

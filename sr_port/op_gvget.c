@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -22,7 +22,6 @@
 #include "stringpool.h"
 #include "gvcst_protos.h"	/* for gvcst_get prototype */
 #include "gvcmx.h"
-#include "gvusr.h"
 #include "sgnl.h"
 #include "op.h"
 
@@ -61,13 +60,10 @@ boolean_t op_gvget(mval *v)
 		 	gotit = gvcst_get(v);
 			assert(FALSE == TREF(in_op_gvget)); /* gvcst_get should have reset it right away */
 		}
-	} else  if (dba_cm == gv_cur_region->dyn.addr->acc_meth)
-	 	gotit = gvcmx_get(v);
-	else
+	} else
 	{
-		gotit = gvusr_get(v);
-		if (gotit)
-			s2pool(&v->str);
+		assert(REG_ACC_METH(gv_cur_region) == dba_cm);
+	 	gotit = gvcmx_get(v);
 	}
 	if (!gotit)
 	{

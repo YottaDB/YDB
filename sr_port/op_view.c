@@ -394,19 +394,13 @@ void	op_view(int numarg, mval *keyword, ...)
 				{
 					if (!reg->open)
 						continue;
-					switch(REG_ACC_METH(reg))
+					if (IS_REG_BG_OR_MM(reg))
 					{
-						case dba_mm:
-						case dba_bg:
-							csa = &FILE_INFO(reg)->s_addrs;
-							memset((char *)csa->gvstats_rec_p, 0, SIZEOF(gvstats_rec_t));
-							break;
-						case dba_cm:
-						case dba_usr:
-							break;
-						default:
-							assert(FALSE && REG_ACC_METH(reg));
-							break;
+						csa = &FILE_INFO(reg)->s_addrs;
+						memset((char *)csa->gvstats_rec_p, 0, SIZEOF(gvstats_rec_t));
+					} else
+					{
+						assert(REG_ACC_METH(reg) == dba_cm);
 					}
 				}
 			}

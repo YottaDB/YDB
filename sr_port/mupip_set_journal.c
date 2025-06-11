@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -167,13 +167,7 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 		if (region)
 		{
 			seg = rptr->reg->dyn.addr;
-			if (dba_usr == seg->acc_meth)
-			{
-				gtm_putmsg_csa(CSA_ARG(REG2CSA(rptr->reg)) VARLSTCNT(6) ERR_UNIMPLOP, 0, ERR_TEXT, 2,
-					LEN_AND_LIT("Journaling is not supported for access method USR"));
-				exit_status |= EXIT_WRN;
-				continue;
-			}
+			assert(dba_usr != seg->acc_meth);
 			if (!mupfndfil(rptr->reg, NULL, LOG_ERROR_TRUE))
 			{
 				exit_status |= EXIT_ERR;

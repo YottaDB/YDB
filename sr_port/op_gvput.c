@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -27,7 +27,6 @@
 #include "change_reg.h"
 #include "format_targ_key.h"
 #include "gvcmx.h"
-#include "gvusr.h"
 #include "sgnl.h"
 
 GBLREF gd_region	*gv_cur_region;
@@ -72,20 +71,12 @@ void op_gvput(mval *var)
 	MV_FORCE_STR(var);
 	if (var->str.len <= gv_cur_region->max_rec_size || is_trigger)
 	{
-		switch (gv_cur_region->dyn.addr->acc_meth)
+		if (IS_REG_BG_OR_MM(gv_cur_region))
+			gvcst_put(var);
+		else
 		{
-			case dba_bg:
-			case dba_mm:
-				gvcst_put(var);
-				break;
-			case dba_cm:
-				gvcmx_put(var);
-				break;
-			case dba_usr:
-				gvusr_put(var);
-				break;
-			default:
-				assertpro(FALSE);
+			assert(REG_ACC_METH(gv_cur_region) == dba_cm);
+			gvcmx_put(var);
 		}
 		if (NULL == gv_cur_region->dyn.addr->repl_list)
 			return;

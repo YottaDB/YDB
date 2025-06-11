@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2023-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -55,7 +55,7 @@ gv_namehead *targ_alloc(int keysize, mname_entry *gvent, gd_region *reg)
 #	endif
 
 	acc_meth = (NULL != reg) ? REG_ACC_METH(reg) : dba_bg;
-	if ((dba_cm == acc_meth) || (dba_usr == acc_meth))
+	if (dba_cm == acc_meth)
 	{
 		gvt = malloc(SIZEOF(gv_namehead) + gvent->var_name.len);
 		memset(gvt, 0, SIZEOF(gv_namehead) + gvent->var_name.len);

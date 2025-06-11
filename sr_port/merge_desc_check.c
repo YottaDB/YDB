@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -109,7 +109,7 @@ boolean_t merge_desc_check(void)
 				assert((NULL == gvnh_reg2) || (NULL != gvt2->gd_csa));
 				if ((NULL == gvt1->gd_csa) || (NULL == gvt2->gd_csa))
 				{	/* One global spans multiple regions, while another is remote. They cannot intersect
-					 * as a global can never span to remote regions (i.e. no dba_usr or dba_cm).
+					 * as a global can never span to remote regions (i.e. no dba_cm).
 					 */
 					return 1;
 				}

@@ -356,6 +356,19 @@ gd_addr *gd_load(mstr *v, boolean_t force_load)
 #		ifdef DEBUG
 		assert((reg - table->regions) <= ARRAYSIZE(isSpannedReg));
 		isSpannedReg[reg - table->regions] = FALSE;
+		/* Assert that access method is only 1 or 3 possible values. BG or MM or CM. */
+		switch(reg->dyn.addr->acc_meth)
+		{
+		case dba_bg:
+		case dba_mm:
+		case dba_cm:
+			break;
+		default:
+			assert(FALSE);
+			break;
+		}
+		/* The below assert is relied upon by the IS_ACC_METH_BG_OR_MM(ACC_METH) macro */
+		assert((0 == dba_rms) && (1 == dba_bg) && (2 == dba_mm) && (3 == dba_cm) && (5 == n_dba));
 #		endif
 		reg->owning_gd = table; /* set backpointer from region to owning gbldir */
 	}
@@ -390,6 +403,7 @@ gd_addr *gd_load(mstr *v, boolean_t force_load)
 	assert(table->has_span_gbls == gdHasSpanGbls);
 	for (reg = table->regions, reg_top = reg + n_regions; reg < reg_top; reg++)
 	{
+		assert(dba_usr != REG_ACC_METH(reg));	/* Assert that we never see dba_usr at gld load time */
 		assert(reg->is_spanned == isSpannedReg[reg - table->regions]);
 		/* Validate "reg->statsDB_reg_index" */
 		reg_index = reg->statsDB_reg_index;
@@ -411,6 +425,7 @@ gd_addr *gd_load(mstr *v, boolean_t force_load)
 		assert(ARRAYSIZE(regname) > base_reg->rname_len);
 		upper_to_lower(regname, REG_STR_LEN(base_reg));
 		assert(!memcmp(regname, (stats_reg)->rname, (stats_reg)->rname_len));	/* BYPASSOK */
+		assert(dba_mm == REG_ACC_METH(stats_reg));	/* Assert that we never see dba_usr at gld load time */
 		/* Since a statsdb region points to an MM database, setting defer_time=0 in that segment
 		 * automatically disables flush timers (wcs_stale) from being set up. GDE should have ensured this.
 		 */

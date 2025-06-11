@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2025 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -18,7 +21,6 @@
 #include "gdsfhead.h"
 #include "gvcst_protos.h"	/* for gvcst_data prototype */
 #include "gvcmx.h"
-#include "gvusr.h"
 #include "sgnl.h"
 #include "op.h"
 
@@ -48,9 +50,10 @@ void op_gvdata(mval *v)
 			x = (gv_target->root ? gvcst_data() : 0);
 		else
 			INVOKE_GVCST_SPR_XXX(gvnh_reg, x = gvcst_spr_data());
-	} else if (REG_ACC_METH(gv_cur_region) == dba_cm)
+	} else
+	{
+		assert(acc_meth == dba_cm);
 		x = gvcmx_data();
-	else
-		x = gvusr_data();
+	}
 	*v = *fndata_table[x / 10][x & 1];
 }

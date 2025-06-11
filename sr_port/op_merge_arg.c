@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2025 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -103,8 +106,10 @@ void op_merge_arg(int m_opr_type, lv_val *lvp)
 	case MARG2_LCL:
 		mglvnp->lclp[IND2] = lvp;
 		break;
-	case MARG2_GBL:
-		if (IS_REG_BG_OR_MM(gv_cur_region) || (dba_usr == gv_cur_region->dyn.addr->acc_meth)
+	default:
+		assert(MARG2_GBL == m_opr_type);
+		assert(dba_usr != REG_ACC_METH(gv_cur_region));
+		if (IS_REG_BG_OR_MM(gv_cur_region)
 			|| ((dba_cm == gv_cur_region->dyn.addr->acc_meth)
 				&& ((link_info *)gv_cur_region->dyn.addr->cm_blk->usr)->query_is_queryget))
 			gvname_env_save(mglvnp->gblp[IND2]);
@@ -119,8 +124,6 @@ void op_merge_arg(int m_opr_type, lv_val *lvp)
 				ERR_TEXT, 2, REG_LEN_STR(gv_cur_region));
 		}
 		break;
-	default:
-		assertpro(FALSE);
 	}
 	assert ((merge_args == (MARG1_LCL | MARG2_LCL))
 		|| (merge_args == (MARG1_LCL | MARG2_GBL))

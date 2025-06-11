@@ -516,9 +516,15 @@ gd_region *dbfilopn(gd_region *reg, boolean_t update_seg_fname_and_return)
 	if (pblk.fnb & F_HAS_NODE)
 	{	/* Remote node specification given */
 		assert(pblk.b_node && pblk.l_node[pblk.b_node - 1] == ':');
+		/* Note that at this point, REG_ACC_METH(reg) could be dba_bg even though it contains a remote
+		 * node specification. The below "gvcmy_open()" call will change the access method to "dba_cm".
+		 * Hence the "dba_cm" assert below can be done only AFTER the "gvcmy_open()" call.
+		 */
 		gvcmy_open(reg, &pblk);
+		assert(dba_cm == REG_ACC_METH(reg));
 		return (gd_region *)-1L;
 	}
+	assert(IS_REG_BG_OR_MM(reg));
 	fnptr = (char *)seg->fname + pblk.b_node;
 	udi->raw = raw;
 	udi->fn = (char *)fnptr;

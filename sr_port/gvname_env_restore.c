@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2025 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -49,14 +52,13 @@ void gvname_env_restore(gvname_info *curr_gvname_info)
 	gv_cur_region = curr_gvname_info->s_gv_cur_region;
 	DEBUG_ONLY(is_bg_or_mm = IS_REG_BG_OR_MM(gv_cur_region);)
 	cs_addrs = curr_gvname_info->s_cs_addrs;
-	assert((is_bg_or_mm && cs_addrs)
-		|| (dba_cm == REG_ACC_METH(gv_cur_region)) || (dba_usr == REG_ACC_METH(gv_cur_region)));
-	if (NULL != cs_addrs) /* cs_addrs might be NULL for dba_cm/dba_usr region */
+	assert((is_bg_or_mm && cs_addrs) || (dba_cm == REG_ACC_METH(gv_cur_region)));
+	if (NULL != cs_addrs) /* cs_addrs might be NULL for dba_cm region */
 		cs_data = cs_addrs->hdr;
 	COPY_KEY(gv_currkey, curr_gvname_info->s_gv_currkey);
 	sgm_info_ptr = curr_gvname_info->s_sgm_info_ptr;
 	assert((is_bg_or_mm && ((dollar_tlevel && sgm_info_ptr) || (!dollar_tlevel && !sgm_info_ptr)))
-		|| (dba_cm == REG_ACC_METH(gv_cur_region)) || (dba_usr == REG_ACC_METH(gv_cur_region)));
+		|| (dba_cm == REG_ACC_METH(gv_cur_region)));
 	DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC(CHECK_CSA_TRUE);
 	TREF(gd_targ_gvnh_reg) = curr_gvname_info->s_gd_targ_gvnh_reg;
 	TREF(gd_targ_map) = curr_gvname_info->s_gd_targ_map;

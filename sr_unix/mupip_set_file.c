@@ -517,13 +517,7 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 		reg_exit_stat = EXIT_NRM;
 		if (region)
 		{
-			if (dba_usr == rptr->reg->dyn.addr->acc_meth)
-			{
-				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_NOUSERDB, 4, LEN_AND_LIT("MUPIP SET"),
-					REG_LEN_STR(rptr->reg));
-				exit_stat |= EXIT_WRN;
-				continue;
-			}
+			assert(dba_usr != REG_ACC_METH(rptr->reg));
 			if (!mupfndfil(rptr->reg, NULL, LOG_ERROR_TRUE))
 				continue;
 			fn = (char *)rptr->reg->dyn.addr->fname;

@@ -51,7 +51,6 @@
 #include "compswap.h"
 #include "mutex.h"
 #include "gds_rundown.h"
-#include "gvusr.h"
 #include "do_semop.h"
 #include "mmseg.h"
 #include "ipcrmid.h"
@@ -195,12 +194,7 @@ int4 gds_rundown(boolean_t cleanup_udi)
 	csd = csa->hdr;
 	cnl = csa->nl;
 	assert((csa == cs_addrs) && (csd == cs_data));	/* relied upon by "jnl_ensure_open" calls below */
-	if ((reg->open) && (dba_usr == csd->acc_meth))
-	{
-		change_reg();
-		gvusr_rundown();
-		return EXIT_NRM;
-	}
+	assert(dba_usr != csd->acc_meth);
 	/* If this region has a corresponding statsdb region that is open, close that first. This is needed to ensure
 	 * that the statsdb can safely be deleted at basedb rundown time if we happen to be the last one to rundown the basedb.
 	 */

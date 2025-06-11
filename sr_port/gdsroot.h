@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -133,7 +133,7 @@ enum db_acc_method
 	dba_bg,
 	dba_mm,
 	dba_cm,
-	dba_usr,
+	dba_usr, /* No longer used in YottaDB but kept as is so enum values (e.g. "n_dba") are identical between GT.M and YottaDB */
 	n_dba,
 	dba_dummy = 0x0ffffff	/* to ensure an int on S390 */
 };

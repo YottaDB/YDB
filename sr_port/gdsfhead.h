@@ -625,7 +625,13 @@ MBSTART {													\
 #define	REG_ACC_METH(REG)		(REG->dyn.addr->acc_meth)
 #define	IS_REG_BG_OR_MM(REG)		IS_ACC_METH_BG_OR_MM(REG_ACC_METH(REG))
 #define	IS_CSD_BG_OR_MM(CSD)		IS_ACC_METH_BG_OR_MM(CSD->acc_meth)
-#define	IS_ACC_METH_BG_OR_MM(ACC_METH)	((dba_bg == ACC_METH) || (dba_mm == ACC_METH))
+
+/* Note: The (dba_mm >= ACC_METH) check in the below macro is better than ((dba_bg == ACC_METH) || (dba_mm == ACC_METH)).
+ * It saves 2 instructions on x86_64 linux. But it relies on dba_bg and dba_mm taking on specific values of
+ * 1 and 2 respectively and that dba_cm is 3 (greater than dba_mm). This is asserted in "gd_load()".
+ * See mention of the IS_ACC_METH_BG_OR_MM macro in a comment there.
+ */
+#define	IS_ACC_METH_BG_OR_MM(ACC_METH)	(DBG_ASSERT((dba_rms != ACC_METH) && (dba_usr != ACC_METH)) (dba_mm >= ACC_METH))
 
 #define	SET_CSA_DIR_TREE(csa, keysize, reg)							\
 MBSTART {											\
@@ -671,7 +677,7 @@ MBSTART {												\
 	GBLREF	buddy_list	*gvt_pending_buddy_list;						\
 	GBLREF	gvt_container	*gvt_pending_list;							\
 													\
-	/* For dba_cm or dba_user, don't add to pending list because those regions			\
+	/* For dba_cm, don't add to pending list because those regions					\
 	 * will never be opened by the client process (this process).					\
 	 */												\
 	if (!REG->open && IS_REG_BG_OR_MM(REG))								\
@@ -922,66 +928,53 @@ MBSTART {													\
  * Note that timers can interrupt the syncing and hence any routines that are called by timers should be safe
  *	and use the TP_CHANGE_REG macro only.
  */
-#define	TP_CHANGE_REG(reg)									\
-MBSTART {											\
-	GBLREF	jnlpool_addrs_ptr_t	jnlpool;						\
-	gv_cur_region = reg;									\
-	if (NULL == gv_cur_region || FALSE == gv_cur_region->open)				\
-	{											\
-		cs_addrs = (sgmnt_addrs *)0;							\
-		cs_data = (sgmnt_data_ptr_t)0;							\
-	} else											\
-	{											\
-		switch (REG_ACC_METH(reg))							\
-		{										\
-			case dba_mm:								\
-			case dba_bg:								\
-				cs_addrs = &FILE_INFO(gv_cur_region)->s_addrs;			\
-				cs_data = cs_addrs->hdr;					\
-				if (cs_addrs->jnlpool && (jnlpool != cs_addrs->jnlpool))	\
-					jnlpool = cs_addrs->jnlpool;				\
-				break;								\
-			case dba_usr:								\
-			case dba_cm:								\
-				cs_addrs = (sgmnt_addrs *)0;					\
-				cs_data = (sgmnt_data_ptr_t)0;					\
-				break;								\
-			default:								\
-				assertpro(FALSE);						\
-				break;								\
-		}										\
-	}											\
+#define	TP_CHANGE_REG(reg)							\
+MBSTART {									\
+	GBLREF	jnlpool_addrs_ptr_t	jnlpool;				\
+										\
+	gv_cur_region = reg;							\
+	if ((NULL == reg) || (FALSE == reg->open))				\
+	{									\
+		cs_addrs = (sgmnt_addrs *)0;					\
+		cs_data = (sgmnt_data_ptr_t)0;					\
+	} else if (IS_REG_BG_OR_MM(reg))					\
+	{									\
+		cs_addrs = &FILE_INFO(gv_cur_region)->s_addrs;			\
+		cs_data = cs_addrs->hdr;					\
+		if (cs_addrs->jnlpool && (jnlpool != cs_addrs->jnlpool))	\
+			jnlpool = cs_addrs->jnlpool;				\
+	} else									\
+	{									\
+		assert(REG_ACC_METH(reg) == dba_cm);				\
+		cs_addrs = (sgmnt_addrs *)0;					\
+		cs_data = (sgmnt_data_ptr_t)0;					\
+	}									\
 } MBEND
 
-#define	TP_CHANGE_REG_IF_NEEDED(reg)								\
-MBSTART {											\
-	GBLREF	jnlpool_addrs_ptr_t	jnlpool;						\
-	assert(reg);										\
-	if (reg != gv_cur_region)								\
-	{											\
-		gv_cur_region = reg;								\
-		switch (REG_ACC_METH(reg))							\
-		{										\
-			case dba_mm:								\
-			case dba_bg:								\
-				assert(reg->open);						\
-				cs_addrs = &FILE_INFO(gv_cur_region)->s_addrs;			\
-				cs_data = cs_addrs->hdr;					\
-				assert((&FILE_INFO(gv_cur_region)->s_addrs == cs_addrs)		\
-					&& cs_addrs->hdr == cs_data);				\
-				if (cs_addrs->jnlpool && (jnlpool != cs_addrs->jnlpool))	\
-					jnlpool = cs_addrs->jnlpool;				\
-				break;								\
-			case dba_usr:								\
-			case dba_cm:								\
-				cs_addrs = (sgmnt_addrs *)0;					\
-				cs_data = (sgmnt_data_ptr_t)0;					\
-				break;								\
-			default:								\
-				assertpro(FALSE);						\
-				break;								\
-		}										\
-	}											\
+#define	TP_CHANGE_REG_IF_NEEDED(reg)							\
+MBSTART {										\
+	GBLREF	jnlpool_addrs_ptr_t	jnlpool;					\
+											\
+	assert(NULL != reg);								\
+	if (reg != gv_cur_region)							\
+	{										\
+		gv_cur_region = reg;							\
+		if (IS_REG_BG_OR_MM(reg))						\
+		{									\
+			assert(reg->open);						\
+			cs_addrs = &FILE_INFO(reg)->s_addrs;				\
+			cs_data = cs_addrs->hdr;					\
+			assert((&FILE_INFO(reg)->s_addrs == cs_addrs)			\
+				&& cs_addrs->hdr == cs_data);				\
+			if (cs_addrs->jnlpool && (jnlpool != cs_addrs->jnlpool))	\
+				jnlpool = cs_addrs->jnlpool;				\
+		} else									\
+		{									\
+			assert(REG_ACC_METH(reg) == dba_cm);				\
+			cs_addrs = (sgmnt_addrs *)0;					\
+			cs_data = (sgmnt_data_ptr_t)0;					\
+		}									\
+	}										\
 } MBEND
 
 #define PUSH_GV_CUR_REGION(REG, SAV_REG, SAV_CS_ADDRS, SAV_CS_DATA, SAV_JNLPOOL)		\
@@ -3377,13 +3370,12 @@ MBSTART {												\
 		if (gvtarg == gvt)									\
 			break;										\
 	}												\
-	/* For dba_cm or dba_usr type of regions, gv_target_list is not maintained so			\
+	/* For dba_cm type of regions, gv_target_list is not maintained so				\
 	 * if gv_target is not part of gv_target_list, assert region is not BG or MM.			\
 	 * The only exception is if the region was dba_cm but later closed due to an error on		\
 	 * the server side (in which case access method gets reset back to BG. (e.g. gvcmz_error.c)	\
 	 */												\
 	assert((NULL != gvtarg) || (dba_cm == REG_ACC_METH(gv_cur_region))				\
-		|| (dba_usr == REG_ACC_METH(gv_cur_region))						\
 		|| ((FALSE == gv_cur_region->open) && (dba_bg == REG_ACC_METH(gv_cur_region))));	\
 } MBEND
 

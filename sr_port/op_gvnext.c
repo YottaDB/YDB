@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2025 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -22,7 +25,6 @@
 #include "gvcst_protos.h"	/* for gvcst_order prototype */
 #include "gvsub2str.h"
 #include "gvcmx.h"
-#include "gvusr.h"
 
 GBLREF gv_key		*gv_altkey;
 GBLREF gv_key		*gv_currkey;
@@ -94,10 +96,11 @@ void op_gvnext(mval *v)
 			found = (gv_target->root ? gvcst_order() : FALSE);
 		else
 			INVOKE_GVCST_SPR_XXX(gvnh_reg, found = gvcst_spr_order());
-	} else if (acc_meth == dba_cm)
+	} else
+	{
+		assert(acc_meth == dba_cm);
 		found = gvcmx_order();
-	else
-		found = gvusr_order();
+	}
 	v->mvtype = 0; /* so stp_gcol, if invoked below, can free up space currently occupied by this to-be-overwritten mval */
 	if (!found)
 	{

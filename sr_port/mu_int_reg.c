@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -82,12 +82,7 @@ void mu_int_reg(gd_region *reg, boolean_t *return_value, boolean_t return_after_
 	*return_value = FALSE;
 	jnlpool_init_needed = TRUE;
 	ESTABLISH(mu_int_reg_ch);
-	if (dba_usr == reg->dyn.addr->acc_meth)
-	{
-		util_out_print("!/Can't integ region !AD; not GDS format", TRUE,  REG_LEN_STR(reg));
-		mu_int_skipreg_cnt++;
-		return;
-	}
+	assert(dba_usr != REG_ACC_METH(reg));
 	gv_cur_region = reg;
 	if (reg_cmcheck(reg))
 	{

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -23,7 +23,6 @@
 #include "gvcst_protos.h"	/* for gvcst_kill prototype */
 #include "change_reg.h"
 #include "gvcmx.h"
-#include "gvusr.h"
 #include "sgnl.h"
 #include "op.h"
 #ifdef GTM_TRIGGER
@@ -68,6 +67,7 @@ void op_gvzwithdraw(void)
 	}
 	if (TREF(gv_last_subsc_null) && NEVER == gv_cur_region->null_subs)
 		sgnl_gvnulsubsc(NONULLSUBS);
+	assert(dba_usr != REG_ACC_METH(gv_cur_region));
 	if (IS_REG_BG_OR_MM(gv_cur_region))
 	{
 		/* No special code needed for spanning globals here since we are in the region we want to be
@@ -76,10 +76,11 @@ void op_gvzwithdraw(void)
 		 */
 		if (IS_OK_TO_INVOKE_GVCST_KILL(gv_target))
 			gvcst_kill(FALSE);
-	} else if (REG_ACC_METH(gv_cur_region) == dba_cm)
+	} else
+	{
+		assert(REG_ACC_METH(gv_cur_region) == dba_cm);
 		gvcmx_kill(FALSE);
-	else
-		gvusr_kill(FALSE);
+	}
 	if (gv_cur_region->dyn.addr->repl_list)
 	{
 		gv_replication_error = gv_replopen_error;

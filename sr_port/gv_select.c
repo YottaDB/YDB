@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2025 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -290,7 +293,7 @@ void gv_select(char *cli_buff, int n_len, boolean_t freeze, char opname[], glist
 			COMPUTE_HASH_MSTR(curr_gbl_name.str, hash_code);
 			op_gvname_fast(VARLSTCNT(2) hash_code, &curr_gbl_name);
 			assert(IS_REG_BG_OR_MM(gv_cur_region));
-				/* for dba_cm or dba_usr, op_gvname_fast/gv_bind_name/gv_init_reg would have errored out */
+				/* for dba_cm, op_gvname_fast/gv_bind_name/gv_init_reg would have errored out */
 			gvname.hash_code = hash_code;
 			gvname.var_name = curr_gbl_name.str;
 			tabent_mname = lookup_hashtab_mname((hash_table_mname *)gd_header->tab_ptr, &gvname);

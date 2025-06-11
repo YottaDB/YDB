@@ -1496,3 +1496,23 @@ GBLDEF	int		indr_stp_incr_factor = 1;
 GBLDEF	int		rts_stp_incr_factor = 1;
 GBLDEF	mstr		**sp_topstr, **sp_array, **sp_arraytop;
 GBLDEF	ssize_t		sp_totspace, sp_totspace_nosort;
+
+/* globals moved from the nixed gbldefs_usr_share.c */
+GBLDEF	gd_region	*gv_cur_region;
+GBLDEF	gv_key		*gv_altkey, *gv_currkey;
+GBLDEF	boolean_t	caller_id_flag = TRUE;
+
+#ifdef INT8_SUPPORTED
+	GBLDEF	const seq_num	seq_num_zero = 0;
+	GBLDEF	const seq_num	seq_num_one = 1;
+	GBLDEF	const seq_num	seq_num_minus_one = (seq_num)-1;
+#else
+	GBLDEF	const seq_num	seq_num_zero = {0, 0};
+	GBLDEF	const seq_num	seq_num_minus_one = {(uint4)-1, (uint4)-1};
+#	ifdef BIGENDIAN
+		GBLDEF	const seq_num	seq_num_one = {0, 1};
+#	else
+		GBLDEF	const seq_num	seq_num_one = {1, 0};
+#	endif
+#endif
+

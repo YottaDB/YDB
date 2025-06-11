@@ -284,16 +284,11 @@ void	op_fnview(int numarg, mval *dst, ...)
 					tmpstr.addr = BG_RES;
 					tmpstr.len = SIZEOF(BG_RES)-1;
 					break;
-				case dba_cm:
+				default:
+					assert(dba_cm == REG_ACC_METH(parmblk.gv_ptr));
 					tmpstr.addr = CM_RES;
 					tmpstr.len = SIZEOF(CM_RES)-1;
 					break;
-				case dba_usr:
-					tmpstr.addr = USR_RES;
-					tmpstr.len = SIZEOF(USR_RES)-1;
-					break;
-				default:
-					assertpro(FALSE && REG_ACC_METH(parmblk.gv_ptr));
 			}
 			dst->str = tmpstr;
 			break;

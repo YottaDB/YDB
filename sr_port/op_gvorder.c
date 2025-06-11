@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -28,7 +28,6 @@
 #include "change_reg.h"
 #include "gvsub2str.h"
 #include "gvcmx.h"
-#include "gvusr.h"
 #include "hashtab_mname.h"
 #include "targ_alloc.h"		/* for GV_BIND_SUBSREG macro which needs "targ_alloc" prototype */
 #include "gtmimagename.h"
@@ -57,7 +56,7 @@ GBLREF spdesc			stringpool;
 
 void op_gvorder(mval *v)
 {
-	boolean_t		found, ok_to_change_currkey;
+	boolean_t		found;
 	enum db_acc_method	acc_meth;
 	gd_addr			*gd_targ;
 	gd_binding		*gd_map_start, *map, *map_top, *start_map, *rmap;
@@ -77,24 +76,19 @@ void op_gvorder(mval *v)
 
 	SETUP_THREADGBL_ACCESS;
 	acc_meth = REG_ACC_METH(gv_cur_region);
-	/* Modify gv_currkey such that a gvcst_search of the resulting gv_currkey will find the next available subscript.
-	 * But in case of dba_usr (the custom implementation of $ORDER which is overloaded for DDP but could be more in the
-	 * future) it is better to hand over gv_currkey as it is so the custom implementation can decide what to do with it.
-	 */
-	ok_to_change_currkey = (dba_usr != acc_meth);
-	if (ok_to_change_currkey)
-	{	/* Modify gv_currkey to reflect the next possible key value in collating order */
-		if (!TREF(gv_last_subsc_null) || gv_cur_region->std_null_coll)
-		{
-			GVKEY_INCREMENT_ORDER(gv_currkey);
-		} else
-		{
-			assert(STR_SUB_PREFIX == gv_currkey->base[gv_currkey->prev]);
-			assert(KEY_DELIMITER == gv_currkey->base[gv_currkey->end]);
-			assert(KEY_DELIMITER == gv_currkey->base[gv_currkey->end - 1]);
-			assert(2 == (gv_currkey->end - gv_currkey->prev));
-			*(&gv_currkey->base[0] + gv_currkey->prev) = 01;
-		}
+	/* Modify gv_currkey such that a gvcst_search of the resulting gv_currkey will find the next available subscript. */
+	/* Modify gv_currkey to reflect the next possible key value in collating order */
+	assert(dba_usr != acc_meth);
+	if (!TREF(gv_last_subsc_null) || gv_cur_region->std_null_coll)
+	{
+		GVKEY_INCREMENT_ORDER(gv_currkey);
+	} else
+	{
+		assert(STR_SUB_PREFIX == gv_currkey->base[gv_currkey->prev]);
+		assert(KEY_DELIMITER == gv_currkey->base[gv_currkey->end]);
+		assert(KEY_DELIMITER == gv_currkey->base[gv_currkey->end - 1]);
+		assert(2 == (gv_currkey->end - gv_currkey->prev));
+		*(&gv_currkey->base[0] + gv_currkey->prev) = 01;
 	}
 	if (gv_currkey->prev)
 	{
@@ -105,10 +99,11 @@ void op_gvorder(mval *v)
 				found = (gv_target->root ? gvcst_order() : FALSE);
 			else
 				INVOKE_GVCST_SPR_XXX(gvnh_reg, found = gvcst_spr_order());
-		} else if (dba_cm == acc_meth)
+		} else
+		{
+			assert(acc_meth == dba_cm);
 			found = gvcmx_order();
-		else
-			found = gvusr_order();
+		}
 		v->mvtype = 0; /* so stp_gcol (if invoked below) can free up space currently occupied by (BYPASSOK)
 				* this to-be-overwritten mval */
 		if (found)
@@ -136,20 +131,18 @@ void op_gvorder(mval *v)
 		} else
 			v->str.len = 0;
 		v->mvtype = MV_STR; /* initialize mvtype now that mval has been otherwise completely set up */
-		if (ok_to_change_currkey)
-		{	/* Restore gv_currkey to what it was at function entry time */
-			if (!TREF(gv_last_subsc_null) || gv_cur_region->std_null_coll)
-			{
-				assert(1 == gv_currkey->base[gv_currkey->end - 2]);
-				assert(KEY_DELIMITER == gv_currkey->base[gv_currkey->end-1]);
-				assert(KEY_DELIMITER == gv_currkey->base[gv_currkey->end]);
-				gv_currkey->base[gv_currkey->end - 2] = KEY_DELIMITER;
-				gv_currkey->end--;
-			} else
-			{
-				assert(01 == gv_currkey->base[gv_currkey->prev]);
-				gv_currkey->base[gv_currkey->prev] = STR_SUB_PREFIX;
-			}
+		/* Restore gv_currkey to what it was at function entry time */
+		if (!TREF(gv_last_subsc_null) || gv_cur_region->std_null_coll)
+		{
+			assert(1 == gv_currkey->base[gv_currkey->end - 2]);
+			assert(KEY_DELIMITER == gv_currkey->base[gv_currkey->end-1]);
+			assert(KEY_DELIMITER == gv_currkey->base[gv_currkey->end]);
+			gv_currkey->base[gv_currkey->end - 2] = KEY_DELIMITER;
+			gv_currkey->end--;
+		} else
+		{
+			assert(01 == gv_currkey->base[gv_currkey->prev]);
+			gv_currkey->base[gv_currkey->prev] = STR_SUB_PREFIX;
 		}
 	} else	/* the following section is for $O(^gname) : name-level $order */
 	{
@@ -188,10 +181,11 @@ void op_gvorder(mval *v)
 					{
 						gv_target = cs_addrs->dir_tree;
 						found = gvcst_order();
-					} else if (acc_meth == dba_cm)
+					} else
+					{
+						assert(acc_meth == dba_cm);
 						found = gvcmx_order();
-					else
-						found = gvusr_order();
+					}
 					if (!found)
 						break;
 					/* At this point, gv_altkey contains the result of the gvcst_order */

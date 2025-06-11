@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -39,25 +39,19 @@ void change_reg(void)
 		cs_data = (sgmnt_data_ptr_t)0;
 		return;
 	}
-
-	switch (gv_cur_region->dyn.addr->acc_meth)
+	if (IS_REG_BG_OR_MM(gv_cur_region))
 	{
-		case dba_usr:
-		case dba_cm:
-			cs_addrs = (sgmnt_addrs *)0;
-			cs_data = (sgmnt_data_ptr_t)0;
-			break;
-		case dba_mm:
-		case dba_bg:
-			cs_addrs = &FILE_INFO(gv_cur_region)->s_addrs;
-			cs_data = cs_addrs->hdr;
-			if (cs_addrs->jnlpool && (jnlpool != cs_addrs->jnlpool))
-				jnlpool = cs_addrs->jnlpool;
-			if (dollar_tlevel)
-				tp_set_sgm();
-			break;
-		default:
-			assertpro(gv_cur_region->dyn.addr->acc_meth != gv_cur_region->dyn.addr->acc_meth);
+		cs_addrs = &FILE_INFO(gv_cur_region)->s_addrs;
+		cs_data = cs_addrs->hdr;
+		if (cs_addrs->jnlpool && (jnlpool != cs_addrs->jnlpool))
+			jnlpool = cs_addrs->jnlpool;
+		if (dollar_tlevel)
+			tp_set_sgm();
+	} else
+	{
+		assert(REG_ACC_METH(gv_cur_region) == dba_cm);
+		cs_addrs = (sgmnt_addrs *)0;
+		cs_data = (sgmnt_data_ptr_t)0;
 	}
 }
 

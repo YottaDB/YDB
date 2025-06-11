@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -30,7 +30,6 @@
 #include "change_reg.h"
 #include "gvsub2str.h"
 #include "gvcmx.h"
-#include "gvusr.h"
 #include "filestruct.h"
 #include "hashtab_mname.h"
 #include "targ_alloc.h"			/* for GV_BIND_SUBSREG macro which needs "targ_alloc" prototype */
@@ -59,7 +58,7 @@ GBLREF spdesc			stringpool;
 
 void op_zprevious(mval *v)
 {
-	boolean_t		found, ok_to_change_currkey;
+	boolean_t		found;
 	enum db_acc_method	acc_meth;
 	gd_addr			*gd_targ;
 	gd_binding		*gd_map_start, *map, *prev_map, *rmap;
@@ -79,13 +78,11 @@ void op_zprevious(mval *v)
 	assert(gv_currkey->prev || !TREF(gv_last_subsc_null));
 	if (gv_currkey->prev)
 	{	/* If last subscript is a NULL subscript, modify gv_currkey such that a gvcst_search of the resulting gv_currkey
-		 * will find the last available subscript. But in case of dba_usr, (the custom implementation of $ZPREVIOUS which
-		 * is overloaded for DDP now but could be more in the future) it is better to hand over gv_currkey as it is so
-		 * the custom implementation can decide what to do with it.
+		 * will find the last available subscript.
 		 */
 		acc_meth = REG_ACC_METH(gv_cur_region);
-		ok_to_change_currkey = (dba_usr != acc_meth);
-		if (TREF(gv_last_subsc_null) && ok_to_change_currkey)
+		assert(dba_usr != acc_meth);
+		if (TREF(gv_last_subsc_null))
 		{	/* Replace the last subscript with the highest possible subscript value i.e. the byte sequence
 			 * 	0xFF (STR_SUB_MAXVAL), 0xFF, 0xFF ...  as much as possible i.e. until gv_currkey->top permits.
 			 * This subscript is guaranteed to be NOT present in the database since a user who tried to set this
@@ -111,10 +108,11 @@ void op_zprevious(mval *v)
 				found = (gv_target->root ? gvcst_zprevious() : FALSE);
 			else
 				INVOKE_GVCST_SPR_XXX(gvnh_reg, found = gvcst_spr_zprevious());
-		} else if (dba_cm == acc_meth)
+		} else
+		{
+			assert(acc_meth == dba_cm);
 			found = gvcmx_zprevious();
-		else
-			found = gvusr_zprevious();
+		}
 		v->mvtype = 0; /* so stp_gcol (if invoked below) can free up space currently occupied (BYPASSOK)
 				* by this to-be-overwritten mval */
 		if (found)
@@ -144,7 +142,7 @@ void op_zprevious(mval *v)
 		} else
 			v->str.len = 0;
 		v->mvtype = MV_STR; /* initialize mvtype now that mval has been otherwise completely set up */
-		if (TREF(gv_last_subsc_null) && ok_to_change_currkey)
+		if (TREF(gv_last_subsc_null))
 		{	/* Restore gv_currkey to what it was at function entry time */
 			gv_undo_append_max_subs_key(gv_currkey, gv_cur_region);
 		}
@@ -190,10 +188,11 @@ void op_zprevious(mval *v)
 					{
 						gv_target = cs_addrs->dir_tree;
 						found = gvcst_zprevious();
-					} else  if (dba_cm == acc_meth)
+					} else
+					{
+						assert(acc_meth == dba_cm);
 						found = gvcmx_zprevious();
-					else
-						found = gvusr_zprevious();
+					}
 					if ('#' == gv_altkey->base[0]) /* don't want to give any hidden ^#* global, e.g "^#t" */
 						found = FALSE;
 					if (!found)
