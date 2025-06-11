@@ -41,10 +41,10 @@ MBSTART {													\
 } MBEND
 
 /* ydb_decode_s.c internal forward declarations */
-int	yed_decode_object(const ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, int max_subs,
-		json_t *jansson_object, ydb_var_types decode_type, int decode_svn_index);
-int	yed_decode_array(const ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, int max_subs,
-		json_t *jansson_object, ydb_var_types decode_type, int decode_svn_index);
+int	yed_decode_object(const ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, json_t *jansson_object,
+		ydb_var_types decode_type, int decode_svn_index);
+int	yed_decode_array(const ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, json_t *jansson_object,
+		ydb_var_types decode_type, int decode_svn_index);
 int	yed_decode_string(const ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, json_t *jansson_object,
 		ydb_var_types decode_type, int decode_svn_index);
 int	yed_decode_integer(const ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, json_t *jansson_object,

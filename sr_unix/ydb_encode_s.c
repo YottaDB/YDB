@@ -49,9 +49,6 @@ int	ydb_encode_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t 
 	assert(!yed_lydb_rtn);	/* ydb_encode_s() and ydb_decode_s() set to TRUE, and they should never be nested */
 	/* Verify entry conditions, make sure YDB CI environment is up etc. */
 	LIBYOTTADB_INIT(LYDB_RTN_ENCODE, (int));	/* Note: macro could return from this function in case of errors */
-	assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* previously unused entries should have been cleared by that
-							 * corresponding ydb_*_s() call.
-							 */
 	ESTABLISH_NORET(ydb_simpleapi_ch, error_encountered);
 	if (error_encountered)
 	{
@@ -61,7 +58,6 @@ int	ydb_encode_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t 
 			errmsg = NULL;
 		}
 		YED_OBJECT_DELETE(jansson_object);
-		assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* Should have been cleared by "ydb_simpleapi_ch" */
 		yed_lydb_rtn = FALSE;
 		REVERT;
 		return ((ERR_TPRETRY == SIGNAL) ? YDB_TP_RESTART : -(TREF(ydb_error_code)));
@@ -79,14 +75,9 @@ int	ydb_encode_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t 
 	if (NULL == ret_value)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,
 			LEN_AND_LIT("NULL ret_value"), LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_ENCODE)));
-	if (NULL == ret_value->buf_addr && 0 != ret_value->len_used)
+	if (NULL == ret_value->buf_addr)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,
-			LEN_AND_LIT("NULL ret_value->buf_addr and non-zero ret_value->len_used"),
-			LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_ENCODE)));
-	if (ret_value->len_alloc < ret_value->len_used)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,
-			LEN_AND_LIT("ret_value->len_alloc < ret_value->len_used"),
-			LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_ENCODE)));
+			LEN_AND_LIT("NULL ret_value->buf_addr"), LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_ENCODE)));
 	for (int i = 0; i < subs_used; i++)
 	{
 		if (subsarray[i].len_alloc < subsarray[i].len_used)
@@ -95,10 +86,16 @@ int	ydb_encode_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t 
 				LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_ENCODE)));
 		if ((0 != subsarray[i].len_used) && (NULL == subsarray[i].buf_addr))
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,
-				LEN_AND_LIT("len_used is non-zero and buff_addr is NULL for at least 1 subscript in subsarray"),
+				LEN_AND_LIT("len_used is non-zero and buf_addr is NULL for at least 1 subscript in subsarray"),
 				LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_ENCODE)));
 	}
-	ydb_data_s(varname, subs_used, subsarray, &data_value);
+	status = ydb_data_s(varname, subs_used, subsarray, &data_value);
+	if (YDB_OK != status)
+	{
+		yed_lydb_rtn = FALSE;
+		REVERT;
+		return status;
+	}
 	if (YDB_DATA_UNDEF == data_value)	/* no subtree */
 	{
 		switch (encode_type)
@@ -134,7 +131,6 @@ int	ydb_encode_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t 
 				break;
 			default:
 				YED_OBJECT_DELETE(jansson_object);
-				assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* Should have been cleared by "ydb_simpleapi_ch" */
 				yed_lydb_rtn = FALSE;
 				REVERT;
 				break;
@@ -150,7 +146,6 @@ int	ydb_encode_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t 
 	YED_OBJECT_DELETE(jansson_object);
 	ret_value->len_used = size;
 	ret_value->buf_addr[ret_value->len_used] = '\0';
-	assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* the counter should have never become non-zero in this function */
 	yed_lydb_rtn = FALSE;
 	LIBYOTTADB_DONE;
 	REVERT;
@@ -200,7 +195,14 @@ int yed_encode_tree(const ydb_buffer_t *varname, int subs_used, const ydb_buffer
 	cur_value.buf_addr = valuepool;
 	if (data_value % 2)	/* handle root of tree's value if it has one */
 	{
-		ydb_get_s(varname, subs_used, subsarray, &cur_value);
+		status = ydb_get_s(varname, subs_used, subsarray, &cur_value);
+		if (YDB_OK != status)
+		{
+			system_free(curpool);
+			system_free(nextpool);
+			system_free(valuepool);
+			return status;
+		}
 		if (0 == cur_value.len_used)
 			val = yed_new_string(cur_value.buf_addr, cur_value.len_used);
 		else if (yed_is_integer(cur_value, &value_ll))
@@ -255,6 +257,13 @@ int yed_encode_tree(const ydb_buffer_t *varname, int subs_used, const ydb_buffer
 		return ERR_MAXNRSUBSCRIPTS;
 	}
 	status = ydb_node_next_s(varname, cur_subs_used, cur_subsarray, &next_subs_used, next_subsarray);
+	if (YDB_OK != status && YDB_ERR_NODEEND != status)
+	{
+		system_free(curpool);
+		system_free(nextpool);
+		system_free(valuepool);
+		return status;
+	}
 	while (0 != next_subs_used)
 	{
 		assert(YDB_OK == status);
@@ -277,10 +286,24 @@ int yed_encode_tree(const ydb_buffer_t *varname, int subs_used, const ydb_buffer
 			return YDB_OK;
 		}
 		assert(next_subs_used > subs_used);
-		ydb_data_s(varname, next_subs_used, next_subsarray, &data_value);
+		status = ydb_data_s(varname, next_subs_used, next_subsarray, &data_value);
+		if (YDB_OK != status)
+		{
+			system_free(curpool);
+			system_free(nextpool);
+			system_free(valuepool);
+			return status;
+		}
 		if (!yed_is_direct_child_of(subs_used, subsarray, next_subs_used, next_subsarray))
 		{	/* The next node is not a direct child of this one. The nodes in between should be represented as objects */
-			ydb_data_s(varname, subs_used + 1, next_subsarray, &data_value);
+			status = ydb_data_s(varname, subs_used + 1, next_subsarray, &data_value);
+			if (YDB_OK != status)
+			{
+				system_free(curpool);
+				system_free(nextpool);
+				system_free(valuepool);
+				return status;
+			}
 			val = yed_new_object();
 			next_subsarray[subs_used].buf_addr[next_subsarray[subs_used].len_used] = '\0';
 			return_code = yed_set_object(cur, next_subsarray[subs_used].buf_addr, val);
@@ -357,7 +380,14 @@ int yed_encode_tree(const ydb_buffer_t *varname, int subs_used, const ydb_buffer
 		}
 		else
 		{	/* No subtree. Represent as an int, real, string or boolean value. */
-			ydb_get_s(varname, next_subs_used, next_subsarray, &cur_value);
+			status = ydb_get_s(varname, next_subs_used, next_subsarray, &cur_value);
+			if (YDB_OK != status)
+			{
+				system_free(curpool);
+				system_free(nextpool);
+				system_free(valuepool);
+				return status;
+			}
 			if (0 == cur_value.len_used)
 				val = yed_new_string(cur_value.buf_addr, cur_value.len_used);
 			else if (yed_is_integer(cur_value, &value_ll))
@@ -432,6 +462,13 @@ int yed_encode_tree(const ydb_buffer_t *varname, int subs_used, const ydb_buffer
 		}
 		next_subs_used = YDB_MAX_SUBS;
 		status = ydb_node_next_s(varname, cur_subs_used, cur_subsarray, &next_subs_used, next_subsarray);
+		if (YDB_OK != status && YDB_ERR_NODEEND != status)
+		{
+			system_free(curpool);
+			system_free(nextpool);
+			system_free(valuepool);
+			return status;
+		}
 	}
 	if (NULL != ret_subs_used)
 	{	/* If this isn't the top level call to this function, update the return subsarray for the calling function */

@@ -24,7 +24,7 @@ GBLREF	boolean_t	caller_func_is_stapi;
  * Parms and return - same as ydb_decode_s() except for the addition of tptoken and errstr.
  */
 int ydb_decode_st(uint64_t tptoken, ydb_buffer_t *errstr, const ydb_buffer_t *varname, int subs_used,
-				const ydb_buffer_t *subsarray, int max_subs, const char *format, const char *value)
+				const ydb_buffer_t *subsarray, const char *format, const char *value)
 {
 	libyottadb_routines	save_active_stapi_rtn;
 	ydb_buffer_t		*save_errstr;
@@ -39,7 +39,7 @@ int ydb_decode_st(uint64_t tptoken, ydb_buffer_t *errstr, const ydb_buffer_t *va
 	if (YDB_OK == retval)
 	{
 		caller_func_is_stapi = TRUE;	/* used to inform below SimpleAPI call that caller is SimpleThreadAPI */
-		retval = ydb_decode_s(varname, subs_used, subsarray, max_subs, format, value);
+		retval = ydb_decode_s(varname, subs_used, subsarray, format, value);
 		threaded_api_ydb_engine_unlock(tptoken, errstr, save_active_stapi_rtn, save_errstr, get_lock);
 	}
 	return (int)retval;
