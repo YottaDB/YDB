@@ -174,7 +174,7 @@ if ( $?gtm_version_change == "1" ) then
 
 	# Default linker options for M objects
 	setenv	gt_ld_m_shl_linker	"ld"
-	setenv  gt_ld_m_shl_options     "-shared"
+	setenv  gt_ld_m_shl_options     "-shared -z noexecstack"
 
 	if ( "armv6l" == $mach_type ) then
 		setenv  gt_cc_options_common    "$gt_cc_options_common -marm -march=armv6 "
@@ -325,7 +325,7 @@ if ( $?gtm_version_change == "1" ) then
 	setenv	gt_cc_shl_options	"-c $gt_cc_shl_fpic"
 
 	setenv	gt_ld_shl_linker	"cc"
-	setenv	gt_ld_shl_options	"-shared"
+	setenv	gt_ld_shl_options	"-shared -z noexecstack"
 
 	# If we are trying to force a 32 bit build on a 64 bit x86 machine, then we need to explicitly specify a 32 bit
 	# over-ride option.
