@@ -5263,22 +5263,49 @@ MBSTART {						\
 	(KEY2)->end = end + 1;				\
 } MBEND
 
-#define NEXT_HIDDEN_SUB(KEY, I)				\
-MBSTART {						\
-	int	end;					\
-							\
-	end = gv_currkey->end - 4;			\
-	(KEY)->base[end++] = 2;				\
-	(KEY)->base[end++] = 1 + ((I + 1) / 0xFF);	\
-	(KEY)->base[end++] = 1 + ((I + 1) % 0xFF);	\
-	(KEY)->base[end++] = 0;				\
-	(KEY)->base[end] = 0;				\
+#define NEXT_HIDDEN_SUB(KEY, I)									\
+MBSTART {											\
+	int		end;									\
+	char		ch;									\
+	unsigned char	*ptr;									\
+												\
+	end = KEY->end;										\
+	/* The below asserts are guaranteed because of the initialization done by the		\
+	 * REPLACE_HIDDEN_SUB_TO_LOWEST macro, which is invoked from the APPEND_HIDDEN_SUB	\
+	 * macro that is called by all callers before any NEXT_HIDDEN_SUB macro invocation.	\
+	 */											\
+	assert(2 == (KEY)->base[end - 4]);							\
+	assert((1 + (I / 0xFF)) == (KEY)->base[end - 3]);					\
+	assert((1 + (I % 0xFF)) == (KEY)->base[end - 2]);					\
+	assert(0 == (KEY)->base[end - 1]);							\
+	assert(0 == (KEY)->base[end]);								\
+	/* The above asserts guarantee that the current key is the 2-byte representation of	\
+	 * `I` base 0xFF. To compute the NEXT hidden sub, we need to compute the 2-byte		\
+	 * representation of `I + 1` base 0xFF. So all that we need to do is increment the 2nd	\
+	 * byte by 1 and if it is 0xFF we need to set it to 1 and increment the 1st byte by 1.	\
+	 */											\
+	ptr = KEY->base + end - 2;								\
+	ch = *ptr;										\
+	ch++;											\
+	if ('\0' != ch)										\
+		*ptr = ch;									\
+	else											\
+	{											\
+		*ptr = 1;									\
+		ptr--;										\
+		(*ptr)++;									\
+	}											\
 } MBEND
-#define RESTORE_CURRKEY(KEY, OLDEND)			\
-MBSTART {						\
-	(KEY)->end = OLDEND;				\
-	(KEY)->base[OLDEND - 1] = 0;			\
-	(KEY)->base[OLDEND] = 0;			\
+#define RESTORE_CURRKEY(KEY, OLDEND)								\
+MBSTART {											\
+	(KEY)->end = OLDEND;									\
+	/* The below assert is guaranteed because all callers invoke either the			\
+	 * APPEND_HIDDEN_SUB or the GVKEY_INCREMENT_QUERY macro before invoking this macro	\
+	 * and that appends subscripts and so restoring currkey only removes the appended	\
+	 * subscripts and so the old end should already have the subscript separator 0 byte.	\
+	 */											\
+	assert(0 == (KEY)->base[OLDEND - 1]);							\
+	(KEY)->base[OLDEND] = 0;								\
 } MBEND
 #define COMPUTE_CHUNK_SIZE(KEY, BLKSZ, RESERVED)					\
 	(BLKSZ - RESERVED - ((KEY)->end + 1) - SIZEOF(blk_hdr) - SIZEOF(rec_hdr))

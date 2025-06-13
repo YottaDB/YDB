@@ -64,9 +64,9 @@ enum cdb_sc gvcst_dataget(mint *dollar_data, mval *val)
 	boolean_t	gotit, gotspan, gotpiece, check_rtsib;
 	mint		dollar_data_ctrl, dollar_data_piece, dollar_data_null, dg_info;
 	mval		val_ctrl, val_piece;
-	int		gblsize, i, total_len, oldend, tmp_numsubs;
+	int		gblsize, i, oldend, tmp_numsubs;
 	unsigned short	numsubs;
-	sm_uc_ptr_t	sn_ptr;
+	sm_uc_ptr_t	sn_ptr, sn_ptr_top;
 	enum cdb_sc	status;
 	int		save_dollar_tlevel;
 
@@ -108,7 +108,7 @@ enum cdb_sc gvcst_dataget(mint *dollar_data, mval *val)
 			ENSURE_STP_FREE_SPACE(gblsize + cs_addrs->hdr->blk_size); /* give leeway.. think about more */
 			DBG_MARK_STRINGPOOL_UNUSABLE;
 			sn_ptr = stringpool.free;
-			total_len = 0;
+			sn_ptr_top = sn_ptr + gblsize;
 			val->str.addr = (char *)sn_ptr;
 			assert(0 < numsubs);
 			i = 0;
@@ -127,15 +127,14 @@ enum cdb_sc gvcst_dataget(mint *dollar_data, mval *val)
 				}
 				gotpiece = dollar_data_piece % 10;
 				if (gotpiece)
-				{
 					sn_ptr += val_piece.str.len;
-					total_len += val_piece.str.len;
-				}
-				assert(total_len < (gblsize + cs_addrs->hdr->blk_size));
-				if (!gotpiece || (total_len > gblsize))
+				else
+					break;
+				assert(sn_ptr < (sn_ptr_top + cs_addrs->hdr->blk_size));
+				if (sn_ptr > sn_ptr_top)
 					break;
 			} while (++i < numsubs);
-			if ((total_len != gblsize) || (i != numsubs))
+			if ((sn_ptr != sn_ptr_top) || (i != numsubs))
 			{	/* Fetched value either too small or too big compared to what control subscript says */
 				RESTORE_CURRKEY(gv_currkey, oldend);
 				DBG_MARK_STRINGPOOL_USABLE;

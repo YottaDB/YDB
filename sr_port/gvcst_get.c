@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -70,9 +70,9 @@ boolean_t gvcst_get(mval *v)
 	boolean_t	gotit, gotspan, gotpiece, gotdummy, sn_tpwrapped;
 	boolean_t	est_first_pass;
 	mval		val_ctrl, val_piece;
-	int		gblsize, i, total_len, oldend, tmp_numsubs;
+	int		gblsize, i, oldend, tmp_numsubs;
 	unsigned short	numsubs;
-	sm_uc_ptr_t	sn_ptr;
+	sm_uc_ptr_t	sn_ptr, sn_ptr_top;
 	int		debug_len;
 	int		save_dollar_tlevel;
 	DCL_THREADGBL_ACCESS;
@@ -123,22 +123,21 @@ boolean_t gvcst_get(mval *v)
 			}
 			ENSURE_STP_FREE_SPACE(gblsize + cs_addrs->hdr->blk_size); /* give leeway.. think about more */
 			sn_ptr = stringpool.free;
-			total_len = 0;
+			sn_ptr_top = sn_ptr + gblsize;
 			v->str.addr = (char *)sn_ptr;
 			for (i = 0; i < numsubs; i++)
 			{
 				NEXT_HIDDEN_SUB(gv_currkey, i);
 				gotpiece = gvcst_get2(&val_piece, sn_ptr);
 				if (gotpiece)
-				{
 					sn_ptr += val_piece.str.len;
-					total_len += val_piece.str.len;
-				}
-				assert(total_len < (gblsize + cs_addrs->hdr->blk_size));
-				if (!gotpiece || (total_len > gblsize))
+				else
+					break;
+				assert(sn_ptr < (sn_ptr_top + cs_addrs->hdr->blk_size));
+				if (sn_ptr > sn_ptr_top)
 					break;
 			}
-			if ((total_len != gblsize) || (i != numsubs))
+			if ((sn_ptr != sn_ptr_top) || (i != numsubs))
 				/* Fetched value either too small or too big compared to what control subscript says */
 				t_retry(cdb_sc_spansize);
 		}
