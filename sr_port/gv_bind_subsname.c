@@ -3,6 +3,9 @@
  * Copyright (c) 2013-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2025 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -27,6 +30,8 @@
 #include "gtmimagename.h"
 #include "io.h"
 #include "gvt_inline.h"
+#include "repl_msg.h"	/* for "gtmsource.h" */
+#include "gtmsource.h"	/* for CHANGE_REG_IF_NEEDED macro invoked inside GV_BIND_SUBSREG macro */
 
 GBLREF gd_region	*gv_cur_region;
 GBLREF gv_key		*gv_currkey;

@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2025 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -29,7 +32,6 @@
 #include "error.h"
 #include "io.h"
 #include "gvcst_protos.h"
-#include "change_reg.h"
 #include "op.h"
 #include "op_tcommit.h"
 #include "tp_frame.h"
@@ -38,6 +40,8 @@
 #include "stack_frame.h"
 #include "gtmimagename.h"
 #include "gvt_inline.h"
+#include "repl_msg.h"	/* for "gtmsource.h" */
+#include "gtmsource.h"	/* for CHANGE_REG_IF_NEEDED macro */
 
 LITREF	mval		literal_batch;
 
@@ -134,8 +138,7 @@ mint	gvcst_spr_data(void)
 	if (gv_target != start_map_gvt)
 	{	/* Restore gv_cur_region/gv_target etc. */
 		gv_target = start_map_gvt;
-		gv_cur_region = start_map->reg.addr;
-		change_reg();
+		CHANGE_REG_IF_NEEDED(start_map->reg.addr);
 	}
 	DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC(CHECK_CSA_TRUE);
 	if (spr_tpwrapped)

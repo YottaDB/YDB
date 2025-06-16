@@ -1627,8 +1627,7 @@ boolean_t trigger_update_rec(mval *trigger_rec, boolean_t noprompt, uint4 *trig_
 		gvt = GET_REAL_GVT(gvspan->gvt_array[reg_index - min_reg_index]);
 		assert(NULL != gvt);
 		gv_target = gvt;
-		gv_cur_region = gd_header->regions + reg_index;
-		change_reg();
+		CHANGE_REG_IF_NEEDED(gd_header->regions + reg_index);
 		SET_DISP_TRIGVN(gv_cur_region, disp_trigvn, disp_trigvn_len, trigvn, trigvn_len);
 		/* Save values[] and value_len[] arrays since they might be overwritten inside "trigupdrec_reg"
 		 * but we need the unmodified values for each call to that function.
@@ -1692,8 +1691,7 @@ boolean_t trigger_update_rec(mval *trigger_rec, boolean_t noprompt, uint4 *trig_
 				continue;
 			}
 			gv_target = gvt;
-			gv_cur_region = gd_header->regions + reg_index;
-			change_reg();
+			CHANGE_REG_IF_NEEDED(gd_header->regions + reg_index);
 			SET_DISP_TRIGVN(gv_cur_region, disp_trigvn, disp_trigvn_len, trigvn, trigvn_len);
 			/* Restore values[] and value_len[] before next call to "trigupdrec_reg" */
 			assert(SIZEOF(value_len) == SIZEOF(save_value_len));

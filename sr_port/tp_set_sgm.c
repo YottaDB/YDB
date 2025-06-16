@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2025 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -55,8 +58,6 @@ void tp_set_sgm(void)
 	assert(csa == &FILE_INFO(gv_cur_region)->s_addrs);
 	si = csa->sgm_info_ptr;
 	assert(NULL != si);
-	if (NULL == si)
-		return;		/* not expected but be safe */
 	assert(si->tp_csa == csa);
 	assert(si->tp_csd == cs_data);
 	assert(csa->hdr == cs_data);

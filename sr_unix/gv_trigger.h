@@ -3,7 +3,7 @@
  * Copyright (c) 2010-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -494,6 +494,9 @@ typedef struct gvtr_invoke_parms_struct
 	GVCST_ROOT_SEARCH;												\
 }
 
+#include "repl_msg.h"	/* for "gtmsource.h" */
+#include "gtmsource.h"	/* for CHANGE_REG_IF_NEEDED macro */
+
 /* Caller has to check for "NULL" value of "cs_addrs" and act accordingly */
 #define	GVTR_SWITCH_REG_AND_HASHT_BIND_NAME(reg)							\
 {													\
@@ -504,8 +507,7 @@ typedef struct gvtr_invoke_parms_struct
 	assert(!IS_STATSDB_REGNAME(reg));	/* caller should have ensured this */			\
 	if (!reg->open)											\
 		gv_init_reg(reg);									\
-	gv_cur_region = reg;										\
-	change_reg(); /* TP_CHANGE_REG wont work as we need to set sgm_info_ptr */			\
+	CHANGE_REG_IF_NEEDED(reg);									\
 	if (NULL != cs_addrs)										\
 	{												\
 		SET_GVTARGET_TO_HASHT_GBL(cs_addrs);	/* sets up gv_target */				\

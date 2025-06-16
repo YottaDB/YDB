@@ -34,6 +34,7 @@
 #include "gtm_reservedDB.h"
 #include "proc_wait_stat.h"
 #include "region_freeze_multiproc.h"
+#include "tp_set_sgm.h"
 
 #define CACHE_STATE_OFF SIZEOF(que_ent)
 
@@ -990,41 +991,48 @@ MBSTART {													\
  * TP_CHANGE_REG_IF_NEEDED macro, it can be used only if the region passed is not
  * NULL, is open and if gv_cur_region, cs_addrs and cs_data are known to be in sync.
  */
-#define	CHANGE_REG_IF_NEEDED(reg)										\
-MBSTART {													\
-	GBLREF	sgmnt_data_ptr_t	cs_data;								\
-	GBLREF	sgmnt_addrs		*cs_addrs;								\
-	GBLREF	jnlpool_addrs_ptr_t	jnlpool;								\
-	GBLREF	uint4			dollar_tlevel;								\
-	GBLREF	sgm_info		*sgm_info_ptr;								\
-														\
-	assert(NULL != reg);											\
-	assert(reg->open);											\
-	if (reg != gv_cur_region)										\
-	{													\
-		gv_cur_region = reg;										\
-		if (IS_REG_BG_OR_MM(reg))									\
-		{												\
-			assert(reg->open);									\
-			cs_addrs = &FILE_INFO(reg)->s_addrs;							\
-			cs_data = cs_addrs->hdr;								\
-			assert((&FILE_INFO(reg)->s_addrs == cs_addrs) && cs_addrs->hdr == cs_data);		\
-		} else												\
-		{												\
-			assert(REG_ACC_METH(reg) == dba_cm);							\
-			cs_addrs = NULL;									\
-			cs_data = NULL;										\
-		}												\
-	} else													\
-	{													\
-		assert((REG_ACC_METH(reg) != dba_cm) || (NULL == cs_addrs));					\
-		assert((REG_ACC_METH(reg) == dba_cm) || (cs_addrs == &FILE_INFO(reg)->s_addrs));		\
-		assert((NULL == cs_addrs) || (cs_data == cs_addrs->hdr));					\
-	}													\
-	if (dollar_tlevel && (NULL != cs_addrs))								\
-		tp_set_sgm();											\
-	if ((NULL != cs_addrs) && (NULL != cs_addrs->jnlpool))							\
-		jnlpool = cs_addrs->jnlpool;									\
+#define	CHANGE_REG_IF_NEEDED(REG)									\
+MBSTART {												\
+	GBLREF	sgmnt_data_ptr_t	cs_data;							\
+	GBLREF	sgmnt_addrs		*cs_addrs;							\
+	GBLREF	jnlpool_addrs_ptr_t	jnlpool;							\
+	GBLREF	uint4			dollar_tlevel;							\
+	GBLREF	struct sgm_info_struct	*sgm_info_ptr;							\
+													\
+	/* Copy REG into a local variable in case it is a complex expression.				\
+	 * Don't want to recompute that expression multiple times inside this macro.			\
+	 */												\
+	gd_region	*lclReg;									\
+													\
+	lclReg = REG;											\
+	assert(NULL != lclReg);										\
+	assert(lclReg->open);										\
+	if (lclReg != gv_cur_region)									\
+	{												\
+		gv_cur_region = lclReg;									\
+		if (IS_REG_BG_OR_MM(lclReg))								\
+		{											\
+			assert(lclReg->open);								\
+			cs_addrs = &FILE_INFO(lclReg)->s_addrs;						\
+			cs_data = cs_addrs->hdr;							\
+			assert((&FILE_INFO(lclReg)->s_addrs == cs_addrs)				\
+				&& cs_addrs->hdr == cs_data);						\
+		} else											\
+		{											\
+			assert(REG_ACC_METH(lclReg) == dba_cm);						\
+			cs_addrs = NULL;								\
+			cs_data = NULL;									\
+		}											\
+	} else												\
+	{												\
+		assert((REG_ACC_METH(lclReg) != dba_cm) || (NULL == cs_addrs));				\
+		assert((REG_ACC_METH(lclReg) == dba_cm) || (cs_addrs == &FILE_INFO(lclReg)->s_addrs));	\
+		assert((NULL == cs_addrs) || (cs_data == cs_addrs->hdr));				\
+	}												\
+	if (dollar_tlevel && (NULL != cs_addrs))							\
+		tp_set_sgm();										\
+	if ((NULL != cs_addrs) && (NULL != cs_addrs->jnlpool))						\
+		jnlpool = cs_addrs->jnlpool;								\
 } MBEND
 
 #define PUSH_GV_CUR_REGION(REG, SAV_REG, SAV_CS_ADDRS, SAV_CS_DATA, SAV_JNLPOOL)		\
@@ -4962,10 +4970,10 @@ MBSTART {										\
 	}										\
 	gv_target = gvt;								\
 	/* Even though gv_cur_region might already be equal to "REG", need to invoke	\
-	 * "change_reg" in order to do the "tp_set_sgm" in case of TP.			\
+	 * "change_reg" in order to do the "tp_set_sgm" in case of TP. The below macro	\
+	 * does exactly that for us.							\
 	 */										\
-	gv_cur_region = REG;								\
-	change_reg();									\
+	CHANGE_REG_IF_NEEDED(REG);							\
 	DEBUG_ONLY(acc_meth = REG_ACC_METH(gv_cur_region);)				\
 	assert(IS_ACC_METH_BG_OR_MM(acc_meth));						\
 	GVCST_ROOT_SEARCH;								\

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -40,6 +40,8 @@
 #include "targ_alloc.h"
 #include "gtmimagename.h"
 #include "gvt_inline.h"
+#include "repl_msg.h"	/* for "gtmsource.h" */
+#include "gtmsource.h"	/* for CHANGE_REG_IF_NEEDED macro */
 
 LITREF	mval		literal_batch;
 
@@ -180,8 +182,7 @@ boolean_t	gvcst_spr_queryget(mval *result_val)
 	if (currkey_saved || (gv_target != start_map_gvt))
 	{	/* Restore gv_cur_region/gv_target etc. */
 		gv_target = start_map_gvt;
-		gv_cur_region = start_map->reg.addr;
-		change_reg();
+		CHANGE_REG_IF_NEEDED(start_map->reg.addr);
 	}
 	assert(gv_cur_region == start_map->reg.addr);
 	DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC(CHECK_CSA_TRUE);

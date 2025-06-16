@@ -171,8 +171,7 @@ void op_gvorder(mval *v)
 				if (!reg->open)
 					gv_init_reg(reg);
 				/* Entries in directory tree of region could have empty GVT in which case move on to next entry */
-				gv_cur_region = map->reg.addr;
-				change_reg();
+				CHANGE_REG_IF_NEEDED(map->reg.addr);
 				acc_meth = REG_ACC_METH(gv_cur_region);
 				for ( ; ; )
 				{
@@ -317,7 +316,6 @@ void op_gvorder(mval *v)
 				GVKEY_DECREMENT_ORDER(gv_currkey); /* back off 1 spot from map */
 			}
 		}
-		change_reg();
 		v->mvtype = 0; /* so stp_gcol (if invoked below) can free up space currently occupied by (BYPASSOK)
 				* this to-be-overwritten mval */
 		if (found)

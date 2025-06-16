@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -26,6 +26,8 @@
 #include "error.h"
 #include "change_reg.h"
 #include "min_max.h"
+#include "repl_msg.h"	/* for "gtmsource.h" */
+#include "gtmsource.h"	/* for CHANGE_REG_IF_NEEDED macro */
 
 GBLREF gd_addr		*gd_header;
 GBLREF gd_region	*gv_cur_region;
@@ -94,8 +96,7 @@ boolean_t region_init(bool cm_regions)
 			}
 		}
 	}
-	gv_cur_region = first_nonstatsdb_reg;
-	change_reg();
+	CHANGE_REG_IF_NEEDED(first_nonstatsdb_reg);
 	return all_files_open;
 }
 

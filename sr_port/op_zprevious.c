@@ -177,8 +177,7 @@ void op_zprevious(mval *v)
 				if (!reg->open)
 					gv_init_reg(reg);
 				/* Entries in directory tree could have empty GVT in which case move on to previous entry */
-				gv_cur_region = map->reg.addr;
-				change_reg();
+				CHANGE_REG_IF_NEEDED(map->reg.addr);
 				acc_meth = REG_ACC_METH(gv_cur_region);
 				for ( ; ; )
 				{
@@ -294,7 +293,6 @@ void op_zprevious(mval *v)
 				}
 			}
 		}
-		change_reg();
 		v->mvtype = 0; /* so stp_gcol (if invoked below) can free up space currently occupied (BYPASSOK)
 				* by this to-be-overwritten mval */
 		if (found)

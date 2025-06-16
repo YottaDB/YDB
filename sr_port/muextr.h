@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.      *
+ * Copyright (c) 2020-2025 YottaDB LLC and/or its subsidiaries.      *
  * All rights reserved.                                         *
  *								*
  *	This source code contains the intellectual property	*
@@ -53,14 +53,16 @@ typedef	struct glist_struct
 		&GBLSTAT.recknt, GBLSTAT.keylen, GBLSTAT.datalen, GBLSTAT.reclen);			\
 }
 
+#include "repl_msg.h"	/* for "gtmsource.h" */
+#include "gtmsource.h"	/* for CHANGE_REG_IF_NEEDED macro */
+
 #define	DO_OP_GVNAME(GL_PTR)								\
 {											\
 	GBLREF	gv_namehead		*gv_target;					\
 	GBLREF	gd_region		*gv_cur_region;					\
 											\
 	gv_target = GL_PTR->gvt;							\
-	gv_cur_region = GL_PTR->reg;							\
-	change_reg();									\
+	CHANGE_REG_IF_NEEDED(GL_PTR->reg);						\
 	assert((NULL != gv_target) && (DIR_ROOT != gv_target->root));			\
 	SET_GV_CURRKEY_FROM_GVT(gv_target);	/* needed by gvcst_root_search */	\
 	GVCST_ROOT_SEARCH;								\

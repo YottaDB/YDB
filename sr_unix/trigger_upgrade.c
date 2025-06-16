@@ -3,7 +3,7 @@
  * Copyright (c) 2014-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -223,7 +223,7 @@ void	trigger_upgrade(gd_region *reg)
 	ESTABLISH_NORET(trigger_upgrade_ch, est_first_pass);
 	/* On a TP restart anywhere down below, this line is where the restart resumes execution from */
 	assert(donot_INVOKE_MUMTSTART);	/* Make sure still set for every try/retry of TP transaction */
-	change_reg(); /* TP_CHANGE_REG wont work as we need to set sgm_info_ptr */
+	CHANGE_REG_IF_NEEDED(reg); /* TP_CHANGE_REG wont work as we need to set sgm_info_ptr */
 	assert(NULL != cs_addrs);
 	assert(csa == cs_addrs);
 	SET_GVTARGET_TO_HASHT_GBL(csa);	/* sets up gv_target */
