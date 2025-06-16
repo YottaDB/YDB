@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -42,6 +42,8 @@
 #include "gvnh_spanreg.h"
 #include "gv_trigger_common.h"	/* for *HASHT* macros used inside GVNH_REG_INIT macro */
 #include "io.h"
+#include "repl_msg.h"	/* for "gtmsource.h" */
+#include "gtmsource.h"	/* for CHANGE_REG_IF_NEEDED macro */
 
 GBLREF gv_namehead	*gv_target;
 GBLREF gv_key		*gv_currkey;
@@ -135,13 +137,12 @@ gvnh_reg_t *gv_bind_name(gd_addr *addr, mname_entry *gvname)
 	gv_currkey->end = keylen;
 	gv_currkey->prev = 0;
 	if (NULL == gvnh_reg->gvspan)
-	{	/* Global does not span multiple regions. In that case, open the only region that this global maps to right here.
-		 * In case of spanning globals, the subscripted reference will be used to find the mapping region (potentially
-		 * different from "reg" computed here. And that is the region to do a "change_reg" on. Will be done later
-		 * in "gv_bind_subsname".
+	{	/* Global does not span multiple regions. In that case, open the only region that this global maps to right here
+		 * by the CHANGE_REG_IF_NEEDED() macro call below. In case of spanning globals, the subscripted reference will be
+		 * used to find the mapping region (potentially different from "reg" computed here. And that is the region to do
+		 * a "change_reg()" on. Will be done later in "gv_bind_subsname()".
 		 */
-		gv_cur_region = reg;
-		change_reg();
+		CHANGE_REG_IF_NEEDED(reg);
 	}
 	return gvnh_reg;
 }

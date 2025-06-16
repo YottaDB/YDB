@@ -930,6 +930,8 @@ MBSTART {													\
  */
 #define	TP_CHANGE_REG(reg)							\
 MBSTART {									\
+	GBLREF	sgmnt_data_ptr_t	cs_data;				\
+	GBLREF	sgmnt_addrs		*cs_addrs;				\
 	GBLREF	jnlpool_addrs_ptr_t	jnlpool;				\
 										\
 	gv_cur_region = reg;							\
@@ -941,7 +943,7 @@ MBSTART {									\
 	{									\
 		cs_addrs = &FILE_INFO(gv_cur_region)->s_addrs;			\
 		cs_data = cs_addrs->hdr;					\
-		if (cs_addrs->jnlpool && (jnlpool != cs_addrs->jnlpool))	\
+		if (NULL != cs_addrs->jnlpool)					\
 			jnlpool = cs_addrs->jnlpool;				\
 	} else									\
 	{									\
@@ -951,30 +953,78 @@ MBSTART {									\
 	}									\
 } MBEND
 
-#define	TP_CHANGE_REG_IF_NEEDED(reg)							\
-MBSTART {										\
-	GBLREF	jnlpool_addrs_ptr_t	jnlpool;					\
-											\
-	assert(NULL != reg);								\
-	if (reg != gv_cur_region)							\
-	{										\
-		gv_cur_region = reg;							\
-		if (IS_REG_BG_OR_MM(reg))						\
-		{									\
-			assert(reg->open);						\
-			cs_addrs = &FILE_INFO(reg)->s_addrs;				\
-			cs_data = cs_addrs->hdr;					\
-			assert((&FILE_INFO(reg)->s_addrs == cs_addrs)			\
-				&& cs_addrs->hdr == cs_data);				\
-			if (cs_addrs->jnlpool && (jnlpool != cs_addrs->jnlpool))	\
-				jnlpool = cs_addrs->jnlpool;				\
-		} else									\
-		{									\
-			assert(REG_ACC_METH(reg) == dba_cm);				\
-			cs_addrs = (sgmnt_addrs *)0;					\
-			cs_data = (sgmnt_data_ptr_t)0;					\
-		}									\
-	}										\
+#define	TP_CHANGE_REG_IF_NEEDED(reg)										\
+MBSTART {													\
+	GBLREF	sgmnt_data_ptr_t	cs_data;								\
+	GBLREF	sgmnt_addrs		*cs_addrs;								\
+	GBLREF	jnlpool_addrs_ptr_t	jnlpool;								\
+														\
+	assert(NULL != reg);											\
+	if (reg != gv_cur_region)										\
+	{													\
+		gv_cur_region = reg;										\
+		if (IS_REG_BG_OR_MM(reg))									\
+		{												\
+			assert(reg->open);									\
+			cs_addrs = &FILE_INFO(reg)->s_addrs;							\
+			cs_data = cs_addrs->hdr;								\
+			assert((&FILE_INFO(reg)->s_addrs == cs_addrs) && cs_addrs->hdr == cs_data);		\
+			if (NULL != cs_addrs->jnlpool)								\
+				jnlpool = cs_addrs->jnlpool;							\
+		} else												\
+		{												\
+			assert(REG_ACC_METH(reg) == dba_cm);							\
+			cs_addrs = (sgmnt_addrs *)0;								\
+			cs_data = (sgmnt_data_ptr_t)0;								\
+		}												\
+	} else													\
+	{													\
+		assert((REG_ACC_METH(reg) != dba_cm) || (NULL == cs_addrs));					\
+		assert((REG_ACC_METH(reg) == dba_cm) || (cs_addrs == &FILE_INFO(reg)->s_addrs));		\
+		assert((NULL == cs_addrs) || (cs_data == cs_addrs->hdr));					\
+	}													\
+} MBEND
+
+/* This is a faster version of "change_reg()" that skips a lot of the setup if the input
+ * region "reg" is the same as the current region "gv_cur_region". Similar to the
+ * TP_CHANGE_REG_IF_NEEDED macro, it can be used only if the region passed is not
+ * NULL, is open and if gv_cur_region, cs_addrs and cs_data are known to be in sync.
+ */
+#define	CHANGE_REG_IF_NEEDED(reg)										\
+MBSTART {													\
+	GBLREF	sgmnt_data_ptr_t	cs_data;								\
+	GBLREF	sgmnt_addrs		*cs_addrs;								\
+	GBLREF	jnlpool_addrs_ptr_t	jnlpool;								\
+	GBLREF	uint4			dollar_tlevel;								\
+	GBLREF	sgm_info		*sgm_info_ptr;								\
+														\
+	assert(NULL != reg);											\
+	assert(reg->open);											\
+	if (reg != gv_cur_region)										\
+	{													\
+		gv_cur_region = reg;										\
+		if (IS_REG_BG_OR_MM(reg))									\
+		{												\
+			assert(reg->open);									\
+			cs_addrs = &FILE_INFO(reg)->s_addrs;							\
+			cs_data = cs_addrs->hdr;								\
+			assert((&FILE_INFO(reg)->s_addrs == cs_addrs) && cs_addrs->hdr == cs_data);		\
+		} else												\
+		{												\
+			assert(REG_ACC_METH(reg) == dba_cm);							\
+			cs_addrs = NULL;									\
+			cs_data = NULL;										\
+		}												\
+	} else													\
+	{													\
+		assert((REG_ACC_METH(reg) != dba_cm) || (NULL == cs_addrs));					\
+		assert((REG_ACC_METH(reg) == dba_cm) || (cs_addrs == &FILE_INFO(reg)->s_addrs));		\
+		assert((NULL == cs_addrs) || (cs_data == cs_addrs->hdr));					\
+	}													\
+	if (dollar_tlevel && (NULL != cs_addrs))								\
+		tp_set_sgm();											\
+	if ((NULL != cs_addrs) && (NULL != cs_addrs->jnlpool))							\
+		jnlpool = cs_addrs->jnlpool;									\
 } MBEND
 
 #define PUSH_GV_CUR_REGION(REG, SAV_REG, SAV_CS_ADDRS, SAV_CS_DATA, SAV_JNLPOOL)		\
