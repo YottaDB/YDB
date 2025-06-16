@@ -31,7 +31,7 @@ GBLREF sgmnt_addrs      	*cs_addrs;
 GBLREF uint4			dollar_tlevel;
 GBLREF jnlpool_addrs_ptr_t	jnlpool;
 
-void change_reg(void)
+inline void change_reg(void)
 {
 	if ((NULL == gv_cur_region) || (FALSE == gv_cur_region->open))
 	{
