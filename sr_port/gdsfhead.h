@@ -2652,7 +2652,10 @@ typedef struct	gd_segment_struct
 	boolean_t		defer_allocate; /* If FALSE: Use fallocate() preallocate space from the disk */
 	enum db_acc_method	acc_meth;
 	file_control		*file_cntl;
-	struct gd_region_struct	*repl_list;
+	struct gd_region_struct	*repl_list;	/* Always set to NULL; Usages have been removed in YottaDB code.
+						 * But this field is still kept in fact in YottaDB to keep .gld format
+						 * (relies on "gd_segment" structure layout) same between GT.M and YottaDB.
+						 */
 	uint4			is_encrypted;
 	boolean_t		asyncio;	/* copied over to csd->asyncio at db creation time */
 	boolean_t		read_only;

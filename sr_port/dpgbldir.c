@@ -367,6 +367,7 @@ gd_addr *gd_load(mstr *v, boolean_t force_load)
 			assert(FALSE);
 			break;
 		}
+		assert(NULL == reg->dyn.addr->repl_list);	/* or else a INPINTEG error would have been issued in gdeget.m */
 		/* The below assert is relied upon by the IS_ACC_METH_BG_OR_MM(ACC_METH) macro */
 		assert((0 == dba_rms) && (1 == dba_bg) && (2 == dba_mm) && (3 == dba_cm) && (5 == n_dba));
 #		endif

@@ -81,25 +81,6 @@ void op_gvzwithdraw(void)
 		assert(REG_ACC_METH(gv_cur_region) == dba_cm);
 		gvcmx_kill(FALSE);
 	}
-	if (gv_cur_region->dyn.addr->repl_list)
-	{
-		gv_replication_error = gv_replopen_error;
-		gv_replopen_error = FALSE;
-		reg = gv_cur_region;
-		while ((gv_cur_region = gv_cur_region->dyn.addr->repl_list))	/* set replicated segments */
-		{
-			if (gv_cur_region->open)
-			{
-				change_reg();
-				with_var();
-			} else
-				gv_replication_error = TRUE;
-		}
-		gv_cur_region = reg;
-		change_reg();
-		if (gv_replication_error)
-			sgnl_gvreplerr();
-	}
 }
 
 void with_var(void)

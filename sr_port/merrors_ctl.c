@@ -465,7 +465,7 @@ LITDEF	err_msg merrors[] = {
 	{ "TERMWRITE", "Error writing to terminal", 0, 0 },
 	{ "COLLTYPVERSION", "Collation type !UL, version !UL mismatch", 2, 0 },
 	{ "LVNULLSUBS", "Null subscripts not allowed in local variables", 0, 0 },
-	{ "GVREPLERR", "Error replicating global in region !AD", 2, 0 },
+	{ "UNUSEDMSG632", "GVREPLERR nixed in r2.04 because it can never occur", 0, 0 },
 	{ "DBFILERDONLY", "The database file !AD was opened as read-only (perms !UL)", 3, 0 },
 	{ "RMWIDTHPOS", "File record size or width must be greater than zero", 0, 0 },
 	{ "OFFSETINV", "Entry point !AD+!SL not valid", 3, 0 },

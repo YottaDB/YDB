@@ -69,7 +69,7 @@ void op_gvput(mval *var)
 	else
 		assert(gv_currkey->end + 1 <= gv_cur_region->max_key_size);
 	MV_FORCE_STR(var);
-	if (var->str.len <= gv_cur_region->max_rec_size || is_trigger)
+	if ((var->str.len <= gv_cur_region->max_rec_size) || is_trigger)
 	{
 		if (IS_REG_BG_OR_MM(gv_cur_region))
 			gvcst_put(var);
@@ -78,29 +78,7 @@ void op_gvput(mval *var)
 			assert(REG_ACC_METH(gv_cur_region) == dba_cm);
 			gvcmx_put(var);
 		}
-		if (NULL == gv_cur_region->dyn.addr->repl_list)
-			return;
-		gv_replication_error = gv_replopen_error;
-		gv_replopen_error = FALSE;
-		save_reg = gv_cur_region;
-		while ((gv_cur_region = gv_cur_region->dyn.addr->repl_list)) /* set replicated segments */
-		{
-			if (gv_cur_region->open && !gv_cur_region->read_only
-				&& (((temp = gv_currkey->end + 1) <= gv_cur_region->max_key_size)
-					|| (is_trigger && (gv_currkey->end + 1 <= MAX_KEY_SZ - 4)))
-				&& ((temp + var->str.len + SIZEOF(rec_hdr) <= gv_cur_region->max_rec_size) || is_trigger))
-			{
-				change_reg();
-				put_var(var);
-			} else
-				gv_replication_error = TRUE;
-		}
-		gv_cur_region = save_reg;
-		change_reg();
-		if (gv_replication_error)
-			sgnl_gvreplerr();
-		else
-			return;
+		return;
 	} else
 	{
 		if (0 == (end = format_targ_key(buff, MAX_ZWR_KEY_SZ, gv_currkey, TRUE)))

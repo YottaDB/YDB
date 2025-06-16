@@ -463,7 +463,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* TERMWRITE */
 	   0,	/* COLLTYPVERSION */
 	   0,	/* LVNULLSUBS */
-	   0,	/* GVREPLERR */
+	   0,	/* UNUSEDMSG632 */
 	   0,	/* DBFILERDONLY */
 	  72,	/* RMWIDTHPOS */
 	  13,	/* OFFSETINV */
