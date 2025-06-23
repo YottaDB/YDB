@@ -23,9 +23,6 @@
 #include "gtm_unistd.h"
 #include "gtm_stdio.h"
 #include "gtm_stat.h"
-#ifdef DEBUG
-#include "gtm_stdlib.h"
-#endif
 
 #include "compiler.h"
 #include "urx.h"
@@ -109,9 +106,6 @@ GBLREF uint4		ydbDebugLevel;
 GBLREF boolean_t	gtm_utf8_mode;
 #ifdef DEBUG_ARLINK
 GBLREF mval		dollar_zsource;
-#endif
-#ifdef DEBUG
-GBLREF uint4		process_id;
 #endif
 
 #ifdef __MVS__
@@ -432,27 +426,6 @@ boolean_t incr_link(int *file_desc, zro_ent *zro_entry, uint4 fname_len, char *f
 			}
 		}
 		zl_error_hskpng(linktyp, file_desc, RECENT_ZHIST);
-#		ifdef DEBUG
-		/* We have seen INVOBJFILE errors show up very rarely (once in hundreds of test runs) due to a CHSET mismatch
-		 * with no clue as to the cause. Therefore, we assert fail in those cases in Debug builds if this is a
-		 * process created under the test system ("gtm_tst" env var is set) AND this is not a subtest that expects
-		 * such error ("unicode/recompile" is the only known subtest). We also note down the ps output at that time.
-		 * This is hoped to give us enough information to help find the cause.
-		 */
-		if ((NULL != getenv("gtm_tst"))
-			&& (MEMCMP_LIT(getenv("tst"), "unicode")
-				|| MEMCMP_LIT(getenv("test_subtest_name"), "recompile")))
-		{
-			char	buff[64];
-
-			/* Note down ps output in filename that has pid in it to avoid multiple pids writing to the
-			 * same file and clobbering the output in case multiple processes encounter INVOBJFILE error.
-			 */
-			SNPRINTF(buff, SIZEOF(buff), "ps --forest -ef > psfu_invobjfile_chset_%d.txt", process_id);
-			system(buff);
-			assert(FALSE);
-		}
-#		endif
 		if ((lcl_compiler_qlf & CQ_UTF8) && !gtm_utf8_mode)
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_INVOBJFILE, 2, fname_len, fname, ERR_TEXT, 2,
 				LEN_AND_LIT("Object compiled with CHSET=UTF-8 which is different from $ZCHSET"));
