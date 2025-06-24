@@ -13,13 +13,28 @@
 # See README.md for more information about this Dockerfile
 # Simple build/running directions are below:
 #
+# Before starting:
+#   $ export DOCKER_BUILDKIT=1 # needed for older versions of Docker
+#
 # Build:
 #   $ docker build -t yottadb/yottadb:latest-master .
 #
+# For Debug build:
+#   $ docker build --build-arg CMAKE_BUILD_TYPE=Debug -t yottadb/yottadb-debug:latest-master .
+#
+# For ASAN build:
+#   $ docker build --build-arg CMAKE_BUILD_TYPE=Debug --build-arg ENABLE_ASAN=ON -t yottadb/yottadb-asan:latest-master .
+#
+# For base image used in pipelines:
+#   $ sed '/^ENTRYPOINT/c\ENTRYPOINT []' Dockerfile > Dockerfile-Bare
+#   $ docker build -f Dockerfile-Bare -t yottadb/yottadb-base:latest-master .
+#
 # Use with data persistence:
 #   $ docker run -p 9080-9081:9080-9081 --rm -v `pwd`/ydb-data:/data -ti yottadb/yottadb:latest-master
+#
+# GUI available at port 9080 (9081 supplies statistics)
 
-ARG OS_VSN=22.04
+ARG OS_VSN=24.04
 
 # Stage 1: YottaDB build image
 FROM ubuntu:${OS_VSN} as ydb-release-builder
@@ -104,7 +119,7 @@ RUN --mount=type=bind,from=ydb-release-builder,source=/tmp/yottadb-release,targe
                     file \
                     binutils \
                     libelf-dev \
-                    libicu70 \
+                    libicu74 \
                     wget \
                     netbase \
                     readline-common \
@@ -140,14 +155,14 @@ RUN --mount=type=bind,from=ydb-release-builder,source=/tmp/yottadb-release,targe
                     file \
                     binutils \
                     libelf-dev \
-                    libicu70 \
+                    libicu74 \
                     nano \
                     wget \
                     netbase \
                     libcurl4 \
-		    nodejs \
+                    nodejs \
                     && \
-    if [ "$ENABLE_ASAN" = "ON" ]; then apt-get install -y --no-install-recommends libasan6; fi && \
+    if [ "$ENABLE_ASAN" = "ON" ]; then apt-get install -y --no-install-recommends libasan8; fi && \
     /tmp/ydb-release/ydbinstall --utf8 --installdir /opt/yottadb/current && \
     cp -R /tmp/plugin /opt/yottadb/current/ && \
     apt-get remove -y wget && \
@@ -159,7 +174,11 @@ RUN --mount=type=bind,from=ydb-release-builder,source=/tmp/yottadb-release,targe
 WORKDIR /data
 EXPOSE 9080 9081
 COPY ci/docker-scripts/docker-main-startup.sh /docker-main-startup.sh
+# ydb_icu_version is set explicitly here (in tandem with libicuNN) to prevent the need
+# for downstream repos using this Docker Image to need to set it explicitly
+# This is not done for Rocky Linux as we don't have many downstream users
 ENV gtmdir=/data \
     LC_ALL=C.UTF-8 \
+    ydb_icu_version=74 \
     EDITOR=/usr/bin/nano
 ENTRYPOINT ["/docker-main-startup.sh"]
