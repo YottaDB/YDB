@@ -199,7 +199,11 @@ void	op_trollback(int rb_levels)		/* rb_levels -> # of transaction levels by whi
 						 */
 		/* Now that we are out of TP, reset the debug-only global variable that is relevant only if we are in TP */
 		DEBUG_ONLY(donot_INVOKE_MUMTSTART = FALSE;)
+
+		/* Commit has been rolled back. Reset TP related global variables (just like is done in "op_tcommit.c"). */
 		dollar_trestart = 0;
+		t_tries = 0;
+
 		if (!reg_reset)
 			RESTORE_GV_CUR_REGION;
 		if (!skipped_CALLINTROLLBACK_error)

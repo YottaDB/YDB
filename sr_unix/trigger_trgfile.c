@@ -3,7 +3,7 @@
  * Copyright (c) 2010-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -56,12 +56,14 @@
 	SETUP_THREADGBL_ACCESS;								\
 	if (lcl_implicit_tpwrap)							\
 	{	/* only if we were implicitly wrapped */				\
-		assert(dollar_tlevel);							\
+		assert(1 == dollar_tlevel);						\
 		assert(donot_INVOKE_MUMTSTART);						\
 		DEBUG_ONLY(donot_INVOKE_MUMTSTART = FALSE);				\
 		/* Print $ztrigger/mupip-trigger output before rolling back TP */	\
 		TP_ZTRIGBUFF_PRINT;							\
 		OP_TROLLBACK(-1);	/* Unroll implicit TP */			\
+		assert(0 == t_tries);	/* must have been reset by "op_trollback()" */	\
+		assert(0 == dollar_tlevel); /* must have been reset by op_trollback */	\
 		REVERT;									\
 	}										\
 	return TRIG_FAILURE;								\
@@ -234,6 +236,7 @@ boolean_t trigger_trgfile_tpwrap(char *trigger_filename, uint4 trigger_filename_
 	}
 	if (0 == dollar_tlevel)
 	{	/* If not already wrapped in TP, wrap it now implicitly */
+		assert(0 == t_tries);
 		assert(!donot_INVOKE_MUMTSTART);
 		DEBUG_ONLY(donot_INVOKE_MUMTSTART = TRUE);
 		/* Note down dollar_tlevel before op_tstart. This is needed to determine if we need to break from the for-loop
@@ -256,9 +259,10 @@ boolean_t trigger_trgfile_tpwrap(char *trigger_filename, uint4 trigger_filename_
 			TREF(ztrigbuffLen) = utilbuff_len;	/* reset ztrig buffer at start of each try/retry */
 			TREF(util_outptr) = TREF(util_outbuff_ptr); /* Signal any unflushed text from previous try as gone */
 			trigger_status = trigger_trgfile_tpwrap_helper(trigger_filename, trigger_filename_len, noprompt, TRUE);
-			/* We expect the above function to return with either op_tcommit or a tp_restart invoked.
-			 * In the case of op_tcommit, we expect dollar_tlevel to be 0 and if so we break out of the loop.
-			 * In the tp_restart case, we expect a maximum of 4 tries/retries and much lesser usually.
+			/* We expect the above function to return after a call to either op_tcommit or op_trollback (invoked
+			 * as part of the TRIG_ERROR_RETURN macro) or tp_restart. In case of op_tcommit or op_trollback, we
+			 * expect dollar_tlevel to be 0 and so we break out of the loop. In the tp_restart case, we expect a
+			 * maximum of 4 tries/retries and much less usually.
 			 */
 			if (0 == dollar_tlevel)
 				break;
@@ -290,6 +294,7 @@ boolean_t trigger_trgfile_tpwrap(char *trigger_filename, uint4 trigger_filename_
 			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_TPFAIL, 0, ERR_TRIGLOADFAIL, 2, t_tries, t_fail_hist, ERR_GVFAILCORE);
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TPFAIL, 0, ERR_TRIGLOADFAIL, 2, t_tries, t_fail_hist);
 		}
+		assert(0 == t_tries);
 	} else
 	{
 		trigger_status = trigger_trgfile_tpwrap_helper(trigger_filename, trigger_filename_len, noprompt, FALSE);

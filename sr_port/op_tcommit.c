@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -558,9 +558,11 @@ enum cdb_sc	op_tcommit(void)
 		} else
 			temp_si = NULL;
 		assert(UNIX_ONLY(jgbl.onlnrlbk || TREF(in_trigger_upgrade) || ) (0 == have_crit(CRIT_HAVE_ANY_REG)));
-		/* Commit was successful */
+
+		/* Commit was successful. Reset TP related global variables (just like is done in "op_trollback.c"). */
 		dollar_trestart = 0;
 		t_tries = 0;
+
 		/* the following section is essentially deferred garbage collection, freeing release block a bitmap at a time */
 		if (NULL != first_sgm_info)
 		{
