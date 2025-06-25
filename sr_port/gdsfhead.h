@@ -1029,10 +1029,10 @@ MBSTART {												\
 		assert((REG_ACC_METH(lclReg) == dba_cm) || (cs_addrs == &FILE_INFO(lclReg)->s_addrs));	\
 		assert((NULL == cs_addrs) || (cs_data == cs_addrs->hdr));				\
 	}												\
-	if (dollar_tlevel && (NULL != cs_addrs))							\
-		tp_set_sgm();										\
 	if ((NULL != cs_addrs) && (NULL != cs_addrs->jnlpool))						\
 		jnlpool = cs_addrs->jnlpool;								\
+	if (dollar_tlevel && (NULL != cs_addrs))							\
+		tp_set_sgm();										\
 } MBEND
 
 #define PUSH_GV_CUR_REGION(REG, SAV_REG, SAV_CS_ADDRS, SAV_CS_DATA, SAV_JNLPOOL)		\
