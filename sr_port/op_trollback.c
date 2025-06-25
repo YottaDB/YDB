@@ -174,7 +174,6 @@ void	op_trollback(int rb_levels)		/* rb_levels -> # of transaction levels by whi
 			assert(tp_pointer && tp_pointer->orig_key);
 			assert(tp_pointer >= (tp_frame *)tpstacktop);
 			assert(tp_pointer <= (tp_frame *)tpstackbase);
-			assert(NULL != gv_currkey);
 			gv_orig_key_ptr = tp_pointer->orig_key;
 			assert(NULL != gv_orig_key_ptr);
 			if (NULL != gv_currkey)
