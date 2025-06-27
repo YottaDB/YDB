@@ -3,7 +3,7 @@
  * Copyright (c) 2014-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -67,7 +67,8 @@ boolean_t grab_latch(sm_global_latch_ptr_t latch, int max_timeout_in_secs, wait_
 	}
 	/* Define number of hard-spins the inner loop does */
 	maxspins = num_additional_processors ? MAX_LOCK_SPINS(LOCK_SPINS, num_additional_processors) : 1;
-	UPDATE_CRIT_COUNTER(csa, state);
+	if (NULL != csa)
+		UPDATE_CRIT_COUNTER(csa, state);
 	for (retries = 1; ; retries++)
 	{
 		++fast_lock_count;	/* Disable interrupts (i.e. wcs_stale) for duration to avoid potential deadlocks */

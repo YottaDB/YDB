@@ -1712,10 +1712,14 @@ MBSTART {												\
 #define	INCR_GVSTATS_COUNTER(CSA, CNL, COUNTER, INCREMENT)						\
 MBSTART {												\
 	if (0 == (RDBF_NOSTATS & (CSA)->reservedDBFlags))						\
-	{												\
-		(CSA)->gvstats_rec_p->COUNTER += INCREMENT;		/* private or shared stats */	\
-		(CNL)->gvstats_rec.COUNTER += INCREMENT;		/* database stats */		\
-	}												\
+		INCR_GVSTATS_COUNTER_HELPER(CSA, CNL, COUNTER, INCREMENT);				\
+} MBEND
+
+#define	INCR_GVSTATS_COUNTER_HELPER(CSA, CNL, COUNTER, INCREMENT)					\
+MBSTART {												\
+	assert(0 == (RDBF_NOSTATS & (CSA)->reservedDBFlags));	/* caller should have ensured this */	\
+	(CSA)->gvstats_rec_p->COUNTER += INCREMENT;		/* private or shared stats */		\
+	(CNL)->gvstats_rec.COUNTER += INCREMENT;		/* database stats */			\
 } MBEND
 
 #define	SYNC_RESERVEDDBFLAGS_REG_CSA_CSD(REG, CSA, CSD, CNL)								\

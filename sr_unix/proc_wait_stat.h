@@ -3,7 +3,7 @@
  * Copyright (c) 2019-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2022-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -130,32 +130,34 @@ void wb_gtm8863_lock_pause(void *,wait_state);
 
 #define UPDATE_CRIT_COUNTER(CSADDRS, WAITSTATE)									\
 MBSTART {                                                                                                       \
-	if (CSADDRS && CSADDRS->nl)										\
+	assert(NULL != (CSADDRS));										\
+	assert(NULL != (CSADDRS)->nl);										\
+	if ((0 == (RDBF_NOSTATS & (CSADDRS)->reservedDBFlags)))							\
 	{                                                                                                       \
 		switch(WAITSTATE)                                                                               \
 		{                                                                                               \
 			case WS_2 :                                                                             \
-				INCR_GVSTATS_COUNTER(CSADDRS, (CSADDRS)->nl, n_ws2, 1);				\
-				INCR_GVSTATS_COUNTER(CSADDRS, (CSADDRS)->nl, n_jnl_wait, 1);			\
+				INCR_GVSTATS_COUNTER_HELPER(CSADDRS, (CSADDRS)->nl, n_ws2, 1);			\
+				INCR_GVSTATS_COUNTER_HELPER(CSADDRS, (CSADDRS)->nl, n_jnl_wait, 1);		\
 				break;                                                                          \
 			case WS_12 :                                                                            \
-				INCR_GVSTATS_COUNTER(CSADDRS, (CSADDRS)->nl, n_ws12, 1);			\
-				INCR_GVSTATS_COUNTER(CSADDRS, (CSADDRS)->nl, n_dbext_wait, 1);			\
+				INCR_GVSTATS_COUNTER_HELPER(CSADDRS, (CSADDRS)->nl, n_ws12, 1);			\
+				INCR_GVSTATS_COUNTER_HELPER(CSADDRS, (CSADDRS)->nl, n_dbext_wait, 1);		\
 				break;                                                                          \
 			case WS_15 :                                                                            \
-				INCR_GVSTATS_COUNTER(CSADDRS, (CSADDRS)->nl, n_ws15, 1);			\
-				INCR_GVSTATS_COUNTER(CSADDRS, (CSADDRS)->nl, n_bg_wait, 1);			\
+				INCR_GVSTATS_COUNTER_HELPER(CSADDRS, (CSADDRS)->nl, n_ws15, 1);			\
+				INCR_GVSTATS_COUNTER_HELPER(CSADDRS, (CSADDRS)->nl, n_bg_wait, 1);		\
 				break;                                                                          \
 			case WS_39 :                                                                            \
-				INCR_GVSTATS_COUNTER(CSADDRS, (CSADDRS)->nl, n_ws39, 1);			\
-				INCR_GVSTATS_COUNTER(CSADDRS, (CSADDRS)->nl, n_mlk_wait, 1);			\
+				INCR_GVSTATS_COUNTER_HELPER(CSADDRS, (CSADDRS)->nl, n_ws39, 1);			\
+				INCR_GVSTATS_COUNTER_HELPER(CSADDRS, (CSADDRS)->nl, n_mlk_wait, 1);		\
 				break;                                                                          \
 			case WS_47 :                                                                            \
-				INCR_GVSTATS_COUNTER(CSADDRS, (CSADDRS)->nl, n_ws47, 1);			\
-				INCR_GVSTATS_COUNTER(CSADDRS, (CSADDRS)->nl, n_trans_wait, 1);			\
+				INCR_GVSTATS_COUNTER_HELPER(CSADDRS, (CSADDRS)->nl, n_ws47, 1);			\
+				INCR_GVSTATS_COUNTER_HELPER(CSADDRS, (CSADDRS)->nl, n_trans_wait, 1);		\
 				break;                                                                          \
 			case WS_11 :  /* For aggregate DEXA */                                                  \
-				INCR_GVSTATS_COUNTER(CSADDRS, (CSADDRS)->nl, n_dbext_wait, 1);			\
+				INCR_GVSTATS_COUNTER_HELPER(CSADDRS, (CSADDRS)->nl, n_dbext_wait, 1);		\
 				break;                                                                          \
 			case WS_13 :  /* For aggregate GLB */                                                   \
 			case WS_14 :  /* For aggregate GLB */                                                   \
@@ -171,7 +173,7 @@ MBSTART {                                                                       
 			case WS_25 :  /* For aggregate GLB */                                                   \
 			case WS_26 :  /* For aggregate GLB */                                                   \
 			case WS_27 :  /* For aggregate GLB */                                                   \
-				INCR_GVSTATS_COUNTER(CSADDRS, (CSADDRS)->nl, n_bg_wait, 1);			\
+				INCR_GVSTATS_COUNTER_HELPER(CSADDRS, (CSADDRS)->nl, n_bg_wait, 1);		\
 				break;                                                                          \
 			case WS_3 :  /* For aggregate JNL */                                                    \
 			case WS_4 :  /* For aggregate JNL */                                                    \
@@ -185,15 +187,15 @@ MBSTART {                                                                       
 			case WS_35 :  /* For aggregate JNL */                                                   \
 			case WS_36 :  /* For aggregate JNL */                                                   \
 			case WS_37 :  /* For aggregate JNL */                                                   \
-				INCR_GVSTATS_COUNTER(CSADDRS, (CSADDRS)->nl, n_jnl_wait, 1);			\
+				INCR_GVSTATS_COUNTER_HELPER(CSADDRS, (CSADDRS)->nl, n_jnl_wait, 1);		\
 				break;                                                                          \
 			case WS_5 :  /* For aggregate MLK */                                                    \
 			case WS_38 :  /* For aggregate MLK */                                                   \
-				INCR_GVSTATS_COUNTER(CSADDRS, (CSADDRS)->nl, n_mlk_wait, 1);			\
+				INCR_GVSTATS_COUNTER_HELPER(CSADDRS, (CSADDRS)->nl, n_mlk_wait, 1);		\
 				break;                                                                          \
 			case WS_40 :  /* For aggregate PRC */                                                   \
 			case WS_41 :  /* For aggregate PRC */                                                   \
-				INCR_GVSTATS_COUNTER(CSADDRS, (CSADDRS)->nl, n_proc_wait, 1);			\
+				INCR_GVSTATS_COUNTER_HELPER(CSADDRS, (CSADDRS)->nl, n_proc_wait, 1);		\
 				break;                                                                          \
 			case WS_43 :  /* For aggregate TRX */                                                   \
 			case WS_44 :  /* For aggregate TRX */                                                   \
@@ -206,7 +208,7 @@ MBSTART {                                                                       
 			case WS_52 :  /* For aggregate TRX */                                                   \
 			case WS_53 :  /* For aggregate TRX */                                                   \
 			case WS_54 :  /* For aggregate TRX */                                                   \
-				INCR_GVSTATS_COUNTER(CSADDRS, (CSADDRS)->nl, n_trans_wait, 1);			\
+				INCR_GVSTATS_COUNTER_HELPER(CSADDRS, (CSADDRS)->nl, n_trans_wait, 1);		\
 				break;                                                                          \
 			case WS_1 :  /* For aggregate ZAD */                                                    \
 			case WS_6 :  /* For aggregate ZAD */                                                    \
@@ -262,7 +264,7 @@ MBSTART {                                                                       
 			case WS_100 :  /* For aggregate ZAD */                                                  \
 			case WS_101 :  /* For aggregate ZAD */                                                  \
 			case WS_102 :  /* For aggregate ZAD */                                                  \
-				INCR_GVSTATS_COUNTER(CSADDRS, (CSADDRS)->nl, n_util_wait, 1);			\
+				INCR_GVSTATS_COUNTER_HELPER(CSADDRS, (CSADDRS)->nl, n_util_wait, 1);		\
 				break;                                                                          \
 			default : /* It is not an error for some instrumentation to be ignored */               \
 				break;                                                                          \
