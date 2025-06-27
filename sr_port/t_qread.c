@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -142,7 +142,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 	register sgmnt_data_ptr_t	csd;
 	enum db_ver		ondsk_blkver;
 	int4			dummy_errno, gtmcrypt_errno;
-	boolean_t		already_built, is_mm, reset_first_tp_srch_status, set_wc_blocked, sleep_invoked;
+	boolean_t		already_built, is_mm, reset_first_tp_srch_status, set_wc_blocked;
 	ht_ent_int8		*tabent;
 	srch_blk_status		*blkhist;
 	trans_num		dirty, blkhdrtn;
@@ -588,8 +588,6 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 		 */
 		*cycle = cr->cycle;
 		SHM_READ_MEMORY_BARRIER;
-		sleep_invoked = FALSE;
-		exceed_sleep_count = 1;
 		for (lcnt = 1;  ; lcnt++)
 		{
 			if (0 > cr->read_in_progress)
@@ -724,7 +722,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 			}
 			if (blk != cr->blk)
 				break;
-			if (lcnt >= BUF_OWNER_STUCK && (0 == (lcnt % BUF_OWNER_STUCK)))
+			if ((BUF_OWNER_STUCK <= lcnt) && (0 == (lcnt % BUF_OWNER_STUCK)))
 			{
 				if (!csa->now_crit)
 				{
@@ -807,8 +805,11 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 					return (sm_uc_ptr_t)NULL;
 				}
 				INCR_GVSTATS_COUNTER(csa, cnl, n_wait_for_read, 1);
-				if (!sleep_invoked)	/* Count # of blks for which we ended up sleeping on the read */
+				if (1 == lcnt)	/* Count # of blks for which we ended up sleeping on the read */
+				{
 					BG_TRACE_PRO_ANY(csa, t_qread_ripsleep_nblks);
+					exceed_sleep_count = 1;
+				}
 				if (0 == (exceed_sleep_count % READ_EXCEED_COUNTER))
 				{	/* Count the number of blocks for which we ended up sleeping on the read, when counter
 					 * exceeds READ_EXCEED_COUNTER. It is an indication that the wait was longer than
@@ -817,7 +818,6 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 					INCR_GVSTATS_COUNTER(csa, cnl, n_wait_read_long, 1);
 				}
 				wcs_sleep(lcnt);
-				sleep_invoked = TRUE;
 				exceed_sleep_count++;
 			}
 		}
