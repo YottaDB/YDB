@@ -49,6 +49,7 @@ GBLREF mline			mline_root;
 GBLREF spdesc			indr_stringpool, rts_stringpool, stringpool;
 GBLREF src_line_struct		src_head;
 GBLREF triple			t_orig;
+GBLREF boolean_t		tref_transform;
 
 LITREF	mval			literal_null;
 
@@ -94,7 +95,7 @@ void op_fnzycompile(mval *string, mval *ret)
 	cmd_qlf.qlf = 0;
 	run_time = FALSE;
 	TREF(compile_time) = TRUE;
-	TREF(transform) = FALSE;
+	tref_transform = FALSE;
 	TREF(dollar_zcstatus) = SS_NORMAL;
 	reinit_compilation_externs();
 	memset(&null_mident, 0, SIZEOF(null_mident));
@@ -142,7 +143,7 @@ void op_fnzycompile(mval *string, mval *ret)
 	reinit_compilation_externs();
 	run_time = TRUE;
 	TREF(compile_time) = FALSE;
-	TREF(transform) = TRUE;
+	tref_transform = TRUE;
 	assert(indr_stringpool.base == stringpool.base);
 	if (indr_stringpool.base == stringpool.base)
 	{

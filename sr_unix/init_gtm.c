@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -80,7 +80,8 @@ GBLREF pthread_t	gtm_main_thread_id;
 GBLREF boolean_t	gtm_main_thread_id_set;
 GBLREF boolean_t	gtm_jvm_process;
 #endif
-GBLDEF boolean_t	ydb_init_complete = FALSE;
+GBLREF boolean_t	ydb_init_complete;
+GBLREF boolean_t	tref_transform;
 
 STATICFNDCL void assert_on_entry(int4 arg);
 
@@ -151,7 +152,7 @@ void init_gtm(void)
 	pattern_typemask = mumps_pattern.typemask;
 	initialize_pattern_table();
 	/* Initialize local collating sequence */
-	TREF(transform) = TRUE;
+	tref_transform = TRUE;
 	lct = find_local_colltype();
 	if (lct != 0)
 	{
@@ -176,7 +177,7 @@ void init_gtm(void)
 	}
 	if (MUMPS_COMPILE == invocation_mode)				/* MUMPS compile branches here and gets none of the below */
 	{
-		TREF(transform) = FALSE;
+		tref_transform = FALSE;
 		EXIT(gtm_compile());
 	}
 	/* With the advent of reservedDBs, the ability to create a new database is not only in MUPIP but is in MUMPS too.

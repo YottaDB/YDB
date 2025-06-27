@@ -72,6 +72,7 @@ GBLREF int		onerror;
 GBLREF io_pair		io_curr_device;
 GBLREF gd_region	*db_init_region;
 GBLREF int4		error_condition;
+GBLREF boolean_t	tref_transform;
 
 LITREF boolean_t mu_int_possub[16][16];
 LITREF boolean_t mu_int_negsub[16][16];
@@ -784,17 +785,17 @@ void bin_load(gtm_uint64_t begin, gtm_uint64_t end, char *line1_ptr, int line1_l
 					if (extr_collseq)
 					{
 						/* undo the extract time collation */
-						TREF(transform) = TRUE;
+						tref_transform = TRUE;
 						save_gv_target_collseq = gv_target->collseq;
 						gv_target->collseq = extr_collseq;
 					} else
-						TREF(transform) = FALSE;
+						tref_transform = FALSE;
 						/* convert the subscript to string format */
 					opstr.addr = (char *)dest_buff;
 					opstr.len = MAX_ZWR_KEY_SZ;
 					end_buff = gvsub2str(src_buff, &opstr, FALSE);
 						/* transform the string to the current subsc format */
-					TREF(transform) = TRUE;
+					tref_transform = TRUE;
 					tmp_mval.mvtype = MV_STR;
 					tmp_mval.str.addr = (char *)dest_buff;
 					tmp_mval.str.len = INTCAST(end_buff - dest_buff);
@@ -1230,8 +1231,8 @@ gvnh_reg_t *bin_call_db(int routine, int err_code, INTPTR_T parm1, INTPTR_T parm
 	 */
 	gvnh_reg_t	*gvnh_reg = NULL;
 	gd_region	*dummy_reg;
-
 	DCL_THREADGBL_ACCESS;
+
 	SETUP_THREADGBL_ACCESS;
 	ESTABLISH_RET(mupip_load_ch, gvnh_reg);
 	switch (routine)

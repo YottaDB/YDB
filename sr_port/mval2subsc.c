@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -27,7 +27,8 @@
 #include "do_xform.h"
 #include "format_targ_key.h"
 
-GBLREF	gv_namehead	*gv_target;
+GBLREF gv_namehead	*gv_target;
+GBLREF boolean_t	tref_transform;
 
 static readonly unsigned char pos_code[100] =
 {
@@ -85,7 +86,7 @@ unsigned char *mval2subsc(mval *in_val, gv_key *out_key, boolean_t std_null_coll
 	assert(!(MV_NUM_APPROX & in_val->mvtype) || (NUM_DEC_DG_2L < in_val->str.len) || !val_iscan(in_val)
 		|| TREF(skip_mv_num_approx_assert));
 	out_ptr = out_key->base + out_key->end;
-	if (TREF(transform) && gv_target->nct)
+	if (tref_transform && gv_target->nct)
 	{
 		MV_FORCE_STR(in_val);
 		mvt = in_val->mvtype | MV_NUM_APPROX;
@@ -109,7 +110,7 @@ unsigned char *mval2subsc(mval *in_val, gv_key *out_key, boolean_t std_null_coll
 	{	/* It's a string */
 		in_ptr = (unsigned char *)in_val->str.addr;
 		tmp_len = in_val->str.len;
-		if (TREF(transform) && gv_target->collseq)
+		if (tref_transform && gv_target->collseq)
 		{
 			mstr_ch.len = tmp_len;
 			mstr_ch.addr = (char *)in_ptr;

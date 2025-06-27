@@ -206,7 +206,6 @@ THREADGBLAR1DEF(tp_fail_bttn,			trans_num,	(CDB_MAX_TRIES))/* array for TP traci
 THREADGBLAR1DEF(tp_fail_histtn,			trans_num,	(CDB_MAX_TRIES))/* array for TP tracing */
 THREADGBLAR1DEF(tp_fail_hist,			gv_namehead *,	(CDB_MAX_TRIES))/* array for TP tracing */
 THREADGBLAR1DEF(tp_fail_hist_reg,		gd_region *,	(CDB_MAX_TRIES))/* array for TP tracing */
-THREADGBLDEF(transform,				boolean_t)			/* flag collation transform eligible */
 THREADGBLDEF(wcs_recover_done,			boolean_t)			/* TRUE if wcs_recover was ever invoked in this
 										 * process. */
 THREADGBLDEF(statsdb_fnerr_reason,		int)				/* Failure code for "gvcst_set_statsdb_fname" */

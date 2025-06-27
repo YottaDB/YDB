@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2025 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -26,6 +29,7 @@
 GBLREF int4		gv_keysize;
 GBLREF gv_namehead	*gv_target;
 GBLREF gd_region	*gv_cur_region;
+GBLREF boolean_t	tref_transform;
 
 /* transform gv_currkey or gv_altkey based on collation sequence
  * if XBACK is true then convert from internal to external format.
@@ -77,10 +81,10 @@ void gv_xform_key(gv_key *keyp,  boolean_t xback)
 			keyp->end = c1 - keyp->base;
 		} else
 		{
-			TREF(transform) = xback;
+			tref_transform = xback;
 			(TREF(gv_sparekey_mval)).str.len = gvsub2str(c0, &((TREF(gv_sparekey_mval)).str), FALSE)
 								- (unsigned char *)(TREF(gv_sparekey_mval)).str.addr;
-			TREF(transform) = !xback;
+			tref_transform = !xback;
 			mval2subsc(TADR(gv_sparekey_mval), keyp, gv_cur_region->std_null_coll);
 			c1 = &keyp->base[keyp->end];
 			while (*c0++)

@@ -57,7 +57,8 @@ GBLREF mval		dollar_zyerror, ztrap_pop2level;
 GBLREF unsigned char	*msp, *stackwarn, *stacktop;
 GBLREF mv_stent		*mv_chain;
 GBLREF unsigned char	*restart_pc, *restart_ctxt;
-GBLREF	io_desc		*gtm_err_dev;
+GBLREF io_desc		*gtm_err_dev;
+GBLREF boolean_t	tref_transform;
 
 error_def(ERR_ASSERT);
 error_def(ERR_CTRAP);
@@ -142,10 +143,10 @@ CONDITION_HANDLER(trans_code_ch)
 	{
 		NEXTCH;
 	}
-	assert(!TREF(compile_time) || (FALSE == TREF(transform)));
-	assert(TREF(compile_time) || (TRUE == TREF(transform)));
+	assert(!TREF(compile_time) || (FALSE == tref_transform));
+	assert(TREF(compile_time) || (TRUE == tref_transform));
 	/* This is for when stack gets unwound in op_commarg before comp_fini gets called*/
-	TREF(transform) = TRUE;
+	tref_transform = TRUE;
 	TREF(compile_time) = FALSE;
 	assert(SFT_ZTRAP == proc_act_type || SFT_DEV_ACT == proc_act_type); /* are trans_code and this function in sync? */
 	assert(NULL != indr_stringpool.base); /* indr_stringpool must have been initialized by now */

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -44,6 +44,8 @@
 GBLREF gd_region	*gv_cur_region;
 GBLREF gv_namehead	*gv_target;
 GBLREF gv_namehead	*reset_gv_target;
+GBLREF boolean_t	tref_transform;
+
 GBLDEF boolean_t	save_transform;
 
 error_def(ERR_COLLATIONUNDEF);
@@ -55,9 +57,9 @@ STATICDEF gd_region	*gvn2gds_save_gv_cur_region;
 #define	RESTORE_GBL_VARS_BEFORE_FUN_RETURN										\
 MBSTART {														\
 	/* Restore global variables "gv_cur_region", "gv_target" and "transform" back to their original state */	\
-	gv_cur_region = gvn2gds_save_gv_cur_region;										\
+	gv_cur_region = gvn2gds_save_gv_cur_region;									\
 	RESET_GV_TARGET(DO_GVT_GVKEY_CHECK);										\
-	TREF(transform) = save_transform;										\
+	tref_transform = save_transform;										\
 } MBEND
 
 CONDITION_HANDLER(gvn2gds_ch)
@@ -130,9 +132,9 @@ unsigned char *gvn2gds(mval *gvn, gv_key *gvkey, int act)
 	 * we're doing here). Note that mval2subsc could issue an rts_error, so we establish a
 	 * condition handler to restore the above.
 	 */
-	save_transform = TREF(transform);
+	save_transform = tref_transform;
 	assert(save_transform);
-	TREF(transform) = TRUE;
+	tref_transform = TRUE;
 	reset_gv_target = gv_target;
 	gv_target = &temp_gv_target;
 	memset(gv_target, 0, SIZEOF(gv_namehead));
@@ -316,9 +318,9 @@ unsigned char *gds2gvn(mval *gds, unsigned char *buff, int col)
 	 * we're doing here). While there should be no need for a condition handler, there is a
 	 * a possible rts_error from gvsub2str in format_target_key, so we establish one.
 	 */
-	save_transform = TREF(transform);
+	save_transform = tref_transform;
 	assert(save_transform);
-	TREF(transform) = TRUE;
+	tref_transform = TRUE;
 	reset_gv_target = gv_target;
 	gv_target = &temp_gv_target;
 	memset(gv_target, 0, SIZEOF(gv_namehead));
@@ -342,6 +344,6 @@ unsigned char *gds2gvn(mval *gds, unsigned char *buff, int col)
 	}
 	/* Restore global variables "gv_target" and "transform" back to their original state */
 	RESET_GV_TARGET(DO_GVT_GVKEY_CHECK);
-	TREF(transform) = save_transform;
+	tref_transform = save_transform;
 	return key;
 }

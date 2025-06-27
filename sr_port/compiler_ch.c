@@ -31,6 +31,7 @@
 GBLREF char			cg_phase;
 GBLREF command_qualifier	cmd_qlf;
 GBLREF spdesc			indr_stringpool, rts_stringpool, stringpool;
+GBLREF boolean_t		tref_transform;
 
 error_def(ERR_ASSERT);
 error_def(ERR_ERRORSUMMARY);
@@ -71,7 +72,7 @@ CONDITION_HANDLER(compiler_ch)
 	{
 		run_time = TRUE;
 		TREF(compile_time) = FALSE;
-		TREF(transform) = TRUE;
+		tref_transform = TRUE;
 	}
 	if (indr_stringpool.base == stringpool.base)
 	{

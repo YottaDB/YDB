@@ -1330,10 +1330,12 @@ GBLDEF	pthread_mutex_t	ydb_engine_threadsafe_mutex[STMWORKQUEUEDIM] = { PTHREAD_
 
 GBLDEF	pthread_t	ydb_engine_threadsafe_mutex_holder[STMWORKQUEUEDIM];
 								/* tid of thread that has YottaDB engine mutex currently locked */
+GBLDEF boolean_t	ydb_init_complete = FALSE;
 GBLDEF	int		fork_after_ydb_init;	/* Set to a non-zero value if a "fork" occurs after "ydb_init_complete" has been
 						 * set to TRUE. Used for handling/detecting error scenarios in SimpleAPI and
 						 * SimpleThreadAPI.
 						 */
+
 GBLDEF 	struct sigaction	orig_sig_action[NSIG + 1];	/* Array of signal handlers (indexed by signal number) that were
 								 * in-place when YDB initialized.
 								 */

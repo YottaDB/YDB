@@ -3,7 +3,7 @@
  * Copyright (c) 2012-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2020-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2020-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -49,6 +49,9 @@ GBLREF gv_namehead	*gv_target;
 GBLREF gv_namehead	*reset_gv_target;
 GBLREF spdesc 		stringpool;
 GBLREF mv_stent		*mv_chain;
+#ifdef DEBUG
+GBLREF boolean_t	tref_transform;
+#endif
 
 LITREF mval		literal_null;
 
@@ -141,7 +144,7 @@ void op_fnzatransform(mval *msrc, int col, int reverse, int forceStr, mval *dst)
 	 * mval2subsc/gvsub2str. "transform" is already set to TRUE (the correct value).
 	 * Assert that. So need to only set "gv_target".
 	 */
-	assert(TREF(transform));
+	assert(tref_transform);
 	assert(INVALID_GV_TARGET == reset_gv_target);
 	reset_gv_target = gv_target;
 	gv_target = &temp_gv_target;

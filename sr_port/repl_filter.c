@@ -323,6 +323,7 @@ GBLREF	int			gtmsource_filter;
 GBLREF	int			gtmrecv_filter;
 GBLREF	int			ydb_repl_filter_timeout;
 GBLREF	jnlpool_addrs_ptr_t	jnlpool;
+GBLREF	boolean_t		tref_transform;
 
 LITREF	char			*trigger_subs[];
 
@@ -358,11 +359,8 @@ static boolean_t	is_nontp, is_null, poll_valid;
 
 void jnl_extr_init(void)
 {
-	DCL_THREADGBL_ACCESS;
-
-	SETUP_THREADGBL_ACCESS;
 	/* Should be a non-filter related function. But for now,... Needs GBLREFs gv_currkey and transform */
-	TREF(transform) = FALSE;      /* to avoid SIG-11 in "mval2subsc" as it expects gv_target to be set up and we don't set it */
+	tref_transform = FALSE;      /* to avoid SIG-11 in "mval2subsc" as it expects gv_target to be set up and we don't set it */
 	GVKEYSIZE_INIT_IF_NEEDED;
 }
 

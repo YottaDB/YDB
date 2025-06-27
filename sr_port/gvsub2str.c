@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2023-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -37,6 +37,8 @@
 #define LARGE_EXP	10000
 
 GBLREF  gv_namehead     *gv_target;
+GBLREF	boolean_t	tref_transform;
+
 LITREF	unsigned short	dpos[], dneg[];
 
 error_def(ERR_GVSUBOFLOW);
@@ -63,9 +65,7 @@ unsigned char *gvsub2str(unsigned char *sub, mstr *opstr, boolean_t xlat_flg)
 	span_subs	*subs_ptr;
 	int		expon, in_length, targ_len;
 	mstr		mstr_ch, mstr_targ;
-	DCL_THREADGBL_ACCESS;
 
-	SETUP_THREADGBL_ACCESS;
 	ch = *sub++;
 	targ = (unsigned char *)opstr->addr;
 	if (STR_SUB_PREFIX == ch || (SUBSCRIPT_STDCOL_NULL == ch && KEY_DELIMITER == *sub))
@@ -89,7 +89,7 @@ unsigned char *gvsub2str(unsigned char *sub, mstr *opstr, boolean_t xlat_flg)
 				ch = (*sub++ - 1);
 			*ptr++ = ch;
 		}
-		if (TREF(transform) && gv_target && gv_target->collseq)
+		if (tref_transform && gv_target && gv_target->collseq)
 		{
 			mstr_ch.len = in_length;
 			mstr_ch.addr = (char *)(xlat_flg ? buf : targ);

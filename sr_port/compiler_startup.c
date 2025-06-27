@@ -55,6 +55,7 @@ GBLREF triple			t_orig;
 GBLREF unsigned char		source_file_name[];
 GBLREF unsigned short		source_name_len;
 GBLREF boolean_t		shebang_invocation;	/* TRUE if yottadb is invoked through the "ydbsh" soft link */
+GBLREF boolean_t		tref_transform;
 
 LITDEF char compile_terminated[] = "COMPILATION TERMINATED DUE TO EXCESS ERRORS";
 
@@ -107,7 +108,7 @@ boolean_t compiler_startup(void)
 	}
 	run_time = FALSE;
 	TREF(compile_time) = TRUE;
-	TREF(transform) = FALSE;
+	tref_transform = FALSE;
 	TREF(dollar_zcstatus) = SS_NORMAL;
 	reinit_compilation_externs();
 	memset(&null_mident, 0, SIZEOF(null_mident));
@@ -271,7 +272,7 @@ boolean_t compiler_startup(void)
 	assert ((FALSE == run_time) && (TRUE == TREF(compile_time)));
 	run_time = TRUE;
 	TREF(compile_time) = FALSE;
-	TREF(transform) = TRUE;
+	tref_transform = TRUE;
 	assert(indr_stringpool.base == stringpool.base);
 	DBG_MARK_STRINGPOOL_USABLE;	/* Now that we are about to switch stringpool back to rts_stringpool, make it usable */
 	indr_stringpool = stringpool;

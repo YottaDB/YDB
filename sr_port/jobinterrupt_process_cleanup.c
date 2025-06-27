@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -40,6 +40,7 @@ GBLREF stack_frame		*frame_pointer;
 GBLREF dollar_ecode_type	dollar_ecode;			/* structure containing $ECODE related information */
 GBLREF volatile boolean_t	dollar_zininterrupt;
 GBLREF volatile int4		outofband;
+GBLREF boolean_t		tref_transform;
 
 error_def(ERR_ERRWZINTR);
 
@@ -69,7 +70,7 @@ void jobinterrupt_process_cleanup(void)
 	   caused us to drive the $zinterrupt handler and (2) we were already on a nice
 	   statement boundary when we were called to run $zinterrupt.
 	*/
-	TREF(transform) = TRUE;
+	tref_transform = TRUE;
 	dollar_zininterrupt = FALSE;	/* No longer in a $zinterrupt */
 	/* Now build message for operator log with the form ERRWZINTR, compiler-error */
 	util_out_print(NULL, RESET);

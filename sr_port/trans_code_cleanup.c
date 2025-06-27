@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -34,6 +34,7 @@ GBLREF	spdesc		indr_stringpool, rts_stringpool, stringpool;
 GBLREF	mstr		*err_act;
 GBLREF	io_desc		*active_device;
 GBLREF	boolean_t	ztrap_explicit_null;
+GBLREF	boolean_t	tref_transform;
 
 error_def(ERR_STACKCRIT);
 error_def(ERR_ERRWZTIMEOUT);
@@ -155,7 +156,7 @@ void trans_code_cleanup(void)
 		GTMTRIG_ONLY(DBGTRIGR((stderr, "trans_code_cleanup: turning off SFF_NORET_VIA_MUMTSTART in frame 0x"lvaddr"\n",
 				       frame_pointer)));
 	}
-	TREF(transform) = TRUE;
+	tref_transform = TRUE;
 	/* Only put error on console if frame we unwind to is a direct mode frame */
 	if (0 != errmsg)
 	{

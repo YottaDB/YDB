@@ -33,6 +33,7 @@
 GBLREF char		cg_phase;
 GBLREF spdesc		stringpool,rts_stringpool;
 GBLREF spdesc		indr_stringpool;
+GBLREF boolean_t	tref_transform;
 
 error_def(ERR_INDRMAXLEN);
 
@@ -47,7 +48,7 @@ void comp_init(mstr *src, oprtype *dst)
 	(TREF(source_buffer)).len = src->len + 1;
 	*((TREF(source_buffer)).addr + src->len) = *((TREF(source_buffer)).addr + src->len + 1) = '\0';
 	TREF(compile_time) = TRUE;
-	TREF(transform) = FALSE;
+	tref_transform = FALSE;
 	cg_phase = CGP_PARSE;
 	TREF(source_error_found) = 0;
 	TREF(last_source_column) = 0;

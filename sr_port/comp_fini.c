@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -34,6 +34,7 @@
 GBLREF spdesc		stringpool, rts_stringpool, indr_stringpool;
 GBLREF int		source_column;
 GBLREF char		cg_phase;
+GBLREF boolean_t	tref_transform;
 
 error_def(ERR_INDEXTRACHARS);
 error_def(ERR_INDRCOMPFAIL);
@@ -102,7 +103,7 @@ int comp_fini(int status, mstr *obj, opctype retcode, oprtype *retopr, oprtype *
 		cg_phase = CGP_NOSTATE;
 	}
 	assert(!TREF(compile_time));
-	TREF(transform) = TRUE;
+	tref_transform = TRUE;
 	COMPILE_HASHTAB_CLEANUP;
 	mcfree();
 	return status;

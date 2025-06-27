@@ -17,8 +17,8 @@ gt_timers.c:warning: Uninitialized va_list is copied [clang-analyzer-valist.Unin
 gtm_ci.c:warning: Initialized va_list 'var' is leaked [clang-analyzer-valist.Unterminated]
 gtm_cip.c:warning: Initialized va_list 'var' is leaked [clang-analyzer-valist.Unterminated]
 gtm_putmsg_list.c:warning: Uninitialized va_list is copied [clang-analyzer-valist.Uninitialized]
-gtm_threadgbl_deftypes.c:warning: Excessive padding in 'gtm_threadgbl_def_t' (182 padding bytes, where 6 is optimal).
-gtm_threadgbl_init.c:warning: Excessive padding in 'gtm_threadgbl_true_t' (182 padding bytes, where 6 is optimal).
+gtm_threadgbl_deftypes.c:warning: Excessive padding in 'gtm_threadgbl_def_t' (186 padding bytes, where 2 is optimal).
+gtm_threadgbl_init.c:warning: Excessive padding in 'gtm_threadgbl_true_t' (186 padding bytes, where 2 is optimal).
 gtmci.c:warning: Initialized va_list 'var' is leaked [clang-analyzer-valist.Unterminated]
 gtmci.c:warning: Initialized va_list 'var' is leaked [clang-analyzer-valist.Unterminated]
 gvcst_init_sysops.c:warning: redundant condition 'db_do_crypt_init' [bugprone-redundant-branch-condition]

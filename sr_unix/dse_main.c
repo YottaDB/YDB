@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -94,6 +94,7 @@ GBLREF boolean_t		write_after_image;
 GBLREF CLI_ENTRY		dse_cmd_ary[];
 GBLREF IN_PARMS			*cli_lex_in_ptr;
 GBLREF ch_ret_type		(*stpgc_ch)();			/* Function pointer to stp_gcol_ch */
+GBLREF boolean_t		tref_transform;
 
 GBLDEF block_id			patch_curr_blk;
 
@@ -110,7 +111,7 @@ int dse_main(int argc, char **argv, char **envp)
 	GTM_THREADGBL_INIT;
 	common_startup_init(DSE_IMAGE, &dse_cmd_ary[0]);
 	licensed = TRUE;
-	TREF(transform) = TRUE;
+	tref_transform = TRUE;
 	TREF(no_spangbls) = TRUE;	/* dse operates on a per-region basis irrespective of global mapping in gld */
 	TREF(skip_file_corrupt_check) = TRUE;	/* do not let csd->file_corrupt flag cause errors in dse */
 	op_open_ptr = op_open;

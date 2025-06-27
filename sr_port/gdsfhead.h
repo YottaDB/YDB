@@ -3575,6 +3575,8 @@ MBSTART {												\
 MBSTART {													\
 	GBLREF mv_stent		*mv_chain;									\
 	GBLREF unsigned char	*msp, *stackwarn, *stacktop;							\
+	GBLREF boolean_t	tref_transform;									\
+														\
 	mval			temp;										\
 	unsigned char		buff[MAX_ZWR_KEY_SZ], *end;							\
 	int			len;										\
@@ -3590,11 +3592,11 @@ MBSTART {													\
 		{												\
 			/* collation transformation should be done at the server's end for CM regions */	\
 			assert(dba_cm != REG_ACC_METH(reg));							\
-			TREF(transform) = FALSE;								\
+			tref_transform = FALSE;									\
 			opstr.addr = (char *)buff;								\
 			opstr.len = MAX_ZWR_KEY_SZ;								\
 			end = gvsub2str((uchar_ptr_t)mvarg->str.addr, &opstr, FALSE);				\
-			TREF(transform) = TRUE;									\
+			tref_transform = TRUE;									\
 			temp.mvtype = MV_STR;									\
 			temp.str.addr = (char *)buff;								\
 			temp.str.len = (mstr_len_t)(end - buff);						\
