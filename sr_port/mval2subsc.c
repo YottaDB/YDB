@@ -30,7 +30,7 @@
 GBLREF gv_namehead	*gv_target;
 GBLREF boolean_t	tref_transform;
 
-static readonly unsigned char pos_code[100] =
+static readonly unsigned int pos_code[100] =
 {
 	0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a,
 	0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1a,
@@ -44,7 +44,7 @@ static readonly unsigned char pos_code[100] =
 	0x91, 0x92, 0x93, 0x94, 0x95, 0x96, 0x97, 0x98, 0x99, 0x9a
 };
 
-static readonly unsigned char neg_code[100] =
+static readonly unsigned int neg_code[100] =
 {
 	0xfe, 0xfd, 0xfc, 0xfb, 0xfa, 0xf9, 0xf8, 0xf7, 0xf6, 0xf5,
 	0xee, 0xed, 0xec, 0xeb, 0xea, 0xe9, 0xe8, 0xe7, 0xe6, 0xe5,
@@ -61,7 +61,8 @@ static readonly unsigned char neg_code[100] =
 unsigned char *mval2subsc(mval *in_val, gv_key *out_key, boolean_t std_null_coll)
 {
 	boolean_t	is_negative;
-	unsigned char	buf1[MAX_KEY_SZ + 1], ch, *cvt_table, *in_ptr, *out_ptr;
+	unsigned char	buf1[MAX_KEY_SZ + 1], ch, *in_ptr, *out_ptr;
+	unsigned int	*cvt_table;
 	unsigned char	*tm, temp_mantissa[NUM_DEC_DG_2L / 2 + 3];	/* Need 1 byte for each two digits.  Add 3 bytes slop */
 	mstr		mstr_ch, mstr_buf1;
 	int4		mt, mw, mx;
@@ -160,27 +161,29 @@ unsigned char *mval2subsc(mval *in_val, gv_key *out_key, boolean_t std_null_coll
 	assert((MAX_GVKEY_PADDING_LEN + 1) <= (int)(out_key->top - out_key->end));
 	if (mvt & MV_INT)
 	{	/* Yes, its an integer, convert it */
-		is_negative = FALSE;
-		cvt_table = pos_code;
-		if (0 > (mt = in_val->m[1]))
+		if (0 < (mt = in_val->m[1]))
 		{
-			is_negative = TRUE;
-			cvt_table = neg_code;
-			mt = -mt;
+			is_negative = FALSE;
+			cvt_table = pos_code;
 		} else  if (0 == mt)
 		{
 			*out_ptr++ = SUBSCRIPT_ZERO;
 			goto ALLDONE;
+		} else
+		{
+			is_negative = TRUE;
+			cvt_table = neg_code;
+			mt = -mt;
 		}
 		if (10 > mt)
 		{
-			*out_ptr++ = (unsigned char)(is_negative ? ~(SUBSCRIPT_BIAS - 2) : (SUBSCRIPT_BIAS - 2));
+			*out_ptr++ = (unsigned char)(!is_negative ? (SUBSCRIPT_BIAS - 2) : ~(SUBSCRIPT_BIAS - 2));
 			*out_ptr++ = cvt_table[mt * 10];
 			goto FINISH_NUMBER;
 		}
 		if (100 > mt)
 		{
-			*out_ptr++ = (unsigned char)(is_negative ? ~(SUBSCRIPT_BIAS - 1) : (SUBSCRIPT_BIAS - 1));
+			*out_ptr++ = (unsigned char)(!is_negative ? (SUBSCRIPT_BIAS - 1) : ~(SUBSCRIPT_BIAS - 1));
 			*out_ptr++ = cvt_table[mt];
 			goto FINISH_NUMBER;
 		}
@@ -217,7 +220,7 @@ unsigned char *mval2subsc(mval *in_val, gv_key *out_key, boolean_t std_null_coll
 		}
 		exp_val = SUBSCRIPT_BIAS + 6;
 ODD_INTEGER:
-		*out_ptr++ = is_negative ? ~(exp_val) : (exp_val);
+		*out_ptr++ = !is_negative ? (exp_val) : ~(exp_val);
 		mw = mx = mt / 10;
 		mw *= 10;
 		mw = mt - mw;
@@ -229,7 +232,7 @@ ODD_INTEGER:
 		}
 		goto KEEP_STRIPING;
 EVEN_INTEGER:
-		*out_ptr++ = is_negative ? ~(exp_val) : (exp_val);
+		*out_ptr++ = !is_negative ? (exp_val) : ~(exp_val);
 KEEP_STRIPING:
 		while (mt)
 		{
