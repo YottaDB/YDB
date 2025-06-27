@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -761,12 +761,12 @@ enum cdb_sc gtm_mutex_lock(gd_region *reg,
 	/* Do a trylock first. If we are locking immediate, we are done. Otherwise we have the opportunity to update
 	 * stats before doing a longer timed lock attempt.
 	 */
-	UPDATE_CRIT_COUNTER(csa, state);
 	status = pthread_mutex_trylock(&csa->critical->mutex);
 	do
 	{
 		if (((EBUSY == status) && (MUTEX_LOCK_WRITE == mutex_lock_type)) || (ETIMEDOUT == status))
 		{	/* Got EBUSY from the trylock above or ETIMEDOUT from a previous iteration. */
+			UPDATE_CRIT_COUNTER(csa, state);
 			INCR_GVSTATS_COUNTER(csa, cnl, n_crit_failed, 1);
 			INCR_GVSTATS_COUNTER(csa, cnl, sq_crit_failed, 1);
 			if (cnl->doing_epoch)
