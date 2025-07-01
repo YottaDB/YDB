@@ -175,51 +175,57 @@ unsigned char *mval2subsc(mval *in_val, gv_key *out_key, boolean_t std_null_coll
 			cvt_table = neg_code;
 			mt = -mt;
 		}
-		if (10 > mt)
-		{
-			*out_ptr++ = (unsigned char)(!is_negative ? (SUBSCRIPT_BIAS - 2) : ~(SUBSCRIPT_BIAS - 2));
-			*out_ptr++ = cvt_table[mt * 10];
-			goto FINISH_NUMBER;
-		}
-		if (100 > mt)
-		{
-			*out_ptr++ = (unsigned char)(!is_negative ? (SUBSCRIPT_BIAS - 1) : ~(SUBSCRIPT_BIAS - 1));
-			*out_ptr++ = cvt_table[mt];
-			goto FINISH_NUMBER;
-		}
-		tm = temp_mantissa;
-		if (1000 > mt)
-		{
-			exp_val = SUBSCRIPT_BIAS;
-			goto ODD_INTEGER;
-		}
-		if (10000 > mt)
-		{
-			exp_val = SUBSCRIPT_BIAS + 1;
-			goto EVEN_INTEGER;
-		}
-		if (100000 > mt)
-		{
-			exp_val = SUBSCRIPT_BIAS + 2;
-			goto ODD_INTEGER;
-		}
 		if (1000000 > mt)
 		{
-			exp_val = SUBSCRIPT_BIAS + 3;
-			goto EVEN_INTEGER;
-		}
-		if (10000000 > mt)
+			if (1000 > mt)
+			{
+				if (10 > mt)
+				{
+					*out_ptr++ = (unsigned char)(!is_negative ? (SUBSCRIPT_BIAS - 2) : ~(SUBSCRIPT_BIAS - 2));
+					*out_ptr++ = cvt_table[mt * 10];
+					goto FINISH_NUMBER;
+				} else if (100 > mt)
+				{
+					*out_ptr++ = (unsigned char)(!is_negative ? (SUBSCRIPT_BIAS - 1) : ~(SUBSCRIPT_BIAS - 1));
+					*out_ptr++ = cvt_table[mt];
+					goto FINISH_NUMBER;
+				} else
+				{
+					exp_val = SUBSCRIPT_BIAS;
+					goto ODD_INTEGER;
+				}
+			} else
+			{
+				if (10000 > mt)
+				{
+					exp_val = SUBSCRIPT_BIAS + 1;
+					goto EVEN_INTEGER;
+				} else if (100000 > mt)
+				{
+					exp_val = SUBSCRIPT_BIAS + 2;
+					goto ODD_INTEGER;
+				} else
+				{
+					exp_val = SUBSCRIPT_BIAS + 3;
+					goto EVEN_INTEGER;
+				}
+			}
+		} else if (10000000 > mt)
 		{
 			exp_val = SUBSCRIPT_BIAS + 4;
 			goto ODD_INTEGER;
-		}
-		if (100000000 > mt)
+		} else if (100000000 > mt)
 		{
 			exp_val = SUBSCRIPT_BIAS + 5;
 			goto EVEN_INTEGER;
+		} else
+		{
+			assert(1000000000 > mt);
+			exp_val = SUBSCRIPT_BIAS + 6;
+			goto ODD_INTEGER;
 		}
-		exp_val = SUBSCRIPT_BIAS + 6;
 ODD_INTEGER:
+		tm = temp_mantissa;
 		*out_ptr++ = !is_negative ? (exp_val) : ~(exp_val);
 		mw = mx = mt / 10;
 		mw *= 10;
@@ -232,6 +238,7 @@ ODD_INTEGER:
 		}
 		goto KEEP_STRIPING;
 EVEN_INTEGER:
+		tm = temp_mantissa;
 		*out_ptr++ = !is_negative ? (exp_val) : ~(exp_val);
 KEEP_STRIPING:
 		while (mt)
@@ -257,45 +264,46 @@ FINISH_INTEGERS:
 		}
 		while (tm > temp_mantissa)
 			*out_ptr++ = *--tm;
-		goto FINISH_NUMBER;
-	}
-	/* Convert 18 digit number */
-	cvt_table = pos_code;
-	if (0 != (is_negative = in_val->sgn))
-		cvt_table = neg_code;
-	*out_ptr++ = is_negative ? ~(in_val->e - MV_XBIAS + SUBSCRIPT_BIAS) : (in_val->e - MV_XBIAS + SUBSCRIPT_BIAS);
-	mt = in_val->m[1];
-	mw = in_val->m[0];
-	/* Strip top two digits */
-	mx = mt / (MANT_HI / 100);
-	*out_ptr++ = cvt_table[mx];
-	mt = (mt - (mx * (MANT_HI / 100))) * 100;
-	/*
-	 * The two msd's have now been converted.  The maximum number of
-	 * data remaining is 7 digits in "mt" and 9 digits in "mw".
-	 * If mw is zero, then we should just grind out mt till we are done
-	 */
-	if (0 == mw)
-		goto LAST_LONGWORD;
-	/* there are more than 7 digits left.  First, we will put 8 digits in mt, (leaving 8 digits in mw) */
-	mx = mw / (MANT_HI / 10);
-	mt += mx * 10;
-	mw = (mw - (mx * (MANT_HI / 10))) * 10;
-	if (0 == mw)
-		goto LAST_LONGWORD;
-	for (digs = 0;  digs < 4;  digs++)
+	} else
 	{
+		/* Convert 18 digit number */
+		cvt_table = pos_code;
+		if (0 != (is_negative = in_val->sgn))
+			cvt_table = neg_code;
+		*out_ptr++ = is_negative ? ~(in_val->e - MV_XBIAS + SUBSCRIPT_BIAS) : (in_val->e - MV_XBIAS + SUBSCRIPT_BIAS);
+		mt = in_val->m[1];
+		mw = in_val->m[0];
+		/* Strip top two digits */
 		mx = mt / (MANT_HI / 100);
 		*out_ptr++ = cvt_table[mx];
 		mt = (mt - (mx * (MANT_HI / 100))) * 100;
-	}
-	mt = mw;
-LAST_LONGWORD:
-	while (mt)
-	{
-		mx = mt / (MANT_HI / 100);
-		*out_ptr++ = cvt_table[mx];
-		mt = (mt - (mx * (MANT_HI / 100))) * 100;
+		/* The two msd's have now been converted.  The maximum number of
+		 * data remaining is 7 digits in "mt" and 9 digits in "mw".
+		 * If mw is zero, then we should just grind out mt till we are done
+		 */
+		if (0 != mw)
+		{
+			/* there are more than 7 digits left.  First, we will put 8 digits in mt, (leaving 8 digits in mw) */
+			mx = mw / (MANT_HI / 10);
+			mt += mx * 10;
+			mw = (mw - (mx * (MANT_HI / 10))) * 10;
+			if (0 != mw)
+			{
+				for (digs = 0;  digs < 4;  digs++)
+				{
+					mx = mt / (MANT_HI / 100);
+					*out_ptr++ = cvt_table[mx];
+					mt = (mt - (mx * (MANT_HI / 100))) * 100;
+				}
+				mt = mw;
+			}
+		}
+		while (mt)
+		{
+			mx = mt / (MANT_HI / 100);
+			*out_ptr++ = cvt_table[mx];
+			mt = (mt - (mx * (MANT_HI / 100))) * 100;
+		}
 	}
 FINISH_NUMBER:
 	if (is_negative)
