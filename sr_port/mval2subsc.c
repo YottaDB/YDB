@@ -69,6 +69,9 @@ unsigned char *mval2subsc(mval *in_val, gv_key *out_key, boolean_t std_null_coll
 	uint4		mvt;	/* Local copy of mvtype, bit ands use a int4, so do conversion once */
 	unsigned int	digs, exp_val;
 	int		tmp_len, avail_bytes;
+#	ifdef DEBUG
+	unsigned char	*tm_end;
+#	endif
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -225,21 +228,25 @@ unsigned char *mval2subsc(mval *in_val, gv_key *out_key, boolean_t std_null_coll
 			goto ODD_INTEGER;
 		}
 ODD_INTEGER:
-		tm = temp_mantissa;
 		*out_ptr++ = !is_negative ? (exp_val) : ~(exp_val);
+		DEBUG_ONLY(tm_end = out_ptr);	/* this is where "tm--" should eventually come back to */
 		mw = mx = mt / 10;
 		mw *= 10;
 		mw = mt - mw;
 		mt = mx;
 		if (mw)
 		{
-			*tm++ = cvt_table[mw * 10];
+			assert((exp_val + 2) >= SUBSCRIPT_BIAS);
+			out_ptr += (exp_val + 2 - SUBSCRIPT_BIAS) / 2;
+			tm = out_ptr++;
+			*tm-- = cvt_table[mw * 10];
 			goto FINISH_INTEGERS;
 		}
+		exp_val--;
 		goto KEEP_STRIPING;
 EVEN_INTEGER:
-		tm = temp_mantissa;
 		*out_ptr++ = !is_negative ? (exp_val) : ~(exp_val);
+		DEBUG_ONLY(tm_end = out_ptr);	/* this is where "tm--" should eventually come back to */
 KEEP_STRIPING:
 		while (mt)
 		{
@@ -249,9 +256,13 @@ KEEP_STRIPING:
 			mt = mx;
 			if (mw)
 			{
-				*tm++ = cvt_table[mw];
+				assert((exp_val + 1) >= SUBSCRIPT_BIAS);
+				out_ptr += (exp_val + 1 - SUBSCRIPT_BIAS) / 2;
+				tm = out_ptr++;
+				*tm-- = cvt_table[mw];
 				break;
 			}
+			exp_val -= 2;
 		}
 FINISH_INTEGERS:
 		while (mt)
@@ -259,11 +270,10 @@ FINISH_INTEGERS:
 			mw = mx = mt / 100;
 			mw *= 100;
 			mw = mt - mw;
-			*tm++ = cvt_table[mw];
+			*tm-- = cvt_table[mw];
 			mt = mx;
 		}
-		while (tm > temp_mantissa)
-			*out_ptr++ = *--tm;
+		assert((tm + 1) == tm_end);
 	} else
 	{
 		/* Convert 18 digit number */
