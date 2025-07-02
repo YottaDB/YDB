@@ -74,10 +74,10 @@ LITREF	char		*gtm_dbversion_table[];
 				(csd->COUNTER.cumul_count + csd->COUNTER.curr_count));			\
 	}
 
-#define SHOW_GVSTATS_STAT(cnl, COUNTER, TEXT1, TEXT2)							\
-{													\
-	if (cnl->gvstats_rec.COUNTER)									\
-		util_out_print("  " TEXT1 " : " TEXT2"  0x!16@XQ", TRUE, (&cnl->gvstats_rec.COUNTER));	\
+#define SHOW_GVSTATS_STAT(cnl, COUNTER, TEXT1, TEXT2)								\
+{														\
+	if (cnl->gvstats_rec.COUNTER)										\
+		util_out_print("  !4AZ : " TEXT2"  0x!16@XQ", TRUE, TEXT1, (&cnl->gvstats_rec.COUNTER));	\
 }
 
 /* NEED_TO_DUMP is only for the qualifiers other than "BASIC" and "ALL".
