@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2025 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -23,7 +26,6 @@
 
 GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF unsigned int	t_tries;
-GBLREF boolean_t	mu_reorg_process;
 
 #define ENOUGH_TRIES_TO_FALL_BACK 17
 
@@ -73,7 +75,7 @@ cache_rec_ptr_t	db_csh_get(block_id block) /* block number to look up */
 			assert(!csa->now_crit || ((0 != cr->blkque.fl) && (0 != cr->blkque.bl)));
 			if (cr->blk == block)
 			{
-				if (CDB_STAGNATE <= t_tries || mu_reorg_process)
+				if (CDB_STAGNATE <= t_tries)
 					CWS_INSERT(block);
 				/* setting refer outside of crit may not prevent its replacement, but that's an
 				 * inefficiency, not a tragedy because of concurrency checks in t_end or tp_tend;
