@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -72,7 +72,9 @@ void	op_dmode(void)
 
 	SETUP_THREADGBL_ACCESS;
 	dummy.mvtype = dummy.str.len = 0;
-	input_line = push_mval(&dummy);
+	assert((intptr_t)frame_pointer->l_symtab > (intptr_t)msp);
+	assert(MVST_MVAL == ((mv_stent *)(((char *)frame_pointer->l_symtab) - mvs_size[MVST_MVAL]))->mv_st_type);
+	input_line = &((mv_stent *)(((char *)frame_pointer->l_symtab) - mvs_size[MVST_MVAL]))->mv_st_cont.mvs_mval;
 	if (dmode_intruptd)
 	{
 		if (io_curr_device.out != save_device.out)

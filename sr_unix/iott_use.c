@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -580,7 +580,7 @@ void iott_use(io_desc *iod, mval *pp)
 			memcpy(&temp_ptr->mask_term, &mask_term, SIZEOF(io_termmask));
 		}
 		if (flush_input && (SPLITP_TTOUT != splitp))
-		{	/* smw no PG(in VMSPG)? not only */
+		{
 			TCFLUSH(tt_ptr->fildes, TCIFLUSH, status);
 			if (0 != status)
 				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5, LIT_AND_LEN("tcflush input"),

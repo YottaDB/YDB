@@ -28,7 +28,7 @@
 
 error_def(ERR_FILENOTFND);
 
-gld_dbname_list *read_db_files_from_gld(gd_addr *addr)
+gld_dbname_list *read_db_files_from_gld(gd_addr *addr, bool skipGTCM)
 {
 	gd_segment 		*seg;
 	uint4			ustatus;
@@ -43,8 +43,9 @@ gld_dbname_list *read_db_files_from_gld(gd_addr *addr)
 	for (reg = addr->regions, reg_top = reg + addr->n_regions; reg < reg_top; reg++)
 	{
 		assert(reg < reg_top);
-		if (IS_STATSDB_REG(reg))
-			continue;	/* Do not open statsdb regions directly. They will get opened as needed */
+		/* Update Process silently skips GT.CM regions. MUPIP RECOVER handles GT.CM region related errors later */
+		if (IS_STATSDB_REG(reg) || ((DO_NOT_OPEN_GTCM == skipGTCM) && reg_cmcheck(reg)))
+			continue;	/* Do not open statsdb and GT.CM regions directly. They will get opened as needed */
 		FILE_CNTL_INIT_IF_NULL(reg);
 		seg = reg->dyn.addr;
 		ret.len = SIZEOF(filename);

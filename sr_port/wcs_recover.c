@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -324,9 +324,12 @@ void wcs_recover(gd_region *reg)
 				{	/* If we have already waited for atleast 4 minutes, no longer wait but fixup
 					 * all following cr's. If r_epid is 0 and also read in progress, we identify
 					 * this as corruption and fixup up this cr and proceed to the next cr.
+					 * If WBTEST_BG_UPDATE_DBCSHGETN_INVALID is settings crs CR_NOTVALID, that may have
+					 * got us here, so continue even in DEBUG if that is set.
 					 */
 					assert(WBTEST_ENABLED(WBTEST_CRASH_SHUTDOWN_EXPECTED)
-						|| WBTEST_ENABLED(WBTEST_MURUNDOWN_KILLCMT06));
+						|| WBTEST_ENABLED(WBTEST_MURUNDOWN_KILLCMT06)
+						|| WBTEST_ENABLED(WBTEST_BG_UPDATE_DBCSHGETN_INVALID));
 					assert(epid);
 					if (!((0 == r_epid) || (epid == r_epid)))
 					{

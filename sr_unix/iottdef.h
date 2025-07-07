@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -24,6 +24,7 @@
 #include "iottdefsp.h"
 
 #define NUM_BITS_IN_INT4	(SIZEOF(int4) * 8)
+#define TTIO_NUM_TERMIOS	2
 
 #define TTDEF_BUF_SZ 		MAX_SRCLINE
 #define TTDEF_PG_WIDTH 		255
@@ -106,7 +107,7 @@ typedef struct
 	uint4   	term_ctrl;
 	io_termmask	mask_term;
 	int		fildes;
-	struct termios  *ttio_struct;
+	struct termios  *ttio_struct;		/* used by iott_setterm and iott_resetterm */
 	tt_interrupt	tt_state_save;		/* in case job interrupt */
 	boolean_t	mupintr;		/* read was interrupted */
 	char		*ttybuff;		/* buffer for tty */
@@ -120,6 +121,9 @@ typedef struct
 	boolean_t	discard_lf;		/* UTF8 mode - previous char was CR so ignore following LF */
 	boolean_t	default_mask_term;	/* mask_term is the default */
 	boolean_t	done_1st_read;		/* UTF8 mode - check for BOM if not */
+	boolean_t	ttio_modified;		/* need to restore on exit from _start */
+	boolean_t	nozenable;		/* prevent process suspension from keyboard VSUSP and VDSUSP */
+	struct termios  *ttio_struct_start;	/* set at gtm_startup, used to restore on exit */
 }d_tt_struct;
 
 void iott_flush_buffer(io_desc *ioptr, boolean_t new_write_flag);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -146,7 +146,6 @@ int f_select(oprtype *a, opctype op)
 			v = &triptr->operand[0].oprval.mlit->v;		/* Boolean was a literal, so optimize it */
 			dqdel(triptr, exorder);
 			exorder_init(&dmpchain);			/* both got_true and throwing use dumping */
-			unuse_literal(v);
 			if (0 == MV_FORCE_BOOL(v))
 			{	/* Boolean FALSE: discard the corresponding value */
 				assert(NULL == savechain);
@@ -157,6 +156,7 @@ int f_select(oprtype *a, opctype op)
 				assert(!throwing && (NULL == savechain));
 				got_true = TRUE;
 			}
+			unuse_literal(v);
 			break;
 		}
 		TREF(shift_side_effects) = TREF(saw_side_effect) = FALSE;

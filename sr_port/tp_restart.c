@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -778,7 +778,7 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 	{	/* Make sure we don't unwind the MVST_TPHOLD for our target level */
 		assert((MVST_TPHOLD != mvc->mv_st_type) || ((newlevel - 1) != mvc->mv_st_cont.mvs_tp_holder.tphold_tlevel));
 		DBGEHND((stderr, "tp_restart: unwinding mv_stent addr 0x"lvaddr" type %d\n", mvc, mvc->mv_st_type));
-		unw_mv_ent(mvc);
+		unw_mv_ent(mvc, UNWIND_NEWVARS);
 		mvc = (mv_stent *)(mvc->mv_st_next + (char *)mvc);
 	}
 	assert((void *)mvc < (void *)frame_pointer);
@@ -797,28 +797,21 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 #	endif
 	assert(curr_symval == tf->sym);
 	if (frame_pointer->flags & SFF_UNW_SYMVAL)
-	{	/* A symval was popped in THIS stackframe by one of our last mv_stent unwinds which means
-		 * l_symtab is fairly borked.
+	{
+		/* A symval was popped in this stackframe by one of our last mv_stent unwinds. Two scenarios to handle:
+		 * 	1) The symval came with a new l_symtab, since the current frame shares (shared) an l_symtab with
+		 * 	a parent (ie it was a local Do or something similar.
+		 * 		- In this case there is nothing to do. The l_symtab mv_stent is handled by unw_mv_stent
+		 * 		restore frame_pointer->l_symtab back to its original value. The original l_symtab will
+		 * 		have been unaffected by any of the work in tp.
+		 * 	2) The symval did not come with a new l_symtab. In which case the l_symtab was not (and isn't) shared
+		 * 	with the parent. There is no danger of corrupting the parent's l_symtab, but since we are reusing the
+		 * 	current frame's l_symtab we need to clear it because it may reference the destroyed mvst_stab.
 		 */
 		assert(frame_pointer->l_symtab);	/* Would be NULL in replication processor */
-		if ((unsigned char *)frame_pointer->l_symtab < msp)
-		{	/* This condition is set up when a local routine is called which, since it is using the
-			 * same code, uses the same l_symtab as the caller. But when an exclusive new is done in
-			 * this frame, op_xnew creates a NEW symtab just for this frame. But when this code
-			 * unwound back to the TSTART, we also unwound the l_symtab this frame was using. So here
-			 * we verify this frame is a simple call frame from the previous and restore the use of its
-			 * l_symtab if so. If not, assertpro. Note the outer SFF_UWN_SYMVAL check keeps  us from
-			 * having non-existant l_symtab issues which is possible when we are MUPIP.
-			 */
-			if ((frame_pointer->rvector == frame_pointer->old_frame_pointer->rvector)
-			    && (frame_pointer->vartab_ptr == frame_pointer->old_frame_pointer->vartab_ptr))
-			{
-				frame_pointer->l_symtab = frame_pointer->old_frame_pointer->l_symtab;
-				frame_pointer->flags &= SFF_UNW_SYMVAL_OFF;	/* No need to clear symtab now */
-			} else
-				assertpro(FALSE);
-		} else
-		{	/* Otherwise the l_symtab needs to be cleared so its references get re-resolved to *this* symtab */
+		assert(frame_pointer->old_frame_pointer);
+		if (frame_pointer->l_symtab != frame_pointer->old_frame_pointer->l_symtab)
+		{
 			memset(frame_pointer->l_symtab, 0, frame_pointer->vartab_len * SIZEOF(ht_ent_mname *));
 			frame_pointer->flags &= SFF_UNW_SYMVAL_OFF;
 		}

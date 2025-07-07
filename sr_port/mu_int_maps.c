@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -73,7 +73,7 @@ void mu_int_maps(void)
 {
 	unsigned char	*local;
 	char		time_str[CTIME_BEFORE_NL + 2]; /* for GET_CUR_TIME macro */
-	uchar_ptr_t	blk_base, buff_blk_base, free_blk_base;
+	uchar_ptr_t	blk_base, buff_blk_base = NULL, free_blk_base;
 	boolean_t	wait_on_kip, agree, disk_full, local_full, master_full;
 	block_id	maps, mapsize, mcnt, lcnt, bcnt;
 	unsigned int	level;

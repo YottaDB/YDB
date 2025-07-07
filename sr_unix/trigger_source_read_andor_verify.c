@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2011-2021 Fidelity National Information	*
+ * Copyright (c) 2011-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -317,7 +317,7 @@ STATICFNDEF int trigger_source_raov(mstr *trigname, gd_region *reg, rhdtyp **rtn
 	mstr			gbl, xecute_buff;
 	mval			trig_index;
 	rhdtyp			*rtn_vector;
-	rtn_tabent		*rttabent;
+	rtn_tabent		*rttabent = rtn_names_end + 1;
 	sgm_info		*save_sgm_info_ptr;
 	jnlpool_addrs_ptr_t	save_jnlpool;
 	sgmnt_addrs		*csa, *regcsa;

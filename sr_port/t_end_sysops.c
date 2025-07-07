@@ -92,6 +92,7 @@
 #include "wcs_wt.h"
 #include "mu_upgrade_bmm.h"	/* for MUPIP_REORG_UPGRADE_NOW_SPLITTING */
 #include "inline_atomic_pid.h"
+#include "inline_not_frozen.h" /* for not_frozen_chilled */
 
 error_def(ERR_DBFILERR);
 error_def(ERR_FREEBLKSLOW);
@@ -1462,7 +1463,7 @@ void wcs_stale(TID tid, int4 hd_len, gd_region **region)
 				}
 				break;
 			case dba_mm:
-				assert(!FROZEN_CHILLED(csa));
+				assert(not_frozen_chilled(csa));
 				wcs_wtstart(reg, 0, NULL, NULL);
 				assert(csd == csa->hdr);
 				need_new_timer = FALSE;

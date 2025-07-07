@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2005-2024 Fidelity National Information	*
+ * Copyright (c) 2005-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -337,7 +337,7 @@ void	mu_reorg_upgrd_dwngrd(void)
 					TRUE, &curr_blk, status, csd->blks_to_upgrd, last_blks_to_upgrd,
 					index_blks_at_v7, tot_dt, mu_ctrlc_occurred);
 		util_out_print("Region !AD : Index block upgrade !ADcomplete",
-				TRUE, REG_LEN_STR(reg), mu_ctrlc_occurred ? 2 : 0, "in");
+				TRUE, REG_LEN_STR(reg), (mu_ctrlc_occurred || IS_ONLNRLBK_ACTIVE(csa)) ? 2 : 0, "in");
 		util_out_print("Region !AD : Upgraded !@UQ index blocks for !@UQ global variable trees, ",
 				FALSE, REG_LEN_STR(reg), &tot_dt, &gv_trees);
 		util_out_print("splitting !@UQ block!AD, adding !@UQ directory tree level!AD",
@@ -350,8 +350,11 @@ void	mu_reorg_upgrd_dwngrd(void)
 			mu_upgrade_in_prog = MUPIP_UPGRADE_OFF;
 			mu_reorg_more_tries = FALSE;
 			if (IS_ONLNRLBK_ACTIVE(csa))
-				util_out_print("Region !AD : Ended due to concurrent ROLLBACK -ONLINE", TRUE);
-			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_MUUPGRDNRDY, 5, DB_LEN_STR(reg),
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REORGUPCNFLCT, 5,
+						LEN_AND_LIT("REORG -UPGRADE"),
+						LEN_AND_LIT("MUPIP ROLLBACK -ONLINE in progress"),
+						csa->nl->onln_rlbk_pid);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_MUUPGRDNRDY, 5, DB_LEN_STR(reg),
 					RTS_ERROR_LITERAL("V7"), &csd->blks_to_upgrd);
 			break;
 		}
@@ -553,6 +556,8 @@ enum cdb_sc find_gvt_roots(block_id *curr_blk, gd_region *reg, cache_rec_ptr_t *
 					continue;
 				} else if ((0 == --lcnt) || (cdb_sc_badlvl == status))
 					return status;	/* Repeated/unrecoverable errors, let the caller deal with it */
+				if (IS_ONLNRLBK_ACTIVE(csa))	/* Conncurrent ONLINE ROLLBACK detected */
+					return cdb_sc_onln_rlbk1;
 				/* Use t_retry() here to increment t_tries, grabbing crit as needed. Note that any
 				 * downstream t_end() or t_abort() resets t_tries. The result should be that REORG
 				 * -UPGRADE will grab and release crit as needed on a per global basis. In the event

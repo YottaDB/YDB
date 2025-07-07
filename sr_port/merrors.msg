@@ -503,7 +503,7 @@ CCEDMPQUALREQ	<A qualifier (DB,[NO]ON, or NOW) is required with the DUMP command
 CCEDBDUMP	<Section !AD dumped>/info/fao=2!/ansi=0
 CCEDBNODUMP	<Section !AD not dumped; status = >/info/fao=2!/ansi=0
 CCPMBX		<Error accessing Cluster Control Program Mailbox>/error/fao=0!/ansi=0
-REQRUNDOWN	<Error accessing database !AD.  Must be rundown on cluster node !AD.>/error/fao=4!/ansi=0
+REQRUNDOWN	<Error accessing database !AD. Run MUPIP RUNDOWN on node !AD>/error/fao=4!/ansi=0
 CCPINTQUE	<Interlock failure accessing Cluster Control Program queue>/error/fao=0!/ansi=0
 CCPBADMSG	<Invalid message code received by Cluster Control Program>/error/fao=0!/ansi=0
 CNOTONSYS	<Command is not supported by this operating system>/error/fao=0!/ansi=0
@@ -1062,7 +1062,7 @@ REPLINSTACC	<Error accessing replication instance file !AD>/error/fao=2!/ansi=0
 NOJNLPOOL	<No journal pool info found in the replication instance of !AD>/error/fao=2!/ansi=0
 NORECVPOOL	<No receiver pool info found in the replication instance of !AD>/error/fao=2!/ansi=0
 FTOKERR		<Error getting ftok of the file !AD>/error/fao=2!/ansi=0
-REPLREQRUNDOWN	<Error accessing replication instance !AD.  Must be rundown on cluster node !AD.>/error/fao=4!/ansi=0
+REPLREQRUNDOWN	<Error accessing replication instance !AD. Run MUPIP RUNDOWN -REGION "*" on node !AD>/error/fao=4!/ansi=0
 BLKCNTEDITFAIL	<Mupip recover or rollback failed to correct the block count field in the file header for file !AD>/info/fao=2!/ansi=0
 SEMREMOVED	<Semaphore id !UL removed from the system>/info/fao=1!/ansi=0
 REPLINSTFMT	<Format error encountered while reading replication instance file !AD. Expected !AD. Found !AD.>/error/fao=6!/ansi=0
@@ -1132,7 +1132,7 @@ JNLFNF		<Journal file !AD not found>/info/fao=2!/ansi=0
 PREVJNLLINKCUT	<Previous journal file name link set to NULL in new journal file !AD created for database file !AD>/info/fao=4!/ansi=0
 PREVJNLLINKSET	<Previous generation journal file name is changed from !AD to !AD>/info/fao=4!/ansi=0
 FILENAMETOOLONG	<File name too long>/error/fao=0!/ansi=0
-REQRECOV	<Error accessing database !AD.  Must be recovered on cluster node !AD.>/error/fao=4!/ansi=0
+REQRECOV	<Error accessing database !AD. Run MUPIP JOURNAL -RECOVER on node !AD>/error/fao=4!/ansi=0
 JNLTRANS2BIG	<Transaction needs an estimated [!UL blocks] in journal file !AD which exceeds the AUTOSWITCHLIMIT of !UL blocks>/error/fao=4!/ansi=0
 JNLSWITCHTOOSM	<Journal AUTOSWITCHLIMIT [!UL blocks] is less than Journal ALLOCATION [!UL blocks] for database file !AD>/error/fao=4!/ansi=0
 JNLSWITCHSZCHG	<Journal AUTOSWITCHLIMIT [!UL blocks] is rounded down to [!UL blocks] to equal the sum of Journal ALLOCATION [!UL blocks] and a multiple of Journal EXTENSION [!UL blocks] for database file !AD>/info/fao=6!/ansi=0
@@ -1255,8 +1255,8 @@ REPLINSTSECNONE	<No information found for secondary instance !AD in instance fil
 REPLINSTSECUNDF	<Secondary replication instance name not defined>/error/fao=0!/ansi=0
 REPLINSTSEQORD	<!AD has seqno [0x!16@XQ] which is less than last record seqno [0x!16@XQ] in replication instance file !AD>/error/fao=6!/ansi=0
 REPLINSTSTNDALN	<Could not get exclusive access to replication instance file !AD>/error/fao=2!/ansi=0
-REPLREQROLLBACK	<Replication instance file !AD indicates abnormal shutdown or an incomplete ROLLBACK. Run MUPIP JOURNAL ROLLBACK first>/error/fao=2!/ansi=0
-REQROLLBACK	<Error accessing database !AD.  Run MUPIP JOURNAL -ROLLBACK -NOONLINE on cluster node !AD.>/error/fao=4!/ansi=0
+REPLREQROLLBACK	<Replication instance file !AD indicates abnormal shutdown or an incomplete ROLLBACK. Run MUPIP JOURNAL -ROLLBACK>/error/fao=2!/ansi=0
+REQROLLBACK	<Error accessing database !AD. Run MUPIP JOURNAL -ROLLBACK -NOONLINE on node !AD>/error/fao=4!/ansi=0
 INVOBJFILE	<Cannot ZLINK object file !AD due to unexpected format>/error/fao=2!/ansi=0
 SRCSRVEXISTS	<Source server for secondary instance !AD is already running with pid !UL>/error/fao=3!/ansi=0
 SRCSRVNOTEXIST	<Source server for secondary instance !AD is not alive>/error/fao=2!/ansi=0
@@ -1583,7 +1583,7 @@ HLPPROC		<Helper Process error>/error/fao=0!/ansi=0
 REPLNOHASHTREC	<Sequence number 0x!16@XQ contains trigger definition updates. !AD side must be at least V6.2-000 for replication to continue>/error/fao=3!/ansi=0
 REMOTEDBNOTRIG	<Trigger operations are not supported on global ^!AD as it maps to database region !AD that points to a remote file>/error/fao=4!/ansi=0
 NEEDTRIGUPGRD	<Cannot do trigger operation on database file !AD until it is upgraded; Run MUPIP TRIGGER -UPGRADE first>/error/fao=2!/ansi=0
-REQRLNKCTLRNDWN	<Error accessing relinkctl file !AZ for $ZROUTINES directory !AD. Must be rundown>/error/fao=3!/ansi=0
+REQRLNKCTLRNDWN	<Error accessing relinkctl file !AZ for $ZROUTINES directory !AD. Run MUPIP RUNDOWN -RELINKCTL>/error/fao=3!/ansi=0
 RLNKCTLRNDWNSUC	<Relinkctl file for $ZROUTINES directory !AD successfully rundown>/info/fao=2!/ansi=0
 RLNKCTLRNDWNFL	<Relinkctl file for $ZROUTINES directory !AD failed to rundown as it is open by !UL process(es)>/error/fao=3!/ansi=0
 MPROFRUNDOWN	<Error during M-profiling rundown>/error/fao=0!/ansi=0
@@ -1623,7 +1623,7 @@ JNLPOOLRECOVERY	<The size of the data written to the journal pool (!UL) does not
 LOCKTIMINGINTP	<A LOCK at !AD within a TP transaction is waiting in a final TP retry, which may lead to a general response gap>/warning/fao=2!/ansi=0
 PBNUNSUPTYPE	<$ZPEEK() does not support type !AD>/error/fao=2!/ansi=0
 DBFHEADLRU	<Database file !AD LRU pointer: 0x!16@XQ is outside of range: 0x!16@XQ to 0x!16@XQ or misaligned>/info/fao=5!/ansi=0
-JNLNOTALLOWED	<Did not enable journaling on !AD region !AD>/warning/fao=4!/ansi=0
+JNLNOTALLOWED	<Did not enable journaling on !AD region !AD (!AD)>/warning/fao=6!/ansi=0
 AIOCANCELTIMEOUT	<Pid [0x!XL] timed out waiting for pending async io to complete/cancel in database file !AD>/error/fao=3!/ansi=0
 DBGLDMISMATCH	<Database file !AD has !AZ whereas !AZ !AD in global directory !AD has !AZ>/error/fao=9!/ansi=0
 DBBLKSIZEALIGN	<Database file !AD has AIO=ON and block_size=!UL which is not a multiple of filesystem block size !UL>/error/fao=4!/ansi=0

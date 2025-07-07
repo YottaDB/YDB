@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -101,6 +101,7 @@ error_def(ERR_DBRDONLY);
 error_def(ERR_GBLNOEXIST);
 error_def(ERR_MAXBTLEVEL);
 error_def(ERR_MUREORGFAIL);
+error_def(ERR_REORGUPCNFLCT);
 
 #define SAVE_REORG_RESTART													\
 {																\
@@ -116,8 +117,7 @@ error_def(ERR_MUREORGFAIL);
 	}															\
 }
 
-#ifdef UNIX
-# define ABORT_TRANS_IF_GBL_EXIST_NOMORE_AND_RETURN(LCL_T_TRIES, GN)								\
+#define ABORT_TRANS_IF_GBL_EXIST_NOMORE_AND_RETURN(LCL_T_TRIES, GN)								\
 {																\
 	boolean_t		tn_aborted;											\
 																\
@@ -130,7 +130,6 @@ error_def(ERR_MUREORGFAIL);
 		return TRUE; /* It is not an error if the global (that once existed) doesn't exist anymore (due to ROLLBACK) */	\
 	}															\
 }
-#endif
 
 void log_detailed_log(char *X, srch_hist *Y, srch_hist *Z, int level, kill_set *kill_set_list, trans_num tn);
 void reorg_finish(block_id dest_blk_id, block_id blks_processed, block_id blks_killed,
@@ -288,8 +287,11 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 		return TRUE;
 	}
 	long_blk_id = (BLK_ID_32_VER < cs_data->desired_db_format);
-	if ((0 != cs_addrs->nl->reorg_upgrade_pid) && (is_proc_alive(cs_addrs->nl->reorg_upgrade_pid, 0)))
-		return FALSE;	/* REORG -UPGRADE cannot run concurrently with TRUNCATE which has higher priority. Stop */
+	if (IS_REORG_UP_ACTIVE(cs_addrs->nl))
+	{	/* Avoid running REORG -UPGRADE concurrently with another REORG */
+		MSG_REORGUPCNFLCT(cs_addrs, "REORG", "MUPIP REORG -UPGRADE in progress")
+		return FALSE;
+	}
 	memcpy(&gv_currkey_next_reorg->base[0], &gv_currkey->base[0], gv_currkey->end + 1);
 	gv_currkey_next_reorg->end =  gv_currkey->end;
 	if (2 > dest_blk_id)
@@ -344,9 +346,11 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 		while(pending_levels)	/* === START WHILE COMPLETE_MERGE === */
 		{
 			assert(pending_levels >= 0);
-			if (mu_ctrlc_occurred || mu_ctrly_occurred || ((0 != cs_addrs->nl->reorg_upgrade_pid)
-						&& (is_proc_alive(cs_addrs->nl->reorg_upgrade_pid, 0))))
-			{	/* REORG -UPGRADE cannot run concurrently with REORG which has higher priority. Stop */
+			if (mu_ctrlc_occurred || mu_ctrly_occurred || (IS_REORG_UP_ACTIVE(cs_addrs->nl)))
+			{
+				if (IS_REORG_UP_ACTIVE(cs_addrs->nl))
+					/* Avoid running REORG -UPGRADE concurrently with another REORG */
+					MSG_REORGUPCNFLCT(cs_addrs, "REORG", "MUPIP REORG -UPGRADE in progress")
 				SAVE_REORG_RESTART;
 				return FALSE;
 			}
@@ -647,10 +651,12 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 			}/* === SPLIT-COALESCE LOOP END === */
 			t_abort(gv_cur_region, cs_addrs);	/* do crit and other cleanup */
 		}/* === START WHILE COMPLETE_MERGE === */
-		if (mu_ctrlc_occurred || mu_ctrly_occurred || ((0 != cs_addrs->nl->reorg_upgrade_pid)
-					&& (is_proc_alive(cs_addrs->nl->reorg_upgrade_pid, 0))))
-		{	/* REORG -UPGRADE cannot run concurrently with TRUNCATE which has higher priority. Stop */
+		if (mu_ctrlc_occurred || mu_ctrly_occurred || (IS_REORG_UP_ACTIVE(cs_addrs->nl)))
+		{
 			SAVE_REORG_RESTART;
+			if (IS_REORG_UP_ACTIVE(cs_addrs->nl))
+				/* Avoid running REORG -UPGRADE concurrently with another REORG */
+				MSG_REORGUPCNFLCT(cs_addrs, "REORG", "MUPIP REORG -UPGRADE in progress")
 			return FALSE;
 		}
 		/* Now swap the working block */
@@ -743,10 +749,12 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 			}	/* === END OF SWAP LOOP === */
 			t_abort(gv_cur_region, cs_addrs);	/* do crit and other cleanup */
 		}
-		if (mu_ctrlc_occurred || mu_ctrly_occurred || ((0 != cs_addrs->nl->reorg_upgrade_pid)
-					&& (is_proc_alive(cs_addrs->nl->reorg_upgrade_pid, 0))))
-		{	/* REORG -UPGRADE cannot run concurrently with TRUNCATE which has higher priority. Stop */
+		if (mu_ctrlc_occurred || mu_ctrly_occurred || (IS_REORG_UP_ACTIVE(cs_addrs->nl)))
+		{
 			SAVE_REORG_RESTART;
+			if (IS_REORG_UP_ACTIVE(cs_addrs->nl))
+				/* Avoid running REORG -UPGRADE concurrently with another REORG */
+				MSG_REORGUPCNFLCT(cs_addrs, "REORG", "MUPIP REORG -UPGRADE in progress")
 			return FALSE;
 		}
 		if (end_of_tree)

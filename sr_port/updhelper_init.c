@@ -119,7 +119,10 @@ void updhelper_init(recvpool_user who)
 	jnlpool_init_needed = TRUE;
 	reg_top = gd_header->regions + gd_header->n_regions;
 	for (reg = gd_header->regions; reg < reg_top; reg++)
-	{	/* Use gvcst_init to set statsdb up, and enable statistics to reader and writer helpers */
+	{
+		if (reg_cmcheck(reg))
+			continue;
+		/* Use gvcst_init to set statsdb up, and enable statistics to reader and writer helpers */
 		if ((! IS_STATSDB_REG(reg)) && (! reg->open))
 		{
 			gvcst_init(reg, NULL);

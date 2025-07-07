@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -348,11 +348,18 @@ typedef struct
 
 /* M name entry used in various structures - variable table (rtnhdr.h), hash table (hashtab_def.h) and
  * global variable (gv_namehead in gdsfhead.h) */
+typedef enum mark_status
+{
+	INDIR_MARKED = -1,
+	NOT_MARKED,
+	XKILL_MARKED
+} mark_status;
+
 typedef struct
 {
-	mident 		var_name;	/* var_name.addr points to the actual variable name */
+	mident		var_name;	/* var_name.addr points to the actual variable name */
 	uint4		hash_code;	/* hash (scrambled) value of the variable name text */
-	boolean_t	marked;		/* Used when in hashtable entry for xkill (at least) */
+	mark_status	marked;		/* Used when in hashtable entry for xkill (at least) */
 } mname_entry;
 
 /* The M stack frame on all platforms that follow pv-based linkage model (alpha model)

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -32,6 +32,7 @@ int m_do(void)
 	int		opcd;
 	oprtype		*cr;
 	triple		*calltrip, *labelref, *obp, *oldchain, *ref0, *ref1, *routineref, tmpchain, *triptr;
+	boolean_t	tval;
 #	ifndef __i386
 	triple		*tripsize = NULL;
 #	endif
@@ -177,9 +178,10 @@ int m_do(void)
 		if (OC_LIT == triptr->opcode)
 		{	/* it's a literal so optimize it */
 			v = &triptr->operand[0].oprval.mlit->v;
+			tval = MV_FORCE_BOOL(v);
 			unuse_literal(v);
 			dqdel(triptr, exorder);
-			if (0 == MV_FORCE_BOOL(v))
+			if (0 == tval)
 			{
 				setcurtchain(oldchain);		/* it's a FALSE so just discard the whole thing */
 #				ifndef __i386

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -134,12 +134,6 @@ typedef struct
 #	endif
 } mvs_tphold_struct;
 
-typedef struct
-{
-	unsigned char		*restart_pc_save;
-	unsigned char		*restart_ctxt_save;
-} mvs_rstrtpc_struct;
-
 /* zintcmd* entries are for timed commands other than I/O which can be
  * interrupted.  Without an identifying structure such as the device
  * structure, we use the restart_pc/ctxt values which must be save
@@ -164,14 +158,21 @@ typedef struct
 	unsigned char	*restart_ctxt_prior;	/* this entry was put on stack */
 } mvs_zintcmd_struct;
 
+typedef struct
+{
+	size_t size;
+	ht_ent_mname **l_symtab;
+	DEBUG_ONLY(ht_ent_mname **old_l_symtab;)
+} mvs_l_symtab_struct;
+
 /* Homogenous mv_stent structure containing all types. This structure is never allocated as is but is allocated
  * on the M stack using the size for the size defined in mvs_size[] array in mtables.c
  * Note that since mvs_size is unsigned char, the sizeof each struct must be under 256 bytes
  */
 typedef struct mv_stent_struct
 {
-	unsigned int 			mv_st_type : 6;		/* Max type is 63 */
-	unsigned int 			mv_st_next : 26;	/* Accomodates distances up to 64MB (stack currently 256KB) */
+	unsigned int 			mv_st_type;
+	unsigned int 			mv_st_next;
 	union
 	{
 		mval			mvs_mval;
@@ -200,7 +201,7 @@ typedef struct mv_stent_struct
 		mvs_zintr_struct	mvs_zintr;
 		mvs_trigr_struct	mvs_trigr;
 	  	mvs_tphold_struct	mvs_tp_holder;
-		mvs_rstrtpc_struct	mvs_rstrtpc;
+		mvs_l_symtab_struct	mvs_l_symtab;
 		mvs_mrgzwrsv_struct	mvs_mrgzwrsv;
 		mvs_zintcmd_struct	mvs_zintcmd;
 		int4			mvs_tval;
@@ -217,7 +218,10 @@ error_def(ERR_STACKOFLOW);
 error_def(ERR_STACKCRIT);
 error_def(ERR_STACKUNDERFLO);
 
-void unw_mv_ent(mv_stent *mv_st_ent);
+#define RETAIN_NEWVARS FALSE
+#define	UNWIND_NEWVARS TRUE
+
+boolean_t unw_mv_ent(mv_stent *mv_st_ent, boolean_t unwind_newvars);
 void push_stck(void* val, int val_size, void** addr, int mvst_stck_type);
 
 #define MVST_MSAV	0	/* An mval and an address to store it at pop time, most
@@ -245,10 +249,10 @@ void push_stck(void* val, int val_size, void** addr, int mvst_stck_type);
 				 */
 #define MVST_LVAL	14	/* Same as MVST_MVAL except we are pushing an lv_val instead of an mval */
 #define MVST_TRIGR	15	/* Used to save the base environment for Trigger execution */
-#define MVST_RSTRTPC	16	/* Unused */
+#define MVST_L_SYMTAB	16	/* used to create a new l_symtab for a frame which did not need one prior to an exclusive new */
 #define MVST_STORIG	17	/* This is the origin mv_stent placed on the stack during initialization */
 #define MVST_MRGZWRSV	18	/* Block used to save merge/zwrite control blocks when one or more of them nest */
-#define	MVST_LAST	18	/* update this, mvs_size and mvs_save in mtables.c, and switches in unw_mv_ent.c,
+#define	MVST_LAST	19	/* update this, mvs_size and mvs_save in mtables.c, and switches in unw_mv_ent.c,
 				 * stp_gcol_src.h, and get_ret_targ.c when adding a new MVST type */
 /* Variation of ROUND_UP2 macro that doesn't have the checking that generates an assertpro. This is necessary because
  * the MV_SIZE macro is used in a static table initializer so cannot have executable (non-constant) code in it

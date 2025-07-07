@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -97,7 +97,7 @@ GBLREF gv_trigger_t		*gtm_trigdsc_last;		/* For debugging purposes - parms gtm_t
 
 #define FREEIFALLOC(ADR) if (NULL != (ADR)) free(ADR)
 
-void unw_mv_ent(mv_stent *mv_st_ent)
+boolean_t unw_mv_ent(mv_stent *mv_st_ent, boolean_t unwind_newvars)
 {
 	d_rm_struct		*rm_ptr;
 	d_socket_struct		*dsocketptr;
@@ -123,51 +123,59 @@ void unw_mv_ent(mv_stent *mv_st_ent)
 	switch (mv_st_ent->mv_st_type)
 	{
 		case MVST_MSAV:
-			*mv_st_ent->mv_st_cont.mvs_msav.addr = mv_st_ent->mv_st_cont.mvs_msav.v;
-			if (&(TREF(dollar_etrap)) == mv_st_ent->mv_st_cont.mvs_msav.addr)
+			if (unwind_newvars)
 			{
-				ztrap_explicit_null = FALSE;
-				(TREF(dollar_ztrap)).str.len = 0;
-			} else if (&(TREF(dollar_ztrap)) == mv_st_ent->mv_st_cont.mvs_msav.addr)
-			{
-				if (STACK_ZTRAP_EXPLICIT_NULL == (TREF(dollar_ztrap)).str.len)
+				assert(frame_pointer->type & SFT_COUNT);
+				*mv_st_ent->mv_st_cont.mvs_msav.addr = mv_st_ent->mv_st_cont.mvs_msav.v;
+				if (&(TREF(dollar_etrap)) == mv_st_ent->mv_st_cont.mvs_msav.addr)
 				{
-					(TREF(dollar_ztrap)).str.len = 0;
-					ztrap_explicit_null = TRUE;
-					if (!dollar_zininterrupt)
-					{	/* exiting error handling & not in interrupt code - check for queued timed events */
-						TRY_EVENT_POP;
-					}
-				} else
 					ztrap_explicit_null = FALSE;
-				(TREF(dollar_etrap)).str.len = 0;
-			} else if (mv_st_ent->mv_st_cont.mvs_msav.addr == &dollar_zgbldir)
-			{
-				/* Restore GLD if a match is found, otherwise defer setting gd_header */
-				gd_header = zgbldir_name_lookup_only(&dollar_zgbldir);
-				if (gv_currkey)
+					(TREF(dollar_ztrap)).str.len = 0;
+				} else if (&(TREF(dollar_ztrap)) == mv_st_ent->mv_st_cont.mvs_msav.addr)
 				{
-					gv_currkey->base[0] = 0;
-					gv_currkey->prev = gv_currkey->end = 0;
+					if (STACK_ZTRAP_EXPLICIT_NULL == (TREF(dollar_ztrap)).str.len)
+					{
+						(TREF(dollar_ztrap)).str.len = 0;
+						ztrap_explicit_null = TRUE;
+						if (!dollar_zininterrupt)
+						{
+							/* exiting error handling & not in interrupt code - check for queued
+							 * timed events.
+							 */
+							TRY_EVENT_POP;
+						}
+					} else
+						ztrap_explicit_null = FALSE;
+					(TREF(dollar_etrap)).str.len = 0;
+				} else if (mv_st_ent->mv_st_cont.mvs_msav.addr == &dollar_zgbldir)
+				{
+					/* Restore GLD if a match is found, otherwise defer setting gd_header */
+					gd_header = zgbldir_name_lookup_only(&dollar_zgbldir);
+					if (gv_currkey)
+					{
+						gv_currkey->base[0] = 0;
+						gv_currkey->prev = gv_currkey->end = 0;
+					}
+					if (gv_target)
+						gv_target->clue.end = 0;
 				}
-				if (gv_target)
-					gv_target->clue.end = 0;
-			}
-			return;
+			} else
+				return FALSE;
+			return TRUE;
 		case MVST_MVAL:
 		case MVST_IARR:
 		case MVST_TPHOLD:
 		case MVST_STORIG:
-			return;
+			return TRUE;
 		case MVST_LVAL:
 			/* Reduce the reference count of this unanchored lv_val (current usage as callin argument
 			 * holder) and put on free list if no longer in use.
 			 */
 			lvval_ptr = mv_st_ent->mv_st_cont.mvs_lvval;
 			DECR_BASE_REF_NOSYM(lvval_ptr, FALSE);
-			return;
+			return TRUE;
 		case MVST_STAB:
-			if (mv_st_ent->mv_st_cont.mvs_stab)
+			if (unwind_newvars && mv_st_ent->mv_st_cont.mvs_stab)
 			{
 				assert(mv_st_ent->mv_st_cont.mvs_stab == curr_symval);
 				symval_ptr = curr_symval;
@@ -188,7 +196,7 @@ void unw_mv_ent(mv_stent *mv_st_ent)
 					/* Note we do not set SFF_UNW_SYMVAL here because this being a trigger related symbol
 					 * table, when it unwinds, so has any possible reference to what was using it.
 					 */
-					return;
+					return TRUE;
 				}
 #				endif
 				if (symval_ptr->alias_activity && ((NULL != symval_ptr->xnew_var_list) || (NULL != alias_retarg)))
@@ -231,8 +239,9 @@ void unw_mv_ent(mv_stent *mv_st_ent)
 				free_hashtab_mname(&symval_ptr->h_symtab);
 				free(symval_ptr);
 				frame_pointer->flags |= SFF_UNW_SYMVAL;
-			}
-			return;
+			} else if (mv_st_ent->mv_st_cont.mvs_stab)
+				return FALSE;
+			return TRUE;
 		case MVST_NTAB:
 			DEBUG_ONLY(hte = lookup_hashtab_mname(&curr_symval->h_symtab, mv_st_ent->mv_st_cont.mvs_ntab.nam_addr));
 			assert(hte);
@@ -250,7 +259,7 @@ void unw_mv_ent(mv_stent *mv_st_ent)
 			{
 				DECR_BASE_REF_NOSYM(lvval_ptr, FALSE);
 			}
-			return;
+			return TRUE;
 		case MVST_PVAL:
 			if (mv_st_ent->mv_st_cont.mvs_pval.mvs_ptab.hte_addr)
 			{
@@ -287,7 +296,7 @@ void unw_mv_ent(mv_stent *mv_st_ent)
 				 */
 				if (lvval_ptr)
 					DECR_BASE_REF_NOSYM(lvval_ptr, FALSE);
-				return;
+				return TRUE;
 			}
 			/* We could use the LV_FREESLOT macro here but we already know which symbol-table we need to use and
 			 * hence avoid that step by directly invoking the LV_FLIST_ENQUEUE macro instead. We however ensure
@@ -295,27 +304,34 @@ void unw_mv_ent(mv_stent *mv_st_ent)
 			 */
 			assert(curr_symval == LV_GET_SYMVAL(mv_st_ent->mv_st_cont.mvs_pval.mvs_val));
 			LV_FLIST_ENQUEUE(&curr_symval->lv_flist, mv_st_ent->mv_st_cont.mvs_pval.mvs_val);
-			return;
+			return TRUE;
 		case MVST_NVAL:
-			assert(mv_st_ent->mv_st_cont.mvs_nval.mvs_ptab.hte_addr);
-			DEBUG_ONLY(hte = lookup_hashtab_mname(&curr_symval->h_symtab, &mv_st_ent->mv_st_cont.mvs_nval.name));
-			assert(hte);
-			assert(hte == mv_st_ent->mv_st_cont.mvs_nval.mvs_ptab.hte_addr);
-			hte = mv_st_ent->mv_st_cont.mvs_nval.mvs_ptab.hte_addr;
-			lvval_ptr = (lv_val *)hte->value;	/* lv_val being popped */
-			DBGRFCT_ONLY(
-				memcpy(vname.c, hte->key.var_name.addr, hte->key.var_name.len);
-				vname.c[hte->key.var_name.len] = '\0';
-			);
-			DBGRFCT((stderr, "unw_mv_ent3: var '%s' hte 0x"lvaddr" being reset from 0x"lvaddr" to 0x"lvaddr"\n",
-				 &vname.c, hte, hte->value, mv_st_ent->mv_st_cont.mvs_nval.mvs_ptab.save_value));
-			hte->value = (char *)mv_st_ent->mv_st_cont.mvs_nval.mvs_ptab.save_value;
-			/* See comment in handling of MVST_PVAL above for content and treatment of lvval_ptr */
-			if (lvval_ptr)
+			if (unwind_newvars)
 			{
-				DECR_BASE_REF_NOSYM(lvval_ptr, FALSE);
-			}
-			return;
+				assert(SFT_COUNT & frame_pointer->type);
+				assert(mv_st_ent->mv_st_cont.mvs_nval.mvs_ptab.hte_addr);
+#				ifdef DEBUG
+				hte = lookup_hashtab_mname(&curr_symval->h_symtab, &mv_st_ent->mv_st_cont.mvs_nval.name);
+#				endif
+				assert(hte);
+				assert(hte == mv_st_ent->mv_st_cont.mvs_nval.mvs_ptab.hte_addr);
+				hte = mv_st_ent->mv_st_cont.mvs_nval.mvs_ptab.hte_addr;
+				lvval_ptr = (lv_val *)hte->value;	/* lv_val being popped */
+				DBGRFCT_ONLY(
+						memcpy(vname.c, hte->key.var_name.addr, hte->key.var_name.len);
+						vname.c[hte->key.var_name.len] = '\0';
+					    );
+				DBGRFCT((stderr, "unw_mv_ent3: var '%s' hte 0x"lvaddr" being reset from 0x"lvaddr" to 0x"lvaddr"\n",
+						&vname.c, hte, hte->value, mv_st_ent->mv_st_cont.mvs_nval.mvs_ptab.save_value));
+				hte->value = (char *)mv_st_ent->mv_st_cont.mvs_nval.mvs_ptab.save_value;
+				/* See comment in handling of MVST_PVAL above for content and treatment of lvval_ptr */
+				if (lvval_ptr)
+				{
+					DECR_BASE_REF_NOSYM(lvval_ptr, FALSE);
+				}
+			} else
+				return FALSE;
+			return TRUE;
 		case MVST_STCK:
 		case MVST_STCK_SP:
 			assert(mvs_size[MVST_STCK] == mvs_size[MVST_STCK_SP]);
@@ -325,17 +341,17 @@ void unw_mv_ent(mv_stent *mv_st_ent)
 			else
 				*(mv_st_ent->mv_st_cont.mvs_stck.mvs_stck_addr) =
 					(unsigned char *)mv_st_ent->mv_st_cont.mvs_stck.mvs_stck_val;
-			return;
+			return TRUE;
 		case MVST_TVAL:
 			dollar_truth = (boolean_t)mv_st_ent->mv_st_cont.mvs_tval;
-			return;
+			return TRUE;
 		case MVST_ZINTDEV:
 			/* Since the interrupted device frame is popping off, there is no way that the READ
 			 * that was interrupted will be resumed (if it already hasn't been). We don't bother
 			 * to check if it is or isn't. We just reset the device.
 			 */
 			if (NULL == mv_st_ent->mv_st_cont.mvs_zintdev.io_ptr)
-				return;	/* already processed */
+				return TRUE;	/* already processed */
 			switch(mv_st_ent->mv_st_cont.mvs_zintdev.io_ptr->type)
 			{
 				case tt:
@@ -347,7 +363,7 @@ void unw_mv_ent(mv_stent *mv_st_ent)
 						mv_st_ent->mv_st_cont.mvs_zintdev.buffer_valid = FALSE;
 						mv_st_ent->mv_st_cont.mvs_zintdev.io_ptr = NULL;
 					}
-					return;
+					return TRUE;
 				case rm:
 					if (NULL != mv_st_ent->mv_st_cont.mvs_zintdev.io_ptr)
 					{	/* This mv_stent has not been processed yet */
@@ -358,7 +374,7 @@ void unw_mv_ent(mv_stent *mv_st_ent)
 						mv_st_ent->mv_st_cont.mvs_zintdev.buffer_valid = FALSE;
 						mv_st_ent->mv_st_cont.mvs_zintdev.io_ptr = NULL;
 					}
-					return;
+					return TRUE;
 				case gtmsocket:
 					if (NULL != mv_st_ent->mv_st_cont.mvs_zintdev.io_ptr)
 					{	/* This mv_stent has not been processed yet */
@@ -385,7 +401,7 @@ void unw_mv_ent(mv_stent *mv_st_ent)
 					}
 					mv_st_ent->mv_st_cont.mvs_zintdev.buffer_valid = FALSE;
 					mv_st_ent->mv_st_cont.mvs_zintdev.io_ptr = NULL;
-					return;
+					return TRUE;
 				default:
 					assertpro(FALSE);	/* No other device should be here */
 			}
@@ -395,7 +411,7 @@ void unw_mv_ent(mv_stent *mv_st_ent)
 			if (NULL == mv_st_ent->mv_st_cont.mvs_zintcmd.restart_pc_check)
 			{	/* not active */
 				assert(ZINTCMD_NOOP == zintcmd_command);
-				return;
+				return TRUE;
 			}
 			assert((ZINTCMD_NOOP < zintcmd_command) && (ZINTCMD_LAST > zintcmd_command));
 			/* restore previous active interrupted command information */
@@ -405,7 +421,7 @@ void unw_mv_ent(mv_stent *mv_st_ent)
 				= mv_st_ent->mv_st_cont.mvs_zintcmd.restart_ctxt_prior;
 			TAREF1(zintcmd_active, zintcmd_command).count--;
 			assert(0 <= TAREF1(zintcmd_active, zintcmd_command).count);
-			return;
+			return TRUE;
 		case MVST_ZINTR:
 			/* Restore environment to pre-$zinterrupt evocation. Note the first few elements of MVST_ZINTR
 			 * and MVST_TRIGR are the same, so the processing of those elements is commonized.
@@ -439,7 +455,7 @@ void unw_mv_ent(mv_stent *mv_st_ent)
 				memcpy(extnam_str.addr, mv_st_ent->mv_st_cont.mvs_trigr.savextref.addr, extnam_str.len);
 #			ifdef GTM_TRIGGER
 			if (MVST_TRIGR != mv_st_ent->mv_st_type) /* MVST_ZINTR common handling ends here */
-				return;
+				return TRUE;
 			ztvalue_changed_ptr = mv_st_ent->mv_st_cont.mvs_trigr.ztvalue_changed_ptr;
 			dollar_ztvalue = mv_st_ent->mv_st_cont.mvs_trigr.ztvalue_save;
 			dollar_ztname = mv_st_ent->mv_st_cont.mvs_trigr.ztname_save;
@@ -481,7 +497,7 @@ void unw_mv_ent(mv_stent *mv_st_ent)
 			ctxt->ch_active = FALSE;
 			ENABLE_INTERRUPTS(INTRPT_IN_CONDSTK, prev_intrpt_state);
 #			endif	/* GTM_TRIGGER */
-			return;
+			return TRUE;
 		case MVST_MRGZWRSV:
 			merge_args = mv_st_ent->mv_st_cont.mvs_mrgzwrsv.save_merge_args;
 			zwrtacindx = mv_st_ent->mv_st_cont.mvs_mrgzwrsv.save_zwrtacindx;
@@ -521,10 +537,22 @@ void unw_mv_ent(mv_stent *mv_st_ent)
 				free(zwrhtab);
 			}
 			zwrhtab = mv_st_ent->mv_st_cont.mvs_mrgzwrsv.save_zwrhtab;
-			return;
+			return TRUE;
+		case MVST_L_SYMTAB:
+			if (unwind_newvars && mv_st_ent->mv_st_cont.mvs_l_symtab.l_symtab)
+			{
+				free(mv_st_ent->mv_st_cont.mvs_l_symtab.l_symtab);
+				mv_st_ent->mv_st_cont.mvs_l_symtab.l_symtab = NULL;
+				assert(frame_pointer->old_frame_pointer);
+				assert(frame_pointer->old_frame_pointer->l_symtab
+						== mv_st_ent->mv_st_cont.mvs_l_symtab.old_l_symtab);
+				frame_pointer->l_symtab = frame_pointer->old_frame_pointer->l_symtab;
+			} else if (mv_st_ent->mv_st_cont.mvs_l_symtab.l_symtab)
+				return FALSE;
+			break;
 		default:
 			assertpro(mv_st_ent->mv_st_type != mv_st_ent->mv_st_type);
 			break;
 	}
-	return; /* This should never get executed, added to make compiler happy */
+	return TRUE;
 }

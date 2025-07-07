@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -142,16 +142,11 @@ void unary_tail(oprtype *opr)
 						return;
 					}
 					if (num || com)
-					{	/* num includes both OC_NEG and OC_FORCENUM */
-						unuse_literal(v);
-						t->opcode = OC_LIT;
-					}
+						t->opcode = OC_LIT; /* num includes both OC_NEG and OC_FORCENUM */
 					if (com)
 					{	/* any complement reduces the literal value to [unsigned] 1 or 0 */
 						PUT_LITERAL_TRUTH((!(1 & com) ? MV_FORCE_BOOL(v) : !MV_FORCE_BOOL(v)), t);
 						v = &t->operand[0].oprval.mlit->v;
-						if (num)	/* forcenum or negate below replace the literal just added above */
-							unuse_literal(v);
 					}
 					assert(1 >= neg);
 					if (num)	/* if an "outer" OC_NEG or OC_FORCENUM, get it over with at compile time */
@@ -170,6 +165,7 @@ void unary_tail(oprtype *opr)
 								mv->sgn = !mv->sgn;
 						}
 						n2s(mv);
+						unuse_literal(v);
 						v = mv;
 						put_lit_s(v, t);
 					}

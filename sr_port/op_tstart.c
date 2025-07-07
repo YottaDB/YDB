@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -500,7 +500,7 @@ void	op_tstart(int implicit_flag, ...) /* value of $T when TSTART */
 				tpvent.var_name.addr = mvname->str.addr;
 				DBGRFCT((stderr, "\nop_tstart: Processing var %.*s\n", tpvent.var_name.len, tpvent.var_name.addr));
 				COMPUTE_HASH_MNAME(&tpvent);
-				tpvent.marked = FALSE;
+				tpvent.marked = NOT_MARKED;
 				if (add_hashtab_mname_symval(&curr_symval->h_symtab, &tpvent, NULL, &tabent))
 					lv_newname(tabent, curr_symval);
 				lv = (lv_val *)tabent->value;

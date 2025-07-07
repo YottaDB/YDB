@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -118,6 +118,7 @@ void zshow_devices(zshow_out *output)
 	static readonly char key[] = "KEY=";
 	static readonly char iv[] = "IV=";
 	static readonly char hup_text[] = "HUPENABLE";
+	static readonly char nozenable_text[] = "NOZENABLE";
 
 	/* gtmsocket specific */
 	static readonly char at_text[] = {'@'};
@@ -387,6 +388,12 @@ void zshow_devices(zshow_out *output)
 					temp_ptr = (d_tt_struct *)io_std_device->in->dev_sp;
 					if (hup_on && (tt_ptr->fildes == temp_ptr->fildes))
 						ZS_STR_OUT(&v, hup_text);
+					if (tt_ptr->nozenable && (tt_ptr->fildes == temp_ptr->fildes))
+					{
+						if (hup_on)	/* no trailing space in hup_text */
+							ZS_ONE_OUT(&v, space_text);
+						ZS_STR_OUT(&v, nozenable_text);
+					}
 					break;
 				case rm:
 					/* we go to rm_ptr above for the rm type */

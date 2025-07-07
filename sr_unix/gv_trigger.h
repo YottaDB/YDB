@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2021 Fidelity National Information	*
+ * Copyright (c) 2010-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -458,7 +458,7 @@ typedef struct gvtr_invoke_parms_struct
 	{	/* Allocate gv_target like structure for "^#t" global in this database file */	\
 		gvname.var_name.addr = HASHT_GBLNAME;						\
 		gvname.var_name.len = HASHT_GBLNAME_LEN;					\
-		gvname.marked = FALSE;								\
+		gvname.marked = NOT_MARKED;							\
 		COMPUTE_HASH_MNAME(&gvname);							\
 		hasht_tree = targ_alloc(CSA->hdr->max_key_size, &gvname, NULL);			\
 		hasht_tree->gd_csa = CSA;							\

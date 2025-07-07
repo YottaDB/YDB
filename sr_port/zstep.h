@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,6 +10,7 @@
  *								*
  ****************************************************************/
 
-#define ZSTEP_INTO 0
-#define ZSTEP_OUTOF 1
-#define ZSTEP_OVER 2
+#define ZSTEP_WHATEVER 0
+#define ZSTEP_INTO 1
+#define ZSTEP_OUTOF 2
+#define ZSTEP_OVER 3

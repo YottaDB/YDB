@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -46,7 +46,7 @@
 #include "gtm_utf8.h"
 #endif
 
-GBLREF boolean_t		async_dm_read, dmterm_default, gtm_utf8_mode, prin_in_dev_failure,
+GBLREF boolean_t		dmterm_default, gtm_utf8_mode, prin_in_dev_failure,
 				prin_out_dev_failure;
 GBLREF char			*CLR_EOL, *CURSOR_DOWN, *CURSOR_LEFT, *CURSOR_RIGHT, *CURSOR_UP;
 GBLREF char			*KEY_BACKSPACE, *KEY_DC, *KEY_DOWN, *KEY_INSERT, *KEY_LEFT, *KEY_RIGHT, *KEY_UP;
@@ -237,11 +237,7 @@ mval 	*dm_read (mval *v)
 				POP_MV_STENT();		/* pop if top of stack */
 			else if ((mv_stent *)((char *) mv_chain + mv_chain->mv_st_next) == mv_zintdev)
 			{	/* ZINTDEV buried under input line on stack, so pop both and replace mval */
-				POP_MV_STENT();
-				assert(mv_chain == mv_zintdev);
-				POP_MV_STENT();
-				dummy.mvtype = dummy.str.len = 0;
-				v = push_mval(&dummy);
+				assert(FALSE);
 			}
 			buffer_moved = (buffer_start != tt_state->buffer_start);
 			if (utf8_active)
@@ -328,9 +324,7 @@ mval 	*dm_read (mval *v)
 				tt_state->who_saved = dmread;
 				tt_state->length = length;
 				tt_state->buffer_start = buffer_start;
-				/* since op_oldvar is not called in case of SIGUSR1, pop mval from top of stack */
 				assert(MVST_MVAL == mv_chain->mv_st_type);
-				POP_MV_STENT();
 				PUSH_MV_STENT(MVST_ZINTDEV);
 				mv_chain->mv_st_cont.mvs_zintdev.curr_sp_buffer.addr = (char *)buffer_start;
 				mv_chain->mv_st_cont.mvs_zintdev.curr_sp_buffer.len = exp_length;
@@ -364,7 +358,6 @@ mval 	*dm_read (mval *v)
 			if (sighup == outofband)
 				exi_condition = -ERR_TERMHANGUP;
 			TAREF1(save_xfer_root, outofband).event_state = pending;
-			async_dm_read = TRUE;
 			async_action(FALSE);
 			break;
 		}

@@ -1,7 +1,7 @@
 
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -66,8 +66,8 @@ void bx_boollit(triple *t)
 			v[j] = &ref0->operand[0].oprval.mlit->v;
 			if (OC_COM == t->operand[j].oprval.tref->opcode)
 			{       /* any complement reduces the literal value to [unsigned] 1 or 0 */
-				unuse_literal(v[j]);
 				tv[j] = !MV_FORCE_BOOL(v[j]);
+				unuse_literal(v[j]);
 				assert(ref0 == optrip[j]);
 				PUT_LITERAL_TRUTH(tv[j], ref0);
 				v[j] = &ref0->operand[0].oprval.mlit->v;
@@ -78,9 +78,9 @@ void bx_boollit(triple *t)
 			num = OC_FORCENUM == t->operand[j].oprval.tref->opcode;
 			if (neg || num)
 			{	/* get literal into uniform state */
-				unuse_literal(v[j]);
 				mv = (mval *)mcalloc(SIZEOF(mval));
 				*mv = *v[j];
+				unuse_literal(v[j]);
 				if (neg)
 				{
 					if (MV_INT & mv->mvtype)

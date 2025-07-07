@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2018-2024 Fidelity National Information	*
+ * Copyright (c) 2018-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -84,10 +84,10 @@ void pop_real_xfer_queue_entry(int4* event_type, int4* param_val)
 		dqdel(entry, ev_que);
 		*param_val = entry->param_val;
 		if (*event_type == (TREF(save_xfer_root_ptr))->ev_que.fl->outofband)
-		{	/* This should not happen, but it did during testing. Fix it for PRO */
+		{	/* May happen if one event compiles the action of another; ensure the queue's clean for PRO */
+			assert(not_in_play == entry->event_state);
 			assert((TREF(save_xfer_root_ptr))->ev_que.fl == (TREF(save_xfer_root_ptr))->ev_que.bl);
 			assert(entry == (TREF(save_xfer_root_ptr))->ev_que.fl);
-			assert(FALSE); 									/* fix it in pro */
 			(TREF(save_xfer_root_ptr))->ev_que.fl = (TREF(save_xfer_root_ptr))->ev_que.bl = TREF(save_xfer_root_ptr);
 		}
 	}

@@ -249,12 +249,12 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 				 * Just do a gds_rundown and continue. Only change the exit status if ALL of the regions
 				 * were AUTODBs, we targeted one specific autodb region, or it's a set -file.
 				 */
-				gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(6) MAKE_MSG_INFO(ERR_JNLNOTALLOWED), 4,
-						LEN_AND_LIT("AUTODB"), DB_LEN_STR(gv_cur_region));
+				gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(8) MAKE_MSG_INFO(ERR_JNLNOTALLOWED), 6,
+						LEN_AND_LIT("AUTODB"), REG_LEN_STR(gv_cur_region), DB_LEN_STR(gv_cur_region));
 			} else
 			{
-				gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(6) ERR_JNLNOTALLOWED, 4, LEN_AND_LIT("AUTODB"),
-						DB_LEN_STR(gv_cur_region));
+				gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(8) ERR_JNLNOTALLOWED, 6, LEN_AND_LIT("AUTODB"),
+						REG_LEN_STR(gv_cur_region),DB_LEN_STR(gv_cur_region));
 				exit_status |= EXIT_WRN;
 			}
 			gds_rundown_status = gds_rundown(CLEANUP_UDI_TRUE, FALSE);

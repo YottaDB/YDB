@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -69,6 +69,7 @@
 #include "gtm_c_stack_trace.h"
 #include "relqop.h"
 #include "inline_atomic_pid.h"
+#include "inline_not_frozen.h" /* for not_frozen_chilled */
 
 #ifdef DEBUG
 GBLREF		int4		exit_state;
@@ -340,7 +341,7 @@ int4	wcs_wtstart(gd_region *region, int4 writes, wtstart_cr_list_t *cr_list_ptr,
 		}
 		if (NULL == csr)
 			break;				/* the queue is empty */
-		assert(!FROZEN_CHILLED(csa) || FREEZE_LATCH_HELD(csa));
+		assert(not_frozen_chilled(csa) || FREEZE_LATCH_HELD(csa));
 		if (csr == csrfirst)
 		{					/* completed a tour of the queue */
 			queue_empty = FALSE;
@@ -572,7 +573,8 @@ int4	wcs_wtstart(gd_region *region, int4 writes, wtstart_cr_list_t *cr_list_ptr,
 						sync_keys = TRUE;
 					else
 						skip_sync = TRUE;
-				}
+				} else if (NULL == csa->encr_key_handle)
+					sync_keys = TRUE;
 				if (skip_sync)
 				{
 					DBG_RECORD_BLOCK_ABORT(csd, csa, cnl, process_id);
@@ -589,6 +591,13 @@ int4	wcs_wtstart(gd_region *region, int4 writes, wtstart_cr_list_t *cr_list_ptr,
 					save_errno = gtmcrypt_errno;
 					if (0 == save_errno)
 						COPY_ENC_INFO(csd, csa->encr_ptr, cnl->reorg_encrypt_cycle);
+					else
+					{	/* Encryption keys unobtainable, issue an error */
+						reorg_encrypt_restart_csa = NULL; /* Reset this in case it is non-NULL */
+						err_status = gtmcrypt_errno =
+							SET_REPEAT_MSG_MASK((SET_CRYPTERR_MASK(ERR_CRYPTOPFAILED)));
+						break;
+					}
 					reorg_encrypt_restart_csa = NULL; /* Reset this in case it is non-NULL */
 				}
 				if (!skip_in_trans && (0 == save_errno))

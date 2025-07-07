@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -59,7 +59,7 @@ GBLREF	unsigned int	t_tries;
 error_def(ERR_LOCKSPACEFULL);
 error_def(ERR_LOCKSPACEINFO);
 
-#define LOCKGCINTP		"LOCKGCINTP"	 /* Garbage collection in the third retry is TPNOTACID */
+#define LOCKGCINTP		"A LOCK requiring LOCK_SPACE cleanup"	 /* Garbage collection in the third retry is TPNOTACID */
 
 /*
  * ------------------------------------------------------

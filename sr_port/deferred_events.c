@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -34,7 +34,7 @@
  */
 
 GBLREF boolean_t		is_tracing_on;				/* M profiling */
-GBLREF boolean_t		async_dm_read, tp_timeout_set_xfer;
+GBLREF boolean_t		tp_timeout_set_xfer;
 GBLREF intrpt_state_t		intrpt_ok_state;
 GBLREF io_pair			io_std_device;
 GBLREF size_t			gtmMallocErrorSize;			/* Size of malloc limit violation */
@@ -297,14 +297,12 @@ boolean_t real_xfer_reset(int4 event_type)
  */
 void async_action(bool lnfetch_or_start)
 {
-	boolean_t	ours, save_async_dm_read;
+	boolean_t	ours;
 	intrpt_state_t	prev_intrpt_state;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	assert(INTRPT_IN_EVENT_HANDLING != intrpt_ok_state);
-	save_async_dm_read = async_dm_read;
-	async_dm_read = FALSE;
 	DEFER_INTERRUPTS(INTRPT_IN_EVENT_HANDLING, prev_intrpt_state);
 	if (jobinterrupt == outofband)
 	{
@@ -312,7 +310,7 @@ void async_action(bool lnfetch_or_start)
 		{	/* This moderately desparate hack deals with interrupt flooding creeping through little state windows */
 			assert(active == TAREF1(save_xfer_root, outofband).event_state);
 			real_xfer_reset(jobinterrupt);
-			DEBUG_ONLY(gtm_fork_n_core());
+			ENABLE_EVENT_INTERRUPTS(prev_intrpt_state);
 			MUM_TSTART;
 		}
 		TAREF1(save_xfer_root, jobinterrupt).event_state = pending;	/* jobinterrupt gets a pass from the assert below */
@@ -340,8 +338,6 @@ void async_action(bool lnfetch_or_start)
 			break;
 		case ctrlc:							/* these go from pending to active here */
 			TAREF1(save_xfer_root, outofband).event_state = active;
-			if (save_async_dm_read && (MVST_MVAL == mv_chain->mv_st_type))
-				POP_MV_STENT();		/* In Direct Mode, so pop mval from top of stack to avoid memory leak */
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_CTRLC);
 			break;
 		case ctrap:

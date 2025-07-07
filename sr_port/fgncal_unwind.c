@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -68,7 +68,7 @@ void fgncal_unwind(void)
 			op_unwind();
 	}
 	for (mvc = mv_chain; mvc < (mv_stent *)local_fgncal_stack; mvc = (mv_stent *)(mvc->mv_st_next + (char *) mvc))
-		unw_mv_ent(mvc);
+		unw_mv_ent(mvc, UNWIND_NEWVARS);
 	mv_chain = mvc;
 	msp = local_fgncal_stack;
 	UNIX_ONLY(TREF(temp_fgncal_stack) = NULL);

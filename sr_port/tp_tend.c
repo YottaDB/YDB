@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -83,6 +83,7 @@
 #include "ztimeout_routines.h"
 #include "gtmdbglvl.h"		/* for GDL_UnconditionalEpoch */
 #include "inline_atomic_pid.h"
+#include "inline_not_frozen.h" /* for not_frozen_hard */
 
 GBLREF	uint4			dollar_tlevel;
 GBLREF	uint4			dollar_trestart;
@@ -1911,8 +1912,8 @@ boolean_t	tp_tend()
 			SET_CUR_CMT_STEP_IF(TRUE, csa->nl->cur_cmt_step, CMT12);
 			SET_CUR_CMT_STEP_IF((si == last_upd_tp_si_by_ftok), TREF(cur_cmt_step), CMT12);
 			/* should never increment curr_tn on a frozen database */
-			assert(!(FROZEN_HARD(csa) || (replication
-							&& IS_REPL_INST_FROZEN_JPL(update_jnlpool, TREF(defer_instance_freeze)))));
+			assert(not_frozen_hard(csa) || !(replication
+							&& IS_REPL_INST_FROZEN_JPL(update_jnlpool, TREF(defer_instance_freeze))));
 			/* For MM, barrier ensures blocks updates complete before incrementing db TN. Otherwise concurrent
 			 * processes could note a premature db TN value in gvcst_search and later fail to detect a block
 			 * modification.

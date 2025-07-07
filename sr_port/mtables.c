@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -157,7 +157,7 @@ LITDEF unsigned char mvs_size[] =
 	MV_SIZE(mvs_stck),
 	MV_SIZE(mvs_lvval),
 	MV_SIZE(mvs_trigr),
-	MV_SIZE(mvs_rstrtpc),
+	MV_SIZE(mvs_l_symtab),
 	MV_SIZE(mvs_storig),
 	MV_SIZE(mvs_mrgzwrsv)
 };
@@ -191,7 +191,7 @@ LITDEF boolean_t mvs_save[] =
 	TRUE,	/* MVST_STCK_SP */
 	TRUE,	/* MVST_LVAL */
 	FALSE,	/* MVST_TRIGR */
-	FALSE,	/* MVST_RSTRTPC (unused) */
+	TRUE,	/* MVST_L_SYMTAB */
 	TRUE,	/* MVST_STORIG */
 	FALSE	/* MVST_MRGZWRSV */
 };
@@ -1009,7 +1009,7 @@ LITDEF char vxi_opcode[][6] =
  */
 void mtables_chk(void)
 {
-	assert(SIZEOF(mvs_size) == (MVST_LAST + 1));
-	assert(SIZEOF(mvs_save) == (SIZEOF(boolean_t) * (MVST_LAST + 1)));
+	assert(SIZEOF(mvs_size) == (MVST_LAST));
+	assert(SIZEOF(mvs_save) == (SIZEOF(boolean_t) * (MVST_LAST)));
 }
 #endif

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -89,8 +89,8 @@ void op_xkill(UNIX_ONLY_COMMA(int n) mval *lvname_arg, ...)
 				assert(HTENT_VALID_MNAME(tabent, lv_val, lv));
 				if (lcl_stdxkill)
 				{	/* M Standard xkill variant - mark the hash table entry so it is not deleted */
-					assert(!tabent->key.marked);
-					tabent->key.marked = PRO_ONLY(TRUE) DEBUG_ONLY(lvtaskcycle);
+					assert(tabent->key.marked == NOT_MARKED);
+					tabent->key.marked = PRO_ONLY(XKILL_MARKED) DEBUG_ONLY(lvtaskcycle);
 					DEBUG_ONLY(vcnt++);
 				} else
 				{	/* GTM xkill variant - mark the lvval so it is not deleted for ANY variant */
@@ -113,12 +113,12 @@ void op_xkill(UNIX_ONLY_COMMA(int n) mval *lvname_arg, ...)
 			assert(LV_IS_BASE_VAR(lv));
 			if (lcl_stdxkill)
 			{	/* M Standard variant - delete this var if hashtab entry not marked (delete by name) */
-				if (!tabent->key.marked)
+				if (tabent->key.marked == NOT_MARKED)
 					lv_kill(lv, DOTPSAVE_TRUE, DO_SUBTREE_TRUE);
 				else
 				{	/* If marked, unmark it and reduce debug count to verify array was as we expected it */
 					assert(tabent->key.marked == lvtaskcycle);
-					tabent->key.marked = FALSE;
+					tabent->key.marked = NOT_MARKED;
 					DEBUG_ONLY(vcnt--);
 				}
 			} else

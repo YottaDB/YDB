@@ -63,6 +63,8 @@
 #endif
 #include "interlock.h"
 #include "do_semop.h"
+#include "inline_atomic_pid.h" /* for DEFINE_ATOMIC_OP(gtm_atomic_uint, ATOMIC_LOAD, memory_order_acquire) */
+#include "inline_not_frozen.h" /* for not_frozen_chilled */
 
 #define WARN_STATUS(jctl)											\
 if (SS_NORMAL != jctl->status)											\
@@ -824,7 +826,7 @@ boolean_t mur_close_files(void)
 				 * timeout with a SEQNUMSEARCHTIMEOUT error (if no GT.M processes have any flush timers active and
 				 * if online rollback does not do the flush either) so it is actually necessary.
 				 */
-				assert(!FROZEN_CHILLED(cs_addrs));
+				assert(not_frozen_chilled(cs_addrs));
 				wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH | WCSFLU_SYNC_EPOCH);
 			}
 			/* Note: udi/csa is used a little later after the "gds_rundown" call to determine if "db_ipcs_reset"

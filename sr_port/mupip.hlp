@@ -3567,6 +3567,11 @@
 
    -G[LOBAL_BUFFERS]=integer
 
+   MUPIP SET -FILE -GLOBAL_BUFFERS= implicitly adjusts trigger_flush_limit to
+   maintain the same ratio as it had with the previous global buffer
+   settings, unless the same command includes a -TRIGGER_FLUSH_LIMIT
+   specification.
+
    In general, increasing the number of global buffers improves performance
    by smoothing the peaks of I/O load on the system. However, increasing the
    number of global buffers also increases the memory requirements of the
@@ -3937,6 +3942,11 @@
    the TRIGGER_FLUSH qualifier is:
 
    -T[RIGGER_FLUSH]=integer
+
+   MUPIP SET -FILE -GLOBAL_BUFFERS= implicitly adjusts trigger_flush to
+   maintain the same ratio as it had with the previous global buffer
+   settings, unless the same command includes a -TRIGGER_FLUSH_LIMIT
+   specification.
 
 3 Version
    Version

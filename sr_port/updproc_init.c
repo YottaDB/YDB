@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -89,7 +89,8 @@ int updproc_init(gld_dbname_list **gld_db_files , seq_num *start_jnl_seqno)
 	 * So no need to do this initialization.
 	 */
 	gvinit();	/* get the desired global directory */
-	*gld_db_files = read_db_files_from_gld(gd_header);/* read all the database files to be opened in this global directory */
+	/* read all the database files to be opened in this global directory */
+	*gld_db_files = read_db_files_from_gld(gd_header, DO_NOT_OPEN_GTCM);
 	if (!updproc_open_files(gld_db_files, start_jnl_seqno)) /* open and initialize all regions */
 		mupip_exit(ERR_UPDATEFILEOPEN);
 	for (curr = *gld_db_files;  NULL != curr; curr = curr->next)

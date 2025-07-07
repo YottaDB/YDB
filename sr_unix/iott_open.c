@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -51,7 +51,7 @@ short iott_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 	unsigned char	ch;
 	d_tt_struct	*tt_ptr;
 	io_desc		*ioptr;
-	int		status, chset_index;
+	int		status, chset_index, dev_sp_size;
 	int		save_errno;
 	int		p_offset;
 	mstr		chset_mstr;
@@ -65,10 +65,12 @@ short iott_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 	ESTABLISH_RET_GTMIO_CH(&ioptr->pair, -1, ch_set);
 	if (ioptr->state == dev_never_opened)
 	{
-		dev_name->iod->dev_sp = (void *)malloc(SIZEOF(d_tt_struct) + SIZEOF(struct termios));
-		memset(dev_name->iod->dev_sp, 0, SIZEOF(d_tt_struct) + SIZEOF(struct termios));
+		dev_sp_size = SIZEOF(d_tt_struct) + (TTIO_NUM_TERMIOS * SIZEOF(struct termios));
+		dev_name->iod->dev_sp = (void *)malloc(dev_sp_size);
+		memset(dev_name->iod->dev_sp, 0, dev_sp_size);
 		tt_ptr = (d_tt_struct *)dev_name->iod->dev_sp;
 		tt_ptr->ttio_struct = (struct termios *)((char *)tt_ptr + SIZEOF(d_tt_struct));
+		tt_ptr->ttio_struct_start = (struct termios *)((char *)tt_ptr + SIZEOF(d_tt_struct) + SIZEOF(struct termios));
 		tt_ptr->in_buf_sz = TTDEF_BUF_SZ;
 		tt_ptr->enbld_outofbands.x = 0;
 		tt_ptr->term_ctrl &= (~TRM_NOECHO);
@@ -148,16 +150,19 @@ short iott_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 
 		assert(fd >= 0);
 		tt_ptr->fildes = fd;
-		status = tcgetattr(tt_ptr->fildes, tt_ptr->ttio_struct);
+		status = tcgetattr(tt_ptr->fildes, tt_ptr->ttio_struct_start);
 		if (0 != status)
 		{
 			save_errno = errno;
 			if (gtm_isanlp(tt_ptr->fildes) == 0)
 				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_TCGETATTR, 1, tt_ptr->fildes, save_errno);
 		}
+		memcpy(tt_ptr->ttio_struct, tt_ptr->ttio_struct_start, SIZEOF(struct termios));
 		if (IS_GTM_IMAGE)
-			/* Only the true runtime runs with the modified terminal settings */
+		{ /* Only the true runtime uses the modified terminal settings */
 			iott_setterm(ioptr);
+			tt_ptr->ttio_modified = TRUE;
+		}
 		status = getcaps(tt_ptr->fildes);
 		if (1 != status)
 		{

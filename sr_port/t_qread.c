@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -53,6 +53,7 @@
 #include "gtm_c_stack_trace.h"
 #include "gtm_time.h"
 #include "process_reorg_encrypt_restart.h"
+#include "mupip_reorg_encrypt.h" /* for MUPIP_REORG_IN_PROG_FALSE */
 #include "wcs_backoff.h"
 #include "wcs_wt.h"
 #include "wcs_recover.h"
@@ -233,7 +234,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 	uint4			blocking_pid;
 	cache_rec_ptr_t		cr;
 	bt_rec_ptr_t		bt;
-	boolean_t		clustered, hold_onto_crit, was_crit, issued_db_init_crypt_warning, sync_needed;
+	boolean_t		clustered, hold_onto_crit, was_crit, wrong_keys = FALSE, sync_needed;
 	int			dummy, exceed_sleep_count, lcnt, ocnt;
 	cw_set_element		*cse;
 	block_ref		chain1;
@@ -465,17 +466,21 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 		 */
 		assert(!was_crit || (cnl->reorg_encrypt_cycle == encr_ptr->reorg_encrypt_cycle));
 		seg = gv_cur_region->dyn.addr;
-		/* Concurrent REORGs can induce crypt warnings. Only error out if reorg_encrypt_cycle matches */
-		issued_db_init_crypt_warning = ((cnl->reorg_encrypt_cycle == encr_ptr->reorg_encrypt_cycle) ?
-							encr_ptr->issued_db_init_crypt_warning : FALSE);
-		if (!IS_BITMAP_BLK(blk) && issued_db_init_crypt_warning)
-		{	/* A non-GT.M process is attempting to read a non-bitmap block, yet it has previously encountered an error
+		/* Concurrent REORGs can induce crypt warnings. Only error out if reorg_encrypt_cycle matches or if a key
+		 * setup error occured: issued_db_init_crypt_warning is TRUE OR encr_key_handle is NULL with an encrypted DB
+		 */
+		if (cnl->reorg_encrypt_cycle == encr_ptr->reorg_encrypt_cycle)
+			wrong_keys = (encr_ptr->issued_db_init_crypt_warning ||			/* key setup error occurred */
+					((GTMCRYPT_INVALID_KEY_HANDLE == csa->encr_key_handle)  /* OR No key with an */
+						 && (IS_ENCRYPTED(csd->is_encrypted))));	/*    encrypted DB */
+		if (!IS_BITMAP_BLK(blk) && wrong_keys)
+		{	/* A GT.M process is attempting to read a non-bitmap block, yet it has previously encountered an error
 			 * during db_init (because it did not have access to the encryption keys) and reported it with a -W-
 			 * severity. Since the block it is attempting to read can be in the unencrypted shared memory (read from
 			 * disk by another process with access to the encryption keys), we cannot let it access it without a valid
 			 * handle, so issue an rts_error.
+			 * NOTE: MUMPS processes can get here if an error handler ignores CRYPTKEYFETCHFAILED
 			 */
-			assert(!IS_GTM_IMAGE);	/* GT.M would have error'ed out in db_init */
 			gtmcrypt_errno = SET_REPEAT_MSG_MASK(SET_CRYPTERR_MASK(ERR_CRYPTBADCONFIG));
 			GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, rts_error, seg->fname_len, seg->fname);
 		} else if (cnl->reorg_encrypt_cycle != encr_ptr->reorg_encrypt_cycle)

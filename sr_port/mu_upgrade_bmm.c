@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2021-2024 Fidelity National Information	*
+ * Copyright (c) 2021-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -128,7 +128,7 @@ error_def(ERR_TEXT);
  ******************************************************************************************/
 int4	mu_upgrade_bmm(gd_region *reg, size_t blocks_needed)
 {
-	boolean_t		dt, is_bg, is_mm, mv_blk_err;
+	boolean_t		adjust_for_first_blk, dt, is_bg, is_mm, mv_blk_err;
 	block_id		blks_in_way, curbml, new_blk_num, offset, old_blk_num, t_blk_num, old_vbn;
 	block_id_32		lost;
 	blk_hdr			blkHdr;
@@ -467,9 +467,10 @@ int4	mu_upgrade_bmm(gd_region *reg, size_t blocks_needed)
 							blkHdr.levl, &old_blk_num, &new_blk_num, &t_blk_num);
 				blk_moved_cnt++;
 			} else
-			{	/* The block being moved is a root block */
-				t_blk_num -= blks_in_way;
-				move_root_block(new_blk_num++, old_blk_num, gvnh_reg, &kill_set_list);
+			{	/* The block being moved is a root block; Treat the first new_blk_num differently */
+				adjust_for_first_blk = ((blks_in_way + 2) >= new_blk_num);
+				t_blk_num = t_blk_num - blks_in_way + adjust_for_first_blk;
+				move_root_block(new_blk_num++, old_blk_num, gvnh_reg, &kill_set_list, adjust_for_first_blk);
 				if (debug_mupip)
 					util_out_print("moved level !UL root block 0x!@XQ to 0x!@XQ (0x!@XQ).", TRUE,
 							blkHdr.levl, &old_blk_num, &new_blk_num, &t_blk_num);
@@ -564,7 +565,7 @@ int4	mu_upgrade_bmm(gd_region *reg, size_t blocks_needed)
 	t_begin_crit(ERR_MUNOUPGRD);
 	kill_set_list.used = 0;
 	/* WARNING assignment below; pre-decrement new_blk_num */
-	if (SS_NORMAL != (status = move_root_block(--new_blk_num, old_blk_num, gvnh_reg, &kill_set_list)))
+	if (SS_NORMAL != (status = move_root_block(--new_blk_num, old_blk_num, gvnh_reg, &kill_set_list, FALSE)))
 	{	/* relocation of the DIR_ROOT (block 1) failed */
 		assert(SS_NORMAL == status);
 		t_abort(gv_cur_region, cs_addrs);				/* do crit and other cleanup */
@@ -986,10 +987,12 @@ enum cdb_sc gen_hist_for_blk(srch_blk_status *blkhist, sm_uc_ptr_t blkBase2, sm_
  *	old_blk_num specifies the block to move
  *	gvnh_reg points to a region structure with hashed names
  *	kill_set_list points to a structure for managing blocks to be freed by the swap
+ *	preincr_new_blk_num TRUE/FALSE indicates need to pre-increment new_blk_num to handle move of a GVT root
  * Output Parameters:
  *	(int4)SS_NORMAL or ERR_MUNOUPGRD
  ******************************************************************************************/
-int4	move_root_block(block_id new_blk_num, block_id old_blk_num, gvnh_reg_t *gvnh_reg, kill_set *kill_set_list)
+int4	move_root_block(block_id new_blk_num, block_id old_blk_num, gvnh_reg_t *gvnh_reg, kill_set *kill_set_list,
+		boolean_t preincr_new_blk_num)
 {
 	block_id		did_block;
 	glist			root_tag;
@@ -1005,14 +1008,14 @@ int4	move_root_block(block_id new_blk_num, block_id old_blk_num, gvnh_reg_t *gvn
 	root_tag.reg = gv_cur_region;
 	root_tag.gvt = gv_target;
 	root_tag.gvnh_reg = gvnh_reg;
-	t_abort(gv_cur_region, cs_addrs);						/* mu_swap_root[_blk] does its own crit */
+	t_abort(gv_cur_region, cs_addrs);					/* mu_swap_root[_blk] does its own crit */
 	mu_reorg_process = TRUE;
 	assert(mu_upgrade_in_prog);
 	status = SS_NORMAL;
 	memcpy(gv_target->alt_hist, &(gv_target->hist), SIZEOF(srch_hist));
 	if (DIR_ROOT != old_blk_num)
 	{	/* global tree root */
-		mu_swap_root(&root_tag, &root_swap_stat, new_blk_num++);
+		mu_swap_root(&root_tag, &root_swap_stat, (preincr_new_blk_num) ? ++new_blk_num: new_blk_num++);
 	} else
 	{	/* directory tree root */
 		assert(0 == csd->kill_in_prog);
@@ -1141,7 +1144,8 @@ enum cdb_sc ditch_dead_globals(block_id curr_blk, block_id offset, cache_rec_ptr
 		if (cdb_sc_starrecord == status)
 		{	/* Reuse the last key's history to use with *-key as the *-key has none of its own */
 			assert((((rec_hdr_ptr_t)recBase)->rsiz + recBase == blkEnd) && (0 != dirHist.level));
-			memcpy(gv_target->alt_hist, &(gv_target->hist), SIZEOF(srch_hist));
+			if (gv_target)
+				memcpy(gv_target->alt_hist, &(gv_target->hist), SIZEOF(srch_hist));
 			key_len = 0;
 		} else if (cdb_sc_normal != status)
 		{	/* failed to parse record */

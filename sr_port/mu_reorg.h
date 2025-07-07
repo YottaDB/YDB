@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -100,6 +100,18 @@ typedef char *dbg_osf_short_char_ptr_t;
 {													\
 	DBG_CHECK_KEY_ALLOCATION_SIZE(KEY);								\
 	STATUS = read_record(REC_SIZE_PTR, KEY_CMPC_PTR, KEY_LEN_PTR, KEY, LEVEL, BLK_STAT, REC_BASE);	\
+}
+
+#define IS_REORG_UP_ACTIVE(CNL)	((0 != (CNL)->reorg_upgrade_pid) && (is_proc_alive((CNL)->reorg_upgrade_pid, 0)))
+
+#define MSG_REORGUPCNFLCT(CSA, LITARG1, LITARG2)							\
+{													\
+	send_msg_csa(CSA_ARG(CSA) VARLSTCNT(7) MAKE_MSG_INFO(ERR_REORGUPCNFLCT), 5,			\
+			LEN_AND_LIT(LITARG1), LEN_AND_LIT(LITARG2),					\
+			((sgmnt_addrs *)CSA)->nl->reorg_upgrade_pid);					\
+	gtm_putmsg_csa(CSA_ARG(CSA) VARLSTCNT(7) MAKE_MSG_INFO(ERR_REORGUPCNFLCT), 5,			\
+			LEN_AND_LIT(LITARG1), LEN_AND_LIT(LITARG2),					\
+			((sgmnt_addrs *)CSA)->nl->reorg_upgrade_pid);					\
 }
 
 enum reorg_options {	DEFAULT = 0,

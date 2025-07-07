@@ -88,7 +88,7 @@ MBSTART {														\
 	int		fn_len;												\
 	char		*fn;												\
 	boolean_t	do_crypt_init;											\
-	boolean_t	shoulda_crypt_init;											\
+	boolean_t	shoulda_crypt_init;										\
 	DEBUG_ONLY(boolean_t	was_gtmcrypt_initialized = gtmcrypt_initialized);					\
 															\
 	do_crypt_init = ((USES_ENCRYPTION(CSD->is_encrypted)) && !IS_LKE_IMAGE && CSA->encr_ptr				\
@@ -964,10 +964,8 @@ void gvcst_init(gd_region *reg, gd_addr *addr)
 	}
 	SET_CSA_DIR_TREE(csa, reg->max_key_size, reg);
 	assert(reg->open);
-	/* Now that reg->open is set to TRUE and directory tree is initialized, go ahead and set rts_error back to being usable */
+	/* Now reg->open is TRUE and internal structures are initialized, go ahead and set rts_error back to being usable */
 	DBG_MARK_RTS_ERROR_USABLE;
-	/* Do the deferred encryption initialization now in case it needs to issue an rts_error */
-	INIT_DEFERRED_DB_ENCRYPTION_IF_NEEDED(reg, csa, csd);
 	/* gds_rundown if invoked from now on will take care of cleaning up the shared memory segment */
 	/* The below code, until the ENABLE_INTERRUPTS(INTRPT_IN_GVCST_INIT, prev_intrpt_state), can do mallocs which in turn
 	 * can issue a GTM-E-MEMORY error which would invoke rts_error. Hence these have to be done AFTER the
@@ -1179,6 +1177,11 @@ void gvcst_init(gd_region *reg, gd_addr *addr)
 		DBG_CHECK_TP_REG_LIST_SORTING(tp_reg_list);
 		TREF(max_fid_index) = max_fid_index;
 	}
+	/* Do deferred encryption initialization AFTER internal structures setup. Prior rts_errors cause processes to exit.
+	 * rts_errors from encryption initialize failures can be trapped and ignored. Without internal structure setup, processes
+	 * can attempt to dereference unallocated memory resulting in a SIG-11.
+	 */
+	INIT_DEFERRED_DB_ENCRYPTION_IF_NEEDED(reg, csa, csd);
 	if (pool_init && REPL_ALLOWED(csd) && jnlpool_init_needed)
 	{
 		/* Last parameter to VALIDATE_INITIALIZED_JNLPOOL is TRUE if the process does logical updates and FALSE otherwise.

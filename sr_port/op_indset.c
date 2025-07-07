@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -48,7 +49,7 @@ void	op_indset(mval *target, mval *value)
 		{
 			targ_key.var_name = target->str;
 			COMPUTE_HASH_MNAME(&targ_key);
-			targ_key.marked = FALSE;
+			targ_key.marked = NOT_MARKED;
 			if (add_hashtab_mname_symval(&curr_symval->h_symtab, &targ_key, NULL, &tabent))
 				lv_newname(tabent, curr_symval);
 			((lv_val *)tabent->value)->v = *value;

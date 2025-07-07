@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -144,11 +144,10 @@ int unw_retarg(mval *src, boolean_t alias_return)
 	 * the point where we can find where to put the quit value.
 	 */
 	unwind_nocounts();
-	assert(frame_pointer && (frame_pointer->type & SFT_COUNT));
 	while (mv_chain < (mv_stent *)frame_pointer)
 	{
 		msp = (unsigned char *)mv_chain;
-		unw_mv_ent(mv_chain);
+		unw_mv_ent(mv_chain, UNWIND_NEWVARS);
 		POP_MV_STENT();
 	}
 	if (0 <= frame_pointer->dollar_test)

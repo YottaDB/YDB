@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -43,6 +43,8 @@
 #include "interlock.h"
 #include "util.h"
 #include "arlinkdbg.h"
+#include "deferred_events_queue.h"
+#include "zstep.h"
 
 /* Define linkage types */
 typedef enum
@@ -508,6 +510,8 @@ boolean_t incr_link(int *file_desc, zro_ent *zro_entry, uint4 fname_len, char *f
 			/* Info level message that link was bypassed. Since this could pollute the error buffer, save and
 			 * restore it across the info message we put out (it is either displayed or it isn't - no need to cache it.
 			 */
+			if (not_in_play < TAREF1(save_xfer_root, zstep_pending).event_state)
+				op_zstep(ZSTEP_WHATEVER, NULL);			/* ZSTEP in play - try not to lose it */
 			DBGARLNK((stderr, "incr_link: Bypassing (re)zlink for routine %.*s (old rhead 0x"lvaddr") - same objhash\n",
 				  old_rhead->routine_name.len, old_rhead->routine_name.addr, old_rhead));
 #			ifdef ZLINK_BYPASS /* #ifdef'd out for now due to issues with ERRWETRAP */

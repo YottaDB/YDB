@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -38,6 +38,7 @@ void op_zstep(uint4 code, mval *action)
 	intrpt_state_t	prev_intrpt_state = INTRPT_NUM_STATES;
 	save_xfer_entry	*entry;
 	stack_frame	*fp;
+	xfer_entry_t	curr_entry;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -60,6 +61,9 @@ void op_zstep(uint4 code, mval *action)
 		TAREF1(save_xfer_root, zstep_pending).event_state = not_in_play;
 		return;
 	}
+	if ((ZSTEP_WHATEVER == code)	/* WHATEVER used by callers to mean work with available state to reestablish ZSTEP */
+			&& ((op_linefetch == (curr_entry = xfer_table[xf_linefetch])) || (op_mproflinefetch == curr_entry)))
+		code = ZSTEP_INTO;			/* if no evidence of current code default to INTO */
 	/* WARNING! AIO sets multi_thread_in_use which disables DEFER_INTERRUPTS, treat it like an active event */
 	if (!(already_ev_handling = ((INTRPT_IN_EVENT_HANDLING == intrpt_ok_state) || multi_thread_in_use)))
 		DEFER_INTERRUPTS(INTRPT_IN_EVENT_HANDLING, prev_intrpt_state);
@@ -83,6 +87,8 @@ void op_zstep(uint4 code, mval *action)
 	}
 	switch(code)
 	{
+		case ZSTEP_WHATEVER:
+			break;						/* rely on what's already there */
 		case ZSTEP_INTO:
 			DBGDFRDEVNT((stderr, "%d %s: INTO \n", __LINE__, __FILE__));
 			FIX_XFER_ENTRY(xf_linefetch, op_zstepfetch);	/* shim: transfers to op_zst_break */

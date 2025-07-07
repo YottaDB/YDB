@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -54,6 +54,7 @@ GBLREF	tp_frame	*tp_pointer;
 GBLREF	unsigned char	*msp, *stackbase, *stacktop;
 GBLREF	void		(*unw_prof_frame_ptr)(void);
 GBLREF	volatile int4	outofband;
+GBLREF symval			*curr_symval;
 
 error_def(ERR_STACKUNDERFLO);
 error_def(ERR_TPQUIT);
@@ -61,10 +62,14 @@ error_def(ERR_TPQUIT);
 /* This has to be maintained in parallel with unw_retarg(), the unwind with a return argument (extrinisic quit) routine. */
 void op_unwind(void)
 {
-	boolean_t	defer_tptimeout, defer_ztimeout;
-	mv_stent	*mvc;
+	boolean_t	will_underflow;
+	mv_stent	*mvc, *mv_prev, *mv_curr;
+	unsigned int	lcl_type, lcl_diff, lcl_size;
+	unsigned char	*lcl_msp, *lcl_mv_chain;
 	rhdtyp		*rtnhdr;
-	DBGEHND_ONLY(stack_frame *prevfp;)
+	stack_frame 	*prevfp;
+	unsigned short	prevtype;
+	boolean_t	unwound_stent;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -74,7 +79,9 @@ void op_unwind(void)
 		if (NULL != alias_retarg)
 			CLEAR_ALIAS_RETARG;
 	}
-	DBGEHND_ONLY(prevfp = frame_pointer);
+	prevfp = frame_pointer;
+	/* Once we pop off this frame we can overwrite this with moved new'd vars, so store for assert */
+	prevtype = prevfp ? prevfp->type : 0;
 	if (tp_pointer && tp_pointer->fp <= frame_pointer)
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_TPQUIT);
 	/* Note that error_ret() should be invoked only after the rts_error() of TPQUIT.
@@ -100,10 +107,28 @@ void op_unwind(void)
 	assert(frame_pointer <= (stack_frame*)stackbase && frame_pointer > (stack_frame *)stacktop);
 	/* See if unwinding an indirect frame */
 	IF_INDR_FRAME_CLEANUP_CACHE_ENTRY(frame_pointer);
+	mv_prev = NULL;
+	will_underflow = (stackbase < ((unsigned char *)frame_pointer + SIZEOF(stack_frame)));
+	will_underflow = will_underflow || (frame_pointer->old_frame_pointer
+			&& ((frame_pointer->old_frame_pointer < (stack_frame *)((char *)frame_pointer + SIZEOF(stack_frame)))
+				|| (frame_pointer->old_frame_pointer > (stack_frame *)stackbase)
+				|| (frame_pointer->old_frame_pointer < (stack_frame *)stacktop)));
+	lcl_diff = ((unsigned char *)mv_chain - stacktop);
 	for (mvc = mv_chain; mvc < (mv_stent *)frame_pointer; )
 	{
-		unw_mv_ent(mvc);
+		unwound_stent = unw_mv_ent(mvc,
+				((will_underflow || (SFT_COUNT & frame_pointer->type)) ? UNWIND_NEWVARS : RETAIN_NEWVARS));
+		mv_curr = mvc;
 		mvc = (mv_stent *)(mvc->mv_st_next + (char *)mvc);
+		if (!unwound_stent)
+		{
+			assert((!will_underflow && !(SFT_COUNT & frame_pointer->type) && ((MVST_MSAV == mv_curr->mv_st_type)
+				|| (MVST_NVAL == mv_curr->mv_st_type) || (MVST_STAB == mv_curr->mv_st_type)
+				|| (MVST_L_SYMTAB == mv_curr->mv_st_type))));
+			/* Create backwards list of stack elements to push */
+			mv_curr->mv_st_next = (mv_prev) ? ((char *)mv_curr - (char *)mv_prev) : 0;
+			mv_prev = mv_curr;
+		}
 	}
 	if (0 <= frame_pointer->dollar_test)		/* get dollar_test if it has been set */
 		dollar_truth = frame_pointer->dollar_test;
@@ -131,6 +156,25 @@ void op_unwind(void)
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STACKUNDERFLO);
 		assert((frame_pointer < frame_pointer->old_frame_pointer) || (NULL == frame_pointer->old_frame_pointer));
 	}
+	assert(!will_underflow);
+	lcl_msp = msp;
+	lcl_mv_chain = (unsigned char *)mv_chain;
+	for (mv_curr = mv_prev, mv_prev = NULL; mv_curr != mv_prev;
+			mv_prev = mv_curr, mv_curr = (mv_stent *)((char *)mv_curr - mv_curr->mv_st_next))
+	{
+		assert((lcl_msp - mvs_size[mv_curr->mv_st_type]) >= ((unsigned char *)mv_curr + mvs_size[mv_curr->mv_st_type]));
+		assert(prevfp && !(SFT_COUNT & prevtype));
+		lcl_type = mv_curr->mv_st_type;
+		lcl_size = mvs_size[lcl_type];
+		lcl_msp -= lcl_size;
+		memcpy(lcl_msp, mv_curr, lcl_size);
+		lcl_diff = (lcl_mv_chain - lcl_msp);
+		assert(((mv_stent *)lcl_msp)->mv_st_type == lcl_type);
+		((mv_stent *)lcl_msp)->mv_st_next = lcl_diff;
+		lcl_mv_chain = lcl_msp;
+	}
+	msp = lcl_msp;
+	mv_chain = (mv_stent *)lcl_mv_chain;
 	USHBIN_ONLY(CLEANUP_COPIED_RECURSIVE_RTN(rtnhdr));
 	/* We just unwound a frame. May have been either a zintrupt frame and/or may have unwound a NEW'd ZTRAP or even cleared
 	 * our error state. If we have a deferred timeout and none of the deferral conditions are anymore in effect, release

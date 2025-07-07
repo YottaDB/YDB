@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -38,116 +38,64 @@ GBLREF stack_frame	*frame_pointer;
 error_def(ERR_STACKOFLOW);
 error_def(ERR_STACKCRIT);
 
-int4 symbinit(void)
+boolean_t symbinit(void)
 {
+	long		ls_size;
 	int		size;
-	int4		shift_size, ls_size, temp_size;
-	mv_stent	*mv_st_ent, *mvst_tmp, *mvst_prev;
-	stack_frame	*fp, *fp_prev, *fp_fix;
+	int4		shift_size, temp_size;
+	mv_stent	*mv_st_ent, *mvst_tmp, *mvst_prev, *mv_st_stab;
+	stack_frame	*fp, *fp_prev = NULL, *fp_fix;
 	symval		*ptr;
+	ht_ent_mname	**new_lsym_addr = NULL, **old_lsym_addr = NULL;
 	unsigned char	*l_syms, *msp_save, *old_sp, *top;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	if (frame_pointer->type & SFT_COUNT)
+
+	/* An MVST_L_SYMTAB generally contains references to entries in an MVST_STAB, so it is safer to pop the L_SYMTAB
+	 * before popping the STAB. Push them in the reverse order to guarantee that.
+	 */
+	PUSH_MV_STENT(MVST_STAB);
+	mv_st_stab = mv_chain;
+	/* Special case to detect initialization failure. It would be better not to malloc at all and instead to reserve
+	 * stack space - in principle it is possible since the necessary space would be no larger than an ordinary l_symtab,
+	 * many of which are already on the stack without a problem. The only concern is the limited mvs_size array, which
+	 * limits maximum mv_stent sizes to CHAR_MAX. If this is ever expanded to a uint array, the malloc here should be
+	 * re-examined.
+	 */
+	mv_st_stab->mv_st_cont.mvs_stab = (symval *)NULL;
+	/* Find the most recent counted frame */
+	for (fp = frame_pointer; !(fp->type & SFT_COUNT); fp_prev = fp, fp = fp->old_frame_pointer)
+		;
+	/* Check if it needs an l_symtab independent of its parent */
+	temp_size = fp->rvector->temp_size;
+	size = fp->vartab_len;
+	ls_size = size * SIZEOF(ht_ent_mname *);
+	if (fp->old_frame_pointer && (fp->l_symtab == fp->old_frame_pointer->l_symtab))
 	{
-		temp_size = frame_pointer->rvector->temp_size;
-		size = frame_pointer->vartab_len;
-		ls_size = size * SIZEOF(ht_ent_mname *);
-		if (frame_pointer->l_symtab != (ht_ent_mname **)((char *)frame_pointer - temp_size - ls_size))
-		{
-			msp_save = msp;
-			msp -= ls_size;
-			if (msp <= stackwarn || msp > stackbase)
-		   	{
-				if (msp <= stacktop || msp > stackbase)
-		   		{
-					msp = msp_save;
-					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_STACKOFLOW);
-		   		} else
-				   	RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_STACKCRIT);
-		   	}
-			frame_pointer->l_symtab = (ht_ent_mname **)msp;
-		}
-		PUSH_MV_STENT(MVST_STAB);
+		assert(fp->l_symtab != (ht_ent_mname **)((char *)fp - temp_size - ls_size));
+		/* Assert that this is the only frame we need to treat like this */
+		assert(!fp_prev || fp_prev->l_symtab != fp->l_symtab);
+		old_lsym_addr = fp->l_symtab;
+		PUSH_MV_STENT(MVST_L_SYMTAB);
 		mv_st_ent = mv_chain;
-		l_syms =  (unsigned char *)frame_pointer->l_symtab;
-		shift_size = 0;
-	} else
-	{
-		fp = frame_pointer;
-		fp_prev = fp->old_frame_pointer;
-		assert(fp_prev);
-		while (!(fp_prev->type & SFT_COUNT))
-		{
-			fp = fp_prev;
-			fp_prev = fp->old_frame_pointer;
-			assert(fp_prev);
-		}
-		top = (unsigned char *)(fp + 1);
-		old_sp = msp;
-		temp_size = fp_prev->rvector->temp_size;
-		size = fp_prev->vartab_len;
-		ls_size = size * SIZEOF(ht_ent_mname *);
-		shift_size = MVST_STAB_SIZE;
-		if (fp_prev->l_symtab != (ht_ent_mname **)((char *)fp_prev - ls_size - temp_size))
-			shift_size += ls_size;
-		msp -= shift_size;
-	   	if (msp <= stackwarn)
-	   	{
-			if (msp <= stacktop)
-	   		{
-				msp = old_sp;
-				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_STACKOFLOW);
-	   		} else
-			   	RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_STACKCRIT);
-	   	}
-		memmove(msp, old_sp, top - (unsigned char *)old_sp);	/* Shift stack w/possible overlapping range */
-		if (shift_size > MVST_STAB_SIZE)
-			fp_prev->l_symtab = (ht_ent_mname **)(top - shift_size);
-		l_syms = (unsigned char *)fp_prev->l_symtab;
-		mv_st_ent = (mv_stent *)(top - MVST_STAB_SIZE);
-		mv_st_ent->mv_st_type = MVST_STAB;
-		ADJUST_FRAME_POINTER(frame_pointer, shift_size);
-		for (fp_fix = frame_pointer; fp_fix != fp_prev ;fp_fix = fp_fix->old_frame_pointer)
-		{
-			if ((unsigned char *)fp_fix->l_symtab < top && (unsigned char *)fp_fix->l_symtab > stacktop)
-			{
-				fp_fix->l_symtab = (ht_ent_mname **)((char *)fp_fix->l_symtab - shift_size);
-				if ((unsigned char *)fp_fix->l_symtab < (unsigned char *)fp_fix)
-					memset((unsigned char *)fp_fix->l_symtab, 0, fp_fix->vartab_len * SIZEOF(ht_ent_mname *));
-			}
-			if (fp_fix->temps_ptr < top && fp_fix->temps_ptr > stacktop)
-				fp_fix->temps_ptr -= shift_size;
-			if (fp_fix->vartab_ptr < (char *)top && fp_fix->vartab_ptr > (char *)stacktop)
-				fp_fix->vartab_ptr -= shift_size;
-			if ((unsigned char *)fp_fix->old_frame_pointer < top && (unsigned char *)fp_fix->old_frame_pointer
-				> stacktop)
-			{
-				ADJUST_FRAME_POINTER(fp_fix->old_frame_pointer, shift_size);
-			}
-		}
-		if ((unsigned char *)mv_chain >= top)
-		{
-			mv_st_ent->mv_st_next = (uint4)((char *)mv_chain - (char *)mv_st_ent);
-			mv_chain = mv_st_ent;
-		} else
-		{
-			fp = (stack_frame *)((char *)fp - shift_size);
-			mv_chain = (mv_stent *)((char *)mv_chain - shift_size);
-			mvst_tmp = mv_chain;
-			mvst_prev = (mv_stent *)((char *)mvst_tmp + mvst_tmp->mv_st_next);
-			while (mvst_prev < (mv_stent *)fp)
-			{
-				mvst_tmp = mvst_prev;
-				mvst_prev = (mv_stent *)((char *)mvst_tmp + mvst_tmp->mv_st_next);
-			}
-			mvst_tmp->mv_st_next = (uint4)((char *)mv_st_ent - (char *)mvst_tmp);
-			mv_st_ent->mv_st_next = (uint4)((char *)mvst_prev - (char *)mv_st_ent + shift_size);
-		}
+		mv_st_ent->mv_st_cont.mvs_l_symtab.size = ls_size;
+		/* handle OOM condition similar to MVST_STAB with originally NULL ptr */
+		mv_st_ent->mv_st_cont.mvs_l_symtab.l_symtab = NULL;
+#		ifdef DEBUG
+		mv_st_ent->mv_st_cont.mvs_l_symtab.old_l_symtab = old_lsym_addr;
+#		endif
+		new_lsym_addr = malloc(ls_size);
+		mv_st_ent->mv_st_cont.mvs_l_symtab.l_symtab = new_lsym_addr;
+		fp->l_symtab = new_lsym_addr;
 	}
-	mv_st_ent->mv_st_cont.mvs_stab = (symval *)NULL;	/* special case this so failed initialization can be detected */
-	memset(l_syms, 0, ls_size);
+	for (fp_fix = frame_pointer; fp_fix != fp; fp_fix = fp_fix->old_frame_pointer)
+	{
+		assert(!(fp_fix->type & SFT_COUNT));
+		memset(fp_fix->l_symtab, 0, fp_fix->vartab_len * SIZEOF(ht_ent_mname *));
+	}
+	assert(ls_size == fp->vartab_len * SIZEOF(ht_ent_mname *));
+	memset(fp->l_symtab, 0, ls_size);
 	size++;
 	ptr = (symval *)malloc(SIZEOF(symval));
 	/* the order of initialization of fields mirrors the layout of the fields in the symval structure definition */
@@ -176,6 +124,6 @@ int4 symbinit(void)
 		 ptr, curr_symval));
 	curr_symval = ptr;
 	(TREF(curr_symval_cycle))++;				/* curr_symval is changing - update cycle */
-	mv_st_ent->mv_st_cont.mvs_stab = ptr;
-	return shift_size;
+	mv_st_stab->mv_st_cont.mvs_stab = ptr;
+	return fp != frame_pointer;
 }

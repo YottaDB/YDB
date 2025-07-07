@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2023 Fidelity National Information	*
+ * Copyright (c) 2006-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -156,6 +156,8 @@ int gtmsource_checkhealth(void)
 	{
 		for (reg = gd_header->regions, region_top = gd_header->regions + gd_header->n_regions; reg < region_top; reg++)
 		{
+			if (reg_cmcheck(reg))
+				continue;
 			csa = &FILE_INFO(reg)->s_addrs;
 			csd = csa->hdr;
 			if (REPL_WAS_ENABLED(csd))

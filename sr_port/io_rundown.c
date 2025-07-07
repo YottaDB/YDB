@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -12,9 +12,11 @@
 
 #include "mdef.h"
 
+#include "invocation_mode.h"
 #include "io.h"
 #include "iosp.h"
 #include "io_params.h"
+#include "iott_setterm.h"
 #include "error.h"
 
 GBLREF boolean_t	prin_in_dev_failure, prin_out_dev_failure;
@@ -44,6 +46,10 @@ void io_rundown (int rundown_type)
 				|| ((RUNDOWN_EXCEPT_STD == rundown_type)
 					&& ((l->iod->pair.in != io_std_device.in) && (l->iod->pair.out != io_std_device.out))))
 				io_dev_close(l);
+			else if ((tt == l->iod->pair.in->type) && (MUMPS_CALLIN == invocation_mode)
+				&& (RUNDOWN_EXCEPT_STD == rundown_type)
+				&& (l->iod->pair.in == io_std_device.in))
+				iott_resetterm(l->iod->pair.in);		/* restore termios attributes if stdin and tt */
 		}
 	}
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -62,7 +62,7 @@ void op_xnew(unsigned int argcnt_arg, mval *s_arg, ...)
 	ht_ent_mname		*tabent1, *tabent2;
 	hash_table_mname	*htold, *htnew;
 	int			argcnt;
-	int4			shift;
+	boolean_t		lsym_modified;
 	lv_val			*lvp, *lvtab1;
 	lv_xnew_var		*xnewvar;
 	mval			*s;
@@ -72,12 +72,12 @@ void op_xnew(unsigned int argcnt_arg, mval *s_arg, ...)
 
 	argcnt = argcnt_arg;
 	htold = &curr_symval->h_symtab;
-	shift = symbinit();
+	lsym_modified = symbinit();
 	DBGRFCT((stderr, "\n\n****op_xnew: **** New symbol table (0x"lvaddr") replaced previous table (0x"lvaddr")\n\n",
 		 curr_symval, curr_symval->last_tab));
 	if (0 >= argcnt)
 	{
-		if (shift)
+		if (lsym_modified)
 			guard_against_zbzst();
 		return;
 	}
@@ -89,14 +89,12 @@ void op_xnew(unsigned int argcnt_arg, mval *s_arg, ...)
 	s = s_arg;
 	for ( ; ; )
 	{
-		if ((unsigned char *)s >= msp && (unsigned char *)s < stackbase)
-			s = (mval*)((char*)s - shift);		/* Only if stack resident */
 		lvent.var_name.len = s->str.len;
 		lvent.var_name.addr = s->str.addr;
 		if (MAX_MIDENT_LEN < lvent.var_name.len)
 			lvent.var_name.len = MAX_MIDENT_LEN;
 		COMPUTE_HASH_MNAME(&lvent);
-		lvent.marked = FALSE;
+		lvent.marked = NOT_MARKED;
 		if (add_hashtab_mname_symval(htold, &lvent, NULL, &tabent1))
 			lv_newname(tabent1, curr_symval->last_tab);
 		lvtab1 = (lv_val *)tabent1->value;
@@ -163,7 +161,7 @@ void op_xnew(unsigned int argcnt_arg, mval *s_arg, ...)
 			REVERT;
 		}
 	}
-	if (shift)
+	if (lsym_modified)
 		guard_against_zbzst();
 	return;
 }

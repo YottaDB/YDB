@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2013-2022 Fidelity National Information	*
+ * Copyright (c) 2013-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -27,6 +27,9 @@
 #include "zr_unlink_rtn.h"
 #include "zroutines.h"
 #include "incr_link.h"
+#include "have_crit.h"
+#include "deferred_events_queue.h"
+#include "zstep.h"
 #ifdef UNIX
 # include "rtnobj.h"
 # include "arlinkdbg.h"
@@ -171,4 +174,6 @@ void zr_unlink_rtn(rhdtyp *old_rhead, boolean_t free_all)
 		GTM_TEXT_FREE(old_rhead);
 #		endif
 	}
+	if (not_in_play < TAREF1(save_xfer_root, zstep_pending).event_state)
+		op_zstep(ZSTEP_WHATEVER, NULL);			/* ZSTEP in play - try not to lose it */
 }

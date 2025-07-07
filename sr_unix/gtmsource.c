@@ -439,6 +439,8 @@ int gtmsource()
 	this_side_std_null_coll = -1;
 	for (reg = gd_header->regions, region_top = gd_header->regions + gd_header->n_regions; reg < region_top; reg++)
 	{
+		if (reg_cmcheck(reg))
+			continue;
 		assert(reg->open);
 		csa = &FILE_INFO(reg)->s_addrs;
 		if (this_side_std_null_coll != csa->hdr->std_null_coll)

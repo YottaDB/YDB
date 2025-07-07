@@ -150,7 +150,6 @@ GBLDEF	bool		out_of_time;
 GBLDEF	io_pair		io_curr_device;		/* current device	*/
 GBLDEF	io_pair		io_std_device;		/* standard device	*/
 GBLDEF	io_log_name	*dollar_principal;	/* pointer to log name GTM$PRINCIPAL if defined */
-GBLDEF	boolean_t	async_dm_read;		/* used by dm_read to tell async_action whether to pop m-stack */
 GBLDEF	boolean_t	prin_dm_io;		/* used by op_dmode so mdb_condition_handler and iorm_readfl know it's active */
 GBLDEF	boolean_t	prin_in_dev_failure;	/* used in I/O to perform NOPRINCIO detection on input */
 GBLDEF	boolean_t	prin_out_dev_failure;	/* used in I/O to perform NOPRINCIO detection on output */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2023 Fidelity National Information	*
+ * Copyright (c) 2003-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -45,6 +45,7 @@
 #include "wbox_test_init.h"
 #include "gt_timer.h"
 #include "anticipatory_freeze.h"
+#include "interlock.h"
 
 /* Note : Now all system error messages are issued here. So callers do not need to issue them again */
 #define STATUS_MSG(INFO, FROMLEN, FROM, TOLEN, TO)							\
@@ -83,6 +84,7 @@ if (SYSCALL_ERROR(info->status) || SYSCALL_ERROR(info->status2))	\
 GBLREF 	jnl_gbls_t		jgbl;
 GBLREF	boolean_t		mupip_jnl_recover;
 GBLREF	jnl_process_vector	*prc_vec;
+GBLREF	uint4			process_id;
 
 ZOS_ONLY(error_def(ERR_BADTAG);)
 error_def(ERR_FILENAMETOOLONG);
@@ -181,6 +183,8 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 	uint4			temp_offset, temp_checksum, pfin_offset, eof_offset;
 	uint4			jnl_fs_block_size;
 	sgmnt_addrs		*csa;
+	boolean_t		region_is_open;
+	boolean_t		latch_just_acquired;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -402,9 +406,11 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 	 * In that case, dont worry about maintaining jb->prev_jrec_time. It will be maintained when this newly
 	 * created journal file is first opened.
 	 */
+	region_is_open = FALSE;
 	if ((NULL != csa) && (NULL != csa->nl))	/* this means database shared memory is accessible (i.e. region is open) */
 	{	/* Keep jb->prev_jrec_time up to date */
 		SET_JNLBUFF_PREV_JREC_TIME(csa->jnl->jnl_buff, eof_record->prefix.time, DO_GBL_JREC_TIME_CHECK_TRUE);
+		region_is_open = TRUE;
 	}
 	free(jrecbuf_base);
 	jrecbuf_base = NULL;
@@ -420,6 +426,14 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 	 * So system will have a.mjl_timestamp and a.mjl_new for a crash after this call
 	 */
 	WAIT_FOR_REPL_INST_UNFREEZE_SAFE(csa);	/* wait for instance freeze before journal file renames */
+	latch_just_acquired = FALSE;
+	if (region_is_open && (!GLOBAL_LATCH_HELD_BY_US(&csa->jnl->jnl_buff->io_in_prog_latch)))
+	{	/* Let's not switch the journal files while another process is doing IO on them.
+		 * Use "WS_41: Close journal file cleanly" as we want all writers done before closing.
+		 */
+		grab_latch(&csa->jnl->jnl_buff->io_in_prog_latch, GRAB_LATCH_INDEFINITE_WAIT, WS_41, csa);
+		latch_just_acquired = TRUE;
+	}
 	if (SS_NORMAL != (info->status = gtm_rename((char *)info->jnl, (int)info->jnl_len,
 						    (char *)rename_fn, rename_fn_len, &info->status2)))
 	{
@@ -428,6 +442,8 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 			gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_RENAMEFAIL, 4, info->jnl_len, info->jnl,
 					rename_fn_len, rename_fn);
 		STATUS_MSG(info, info->jnl_len, info->jnl, rename_fn, rename_fn_len);
+		if (latch_just_acquired)
+			rel_latch(&csa->jnl->jnl_buff->io_in_prog_latch);
 		return EXIT_ERR;
 	}
 	/* Following does rename of a.mjl_new to a.mjl.
@@ -442,8 +458,12 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 			gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_RENAMEFAIL, 4, info->jnl_len, info->jnl,
 					rename_fn_len, rename_fn);
 		STATUS_MSG(info, create_fn_len, create_fn, info->jnl_len, info->jnl);
+		if (latch_just_acquired)
+			rel_latch(&csa->jnl->jnl_buff->io_in_prog_latch);
 		return EXIT_ERR;
 	}
+	if (latch_just_acquired)
+		rel_latch(&csa->jnl->jnl_buff->io_in_prog_latch);
 	send_msg_csa(CSA_ARG(csa) VARLSTCNT (6) ERR_FILERENAME, 4, info->jnl_len, info->jnl, rename_fn_len, rename_fn);
 	if (!(IS_GTM_IMAGE))
 		gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT (6) ERR_FILERENAME, 4, info->jnl_len, info->jnl, rename_fn_len, rename_fn);

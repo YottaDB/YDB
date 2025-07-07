@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -25,9 +25,9 @@ void cg_var(mtreenode *node, void *var_tabent_arg)
 {	/* Copy mident with variable name to variable table entry */
 	var_tabent **p = var_tabent_arg;
 
-	assert(stringpool.base <= (unsigned char *)node->var.mvname.addr && (unsigned char *)node->var.mvname.addr < stringpool.top);
+	assert((char *)stringpool.base <= node->var.mvname.addr && (unsigned char *)node->var.mvname.addr < stringpool.top);
 	(*p)[node->var.mvidx].var_name = node->var.mvname;
 	COMPUTE_HASH_MNAME(&((*p)[node->var.mvidx]));
 	(*p)[node->var.mvidx].var_name.addr = (char *)(node->var.mvname.addr - (char *)stringpool.base);
-	(*p)[node->var.mvidx].marked = FALSE;
+	(*p)[node->var.mvidx].marked = NOT_MARKED;
 }

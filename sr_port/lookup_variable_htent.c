@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2009, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2009-2025 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,13 +25,14 @@
 #include "stack_frame.h"
 #include "lookup_variable_htent.h"
 #include "alias.h"
+#include "stringpool.h"
 
 GBLREF symval		*curr_symval;
 GBLREF stack_frame	*frame_pointer;
 
 ht_ent_mname *lookup_variable_htent(unsigned int x)
 {
-	ht_ent_mname	*tabent;
+	ht_ent_mname	*tabent = NULL;
 	boolean_t	added;
 
 	assert(x < frame_pointer->vartab_len);

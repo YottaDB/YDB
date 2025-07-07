@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -243,6 +243,12 @@ int eval_expr(oprtype *a)
 					}					/* end of side effect processing */
 					assert((catbp == catbp->que.fl) && (catbp == catbp->que.bl) && (NULL == catbp->bpt));
 					assert(op_count > 1);
+					ref->operand[0] = put_ilit(op_count);
+					ins_triple(ref);
+					break;
+				}
+				if (op_count == (MAX_ARGS - 3))
+				{
 					ref->operand[0] = put_ilit(op_count);
 					ins_triple(ref);
 					break;

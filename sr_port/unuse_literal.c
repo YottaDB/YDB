@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2016-2020 Fidelity National Information	*
+ * Copyright (c) 2016-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -59,6 +59,10 @@ boolean_t unuse_literal(mval *x)
 		if (in_hashtab)
 			delete_hashtab_ent_str(complits_hashtab, litent);
 		dqdel(a, que);
+#		ifdef DEBUG
+		x->str.addr = NULL;
+		a->v.str.addr = NULL;
+#		endif
 		return TRUE;
 	}
 	return FALSE;

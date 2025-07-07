@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -24,6 +24,8 @@
 #include "eintr_wrappers.h"
 #include "gtm_isanlp.h"
 
+GBLREF	int	process_exiting;
+
 error_def(ERR_TCSETATTR);
 
 void  iott_resetterm(io_desc *iod)
@@ -36,7 +38,10 @@ void  iott_resetterm(io_desc *iod)
 	ttptr =(d_tt_struct *) iod->dev_sp;
 	if (ttptr->ttio_struct)
 	{
-	        t = *ttptr->ttio_struct;
+		if (!process_exiting)
+			t = *ttptr->ttio_struct;
+		else
+			t = *ttptr->ttio_struct_start;
 		Tcsetattr(ttptr->fildes, TCSANOW, &t, status, save_errno);
 		if (status != 0)
 		{

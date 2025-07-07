@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -129,7 +129,7 @@ void flush_jmp (rhdtyp *rtn_base, unsigned char *context, unsigned char *transfe
 		{	/* Don't need to keep this mv_stent. Remove it from the chain */
 			DBGEHND((stderr, "flush_jmp: Removing no-save mv_stent addr 0x"lvaddr" and type %d\n",
 				 mv_st_prev, mv_st_type));
-			unw_mv_ent(mv_st_prev);
+			unw_mv_ent(mv_st_prev, UNWIND_NEWVARS);
 			mv_st_ent->mv_st_next += mv_st_prev->mv_st_next;
 			mv_st_prev = (mv_stent *)((char *)mv_st_prev + mv_st_prev->mv_st_next);
 			continue;

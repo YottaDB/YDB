@@ -329,6 +329,7 @@ GBLREF	boolean_t		jnlpool_init_needed;
 GBLREF	mstr			extnam_str;
 GBLREF	mval			dollar_zgbldir;
 GBLREF	int4			pre_drvlongjmp_error_condition;
+GBLREF	boolean_t		is_updproc;
 #ifndef MUTEX_MSEM_WAKE
 GBLREF	int 	mutex_sock_fd;
 #endif
@@ -562,7 +563,7 @@ gd_region *dbfilopn(gd_region *reg)
 			seg->allocation = baseDBcsa->hdr->statsdb_allocation;
 		}
 	}
-	assert(IS_ACC_METH_BG_OR_MM(seg->acc_meth));
+	assert(IS_ACC_METH_BG_OR_MM(seg->acc_meth) || is_updproc);
 	FILE_CNTL_INIT_IF_NULL(reg);
 	udi = FILE_INFO(reg);
 	csa = &udi->s_addrs;
@@ -607,6 +608,8 @@ gd_region *dbfilopn(gd_region *reg)
 	if (pblk.fnb & F_HAS_NODE)
 	{	/* Remote node specification given */
 		assert(pblk.b_node && pblk.l_node[pblk.b_node - 1] == ':');
+		if (is_updproc && !REPL_ALLOWED(csa))
+			return (gd_region *)-1L; /* Update process does not process the updates going to the GT.CM region */
 		gvcmy_open(reg, &pblk);
 		assert(!is_statsDB);
 		return (gd_region *)-1L;

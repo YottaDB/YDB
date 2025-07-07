@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -140,6 +140,7 @@
 #define	GTM_LOG_ENV			"$gtm_log"
 #define	GTM_LVNULLSUBS			"$gtm_lvnullsubs"
 #define	GTM_NOCENABLE			"$gtm_nocenable"
+#define	GTM_NOZENABLE			"$gtm_nozenable"
 #define	GTM_NON_BLOCKED_WRITE_RETRIES	"$gtm_non_blocked_write_retries"
 #define	GTM_PRINCIPAL_EDITING		"$gtm_principal_editing"
 #define	GTM_PROCSTUCKEXEC		"$gtm_procstuckexec"

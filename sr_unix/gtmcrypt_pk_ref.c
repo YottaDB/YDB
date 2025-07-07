@@ -175,13 +175,13 @@ gpgme_error_t gc_pk_get_decrypted_key_pkcs(const char *key_path, unsigned char *
 {
 	FILE			*fp;
 	EVP_PKEY_CTX		*ctx;
-	unsigned char		*cipher_key = NULL, *temp = NULL;
-	size_t			cipher_key_len = 0, len = 0, olen = 0;
+	unsigned char		*key_buff = NULL, *temp = NULL;
+	size_t			key_buff_len = 0, len = 0, olen = 0;
 	unsigned long 		oerr;
 	char			oerrstr[2048];
 
 	/* Acquire (encrypted) symmetric key in an allocated buffer */
-	if (NULL == (cipher_key = gc_pk_get_symmetric_key(key_path, &cipher_key_len)))
+	if (NULL == (key_buff = gc_pk_get_symmetric_key(key_path, &key_buff_len)))
 		return -1;	/* Error message set in called function */
 	/* Establish context to decrypt symmetric key. Below are two separate functions called back to back */
 	if ((NULL == (ctx = EVP_PKEY_CTX_new(evp_pkey, NULL)))
@@ -190,7 +190,7 @@ gpgme_error_t gc_pk_get_decrypted_key_pkcs(const char *key_path, unsigned char *
 		oerr = ERR_get_error();
 		ERR_error_string_n(oerr, oerrstr, sizeof(oerrstr));
 		UPDATE_ERROR_STRING("Could not create decryption context for " STR_ARG " reason %s", ELLIPSIZE(key_path), oerrstr);
-		free(cipher_key);
+		free(key_buff);
 		if (NULL != ctx)
 			EVP_PKEY_CTX_free(ctx);
 		return -1;
@@ -199,12 +199,12 @@ gpgme_error_t gc_pk_get_decrypted_key_pkcs(const char *key_path, unsigned char *
 	 * is not possible here. */
 	/* Recommended decrypted buffer size check even though plaintext length has known SYMMETRIC_KEY_MAX bytes length.
 	 * OpenSSL rounds up to the nearest modulus size, 512 */
-	if (EVP_PKEY_decrypt(ctx, NULL, &olen, cipher_key, cipher_key_len) <= 0)
+	if (EVP_PKEY_decrypt(ctx, NULL, &olen, key_buff, key_buff_len) <= 0)
 	{
 		oerr = ERR_get_error();
 		ERR_error_string_n(oerr, oerrstr, sizeof(oerrstr));
 		UPDATE_ERROR_STRING("Failure to decrypt " STR_ARG " for reason %s", ELLIPSIZE(key_path), oerrstr);
-		free(cipher_key);
+		free(key_buff);
 		EVP_PKEY_CTX_free(ctx);
 		return -1;
 	}
@@ -214,17 +214,17 @@ gpgme_error_t gc_pk_get_decrypted_key_pkcs(const char *key_path, unsigned char *
 	{
 		UPDATE_ERROR_STRING("Failure to allocate memory to decrypt " STR_ARG " for reason %s",
 				ELLIPSIZE(key_path), strerror(errno));
-		free(cipher_key);
+		free(key_buff);
 		EVP_PKEY_CTX_free(ctx);
 		return -1;
 	}
 	/* Finally decrypt symmetric key */
-	if (EVP_PKEY_decrypt(ctx, temp, &len, cipher_key, cipher_key_len) <= 0)
+	if (EVP_PKEY_decrypt(ctx, temp, &len, key_buff, key_buff_len) <= 0)
 	{
 		oerr = ERR_get_error();
 		ERR_error_string_n(oerr, oerrstr, sizeof(oerrstr));
 		UPDATE_ERROR_STRING("Failure to decrypt " STR_ARG " for reason %s", ELLIPSIZE(key_path), oerrstr);
-		free(cipher_key);
+		free(key_buff);
 		EVP_PKEY_CTX_free(ctx);
 		return -1;
 	}
@@ -233,14 +233,14 @@ gpgme_error_t gc_pk_get_decrypted_key_pkcs(const char *key_path, unsigned char *
 		oerr = ERR_get_error();
 		ERR_error_string_n(oerr, oerrstr, sizeof(oerrstr));
 		UPDATE_ERROR_STRING("Failure to decrypt " STR_ARG " for reason %s", ELLIPSIZE(key_path), oerrstr);
-		free(cipher_key);
+		free(key_buff);
 		EVP_PKEY_CTX_free(ctx);
 		return -1;
 	}
 	memcpy((void *)plain_text, (void *)temp, (size_t)len);
 	*plain_text_length = len;
 	EVP_PKEY_CTX_free(ctx);
-	free(cipher_key);
+	free(key_buff);
 	return 0;
 }
 
@@ -300,8 +300,8 @@ int gc_pk_establish_pkcs_cfg(config_setting_t *parent, char *config_fn)
 			/* OSSL_KEYMGMT_SELECT_KEYPAIR - https://docs.openssl.org/master/man7/provider-keymgmt/#key-objects */
 			if (dctx == NULL)
 			{
-				UPDATE_ERROR_STRING("Configuration file " STR_ARG " no decoders for %s %s %s",
-						ELLIPSIZE(key_path), key_path, key_format, key_type);
+				UPDATE_ERROR_STRING("Configuration file " STR_ARG " no decoders for %s %s",
+						ELLIPSIZE(key_path), key_format, key_type);
 				return -1;
 			}
 			/* Establish passphrase callback function */

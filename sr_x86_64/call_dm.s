@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2007-2015 Fidelity National Information 	#
+# Copyright (c) 2007-2025 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -26,6 +26,4 @@ ENTRY	call_dm
 newcmd:
 	CHKSTKALIGN			# Verify stack alignment
 	call	opp_dmode
-	call	op_oldvar
 	jmp	newcmd
-

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -365,7 +365,7 @@ int tp_unwind_restlv(lv_val *curr_lv, lv_val *save_lv, tp_var *restore_ent, bool
 			mvc = mv_chain;
 			while((curr_symval != tp_pointer->sym) && (mvc < tp_pointer->mvc))
 			{
-				unw_mv_ent(mvc);
+				unw_mv_ent(mvc, UNWIND_NEWVARS);
 				mvc = (mv_stent *)(mvc->mv_st_next + (char *)mvc);
 			}
 			mv_chain = mvc;

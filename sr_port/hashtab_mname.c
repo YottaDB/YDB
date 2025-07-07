@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,6 +24,7 @@
 #include "gdsbt.h"
 #include "gdsfhead.h"
 #include "alias.h"
+#include "stringpool.h"
 
 GBLREF symval			*curr_symval;
 
@@ -44,12 +46,25 @@ boolean_t add_hashtab_mname_symval(hash_table_mname *table, mname_entry *key, vo
 	boolean_t		retval;
 	int			table_size_orig;
 	ht_ent_mname		*table_base_orig;
+	mname_entry		lcl_mname;
 
 	/* Currently only two values we expect here shown below. If calls are added with other values, they need
 	   to be taken care of here and in EXPAND_HASHTAB in hashtab_implementation.h
 	*/
 	assert(table == &curr_symval->h_symtab || table == &curr_symval->last_tab->h_symtab);
-	assert(FALSE == key->marked);
+	if (INDIR_MARKED == key->marked)
+	{
+		lcl_mname = *key;
+		lcl_mname.marked = NOT_MARKED;
+		if (!IS_IN_STRINGPOOL(lcl_mname.var_name.addr, lcl_mname.var_name.len))
+			s2pool(&lcl_mname.var_name);
+#		ifdef DEBUG
+		COMPUTE_HASH_MNAME(&lcl_mname);
+		assert(lcl_mname.hash_code == key->hash_code);
+#		endif
+		key = &lcl_mname;
+	}
+	assert(NOT_MARKED == key->marked);
 
 	/* remember table we started with */
 	table_base_orig = table->base;

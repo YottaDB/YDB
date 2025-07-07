@@ -9389,7 +9389,7 @@
    Returns the numeric byte value (0 through 255) of a given sequence of
    octets (8-bit bytes).
 
-   The format for the $ASCII function is:
+   The format for the $ZASCII function is:
 
    $ZA[SCII](expr[,intexpr])
 
@@ -13579,15 +13579,15 @@
 
    $ZTIMeout=([timeout][:labelref])
 
-     o The optional timeout in seconds specifies with microsecond accuracy
+     o The optional timeout in seconds specifies with microsecond resolution
        how long from the current time the timer interrupts the process. If
        the specified timeout is negative, GT.M cancels the timer. If the
-       timeout is zero, GT.M treats it as it would a DO of the vector.
+       timeout is zero, GT.M treats it as it would an XECUTE of the vector.
      o The optional labelref specifies a code vector defining a fragment of M
-       code to which GT.M transfers control as if with a DO when the timeout
-       expires. If the timeout is missing, the assignment must start with a
-       colon and only changes the vector, and in this case, if the timeout is
-       the empty string, GT.M removes any current vector.
+       code to which GT.M transfers control as if with an XECUTE when the
+       timeout expires. If the timeout is missing, the assignment must start
+       with a colon and only changes the vector, and in this case, if the
+       timeout is the empty string, GT.M removes any current vector.
 
    Note that GT.M only recognizes interrupts such as from $ZTIMEOUT at points
    where it can properly resume operation, such as the beginning of a line,

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -61,6 +61,7 @@
 #include "interlock.h"
 #include "warn_db_sz.h"
 #include "inline_atomic_pid.h"
+#include "inline_not_frozen.h" /* for not_frozen_hard */
 
 #define	GDSFILEXT_CLNUP						\
 MBSTART {							\
@@ -245,7 +246,7 @@ int4 gdsfilext(block_id blocks, block_id filesize, boolean_t trans_in_prog)
 	 *	op_tcommit to invoke bm_getfree->gdsfilext, then we would have come here with a frozen region on which
 	 *	we hold crit.
 	 */
-	assert(!was_crit || !FROZEN_HARD(cs_addrs) || (dollar_tlevel && (CDB_STAGNATE <= t_tries)));
+	assert(!was_crit || not_frozen_hard(cs_addrs) || (dollar_tlevel && (CDB_STAGNATE <= t_tries)));
 	/*
 	 * If we are in the final retry and already hold crit, it is possible that csa->nl->wc_blocked is also set to TRUE
 	 * (by a concurrent process in phase2 which encountered an error in the midst of commit and secshr_db_clnup

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -253,13 +253,6 @@ MBSTART {														\
 			m = (mval *)((char *)ihdr + ihdr->fixup_vals_off);	\
 			for (mtop = m + fixup_cnt; m < mtop; m++)		\
 				MVAL_STPG_ADD(m);				\
-		}								\
-		fixup_cnt = ihdr->vartab_len;					\
-		if (fixup_cnt)							\
-		{								\
-			vent = (var_tabent *)((char *)ihdr + ihdr->vartab_off);	\
-			for (vartop = vent + fixup_cnt; vent < vartop; vent++)	\
-				MSTR_STPG_ADD(&vent->var_name);			\
 		}								\
 	}
 
@@ -795,6 +788,7 @@ void stp_gcol(size_t space_asked)	/* BYPASSOK */
 				case MVST_PVAL:
 				case MVST_STORIG:
 				case MVST_ZINTCMD:
+				case MVST_L_SYMTAB:
 					continue;
 				case MVST_TPHOLD:
 #					ifdef GTM_TRIGGER

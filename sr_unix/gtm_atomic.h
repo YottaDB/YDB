@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2024 Fidelity National Information		*
+ * Copyright (c) 2024-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -811,7 +811,7 @@ _Static_assert(sizeof(gtm_atomic_ulong) == sizeof(gtm_atomic_uintmax_t),
 			: [val]		"r"	(VAL),									\
 			  [obj_ptr]	"r"	(OBJ_PTR)								\
 			: "cr0")
-#define PPC_ASM_CMPSWAP__gtm_atomic_ushort__(OBJ_PTR, EXP_PTR, VAL, RET, PRE_BARRIER, SUCCESS_BARRIER, FAIL_BARRER)	\
+#define PPC_ASM_CMPSWAP__gtm_atomic_ushort__(OBJ_PTR, EXP_PTR, VAL, RET, PRE_BARRIER, SUCCESS_BARRIER, FAIL_BARRIER)	\
 	asm volatile (	"\tli %[retval],1\n"										\
 			PRE_BARRIER											\
 			"0:\tlharx %[scratch],0,%[obj_ptr]\n"								\

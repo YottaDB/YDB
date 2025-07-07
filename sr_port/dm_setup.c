@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,4 +28,6 @@ void dm_setup(void)
 #endif
 	new_stack_frame(frame_pointer->rvector, GTM_CONTEXT(call_dm), CODE_ADDRESS(call_dm));
 	frame_pointer->type = SFT_DM;
+	/* Push an input line mval onto the stack. It persists until frame unwind. */
+	PUSH_MV_STENT(MVST_MVAL);
 }

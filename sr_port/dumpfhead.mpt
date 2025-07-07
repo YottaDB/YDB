@@ -186,7 +186,7 @@ BinToDateStr(bin,gmt)
 	; Now we have our incoming epoch value in usable format
 	; Next, capture the current system Horolog & Epoch dates, taking care that both
 	; fall within the same second. (Also convert the zulu time from microseconds to seconds)
-	for i=1 set horo=$Horolog,zulu=$Zut\1000000 quit:horo=$Horolog
+	for i=1:1 set horo=$Horolog,zulu=$Zut\1000000 quit:horo=$Horolog
 
 	; Isolate the horolog day & second pieces and generate an epoch date from them.
 	; The difference between this constructed epoch and the real epoch is the timezone offset.

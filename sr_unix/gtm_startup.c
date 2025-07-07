@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -90,6 +90,7 @@
 #include "gcall.h" /* For ojchildparms() */
 #include "common_startup_init.h"
 #include "trans_numeric.h"
+#include "deferred_events_queue.h"
 #ifdef UTF8_SUPPORTED
 #include "utfcgr.h"
 #endif
@@ -130,7 +131,7 @@ GBLREF ch_ret_type		(*stpgc_ch)();			/* Function pointer to stp_gcol_ch */
 GBLREF enum gtmImageTypes	image_type;
 GBLREF int			init_xfer_table(void);
 GBLREF void 			(*primary_exit_handler)(void);
-
+GBLREF intrpt_state_t		intrpt_ok_state;
 OS_PAGE_SIZE_DECLARE
 
 #define MIN_INDIRECTION_NESTING 32
@@ -276,6 +277,10 @@ void gtm_startup(struct startup_vector *svec)
 	lvzwr_init((enum zwr_init_types)0, (mval *)NULL);
 	TREF(in_zwrite) = FALSE;
 	curr_symval->alias_activity = FALSE;
+	assert(INTRPT_OK_TO_INTERRUPT == intrpt_ok_state);
+	intrpt_ok_state = INTRPT_IN_EVENT_HANDLING;
+	EMPTY_XFER_QUEUE_ENTRIES;
+	intrpt_ok_state = INTRPT_OK_TO_INTERRUPT;
 	if ((GTM_IMAGE == image_type) && (NULL != svec->base_addr))
 		/* We are in the grandchild at this point. This call is made to greet local variables sent from the midchild. There
 		 * is no symbol table for locals before this point so we have to greet them here, after creating the symbol table.

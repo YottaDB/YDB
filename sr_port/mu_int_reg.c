@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -36,6 +36,8 @@
 #include "gt_timer.h"
 #include "mupint.h"
 #include "wbox_test_init.h"
+#include "inline_atomic_pid.h" /* for DEFINE_ATOMIC_OP(gtm_atomic_uint, ATOMIC_LOAD, memory_order_acquire) */
+#include "inline_not_frozen.h" /* for not_frozen_hard */
 
 #define MUPIP_INTEG "MUPIP INTEG"
 
@@ -191,7 +193,7 @@ void mu_int_reg(gd_region *reg, boolean_t *return_value, boolean_t return_after_
 			ss_release(&csa->ss_ctx);
 			ointeg_this_reg = FALSE; /* Turn off ONLINE INTEG for this region */
 			assert(process_id != cnl->in_crit); /* Ensure ss_initiate released the crit before returning */
-			assert(!FROZEN_HARD(csa)); /* Ensure region is unfrozen before returning from ss_initiate */
+			assert(not_frozen_hard(csa)); /* Ensure region is unfrozen before returning from ss_initiate */
 			assert(INTRPT_IN_SS_INITIATE != intrpt_ok_state); /* Ensure ss_initiate released intrpt_ok_state */
 			return;
 		}

@@ -61,6 +61,9 @@
 #endif
 #ifdef DEBUG
 #include "util.h"
+#ifdef _AIX
+#include <sys/procfs.h>
+#endif
 #endif
 
 GBLDEF repl_ctl_element		*repl_ctl_list = NULL;
@@ -405,6 +408,8 @@ int gtmsource_ctl_init(void)
 	last_rctl = NULL;
 	for (reg = gd_header->regions; reg < region_top; reg++)
 	{
+		if (reg_cmcheck(reg))
+			continue;
 		assert(reg->open);
 		csa = &FILE_INFO(reg)->s_addrs;
 		csd = csa->hdr;
@@ -451,12 +456,19 @@ int gtmsource_ctl_init(void)
 
 int repl_ctl_close(repl_ctl_element *ctl)
 {
-	int	index, save_errno, status;
-	uint	size;
-#	ifdef DEBUG
-	FILE	*pf;
-	char	buff[35], line[20], *fgets_res;
+	int		index, save_errno, status;
+	uint		size;
+#ifdef DEBUG
+	int		rc;
+	FILE		*fp;
+	char		path[64];
+	long		dummy, rss;
+#	ifdef _AIX
+	size_t		ret_size;
+	boolean_t	err = FALSE;
+	psinfo_t	psinfo;
 #	endif
+#endif
 
 	if (NULL != ctl)
 	{
@@ -469,18 +481,24 @@ int repl_ctl_close(repl_ctl_element *ctl)
 #					ifdef DEBUG
 					if (WBTEST_ENABLED(WBTEST_MUNMAP_FREE) && (1 == gtm_white_box_test_case_count))
 					{
-						SNPRINTF(buff, SIZEOF(buff), "ps -p %u -o 'rssize='", getpid());
-						if (NULL == (pf = POPEN(buff ,"r")))
-						{
-							save_errno = errno;
-							send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
-										LEN_AND_LIT("popen()"), CALLFROM, save_errno);
-						}
-						FGETS_FILE(line, SIZEOF(line), pf, fgets_res);
-						assert(NULL != fgets_res);
+#						ifdef _AIX
+						SNPRINTF(path, SIZEOF(path), "/proc/%u/psinfo", getpid());
+						Fopen(fp, path, "rb");
+						assert(NULL != fp);
+						GTM_FREAD(&psinfo, SIZEOF(psinfo), 1, fp, ret_size, err);
+						rss = psinfo.pr_rssize;
+#						else
+						SNPRINTF(path, SIZEOF(path), "/proc/%u/statm", getpid());
+						Fopen(fp, path, "r");
+						assert(NULL != fp);
+						rc = FSCANF(fp, "%ld %ld", &dummy, &rss);
+						assert((EOF != rc) && (!ferror(fp)));
+						rss *= (getpagesize() / 1024);
+#						endif
+						FCLOSE(fp, rc);
+						assert(0 == rc);
 						/* Record the memory "pick", before deallocating memory with munmap() */
-						util_out_print("WBTEST_MUNMAP_FREE : VmRSS !UL kB", TRUE,
-												STRTOUL(line, NULL, 10));
+						util_out_print("WBTEST_MUNMAP_FREE : VmRSS !UL kB", TRUE, rss);
 						/* Only need to signal the test once */
 						gtm_white_box_test_case_enabled = FALSE;
 					}

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -31,6 +31,7 @@ GBLREF bool		licensed ;
 GBLREF gv_key		*gv_currkey;
 GBLREF gv_key		*gv_altkey;
 GBLREF gd_region	*gv_cur_region;
+GBLREF boolean_t	is_updproc;
 
 void gv_init_reg (gd_region *reg, gd_addr *addr)
 {
@@ -60,6 +61,7 @@ void gv_init_reg (gd_region *reg, gd_addr *addr)
 		default:
 		assertpro(reg->dyn.addr->acc_meth != reg->dyn.addr->acc_meth);
 	}
-	assert((reg->open) || (TREF(ok_to_leave_statsdb_unopened) && IS_STATSDB_REG(reg)));
+	assert((reg->open) || (is_updproc && (dba_cm == reg->dyn.addr->acc_meth)) ||
+		(TREF(ok_to_leave_statsdb_unopened) && IS_STATSDB_REG(reg)));
 	return;
 }

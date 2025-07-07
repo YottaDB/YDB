@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -118,7 +118,6 @@ int f_translate(oprtype *a, opctype op)
 			}
 		} else if (gtm_utf8_mode && valid_utf_string(&srch_mval->str) && valid_utf_string(&rplc_mval->str))
 		{	/* actual UTF-8 characters, so need hashtable rather than just than code table */
-			unuse_literal(&args[1]->operand[0].oprval.tref->operand[0].oprval.mlit->v);
 			if (!badchar_inhibit)
 				MV_FORCE_LEN(srch_mval);      				/* needed only to validate for BADCHARs */
 			else
@@ -153,6 +152,7 @@ int f_translate(oprtype *a, opctype op)
 				args[0]->opcode = OC_LIT;
 				put_lit_s(&dst_mval, args[0]);
 				args[0]->operand[1].oprclass = NO_REF;
+				unuse_literal(&args[1]->operand[0].oprval.tref->operand[0].oprval.mlit->v);
 				unuse_literal(&args[2]->operand[0].oprval.tref->operand[0].oprval.mlit->v);
 				unuse_literal(&args[3]->operand[0].oprval.tref->operand[0].oprval.mlit->v);
 				dqdel(args[1]->operand[0].oprval.tref, exorder);

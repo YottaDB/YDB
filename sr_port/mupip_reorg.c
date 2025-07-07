@@ -1,6 +1,6 @@
 /***************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -398,16 +398,9 @@ void mupip_reorg(void)
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_REORGCTRLY);
 			mupip_exit(ERR_MUNOFINISH);
 		}
-		if ((0 != cs_addrs->nl->reorg_upgrade_pid) && (is_proc_alive(cs_addrs->nl->reorg_upgrade_pid, 0)))
-		{	/* REORG -UPGRADE cannot run concurrently with TRUNCATE and is higher priority. Stop */
-			send_msg_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(7) MAKE_MSG_INFO(ERR_REORGUPCNFLCT), 5,
-					LEN_AND_LIT("REORG"),
-					LEN_AND_LIT("MUPIP REORG -UPGRADE in progress"),
-					cs_addrs->nl->reorg_upgrade_pid);
-			gtm_putmsg_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(7) MAKE_MSG_INFO(ERR_REORGUPCNFLCT), 5,
-					LEN_AND_LIT("REORG"),
-					LEN_AND_LIT("MUPIP REORG -UPGRADE in progress"),
-					cs_addrs->nl->reorg_upgrade_pid);
+		if (IS_REORG_UP_ACTIVE(cs_addrs->nl))
+		{	/* Avoid running REORG -UPGRADE concurrently with another REORG */
+			MSG_REORGUPCNFLCT(cs_addrs, "REORG", "MUPIP REORG -UPGRADE in progress")
 			mupip_exit(ERR_MUNOFINISH);
 		}
 	}
@@ -426,16 +419,9 @@ void mupip_reorg(void)
 			csd = cs_data;
 			csa = cs_addrs;
 			cnl = csa->nl;
-			if ((0 != cnl->reorg_upgrade_pid) && (is_proc_alive(cnl->reorg_upgrade_pid, 0)))
-			{	/* REORG -UPGRADE cannot run concurrently with TRUNCATE and is higher priority. Stop */
-				send_msg_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(7) MAKE_MSG_INFO(ERR_REORGUPCNFLCT), 5,
-						LEN_AND_LIT("REORG -TRUNCATE"),
-						LEN_AND_LIT("MUPIP REORG -UPGRADE in progress"),
-						cnl->reorg_upgrade_pid);
-				gtm_putmsg_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(7) MAKE_MSG_INFO(ERR_REORGUPCNFLCT), 5,
-						LEN_AND_LIT("REORG -TRUNCATE"),
-						LEN_AND_LIT("MUPIP REORG -UPGRADE in progress"),
-						cnl->reorg_upgrade_pid);
+			if (IS_REORG_UP_ACTIVE(cnl))
+			{	/* Avoid running REORG -UPGRADE concurrently with another REORG */
+				MSG_REORGUPCNFLCT(REG2CSA(gv_cur_region), "REORG -TRUNCATE", "MUPIP REORG -UPGRADE in progress")
 				mupip_exit(ERR_MUNOFINISH);
 			}
 		}
@@ -458,8 +444,7 @@ void mupip_reorg(void)
 			gv_target->root = 0; /* Recompute gv_target->root in case mu_reorg changed things around */
 			inctn_opcode = inctn_invalid_op;	/* needed for GVCST_ROOT_SEARCH */
 			GVCST_ROOT_SEARCH;			/* set gv_target->root */
-			if ((0 == gv_target->root)
-					|| ((0 != cnl->reorg_upgrade_pid) && (is_proc_alive(cnl->reorg_upgrade_pid, 0))))
+			if ((0 == gv_target->root) || (IS_REORG_UP_ACTIVE(cnl)))
 				continue;
 			hasht_gl.reg = gv_cur_region;
 			hasht_gl.gvt = gv_target;
@@ -492,17 +477,10 @@ void mupip_reorg(void)
 						REG_LEN_STR(gv_cur_region));
 				continue;
 			}
-			if ((0 != cnl->reorg_upgrade_pid) && (is_proc_alive(cnl->reorg_upgrade_pid, 0)))
+			if (IS_REORG_UP_ACTIVE(cnl))
 			{	/* REORG -UPGRADE cannot run concurrently with TRUNCATE and is higher priority. Stop */
 				rel_crit(gv_cur_region);
-				send_msg_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(7) MAKE_MSG_INFO(ERR_REORGUPCNFLCT), 5,
-						LEN_AND_LIT("REORG -TRUNCATE"),
-						LEN_AND_LIT("MUPIP REORG -UPGRADE in progress"),
-						cnl->reorg_upgrade_pid);
-				gtm_putmsg_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(7) MAKE_MSG_INFO(ERR_REORGUPCNFLCT), 5,
-						LEN_AND_LIT("REORG -TRUNCATE"),
-						LEN_AND_LIT("MUPIP REORG -UPGRADE in progress"),
-						cnl->reorg_upgrade_pid);
+				MSG_REORGUPCNFLCT(REG2CSA(gv_cur_region), "REORG -TRUNCATE", "MUPIP REORG -UPGRADE in progress")
 				mupip_exit(ERR_MUNOFINISH);
 			}
 			cnl->trunc_pid = process_id;

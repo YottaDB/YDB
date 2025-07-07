@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2014-2025 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,7 +24,7 @@ int f_zsocket(oprtype *a, opctype op)
 {
 	int	argc;
 	char	tok_temp;
-	oprtype *argp, argv[MAX_ZSOCKET_ARGS];
+	oprtype *argp, argv[MAX_ZSOCKET_ARGS + 1];
 	triple	*curr, *last, *root;
 	DCL_THREADGBL_ACCESS;
 

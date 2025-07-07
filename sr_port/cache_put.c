@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -78,7 +79,10 @@ void cache_put(icode_str *src, mstr *object)
 		/* Do address fix up of local variable name which is in stringpool */
 		var_base = (var_tabent *)((unsigned char *)csp->obj.addr + ((ihdtyp *)(csp->obj.addr))->vartab_off);
 		for (varent = var_base, i = 0; i < fixup_cnt; i++, varent++)
-			varent->var_name.addr = (INTPTR_T) varent->var_name.addr + object->addr;
+		{
+			varent->var_name.addr = (INTPTR_T) varent->var_name.addr + csp->obj.addr;
+			varent->marked = INDIR_MARKED;	/* Mark to copy to stringpool on first gtm_fetch */
+		}
 	}
 	*object = csp->obj;				/* Update location of object code for comp_indr */
 	cacheflush(csp->obj.addr, csp->obj.len, BCACHE);

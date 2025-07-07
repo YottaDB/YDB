@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2013-2024 Fidelity National Information	*
+ * Copyright (c) 2013-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -441,7 +441,7 @@ void	op_fnzpeek(mval *structid, int offset, int len, mval *format, mval *ret)
 	int			errtoraise, rc, rslt;
 	unsigned char		fmtcode;
 	boolean_t		arg_supplied, attach_success;
-	unsigned char		mnemonic[NAME_ENTRY_SZ], *nptr, *cptr, *cptrend, *argptr;
+	unsigned char		mnemonic[NAME_ENTRY_SZ + ARGUMENT_MAX_LEN + 1], *nptr, *cptr, *cptrend, *argptr;
 	int			mnemonic_len, mnemonic_index, mnemonic_opcode, arglen, arryidx = -1;
 	gd_region		*r_top, *r_ptr = NULL;
 	replpool_identifier	replpool_id;
@@ -460,6 +460,8 @@ void	op_fnzpeek(mval *structid, int offset, int len, mval *format, mval *ret)
 	MV_FORCE_STR(structid);
 	MV_FORCE_STR(format);
 	/* Parse and lookup the first arg's mnemonic and arg (if supplied) */
+	if (structid->str.len > (NAME_ENTRY_SZ + ARGUMENT_MAX_LEN + 1))
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_BADZPEEKARG, 2, RTS_ERROR_LITERAL("length"));
 	for (nptr = mnemonic, cptr = (unsigned char *)structid->str.addr, cptrend = cptr + structid->str.len;
 	     cptr < cptrend; ++cptr)
 	{
@@ -467,6 +469,7 @@ void	op_fnzpeek(mval *structid, int offset, int len, mval *format, mval *ret)
 			break;		/* End of mnemonic, start of arg */
 		*nptr++ = *cptr;
 	}
+	assert(nptr <= ARRAYTOP(mnemonic));
 	arg_supplied = (cptr < cptrend);
 	mnemonic_len = INTCAST(nptr - mnemonic);
 	mnemonic_index = namelook(zpeek_index, zpeek_names, (char *)mnemonic, mnemonic_len);

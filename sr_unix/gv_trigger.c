@@ -987,7 +987,7 @@ void	gvtr_db_read_hasht(sgmnt_addrs *csa)
 					lvnamedsc->var_name.addr = (char *)get_new_element(gvt_trigger->gv_trig_list,
 										DIVIDE_ROUND_UP(len, GVTR_LIST_ELE_SIZE));
 					memcpy(lvnamedsc->var_name.addr, ptr_start, len);
-					lvnamedsc->marked = FALSE;
+					lvnamedsc->marked = NOT_MARKED;
 					COMPUTE_HASH_MNAME(lvnamedsc);
 					lvnamedsc++;
 					curlvsub++;

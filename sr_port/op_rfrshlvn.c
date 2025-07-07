@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2023 Fidelity National Information	*
+ * Copyright (c) 2012-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -53,7 +53,7 @@ lv_val *op_rfrshlvn(uint4 indx, opctype oc)
 	assert(OC_SAVLVN == slot->sav_opcode);
 	targ_key.var_name = slot->lvname->str;
 	COMPUTE_HASH_MNAME(&targ_key);
-	targ_key.marked = FALSE;
+	targ_key.marked = NOT_MARKED;
 	if (add_hashtab_mname_symval(&curr_symval->h_symtab, &targ_key, NULL, &tabent))
 		lv_newname(tabent, curr_symval);
 	lvn_info = (lvname_info *)&slot->glvn_info;

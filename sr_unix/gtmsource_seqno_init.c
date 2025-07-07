@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2017 Fidelity National Information	*
+ * Copyright (c) 2006-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -70,6 +70,8 @@ void gtmsource_seqno_init(boolean_t this_side_std_null_coll)
 	}
 	for (reg = gd_header->regions; reg < region_top; reg++)
 	{
+		if (reg_cmcheck(reg))
+			continue;
 		assert(reg->open);
 		csa = &FILE_INFO(reg)->s_addrs;
 		csd = csa->hdr;

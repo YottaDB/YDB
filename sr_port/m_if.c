@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -92,8 +92,9 @@ int m_if(void)
 			{	/* it is a literal so we optimize it */
 				dqdel(triptr, exorder);
 				v = &triptr->operand[0].oprval.mlit->v;
+				t_set = (0 == MV_FORCE_BOOL(v));
 				unuse_literal(v);
-				if ((t_set = (0 == MV_FORCE_BOOL(v))))	/* WARNING: assignment */
+				if (t_set)
 				{	/* it's FALSE, insert clear of $TEST */
 					newtriple(OC_CLRTEST);
 					if (TK_SPACE == TREF(director_token))			/* if there are trailing spaces */

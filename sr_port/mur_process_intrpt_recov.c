@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2023 Fidelity National Information	*
+ * Copyright (c) 2003-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -37,6 +37,8 @@
 #include "anticipatory_freeze.h"
 #include "wcs_flu.h"	/* for wcs_flu() prototype */
 #include "wbox_test_init.h"
+#include "inline_atomic_pid.h"
+#include "inline_not_frozen.h" /* for not_frozen_chilled */
 
 GBLREF	reg_ctl_list		*mur_ctl;
 GBLREF	mur_gbls_t		murgbl;
@@ -209,7 +211,7 @@ uint4 mur_process_intrpt_recov()
 				csd->save_strm_reg_seqno[idx] = csd->strm_reg_seqno[idx];
 			csd->strm_reg_seqno[idx] = jnlrec->jrec_epoch.strm_seqno[idx];
 		}
-		assert(!FROZEN_CHILLED(csa));
+		assert(not_frozen_chilled(csa));
 		wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_FSYNC_DB);
 		assert(csa->ti->curr_tn == jctl->turn_around_tn);
 		if (jgbl.onlnrlbk)

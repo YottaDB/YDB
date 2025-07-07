@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -148,7 +148,7 @@ typedef struct stack_frame_struct	/* contents of the GT.M MUMPS stack frame */
 
 void new_stack_frame(rhdtyp *rtn_base, unsigned char *context, unsigned char *transfer_addr);
 void new_stack_frame_sp(rhdtyp *rtn_base, unsigned char *context, unsigned char *transfer_addr);
-int4 symbinit(void);
+boolean_t symbinit(void);
 unsigned char *get_symb_line(unsigned char *out, int max_len, unsigned char **b_line, unsigned char **ctxt);
 unsigned char *symb_line(unsigned char *in_addr, unsigned char *out, int max_len, unsigned char **b_line, rhdtyp *routine);
 void copy_stack_frame(void);

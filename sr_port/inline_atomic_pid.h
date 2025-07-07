@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2024 Fidelity National Information		*
+ * Copyright (c) 2024-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -50,7 +50,7 @@ static inline void inline_atomic_pid_set(uint4 *pid_addr, uint4 value)
  */
 static inline uint4 inline_atomic_pid_get(uint4 *pid_addr)
 {
-	return (uint4)ATOMIC_LOAD((gtm_atomic_uint *)pid_addr, memory_order_acquire);
+	return ATOMIC_LOAD((gtm_atomic_uint *)pid_addr, memory_order_acquire);
 }
 
 #endif /* INLINE_UPDATE_IN_CW_SET_INCLUDED */

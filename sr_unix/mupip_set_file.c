@@ -20,6 +20,7 @@
 #include "gtm_string.h"
 
 #include <sys/sem.h>
+#include <math.h> /* needed for handling ratio preservation for flush trigger top */
 
 #ifdef __MVS__
 #include "gtm_zos_io.h"
@@ -664,9 +665,21 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 			}
 			if (glbl_buff_status)
 			{
+				if (!(CLI_PRESENT == cli_present("TRIGGER_FLUSH_LIMIT")))
+				{
+					new_flush_trigger = (BT_FACTOR(new_cache_size) == pvt_csd->n_bts) ?
+						pvt_csd->flush_trigger_top : (int4) round(((double) pvt_csd->flush_trigger_top /
+						(double) pvt_csd->n_bts) * BT_FACTOR(new_cache_size));
+					if (new_flush_trigger > FLUSH_FACTOR(BT_FACTOR(new_cache_size)))
+						pvt_csd->flush_trigger_top = FLUSH_FACTOR(BT_FACTOR(new_cache_size));
+					else if (new_flush_trigger < MIN_FLUSH_TRIGGER(BT_FACTOR(new_cache_size)))
+						pvt_csd->flush_trigger_top = MIN_FLUSH_TRIGGER(BT_FACTOR(new_cache_size));
+					else
+						pvt_csd->flush_trigger_top = new_flush_trigger;
+				}
 				pvt_csd->n_bts = BT_FACTOR(new_cache_size);
 				pvt_csd->bt_buckets = getprime(pvt_csd->n_bts);
-				pvt_csd->flush_trigger = FLUSH_FACTOR(pvt_csd->n_bts);
+				pvt_csd->flush_trigger = pvt_csd->flush_trigger_top;
 			}
 			if (key_size_status)
 			{

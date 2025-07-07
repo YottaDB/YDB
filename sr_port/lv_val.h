@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -174,7 +174,7 @@
 	lv_blk		*lvbp;												\
 	lv_val		*lvp, *lvp_top;											\
 															\
-	if (0 == ++lvtaskcycle)												\
+	if (0 == ++lvtaskcycle || (-1 == lvtaskcycle))									\
 	{	/* Set tstart cycle in all active lv_vals to 0 */							\
 		for (lvlsymtab = curr_symval; lvlsymtab; lvlsymtab = lvlsymtab->last_tab)				\
 			for (lvbp = curr_symval->lv_first_block; lvbp; lvbp = lvbp->next)				\
