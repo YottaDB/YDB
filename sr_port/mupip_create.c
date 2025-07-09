@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2022-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -62,7 +62,8 @@ void mupip_create(void)
 		gtm_db_create_ver = GDSVCURR;
 	if (CLI_PRESENT == cli_present("REGION"))
 	{
-		reglen = SIZEOF(buff);
+		assert(MAX_RN_LEN + 1 == SIZEOF(buff));
+		reglen = MAX_RN_LEN;
 	 	if (0 == cli_get_str("REGION", buff, &reglen))
 			mupip_exit(ERR_MUPCLIERR);
 	 	for (i=0; i < reglen; i++)

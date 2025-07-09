@@ -70,17 +70,22 @@ error_def(ERR_TEXT);
 void mupip_extend(void)
 {
 	unsigned short	r_len;
-	char		regionname[MAX_RN_LEN];
+	char		regionname[MAX_RN_LEN + 1];
 	uint4		bplmap, i;
 	int4		status;
 	block_id	blocks, bit_maps, tblocks, total, old_total, temp1, temp2;
 	int		fd;
 	boolean_t	defer_alloc;
 
-	r_len = SIZEOF(regionname);
+	r_len = MAX_RN_LEN;
 	jnlpool_init_needed = TRUE;
 	if (cli_get_str("REG_NAME", regionname, &r_len) == FALSE)
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_MUNODBNAME);
+	assert((MAX_RN_LEN <= r_len) || ('\0' == regionname[r_len]));
+	/* The following is only needed for the 'MAX_RN_LEN == r_len' case due to the above assert,
+	 * but we do it all the time for simplicity.
+	 */
+	regionname[r_len] = '\0';
 	cli_strupper(regionname);
 	gvinit();
 	for (i = 0, gv_cur_region = gd_header->regions; i < gd_header->n_regions; i++, gv_cur_region++)
