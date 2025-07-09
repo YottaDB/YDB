@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2023-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -124,6 +124,7 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 	unsigned char		save_cw_set_depth, x_blk_lmap;
 	unsigned int		bsiz;
 	unsigned short		temp_ushort;
+	boolean_t		is_bg;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -148,7 +149,7 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 	work_blk_id_sz = SIZEOF_BLK_ID(work_long_blk_id);
 	if (blk_size < work_blk_size)
 	{
-		assert(t_tries < CDB_STAGNATE);
+		assert(CDB_STAGNATE > t_tries);
 		NONTP_TRACE_HIST_MOD(work_blk_stat, t_blkmod_mu_swap_blk);
 		return cdb_sc_blkmod;
 	}
@@ -226,7 +227,7 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 			if (!(dest_blk_ptr = t_qread(dest_blk_id, (sm_int_ptr_t)&destblkhist.cycle, &destblkhist.cr)))
 			{
 				assert(0 == upg_mv_block);
-				assert(t_tries < CDB_STAGNATE);
+				assert(CDB_STAGNATE > t_tries);
 				return (enum cdb_sc)rdfail_detail;
 			}
 			destblkhist.blk_num = dest_blk_id;
@@ -265,12 +266,12 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 			READ_BLK_ID(temp_long_blk_id, &child1, rec_base + SIZEOF(rec_hdr));
 			if (0 == child1 || child1 > cs_data->trans_hist.total_blks - 1)
 			{
-				assert(t_tries < CDB_STAGNATE);
+				assert(CDB_STAGNATE > t_tries);
 				return cdb_sc_rdfail;
 			}
 			if (!(tblk_ptr = t_qread(child1, (sm_int_ptr_t)&dest_child_cycle, &dest_child_cr)))
 			{
-				assert(t_tries < CDB_STAGNATE);
+				assert(CDB_STAGNATE > t_tries);
 				return (enum cdb_sc)rdfail_detail;
 			}
 			temp_long_blk_id = IS_64_BLK_ID(tblk_ptr);
@@ -327,7 +328,7 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 		status = gvcst_search(TREF(gv_reorgkey), dir_hist_ptr);
 		if (cdb_sc_normal != status)
 		{
-			assert(t_tries < CDB_STAGNATE);
+			assert(CDB_STAGNATE > t_tries);
 			RESET_GV_TARGET_LCL_AND_CLR_GBL(save_targ, DO_GVT_GVKEY_CHECK);
 			return status;
 		}
@@ -354,7 +355,7 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 		READ_BLK_ID(IS_64_BLK_ID(dir_hist_ptr->h[0].buffaddr), &(gv_target->root), key_base + key_len_dir);
 		if ((0 == gv_target->root) || (gv_target->root > (cs_data->trans_hist.total_blks - 1)))
 		{
-			assert(t_tries < CDB_STAGNATE);
+			assert(CDB_STAGNATE > t_tries);
 			RESET_GV_TARGET_LCL_AND_CLR_GBL(save_targ, DO_GVT_GVKEY_CHECK);
 			NONTP_TRACE_HIST_MOD(work_blk_stat, t_blkmod_mu_swap_blk);
 			return cdb_sc_blkmod;
@@ -363,22 +364,31 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 		gv_target->clue.end = 0;
 		status = gvcst_search(TREF(gv_reorgkey), dest_hist_ptr);
 		RESET_GV_TARGET_LCL_AND_CLR_GBL(save_targ, DO_GVT_GVKEY_CHECK);
+		if (cdb_sc_normal != status)
+		{
+			assert(CDB_STAGNATE > t_tries);
+			return status;
+		}
+		is_bg = (dba_bg == cs_data->acc_meth);
+		if  (is_bg && (destblkhist.cr->cycle != destblkhist.cycle))
+		{	/* cr that the first t_qread() done above returned got reused for a different block
+			 * by later calls to t_qread() or gvcst_search() before this point. Possible for
+			 * example if we are running with a small "gtm_poollimit" env var setting.
+			 */
+			assert(CDB_STAGNATE > t_tries);
+			return cdb_sc_lostcr;
+		}
 		if (dest_blk_level >= dest_hist_ptr->depth			/* do not swap in root level */
 			|| dest_hist_ptr->h[dest_blk_level].blk_num != dest_blk_id) /* must be in a kill set of another process. */
 		{
 			assert(0 == upg_mv_block);
 			continue;
 		}
-		if ((cdb_sc_normal != status) || (dest_hist_ptr->h[nslevel].curr_rec.match != ((TREF(gv_reorgkey))->end + 1)))
+		if (dest_hist_ptr->h[nslevel].curr_rec.match != ((TREF(gv_reorgkey))->end + 1))
 		{
-			assert(t_tries < CDB_STAGNATE);
-			if (cdb_sc_normal != status)
-				return status;
-			else
-			{
-				NONTP_TRACE_HIST_MOD(work_blk_stat, t_blkmod_mu_swap_blk);
-				return cdb_sc_blkmod;
-			}
+			assert(CDB_STAGNATE > t_tries);
+			NONTP_TRACE_HIST_MOD(work_blk_stat, t_blkmod_mu_swap_blk);
+			return cdb_sc_blkmod;
 		}
 		for (wlevel = nslevel; wlevel <= dest_blk_level; wlevel++)
 			dest_hist_ptr->h[wlevel].tn = ctn;
@@ -393,6 +403,7 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 		dest_parent_id_sz = SIZEOF_BLK_ID(dest_long_parent_id);
 		if (0 >= dest_parent_size)
 		{
+			assert(CDB_STAGNATE > t_tries);
 			NONTP_TRACE_HIST_MOD(work_blk_stat, t_blkmod_mu_swap_blk);
 			return cdb_sc_blkmod;
 		}
@@ -410,7 +421,7 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 		BLK_SEG(bs_ptr, dest_blk_ptr + SIZEOF(blk_hdr), dest_blk_size - SIZEOF(blk_hdr));
 		if (!BLK_FINI (bs_ptr,bs1))
 		{
-			assert(t_tries < CDB_STAGNATE);
+			assert(CDB_STAGNATE > t_tries);
 			NONTP_TRACE_HIST_MOD(work_blk_stat, t_blkmod_mu_swap_blk);
 			return cdb_sc_blkmod;
 		}
@@ -430,7 +441,7 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 		assert((0 == upg_mv_block));
 		if ((dest_blk_level + 1 != level) || (dest_parent_size != work_blk_size))
 		{
-			assert(t_tries < CDB_STAGNATE);
+			assert(CDB_STAGNATE > t_tries);
 			NONTP_TRACE_HIST_MOD(work_blk_stat, t_blkmod_mu_swap_blk);
 			return cdb_sc_blkmod;
 		}
@@ -443,7 +454,7 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 		GET_RSIZ(rec_size1, saved_blk + first_offset);
 		if (work_blk_size < first_offset + rec_size1)
 		{
-			assert(t_tries < CDB_STAGNATE);
+			assert(CDB_STAGNATE > t_tries);
 			NONTP_TRACE_HIST_MOD(work_blk_stat, t_blkmod_mu_swap_blk);
 			return cdb_sc_blkmod;
 		}
@@ -456,7 +467,7 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 		BLK_SEG(bs_ptr, saved_blk + piece_len1, dest_parent_size - piece_len1);
 		if (!BLK_FINI(bs_ptr, bs1))
 		{
-			assert(t_tries < CDB_STAGNATE);
+			assert(CDB_STAGNATE > t_tries);
 			NONTP_TRACE_HIST_MOD(work_blk_stat, t_blkmod_mu_swap_blk);
 			return cdb_sc_blkmod;
 		}
@@ -474,7 +485,7 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 		BLK_SEG(bs_ptr, saved_blk + SIZEOF(blk_hdr), work_blk_size - SIZEOF(blk_hdr));
 		if (!BLK_FINI(bs_ptr, bs1))
 		{
-			assert(t_tries < CDB_STAGNATE);
+			assert(CDB_STAGNATE > t_tries);
 			NONTP_TRACE_HIST_MOD(work_blk_stat, t_blkmod_mu_swap_blk);
 			return cdb_sc_blkmod;
 		}
@@ -544,7 +555,7 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 			if (level != dest_blk_level ||
 				gv_target->hist.h[level+1].curr_rec.offset == dest_hist_ptr->h[level+1].curr_rec.offset)
 			{
-				assert(t_tries < CDB_STAGNATE);
+				assert(CDB_STAGNATE > t_tries);
 				NONTP_TRACE_HIST_MOD(work_blk_stat, t_blkmod_mu_swap_blk);
 				return cdb_sc_blkmod;
 			}
@@ -566,7 +577,7 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 				(bstar_rec_size(dest_long_parent_id) >= rec_size1) ||
 				(bstar_rec_size(dest_long_parent_id) > rec_size2))
 			{
-				assert(t_tries < CDB_STAGNATE);
+				assert(CDB_STAGNATE > t_tries);
 				NONTP_TRACE_HIST_MOD(work_blk_stat, t_blkmod_mu_swap_blk);
 				return cdb_sc_blkmod;
 			}
@@ -587,7 +598,7 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 				dest_parent_size - second_offset - rec_size2);
 			if (!BLK_FINI(bs_ptr,bs1))
 			{
-				assert(t_tries < CDB_STAGNATE);
+				assert(CDB_STAGNATE > t_tries);
 				NONTP_TRACE_HIST_MOD(work_blk_stat, t_blkmod_mu_swap_blk);
 				return cdb_sc_blkmod;
 			}
@@ -605,7 +616,7 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 			if ((dest_parent_size < (rec_size1 + dest_hist_ptr->h[dest_blk_level+1].curr_rec.offset)) ||
 				(bstar_rec_size(dest_long_parent_id) > rec_size1))
 			{
-				assert(t_tries < CDB_STAGNATE);
+				assert(CDB_STAGNATE > t_tries);
 				NONTP_TRACE_HIST_MOD(work_blk_stat, t_blkmod_mu_swap_blk);
 				return cdb_sc_blkmod;
 			}
@@ -618,7 +629,7 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 				dest_parent_size - dest_hist_ptr->h[dest_blk_level+1].curr_rec.offset - rec_size1);
 			if (!BLK_FINI(bs_ptr,bs1))
 			{
-				assert(t_tries < CDB_STAGNATE);
+				assert(CDB_STAGNATE > t_tries);
 				NONTP_TRACE_HIST_MOD(work_blk_stat, t_blkmod_mu_swap_blk);
 				return cdb_sc_blkmod;
 			}
@@ -634,7 +645,7 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 		if (work_parent_size < rec_size1 +  gv_target->hist.h[level+1].curr_rec.offset ||
 				bstar_rec_size(work_long_parent_id) > rec_size1)
 		{
-			assert((t_tries < CDB_STAGNATE) && (0 == upg_mv_block));
+			assert((CDB_STAGNATE > t_tries) && (0 == upg_mv_block));
 			NONTP_TRACE_HIST_MOD(work_blk_stat, t_blkmod_mu_swap_blk);
 			return cdb_sc_blkmod;
 		}
@@ -648,7 +659,7 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 			work_parent_size - gv_target->hist.h[level+1].curr_rec.offset - rec_size1);
 		if (!BLK_FINI(bs_ptr, bs1))
 		{
-			assert(t_tries < CDB_STAGNATE);
+			assert(CDB_STAGNATE > t_tries);
 			NONTP_TRACE_HIST_MOD(work_blk_stat, t_blkmod_mu_swap_blk);
 			return cdb_sc_blkmod;
 		}
