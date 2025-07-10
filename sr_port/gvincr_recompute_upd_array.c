@@ -3,7 +3,7 @@
  * Copyright (c) 2004-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -105,6 +105,26 @@ enum cdb_sc	gvincr_recompute_upd_array(srch_blk_status *bh, struct cw_set_elemen
 		assert(CDB_STAGNATE > t_tries);
 		return cdb_sc_blkmod;
 	}
+	if (bh->cr != cr)
+	{	/* History is not in sync with cr. Possible in case cr is a newer twin and history points to older twin.
+		 * Assert accordingly. And update history to be in sync with newer twin in the hope that the recomputation
+		 * will succeed and the history validation in t_end() (caller) will otherwise succeed.
+		 */
+		assert(csa->hdr->asyncio);
+		assert(0 != cr->twin);
+		assert(0 != cr->bt_index);
+		bh->cr = cr;
+		bh->cycle = cr->cycle;
+		bh->tn = csa->ti->curr_tn;
+		assert(bh->buffaddr != (sm_uc_ptr_t)GDS_REL2ABS(cr->buffaddr));
+		cse->old_block = bh->buffaddr = (sm_uc_ptr_t)GDS_REL2ABS(cr->buffaddr);
+	} else
+	{
+		assert(bh->cycle == cr->cycle);	/* t_end() (caller) would have restarted otherwise */
+		assert(bh->buffaddr = (sm_uc_ptr_t)GDS_REL2ABS(cr->buffaddr));
+	}
+	/* assert that cse->old_block is indeed pointing to the buffer that the cache-record is pointing to */
+	assert(cse->old_block == (sm_uc_ptr_t)GDS_REL2ABS(cr->buffaddr));
 	buffaddr = bh->buffaddr;
 	target_key_size = gv_currkey->end + 1;
 	if (cdb_sc_normal != (status = gvcst_search_blk(gv_currkey, bh)))
@@ -178,9 +198,6 @@ enum cdb_sc	gvincr_recompute_upd_array(srch_blk_status *bh, struct cw_set_elemen
 		return cdb_sc_mkblk;
 	}
 	cse->upd_addr.blk = bs1;
-	/* assert that cse->old_block is indeed pointing to the buffer that the cache-record is pointing to.
-	 * While this code no longer copies the cache record's "ondsk_blkver" onto the cse, we leave this assert in place*/
-	assert((cse->old_block == (sm_uc_ptr_t)GDS_REL2ABS(cr->buffaddr)) || (bh->cycle != cr->cycle) || (bh->cr != cr));
 	cse->done = FALSE;
 	if (cse->ondsk_blkver < ((blk_hdr_ptr_t)cse->old_block)->bver)
 	{	/* Adjust the ondsk_blkver as needed */

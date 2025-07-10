@@ -1568,13 +1568,49 @@ enum cdb_sc	t_recompute_upd_array(srch_blk_status *bh, struct cw_set_element_str
 			BG_TRACE_PRO_ANY(csa, recompute_upd_array_in_tend);
 			return cdb_sc_blkmod;
 		}
-		bh->cr = cr;
-		bh->cycle = cr->cycle;
-		cse->old_block = (sm_uc_ptr_t)GDS_REL2ABS(cr->buffaddr);
-		/* old_block needs to be repointed to the NEW buffer but the fact that this block was free does not change in this
-		 * entire function. So cse->blk_prior_state's free_status can stay as it is.
-		 */
-		bh->buffaddr = (sm_uc_ptr_t)GDS_REL2ABS(cr->buffaddr);
+		if (!dollar_tlevel)
+		{	/* Caller is t_end(). It has already done the "cycle" check (i.e. cr->cycle == bh->cycle is TRUE) */
+			if (bh->cr != cr)
+			{	/* History is not in sync with cr. Possible in case cr is a newer twin and history points
+				 * to older twin. Assert accordingly. And update history to be in sync with newer twin in
+				 * the hope that the recomputation will succeed and the history validation in t_end()
+				 * (caller) will otherwise succeed.
+				 */
+				assert(csa->hdr->asyncio);
+				assert(0 != cr->twin);
+				assert(0 != cr->bt_index);
+				bh->cr = cr;
+				bh->cycle = cr->cycle;
+				bh->tn = csa->ti->curr_tn;
+				assert(bh->buffaddr != (sm_uc_ptr_t)GDS_REL2ABS(cr->buffaddr));
+				/* old_block needs to be repointed to the NEW buffer but the fact that this block was free
+				 * does not change in this entire function. So cse->blk_prior_state's free_status can stay as it is.
+				 */
+				cse->old_block = bh->buffaddr = (sm_uc_ptr_t)GDS_REL2ABS(cr->buffaddr);
+			} else
+			{
+				assert(bh->cycle == cr->cycle);	/* t_end() (caller) would have restarted otherwise */
+				assert(bh->buffaddr = (sm_uc_ptr_t)GDS_REL2ABS(cr->buffaddr));
+			}
+			/* assert that cse->old_block is indeed pointing to the buffer that the cache-record is pointing to */
+			assert(cse->old_block == (sm_uc_ptr_t)GDS_REL2ABS(cr->buffaddr));
+		} else
+		{	/* Caller is tp_tend(). In this case, the "cycle" check is not already done (will be done only
+			 * after this call). So if "bh->cr == cr", it is not guaranteed that "bh->cycle" and "bh->buffaddr"
+			 * are the same as "cr->cycle" and "cr->buffaddr" like was the case when "t_end()" was the caller
+			 * (in the "if" block above). So fix all those fields explicitly for now.
+			 *
+			 * NOTE: One might hope that "tp_tend()" can also be fixed to be just like "t_end()" at which point,
+			 * the below code can be removed and the "if" block above can be made common to both t_end and tp_tend.
+			 * But that is unlikely because "tp_tend()" validation skips the "cycle" check for blocks that were
+			 * only part of the read-set. Only blocks that are part of the read-write set go through the "cycle"
+			 * check. Therefore, this else block will stay on.
+			 */
+			bh->cr = cr;
+			bh->cycle = cr->cycle;
+			cse->old_block = (sm_uc_ptr_t)GDS_REL2ABS(cr->buffaddr);
+			bh->buffaddr = (sm_uc_ptr_t)GDS_REL2ABS(cr->buffaddr);
+		}
 	}
 	buffaddr = bh->buffaddr;
 	if ((NULL != cse->old_block) && (cse->ondsk_blkver < ((blk_hdr_ptr_t)cse->old_block)->bver))

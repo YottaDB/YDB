@@ -3,7 +3,7 @@
  * Copyright (c) 2005-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -59,11 +59,11 @@ TAB_BG_TRC_REC("  WcBlocked tptend t1   ", wc_blocked_tp_tend_t1)
 TAB_BG_TRC_REC("  WcBlocked tp bitmap   ", wc_blocked_tp_tend_bitmap)
 TAB_BG_TRC_REC("  WcBlocked tp jnl cwset", wc_blocked_tp_tend_jnl_cwset)
 TAB_BG_TRC_REC("  WcBlocked tp jnl wcflu", wc_blocked_tp_tend_jnl_wcsflu)
-TAB_BG_TRC_REC("  WcBlocked tend hist   ", wc_blocked_t_end_hist)
-TAB_BG_TRC_REC("  WcBlocked hist1 nul bt", wc_blocked_t_end_hist1_nullbt)
-TAB_BG_TRC_REC("  WcBlocked hist1 no nul", wc_blocked_t_end_hist1_nonnullbt)
-TAB_BG_TRC_REC("  WcBlocked bitmp nul bt", wc_blocked_t_end_bitmap_nullbt)
-TAB_BG_TRC_REC("  WcBlocked bitmp no nul", wc_blocked_t_end_bitmap_nonnullbt)
+TAB_BG_TRC_REC("  WcBlocked tend hist   ", wc_blocked_t_end_hist)		/* currently unused in YottaDB */
+TAB_BG_TRC_REC("  WcBlocked hist1 nul bt", wc_blocked_t_end_hist1_nullbt)	/* currently unused in YottaDB and GT.M */
+TAB_BG_TRC_REC("  WcBlocked hist1 no nul", wc_blocked_t_end_hist1_nonnullbt)	/* currently unused in YottaDB and GT.M */
+TAB_BG_TRC_REC("  WcBlocked bitmp nul bt", wc_blocked_t_end_bitmap_nullbt)	/* currently unused in YottaDB */
+TAB_BG_TRC_REC("  WcBlocked bitmp no nul", wc_blocked_t_end_bitmap_nonnullbt)	/* currently unused in YottaDB and GT.M */
 TAB_BG_TRC_REC("  WcBlocked jnl cwset   ", wc_blocked_t_end_jnl_cwset)
 TAB_BG_TRC_REC("  WcBlocked jnl wcflu   ", wc_blocked_t_end_jnl_wcsflu)
 TAB_BG_TRC_REC("  UNUSED                ", unused_filler_0052)	/* db_csh_get_too_many_loops => gvstats n_buffer_scarce BUS*/
@@ -97,9 +97,9 @@ TAB_BG_TRC_REC("  DbCshGetn_WrtLtchStuck", db_csh_getn_wrt_latch_stuck)
 TAB_BG_TRC_REC("  WcBlocked secshrclnup1", wcb_secshr_db_clnup_now_crit)
 TAB_BG_TRC_REC("  WcBlocked t_qread_bt1 ", wc_blocked_t_qread_bad_bt_index1)
 TAB_BG_TRC_REC("  WcBlocked t_qread_bt2 ", wc_blocked_t_qread_bad_bt_index2)
-TAB_BG_TRC_REC("  WcBlocked tend crbt1  ", wc_blocked_t_end_crbtmismatch1)
-TAB_BG_TRC_REC("  WcBlocked tend crbt2  ", wc_blocked_t_end_crbtmismatch2)
-TAB_BG_TRC_REC("  WcBlocked tend crbt3  ", wc_blocked_t_end_crbtmismatch3)
+TAB_BG_TRC_REC("  WcBlocked tend crbt1  ", wc_blocked_t_end_crbtmismatch1)	/* currently unused in YottaDB */
+TAB_BG_TRC_REC("  WcBlocked tend crbt2  ", wc_blocked_t_end_crbtmismatch2)	/* currently unused in YottaDB */
+TAB_BG_TRC_REC("  WcBlocked tend crbt3  ", wc_blocked_t_end_crbtmismatch3)	/* currently unused in YottaDB */
 TAB_BG_TRC_REC("  WcBlocked tptend crbt1", wc_blocked_tp_tend_crbtmismatch1)
 TAB_BG_TRC_REC("  WcBlocked tptend crbt2", wc_blocked_tp_tend_crbtmismatch2)
 TAB_BG_TRC_REC("  WcBlocked tptend crbt3", wc_blocked_tp_tend_crbtmismatch3)

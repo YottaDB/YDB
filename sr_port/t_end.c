@@ -160,8 +160,6 @@ error_def(ERR_NOTREPLICATED);
 error_def(ERR_TEXT);
 error_def(ERR_TNTOOLARGE);
 
-#define BLOCK_FLUSHING(x) (csa->hdr->clustered && x->flushing && !CCP_SEGMENT_STATE(cs_addrs->nl,CCST_MASK_HAVE_DIRTY_BUFFERS))
-
 #define	RESTORE_CURRTN_IF_NEEDED(csa, cti, write_inctn, decremented_currtn)				\
 {													\
 	if (write_inctn && decremented_currtn)								\
@@ -335,7 +333,6 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 	if (!update_trans)
 	{	/* Take a fast path for read transactions. We do not need crit; we simply need to verify our blocks have not been
 		 * modified since we read them. The read is valid if neither the cycles nor the tns have changed. Otherwise restart.
-		 * Note: if, as with updates, we validated via bt_get/db_csh_get, we would restart under the same conditions.
 		 */
 		SHM_READ_MEMORY_BARRIER;
 		same_db_state = (start_tn == cti->early_tn);
@@ -917,38 +914,43 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 				t1->cse = NULL;	/* reset for next transaction */
 			} else
 			{
-				bt = bt_get(t1->blk_num);
-				if (NULL == bt)
+				cr = t1->cr;
+				if (0 != cr->bt_index)
 				{
+					bt = (bt_rec_ptr_t)GDS_REL2ABS(cr->bt_index);
+					assert(NULL != bt);
+					assert(cr->blk == bt->blk);
+					if (cr->cycle != t1->cycle)
+					{
+						assert(CDB_STAGNATE > t_tries);
+						status = cdb_sc_lostcr;
+						goto failed;
+					}
+				} else if (0 != cr->twin)
+				{	/* Update "cr" to point to newer twin */
+					cr = (cache_rec_ptr_t)GDS_ANY_REL2ABS(csa, cr->twin);
+					assert(0 != cr->bt_index);
+					bt = (bt_rec_ptr_t)GDS_REL2ABS(cr->bt_index);
+					assert(NULL != bt);
+					assert(cr->blk == bt->blk);
+				} else
+				{
+					bt = NULL;
 					if (t1->tn <= oldest_hist_tn)
 					{
 						assert(CDB_STAGNATE > t_tries);
 						status = cdb_sc_losthist;
 						goto failed;
 					}
-					cr = db_csh_get(t1->blk_num);
-				} else
-				{
-					if (BLOCK_FLUSHING(bt))
+					if (cr->cycle != t1->cycle)
 					{
 						assert(CDB_STAGNATE > t_tries);
-						status = cdb_sc_blockflush;
+						status = cdb_sc_lostcr;
 						goto failed;
 					}
-					if (CR_NOTVALID == bt->cache_index)
-						cr = db_csh_get(t1->blk_num);
-					else
-					{
-						cr = (cache_rec_ptr_t)GDS_REL2ABS(bt->cache_index);
-						if (cr->blk != bt->blk)
-						{
-							assert(FALSE);
-							SET_TRACEABLE_VAR(cnl->wc_blocked, WC_BLOCK_RECOVER);
-							BG_TRACE_PRO_ANY(csa, wc_blocked_t_end_crbtmismatch1);
-							status = cdb_sc_crbtmismatch;
-							goto failed;
-						}
-					}
+				}
+				if (NULL != bt)
+				{
 					assert(bt->killtn <= bt->tn);
 					if (t1->tn <= bt->tn)
 					{
@@ -991,28 +993,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 						}
 					}
 				}
-				if ((cache_rec_ptr_t)CR_NOTVALID == cr)
-				{
-					SET_TRACEABLE_VAR(cnl->wc_blocked, WC_BLOCK_RECOVER);
-					BG_TRACE_PRO_ANY(csa, wc_blocked_t_end_hist);
-					SET_CACHE_FAIL_STATUS(status, csd);
-					goto failed;
-				}
-				if ((NULL == cr) || (cr->cycle != t1->cycle)
-					|| ((sm_long_t)GDS_REL2ABS(cr->buffaddr) != (sm_long_t)t1->buffaddr))
-				{
-					if ((NULL != cr) && (NULL != bt) && (cr->blk != bt->blk))
-					{
-						assert(FALSE);
-						SET_TRACEABLE_VAR(cnl->wc_blocked, WC_BLOCK_RECOVER);
-						BG_TRACE_PRO_ANY(csa, wc_blocked_t_end_crbtmismatch2);
-						status = cdb_sc_crbtmismatch;
-						goto failed;
-					}
-					assert(CDB_STAGNATE > t_tries);
-					status = cdb_sc_lostcr;
-					goto failed;
-				}
+				assert((sm_long_t)GDS_REL2ABS(cr->buffaddr) == (sm_long_t)t1->buffaddr);
 				/* MUPIP REORG -UPGRADE enters t_end without any of the usual concurrency checks. It is possible
 				 * for a process to be in bg_update_phase2 modifying the same CR. Since UPGRADE can be deferred
 				 * stop the update and let it t_retry() the GVT */
@@ -1101,22 +1082,16 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 			}
 		} else
 		{
-			bt = bt_get(cs->blk);
-			if (NULL == bt)
+			cr = cs->cr;
+			if (0 != cr->bt_index)
 			{
-				if (cs->tn <= oldest_hist_tn)
+				bt = (bt_rec_ptr_t)GDS_REL2ABS(cr->bt_index);
+				assert(NULL != bt);
+				assert(cr->blk == bt->blk);
+				if (cr->cycle != cs->cycle)
 				{
 					assert(CDB_STAGNATE > t_tries);
-					status = cdb_sc_lostbmlhist;
-					goto failed;
-				}
-				cr = db_csh_get(cs->blk);
-			} else
-			{
-				if (BLOCK_FLUSHING(bt))
-				{
-					assert(CDB_STAGNATE > t_tries);
-					status = cdb_sc_blockflush;
+					status = cdb_sc_lostbmlcr;
 					goto failed;
 				}
 				if (cs->tn <= bt->tn)
@@ -1125,35 +1100,28 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 					status = cdb_sc_bmlmod;
 					goto failed;
 				}
-				if (CR_NOTVALID == bt->cache_index)
-					cr = db_csh_get(cs->blk);
-				else
-				{
-					cr = (cache_rec_ptr_t)GDS_REL2ABS(bt->cache_index);
-					if (cr->blk != bt->blk)
-					{
-						assert(FALSE);
-						SET_TRACEABLE_VAR(cnl->wc_blocked, WC_BLOCK_RECOVER);
-						BG_TRACE_PRO_ANY(csa, wc_blocked_t_end_crbtmismatch3);
-						status = cdb_sc_crbtmismatch;
-						goto failed;
-					}
-				}
-			}
-			if ((cache_rec_ptr_t)CR_NOTVALID == cr)
-			{
-				SET_TRACEABLE_VAR(cnl->wc_blocked, WC_BLOCK_RECOVER);
-				BG_TRACE_PRO_ANY(csa, wc_blocked_t_end_bitmap_nullbt);
-				SET_CACHE_FAIL_STATUS(status, csd);
-				goto failed;
-			}
-			if ((NULL == cr)  || (cr->cycle != cs->cycle) ||
-				((sm_long_t)GDS_REL2ABS(cr->buffaddr) != (sm_long_t)cs->old_block))
+			} else if (0 != cr->twin)
 			{
 				assert(CDB_STAGNATE > t_tries);
-				status = cdb_sc_lostbmlcr;
+				status = cdb_sc_bmlmod;
 				goto failed;
+			} else
+			{
+				bt = NULL;
+				if (cs->tn <= oldest_hist_tn)
+				{
+					assert(CDB_STAGNATE > t_tries);
+					status = cdb_sc_lostbmlhist;
+					goto failed;
+				}
+				if (cr->cycle != cs->cycle)
+				{
+					assert(CDB_STAGNATE > t_tries);
+					status = cdb_sc_lostbmlcr;
+					goto failed;
+				}
 			}
+			assert((sm_long_t)GDS_REL2ABS(cr->buffaddr) == (sm_long_t)cs->old_block);
 			PIN_CACHE_RECORD(cr, cr_array, cr_array_index);
 		}
 	}
