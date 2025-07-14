@@ -131,6 +131,7 @@ RUN --mount=type=bind,from=ydb-release-builder,source=/tmp/yottadb-release,targe
                     libcurl4-openssl-dev \
                     ca-certificates \
                     gcc \
+                    libncurses6 \
                     && \
     /tmp/ydb-release/ydbinstall --utf8 --installdir /opt/yottadb/current --gui
 
@@ -161,6 +162,7 @@ RUN --mount=type=bind,from=ydb-release-builder,source=/tmp/yottadb-release,targe
                     netbase \
                     libcurl4 \
                     nodejs \
+                    libncurses6 \
                     && \
     if [ "$ENABLE_ASAN" = "ON" ]; then apt-get install -y --no-install-recommends libasan8; fi && \
     /tmp/ydb-release/ydbinstall --utf8 --installdir /opt/yottadb/current && \
