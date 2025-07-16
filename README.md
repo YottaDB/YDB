@@ -77,13 +77,13 @@ sudo apt-get install --no-install-recommends clang llvm lld
 
   ```sh
   Debian, Ubuntu, and derivatives
-  sudo apt-get install --no-install-recommends file cmake make gcc git curl tcsh libjansson4 {libconfig,libelf,libicu,libncurses,libreadline,libjansson}-dev binutils ca-certificates
+  sudo apt-get install --no-install-recommends file cmake make gcc git curl tcsh libjansson4 {libconfig,libelf,libicu,libncurses,libreadline,libjansson,libssl}-dev binutils ca-certificates
 
   Red Hat and derivatives
-  sudo yum install file cmake make gcc git curl tcsh jansson {libconfig,libicu,ncurses,elfutils-libelf,readline,jansson}-devel binutils ca-certificates
+  sudo yum install file cmake make gcc git curl tcsh jansson {libconfig,libicu,ncurses,elfutils-libelf,readline,jansson,openssl}-devel binutils ca-certificates
 
   SUSE and derivatives
-  sudo zypper install cmake make gcc git file curl tcsh binutils-gold icu libjansson4 {libconfig,libicu,ncurses,libelf,readline,libjansson}-devel binutils ca-certificates
+  sudo zypper install cmake make gcc git file curl tcsh binutils-gold icu libjansson4 {libconfig,libicu,ncurses,libelf,readline,libjansson,libopenssl}-devel binutils ca-certificates
   ```
 
   There may be other library dependencies or the packages may have different names.
