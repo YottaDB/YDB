@@ -214,7 +214,7 @@ int yed_decode_array(const ydb_buffer_t *varname, int subs_used, ydb_buffer_t *s
 	array_size = yed_get_size(jansson_object);
 	if (YDB_MAX_SUBS < array_size)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,
-			LEN_AND_LIT("Length of at least 1 array in JSON input is > YDB_MAX_SUBS"),
+			LEN_AND_LIT("Length of at least 1 array is > YDB_MAX_SUBS in JSON input"),
 			LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_DECODE)));
 	if (YDB_MAX_SUBS == subs_used)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXNRSUBSCRIPTS);
@@ -275,7 +275,7 @@ int yed_decode_string(const ydb_buffer_t *varname, int subs_used, ydb_buffer_t *
 	value_buffer.len_alloc = strlen(value);
 	if (YDB_MAX_STR < value_buffer.len_alloc)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,
-			LEN_AND_LIT("Size for string value in JSON input is > YDB_MAX_STR"),
+			LEN_AND_LIT("Size for string value is > YDB_MAX_STR in JSON input"),
 			LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_DECODE)));
 	value_buffer.buf_addr = system_malloc(value_buffer.len_alloc);
 	YDB_COPY_STRING_TO_BUFFER(value, &value_buffer, done);
