@@ -55,7 +55,10 @@ endif()
 # CMAKE_C_FLAGS during compilation (likewise with CMAKE_ASM_FLAGS_DEBUG). Keep these debug variables defined and ready.
 set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -DDEBUG")
 if ( CMAKE_COMPILER_IS_GNUCC )
-  set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -O0 -g3")
+  # Note: -g3 causes libmumps.a file size to grow from 145Mb to 990Mb. Additionally, -O0 has been seen to not ensure
+  # that no local variables are optimized out. Therefore, this line is commented out for the regular Debug build.
+  # In case anyone finds it useful, they can uncomment it and rebuild.
+  # set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -O0 -g3")
   set(CMAKE_ASM_FLAGS_DEBUG "${CMAKE_ASM_FLAGS_DEBUG} -Wa,--defsym,DEBUG=1")
 else()
   set(CMAKE_ASM_FLAGS_DEBUG "${CMAKE_ASM_FLAGS_DEBUG} -Wa,-defsym,DEBUG=1")
