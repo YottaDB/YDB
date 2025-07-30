@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -609,31 +609,34 @@ int ydb_ci_exec(const char *c_rtn_name, ci_name_descriptor *ci_info, va_list tem
 	ESTABLISH_RET(gtmci_ch, mumps_status);
 	if (!c_rtn_name)
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_CIRCALLNAME);
-	if (!internal_use)
-	{	/* Check if the currently active call-in table is already loaded. If so, use it. */
-		ci_tab = TREF(ci_table_curr);
-		if (NULL == ci_tab)
-		{	/* There is no currently active call-in table. Use the default call-in table if it has been loaded. */
-			ci_tab = TREF(ci_table_default);
-		}
-		if (NULL == ci_tab)
-		{	/* Neither the active nor the default call-in table is available. Load the default call-in table. */
-			ci_tab = ci_tab_entry_open(INTERNAL_USE_FALSE, NULL);
-			TREF(ci_table_curr) = ci_tab;
-			TREF(ci_table_default) = ci_tab;
-		}
-	} else
-	{	/* Call from the filter command*/
-		ci_tab = TREF(ci_table_internal_filter);
-		if (NULL == ci_tab)
-		{
-			ci_tab = ci_tab_entry_open(INTERNAL_USE_TRUE, NULL);
-			TREF(ci_table_internal_filter) = ci_tab;
-		}
-	}
 	entry = (NULL != ci_info) ? ci_info->handle : NULL;
+	assert(!internal_use || (NULL == ci_info));	/* Assert that if "internal_use" is TRUE, we have "entry"
+							 * set to NULL and enter the below "if" block to initialize "entry".
+							 */
 	if (NULL == entry)
 	{
+		if (!internal_use)
+		{	/* Check if the currently active call-in table is already loaded. If so, use it. */
+			ci_tab = TREF(ci_table_curr);
+			if (NULL == ci_tab)
+			{	/* There is no currently active call-in table. Use the default call-in table if it has been loaded. */
+				ci_tab = TREF(ci_table_default);
+			}
+			if (NULL == ci_tab)
+			{	/* Neither the active nor the default call-in table is available. Load the default call-in table. */
+				ci_tab = ci_tab_entry_open(INTERNAL_USE_FALSE, NULL);
+				TREF(ci_table_curr) = ci_tab;
+				TREF(ci_table_default) = ci_tab;
+			}
+		} else
+		{	/* Call from the filter command*/
+			ci_tab = TREF(ci_table_internal_filter);
+			if (NULL == ci_tab)
+			{
+				ci_tab = ci_tab_entry_open(INTERNAL_USE_TRUE, NULL);
+				TREF(ci_table_internal_filter) = ci_tab;
+			}
+		}
 		if (!(entry = ci_find_rtn_entry(ci_tab, c_rtn_name)))	/* c_rtn_name not found in the table */
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_CINOENTRY, 3, LEN_AND_STR(c_rtn_name), ci_tab->fname);
 		if (NULL != ci_info)
