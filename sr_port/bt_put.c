@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -96,7 +96,7 @@ bt_rec_ptr_t bt_put(gd_region *reg, block_id block)
 			bt->killtn = lcl_tn;
 			insqt((que_ent_ptr_t)bt, (que_ent_ptr_t)hdr);
 			th = (th_rec_ptr_t)remqh((que_ent_ptr_t)csa->th_base);
-			assertpro(EMPTY_QUEUE != (sm_long_t)th);
+			assert(EMPTY_QUEUE != (sm_long_t)th);
 			break;
 		}
 		if (bt->blk == block)
@@ -117,7 +117,7 @@ bt_rec_ptr_t bt_put(gd_region *reg, block_id block)
 			assert(in_wcs_recover || (bt->tn < lcl_tn) || (jgbl.forw_phase_recovery && !JNL_ENABLED(csa)));
 			q0 = (bt_rec_ptr_t)((sm_uc_ptr_t)bt + bt->tnque.fl);
 			th = (th_rec_ptr_t)remqt((que_ent_ptr_t)((sm_uc_ptr_t)q0 + SIZEOF(th->tnque)));
-			assertpro(EMPTY_QUEUE != (sm_long_t)th);
+			assert(EMPTY_QUEUE != (sm_long_t)th);
 			break;
 		}
 		if (0 == bt->blkque.fl)
