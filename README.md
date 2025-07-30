@@ -202,10 +202,11 @@ docker run --rm -it -p 9080-9081:9080-9081 download.yottadb.com/yottadb/yottadb 
 
 ## Contribute to YottaDB Development
 
-To contribute or help with further development, [fork the repository](https://docs.gitlab.com/ee/gitlab-basics/fork-project.html), clone your fork to a local copy, and submit Merge Requests! Please also set up the pre-commit script to automatically enforce some coding conventions. Assuming you are in the top-level directory, the following will work:
+To contribute or help with further development, [fork the repository](https://docs.gitlab.com/ee/gitlab-basics/fork-project.html), clone your fork to a local copy, and submit Merge Requests! Please also set up the pre-commit and pre-rebase scripts to automatically enforce some coding conventions. Assuming you are in the top-level directory, the following will work:
 
 ```sh
 ln -s ../../pre-commit .git/hooks
+ln -s ../../pre-rebase .git/hooks
 ```
 
 **YottaDB is a registered trademark of YottaDB LLC**

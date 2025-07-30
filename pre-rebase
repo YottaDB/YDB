@@ -1,0 +1,52 @@
+#!/usr/bin/env tcsh
+#
+#################################################################
+#                                                               #
+# Copyright (c) 2025 YottaDB LLC and/or its subsidiaries.       #
+# All rights reserved.                                          #
+#                                                               #
+#       This source code contains the intellectual property     #
+#       of its copyright holder(s), and is made available       #
+#       under a license.  If you do not know the terms of       #
+#       the license, please stop and do not read further.       #
+#                                                               #
+#################################################################
+#
+# Pre-rebase hook script that
+#
+# ----------------------------------------------------------------
+# 1) Verifies changes to OBJ_UNIX_LABEL don't get lost on a rebase
+# ----------------------------------------------------------------
+#
+# Based on the pre-rebase script in YDBOcto at:
+# https://gitlab.com/YottaDB/DBMS/YDBOcto/-/blob/master/pre-rebase?ref_type=heads
+@ exitstatus = 0
+
+if ("" != $2) then
+	# This is a git rebase --onto. For example "git rebase --onto base tmp~3 tmp".
+	# In this case, $1 would be "tmp~3" and $2 would be "tmp".
+	set basecommit = `git merge-base master $1`
+	set tipcommit = $2
+else
+	# This is a git rebase without --onto. git rebase does not tell us which branch the rebase target it.
+	# So we assume it is "master". And HEAD points to current branch.
+	set basecommit = `git merge-base master HEAD`
+	set tipcommit = "HEAD"
+endif
+foreach macro ("OBJ_UNIX_LABEL")
+	set fmt_mst = `git diff $basecommit..master | grep '^+#define[[:space:]]'$macro | awk '{print $3}'`
+	set fmt_brnch = `git diff $basecommit..$tipcommit | grep '^+#define[[:space:]]'$macro | awk '{print $3}'`
+	if (("" != "$fmt_brnch") && ("" != "$fmt_mst") && (0 != `expr "$fmt_mst" == "$fmt_brnch"`)) then
+		# This is a case where the macro $macro is being bumped up in the current branch and was bumped up
+		# in the master too concurrently. And both bumps were to the exact same value. In this case,
+		# a rebase would succeed but would lose the bump which is incorrect. Refuse the rebase unless the bump
+		# is higher in the current branch than the master. In case the two bumps were to different values,
+		# the rebase would see it as a conflict and abort on its own so that case does not need to be handled
+		# here. Only the equality case needs to be handled.
+		echo "$macro macro is bumped to $fmt_brnch in current branch but is bumped to $fmt_mst in master"
+		echo "Aborting rebase. Bump $macro macro to a value higher than $fmt_mst for the rebase to succeed."
+		@ exitstatus = 1
+	endif
+end
+
+exit $exitstatus
