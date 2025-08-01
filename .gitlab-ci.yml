@@ -89,6 +89,7 @@ build-test:
       - testarea1/
       - testarea2/
       - testarea3/
+      - pipeline-test-ydb-build.out
     expire_in: 1 month
     when: always
   script:
