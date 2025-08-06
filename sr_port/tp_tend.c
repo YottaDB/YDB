@@ -1048,11 +1048,6 @@ boolean_t	tp_tend()
 				}
 			}
 #			endif
-			if (DIVIDE_ROUND_UP(si->num_of_blks, 4) < leafmods)	/* if status == cdb_sc_normal, then leafmods  */
-			{
-				status = cdb_sc_toomanyrecompute;		/* is exactly the number of recomputed blocks */
-				goto failed;
-			}
 			assert(cdb_sc_normal == status);
 			if (NULL == first_cw_set)
 				continue;

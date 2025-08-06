@@ -3,6 +3,9 @@
  * Copyright (c) 2003-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *                                                              *
+ * Copyright (c) 2025 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *      This source code contains the intellectual property     *
  *      of its copyright holder(s), and is made available       *
  *      under a license.  If you do not know the terms of       *
@@ -102,7 +105,7 @@ CDB_SC_LCHAR_ENTRY(cdb_sc_lostbmlcr,        FALSE, TRUE,  'c') /* 'c'  t_end or 
 CDB_SC_LCHAR_ENTRY(cdb_sc_lostoldblk,       FALSE, FALSE, 'd') /* 'd'  Not currently used */
 CDB_SC_LCHAR_ENTRY(cdb_sc_blknumerr,        FALSE, FALSE, 'e') /* 'e'  t_qread or op_tcommit - block number is impossible */
 CDB_SC_LCHAR_ENTRY(cdb_sc_blksplit,         FALSE, FALSE, 'f') /* 'f'  recompute_upd_array recognized that the block needs to be split */
-CDB_SC_LCHAR_ENTRY(cdb_sc_toomanyrecompute, FALSE, FALSE, 'g') /* 'g'  more than 25% of the blocks in read-set need to be recomputed */
+CDB_SC_LCHAR_ENTRY(cdb_sc_toomanyrecompute, FALSE, FALSE, 'g') /* 'g'  Not currently used in YottaDB */
 CDB_SC_LCHAR_ENTRY(cdb_sc_jnlstatemod,      TRUE,  FALSE, 'h') /* 'h'  csd->jnl_state changed or csd->jnl_before_image changed since start of the transaction */
 CDB_SC_LCHAR_ENTRY(cdb_sc_needlock,         FALSE, FALSE, 'i') /* 'i'  Not currently used */
 CDB_SC_LCHAR_ENTRY(cdb_sc_bkupss_statemod,  FALSE, FALSE, 'j') /* 'j'  t_end/tp_tend found that either online-backup-in-progress or snapshot state changed since start of transaction */
