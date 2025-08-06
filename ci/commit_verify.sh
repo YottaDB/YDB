@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #################################################################
 #								#
-# Copyright (c) 2020-2024 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2020-2025 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
@@ -86,6 +86,8 @@ GPG_KEYS=(
     "D2590D2F68BC2620370D52EBDEEEA9DC8B9A55D8"
     # Jirapat Distaprom
     "146843872A57D45E8CB06841295AC8BD2134D07E"
+    # Serena Willis
+    "8C3416F3D6FD7624914704A22B379ED58A1511C0"
 )
 gpg --keyserver hkps://keyserver.ubuntu.com --recv-keys "${GPG_KEYS[@]}"
 
