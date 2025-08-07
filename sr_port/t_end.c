@@ -209,7 +209,6 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 	DEBUG_ONLY(sgmnt_addrs	*jnlpool_csa = NULL;)
 	sgmnt_data_ptr_t	csd;
 	node_local_ptr_t	cnl;
-	sgm_info		*dummysi = NULL;	/* needed as a dummy parameter for {mm,bg}_update */
 	srch_blk_status		*t1;
 	trans_num		valid_thru, oldest_hist_tn, dbtn, blktn, temp_tn, epoch_tn, old_block_tn;
 	unsigned char		cw_depth, cw_bmp_depth, buff[MAX_ZWR_KEY_SZ], *end;
@@ -587,7 +586,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 				 * note that checking for crit is equivalent to checking if we are in the final retry.
 				 */
 				assert((CDB_STAGNATE > t_tries) || (cs->blk < cti->total_blks));
-				cs->mode = gds_t_acquired;
+				SET_CSE_MODE_TO_GDS_T_ACQUIRED(cs);
 #ifdef DEBUG
 				/* This condition is a little tricky at first blush. It is meant to cover index blocks only
 				 * because data blocks are upgraded later in mm_update() and bg_update_phase1()
@@ -1009,7 +1008,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 				 * where the history has a non-zero cw-set-element.
 				 */
 				cs = t1->cse;
-				if (cs)
+				if (NULL != cs)
 				{
 					if (n_gds_t_op > cs->mode)
 					{
@@ -1029,6 +1028,12 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 						assert((gds_t_busy2free != cs->mode) || (free_seen & BUSY2FREE));
 						assert((gds_t_recycled2free != cs->mode) || (free_seen & RECYCLED2FREE));
 					}
+					/* Note down "bt" in "cs->bt" to avoid a "bt_put()" call in "bg_update_phase1()".
+					 * Since "bt" is potentially non-NULL, also note down "cr" in "cs->cr" to avoid a
+					 * heavyweight "db_csh_get()" call in "bg_update_phase1()".
+					 */
+					cs->bt = bt;	/* to be used by "bt_put" in bg_update_phase1 */
+					cs->cr = cr;	/* to be used by "bt_put" in bg_update_phase1 */
 					t1->cse = NULL;	/* reset for next transaction */
 				}
 			}
@@ -1123,6 +1128,13 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 			}
 			assert((sm_long_t)GDS_REL2ABS(cr->buffaddr) == (sm_long_t)cs->old_block);
 			PIN_CACHE_RECORD(cr, cr_array, cr_array_index);
+			/* Note down "bt" in "cs->bt" to avoid a "bt_put()" call in "bg_update_phase1()".
+			 * Since "bt" is potentially non-NULL, also note down "cr" in "cs->cr" to avoid a
+			 * heavyweight "db_csh_get()" call in "bg_update_phase1()". But "cs->cr" would
+			 * already have been initialized to "cr" so just assert that below.
+			 */
+			cs->bt = bt;	/* to be used by "bt_put" in bg_update_phase1 */
+			assert(cs->cr == cr);	/* to be used by "bt_put" in bg_update_phase1 */
 		}
 	}
 	if ((0 != cw_map_depth) && mu_reorg_encrypt_in_prog)
@@ -1187,6 +1199,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 				}
 				PIN_CACHE_RECORD(cr, cr_array, cr_array_index);
 				old_block = (blk_hdr_ptr_t)GDS_REL2ABS(cr->buffaddr);
+				assert(NULL == cs->bt);	/* should have been set to NULL before getting crit */
 				assert((cs->cr != cr) || (cs->old_block == (sm_uc_ptr_t)old_block));
 				old_block_tn = old_block->tn;
 				/* Need checksums if before imaging and if a PBLK record is going to be written. However,
@@ -1551,6 +1564,9 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 		cs = &cw_set[0];
 		if (SAVE_2FREE_IMAGE(cs->mode, free_seen, csd))
 		{
+			boolean_t	backup_block_saved;	/* dummy variable passed to BG_BACKUP_BLOCK but never used
+								 * because "dollar_tlevel" is 0 in this case.
+								 */
 			blkid = cs->blk;
 			assert(!IS_BITMAP_BLK(blkid) && (blkid == cr_array[0]->blk));
 			csa->backup_in_prog = (BACKUP_NOT_IN_PROGRESS != cnl->nbb);
@@ -1558,8 +1574,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 			backup_cr = cr;
 			blk_ptr = (sm_uc_ptr_t)GDS_REL2ABS(cr->buffaddr);
 			backup_blk_ptr = blk_ptr;
-			BG_BACKUP_BLOCK(csa, csd, cnl, cr, cs, blkid, backup_cr, backup_blk_ptr, block_saved,
-					 dummysi->backup_block_saved);
+			BG_BACKUP_BLOCK(csa, csd, cnl, cr, cs, blkid, backup_cr, backup_blk_ptr, block_saved, backup_block_saved);
 			if (SNAPSHOTS_IN_PROG(csa))
 			{	/* we write the before-image to snapshot file only for FAST_INTEG and not for
 				 * regular integ because the block is going to be marked free at this point
@@ -1632,24 +1647,10 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 					bml_status_check(cs);
 #				endif
 				if (is_mm)
-					status = mm_update(cs, dbtn, blktn, dummysi);	/* Step CMT10 */
+					status = mm_update(cs, dbtn, blktn);	/* Step CMT10 */
 				else
 				{
-					if (csd->dsid)
-					{
-						if (ERR_GVKILLFAIL == t_err)
-						{
-							if (cs == cw_set)
-							{
-								if ((gds_t_acquired == mode) ||
-								    ((cw_set_depth > 1) && (0 == cw_set[1].level)))
-									rc_cpt_inval();
-								else
-									rc_cpt_entry(cs->blk);
-							}
-						} else	if (0 == cs->level)
-							rc_cpt_entry(cs->blk);
-					}
+					assert(!csd->dsid); /* assert justifies removing "if (csd->dsid)" code block from here */
 					/* Do phase1 of bg_update while holding crit on the database.
 					 * This will lock the buffers that need to be changed.
 					 * Once crit is released, invoke phase2 which will update those locked buffers.
@@ -1661,7 +1662,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 					 * (to reduce restarts due to bitmap collisions) is addressed, we can reexamine
 					 * whether it makes sense to move bitmap block builds back to phase2.
 					 */
-					status = bg_update_phase1(cs, dbtn, dummysi);	/* Step CMT10 */
+					status = bg_update_phase1(cs, dbtn);	/* Step CMT10 */
 					if ((cdb_sc_normal == status) && (gds_t_writemap == mode))
 					{	/* If we are about to do phase2 db commit while holding crit,
 						 * then check if jnl phase2 is pending. If so do it also in crit
@@ -1670,7 +1671,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 						if (NEED_TO_FINISH_JNL_PHASE2(jrs))
 							NONTP_FINISH_JNL_PHASE2_IN_JNLBUFF_AND_JNLPOOL(csa,	\
 									jrs, replication, jnlpool); /* Step CMT06a & CMT06b */
-						status = bg_update_phase2(cs, dbtn, blktn, dummysi);	/* Step CMT10a */
+						status = bg_update_phase2(cs, dbtn, blktn);	/* Step CMT10a */
 						if (cdb_sc_normal == status)
 							cs->mode = gds_t_committed;
 					}
@@ -1770,7 +1771,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 				 * Note that cs->old_mode is negated by bg_update_phase1 (to help secshr_db_clnup).
 				 */
 				assert(-cs->old_mode == mode);
-				status = bg_update_phase2(cs, dbtn, blktn, dummysi);	/* Step CMT18 */
+				status = bg_update_phase2(cs, dbtn, blktn);	/* Step CMT18 */
 				if (cdb_sc_normal != status)
 				{	/* the database is probably in trouble */
 					INVOKE_T_COMMIT_CLEANUP(status, csa);

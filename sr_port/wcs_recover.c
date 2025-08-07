@@ -412,7 +412,7 @@ void wcs_recover(gd_region *reg)
 						|| (dse_running
 							&& (WBTEST_BG_UPDATE_BTPUTNULL == ydb_white_box_test_case_number))));
 			}
-			bt = bt_put(reg, cr->blk);
+			bt = bt_put(csa, cr->blk);
 			BT_NOT_NULL(bt, cr, csa, reg);
 			bt->killtn = csd->trans_hist.curr_tn;	/* be safe; don't know when was last kill after recover */
 			if (CR_NOTVALID != bt->cache_index)
@@ -535,7 +535,7 @@ void wcs_recover(gd_region *reg)
 		}
 		if (LATCH_SET > WRITE_LATCH_VAL(cr))
 		{	/* No process has an interest */
-			bt = bt_put(reg, cr->blk);
+			bt = bt_put(csa, cr->blk);
 			BT_NOT_NULL(bt, cr, csa, reg);
 			bt->killtn = csd->trans_hist.curr_tn;	/* be safe; don't know when was last kill after recover */
 			if (CR_NOTVALID == bt->cache_index)
@@ -595,7 +595,7 @@ void wcs_recover(gd_region *reg)
 		 */
 		assert(LATCH_CONFLICT >= WRITE_LATCH_VAL(cr));
 		hq = (cache_que_head_ptr_t)(hash_hdr + (cr->blk % bt_buckets));
-		bt = bt_put(reg, cr->blk);
+		bt = bt_put(csa, cr->blk);
 		BT_NOT_NULL(bt, cr, csa, reg);
 		bt->killtn = csd->trans_hist.curr_tn;	/* be safe; don't know when was last kill after recover */
 		if (CR_NOTVALID == bt->cache_index)

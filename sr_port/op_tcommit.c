@@ -430,7 +430,7 @@ enum cdb_sc	op_tcommit(void)
 							}
 							cse->blk = new_blk;
 							csa->tp_hint = new_blk;
-							cse->mode = gds_t_acquired;
+							SET_CSE_MODE_TO_GDS_T_ACQUIRED(cse);
 							/* Assert that in final retry total_blks (private and shared) are in sync */
 							assert((CDB_STAGNATE > t_tries) || !is_mm
 									|| (csa->total_blks == csa->ti->total_blks));

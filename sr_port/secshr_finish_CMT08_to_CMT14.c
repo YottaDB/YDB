@@ -3,7 +3,7 @@
  * Copyright (c) 2017-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -323,14 +323,20 @@ void	secshr_finish_CMT08_to_CMT14(sgmnt_addrs *csa, jnlpool_addrs_ptr_t update_j
 							if (gds_t_committed > old_mode)
 								assert(process_id != cr->in_tend);
 							else
-							{	/* For the kill_t_* case, cs->cr will be NULL as bg_update was not
-								 * invoked and the cw-set-elements were memset to 0 in TP. But for
-								 * gds_t_write_root and gds_t_busy2free, they are non-TP ONLY modes
-								 * and cses are not initialized so can't check for NULL cr.
+							{	/* For the kill_t_* case, cs->cr will most likely be NULL as
+								 * bg_update was not invoked and the cw-set-elements were memset
+								 * to 0 in TP. But in tp_tend.c, it is possible "cs->cr" got set
+								 * to a non-NULL value and so it is not guaranteed to be NULL.
+								 *
+								 * For gds_t_write_root, gds_t_busy2free and gds_t_recycled2free,
+								 * they are non-TP ONLY modes and cses are not initialized so
+								 * can't check for NULL cr.
+								 *
 								 * "n_gds_t_op" demarcates the boundaries between non-TP only and
-								 * TP only modes. So use that.
+								 * TP only modes. So we can use that except that "cr" is not
+								 * guaranteed to be NULL in either TP or non-TP. So no asserts
+								 * done below.
 								 */
-								assert((n_gds_t_op > old_mode) || (NULL == cr));
 							}
 							assert((NULL == cr) || (cr->ondsk_blkver == csd->desired_db_format));
 						}

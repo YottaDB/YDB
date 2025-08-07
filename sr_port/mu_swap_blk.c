@@ -497,7 +497,7 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 			 * from gds_t_create to gds_t_acquired). Instead we do that and a little more (that t_end does) all here.
 			 */
 			assert(dest_blk_id == tmpcse->blk);
-			tmpcse->mode = gds_t_acquired;
+			SET_CSE_MODE_TO_GDS_T_ACQUIRED(tmpcse);
 			/* If snapshots are in progress, we might want to read the before images of the FREE blocks also.
 			 * Since mu_swap_blk mimics a small part of t_end, it sets cse->mode to gds_t_acquired and hence
 			 * will not read the before images of the FREE blocks in t_end. To workaround this, set

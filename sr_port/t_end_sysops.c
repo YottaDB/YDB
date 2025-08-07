@@ -299,7 +299,7 @@ void bm_update(cw_set_element *cs, sm_uc_ptr_t lclmap, boolean_t is_mm)
 	return;
 }
 
-enum cdb_sc mm_update(cw_set_element *cs, trans_num ctn, trans_num effective_tn, sgm_info *si)
+enum cdb_sc mm_update(cw_set_element *cs, trans_num ctn, trans_num effective_tn)
 {
 	block_id		blkid;
 	cw_set_element		*cs_ptr, *nxt;
@@ -335,7 +335,7 @@ enum cdb_sc mm_update(cw_set_element *cs, trans_num ctn, trans_num effective_tn,
 		if (!dollar_tlevel)
 			block_saved = TRUE;
 		else
-			si->backup_block_saved = TRUE;
+			sgm_info_ptr->backup_block_saved = TRUE;
 	}
 	if (SNAPSHOTS_IN_PROG(cs_addrs) && (NULL != cs->old_block))
 	{
@@ -455,7 +455,7 @@ enum cdb_sc mm_update(cw_set_element *cs, trans_num ctn, trans_num effective_tn,
 							<= (int)(((blk_hdr_ptr_t)db_addr[0])->bsiz));
 					assert((SIZEOF(int) * 8) >= CW_INDEX_MAX_BITS);
 					assert((int)chain.cw_index < sgm_info_ptr->cw_set_depth);
-					tp_get_cw(si->first_cw_set, (int)chain.cw_index, &cs_ptr);
+					tp_get_cw(sgm_info_ptr->first_cw_set, (int)chain.cw_index, &cs_ptr);
 					WRITE_BLK_ID(long_blk_id, cs_ptr->blk, chain_ptr);
 					if (0 == chain.next_off)
 						break;
@@ -468,18 +468,7 @@ enum cdb_sc mm_update(cw_set_element *cs, trans_num ctn, trans_num effective_tn,
 }
 
 /* update buffered global database */
-enum cdb_sc bg_update(cw_set_element *cs, trans_num ctn, trans_num effective_tn, sgm_info *si)
-{
-	enum cdb_sc		status;
-
-	cs->old_mode = cs->mode;
-	status = bg_update_phase1(cs, ctn, si);
-	if (cdb_sc_normal == status)
-		status = bg_update_phase2(cs, ctn, effective_tn, si);
-	return status;
-}
-
-enum cdb_sc bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
+enum cdb_sc bg_update_phase1(cw_set_element *cs, trans_num ctn)
 {
 	boolean_t		twinning_on;
 	int			dummy;
@@ -514,19 +503,58 @@ enum cdb_sc bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 	/* assert changed to assertpro 2/15/2012. can be changed back once reorg truncate has been running for say 3 to 4 years */
 	assert((0 <= blkid) && (blkid < csa->ti->total_blks));
 	INCR_DB_CSH_COUNTER(csa, n_bgmm_updates, 1);
-	bt = bt_put(gv_cur_region, blkid);
-	GTM_WHITE_BOX_TEST(WBTEST_BG_UPDATE_BTPUTNULL, bt, NULL);
-	if (NULL == bt)
+	/* If "cs" had a "bt" noted down in t_end/tp_tend, use it and try to avoid a heavyweight "bt_put()".
+	 * Note that the noted "bt" could have been reused for a different block before we reach here (more likely
+	 * in the tp_tend case if a lot of blocks were updated) due to a prior call to "bg_update_phase1()" invoking
+	 * "bt_put()" for a different block in case the noted "bt" was the oldest bt at that point in time. Hence the
+	 * "blkid != bt->blk" check below. If they are indeed different, treat this as if we did not note down a "bt"
+	 * and fall through to the heavyweight "bt_put()" code path.
+	 *
+	 * If noted "bt" is still non-NULL, then note down "cs->cr" too and avoid a heavyweight "db_csh_get()" call.
+	 */
+	bt = cs->bt;
+	if ((NULL != bt) && (blkid != bt->blk))
+		bt = NULL;
+	if (NULL != bt)
 	{
-		assert(ydb_white_box_test_case_enabled);
-		return cdb_sc_cacheprob;
+		bt_rec_ptr_t		q0;
+		th_rec_ptr_t		th;
+
+#		ifdef DEBUG
+		bt_rec_ptr_t	bt2;
+
+		bt2 = bt_get(blkid);
+		assert(bt2 == bt);
+#		endif
+		/* Implement a faster bt_put() */
+		q0 = (bt_rec_ptr_t)((sm_uc_ptr_t)bt + bt->tnque.fl);
+		th = (th_rec_ptr_t)remqt((que_ent_ptr_t)((sm_uc_ptr_t)q0 + SIZEOF(th->tnque)));
+		assert(EMPTY_QUEUE != (sm_long_t)th);
+		insqt((que_ent_ptr_t)th, (que_ent_ptr_t)csa->th_base);
+		bt->tn = ctn;
+		cr = cs->cr; /* Note down "cr" from "cs" as well to try and avoid a "db_csh_get" */
+		assert((CR_NOTVALID == bt->cache_index) || (cr == (cache_rec_ptr_t)GDS_REL2ABS(bt->cache_index)));
+		assert((CR_NOTVALID != bt->cache_index) || (NULL == cr));
+	} else
+	{
+		bt = bt_put(csa, blkid);
+		GTM_WHITE_BOX_TEST(WBTEST_BG_UPDATE_BTPUTNULL, bt, NULL);
+		if (NULL == bt)
+		{
+			assert(ydb_white_box_test_case_enabled);
+			return cdb_sc_cacheprob;
+		}
+		cr = (cache_rec_ptr_t)(INTPTR_T)bt->cache_index;
+		if ((cache_rec_ptr_t)CR_NOTVALID == cr)
+			cr = NULL;
+		else
+			cr = (cache_rec_ptr_t)GDS_REL2ABS(cr);
 	}
 	if (cs->write_type & GDS_WRITE_KILLTN)
 		bt->killtn = ctn;
-	cr = (cache_rec_ptr_t)(INTPTR_T)bt->cache_index;
 	DEBUG_ONLY(read_before_image =
 			((JNL_ENABLED(csa) && csa->jnl_before_image) || csa->backup_in_prog || SNAPSHOTS_IN_PROG(csa));)
-	if ((cache_rec_ptr_t)CR_NOTVALID == cr)
+	if (NULL == cr)
 	{	/* no cache record associated with the bt_rec */
 		cr = db_csh_get(blkid);
 		GTM_WHITE_BOX_TEST(WBTEST_BG_UPDATE_DBCSHGET_INVALID, cr, (cache_rec_ptr_t)CR_NOTVALID);
@@ -642,7 +670,6 @@ enum cdb_sc bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 		cr->backup_cr_is_twin = FALSE;
 	} else	/* end of if else on cr NOTVALID */
 	{
-		cr = (cache_rec_ptr_t)GDS_REL2ABS(cr);
 		assert(bt == (bt_rec_ptr_t)GDS_REL2ABS(cr->bt_index));
 		assert(CR_BLKEMPTY != cr->blk);
 		assert(blkid == cr->blk);
@@ -774,7 +801,7 @@ enum cdb_sc bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 							assert(ARRAYSIZE(cr_array) > cr_array_index);
 							PIN_CACHE_RECORD(cr_new, cr_array, cr_array_index);
 						} else
-							TP_PIN_CACHE_RECORD(cr_new, si);
+							TP_PIN_CACHE_RECORD(cr_new, sgm_info_ptr);
 						assert(process_id == cr->in_tend);
 						cr->in_tend = 0;
 						cr_new->in_tend = process_id;
@@ -911,7 +938,7 @@ enum cdb_sc bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 			assert(ARRAYSIZE(cr_array) > cr_array_index);
 			PIN_CACHE_RECORD(cr, cr_array, cr_array_index);
 		} else
-			TP_PIN_CACHE_RECORD(cr, si);
+			TP_PIN_CACHE_RECORD(cr, sgm_info_ptr);
 	}
 	assert(0 == cr->data_invalid);
 	if (0 != cr->r_epid)
@@ -1028,7 +1055,7 @@ enum cdb_sc bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 	return cdb_sc_normal;
 }
 
-enum cdb_sc bg_update_phase2(cw_set_element *cs, trans_num ctn, trans_num effective_tn, sgm_info *si)
+enum cdb_sc bg_update_phase2(cw_set_element *cs, trans_num ctn, trans_num effective_tn)
 {
 	int4			n;
 	off_chain		chain;
@@ -1108,7 +1135,8 @@ enum cdb_sc bg_update_phase2(cw_set_element *cs, trans_num ctn, trans_num effect
 			backup_cr = (cache_rec_ptr_t)GDS_ANY_REL2ABS(csa, cr->twin);
 			backup_blk_ptr = (sm_uc_ptr_t)GDS_REL2ABS(backup_cr->buffaddr);
 		}
-		BG_BACKUP_BLOCK(csa, csd, cnl, cr, cs, blkid, backup_cr, backup_blk_ptr, block_saved, si->backup_block_saved);
+		BG_BACKUP_BLOCK(csa, csd, cnl, cr, cs, blkid, backup_cr, backup_blk_ptr, block_saved,		\
+									sgm_info_ptr->backup_block_saved);
 	}
 	/* Update cr->ondsk_blkver to reflect the current desired_db_format. */
 	SET_ONDSK_BLKVER(cr, csd, ctn);
@@ -1211,7 +1239,7 @@ enum cdb_sc bg_update_phase2(cw_set_element *cs, trans_num ctn, trans_num effect
 							<= (int)((blk_hdr_ptr_t)blk_ptr)->bsiz);
 					assert((SIZEOF(int) * 8) >= CW_INDEX_MAX_BITS);
 					assert((int)chain.cw_index < sgm_info_ptr->cw_set_depth);
-					tp_get_cw(si->first_cw_set, (int)chain.cw_index, &cs_ptr);
+					tp_get_cw(sgm_info_ptr->first_cw_set, (int)chain.cw_index, &cs_ptr);
 					WRITE_BLK_ID(long_blk_id, cs_ptr->blk, chain_ptr);
 					if (0 == chain.next_off)
 						break;

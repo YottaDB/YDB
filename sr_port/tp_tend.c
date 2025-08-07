@@ -957,39 +957,47 @@ boolean_t	tp_tend()
 						PRO_ONLY(goto failed;)
 					}
 					assert(CYCLE_PVT_COPY != t1->cycle);
-					if (cse)
-					{	/* Do cycle check only if blk has cse and hasn't been built (if it has, then tp_hist
-						 * would have done the cdb_sc_lostcr check soon after it got built) or if we have BI
-						 * journaling or online backup is currently running. The BI-journaling/online-backup
-						 * check is to ensure that the before-image/pre-update-copy we write hasn't been
-						 * recycled.
-						 */
-						if ((NULL == bt) || (CR_NOTVALID == bt->cache_index))
-							cr = db_csh_get(t1->blk_num);
-						else
-						{
-							cr = (cache_rec_ptr_t)GDS_ANY_REL2ABS(csa, bt->cache_index);
-							if ((NULL != cr) && (cr->blk != bt->blk))
-							{
-								assert(FALSE);
-								SET_TRACEABLE_VAR(cnl->wc_blocked, WC_BLOCK_RECOVER);
-								BG_TRACE_PRO_ANY(csa, wc_blocked_tp_tend_crbtmismatch1);
-								status = cdb_sc_crbtmismatch;
-								TP_TRACE_HIST(t1->blk_num, t1->blk_target);
-								goto failed;
-							}
-						}
-						if ((cache_rec_ptr_t)CR_NOTVALID == cr)
-						{
-							SET_TRACEABLE_VAR(cnl->wc_blocked, WC_BLOCK_RECOVER);
-							BG_TRACE_PRO_ANY(csa, wc_blocked_tp_tend_t1);
-							SET_CACHE_FAIL_STATUS(status, csd);
-							TP_TRACE_HIST(t1->blk_num, t1->blk_target);
-							goto failed;
-						}
-						assert(lcl_update_trans);	/* ensure read_before_image was computed above */
+					if (NULL != cse)
+					{
 						if (!cse->new_buff || read_before_image)
-						{
+						{	/* Do cycle check only if blk has cse and hasn't been built (if it has,
+							 * then tp_hist would have done the cdb_sc_lostcr check soon after it
+							 * got built) or if we have BI journaling or online backup is currently
+							 * running. The BI-journaling/online-backup check is to ensure that the
+							 * before-image/pre-update-copy we write hasn't been recycled.
+							 */
+							if ((NULL == bt) || (CR_NOTVALID == bt->cache_index))
+							{
+								cr = db_csh_get(t1->blk_num);
+								if ((cache_rec_ptr_t)CR_NOTVALID == cr)
+								{
+									SET_TRACEABLE_VAR(cnl->wc_blocked, WC_BLOCK_RECOVER);
+									BG_TRACE_PRO_ANY(csa, wc_blocked_tp_tend_t1);
+									SET_CACHE_FAIL_STATUS(status, csd);
+									TP_TRACE_HIST(t1->blk_num, t1->blk_target);
+									goto failed;
+								}
+								if ((NULL != bt) && (NULL != cr))
+								{	/* Establish the connection between bt and cr
+									 * as bg_update_phase1() relies on this.
+									 */
+									cr->bt_index = GDS_ABS2REL(bt);
+									bt->cache_index = (int4)GDS_ABS2REL(cr);
+								}
+							} else
+							{
+								cr = (cache_rec_ptr_t)GDS_ANY_REL2ABS(csa, bt->cache_index);
+								if ((NULL != cr) && (cr->blk != bt->blk))
+								{
+									assert(FALSE);
+									SET_TRACEABLE_VAR(cnl->wc_blocked, WC_BLOCK_RECOVER);
+									BG_TRACE_PRO_ANY(csa, wc_blocked_tp_tend_crbtmismatch1);
+									status = cdb_sc_crbtmismatch;
+									TP_TRACE_HIST(t1->blk_num, t1->blk_target);
+									goto failed;
+								}
+							}
+							assert(lcl_update_trans); /* ensure read_before_image was computed above */
 							if ((NULL == cr) || (cr->cycle != t1->cycle)
 								|| ((sm_long_t)GDS_ANY_REL2ABS(csa, cr->buffaddr)
 									!= (sm_long_t)t1->buffaddr))
@@ -1021,7 +1029,22 @@ boolean_t	tp_tend()
 							assert(kill_t_write  > n_gds_t_op);
 							if (n_gds_t_op > cse->mode)
 								TP_PIN_CACHE_RECORD(cr, si);
+							cse->cr = cr;	/* to be used by "bt_put" in bg_update_phase1 */
+						} else
+						{	/* We have built a private copy of the block already. So we don't need
+							 * access to the "cr". And so set "bt" as NULL as this minimizes the
+							 * complications in "bg_update_phase1()" by letting it finding the bt
+							 * using a "bt_put()". It is considered okay to do the heavyweight call
+							 * in this case as it is less likely.
+							 */
+							bt = NULL;
 						}
+						/* Note down "bt" in "cs->bt" to avoid a "bt_put()" call in "bg_update_phase1()".
+						 * Since "bt" is potentially non-NULL, also note down "cr" in "cs->cr" to avoid a
+						 * heavyweight "db_csh_get()" call in "bg_update_phase1()". But "cs->cr" has
+						 * already been noted down in the "bt != NULL" case above so nothing more needed.
+						 */
+						cse->bt = bt;	/* to be used by "bt_put" in bg_update_phase1 */
 						/* The only case cr can be NULL at this point of code is when
 						 * 	a) cse->new_buff is non-NULL
 						 *	b) AND the block is not in cache
@@ -1099,6 +1122,13 @@ boolean_t	tp_tend()
 							BG_TRACE_PRO_ANY(csa, wc_blocked_tp_tend_bitmap);
 							goto failed;
 						}
+						if ((NULL != bt) && (NULL != cr))
+						{	/* Establish the connection between bt and cr
+							 * as bg_update_phase1() relies on this.
+							 */
+							cr->bt_index = GDS_ABS2REL(bt);
+							bt->cache_index = (int4)GDS_ABS2REL(cr);
+						}
 					} else
 					{
 						cr = (cache_rec_ptr_t)GDS_ANY_REL2ABS(csa, bt->cache_index);
@@ -1121,6 +1151,13 @@ boolean_t	tp_tend()
 						goto failed;
 					}
 					TP_PIN_CACHE_RECORD(cr, si);
+					/* Note down "bt" in "cs->bt" to avoid a "bt_put()" call in "bg_update_phase1()".
+					 * Since "bt" is potentially non-NULL, also note down "cr" in "cs->cr" to avoid a
+					 * heavyweight "db_csh_get()" call in "bg_update_phase1()". But "cs->cr" would
+					 * already have been initialized to "cr" so just assert that below.
+					 */
+					cse->bt = bt;	/* to be used by "bt_put" in bg_update_phase1 */
+					assert(cse->cr == cr);	/* to be used by "bt_put" in bg_update_phase1 */
 				}
 			}	/* for (all bitmaps written) */
 			si->backup_block_saved = FALSE;
@@ -1170,6 +1207,7 @@ boolean_t	tp_tend()
 						}
 						TP_PIN_CACHE_RECORD(cr, si);
 						old_block = (blk_hdr_ptr_t)GDS_REL2ABS(cr->buffaddr);
+						assert(NULL == cse->bt); /* should have been set to NULL before getting crit */
 						assert((cse->cr != cr) || (cse->old_block == (sm_uc_ptr_t)old_block));
 						old_block_tn = old_block->tn;
 						/* Need checksums if before imaging and if a PBLK record is going to be written. */
@@ -1559,8 +1597,7 @@ boolean_t	tp_tend()
 				SET_REG_SEQNO(csa, temp_jnl_seqno, supplementary, strm_index, next_strm_seqno,
 											SKIP_ASSERT_FALSE); /* Step CMT09 */
 			}
-			if (csd->dsid && tp_kill_bitmaps)
-				rc_cpt_inval();
+			assert(!csd->dsid);
 			cse = si->first_cw_set;
 			if (NULL != cse)
 			{
@@ -1595,11 +1632,7 @@ boolean_t	tp_tend()
 					if (n_gds_t_op > mode)
 					{
 						DEBUG_ONLY(bml_status_check(cse));
-						if (csd->dsid && !tp_kill_bitmaps && (0 == cse->level))
-						{
-							assert(!is_mm);
-							rc_cpt_entry(cse->blk);
-						}
+						assert(!csd->dsid);
 						/* Do phase1 of bg_update while holding crit on the database.
 						 * This will lock the buffers that need to be changed.
 						 * Once crit is released, invoke phase2 which will update those locked buffers.
@@ -1618,10 +1651,10 @@ boolean_t	tp_tend()
 						 * Hence build such blocks in phase1 while holding crit and avoid such restarts.
 						 */
 						if (is_mm)
-							status = mm_update(cse, ctn, ctn, si);	/* Step CMT10 */
+							status = mm_update(cse, ctn, ctn);	/* Step CMT10 */
 						else
 						{
-							status = bg_update_phase1(cse, ctn, si);	/* Step CMT10 */
+							status = bg_update_phase1(cse, ctn);	/* Step CMT10 */
 							if ((cdb_sc_normal == status) && IS_BG_PHASE2_COMMIT_IN_CRIT(cse, mode))
 							{	/* If we are about to do phase2 db commit while holding crit,
 								 * then check if jnl phase2 commit is pending on this region.
@@ -1630,7 +1663,7 @@ boolean_t	tp_tend()
 								jrs = si->jbuf_rsrv_ptr;
 								if (NEED_TO_FINISH_JNL_PHASE2(jrs))
 									FINISH_JNL_PHASE2_IN_JNLBUFF(csa, jrs);	/* Step CMT10a */
-								status = bg_update_phase2(cse, ctn, ctn, si);	/* Step CMT10a */
+								status = bg_update_phase2(cse, ctn, ctn);	/* Step CMT10a */
 								if (cdb_sc_normal == status)
 									cse->mode = gds_t_committed;
 							}
@@ -1774,7 +1807,7 @@ boolean_t	tp_tend()
 						 * Note that cse->old_mode is negated by bg_update_phase1 (to help secshr_db_clnup).
 						 */
 						assert(-cse->old_mode == (int4)cse->mode);
-						status = bg_update_phase2(cse, ctn, ctn, si);	/* Step CMT18 */
+						status = bg_update_phase2(cse, ctn, ctn);	/* Step CMT18 */
 						if (cdb_sc_normal != status)
 						{	/* the database is probably in trouble */
 							TP_TRACE_HIST(cse->blk, cse->blk_target);

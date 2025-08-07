@@ -451,7 +451,7 @@ block_id swap_root_or_directory_block(int parent_blk_lvl, int child_blk_lvl, src
 	(free_blk_recycled) ? BIT_SET_RECYCLED_AND_CLEAR_FREE(tmpcse->blk_prior_state)
 			    : BIT_CLEAR_RECYCLED_AND_SET_FREE(tmpcse->blk_prior_state);
 	t_create(free_blk_id, bs1, 0, 0, child_blk_lvl);
-	tmpcse->mode = gds_t_acquired;
+	SET_CSE_MODE_TO_GDS_T_ACQUIRED(tmpcse);
 	tmpcse->ondsk_blkver = ((blk_hdr_ptr_t)child_blk_ptr)->bver; /* Retain block version */
 	if (!free_blk_recycled)
 		tmpcse->old_block = NULL;

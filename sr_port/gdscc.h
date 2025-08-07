@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2025 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -139,6 +142,14 @@ typedef struct cw_set_element_struct
 	trans_num	tn;				/* transaction number for bit maps */
 	sm_uc_ptr_t	old_block;			/* Address of 'before-image' of block to be over-written */
 	cache_rec_ptr_t	cr;
+	bt_rec_ptr_t	bt;				/* Set to a non-NULL or NULL value in t_end/tp_tend and a few other places.
+							 * Used in bg_update_phase1. This helps avoid a heavyweight "bt_put()"
+							 * call in "bg_update_phase1()" inside crit. If "cse->bt" is non-NULL,
+							 * "bg_update_phase1()" also assumes that "cse->cr" is also set to a
+							 * non-NULL value and uses that to avoid a heavyweight "db_csh_get()" call.
+							 * If "cse->bt" is NULL, then we do not look at "cse->cr" and so no need to
+							 * initialize it in t_end/tp_tend.
+							 */
         struct cw_set_element_struct  *next_cw_set;
         struct cw_set_element_struct  *prev_cw_set;	/* linked list (vertical) of cw_set_elements with one link per block */
 
@@ -225,5 +236,16 @@ GBLREF	uint4		dollar_tlevel;
 /* See comment in tp_tend where this macro is used for details */
 #define	IS_BG_PHASE2_COMMIT_IN_CRIT(CSE, MODE)							\
 	((gds_t_writemap == MODE) || (CSE->recompute_list_head && (gds_t_write == MODE)))
+
+#define	SET_CSE_MODE_TO_GDS_T_ACQUIRED(CSE)						\
+{											\
+	CSE->mode = gds_t_acquired;							\
+	CSE->bt = NULL;	/* Initialization needed to avoid "bg_update_phase1()"		\
+			 * from using a stale value of "bt" from a prior transaction.	\
+			 * "bg_update_phase1()" also uses "CSE->cr" only if "CSE->bt"	\
+			 * is non-NULL so no need to initialize "CSE->cr" since "bt"	\
+			 * is set to NULL.						\
+			 */								\
+}
 
 #endif

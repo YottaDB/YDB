@@ -1651,10 +1651,10 @@ MBSTART {														\
 			assert(NULL != jpc);										\
 			if (SS_NORMAL != jpc->status)									\
 				rts_error_csa(CSA_ARG(csa) VARLSTCNT(7) jnl_status, 4, JNL_LEN_STR(csd),		\
-						DB_LEN_STR(gv_cur_region), jpc->status);				\
+						DB_LEN_STR(reg), jpc->status);						\
 			else												\
 				rts_error_csa(CSA_ARG(csa) VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(csd),		\
-						DB_LEN_STR(gv_cur_region));						\
+						DB_LEN_STR(reg));							\
 		}													\
 	}														\
 } MBEND
@@ -5453,7 +5453,7 @@ MBSTART {												\
 #define	SKIP_BASEDB_OPEN_TRUE		TRUE
 
 void		assert_jrec_member_offsets(void);
-bt_rec_ptr_t	bt_put(gd_region *r, block_id block);
+bt_rec_ptr_t	bt_put(sgmnt_addrs *csa, block_id block);
 void		bt_que_refresh(gd_region *greg);
 void		bt_init(sgmnt_addrs *cs);
 void		bt_malloc(sgmnt_addrs *csa);

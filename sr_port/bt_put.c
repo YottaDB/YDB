@@ -38,29 +38,28 @@ static	int4		entry_count = 0;
 GBLREF	volatile boolean_t	in_wcs_recover;	/* TRUE if in "wcs_recover" */
 GBLREF	uint4			process_id;
 GBLREF 	jnl_gbls_t		jgbl;
+GBLREF	gd_region		*gv_cur_region;
 
 error_def(ERR_BTFAIL);
 error_def(ERR_WCBLOCKED);
 
-bt_rec_ptr_t bt_put(gd_region *reg, block_id block)
+bt_rec_ptr_t bt_put(sgmnt_addrs *csa, block_id block)
 {
 	bt_rec_ptr_t		bt, q0, q1, hdr;
-	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
 	cache_rec_ptr_t		cr;
 	th_rec_ptr_t		th;
 	trans_num		lcl_tn;
-	uint4			lcnt;
+	uint4			lcnt, max_lcnt;
 	node_local_ptr_t	cnl;
 
-	csa = (sgmnt_addrs *)&FILE_INFO(reg)->s_addrs;
 	csd = csa->hdr;
-	cnl = csa->nl;
 	assert(csa->now_crit || csd->clustered);
 	assert(dba_mm != csa->hdr->acc_meth);
 	lcl_tn = csa->ti->curr_tn;
 	hdr = csa->bt_header + (block % csd->bt_buckets);
 	assert(BT_QUEHEAD == hdr->blk);
+	max_lcnt = csd->n_bts;
 	for (lcnt = 0, bt = (bt_rec_ptr_t)((sm_uc_ptr_t)hdr + hdr->blkque.fl);  ;
 		bt = (bt_rec_ptr_t)((sm_uc_ptr_t)bt + bt->blkque.fl), lcnt++)
 	{
@@ -74,14 +73,16 @@ bt_rec_ptr_t bt_put(gd_region *reg, block_id block)
 				cr = (cache_rec_ptr_t)GDS_ANY_REL2ABS(csa, bt->cache_index);
 				if (cr->dirty)
 				{	/* get it written so it can be reused */
+					cnl = csa->nl;
 					INCR_GVSTATS_COUNTER(csa, cnl, n_bt_scarce, 1);
-					if (FALSE == wcs_get_space(reg, 0, cr))
+					assert(&FILE_INFO(gv_cur_region)->s_addrs == csa);
+					if (FALSE == wcs_get_space(gv_cur_region, 0, cr))
 					{
 						/* only reason we currently know why wcs_get_space could fail */
 						assert(csa->nl->wc_blocked || ydb_white_box_test_case_enabled);
 						BG_TRACE_PRO_ANY(csa, wcb_bt_put);
 						send_msg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_WCBLOCKED, 6,
-							LEN_AND_LIT("wcb_bt_put"), process_id, &lcl_tn, DB_LEN_STR(reg));
+							LEN_AND_LIT("wcb_bt_put"), process_id, &lcl_tn, DB_LEN_STR(gv_cur_region));
 						return NULL;
 					}
 				}
@@ -122,7 +123,7 @@ bt_rec_ptr_t bt_put(gd_region *reg, block_id block)
 		}
 		if (0 == bt->blkque.fl)
 			RTS_ERROR_CSA_ABT(csa, VARLSTCNT(3) ERR_BTFAIL, 1, 2);
-		if (lcnt >= csd->n_bts)
+		if (lcnt >= max_lcnt)
 			RTS_ERROR_CSA_ABT(csa, VARLSTCNT(3) ERR_BTFAIL, 1, 3);
 	}
 	insqt((que_ent_ptr_t)th, (que_ent_ptr_t)csa->th_base);
