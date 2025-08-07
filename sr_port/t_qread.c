@@ -133,8 +133,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 	int4			status;
 	uint4			blocking_pid;
 	cache_rec_ptr_t		cr;
-	bt_rec_ptr_t		bt;
-	boolean_t		clustered, hold_onto_crit, was_crit, issued_db_init_crypt_warning, sync_needed;
+	boolean_t		hold_onto_crit, was_crit, issued_db_init_crypt_warning, sync_needed;
 	int			dummy, exceed_sleep_count, lcnt, ocnt;
 	cw_set_element		*cse;
 	block_ref		chain1;
@@ -410,8 +409,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 	assert(dba_bg == csd->acc_meth);
 	assert(!first_tp_srch_status || !first_tp_srch_status->cr
 					|| first_tp_srch_status->cycle != first_tp_srch_status->cr->cycle);
-	if (FALSE == (clustered = csd->clustered))
-		bt = NULL;
+	assert(FALSE == csd->clustered); /* this assert justifies the removal of a lot of "if (csd->clustered)" code from before */
 	ocnt = 0;
 	set_wc_blocked = FALSE;	/* to indicate whether cnl->wc_blocked was set to TRUE by us */
 	hold_onto_crit = csa->hold_onto_crit;	/* note down in local to avoid csa-> dereference in multiple usages below */
@@ -424,16 +422,9 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 				rel_crit(gv_cur_region);
 				return (sm_uc_ptr_t)NULL;
 			}
-			if (clustered && (NULL != (bt = bt_get(blk))) && (FALSE == bt->flushing))
-				bt = NULL;
 			if (!csa->now_crit)
 			{
 				assert(!hold_onto_crit);
-				if (NULL != bt)
-				{	/* at this point, bt is not NULL only if clustered and flushing - wait no crit */
-					assert(clustered);
-					wait_for_block_flush(bt, blk);	/* try for no other node currently writing the block */
-				}
 				/* assume defaults for flush_target and buffs_per_flush */
 				flush_target = csd->flush_trigger;
 				buffs_per_flush = 0;
@@ -462,11 +453,6 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 					return (sm_uc_ptr_t)NULL;
 				}
 				cr = db_csh_get(blk);			/* in case blk arrived before crit */
-			}
-			if (clustered && (NULL != (bt = bt_get(blk))) && (TRUE == bt->flushing))
-			{	/* Once crit, need to assure that if clustered, that flushing is [still] complete
-				 * If it isn't, we missed an entire WM cycle and have to wait for another node to finish */
-				wait_for_block_flush(bt, blk);	/* ensure no other node currently writing the block */
 			}
 			if (NULL == cr)
 			{	/* really not in memory - must get a new buffer */
@@ -592,12 +578,6 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 		{
 			if (0 > cr->read_in_progress)
 			{	/* it's not being read */
-				if (clustered && (0 == cr->bt_index) && (cr->tn < OLDEST_HIST_TN(csa)))
-				{	/* can't rely on the buffer */
-					cr->cycle++;	/* increment cycle whenever blk number changes (tp_hist depends on this) */
-					cr->blk = CR_BLKEMPTY;
-					break;
-				}
 				*cr_out = cr;
 				/* If we were doing the "db_csh_get" above (in t_qread itself) and located the cache-record
 				 * which, before coming here and taking a copy of cr->cycle a few lines above, was made an
@@ -706,6 +686,8 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 				/* Assert that if we are returning a "twin" while in crit, it better be the NEWER "twin" */
 				assert(!csa->now_crit || !cr->twin || cr->bt_index);
 #				ifdef DEBUG
+				bt_rec_ptr_t            bt;
+
 				if (csa->now_crit && (NULL != (bt = bt_get(blk))) && (CR_NOTVALID != bt->cache_index))
 				{
 					cr_lo = (cache_rec_ptr_t)csa->acc_meth.bg.cache_state->cache_array + csd->bt_buckets;
