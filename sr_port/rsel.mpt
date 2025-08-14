@@ -3,7 +3,7 @@
 ; Copyright (c) 1987-2019 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
-; Copyright (c) 2020-2022 YottaDB LLC and/or its subsidiaries.	;
+; Copyright (c) 2020-2025 YottaDB LLC and/or its subsidiaries.	;
 ; All rights reserved.						;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -89,7 +89,7 @@ CALL
 SILENT(patt,label)
 	n $et,io s $et=$s($d(%zdebug):"b",1:"zg "_$zl_":err^%RSEL"),io=$io
 	i ""=$g(label) s label="SRC"
-	d @label
+	d @$zconvert(label,"u")
 	u io
 	q
 SRCDIR()
@@ -219,7 +219,11 @@ save
 	. e  i 'add,$d(^%RSET($j,r)) k ^%RSET($j,r) s cnt=cnt-1
 	. i  i out w:$x>70 ! w r,?$x\10+1*10
 	e  d
-	. i add,'$d(%ZR(r)) s %ZR(r)=d(i),cnt=cnt+1
+	. i add,'$d(%ZR(r)) d
+	. . s %ZR(r)=$zparse(d(i),,,,"symlink")
+	. . ; This fancy expression means if this is a directory... if so, add a trailing slash
+	. . i $zsearch(%ZR(r),-1)'="",$zparse(%ZR(r)_"/")'="" set %ZR(r)=%ZR(r)_"/"
+	. . s cnt=cnt+1
 	. e  i 'add,$d(%ZR(r)) k %ZR(r) s cnt=cnt-1
 	. i  i out w:$x>70 ! w r,?$x\10+1*10
 	q
