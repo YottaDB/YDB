@@ -24,6 +24,7 @@
 #include "gvcmx.h"
 #include "sgnl.h"
 #include "op.h"
+#include "libyottadb_int.h"
 
 GBLREF	gv_namehead	*gv_target;
 GBLREF	gd_region	*gv_cur_region;
@@ -69,8 +70,14 @@ boolean_t op_gvget(mval *v)
 	{
 		if (undef_inhibit)
 			*v = literal_null;
-		else
-			sgnl_gvundef();
+		else if (LYDB_RTN_GET == TREF(libyottadb_active_rtn))
+		{	/* This is a "ydb_get_s()" or "ydb_get_st()" call. Do not issue a GVUNDEF error.
+			 * Instead just set TREF(ydb_error_code) so caller ydb_get_s() can return YDB_ERR_GVUNDEF.
+			 * This avoids heavyweight error processing. (YDB#1164).
+			 */
+			TREF(ydb_error_code) = ERR_GVUNDEF;
+		} else
+			sgnl_gvundef();	/* Issue GVUNDEF error */
 	}
 	return gotit;
 }

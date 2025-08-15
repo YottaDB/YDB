@@ -58,7 +58,7 @@ int ydb_get_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *su
 	boolean_t	gotit, nospace;
 	gparam_list	plist;
 	ht_ent_mname	*tabent;
-	int		get_svn_index, i;
+	int		get_svn_index, i, ret;
 	lv_val		*lvvalp, *src_lv;
 	mname_entry	var_mname;
 	mval		get_value, gvname, plist_mvals[YDB_MAX_SUBS + 1];
@@ -96,6 +96,7 @@ int ydb_get_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *su
 	if (NULL == ret_value)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,
 			LEN_AND_LIT("NULL ret_value"), LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_GET)));
+	ret = YDB_OK;
 	/* Separate actions depending on type of GET being done */
 	switch(get_type)
 	{
@@ -124,61 +125,12 @@ int ydb_get_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *su
 				src_lv = (lv_val *)callg((callgfnptr)op_getindx, &plist);	/* Locate node */
 			}
 			if ((lv_val *)&literal_null == src_lv)	/* it is a case of LVUNDEF */
-			{
-				unsigned char	lvundef_buff[512], *ptr;
-				unsigned int	avail_len, len;
-
-				avail_len = SIZEOF(lvundef_buff);
-				ptr = &lvundef_buff[0];
-				len = MIN(avail_len, varname->len_used);
-				memcpy(ptr, varname->buf_addr, len);
-				ptr += len;
-				avail_len -= len;
-				for (i = 0; i < subs_used; i++)
-				{
-					if (0 == i)
-					{
-						if (1 > avail_len)	/* not enough space to hold output */
-							break;
-						*ptr++ = '(';
-						avail_len--;
-					}
-					len = MIN(avail_len, subsarray[i].len_used);
-					if (len)
-					{
-						if (val_iscan(&plist_mvals[i]))
-						{
-							memcpy(ptr, subsarray[i].buf_addr, len);
-							ptr += len;
-							avail_len -= len;
-						} else
-						{
-							mval	dst;
-
-							op_fnzwrite(FALSE, &plist_mvals[i], &dst); /* dst points to stringpool */
-							/* Check if we have enough space in our local buffer to copy over "dst".
-							 * If so, copy. If not, copy as much space as we have and proceed to
-							 * issue LVUNDEF error. Hence the use of MIN below.
-							 */
-							assert(MVTYPE_IS_STRING(dst.mvtype));
-							len = MIN(avail_len, dst.str.len);
-							memcpy(ptr, dst.str.addr, len);
-							ptr += len;
-							avail_len -= len;
-							if (len < dst.str.len)
-								break;
-						}
-					}
-					/* Add ',' or ')' as applicable */
-					if (1 > avail_len)	/* not enough space to hold output */
-						break;
-					*ptr++ = ((subs_used - 1) == i) ? ')' : ',';
-					avail_len--;
-				}
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_LVUNDEF, 2, ptr - lvundef_buff, lvundef_buff);
+				ret = YDB_ERR_LVUNDEF;
+			else
+			{	/* Copy value to return buffer */
+				SET_YDB_BUFF_T_FROM_MVAL(ret_value, &src_lv->v, "NULL ret_value->buf_addr",	\
+					LYDBRTNNAME(LYDB_RTN_GET));
 			}
-			/* Copy value to return buffer */
-			SET_YDB_BUFF_T_FROM_MVAL(ret_value, &src_lv->v, "NULL ret_value->buf_addr", LYDBRTNNAME(LYDB_RTN_GET));
 			break;
 		case LYDB_VARREF_GLOBAL:
 			/* Fetch the given global variable value. We do this by:
@@ -198,22 +150,28 @@ int ydb_get_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *su
 			gotit = op_gvget(&get_value);			/* Fetch value into get_value - should signal UNDEF
 									 * if value not found (and undef_inhibit not set)
 									 */
-			assert(gotit);
-			/* Copy value to return buffer */
-			SET_YDB_BUFF_T_FROM_MVAL(ret_value, &get_value, "NULL ret_value->buf_addr", LYDBRTNNAME(LYDB_RTN_GET));
+			if (!gotit)
+			{
+				assert(ERR_GVUNDEF == TREF(ydb_error_code));
+				assert(YDB_ERR_GVUNDEF == -ERR_GVUNDEF);
+				ret = -(TREF(ydb_error_code));
+			} else
+			{	/* Copy value to return buffer */
+				SET_YDB_BUFF_T_FROM_MVAL(ret_value, &get_value, "NULL ret_value->buf_addr",	\
+					LYDBRTNNAME(LYDB_RTN_GET));
+			}
 			break;
-		case LYDB_VARREF_ISV:
+		default:
+			assert(LYDB_VARREF_ISV == get_type);
 			/* Fetch the given ISV value (no subscripts supported) */
 			op_svget(get_svn_index, &get_value);
 			/* Copy value to return buffer */
 			SET_YDB_BUFF_T_FROM_MVAL(ret_value, &get_value, "NULL ret_value->buf_addr", LYDBRTNNAME(LYDB_RTN_GET));
 			break;
-		default:
-			assertpro(FALSE);
 	}
 	assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* the counter should have never become non-zero in this function */
 	if (!yed_lydb_rtn)	/* yed_lydb_rtn is TRUE if called by ydb_encode_s() */
 		LIBYOTTADB_DONE;
 	REVERT;
-	return YDB_OK;
+	return ret;
 }
