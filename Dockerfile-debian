@@ -18,7 +18,7 @@
 # Use with data persistence:
 #   $ docker run -p 1337:1337 -p 9080:9080 --rm -v `pwd`/ydb-data:/data -ti yottadb/yottadb:latest
 
-ARG OS_VSN=bullseye
+ARG OS_VSN=trixie
 
 # Stage 1: YottaDB build image
 FROM debian:${OS_VSN} as ydb-release-builder
@@ -108,6 +108,7 @@ RUN apt-get update && \
                     python3-setuptools \
                     libffi-dev \
                     python3-pip \
+                    python3-venv \
                     npm \
                     g++ \
                     lua5.4 \
@@ -144,10 +145,8 @@ ENV ydb_dir=/data \
     GOPATH=$HOME/go \
     GOPROXY=https://proxy.golang.org/cached-only \
     ydb_dist=/opt/yottadb/current
-RUN go version && go get -t -d lang.yottadb.com/go/yottadb && cd $GOPATH/src/lang.yottadb.com/go/yottadb && git checkout master
 RUN git clone https://github.com/anet-be/lua-yottadb.git && cd lua-yottadb && make install && cd - && rm -rf lua-yottadb
 RUN . /opt/yottadb/current/ydb_env_set && git clone https://gitlab.com/oesiman/yottadb-perl.git && cd yottadb-perl && perl Makefile.PL && make test TEST_DB=1 && make install && cd - && rm -rf yottadb-perl
-RUN git clone https://gitlab.com/YottaDB/Lang/YDBPython.git && cd YDBPython && python3 -m pip install --user . && cd - && rm -rf YDBPython
 COPY ci/docker-scripts/docker-debian-startup.sh /docker-debian-startup.sh
 EXPOSE 1337 9080
 ENTRYPOINT ["/docker-debian-startup.sh"]
