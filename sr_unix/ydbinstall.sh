@@ -716,6 +716,12 @@ check_if_shlibs_exist "Shared library/libraries required by YottaDB not found:"
 # Check for additional dependencies beyond those for YottaDB.
 unset hdrlist shliblist utillist
 
+# Build from source
+if [ -n "$ydb_from_source" ] ; then
+	append_to_str utillist "gawk"
+	append_to_str hdrlist "jansson.h"
+fi
+
 # YDBAIM
 if [ "Y" = $ydb_aim ] ; then
 	append_to_str utillist "git cmake ld make pkg-config"
@@ -849,27 +855,23 @@ if [ -n "$ydb_from_source" ] ; then
 		mkdir build && cd build
 		# Check if --branch was selected. If so, checkout that branch.
 		if [ -n "$ydb_branch" ] ; then
-			if ! git checkout $ydb_branch ; then
+			if ! git checkout --detach $ydb_branch ; then
 				echo "branch $ydb_branch does not exist. Exiting. Temporary directory $ydbinstall_tmp will not be deleted."
 				err_exit
 			fi
 		fi
 		if [ "dbg" = `echo "$gtm_buildtype" | tr '[:upper:]' '[:lower:]'` ] ; then
 			# if --buildtype is dbg, tell CMake to make a dbg build
-			cmake_command="${cmakecmd} -D CMAKE_BUILD_TYPE=Debug"
+			cmake_command="${cmakecmd} -D CMAKE_BUILD_TYPE=Debug -D CMAKE_POLICY_VERSION_MINIMUM=3.5"
 		else
-			cmake_command="${cmakecmd} -D CMAKE_BUILD_TYPE=RelWithDebInfo"
+			cmake_command="${cmakecmd} -D CMAKE_POLICY_VERSION_MINIMUM=3.5"
 		fi
 		if ! ${cmake_command} .. ; then
 			echo "CMake failed. Exiting. Temporary directory $ydbinstall_tmp will not be deleted."
 			err_exit
 		fi
-		if ! make -j `grep -c ^processor /proc/cpuinfo` ; then
-			echo "Build failed. Exiting. Temporary directory $ydbinstall_tmp will not be deleted."
-			err_exit
-		fi
-		if ! make install ; then
-			echo "Make install failed. Exiting. Temporary directory $ydbinstall_tmp will not be deleted."
+		if ! make -j  $(getconf _NPROCESSORS_ONLN) install ; then
+			echo "Make failed. Exiting. Temporary directory $ydbinstall_tmp will not be deleted."
 			err_exit
 		fi
 	else
@@ -884,12 +886,17 @@ if [ -n "$ydb_from_source" ] ; then
 	# --branch and --from-source : already executed by this block of code
 	# --build-type : If a dbg build was requested, we've already built a dbg build with cmake
 	# --distrib and --filename : conflicts with --branch and --from-source
+	# --filename : a successful build from source installation does not have a separate distribution file
+	# --force-install : a successful build from source should not need a --force-install
+	# --from-source : having just built from source, no need to build again
 	# --help : If this option was selected, ydbinstall would have exited already
 	# --plugins-only: There is no need to build YottaDB from source just to add plugins to an already installed YottaDB instance.
 	install_options=""
 	if [ "Y" = "$ydb_aim" ] ; then install_options="${install_options} --aim" ; fi
-	if [ -n "$gtm_copyenv" ] ; then install_options="${install_options} --copyenv ${gtm_copyenv}" ; fi
-	if [ -n "$gtm_copyexec" ] ; then install_options="${install_options} --copyexec ${gtm_copyexec}" ; fi
+	if [ -n "$gtm_copyenv" ] ; then install_options="${install_options} --copyenv ${gtm_copyenv}"
+	else install_options="${install_options} --nocopyenv" ; fi
+	if [ -n "$gtm_copyexec" ] ; then install_options="${install_options} --copyexec ${gtm_copyexec}"
+	else install_options="${instal_options} --nocopyexec" ; fi
 	if [ "Y" = "$ydb_curl" ] ; then install_options="${install_options} --curl" ; fi
 	if [ "Y" = "$ydb_debug" ] ; then install_options="${install_options} --debug" ; fi
 	if [ "Y" = "$gtm_dryrun" ] ; then install_options="${install_options} --dry-run" ; fi
@@ -901,8 +908,10 @@ if [ -n "$ydb_from_source" ] ; then
 	if [ "Y" = "$gtm_gtm" ] ; then install_options="${install_options} --gtm" ; fi
 	if [ -n "$ydb_installdir" ] ; then install_options="${install_options} --installdir ${ydb_installdir}" ; fi
 	if [ "Y" = "$gtm_keep_obj" ] ; then install_options="${install_options} --keep-obj" ; fi
-	if [ -n "$gtm_linkenv" ] ; then install_options="${install_options} --linkenv ${gtm_linkenv}" ; fi
-	if [ -n "$gtm_linkexec" ] ; then install_options="${install_options} --linkexec ${gtm_linkexec}" ; fi
+	if [ -n "$gtm_linkenv" ] ; then install_options="${install_options} --linkenv ${gtm_linkenv}"
+	else install_options="${install_options} --nolinkenv" ; fi
+	if [ -n "$gtm_linkexec" ] ; then install_options="${install_options} --linkexec ${gtm_linkexec}"
+	else install_options="${install_options} --nolinkexec" ; fi
 	if [ "N" = "$ydb_deprecated" ] ; then install_options="${install_options} --nodeprecated" ; fi
 	if [ "Y" = "$ydb_gui" ] ; then install_options="${install_options} --gui" ; fi
 	if [ "Y" = "$ydb_octo" ] ; then
@@ -913,8 +922,10 @@ if [ -n "$ydb_from_source" ] ; then
 		fi
 	fi
 	if [ "Y" = "$gtm_overwrite_existing" ] ; then install_options="${install_options} --overwrite-existing" ; fi
+	if [ "N" = "$ydb_pkgconfig" ] ; then install_options="${install_options} --nopkg-config" ; fi
 	if [ "Y" = "$ydb_posix" ] ; then install_options="${install_options} --posix" ; fi
 	if [ "Y" = "$ydb_sodium" ] ; then install_options="${install_options} --sodium" ; fi
+	if [ "Y" = "$ydb_support" ] ; then install_options="${install_options} --support" ; fi
 	if [ "Y" = "$ydb_syslog" ] ; then install_options="${install_options} --syslog" ; fi
 	if [ "Y" = "$gtm_prompt_for_group" ] ; then install_options="${install_options} --prompt-for-group" ; fi
 	if [ "N" = "$gtm_lcase_utils" ] ; then install_options="${install_options} --ucaseonly-utils" ; fi
@@ -925,7 +936,6 @@ if [ -n "$ydb_from_source" ] ; then
 	if [ "Y" = "$gtm_verbose" ] ; then install_options="${install_options} --verbose" ; fi
 	if [ "Y" = "$ydb_ws" ] ; then install_options="${install_options} --webserver" ; fi
 	if [ "Y" = "$ydb_zlib" ] ; then install_options="${install_options} --zlib" ; fi
-
 	# Now that we have the full set of options, run ydbinstall
 	if ./ydbinstall ${install_options} ; then
 		# Install succeeded. Exit with code 0 (success)

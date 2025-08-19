@@ -77,13 +77,13 @@ sudo apt-get install --no-install-recommends clang llvm lld
 
   ```sh
   Debian, Ubuntu, and derivatives
-  sudo apt-get install --no-install-recommends file cmake make gcc git curl tcsh libjansson4 {libconfig,libelf,libicu,libncurses,libreadline,libjansson,libssl}-dev binutils ca-certificates
+  sudo apt-get install --no-install-recommends file cmake make gawk gcc git curl tcsh libjansson4 {libconfig,libelf,libicu,libncurses,libreadline,libjansson,libssl}-dev binutils ca-certificates
 
   Red Hat and derivatives
-  sudo yum install file cmake make gcc git curl tcsh jansson {libconfig,libicu,ncurses,elfutils-libelf,readline,jansson,openssl}-devel binutils ca-certificates
+  sudo yum install file cmake make gawk gcc git curl tcsh jansson {libconfig,libicu,ncurses,elfutils-libelf,readline,jansson,openssl}-devel binutils ca-certificates
 
   SUSE and derivatives
-  sudo zypper install cmake make gcc git file curl tcsh binutils-gold icu libjansson4 {libconfig,libicu,ncurses,libelf,readline,libjansson,libopenssl}-devel binutils ca-certificates
+  sudo zypper install cmake make gawk gcc git file curl tcsh binutils-gold icu libjansson4 {libconfig,libicu,ncurses,libelf,readline,libjansson,libopenssl}-devel binutils ca-certificates
   ```
 
   There may be other library dependencies or the packages may have different names.
@@ -112,7 +112,7 @@ sudo apt-get install --no-install-recommends clang llvm lld
   ```
 
   Note: By default the script creates production (pro) builds of YottaDB. To create
-  a debug (dbg) build of YottaDB supply the `-D CMAKE_BUILD_TYPE=Debug` parameter to cmake
+  a debug (dbg) build of YottaDB add a `-D CMAKE_BUILD_TYPE=Debug` parameter to the `cmake` command.
   (*Note: title case is important*)
 
   ### Build with gcc
