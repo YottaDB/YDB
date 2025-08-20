@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  * 								*
- * Copyright (c) 2020-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2020-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -38,6 +38,7 @@ static readonly CLI_ENTRY mumps_qual[] = {
 { "DIRECT_MODE", 	0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NON_NEG, 	VAL_N_A, 0},
 { "DYNAMIC_LITERALS", 	0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NEG, 	VAL_N_A, 0},
 { "EMBED_SOURCE", 	0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NEG, 	VAL_N_A, 0},
+{ "HELP", 		0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NON_NEG, 	VAL_N_A, 0},
 { "IGNORE", 		0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NEG, 	VAL_N_A, 0},
 { "INLINE_LITERALS",	0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NEG, 	VAL_N_A, 0},
 { "LABELS", 		0, 0, 0, 0, 0, 0, VAL_REQ, 	  1, NON_NEG, 	VAL_STR, 0},

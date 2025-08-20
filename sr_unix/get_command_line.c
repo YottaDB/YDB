@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2021-2024 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2021-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -55,16 +55,31 @@ void get_command_line(mval *result, boolean_t zcmd_line)
 		first_item = 1;
 		if (zcmd_line)
 		{	/* $ZCMDLINE returns the processed command line. Remove "-direct" and/or "-run <runarg>" from cmd line */
-			if (!STRCMP(cmd_arg[1], "-"))
+			if (!STRCMP(cmd_arg[1], "-") || (!STRCMP(cmd_arg[1], "--")))
 			{
-				first_item += 2;
-				cp = (unsigned char *)cmd_arg[2];
+				if (!STRCMP(cmd_arg[2], "-"))
+				{
+					/* Handle the case where there are spaces between two dashes to prevent the second dash from being treated as the option specifier */
+					first_item += 3;
+					cp = (unsigned char *)cmd_arg[3];
+				} else
+				{
+					first_item += 2;
+					cp = (unsigned char *)cmd_arg[2];
+				}
 			} else
 			{
 				cp = (unsigned char *)cmd_arg[1];
 				assert(NULL != cp);
 				if ('-' == *cp++)
+				{
 					first_item++;
+					if ('-' == *cp)
+					{
+						/* Treat '--' as if '-' was specified to prevent passing <runarg> to $ZCMDLINE */
+						cp++;
+					}
+				}
 			}
 			if ((1 < first_item) && (NULL != cp) && ('r' == TOLOWER(*cp)))
 				first_item++;

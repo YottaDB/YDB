@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -12,6 +12,8 @@
  *	the license, please stop and do not read further.	*
  *								*
  ****************************************************************/
+
+#include "gtm_ctype.h" /* Include ISSPACE_ASCII for lexing macros below */
 
 #ifndef CLI_H
 #define CLI_H
@@ -68,6 +70,18 @@
 #define DEFA_PRESENT	(char *) 1L /* Should be same as CLI_PRESENT - default present */
 
 #define CLI_GET_STR_ALL	cli_get_str
+
+/* CLI lexing utility macros shared by cli_lex.c and cli_parse.c. */
+#ifdef UTF8_SUPPORTED
+GBLREF	boolean_t	gtm_utf8_mode;
+#define CLI_GET_CHAR(PTR, BUFEND, CHAR) (gtm_utf8_mode ? UTF8_MBTOWC(PTR, BUFEND, CHAR) : (CHAR = (wint_t)*(PTR), (PTR) + 1))
+#define CLI_PUT_CHAR(PTR, CHAR) (gtm_utf8_mode ? UTF8_WCTOMB(CHAR, PTR) : (*(PTR) = CHAR, (PTR) + 1))
+#define CLI_ISSPACE(CHAR) (gtm_utf8_mode ? U_ISSPACE(CHAR) : ISSPACE_ASCII((int)CHAR))
+#else
+#define CLI_GET_CHAR(PTR, BUFEND, CHAR) (CHAR = (int)*(PTR), (PTR) + 1)
+#define CLI_PUT_CHAR(PTR, CHAR) (*(PTR) = CHAR, (PTR) + 1)
+#define CLI_ISSPACE(CHAR) ISSPACE_ASCII(CHAR)
+#endif
 
 /*
  * ------------------------------------------------------

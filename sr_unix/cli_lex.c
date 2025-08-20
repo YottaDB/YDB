@@ -22,7 +22,6 @@
 #include <dlfcn.h>
 
 #include "mdef.h"
-#include "gtm_ctype.h"
 #include <errno.h>
 #include "gtm_stdio.h"
 #include "gtm_string.h"
@@ -55,17 +54,6 @@ GBLREF char 	cli_err_str[];			/* Parse Error message buffer */
 LITREF gtmImageName		gtmImageNames[];
 
 static struct termios   tty_settings;
-
-#ifdef UTF8_SUPPORTED
-GBLREF	boolean_t	gtm_utf8_mode;
-#define CLI_GET_CHAR(PTR, BUFEND, CHAR) (gtm_utf8_mode ? UTF8_MBTOWC(PTR, BUFEND, CHAR) : (CHAR = (wint_t)*(PTR), (PTR) + 1))
-#define CLI_PUT_CHAR(PTR, CHAR) (gtm_utf8_mode ? UTF8_WCTOMB(CHAR, PTR) : (*(PTR) = CHAR, (PTR) + 1))
-#define CLI_ISSPACE(CHAR) (gtm_utf8_mode ? U_ISSPACE(CHAR) : ISSPACE_ASCII((int)CHAR))
-#else
-#define CLI_GET_CHAR(PTR, BUFEND, CHAR) (CHAR = (int)*(PTR), (PTR) + 1)
-#define CLI_PUT_CHAR(PTR, CHAR) (*(PTR) = CHAR, (PTR) + 1)
-#define CLI_ISSPACE(CHAR) ISSPACE_ASCII(CHAR)
-#endif
 
 static int tok_string_extract(void)
 {

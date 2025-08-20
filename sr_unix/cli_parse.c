@@ -337,13 +337,36 @@ int 	parse_arg(CLI_ENTRY *pcmd_parms, int *eof)
 		return (-1);
 	}
 	/* -------------------------
-	 * Get the qualifier string
+	 * Get the qualifier string:
+	 * 1. Check whether there is a next token, if not, print error and return
+	 * 2. If so, check whether it is another qualifier token '-'
+	 * 3. Check again whether there is a next token and, if not, print error and return
 	 * -------------------------
 	 */
 	if (!cli_look_next_token(eof) || 0 == cli_gettoken(eof))
 	{
 		SNPRINTF(cli_err_str, MAX_CLI_ERR_STR, "Qualifier string missing %s ", opt_str);
 		return (-1);
+	} else if (cli_is_qualif(cli_token_buf))
+	{
+		if (CLI_ISSPACE(*(cli_lex_in_ptr->tp-2)) && !CLI_ISSPACE(*cli_lex_in_ptr->tp)) {
+			/* The command line includes a pattern like: `- -qualifier`, i.e.:
+			 * 1. cli_lex_in_ptr->tp is the start of a qualifier string
+			 * 2. cli_lex_in_ptr->tp-1 is a '-', per the immediately preceding cli_is_qualif() check
+			 * 3. cli_lex_in_ptr->tp-2 is a ' '
+			 * 4. cli_lex_in_ptr->tp-3 is a '-', per the cli_is_qualif() check above, prior to the immediately preceding one.
+			 * So, the first '-' signals an option qualifier, but none is specified.
+			 *
+			 * Note that `cli_lex_in_ptr->tp-2` is safe to read here since this address has already been read by
+			 * the `cli_gettoken()` call in the preceding `if` check of the containing `if-else` statement.
+			 */
+			SNPRINTF(cli_err_str, MAX_CLI_ERR_STR, "Qualifier string missing %s", opt_str);
+			return (-1);
+		}
+		if ((!cli_look_next_token(eof)) || (0 == cli_gettoken(eof))) {
+			SNPRINTF(cli_err_str, MAX_CLI_ERR_STR, "Qualifier string missing %s%s ", opt_str, cli_token_buf);
+			return (-1);
+		}
 	}
 	/* ---------------------------------------
 	 * Fold the qualifier string to upper case
@@ -562,6 +585,10 @@ int cli_check_negated(char **opt_str_ptr, CLI_ENTRY *pcmd_parm_ptr, CLI_ENTRY **
 		/* Check that the qualifier does not have the NO prefix */
 		if (0 == (*pparm_ptr = find_cmd_param(opt_str_tmp, pcmd_parms, FALSE)))
 		{
+			if (1 == neg_flg)
+			{
+				*opt_str_ptr -= STR_LIT_LEN(NO_STRING);
+			}
 			SNPRINTF(cli_err_str, MAX_CLI_ERR_STR, "Unrecognized option : %s", *opt_str_ptr);
 			cli_lex_in_ptr->tp = 0;
 			return (-1);
