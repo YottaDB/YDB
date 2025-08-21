@@ -358,7 +358,13 @@ void mupip_upgrade(void)
 				jnl_write_inctn_rec(csa);
 				inctn_opcode = save_inctn_opcode;
 			} else
+			{
 				gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(csd), DB_LEN_STR(reg));
+				util_out_print("  Moving onto next region.",TRUE);
+				error = TRUE;
+				RELEASE_ACCESS_SEMAPHORE_AND_RUNDOWN(gv_cur_region, error);
+				continue;
+			}
 		}
 		if (FALSE == was_crit)
 			rel_crit(reg);
