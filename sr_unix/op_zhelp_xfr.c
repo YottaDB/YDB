@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -29,6 +29,7 @@ void op_zhelp_xfr(mval *subject, mval *lib)
 {
 	mstr	x;
 	mval	*action;
+	int	i;
 
 	MV_FORCE_STR(subject);
 	MV_FORCE_STR(lib);
@@ -43,21 +44,42 @@ void op_zhelp_xfr(mval *subject, mval *lib)
 	s2pool(&action->str);
 	action->mvtype = MV_STR;
 
-	mval_lex(subject, &x);
-	if (IS_AT_END_OF_STRINGPOOL(x.addr, 0))
+	/* To "action", we concatenate the following things in that order before calling "op_commarg()".
+	 * - subject (after it has been processed by mval_lex())
+	 * - com (a comma)
+	 * - lib (after it has been processed by mval_lex())
+	 * - rpar (right parentheses)
+	 * To avoid code duplication, we do the above 4 steps in a for loop with 2 iterations where each iteration
+	 * does 2 of the above steps.
+	 */
+	for (i = 0; i < 2; i++)
 	{
-		action->str.len += x.len;
-		stringpool.free += x.len;
-	} else
-		op_cat(VARLSTCNT(3) action, action, subject);
-	op_cat(VARLSTCNT(3) action, action, &com);	/* add "," */
-	mval_lex(lib, &x);
-	if (IS_AT_END_OF_STRINGPOOL(x.addr, 0))
-	{
-		action->str.len += x.len;
-		stringpool.free += x.len;
-	} else
-		op_cat(VARLSTCNT(3) action, action, lib);
-	op_cat(VARLSTCNT(3) action, action, &rpar);	/* add ")" */
+		mval_lex((0 == i) ? subject : lib, &x);
+		/* With "stp_gcol()", we are guaranteed that "action->str.addr" points to the end of the stringpool
+		 * as that is the most recent string in the stringpool and any "stp_gcol()" call inside "mval_lex()"
+		 * would continue to keep it at the end of the stringpool. But with "stp_gcol_nosort()", this is no
+		 * longer guaranteed. String order in the stringpool is not preserved. And so we need to check if
+		 * "action" and "x" line up one after the other in the stringpool and if so skip the heavyweight
+		 * "op_cat()" call below. To keep the code simple, we do this check in both sort and nosort cases.
+		 */
+		if (IS_AT_END_OF_STRINGPOOL(action->str.addr, action->str.len) && IS_AT_END_OF_STRINGPOOL(x.addr, 0))
+		{
+			assert(!memcmp(action->str.addr + action->str.len, x.addr, x.len));
+			action->str.len += x.len;
+			stringpool.free += x.len;
+		} else
+		{
+			mval	*mv;
+
+			PUSH_MV_STENT(MVST_MVAL); /* create a temporary on M stack */
+			mv = &mv_chain->mv_st_cont.mvs_mval;
+			mv->mvtype = MV_STR;
+			mv->str = x;
+			stringpool.free += x.len;
+			op_cat(VARLSTCNT(3) action, action, mv);
+			POP_MV_STENT(); /* no more need of temporary */
+		}
+		op_cat(VARLSTCNT(3) action, action, (0 == i) ? &com : &rpar);
+	}
 	op_commarg(action,indir_linetail);
 }
