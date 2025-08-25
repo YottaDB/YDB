@@ -88,6 +88,8 @@ GPG_KEYS=(
     "146843872A57D45E8CB06841295AC8BD2134D07E"
     # Serena Willis
     "8C3416F3D6FD7624914704A22B379ED58A1511C0"
+    # Ben Chermside
+    "F0EE5AF195B29FBBBE53A2099B40A867535E7187"
 )
 gpg --keyserver hkps://keyserver.ubuntu.com --recv-keys "${GPG_KEYS[@]}"
 
