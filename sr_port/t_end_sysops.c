@@ -471,23 +471,23 @@ enum cdb_sc mm_update(cw_set_element *cs, trans_num ctn, trans_num effective_tn)
 enum cdb_sc bg_update_phase1(cw_set_element *cs, trans_num ctn)
 {
 	boolean_t		twinning_on;
-	int			dummy;
 	int4			n;
-	uint4			lcnt;
 	bt_rec_ptr_t		bt;
-	cache_rec_ptr_t		cr, cr_new, save_cr;
+	cache_rec_ptr_t		cr, cr_new;
 	boolean_t		read_finished, wait_for_rip, write_finished, intend_finished;
-	boolean_t		read_before_image;
 	block_id		blkid;
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
 	node_local_ptr_t	cnl;
 	enum gds_t_mode		mode;
 	enum db_ver		desired_db_format;
-	trans_num		dirty_tn;
 	gv_namehead		*gvt;
 	srch_blk_status		*blk_hist;
 	void_ptr_t		retcrptr;
+#	ifdef DEBUG
+	boolean_t		read_before_image;
+	cache_rec_ptr_t		save_cr;
+#	endif
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -565,6 +565,8 @@ enum cdb_sc bg_update_phase1(cw_set_element *cs, trans_num ctn)
 			INCR_DB_CSH_COUNTER(csa, n_bg_update_creates, 1);
 			cr = db_csh_getn(blkid);
 #			ifdef DEBUG
+			int	dummy;
+
 			save_cr = NULL;
 			if (ydb_white_box_test_case_enabled)
 			{
@@ -1010,24 +1012,22 @@ enum cdb_sc bg_update_phase1(cw_set_element *cs, trans_num ctn)
 		|| cr->twin || (CR_BLKEMPTY == cs->cr->blk) || ((cs->cr == cr) && (cs->cycle == cr->cycle)));
 	/* Before marking this cache-record dirty, record the value of cr->dirty into cr->tn.
 	 * This is used in phase2 to determine "recycled".
-	 */
-	dirty_tn = cr->dirty;
-	cr->tn = dirty_tn ? ctn : 0;
-	/* Now that we have locked a buffer for commit, there is one less free buffer available. Decrement wc_in_free.
+	 * Also, now that we have locked a buffer for commit, there is one less free buffer available. Decrement wc_in_free.
 	 * Do not do this if the cache-record is already dirty since this would have already been done the first time
 	 * it transitioned from non-dirty to dirty.
 	 */
-	if (0 == dirty_tn)
+	if (0 == cr->dirty)
 	{
+		cr->tn = 0;
 		SUB_ENT_FROM_FREE_QUE_CNT(cnl);
-		assert(0 == cr->dirty);		/* dirty_tn just picked up above from cr->dirty of locked buffer */
 		INCR_GVSTATS_COUNTER(csa, cnl, n_clean2dirty, 1);
 		cr->dirty = ctn;		/* block will be dirty.	 Note the tn in which this occurred */
 		/* At this point cr->flushed_dirty_tn could be EQUAL to ctn if this cache-record was used to update a different
 		 * block in this very same transaction and reused later for the current block. Reset it to 0 to avoid confusion.
 		 */
 		cr->flushed_dirty_tn = 0;
-	}
+	} else
+		cr->tn = ctn;
 	/* Take backup of block in phase2 (outside of crit). */
 	cs->cr = cr;		/* note down "cr" so phase2 can find it easily (given "cs") */
 	/* If this is the first time the the database block has been written, we must write
@@ -1062,24 +1062,21 @@ enum cdb_sc bg_update_phase2(cw_set_element *cs, trans_num ctn, trans_num effect
 	sm_uc_ptr_t		blk_ptr, backup_blk_ptr, chain_ptr;
 	cw_set_element		*cs_ptr, *nxt;
 	cache_rec_ptr_t		cr, backup_cr;
-	boolean_t		recycled;
 	boolean_t		bmp_status, long_blk_id;
 	block_id		blkid;
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
 	node_local_ptr_t	cnl;
-	enum gds_t_mode		mode;
 	cache_que_heads_ptr_t	cache_state;
 	boolean_t		write_to_snapshot_file;
 	snapshot_context_ptr_t	lcl_ss_ctx;
 #	ifdef DEBUG
 	int4			blk_id_sz;
 	jbuf_rsrv_struct_t	*jrs;
-#	endif
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	mode = cs->mode;
+#	endif
 	cr = cs->cr;
 	/* Make sure asserts that were valid before letting go of this cache-record in phase1 are still so */
 	assert(process_id == cr->in_tend);		/* should have been set in phase1 to update buffer */
@@ -1160,7 +1157,7 @@ enum cdb_sc bg_update_phase2(cw_set_element *cs, trans_num ctn, trans_num effect
 		}
 	}
 	SET_DATA_INVALID(cr);	/* data_invalid should be set signaling intent to update contents of a valid block */
-	if (gds_t_writemap == mode)
+	if (gds_t_writemap == cs->mode)
 	{
 		assert(csa->now_crit);	/* at this point, bitmap blocks are built while holding crit */
 		assert(0 == (blkid & (BLKS_PER_LMAP - 1)));
@@ -1249,18 +1246,11 @@ enum cdb_sc bg_update_phase2(cw_set_element *cs, trans_num ctn, trans_num effect
 	}
 	RESET_DATA_INVALID(cr);
 	CERT_BLK_IF_NEEDED(certify_all_blocks, gv_cur_region, cs, blk_ptr, gv_target);
-	if (cr->tn)
-	{
-		recycled = TRUE;
-		assert(cr->dirty > cr->flushed_dirty_tn);
-	} else
-		recycled = FALSE;
-	if (!recycled)
-		cr->jnl_addr = cs->jnl_freeaddr;	/* update jnl_addr only if cache-record is not already in active queue */
-	assert(recycled || (LATCH_SET == WRITE_LATCH_VAL(cr)));
-	assert(!recycled || (LATCH_CLEAR < WRITE_LATCH_VAL(cr)));
+	assert(!cr->tn || (cr->dirty > cr->flushed_dirty_tn));
+	assert(cr->tn || (LATCH_SET == WRITE_LATCH_VAL(cr)));
+	assert(!cr->tn || (LATCH_CLEAR < WRITE_LATCH_VAL(cr)));
 	cache_state = csa->acc_meth.bg.cache_state;
-	if (!recycled)
+	if (!cr->tn)
 	{	/* stuff it on the active queue */
 		assert(0 == cr->epid);
 		/* Earlier revisions of this code had a kludge in place here to work around INSQTI failures (D9D06-002342).
@@ -1277,6 +1267,7 @@ enum cdb_sc bg_update_phase2(cw_set_element *cs, trans_num ctn, trans_num effect
 			return cdb_sc_cacheprob;
 		}
 		ADD_ENT_TO_ACTIVE_QUE_CNT(cnl);
+		cr->jnl_addr = cs->jnl_freeaddr;	/* update jnl_addr only if cache-record is not already in active queue */
 	}
 	RELEASE_BUFF_UPDATE_LOCK(cr, n, &cnl->db_latch);
 	/* "n" holds the pre-release value, so check accordingly */
