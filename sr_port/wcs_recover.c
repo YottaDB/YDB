@@ -480,7 +480,7 @@ void wcs_recover(gd_region *reg)
 					}
 				}	/* if (LATCH_CLEAR < WRITE_LATCH_VAL(cr_alt)) */
 			}	/* if (CR_NOTVALID == cr_alt) */
-			bt->cache_index = (int4)GDS_ANY_ABS2REL(csa, cr);
+			bt->cache_index = GDS_ANY_ABS2REL(csa, cr);
 			cr->bt_index = GDS_ANY_ABS2REL(csa, bt);
 			cr->dirty = csd->trans_hist.curr_tn;
 			cr->flushed_dirty_tn = 0;	/* need to be less than cr->dirty. we choose 0. */
@@ -540,7 +540,7 @@ void wcs_recover(gd_region *reg)
 			bt->killtn = csd->trans_hist.curr_tn;	/* be safe; don't know when was last kill after recover */
 			if (CR_NOTVALID == bt->cache_index)
 			{	/* no previous entry for this block */
-				bt->cache_index = (int4)GDS_ANY_ABS2REL(csa, cr);
+				bt->cache_index = GDS_ANY_ABS2REL(csa, cr);
 				cr->bt_index = GDS_ANY_ABS2REL(csa, bt);
 				cr->refer = TRUE;
 				hq = (cache_que_head_ptr_t)(hash_hdr + (cr->blk % bt_buckets));
@@ -563,7 +563,7 @@ void wcs_recover(gd_region *reg)
 						WRITE_LATCH_VAL(cr_alt) = LATCH_CONFLICT;
 					cr_alt->twin = GDS_ANY_ABS2REL(csa, cr);
 					cr->twin = GDS_ANY_ABS2REL(csa, cr_alt);
-					bt->cache_index = (int4)GDS_ANY_ABS2REL(csa, cr);
+					bt->cache_index = GDS_ANY_ABS2REL(csa, cr);
 					cr->bt_index = GDS_ANY_ABS2REL(csa, bt);
 					cr->refer = TRUE;
 					hq = (cache_que_head_ptr_t)(hash_hdr + (cr->blk % bt_buckets));
@@ -600,7 +600,7 @@ void wcs_recover(gd_region *reg)
 		bt->killtn = csd->trans_hist.curr_tn;	/* be safe; don't know when was last kill after recover */
 		if (CR_NOTVALID == bt->cache_index)
 		{	/* no previous entry for this block */
-			bt->cache_index = (int4)GDS_ANY_ABS2REL(csa, cr);
+			bt->cache_index = GDS_ANY_ABS2REL(csa, cr);
 			cr->bt_index = GDS_ANY_ABS2REL(csa, bt);
 			cr->refer = TRUE;
 			insqh((que_ent_ptr_t)&cr->blkque, (que_ent_ptr_t)hq);

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -383,20 +383,12 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 				SEND_MSG_CSA(VARLSTCNT(11) ERR_DBADDRANGE8, 9, DB_LEN_STR(reg),
 					th, &th->blk, &th->blk, RTS_ERROR_TEXT("th->blk"), &nil, &csd->trans_hist.total_blks);
 			}
-			if (((int)(th->cache_index) != CR_NOTVALID) &&
-				(((int)(th->cache_index) < cr_base) || ((int)(th->cache_index) >= cr_top)))
+			if ((CR_NOTVALID != th->cache_index) && ((th->cache_index < cr_base) || (th->cache_index >= cr_top)))
 			{
 				assert(expect_damage);
 				ret = FALSE;
 				SEND_MSG_CSA(VARLSTCNT(11) ERR_DBADDRANGE8, 9, DB_LEN_STR(reg),
 					th, &th->blk, &th->cache_index, RTS_ERROR_TEXT("th->cache_index"), &cr_base, &cr_top);
-			}
-			if (th->flushing != FALSE) /* ??? this is a gt.cx item that may require more synchronization at the top */
-			{
-				assert(expect_damage);
-				ret = FALSE;
-				SEND_MSG_CSA(VARLSTCNT(8) ERR_DBFHEADERR4, 6, DB_LEN_STR(reg),
-					RTS_ERROR_TEXT("th->flushing"), th->flushing, FALSE);
 			}
 			if (0 == th->tnque.fl)
 			{	/* No point proceeding to next iteration of loop as "th + th->tnque.fl" will be the same as "th" */

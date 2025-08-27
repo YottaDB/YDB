@@ -982,7 +982,7 @@ boolean_t	tp_tend()
 									 * as bg_update_phase1() relies on this.
 									 */
 									cr->bt_index = GDS_ABS2REL(bt);
-									bt->cache_index = (int4)GDS_ABS2REL(cr);
+									bt->cache_index = GDS_ABS2REL(cr);
 								}
 							} else
 							{
@@ -1127,7 +1127,7 @@ boolean_t	tp_tend()
 							 * as bg_update_phase1() relies on this.
 							 */
 							cr->bt_index = GDS_ABS2REL(bt);
-							bt->cache_index = (int4)GDS_ABS2REL(cr);
+							bt->cache_index = GDS_ABS2REL(cr);
 						}
 					} else
 					{

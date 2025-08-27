@@ -668,7 +668,7 @@ enum cdb_sc bg_update_phase1(cw_set_element *cs, trans_num ctn)
 		assert(LATCH_SET <= WRITE_LATCH_VAL(cr));
 		BG_TRACE(new_buff);
 		cr->bt_index = GDS_ABS2REL(bt);
-		bt->cache_index = (int4)GDS_ABS2REL(cr);
+		bt->cache_index = GDS_ABS2REL(cr);
 		cr->backup_cr_is_twin = FALSE;
 	} else	/* end of if else on cr NOTVALID */
 	{

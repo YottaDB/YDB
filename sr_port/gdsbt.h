@@ -102,9 +102,7 @@ typedef struct bt_rec_struct
 	trans_num	tn;		/* transaction #*/
 	trans_num	killtn;		/* last transaction when this block was updated as part of an M-kill */
 	block_id	blk;		/* block #*/
-	int4		cache_index;
-	bool		flushing;	/* buffer is being flushed after a machine switch on a cluster */
-	char		filler[3];	/* maintain 8 byte alignment */
+	sm_off_t	cache_index;
 } bt_rec;				/* block table record */
 
 /* This structure is used to access the transaction queue.  It points at all but the
@@ -121,9 +119,7 @@ typedef struct th_rec_struct
 	trans_num	tn;
 	trans_num	killtn;		/* last transaction when this block was updated as part of an M-kill */
 	block_id	blk;
-	int4		cache_index;
-	bool		flushing;
-	char		filler[3];	/* maintain 8 byte alignment */
+	sm_off_t	cache_index;
 } th_rec;
 
 /* This structure is used to maintain all cache records.  The BT queue contains
