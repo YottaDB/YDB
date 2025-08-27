@@ -967,40 +967,40 @@ enum cdb_sc bg_update_phase1(cw_set_element *cs, trans_num ctn)
 		TREF(block_now_locked) = NULL;
 	}
 	/* Update csd->blks_to_upgrd while we have crit */
-	desired_db_format = csd->desired_db_format;
 	/* assert that appropriate inctn journal records were written at the beginning of the commit in t_end */
-	assert((inctn_blkupgrd_fmtchng != inctn_opcode) || ((GDSV6p == cr->ondsk_blkver) && (GDSV7m == desired_db_format)));
+	assert((inctn_blkupgrd_fmtchng != inctn_opcode) || ((GDSV6p == cr->ondsk_blkver) && (GDSV7m == csd->desired_db_format)));
 	assert(!(JNL_ENABLED(csa) && csa->jnl_before_image) || !mu_reorg_nosafejnl
-		|| (inctn_blkupgrd != inctn_opcode) || (cr->ondsk_blkver == desired_db_format));
+		|| (inctn_blkupgrd != inctn_opcode) || (cr->ondsk_blkver == csd->desired_db_format));
 	assert(!mu_upgrade_in_prog || !mu_reorg_encrypt_in_prog || (gds_t_acquired != mode));
 	assert((gds_t_write_recycled != mode) || mu_upgrade_in_prog || mu_reorg_encrypt_in_prog);
-	if (!cs_data->fully_upgraded)
+	if (!csd->fully_upgraded)
 	{
-		assert(GDSV6 < cs_data->desired_db_format);
+		assert(GDSV6 < csd->desired_db_format);
+		desired_db_format = csd->desired_db_format;
 		if (GDSV7m != cs->ondsk_blkver)
 		{
 			if  (gds_t_acquired == mode)
 			{	/* Increment blks_to_upgrd for new V6p idx blocks */
 				INCR_BLKS_TO_UPGRD(csa, csd, 1);	/* Increment blks_to_upgrd for new V6p index blocks */
 #ifdef				DEBUG_BLKS_TO_UPGRD
-				util_out_print("!UL + 0x!@XQ !AD:0x!@XQ:!UL:!UL:!UL", TRUE, cs_data->blks_to_upgrd, &ctn,
+				util_out_print("!UL + 0x!@XQ !AD:0x!@XQ:!UL:!UL:!UL", TRUE, csd->blks_to_upgrd, &ctn,
 						REG_LEN_STR(gv_cur_region), &cs->blk, cs->ondsk_blkver, cs->level, cs->mode);
 #endif
 			} else if (!mu_upgrade_in_prog && (0 == cs->level) && (GDSV6 == cs->ondsk_blkver)
 					&& (gds_t_write_recycled != cs->mode) && !cs->done)
 			{	/* Level zero block, update the header and decrement blks_to_upgrd */
-				DECR_BLKS_TO_UPGRD(cs_addrs, cs_data, 1);
+				DECR_BLKS_TO_UPGRD(cs_addrs, csd, 1);
 #ifdef				DEBUG_BLKS_TO_UPGRD
-				util_out_print("!UL - 0x!@XQ !AD:0x!@XQ:!UL:!UL:!UL", TRUE, cs_data->blks_to_upgrd, &ctn,
+				util_out_print("!UL - 0x!@XQ !AD:0x!@XQ:!UL:!UL:!UL", TRUE, csd->blks_to_upgrd, &ctn,
 						REG_LEN_STR(gv_cur_region), &cs->blk, cs->ondsk_blkver, cs->level, cs->mode);
 #endif
-				cr->ondsk_blkver = cs->ondsk_blkver = cs_data->desired_db_format;
+				cr->ondsk_blkver = cs->ondsk_blkver = desired_db_format;
 			}
 		} else if ((GDSV7m == cs->ondsk_blkver) && mu_upgrade_in_prog)
 		{
 			DECR_BLKS_TO_UPGRD(csa, csd, 1);	/* Decrement in transition block */
 #ifdef			DEBUG_BLKS_TO_UPGRD
-			util_out_print("!UL - 0x!@XQ !AD:0x!@XQ:!UL:!UL:!UL", TRUE, cs_data->blks_to_upgrd, &ctn,
+			util_out_print("!UL - 0x!@XQ !AD:0x!@XQ:!UL:!UL:!UL", TRUE, csd->blks_to_upgrd, &ctn,
 					REG_LEN_STR(gv_cur_region), &cs->blk, cs->ondsk_blkver, cs->level, cs->mode);
 #endif
 		}
