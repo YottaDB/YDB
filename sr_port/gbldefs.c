@@ -888,18 +888,6 @@ GBLDEF	ch_ret_type	(*stpgc_ch)();			/* Function pointer to stp_gcol_ch */
 GBLDEF	ch_ret_type	(*t_ch_fnptr)();		/* Function pointer to t_ch */
 GBLDEF	ch_ret_type	(*dbinit_ch_fnptr)();		/* Function pointer to dbinit_ch */
 #endif
-GBLDEF	cache_rec_ptr_t	pin_fail_cr;			/* Pointer to the cache-record that we failed while pinning */
-GBLDEF	cache_rec	pin_fail_cr_contents;		/* Contents of the cache-record that we failed while pinning */
-GBLDEF	cache_rec_ptr_t	pin_fail_twin_cr;		/* Pointer to twin of the cache-record that we failed to pin */
-GBLDEF	cache_rec	pin_fail_twin_cr_contents;	/* Contents of twin of the cache-record that we failed to pin */
-GBLDEF	bt_rec_ptr_t	pin_fail_bt;			/* Pointer to bt of the cache-record that we failed to pin */
-GBLDEF	bt_rec		pin_fail_bt_contents;		/* Contents of bt of the cache-record that we failed to pin */
-GBLDEF	int4		pin_fail_in_crit;		/* Holder of crit at the time we failed to pin */
-GBLDEF	int4		pin_fail_wc_in_free;		/* Number of write cache records in free queue when we failed to pin */
-GBLDEF	int4		pin_fail_wcs_active_lvl;	/* Number of entries in active queue when we failed to pin */
-GBLDEF	int4		pin_fail_ref_cnt;		/* Reference count when we failed to pin */
-GBLDEF	int4		pin_fail_in_wtstart;		/* Count of processes in wcs_wtstart when we failed to pin */
-GBLDEF	int4		pin_fail_phase2_commit_pidcnt;	/* Number of processes in phase2 commit when we failed to pin */
 GBLDEF	zwr_hash_table	*zwrhtab;			/* How we track aliases during zwrites */
 GBLDEF	uint4		zwrtacindx;			/* When creating $ZWRTACxxx vars for ZWRite, this holds xxx */
 GBLDEF	uint4		tstartcycle;			/* lv_val cycle for tstart operations */

@@ -984,27 +984,27 @@ enum cdb_sc bg_update_phase1(cw_set_element *cs, trans_num ctn)
 			if  (gds_t_acquired == mode)
 			{	/* Increment blks_to_upgrd for new V6p idx blocks */
 				INCR_BLKS_TO_UPGRD(csa, csd, 1);	/* Increment blks_to_upgrd for new V6p index blocks */
-#ifdef				DEBUG_BLKS_TO_UPGRD
+#				ifdef	DEBUG_BLKS_TO_UPGRD
 				util_out_print("!UL + 0x!@XQ !AD:0x!@XQ:!UL:!UL:!UL", TRUE, csd->blks_to_upgrd, &ctn,
 						REG_LEN_STR(gv_cur_region), &cs->blk, cs->ondsk_blkver, cs->level, cs->mode);
-#endif
+#				endif
 			} else if (!mu_upgrade_in_prog && (0 == cs->level) && (GDSV6 == cs->ondsk_blkver)
 					&& (gds_t_write_recycled != cs->mode) && !cs->done)
 			{	/* Level zero block, update the header and decrement blks_to_upgrd */
 				DECR_BLKS_TO_UPGRD(cs_addrs, csd, 1);
-#ifdef				DEBUG_BLKS_TO_UPGRD
+#				ifdef	DEBUG_BLKS_TO_UPGRD
 				util_out_print("!UL - 0x!@XQ !AD:0x!@XQ:!UL:!UL:!UL", TRUE, csd->blks_to_upgrd, &ctn,
 						REG_LEN_STR(gv_cur_region), &cs->blk, cs->ondsk_blkver, cs->level, cs->mode);
-#endif
+#				endif
 				cr->ondsk_blkver = cs->ondsk_blkver = desired_db_format;
 			}
 		} else if ((GDSV7m == cs->ondsk_blkver) && mu_upgrade_in_prog)
 		{
 			DECR_BLKS_TO_UPGRD(csa, csd, 1);	/* Decrement in transition block */
-#ifdef			DEBUG_BLKS_TO_UPGRD
+#			ifdef	DEBUG_BLKS_TO_UPGRD
 			util_out_print("!UL - 0x!@XQ !AD:0x!@XQ:!UL:!UL:!UL", TRUE, csd->blks_to_upgrd, &ctn,
 					REG_LEN_STR(gv_cur_region), &cs->blk, cs->ondsk_blkver, cs->level, cs->mode);
-#endif
+#			endif
 		}
 	}
 	/* generic dse_running variable below is used for caller == dse_maps */

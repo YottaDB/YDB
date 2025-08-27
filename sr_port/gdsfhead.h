@@ -1110,19 +1110,6 @@ MBSTART {								\
 	PIN_CACHE_RECORD(cr, si->cr_array, si->cr_array_index);		\
 } MBEND
 
-GBLREF	cache_rec_ptr_t	pin_fail_cr;			/* Pointer to the cache-record that we failed while pinning */
-GBLREF	cache_rec	pin_fail_cr_contents;		/* Contents of the cache-record that we failed while pinning */
-GBLREF	cache_rec_ptr_t	pin_fail_twin_cr;		/* Pointer to twin of the cache-record that we failed to pin */
-GBLREF	cache_rec	pin_fail_twin_cr_contents;	/* Contents of twin of the cache-record that we failed to pin */
-GBLREF	bt_rec_ptr_t	pin_fail_bt;			/* Pointer to bt of the cache-record that we failed to pin */
-GBLREF	bt_rec		pin_fail_bt_contents;		/* Contents of bt of the cache-record that we failed to pin */
-GBLREF	int4		pin_fail_in_crit;		/* Holder of crit at the time we failed to pin */
-GBLREF	int4		pin_fail_wc_in_free;		/* Number of write cache records in free queue when we failed to pin */
-GBLREF	int4		pin_fail_wcs_active_lvl;	/* Number of entries in active queue when we failed to pin */
-GBLREF	int4		pin_fail_ref_cnt;		/* Reference count when we failed to pin */
-GBLREF	int4		pin_fail_in_wtstart;		/* Count of processes in wcs_wtstart when we failed to pin */
-GBLREF	int4		pin_fail_phase2_commit_pidcnt;	/* Number of processes in phase2 commit when we failed to pin */
-
 /* Macro to be used whenever cr->in_cw_set needs to be set (PIN) outside of a TP transaction */
 #define	PIN_CACHE_RECORD(cr, crarray, crarrayindex)							\
 MBSTART {												\
@@ -1132,34 +1119,11 @@ MBSTART {												\
 	DEBUG_ONLY(data_invalid = cr->data_invalid);							\
 	assert((process_id == in_tend) || (0 == in_tend));						\
 	assert((process_id == data_invalid) || (0 == data_invalid));					\
-	in_cw_set = cr->in_cw_set;									\
-	if (0 != in_cw_set)										\
-	{												\
-		pin_fail_cr = cr;									\
-		pin_fail_cr_contents = *cr;								\
-		if (cr->bt_index)									\
-		{											\
-			pin_fail_bt = (bt_rec_ptr_t)GDS_ANY_REL2ABS(cs_addrs, cr->bt_index);		\
-			pin_fail_bt_contents = *pin_fail_bt;						\
-		}											\
-		if (cr->twin)										\
-		{											\
-			pin_fail_twin_cr = (cache_rec_ptr_t)GDS_ANY_REL2ABS(cs_addrs, cr->twin);	\
-			pin_fail_twin_cr_contents = *pin_fail_twin_cr;					\
-		}											\
-		pin_fail_in_crit		= cs_addrs->nl->in_crit;				\
-		pin_fail_wc_in_free		= cs_addrs->nl->wc_in_free;				\
-		pin_fail_wcs_active_lvl		= cs_addrs->nl->wcs_active_lvl;				\
-		pin_fail_ref_cnt		= cs_addrs->nl->ref_cnt;				\
-		pin_fail_in_wtstart		= cs_addrs->nl->in_wtstart;				\
-		pin_fail_phase2_commit_pidcnt	= cs_addrs->nl->wcs_phase2_commit_pidcnt;		\
-		assertpro(0 == in_cw_set);								\
-	}												\
+	assert(0 == cr->in_cw_set);									\
 	/* If twinning, we should never set in_cw_set on an OLDER twin. Assert that. */			\
 	assert(!cr->twin || cr->bt_index);								\
 	/* stuff it in the array before setting in_cw_set */						\
-	crarray[crarrayindex] = cr;									\
-	crarrayindex++;											\
+	crarray[crarrayindex++] = cr;									\
 	cr->in_cw_set = process_id;									\
 } MBEND
 
