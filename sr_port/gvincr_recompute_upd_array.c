@@ -43,12 +43,15 @@ GBLREF	mval			*post_incr_mval;	/* mval pointing to the post-$INCR value */
 GBLREF	jnl_format_buffer       *non_tp_jfb_ptr;
 GBLREF	jnl_gbls_t		jgbl;
 GBLREF	char			*update_array, *update_array_ptr;
-GBLREF	int			gv_fillfactor, rc_set_fragment;	/* Contains offset within data at which data fragment starts */
+GBLREF	int			gv_fillfactor;
 GBLREF	unsigned char		cw_set_depth;
 GBLREF	gv_key			*gv_currkey;
 GBLREF	unsigned int		t_tries;
 GBLREF	uint4			update_array_size;
 GBLREF	gv_namehead		*gv_target;
+#ifdef DEBUG
+GBLREF	int			rc_set_fragment;	/* Contains offset within data at which data fragment starts */
+#endif
 
 /* --------------------------------------------------------------------------------------------
  * This code is very similar to the code in gvcst_put for the non-block-split case as well as
@@ -155,11 +158,7 @@ enum cdb_sc	gvincr_recompute_upd_array(srch_blk_status *bh, struct cw_set_elemen
 		assert(CDB_STAGNATE > t_tries);
 		return cdb_sc_blksplit;
 	}
-	if (0 != rc_set_fragment)
-	{
-		assert(CDB_STAGNATE > t_tries);
-		return cdb_sc_mkblk;	/* let gvcst_put do the recomputation out of crit in case of rc_set */
-	}
+	assert(0 == rc_set_fragment);
 	/* Note that a lot of the code below relies on the fact that we are in non-TP. For TP we need to do extra stuff */
 	assert(NULL != update_array);
 	assert(NULL != update_array_ptr);

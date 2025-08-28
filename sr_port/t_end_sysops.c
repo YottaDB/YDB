@@ -140,7 +140,7 @@ GBLREF	gd_region		*gv_cur_region;
 GBLREF	gv_namehead		*gv_target;
 GBLREF	inctn_opcode_t		inctn_opcode;
 GBLREF	inctn_detail_t		inctn_detail;			/* holds detail to fill in to inctn jnl record */
-GBLREF	int			gv_fillfactor, rc_set_fragment;	/* Contains offset within data at which data fragment starts */
+GBLREF	int			gv_fillfactor;
 GBLREF	jnl_format_buffer	*non_tp_jfb_ptr;
 GBLREF	jnl_gbls_t		jgbl;
 GBLREF	jnlpool_addrs_ptr_t	jnlpool;
@@ -155,6 +155,9 @@ GBLREF	unsigned char		cw_set_depth;
 GBLREF	unsigned int		cr_array_index, t_tries;
 GBLREF	volatile boolean_t	in_mutex_deadlock_check;
 GBLREF	volatile int4		crit_count, fast_lock_count, gtmMallocDepth;
+#ifdef DEBUG
+GBLREF	int			rc_set_fragment;	/* Contains offset within data at which data fragment starts */
+#endif
 
 void fileheader_sync(gd_region *reg)
 {
@@ -1719,20 +1722,15 @@ enum cdb_sc	t_recompute_upd_array(srch_blk_status *bh, struct cw_set_element_str
 			assert(CDB_STAGNATE > t_tries);
 			return cdb_sc_blksplit;
 		}
+		assert(0 == rc_set_fragment);
 		if (dollar_tlevel)
 		{
-			assertpro(0 == rc_set_fragment);
 			DEBUG_ONLY(chain1.id = bh->blk_num);
 			assert(0 == chain1.chain.flag);
 			segment_update_array_size = UA_NON_BM_SIZE(cs_data);
 			ENSURE_UPDATE_ARRAY_SPACE(segment_update_array_size);
 		} else
 		{	/* non-TP */
-			if (0 != rc_set_fragment)
-			{
-				assert(CDB_STAGNATE > t_tries);
-				return cdb_sc_mkblk;	/* let gvcst_put do the recomputation out of crit in case of rc_set */
-			}
 			assert(NULL == kv->next);
 			assert(NULL != update_array);
 			assert(NULL != update_array_ptr);
