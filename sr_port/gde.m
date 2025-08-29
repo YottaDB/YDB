@@ -3,7 +3,7 @@
 ; Copyright (c) 2001-2022 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
-; Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	;
+; Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	;
 ; All rights reserved.						;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -54,7 +54,10 @@ DBG:	;transfer point for DEBUG and "runtime" %gde
 	i runtime s prompt="GD_SHOW>",verb="SHOW",x="" f  s x=$o(syntab(x)) q:'$l(x)  i x'="SHOW" k syntab(x)
 INTERACT
 	quit:$g(gdequiet)
-	f  u io:ctrap=$c(25,26) w !,prompt," " r comline u @useio d comline:$l(comline)
+	f  u io:ctrap=$c(3,25,26) w !,prompt," " r comline u @useio d comline:$l(comline)
+	;I think it should check if the env varable nocenable is on. so
+	;i nocenable f  u io:ctrap=$c(25,26) w !,prompt," " r comline u @useio d comline:$l(comline)
+	;e  f  u io:ctrap=$c(3,25,26) w !,prompt," " r comline u @useio d comline:$l(comline)
 	q
 GDELOG
 	new $etrap
@@ -73,7 +76,7 @@ comline:
 	d GDEPARSE^GDEPARSE
 	q
 CTRL
-	i $p($zs,",",3,999)["-E-CTRAP, Character trap $C(3) encountered" do  zg @resume(comlevel)
+	i $p($zs,",",3,999)["-E-CTRAP, Character trap $C(3) encountered" do  s $zs="",$ec="" zg resume(comlevel)-1
 	. i comlevel>0 d comeof ; if we take a ctrl-c in a command file then get out of that command file
 	i $p($zs,",",3,999)["-E-CTRAP, Character trap $C(25) encountered" d GETOUT^GDEEXIT h
 	i $p($zs,",",3,999)["-E-CTRAP, Character trap $C(26) encountered" d EXIT^GDEEXIT
@@ -120,12 +123,12 @@ SHOERR
 	q
 ABORT
 	s abortzs=$zs,abort="GDEDUMP.DMP",$et=""
-        o abort:(newversion:noreadonly) u abort zsh "*" c abort
-        u @useio
+	o abort:(newversion:noreadonly) u abort zsh "*" c abort
+	u @useio
 	; make GDECHECK error fatal except native UNIX
-        i $d(gdeerr) Write:'$g(gdequiet) $ZMessage($Select((256>abortzs):+abortzs,1:+abortzs\8*8+4)),!
-        e  w:'$g(gdequiet) $zs
-        d GETOUT^GDEEXIT
+	i $d(gdeerr) Write:'$g(gdequiet) $ZMessage($Select((256>abortzs):+abortzs,1:+abortzs\8*8+4)),!
+	e  w:'$g(gdequiet) $zs
+	d GETOUT^GDEEXIT
 	h
 DEBUG	;entry point to debug gde
 	n  ; clear calling process M variable state (if any) so it does not interfere with GDE variable names
