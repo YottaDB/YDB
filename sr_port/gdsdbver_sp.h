@@ -288,4 +288,5 @@ ENUM_ENTRY(GDSMVFILLER254),	/* 254 - Space reserved for GT.M changes to minor db
 ENUM_ENTRY(GDSMVFILLER255),	/* 255 - Space reserved for GT.M changes to minor db format */
 ENUM_ENTRY(GDSMR204_V71001),	/* 256 - YottaDB r2.04 which includes GDSMV71001 */
 ENUM_ENTRY(GDSMR204_V71002),	/* 257 - YottaDB r2.04 which includes GDSMV71002 */
+ENUM_ENTRY(GDSMR204),		/* 258 - New field "mutex_type" records mutex manager type */
 ENUM_ENTRY(GDSMVLAST)

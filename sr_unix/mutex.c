@@ -13,61 +13,73 @@
  *								*
  ****************************************************************/
 
-/* GT.M Mutex Control */
-
 #include "mdef.h"
 
-#include "gtm_time.h"	/* for time() */
-#include "gtm_socket.h"
-#include "gtm_string.h"
-#include "gtm_stdlib.h"
-#include "gtm_unistd.h"
-#include "gtm_stdio.h"
-#include "gtm_poll.h"
-#include "gtm_un.h"
-
-#include <errno.h>
-#if defined(__MVS__) || defined(__linux__) || defined(__CYGWIN__)
-#include "gtm_limits.h"
-#else
-#include <sys/limits.h>
-#endif
-
-#include "aswp.h"
 #include "gdsroot.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
 #include "gdsbt.h"
 #include "gdsfhead.h"
-#include "lockconst.h"
-#include "interlock.h"
-#include "filestruct.h"
-#include "io.h"
-#include "jnl.h"
 #include "gdsbgtr.h"
 #include "mutex.h"
 #include "relqueopi.h"
-#include "eintr_wrappers.h"
-#include "send_msg.h"
+#include "relqop.h"
 #include "is_proc_alive.h"
-#include "compswap.h"
 #include "gtmsecshr.h"
 #include "gtm_rel_quant.h"
-#include "add_inter.h"
 #include "mutex_deadlock_check.h"
-#include "gt_timer.h"
 #include "gtmio.h"
 #include "gtm_c_stack_trace.h"
-#include "sleep.h"
 #include "anticipatory_freeze.h"
 #ifdef DEBUG
 #include "wbox_test_init.h"
-#include "repl_msg.h"			/* needed by gtmsource.h */
-#include "gtmsource.h"			/* required for jnlpool GBLREF */
 #endif
 
-#ifdef MUTEX_MSEM_WAKE
-#define MUTEX_MAX_WAIT        		(MUTEX_CONST_TIMEOUT_VAL * (uint8)NANOSECS_IN_SEC)
+#define	CAT_CHECK_FREQUENCY		1024	/* Check if mutex type needs to be switched every 1024 crit successes */
+#define	PTHREAD_MUTEX_SWITCH_STREAK	16	/* Do the switch only if the condition is satisfied for 16 consecutive times */
+#define	DFT_DAT_RATIO_THRESHOLD		0.60	/* If change in CFT (called DFT) is greater than 60% of the change in
+						 * CAT (called DAT), we will switch from pthread to ydb mutex.
+						 */
+
+#ifdef DEBUG_YDB_MUTEX
+GBLDEF	char	*ydb_mutex_benchmark;
+
+#	define	DEBUG_GET_BENCHMARK_ENV						\
+	{									\
+		if (NULL == ydb_mutex_benchmark)				\
+		{								\
+			ydb_mutex_benchmark = getenv("ydb_mutex_benchmark");	\
+			if (NULL == ydb_mutex_benchmark)			\
+				ydb_mutex_benchmark = "";			\
+		}								\
+	}
+
+#	define	DEBUG_SEND_MUTEX_STREAK_SYSLOG_MESSAGE(CSA, CNL)						\
+	{													\
+		char	buff[256];										\
+														\
+		SNPRINTF(buff, SIZEOF(buff), "%s : MUTEX_TYPE = [%d] : MUTEX-STREAK = [%d] : "			\
+			"CAT = %lld : CFT = %lld : "								\
+			"CQT = %lld : CYT = %lld : DQT = %lld : DYT = %lld : DFT = %lld : "			\
+			"REF = %d : CRITREF = %d : MSEMREF = %d\n",						\
+			ydb_mutex_benchmark,									\
+			CSA->critical->curr_mutex_type,								\
+			CNL->switch_streak,									\
+			CNL->gvstats_rec.n_crit_success,							\
+			CNL->gvstats_rec.n_crit_failed,								\
+			CNL->gvstats_rec.n_crit_que_slps,							\
+			CNL->gvstats_rec.n_crit_yields,								\
+			delta_n_crit_que_slps,									\
+			delta_n_crit_yields,									\
+			delta_n_crit_failed,									\
+			CNL->ref_cnt,										\
+			CSA->critical->n_crit_waiters,								\
+			CSA->critical->n_msem_waiters);								\
+		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TEXT, 2, LEN_AND_STR(buff));			\
+	}
+#else
+#	define	DEBUG_SEND_MUTEX_STREAK_SYSLOG_MESSAGE(CSA, CNL)
+#	define	DEBUG_GET_BENCHMARK_ENV
 #endif
 
 #define	PROBE_BG_TRACE_PRO_ANY(CSA, EVENT)					\
@@ -81,68 +93,96 @@
 		BG_TRACE_PRO_ANY(CSA, EVENT);					\
 }
 
-#define	ONE_MUTEX_TRY(CSA, ADDR, CRASH_CNT, PID, LOCK_TYPE, SPINS, SPIN_CNT, YIELDS, YIELD_CNT, Q_SLPS, IN_EPOCH, ATSTART, STATE) \
-MBSTART {															\
-	ABS_TIME 		ATEND;												\
-	enum cdb_sc		STATUS;												\
-	gtm_uint64_t		FAILED_LOCK_ATTEMPTS;										\
-	node_local		*CNL;												\
+/* NOTE:
+ * 1) This macro can do one of 3 things. A "continue" or "return" or neither. Caller is expected to handle this.
+ * 2) The below macro does not have MBSTART/MBEND as it does "continue" and expects that to continue on to the next iteration
+ *    of the for loop in the caller. Having MBSTART/MBEND would introduce a do/while loop in between and break that assumption.
+ */
+#define	ONE_MUTEX_TRY(CSA, CNL, ADDR, ATSTART, SAVE_JNLPOOL, CURR_MUTEX_TYPE)							\
+{																\
+	GBLREF jnlpool_addrs_ptr_t	jnlpool;										\
 																\
-	CNL = (CSA)->nl;													\
-	if ((CRASH_CNT) != (ADDR)->crashcnt)											\
-		STATUS = cdb_sc_critreset;											\
-	else if (GET_SWAPLOCK(&(ADDR)->semaphore))										\
+	if (GET_SWAPLOCK(&(ADDR)->semaphore))											\
 	{															\
+		if (ADDR->curr_mutex_type != CURR_MUTEX_TYPE)									\
+		{	/* We got the ydb mutex lock but mutex type concurrently switched from ydb to pthread.			\
+			 * Go back to trying to get the pthread mutex lock. Caller is expected to be inside a			\
+			 * "for" loop so a "continue" in this macro takes us to the next iteration of the "for"			\
+			 * loop. Caller should detect this and take appropriate action.						\
+			 */													\
+			RELEASE_SWAPLOCK(&ADDR->semaphore);									\
+			continue;												\
+		}														\
+		if (IS_MUTEX_TYPE_ADAPTIVE(CURR_MUTEX_TYPE))									\
+		{														\
+			if (0 == CNL->gvstats_rec.n_crit_success % CAT_CHECK_FREQUENCY)						\
+			{													\
+				uint8				delta_n_crit_que_slps;						\
+				DEBUG_YDB_MUTEX_ONLY(uint8	delta_n_crit_yields);						\
+				DEBUG_YDB_MUTEX_ONLY(uint8	delta_n_crit_failed);						\
+																\
+				DEBUG_GET_BENCHMARK_ENV;									\
+				delta_n_crit_que_slps = CNL->gvstats_rec.n_crit_que_slps - CNL->prev_n_crit_que_slps;		\
+				DEBUG_YDB_MUTEX_ONLY(delta_n_crit_yields							\
+						= CNL->gvstats_rec.n_crit_yields - CNL->prev_n_crit_yields);			\
+				DEBUG_YDB_MUTEX_ONLY(delta_n_crit_failed							\
+						= CNL->gvstats_rec.n_crit_failed - CNL->prev_n_crit_failed);			\
+				CNL->prev_n_crit_que_slps = CNL->gvstats_rec.n_crit_que_slps;					\
+				DEBUG_YDB_MUTEX_ONLY(CNL->prev_n_crit_yields = CNL->gvstats_rec.n_crit_yields);			\
+				DEBUG_YDB_MUTEX_ONLY(CNL->prev_n_crit_failed = CNL->gvstats_rec.n_crit_failed);			\
+				if (CAT_CHECK_FREQUENCY < (delta_n_crit_que_slps + CSA->critical->n_msem_waiters))		\
+				{												\
+					CNL->switch_streak++;									\
+					DEBUG_SEND_MUTEX_STREAK_SYSLOG_MESSAGE(CSA, CNL);					\
+					if (PTHREAD_MUTEX_SWITCH_STREAK <= CNL->switch_streak)					\
+					{											\
+						/* Below initialization is needed by pthread mutex logic */			\
+						CNL->prev_n_crit_failed = CNL->gvstats_rec.n_crit_failed;			\
+						CNL->switch_streak = 0;								\
+						/* Ensure that ADDR->curr_mutex_type update occurs LAST (before releasing	\
+						 * lock) using a write memory barrier.						\
+						 */										\
+						SHM_WRITE_MEMORY_BARRIER;							\
+						ADDR->curr_mutex_type = mutex_type_adaptive_pthread;				\
+						RELEASE_SWAPLOCK(&ADDR->semaphore);						\
+						/* Wake up all processes in msem wait queue so they can				\
+						 * switch to pthread mutex.							\
+						 */										\
+						for ( ; 0 != ADDR->prochead.que.fl; )						\
+						{										\
+							boolean_t	woke_self_or_none;					\
+																\
+							mutex_wakeup(ADDR, &woke_self_or_none);					\
+						}										\
+						continue;									\
+					}											\
+				} else												\
+				{												\
+					DEBUG_YDB_MUTEX_ONLY(if (0 < CNL->switch_streak))					\
+						DEBUG_SEND_MUTEX_STREAK_SYSLOG_MESSAGE(CSA, CNL);				\
+					CNL->switch_streak = 0;									\
+				}												\
+			}													\
+		}														\
 		(CSA)->critical->crit_cycle++;											\
-		MUTEX_DPRINT3("%d: Write %sACQUIRED\n", (PID), (MUTEX_LOCK_WRITE == (LOCK_TYPE)) ? "" : "IMMEDIATE ");		\
-		MUTEX_TEST_SIGNAL_HERE("WRTLCK NOW CRIT\n", FALSE);								\
-		SET_CSA_NOW_CRIT_TRUE(CSA);											\
-		MUTEX_TEST_SIGNAL_HERE("WRTLCK SUCCESS\n", FALSE);								\
-		if (-1 != (SPIN_CNT))												\
-		{														\
-			assert((gtm_uint64_t)(SPIN_CNT) <= (SPINS));								\
-			(SPINS) -= (gtm_uint64_t)(SPIN_CNT);			/* reduce by the number of unused */		\
-		}														\
-		if (-1 != (YIELD_CNT))												\
-		{														\
-			assert((gtm_uint64_t)(YIELD_CNT) <= (YIELDS));								\
-			(YIELDS) -= (gtm_uint64_t)(YIELD_CNT);			/* reduce by the number of unused */		\
-		}														\
-		STATUS = cdb_sc_normal;												\
+		CSA->now_crit = TRUE;												\
 		INCR_GVSTATS_COUNTER((CSA), CNL, n_crit_success, 1);								\
-	} else															\
-		STATUS = cdb_sc_nolock;												\
-	if ((cdb_sc_normal == STATUS) || (MUTEX_LOCK_WRITE_IMMEDIATE == (LOCK_TYPE)) || (cdb_sc_critreset == STATUS))		\
-	{															\
-		FAILED_LOCK_ATTEMPTS = (SPINS) + (YIELDS) + (Q_SLPS) + (cdb_sc_nolock == STATUS);				\
-		if ((IN_EPOCH))													\
-			INCR_GVSTATS_COUNTER((CSA), CNL, n_crits_in_epch, FAILED_LOCK_ATTEMPTS);				\
-		INCR_GVSTATS_COUNTER((CSA), CNL, n_crit_failed, FAILED_LOCK_ATTEMPTS);						\
-		INCR_GVSTATS_COUNTER((CSA), CNL, sq_crit_failed, FAILED_LOCK_ATTEMPTS * FAILED_LOCK_ATTEMPTS);			\
-		if (YIELDS)													\
-		{														\
-			INCR_GVSTATS_COUNTER((CSA), CNL, n_crit_yields, (YIELDS));						\
-			INCR_GVSTATS_COUNTER((CSA), CNL, sq_crit_yields, (YIELDS) * (YIELDS));					\
-		}														\
-		if (Q_SLPS)													\
-		{														\
-			INCR_GVSTATS_COUNTER((CSA), CNL, n_crit_que_slps, (Q_SLPS));						\
-			INCR_GVSTATS_COUNTER((CSA), CNL, sq_crit_que_slps, (Q_SLPS) * (Q_SLPS));				\
-		}														\
+		DEBUG_YDB_MUTEX_ONLY(INTERLOCK_ADD(&ADDR->n_crit_waiters, -1));							\
 		if ((CSA)->crit_probe)												\
 		{														\
+			ABS_TIME 	ATEND;											\
+																\
 			sys_get_curr_time(&ATEND);		/* end time for the probcrit */					\
 			ATEND = sub_abs_time(&ATEND, &(ATSTART));	/* times currently use usec but might someday use ns*/	\
 			(CSA)->probecrit_rec.t_get_crit =  (((gtm_uint64_t)ATEND.tv_sec * NANOSECS_IN_SEC) + ATEND.tv_nsec);	\
-			(CSA)->probecrit_rec.p_crit_failed = (gtm_uint64_t)FAILED_LOCK_ATTEMPTS;				\
-			(CSA)->probecrit_rec.p_crit_yields = (gtm_uint64_t)(YIELDS);						\
-			(CSA)->probecrit_rec.p_crit_que_slps = (gtm_uint64_t)(Q_SLPS);						\
+			(CSA)->probecrit_rec.p_crit_failed = 0;									\
+			(CSA)->probecrit_rec.p_crit_yields = 0;									\
+			(CSA)->probecrit_rec.p_crit_que_slps = 0;								\
 		}														\
-		if (save_jnlpool != jnlpool)											\
-			jnlpool = save_jnlpool;											\
-		return STATUS;													\
+		assert(SAVE_JNLPOOL == jnlpool);										\
+		return cdb_sc_normal;												\
 	}															\
-} MBEND
+}
 
 #define IS_ONLNRLBK_ACTIVE(CSA)	(0 != CSA->nl->onln_rlbk_pid)
 
@@ -150,35 +190,13 @@ GBLREF int			num_additional_processors;
 GBLREF jnl_gbls_t		jgbl;
 GBLREF jnlpool_addrs_ptr_t	jnlpool;
 GBLREF uint4			process_id;
-GBLREF uint4			mutex_per_process_init_pid;
 GBLREF uint4			mu_upgrade_in_prog;
-#ifdef MUTEX_MSEM_WAKE
-#  ifdef POSIX_MSEM
-static sem_t			*mutex_wake_msem_ptr = NULL;
-#  else
-static msemaphore		*mutex_wake_msem_ptr = NULL;
-#  endif
-static mutex_que_entry_ptr_t	msem_slot;
-#else
-GBLREF int			mutex_sock_fd;
-#endif
-#ifdef DEBUG
-GBLREF boolean_t		in_mu_rndwn_file;
-#endif
 
 DECLARE_MUTEX_TRACE_CNTRS
 DECLARE_MUTEX_TEST_SIGNAL_FLAG
 
-static	boolean_t	woke_self;
-static	boolean_t	woke_none;
-static	unsigned short	next_rand[3];
-static	int		optimistic_attempts;
-static	int		mutex_expected_wake_instance = 0;
-
-#ifndef CRIT_USE_PTHREAD_MUTEX
-static	enum cdb_sc	mutex_wakeup(mutex_struct_ptr_t addr, mutex_spin_parms_ptr_t mutex_spin_parms);
-#endif
-void			mutex_salvage(gd_region *reg);
+/* The following functions are used only with ydb mutex (not with pthread mutex) */
+void			mutex_salvage(sgmnt_addrs *csa);
 void			mutex_clean_dead_owner(gd_region* reg, uint4 holder_pid);
 
 error_def(ERR_MUTEXERR);
@@ -200,10 +218,10 @@ error_def(ERR_WCBLOCKED);
  *		queue slots. If crash is TRUE, then this is a "crash"
  *		reinitialization; otherwise, it's a "clean" initialization.
  *
- *		enum cdb_sc gtm_mutex_lock(reg, mutex_spin_parms, seq, mutex_lock_type)
- *			mutex for region reg
+ *		enum cdb_sc gtm_mutex_lock(csa, mutex_lock_type, state)
+ *			mutex for region reg corresponding to csa
  *
- *		enum cdb_sc mutex_unlockw(reg, seq);
+ *		enum cdb_sc mutex_unlockw(reg);
  *			Unlock mutex for region reg
  *
  *		For routines taking the seq argument, if seq != crash count,
@@ -235,36 +253,25 @@ error_def(ERR_WCBLOCKED);
  *		|_ fl	first queue entry      _|
  *		|_ bl			       _|
  *		|_ pid			       _|
- *		|  super_crit [CCP use only]^   |
  *		---------------------------------
  *		|_ fl	second queue entry     _|
  *		|_ bl			       _|
  *		|_ pid			       _|
- *		|  super_crit [CCP use only]^   |
  *		---------------------------------
  *		:	:	:	:	:
  *		---------------------------------
  *		|_ fl	last queue entry       _|
  *		|_ bl			       _|
  *		|_ pid			       _|
- *		|  super_crit [CCP use only]^   |
  *		---------------------------------
- *
- *		^Note:  only one entry at a time (at the head of the
- *		        waiting process queue) will ever use "super_crit".
- *		        CCP is used in VMS only - 03/11/98
- *		07-31-2002 se: super-crit is not used at all anymore. Comments are left for historical purposes.
  *
  *		Fields may be interspersed with fillers for alignment purposes.
  */
 
-#ifndef CRIT_USE_PTHREAD_MUTEX
+/* This function is called only with ydb mutex (not with pthread mutex) */
 static	void	clean_initialize(mutex_struct_ptr_t addr, int n, bool crash)
 {
 	mutex_que_entry_ptr_t	q_free_entry;
-#	if defined(MUTEX_MSEM_WAKE) && !defined(POSIX_MSEM)
-	msemaphore		*status;
-#	endif
 
 	assert(n > 0);
 	addr->queslots = n;
@@ -278,23 +285,17 @@ static	void	clean_initialize(mutex_struct_ptr_t addr, int n, bool crash)
 	q_free_entry = (mutex_que_entry_ptr_t)((sm_uc_ptr_t)&addr->freehead + SIZEOF(mutex_que_head));
 	q_free_entry->que.fl = q_free_entry->que.bl = 0;
 	q_free_entry->pid = 0;
-	q_free_entry->super_crit = (void *)NULL;
-	q_free_entry->mutex_wake_instance = 0;
 	while (n--)
 	{
-#		ifdef MUTEX_MSEM_WAKE
-#		  ifdef POSIX_MSEM
 		if (-1 == sem_init(&q_free_entry->mutex_wake_msem, TRUE, 0))  /* Shared lock with no initial resources (locked) */
-#		  else
-		if ((NULL == (status = msem_init(&q_free_entry->mutex_wake_msem, MSEM_LOCKED))) || ((msemaphore *)-1 == status))
-#		  endif
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_MUTEXERR, 0, ERR_TEXT, 2,
 				RTS_ERROR_TEXT("Error with mutex wait memory semaphore initialization"), errno);
-#		endif
 		/* Initialize fl,bl links to 0 before INSQTI as it (gtm_insqti in relqueopi.c) asserts this */
 		DEBUG_ONLY(((que_ent_ptr_t)q_free_entry)->fl = 0;)
 		DEBUG_ONLY(((que_ent_ptr_t)q_free_entry)->bl = 0;)
-		if (INTERLOCK_FAIL == INSQTI((que_ent_ptr_t)q_free_entry++, (que_head_ptr_t)&addr->freehead))
+		if (!crash)
+			insqt((que_ent_ptr_t)q_free_entry++, (que_ent_ptr_t)&addr->freehead);
+		else if (INTERLOCK_FAIL == INSQTI((que_ent_ptr_t)q_free_entry++, (que_head_ptr_t)&addr->freehead))
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_MUTEXERR, 0, ERR_TEXT, 2,
 				RTS_ERROR_TEXT("Interlock instruction failure in mutex initialize"));
 	}
@@ -303,20 +304,16 @@ static	void	clean_initialize(mutex_struct_ptr_t addr, int n, bool crash)
 	if (!crash)
 	{
 		SET_LATCH(&addr->crashcnt, 0);
-		SET_LATCH_GLOBAL(&addr->crashcnt_latch, LOCK_AVAILABLE);
 	}
 	return;
 }
 
+/* This function is called only with ydb mutex (not with pthread mutex) */
 static	void	crash_initialize(mutex_struct_ptr_t addr, int n, bool crash)
 {
-	/*
-	 * mutex_wake_proc() is not declared here because its return value
-	 * is left unspecified in its definition (see mutex_wake_proc.c)
-	 */
 	mutex_que_entry_ptr_t	next_entry;
 
-	INCR_CNT(&addr->crashcnt, &addr->crashcnt_latch);
+	INTERLOCK_ADD(&addr->crashcnt, 1);
 	addr->freehead.que.fl = addr->freehead.que.bl = 0;
 	next_entry = (mutex_que_entry_ptr_t)&addr->prochead;
 	do
@@ -345,35 +342,17 @@ static	void	crash_initialize(mutex_struct_ptr_t addr, int n, bool crash)
 		}
 		/* Wake up process */
 		if (next_entry->pid != process_id)
-#			ifdef MUTEX_MSEM_WAKE
 			mutex_wake_proc(&next_entry->mutex_wake_msem);
-#			else
-			mutex_wake_proc((sm_int_ptr_t)&next_entry->pid, next_entry->mutex_wake_instance);
-#			endif
 	} while (TRUE);
 }
 
-static	enum cdb_sc mutex_long_sleep(mutex_struct_ptr_t addr, sgmnt_addrs *csa,  mutex_spin_parms_ptr_t mutex_spin_parms)
+/* This function is called only with ydb mutex (not with pthread mutex) */
+static	enum cdb_sc mutex_long_sleep(mutex_struct_ptr_t addr, sgmnt_addrs *csa, mutex_que_entry_ptr_t free_slot)
 {
 	enum cdb_sc		status;
-	boolean_t		wakeup_status;
-#	ifdef MUTEX_MSEM_WAKE
-	boolean_t		msem_timedout;
+	int			wakeup_status;
 	int			save_errno;
-#	else
-	struct timeval		timeout;
-	int			timeout_threshold;
-	struct sockaddr_un	mutex_woke_me_proc;
-	GTM_SOCKLEN_TYPE	mutex_woke_me_proc_len;
-	mutex_wake_msg_t	mutex_wake_msg[2];
-	int			sel_stat;
-	ssize_t			nbrecvd;
-	int			timeout_intr_slpcnt;
-	long			timeout_val;
-	int			poll_timeout;
-	nfds_t			poll_nfds;
-	struct pollfd		poll_fdlist[1];
-#	endif
+	boolean_t		woke_self_or_none;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -384,812 +363,705 @@ static	enum cdb_sc mutex_long_sleep(mutex_struct_ptr_t addr, sgmnt_addrs *csa,  
 		FPRINTF(stderr, "MUPIP BACKUP is about to start long sleep\n");
 	}
 #	endif
-	if (LOCK_AVAILABLE == addr->semaphore.u.parts.latch_pid && --optimistic_attempts)
+	if (LOCK_AVAILABLE == addr->semaphore.u.parts.latch_pid)
 	{
 		MUTEX_DPRINT2("%d: Nobody in crit (II) wake procs\n", process_id);
 		MUTEX_TRACE_CNTR(mutex_trc_mutex_slp_fn_noslp);
-		status = mutex_wakeup(addr, mutex_spin_parms);
-		if ((cdb_sc_normal == status) && (woke_self || woke_none))
+		status = mutex_wakeup(addr, &woke_self_or_none);
+		if ((cdb_sc_normal == status) && woke_self_or_none)
 			return (cdb_sc_normal);
 		else if (cdb_sc_dbccerr == status)
 			return (cdb_sc_dbccerr);
 	}
-	optimistic_attempts = MUTEX_MAX_OPTIMISTIC_ATTEMPTS;
 	do
 	{
-#		ifdef MUTEX_MSEM_WAKE
-		if (msem_slot->pid != process_id)
+		if (free_slot->pid != process_id)
 		{	/* My msemaphore is already used by another process.
 		   	 * In other words, I was woken up, but missed my wakeup call.
 			 * I should return immediately.
 			 */
-			wakeup_status = TRUE;
+			wakeup_status = 0;
 		} else
 		{
-			TIMEOUT_INIT(msem_timedout, MUTEX_MAX_WAIT);
+			int		res;
+			struct timespec abs_time;
+
+			res = clock_gettime(CLOCK_REALTIME, &abs_time);
+			if (-1 == res)
+			{
+				save_errno = errno;
+				assert(FALSE);
+				RTS_ERROR_CSA_ABT(csa, VARLSTCNT(8)
+					ERR_SYSCALL, 5, LEN_AND_LIT("clock_gettime"), CALLFROM, save_errno);
+			}
+			abs_time.tv_sec += MUTEX_CONST_TIMEOUT_VAL;
 			/*
 			 * the check for EINTR below is valid and should not be converted to an EINTR
 			 * wrapper macro, because another condition is checked for the while loop.
 			 */
-			while (!(wakeup_status = (0 == MSEM_LOCKW(mutex_wake_msem_ptr))))
+			while (0 != (wakeup_status = sem_timedwait(&free_slot->mutex_wake_msem, &abs_time)))
 			{
 				save_errno = errno;
-				if (EINTR == save_errno)
-				{
+				if (ETIMEDOUT == save_errno)	/* semaphore lock attempt timed out */
+					break;
+				else if (EINTR == save_errno)	/* signal interrupted the call */
 					eintr_handling_check();
-					if (msem_timedout)
-					{
-						MUTEX_DPRINT3("%d: msem sleep done, heartbeat_counter = %d\n",
-							     process_id, heartbeat_counter);
-						break;
-					}
-					MUTEX_DPRINT3("%d: msem sleep continue, heartbeat_counter = %d\n",
-						      process_id, heartbeat_counter);
-				} else
+				else
 				{
 					HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 					RTS_ERROR_CSA_ABT(csa, VARLSTCNT(7) ERR_MUTEXERR, 0, ERR_TEXT, 2,
 						RTS_ERROR_TEXT("Error with mutex wake msem"), save_errno);
 				}
 			}
-			if (wakeup_status)
+			if (0 == wakeup_status)
 				HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
-			TIMEOUT_DONE(msem_timedout);
-			/* wakeup_status is set to true, if I was able to lock...somebody woke me up;
-			 * wakeup_status is set to false, if I timed out and should go to recovery.
+			/* wakeup_status is set to 0, if I was able to lock...somebody woke me up;
+			 * wakeup_status is set to non-zero, if I timed out and should go to recovery.
 			 */
 		}
-#		else
-		do
-		{
-			timeout.tv_sec = MUTEX_CONST_TIMEOUT_VAL;
-			timeout.tv_usec = (gtm_tv_usec_t)(nrand48(next_rand) & ((1U << MUTEX_NUM_WAIT_BITS) - 1)) + 1;
-			timeout_val = (timeout.tv_sec * E_6) + timeout.tv_usec;
-			/*
-			 * Can add backoff logic here to increase the timeout
-			 * as the number of attempts increase
-			 */
-			timeout_intr_slpcnt = MUTEX_INTR_SLPCNT;
-			MUTEX_DPRINT4("%d: Sleeping for %d s %d us\n", process_id, timeout.tv_sec, timeout.tv_usec);
-			MUTEX_TRACE_CNTR(mutex_trc_slp);
-			/*
-			 * the check for EINTR below is valid and should not be converted to an EINTR
-			 * wrapper macro, since it might be a timeout.
-			 */
-			poll_fdlist[0].fd = mutex_sock_fd;
-			poll_fdlist[0].events = POLLIN;
-			poll_nfds = 1;
-			poll_timeout = (long)((timeout.tv_sec * MILLISECS_IN_SEC) +
-					DIVIDE_ROUND_UP(timeout.tv_usec, MICROSECS_IN_MSEC));
-			while (-1 == (sel_stat = poll(&poll_fdlist[0], poll_nfds, poll_timeout)))
-			{
-				if (EINTR == errno)
-				{	/* somebody interrupted me, reduce the timeout by half and continue */
-					eintr_handling_check();
-					MUTEX_TRACE_CNTR(mutex_trc_slp_intr);
-					if (!(timeout_intr_slpcnt--)) /* Assume timed out */
-					{
-						sel_stat = 0;
-						MUTEX_TRACE_CNTR(mutex_trc_intr_tmout);
-						break;
-					}
-				} else
-				{
-					HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
-					rts_error_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_TEXT, 2,
-						RTS_ERROR_TEXT("Error with mutex select. Running in degraded mode"), errno);
-				}
-				timeout_val >>= 1;
-				timeout.tv_sec = timeout_val / E_6;
-				timeout.tv_usec = (gtm_tv_usec_t)(timeout_val % E_6);
-				MUTEX_DPRINT4("%d: Interrupted select, new timeout %d s %d us\n", process_id, timeout.tv_sec,
-					timeout.tv_usec);
-				MUTEX_TRACE_CNTR(mutex_trc_slp);
-			}
-			if (1 == sel_stat) /* Somebody woke me up */
-			{
-				HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
-				mutex_woke_me_proc_len = SIZEOF(struct sockaddr_un);
-				RECVFROM_SOCK(mutex_sock_fd, (void *)&mutex_wake_msg[0], SIZEOF(mutex_wake_msg), 0,
-					(struct sockaddr *)&mutex_woke_me_proc,
-					(GTM_SOCKLEN_TYPE *)&mutex_woke_me_proc_len, nbrecvd);
-				if (SIZEOF(mutex_wake_msg) == nbrecvd) /* Drained out both old and new wake messages */
-				{
-					MUTEX_TRACE_CNTR(mutex_trc_slp_wkup);
-					MUTEX_TRACE_CNTR(mutex_trc_pgybckd_dlyd_wkup);
-					MUTEX_DPRINT3("%d: %d woke me up, drained delayed message too\n", process_id,
-						mutex_wake_msg[1].pid);
-					wakeup_status = TRUE;
-					break;
-				}
-				if (BIN_TOGGLE(mutex_expected_wake_instance) == mutex_wake_msg[0].mutex_wake_instance)
-				{
-					MUTEX_DPRINT3("%d: %d woke me up\n", process_id, mutex_wake_msg[0].pid);
-					MUTEX_TRACE_CNTR(mutex_trc_slp_wkup);
-					wakeup_status = TRUE;
-					break;
-				} /* else, old wake msg, ignore */
-				MUTEX_DPRINT3("%d: %d sent me delayed wake msg\n", process_id, mutex_wake_msg[0].pid);
-				MUTEX_TRACE_CNTR(mutex_trc_xplct_dlyd_wkup);
-			} else if (0 == sel_stat) /* Timed out */
-			{
-				HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
-				MUTEX_DPRINT2("%d: Sleep done, go wake others\n", process_id);
-				MUTEX_TRACE_CNTR(mutex_trc_slp_tmout);
-				wakeup_status = FALSE;
-				break;
-			}
-		} while (TRUE);
-#		endif
-		/*
-		 * If I was woken up and am a writer, others are blocking on
-		 * me. So, I shall try to get the lock NOW
-		 */
-		if (wakeup_status)
+		/* If I was woken up and am a writer, others are blocking on me. So, I shall try to get the lock NOW */
+		if (0 == wakeup_status)
 			return (cdb_sc_normal);
 		else
 			mutex_deadlock_check(addr, csa); /* Timed out: See if any deadlocks and fix if detected */
-		status = mutex_wakeup(addr, mutex_spin_parms);
+		status = mutex_wakeup(addr, &woke_self_or_none);
 		if (cdb_sc_dbccerr == status)
 			return (cdb_sc_dbccerr);
 		/* else status is cdb_sc_normal */
-		if (woke_self || woke_none)
+		assert(cdb_sc_normal == status);
+		if (woke_self_or_none)
 			return (cdb_sc_normal);
-		/*
-		 * There are others above me in the queue or I missed my
-		 * wakeup call. In the latter case, select or msem_lock will return
-		 * immediately and there won't be further sleeps.
+		/* There are others above me in the queue or I missed my wakeup call. In the latter case,
+		 * sem_timedwait() will return immediately and there won't be further sleeps.
 		 */
 	} while (TRUE);
 }
 
-static	enum cdb_sc mutex_wakeup(mutex_struct_ptr_t addr, mutex_spin_parms_ptr_t mutex_spin_parms)
+/* This function is called only with ydb mutex (not with pthread mutex) */
+enum cdb_sc mutex_wakeup(mutex_struct_ptr_t addr, boolean_t *woke_self_or_none)
 {
 	mutex_que_entry_ptr_t	free_entry;
-	int			queue_retry_counter_remq,
-				quant_retry_counter_remq,
-				queue_retry_counter_insq,
-				quant_retry_counter_insq;
-	uint4			wake_this_pid;
-	int			wake_instance;
+	int			status;
 
-	woke_self = FALSE;
-	woke_none = TRUE;
-	quant_retry_counter_remq = queue_retry_counter_remq = 0;
-	do
+	*woke_self_or_none = TRUE;	/* TRUE because I have woken none at this point */
+	free_entry = (mutex_que_entry_ptr_t)REMQHI((que_head_ptr_t)&addr->prochead);
+	if ((mutex_que_entry_ptr_t)NULL == free_entry)
+		return (cdb_sc_normal);	/* Empty wait queue */
+	if ((mutex_que_entry_ptr_t)INTERLOCK_FAIL == free_entry)
+		return (cdb_sc_dbccerr);
+	INTERLOCK_ADD(&addr->n_msem_waiters, -1);
+	if (free_entry->pid != process_id)
 	{
-		do
-		{
-			free_entry = (mutex_que_entry_ptr_t)REMQHI((que_head_ptr_t)&addr->prochead);
-			if ((mutex_que_entry_ptr_t)NULL != free_entry &&
-			    (mutex_que_entry_ptr_t)INTERLOCK_FAIL != free_entry)
-			{
-				wake_this_pid = free_entry->pid;
-				wake_instance = free_entry->mutex_wake_instance;
-#				ifdef MUTEX_MSEM_WAKE
-				/*
-				 * In case of msem wakeup, the msem has to be
-				 * unlocked before returning free_entry to
-				 * free queue, or else another process might
-				 * use the same msem (in free_entry) for its
-				 * sleep.
-				 */
-				if (wake_this_pid != process_id)
-					mutex_wake_proc(&free_entry->mutex_wake_msem);
-				else
-					woke_self = TRUE;
-				/* This makes this entry not belong to any process before
-				 * inserting it into the free queue.
-				 */
-				free_entry->pid = quant_retry_counter_insq = queue_retry_counter_insq = 0;
-#				endif
-				do
-				{
-					do
-					{
-						if (INTERLOCK_FAIL !=
-							INSQTI((que_ent_ptr_t)free_entry, (que_head_ptr_t)&addr->freehead))
-						{
-							MUTEX_DPRINT3("%d: Waking up %d\n", process_id, wake_this_pid);
-							woke_none = FALSE;
-							if (wake_this_pid != process_id)
-							{
-								MUTEX_TRACE_CNTR(mutex_trc_crit_wk);
-#								ifndef MUTEX_MSEM_WAKE
-								mutex_wake_proc((sm_int_ptr_t)&wake_this_pid, wake_instance);
-#								endif
-							} else
-							{
-								/* With
-								 * msem wake,
-								 * this can
-								 * never
-								 * happen */
-								woke_self = TRUE;
-							}
-							return (cdb_sc_normal); /* No more wakes */
-						}
-						if (!queue_retry_counter_insq)		/* save memory reference on fast path */
-							queue_retry_counter_insq = mutex_spin_parms->mutex_hard_spin_count;
-					} while (--queue_retry_counter_insq);
-					if (!quant_retry_counter_insq)			/* save memory reference on fast path */
-						quant_retry_counter_insq = MAX(E_4 - mutex_spin_parms->mutex_hard_spin_count,
-							mutex_spin_parms->mutex_sleep_spin_count);
-					if (!(--quant_retry_counter_insq))
-					{
-#						ifndef MUTEX_MSEM_WAKE
-						if (wake_this_pid != process_id)
-							mutex_wake_proc((sm_int_ptr_t)&wake_this_pid, wake_instance);
-#						endif
-						/* Too many failures */
-						return (cdb_sc_dbccerr);
-					} else
-						GTM_REL_QUANT(mutex_spin_parms->mutex_spin_sleep_mask);
-				} while (quant_retry_counter_insq);	/* actually terminated by return 3 lines above */
-			} else if ((mutex_que_entry_ptr_t)NULL == free_entry)
-			{
-				/* Empty wait queue */
-				MUTEX_DPRINT2("%d: Empty wait queue\n", process_id);
-				return (cdb_sc_normal);
-			} /* else secondary interlock failed */
-			if (!queue_retry_counter_remq)			/* save memory reference on fast path */
-				quant_retry_counter_remq = mutex_spin_parms->mutex_hard_spin_count;
-		} while (--queue_retry_counter_remq);
-		if (!quant_retry_counter_remq)				/* save memory reference on fast path */
-			quant_retry_counter_remq = MAX(E_4 - mutex_spin_parms->mutex_hard_spin_count,
-							mutex_spin_parms->mutex_sleep_spin_count);
-		if (!(--quant_retry_counter_remq))
-			return (cdb_sc_dbccerr); /* Too many queue failures */
-		else
-			GTM_REL_QUANT(mutex_spin_parms->mutex_spin_sleep_mask);
-	} while (quant_retry_counter_remq);
-	return (cdb_sc_dbccerr); /* This will never get executed, added to make compiler happy */
+		*woke_self_or_none = FALSE;
+		mutex_wake_proc(&free_entry->mutex_wake_msem);
+	} else
+		*woke_self_or_none = TRUE;
+	/* This makes this entry not belong to any process before inserting it into the free queue. */
+	free_entry->pid = 0;
+	status = INSQTI((que_ent_ptr_t)free_entry, (que_head_ptr_t)&addr->freehead);
+	if (INTERLOCK_FAIL == status)
+		return (cdb_sc_dbccerr);
+	return (cdb_sc_normal); /* No more wakes */
 }
-#endif
+
+/* Unlock the msem to wake the process waiting on it */
+void mutex_wake_proc(sem_t *mutex_wake_msem_ptr)
+{
+	int	rc;
+
+	GTM_SEM_POST(mutex_wake_msem_ptr, rc);
+	if (0 > rc)
+	{
+		assert(FALSE);
+		RTS_ERROR_ABT(VARLSTCNT(7) ERR_MUTEXERR, 0, ERR_TEXT, 2, RTS_ERROR_TEXT("Error with sem_post()"), errno);
+	}
+	return;
+}
 
 void	gtm_mutex_init(gd_region *reg, int n, bool crash)
 {
-#	ifdef CRIT_USE_PTHREAD_MUTEX
 	sgmnt_addrs		*csa;
 	int4			status;
 	pthread_mutexattr_t	crit_attr;
+	mutex_type_t		mutex_type;
 
+	/* Assert that the below macros yield the correct values as these macros are used in various places */
+	assert(IS_MUTEX_TYPE_PTHREAD(mutex_type_pthread));
+	assert(IS_MUTEX_TYPE_PTHREAD(mutex_type_adaptive_pthread));
+	assert(!IS_MUTEX_TYPE_PTHREAD(mutex_type_ydb));
+	assert(!IS_MUTEX_TYPE_PTHREAD(mutex_type_adaptive_ydb));
+	assert(!IS_MUTEX_TYPE_YDB(mutex_type_pthread));
+	assert(!IS_MUTEX_TYPE_YDB(mutex_type_adaptive_pthread));
+	assert(IS_MUTEX_TYPE_YDB(mutex_type_ydb));
+	assert(IS_MUTEX_TYPE_YDB(mutex_type_adaptive_ydb));
+	assert(!IS_MUTEX_TYPE_ADAPTIVE(mutex_type_pthread));
+	assert(!IS_MUTEX_TYPE_ADAPTIVE(mutex_type_ydb));
+	assert(IS_MUTEX_TYPE_ADAPTIVE(mutex_type_adaptive_pthread));
+	assert(IS_MUTEX_TYPE_ADAPTIVE(mutex_type_adaptive_ydb));
 	csa = &FILE_INFO(reg)->s_addrs;
-	if (crash)
+	if (NULL == csa->hdr || IS_STATSDB_REGNAME(reg))
+		mutex_type = mutex_type_ydb;	/* For jnlpool OR statsdb regions, set mutex type to ydb. Not adaptive as
+						 * otherwise we would then need to provide a way for the user to see the current
+						 * setting inside adaptive (could be ydb or pthread).
+						 */
+	else
+		mutex_type = csa->hdr->mutex_type;
+	if (mutex_type_pthread != mutex_type)
 	{
-		pthread_mutex_unlock(&csa->critical->mutex);		/* We may not have it locked, so ignore errors. */
-		status = pthread_mutex_destroy(&csa->critical->mutex);
+		/* Set up ydb mutex (will be used at start) */
+		if (!crash)
+			clean_initialize(csa->critical, n, crash);
+		else
+			crash_initialize(csa->critical, n, crash);
+	}
+	if (mutex_type_ydb != mutex_type)
+	{
+		/* Also set up pthread mutex (for when it will be needed in case we later switch from ydb mutex to pthread mutex) */
+		if (crash)
+		{
+			pthread_mutex_unlock(&csa->critical->mutex);		/* We may not have it locked, so ignore errors. */
+			status = pthread_mutex_destroy(&csa->critical->mutex);
+			if (0 != status)
+			{
+				RTS_ERROR_CSA_ABT(csa, VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("pthread_mutex_destroy"),
+					CALLFROM, status);
+			}
+		}
+		status = pthread_mutexattr_init(&crit_attr);
 		if (0 != status)
 		{
-			RTS_ERROR_CSA_ABT(csa, VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("pthread_mutex_destroy"),
+			RTS_ERROR_CSA_ABT(csa, VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("pthread_mutexattr_init"),
+				CALLFROM, status);
+		}
+		status = pthread_mutexattr_settype(&crit_attr, PTHREAD_MUTEX_ERRORCHECK);
+		if (0 != status)
+		{
+			RTS_ERROR_CSA_ABT(csa, VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("pthread_mutexattr_settype"),
+				CALLFROM, status);
+		}
+		status = pthread_mutexattr_setpshared(&crit_attr, PTHREAD_PROCESS_SHARED);
+		if (0 != status)
+		{
+			RTS_ERROR_CSA_ABT(csa, VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("pthread_mutexattr_setpshared"),
+				CALLFROM, status);
+		}
+#		ifdef PTHREAD_MUTEX_ROBUST_SUPPORTED
+		status = pthread_mutexattr_setrobust(&crit_attr, PTHREAD_MUTEX_ROBUST);
+		if (0 != status)
+		{
+			RTS_ERROR_CSA_ABT(csa, VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("pthread_mutexattr_setrobust"),
+				CALLFROM, status);
+		}
+#		endif
+		status = pthread_mutex_init(&csa->critical->mutex, &crit_attr);
+		if (0 != status)
+		{
+			RTS_ERROR_CSA_ABT(csa, VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("pthread_mutex_init"),
 				CALLFROM, status);
 		}
 	}
-	/* Set up mutex for new file */
-	status = pthread_mutexattr_init(&crit_attr);
-	if (0 != status)
-	{
-		RTS_ERROR_CSA_ABT(csa, VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("pthread_mutexattr_init"),
-			CALLFROM, status);
+	if (0 == csa->critical->crit_cycle)
+	{	/* A 0 value of crit_cycle implies this is a call to "gtm_mutex_init()" right after db shm creation
+		 * (when all shm values are guaranteed to be 0 initialized). In that case, initialize the mutex manager.
+		 */
+		csa->critical->curr_mutex_type = mutex_type;
+		assert(0 == csa->critical->stuck_cycle);	/* Should be 0 initialized at shared memory creation time */
 	}
-	status = pthread_mutexattr_settype(&crit_attr, PTHREAD_MUTEX_ERRORCHECK);
-	if (0 != status)
-	{
-		RTS_ERROR_CSA_ABT(csa, VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("pthread_mutexattr_settype"),
-			CALLFROM, status);
-	}
-	status = pthread_mutexattr_setpshared(&crit_attr, PTHREAD_PROCESS_SHARED);
-	if (0 != status)
-	{
-		RTS_ERROR_CSA_ABT(csa, VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("pthread_mutexattr_setpshared"),
-			CALLFROM, status);
-	}
-#	ifdef PTHREAD_MUTEX_ROBUST_SUPPORTED
-	status = pthread_mutexattr_setrobust(&crit_attr, PTHREAD_MUTEX_ROBUST);
-	if (0 != status)
-	{
-		RTS_ERROR_CSA_ABT(csa, VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("pthread_mutexattr_setrobust"),
-			CALLFROM, status);
-	}
-#	endif
-	status = pthread_mutex_init(&csa->critical->mutex, &crit_attr);
-	if (0 != status)
-	{
-		RTS_ERROR_CSA_ABT(csa, VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("pthread_mutex_init"),
-			CALLFROM, status);
-	}
-#	else
-	if (!crash)
-		clean_initialize((&FILE_INFO(reg)->s_addrs)->critical, n, crash);
-	else
-		crash_initialize((&FILE_INFO(reg)->s_addrs)->critical, n, crash);
 	return;
-#	endif
 }
 
-enum cdb_sc gtm_mutex_lock(gd_region *reg,
-			      mutex_spin_parms_ptr_t mutex_spin_parms,
-			      int crash_count,
-			      mutex_lock_t mutex_lock_type, wait_state state)
+enum cdb_sc gtm_mutex_lock(sgmnt_addrs *csa, mutex_lock_t mutex_lock_type, wait_state state)
 {
-	sgmnt_addrs		*csa;
-	node_local		*cnl;
-	ABS_TIME 		atstart;
-	latch_t			local_crit_cycle = 0;
-	int4			local_stuck_cycle = 0;
-	uint4			timeout_count = 0;
-#	ifdef CRIT_USE_PTHREAD_MUTEX
-	int			status;
-	ABS_TIME 		atend;
-	struct timespec		timeout;
-#	else
-	enum cdb_sc		status;
-	boolean_t		epoch_count, try_recovery;
-	gtm_int64_t		hard_spin_cnt, sleep_spin_cnt;
-	gtm_uint64_t		queue_sleeps, spins, yields;
-	int 			n_queslots, redo_cntr;
-	mutex_struct_ptr_t 	addr;
-	mutex_que_entry_ptr_t	free_slot;
-	uint4			in_crit_pid;
-	jnlpool_addrs_ptr_t	save_jnlpool;
-	time_t			curr_time;
-	uint4			curr_time_uint4, next_alert_uint4;
-#	ifdef MUTEX_MSEM_WAKE
-	int			rc;
-#	endif
-#	endif
-        DCL_THREADGBL_ACCESS;
+	/*  --- These fields are used by both the ydb and pthread mutex logic --- */
+	node_local			*cnl;
+	ABS_TIME			atstart;
+	latch_t				local_crit_cycle = 0;
+	int4				local_stuck_cycle = 0;
+	mutex_struct_ptr_t		addr;
+	int				status;
+	/*  --- These fields are used only by the pthread mutex logic --- */
+	ABS_TIME			atend;
+	struct timespec			timeout;
+	uint4				timeout_count;
+	/*  --- These fields are used only by the ydb     mutex logic --- */
+	boolean_t			try_recovery;
+	gtm_int64_t			hard_spin_cnt, sleep_spin_cnt;
+	mutex_que_entry_ptr_t		free_slot;
+	uint4				in_crit_pid;
+	DEBUG_ONLY(jnlpool_addrs_ptr_t	save_jnlpool);
+	time_t				curr_time;
+	uint4				curr_time_uint4, next_alert_uint4;
+	mutex_spin_parms_ptr_t		mutex_spin_parms;
+	int				rc;
+	gtm_uint64_t			n_crit_yields;
+	int				max_sleep_spin_count, max_hard_spin_count;
+	mutex_type_t			curr_mutex_type;
+	boolean_t			mutex_switched;
+	DCL_THREADGBL_ACCESS;
 
-        SETUP_THREADGBL_ACCESS;
-	csa = &FILE_INFO(reg)->s_addrs;
+	SETUP_THREADGBL_ACCESS;
 	assert(!csa->now_crit);
+	assert(NULL != csa->region);
+	assert(csa == &FILE_INFO(csa->region)->s_addrs);
 	cnl = csa->nl;
-	/* Check that "mutex_per_process_init" has happened before we try to grab crit and that it was done with our current
-	 * pid (i.e. ensure that even in the case where parent did the mutex init with its pid and did a fork, the child process
-	 * has done a reinitialization with its pid). The only exception is if we are in "mu_rndwn_file" in which case we
-	 * know for sure there is no other pid accessing the database shared memory.
-	 */
+	assert(NULL != cnl);
 	assert((MUTEX_LOCK_WRITE_IMMEDIATE == mutex_lock_type) || (MUTEX_LOCK_WRITE == mutex_lock_type));
-	assert((mutex_per_process_init_pid == process_id) || ((0 == mutex_per_process_init_pid) && in_mu_rndwn_file));
 	MUTEX_TRACE_CNTR((MUTEX_LOCK_WRITE == mutex_lock_type) ? mutex_trc_lockw : mutex_trc_lockwim);
-#	ifdef CRIT_USE_PTHREAD_MUTEX
-	if (csa->crit_probe)
+	addr = csa->critical;
+	DEBUG_YDB_MUTEX_ONLY(INTERLOCK_ADD(&addr->n_crit_waiters, 1));
+	for ( ; ; )
 	{
-		csa->probecrit_rec.p_crit_que_slots = 0;
-		sys_get_curr_time(&atstart);							/* start time for the probecrit */
-	}
-	/* Do a trylock first. If we are locking immediate, we are done. Otherwise we have the opportunity to update
-	 * stats before doing a longer timed lock attempt.
-	 */
-	status = pthread_mutex_trylock(&csa->critical->mutex);
-	do
-	{
-		if (((EBUSY == status) && (MUTEX_LOCK_WRITE == mutex_lock_type)) || (ETIMEDOUT == status))
-		{	/* Got EBUSY from the trylock above or ETIMEDOUT from a previous iteration. */
-			UPDATE_CRIT_COUNTER(csa, state);
+		curr_mutex_type = addr->curr_mutex_type;
+		mutex_switched = FALSE;
+		if (IS_MUTEX_TYPE_PTHREAD(curr_mutex_type))
+		{
+			if (csa->crit_probe)
+			{
+				csa->probecrit_rec.p_crit_que_slots = 0;
+				sys_get_curr_time(&atstart);				/* start time for the probecrit */
+			}
+			/* Do a trylock first. If we are locking immediate, we are done.
+			 * Otherwise we have the opportunity to update stats before doing a longer timed lock attempt.
+			 */
+			status = pthread_mutex_trylock(&addr->mutex);
+			timeout_count = 0;
+			do
+			{
+				if (((EBUSY == status) && (MUTEX_LOCK_WRITE == mutex_lock_type)) || (ETIMEDOUT == status))
+				{	/* Got EBUSY from the trylock above or ETIMEDOUT from a previous iteration. */
+					UPDATE_CRIT_COUNTER(csa, state);
+					INCR_GVSTATS_COUNTER(csa, cnl, n_crit_failed, 1);
+					INCR_GVSTATS_COUNTER(csa, cnl, sq_crit_failed, 1);
+					if (cnl->doing_epoch)
+						INCR_GVSTATS_COUNTER(csa, cnl, n_crits_in_epch, 1);
+					local_crit_cycle = addr->crit_cycle;
+					local_stuck_cycle = addr->stuck_cycle;
+					if (mu_upgrade_in_prog && IS_ONLNRLBK_ACTIVE(csa))
+						RTS_ERROR_CSA_ABT(CSA_ARG(NULL) VARLSTCNT(7) ERR_REORGUPCNFLCT, 5,
+								LEN_AND_LIT("REORG -UPGRADE"),
+								LEN_AND_LIT("MUPIP ROLLBACK -ONLINE in progress"),
+								csa->nl->onln_rlbk_pid);
+					status = clock_gettime(CLOCK_REALTIME, &timeout);
+					if (0 != status)
+						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5,
+							LEN_AND_LIT("clock_gettime"), CALLFROM, errno, 0);
+					timeout.tv_sec += MUTEX_CONST_TIMEOUT_VAL;
+					status = pthread_mutex_timedlock(&addr->mutex, &timeout);
+				}
+				switch (status)
+				{
+					case EOWNERDEAD:
+						mutex_clean_dead_owner(csa->region, cnl->in_crit);
+						/* Record salvage event in db file header if applicable.
+						 * Take care not to do it for jnlpool which has no concept of a db cache.
+						 * In that case csa->hdr is NULL so check accordingly.
+						 */
+						assert((NULL != csa->hdr)
+							|| (jnlpool && (csa == &FILE_INFO(jnlpool->jnlpool_dummy_reg)->s_addrs)));
+						if (NULL != csa->hdr)
+						{
+							SET_TRACEABLE_VAR(cnl->wc_blocked, WC_BLOCK_RECOVER);
+							BG_TRACE_PRO_ANY(csa, wcb_mutex_salvage);
+								/* no need to use PROBE_BG_TRACE_PRO_ANY macro
+								 * since we already checked for csa->hdr NULL.
+								 */
+							send_msg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_WCBLOCKED, 6,
+								LEN_AND_LIT("wcb_mutex_salvage"),
+								process_id, &csa->ti->curr_tn, DB_LEN_STR(csa->region));
+						}
+#						ifdef PTHREAD_MUTEX_CONSISTENT_SUPPORTED
+						status = pthread_mutex_consistent(&addr->mutex);
+						if (0 != status)
+							RTS_ERROR_CSA_ABT(csa, VARLSTCNT(8) ERR_SYSCALL, 5,
+								LEN_AND_LIT("pthread_mutex_consistent"), CALLFROM, status);
+#						endif
+						/* fall through */
+					case 0:
+						if (addr->curr_mutex_type != curr_mutex_type)
+						{	/* We got the pthread mutex lock but mutex type concurrently
+							 * switched from pthread to ydb. Go back to trying to get the
+							 * ydb mutex lock.
+							 */
+							pthread_mutex_unlock(&addr->mutex);
+							mutex_switched = TRUE;
+							break;
+						}
+						if (IS_MUTEX_TYPE_ADAPTIVE(curr_mutex_type))
+						{
+							if (0 == cnl->gvstats_rec.n_crit_success % CAT_CHECK_FREQUENCY)
+							{
+								uint8				delta_n_crit_failed;
+								DEBUG_YDB_MUTEX_ONLY(uint8	delta_n_crit_que_slps = 0);
+								DEBUG_YDB_MUTEX_ONLY(uint8	delta_n_crit_yields = 0);
+
+								DEBUG_GET_BENCHMARK_ENV;
+								delta_n_crit_failed = cnl->gvstats_rec.n_crit_failed
+												- cnl->prev_n_crit_failed;
+								cnl->prev_n_crit_failed = cnl->gvstats_rec.n_crit_failed;
+								if ((CAT_CHECK_FREQUENCY * DFT_DAT_RATIO_THRESHOLD)
+									< delta_n_crit_failed)
+								{
+									cnl->switch_streak++;
+									DEBUG_SEND_MUTEX_STREAK_SYSLOG_MESSAGE(csa, cnl);
+									if (PTHREAD_MUTEX_SWITCH_STREAK <= cnl->switch_streak)
+									{
+										/* Below init is needed by ydb mutex logic */
+										cnl->prev_n_crit_que_slps
+											= cnl->gvstats_rec.n_crit_que_slps;
+										cnl->switch_streak = 0;
+										/* Ensure curr_mutex_type set occurs LAST (before
+										 * releasing lock) using a write memory barrier.
+										 */
+										SHM_WRITE_MEMORY_BARRIER;
+										addr->curr_mutex_type = mutex_type_adaptive_ydb;
+										pthread_mutex_unlock(&addr->mutex);
+										break;
+									}
+								} else
+								{
+									DEBUG_YDB_MUTEX_ONLY(if (0 < cnl->switch_streak))
+										DEBUG_SEND_MUTEX_STREAK_SYSLOG_MESSAGE(csa, cnl);
+									cnl->switch_streak = 0;
+								}
+							}
+						}
+						csa->now_crit = TRUE;
+						if (csa->crit_probe)
+						{
+							sys_get_curr_time(&atend);		/* end time for the probcrit */
+							atend = sub_abs_time(&atend, &atstart);
+							csa->probecrit_rec.t_get_crit
+								= ((gtm_uint64_t)atend.tv_sec * NANOSECS_IN_SEC) + atend.tv_nsec;
+							csa->probecrit_rec.p_crit_failed = 0;
+							csa->probecrit_rec.p_crit_yields = 0;
+							csa->probecrit_rec.p_crit_que_slps = 0;
+						}
+						INCR_GVSTATS_COUNTER(csa, cnl, n_crit_success, 1);
+						DEBUG_YDB_MUTEX_ONLY(INTERLOCK_ADD(&addr->n_crit_waiters, -1));
+						addr->crit_cycle++;
+						return cdb_sc_normal;
+					case EBUSY:
+						assert(MUTEX_LOCK_WRITE_IMMEDIATE == mutex_lock_type);
+						DEBUG_YDB_MUTEX_ONLY(INTERLOCK_ADD(&addr->n_crit_waiters, -1));
+						return cdb_sc_nolock;
+					case ETIMEDOUT:
+						if (addr->curr_mutex_type != curr_mutex_type)
+						{	/* We have not yet gotten the pthread mutex lock but mutex type
+							 * concurrently switched from pthread to ydb. Go back to trying to
+							 * get the ydb mutex lock.
+							 */
+							mutex_switched = TRUE;
+							break;
+						}
+						/* Timed out: See if any deadlocks and fix if detected */
+						mutex_deadlock_check(addr, csa);
+						assert((MUTEX_CONST_TIMEOUT_VAL * 2) == MUTEXLCKALERT_INTERVAL);
+						if ((0 == (++timeout_count % 2)) && (addr->crit_cycle == local_crit_cycle))
+						{
+							uint4	onln_rlbk_pid;
+
+							if (IS_REPL_INST_FROZEN)
+								break;
+							onln_rlbk_pid = cnl->onln_rlbk_pid;
+							if (0 != onln_rlbk_pid)
+							{
+								send_msg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_ORLBKINPROG, 3,
+										onln_rlbk_pid, DB_LEN_STR(csa->region));
+								break;
+							}
+							if (INTERLOCK_ADD(&addr->stuck_cycle, 1) == (local_stuck_cycle + 1))
+							{
+								GET_C_STACK_FROM_SCRIPT("MUTEXLCKALERT", process_id, cnl->in_crit,
+									addr->crit_cycle);
+								send_msg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_MUTEXLCKALERT, 4,
+									DB_LEN_STR(csa->region), cnl->in_crit, addr->crit_cycle);
+							}
+						}
+						if ((addr->crit_cycle == local_crit_cycle) && !TREF(disable_sigcont))
+						{	/* The process might have been STOPPED (kill -SIGSTOP).
+							 * Send SIGCONT and nudge the stopped process forward. However, skip
+							 * this call in case of SENDTO_EPERM white-box test, because we do not
+							 * want the intentionally stuck process to be awakened prematurely.
+							 */
+							if (DEBUG_ONLY(!WBTEST_ENABLED(WBTEST_SENDTO_EPERM) &&) TRUE)
+								continue_proc(cnl->in_crit);
+						}
+						break;
+					default:
+						assert(!status);
+						DEBUG_YDB_MUTEX_ONLY(INTERLOCK_ADD(&addr->n_crit_waiters, -1));
+						return cdb_sc_nolock;	/* Keep syntax checkers happy */
+				}
+				if (mutex_switched)
+					break;
+			} while (ETIMEDOUT == status);
+			/* The only way we could come here is if "addr->curr_mutex_type" changed in value concurrently
+			 * while we were trying to get the pthread mutex lock. So go back to the loop and retry based
+			 * on the current mutex algorithm in place (note it could be have changed more than once too).
+			 */
+			assert(mutex_switched);
+			continue;
+		} else
+		{
+			DEBUG_ONLY(save_jnlpool = jnlpool);
+			if (csa->crit_probe)
+			{
+				csa->probecrit_rec.p_crit_que_full = 0;
+				/* run the active queue to find how many slots are left */
+				csa->probecrit_rec.p_crit_que_slots = (gtm_uint64_t)addr->queslots;
+					/* free = total number of slots */
+				csa->probecrit_rec.p_crit_que_slots -= verify_queue_lock((que_head_ptr_t)&addr->prochead, csa);
+					/* less used slots*/
+				sys_get_curr_time(&atstart);	/* start time for the probecrit */
+			}
+			ONE_MUTEX_TRY(csa, cnl, addr, atstart, save_jnlpool, curr_mutex_type);
+			/* Note: The above macro would have done a "continue" if it detected the current mutex type
+			 * concurrently changed to pthread.
+			 */
+			if (MUTEX_LOCK_WRITE_IMMEDIATE == mutex_lock_type)
+			{
+				DEBUG_YDB_MUTEX_ONLY(INTERLOCK_ADD(&addr->n_crit_waiters, -1));
+				return cdb_sc_nolock;
+			}
+			local_crit_cycle = 0;	/* this keeps us from doing a MUTEXLCKALERT on the first cycle
+						 * in case the time latch is stale.
+						 */
+			try_recovery = jgbl.onlnrlbk;	/* salvage lock the first time if we are online rollback
+							 * thereby reducing unnecessary waits.
+							 */
+			mutex_spin_parms = (NULL != csa->hdr)
+				? (mutex_spin_parms_ptr_t)(&csa->hdr->mutex_spin_parms)
+				: (mutex_spin_parms_ptr_t)((sm_uc_ptr_t)addr + JNLPOOL_CRIT_SPACE);
+			n_crit_yields = cnl->gvstats_rec.n_crit_yields;
 			INCR_GVSTATS_COUNTER(csa, cnl, n_crit_failed, 1);
-			INCR_GVSTATS_COUNTER(csa, cnl, sq_crit_failed, 1);
 			if (cnl->doing_epoch)
 				INCR_GVSTATS_COUNTER(csa, cnl, n_crits_in_epch, 1);
-			local_crit_cycle = csa->critical->crit_cycle;
-			local_stuck_cycle = csa->critical->stuck_cycle;
-			if (mu_upgrade_in_prog && IS_ONLNRLBK_ACTIVE(csa))
-				RTS_ERROR_CSA_ABT(CSA_ARG(NULL) VARLSTCNT(7) ERR_REORGUPCNFLCT, 5,
-						LEN_AND_LIT("REORG -UPGRADE"),
-						LEN_AND_LIT("MUPIP ROLLBACK -ONLINE in progress"),
-						csa->nl->onln_rlbk_pid);
-			status = clock_gettime(CLOCK_REALTIME, &timeout);
-			if (0 != status)
-				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5,
-					LEN_AND_LIT("clock_gettime"), CALLFROM, errno, 0);
-			timeout.tv_sec += MUTEX_CONST_TIMEOUT_VAL;
-			status = pthread_mutex_timedlock(&csa->critical->mutex, &timeout);
-		}
-		switch (status)
-		{
-			case EOWNERDEAD:
-				mutex_clean_dead_owner(reg, cnl->in_crit);
-				/* Record salvage event in db file header if applicable.
-				 * Take care not to do it for jnlpool which has no concept of a db cache.
-				 * In that case csa->hdr is NULL so check accordingly.
-				 */
-				assert((NULL != csa->hdr)
-						|| (jnlpool && (csa == &FILE_INFO(jnlpool->jnlpool_dummy_reg)->s_addrs)));
-				if (NULL != csa->hdr)
-				{
-					SET_TRACEABLE_VAR(cnl->wc_blocked, WC_BLOCK_RECOVER);
-					BG_TRACE_PRO_ANY(csa, wcb_mutex_salvage); /* no need to use PROBE_BG_TRACE_PRO_ANY macro
-										   * since we already checked for csa->hdr NULL.
-										   */
-					send_msg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_WCBLOCKED, 6, LEN_AND_LIT("wcb_mutex_salvage"),
-							process_id, &csa->ti->curr_tn, DB_LEN_STR(reg));
-				}
-#				ifdef PTHREAD_MUTEX_CONSISTENT_SUPPORTED
-				status = pthread_mutex_consistent(&csa->critical->mutex);
-				if (0 != status)
-					RTS_ERROR_CSA_ABT(csa, VARLSTCNT(8) ERR_SYSCALL, 5,
-						LEN_AND_LIT("pthread_mutex_consistent"), CALLFROM, status);
-#				endif
-				/* fall through */
-			case 0:
-				SET_CSA_NOW_CRIT_TRUE(csa);
-				if (csa->crit_probe)
-				{
-					sys_get_curr_time(&atend);		/* end time for the probcrit */
-					atend = sub_abs_time(&atend, &atstart);
-					csa->probecrit_rec.t_get_crit
-						= ((gtm_uint64_t)atend.tv_sec * NANOSECS_IN_SEC) + atend.tv_nsec;
-					csa->probecrit_rec.p_crit_failed = 0;
-					csa->probecrit_rec.p_crit_yields = 0;
-					csa->probecrit_rec.p_crit_que_slps = 0;
-				}
-				INCR_GVSTATS_COUNTER(csa, cnl, n_crit_success, 1);
-				csa->critical->crit_cycle++;
-				return cdb_sc_normal;
-			case EBUSY:
-				assert(MUTEX_LOCK_WRITE_IMMEDIATE == mutex_lock_type);
-				return cdb_sc_nolock;
-			case ETIMEDOUT:
-				mutex_deadlock_check(csa->critical, csa); /* Timed out: See if any deadlocks and fix if detected */
-				assert((MUTEX_CONST_TIMEOUT_VAL * 2) == MUTEXLCKALERT_INTERVAL);
-				if ((0 == (++timeout_count % 2)) && (csa->critical->crit_cycle == local_crit_cycle))
-				{
-					uint4	onln_rlbk_pid;
-
-					if (IS_REPL_INST_FROZEN)
-						break;
-					onln_rlbk_pid = cnl->onln_rlbk_pid;
-					if (0 != onln_rlbk_pid)
-					{
-						send_msg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_ORLBKINPROG, 3,
-								onln_rlbk_pid, DB_LEN_STR(reg));
-						break;
-					}
-					if (INTERLOCK_ADD(&csa->critical->stuck_cycle, 1) == (local_stuck_cycle + 1))
-					{
-						GET_C_STACK_FROM_SCRIPT("MUTEXLCKALERT", process_id, cnl->in_crit,
-							csa->critical->crit_cycle);
-						send_msg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_MUTEXLCKALERT, 4,
-								DB_LEN_STR(reg), cnl->in_crit, csa->critical->crit_cycle);
-					}
-				}
-				if ((csa->critical->crit_cycle == local_crit_cycle) && !TREF(disable_sigcont))
-				{	/* The process might have been STOPPED (kill -SIGSTOP).
-					 * Send SIGCONT and nudge the stopped process forward.
-					 * However, skip this call in case of SENDTO_EPERM white-box test, because we do not want
-					 * the intentionally stuck process to be awakened prematurely.
+			max_sleep_spin_count = mutex_spin_parms->mutex_sleep_spin_count;
+			max_hard_spin_count = num_additional_processors ? mutex_spin_parms->mutex_hard_spin_count : 1;
+			do
+			{	/* master loop */
+				if (addr->curr_mutex_type != curr_mutex_type)
+				{	/* We did not yet get the ydb mutex lock but mutex type concurrently switched
+					 * from ydb to pthread. Go back to trying to get the pthread mutex lock.
 					 */
-					if (DEBUG_ONLY(!WBTEST_ENABLED(WBTEST_SENDTO_EPERM) &&) TRUE)
-						continue_proc(cnl->in_crit);
-				}
-				break;
-			default:
-				assertpro(!status);
-				return cdb_sc_nolock;	/* Keep syntax checkers happy */
-		}
-	} while (ETIMEDOUT == status);
-	assertpro(!status);
-	return cdb_sc_nolock;		/* To keep compiler happy; should never happen. */
-#	else
-	UPDATE_CRIT_COUNTER(csa, state);
-	save_jnlpool = jnlpool;
-	optimistic_attempts = MUTEX_MAX_OPTIMISTIC_ATTEMPTS;
-	queue_sleeps = csa->probecrit_rec.p_crit_que_full = 0;
-	spins = yields = 0;
-	local_crit_cycle = 0;	/* this keeps us from doing a MUTEXLCKALERT on the first cycle in case the time latch is stale */
-	try_recovery = jgbl.onlnrlbk; /* salvage lock the first time if we are online rollback thereby reducing unnecessary waits */
-	assert(cnl);
-	epoch_count = cnl->doing_epoch;
-	addr = csa->critical;
-	if (csa->crit_probe)
-	{	/* run the active queue to find how many slots are left */
-		csa->probecrit_rec.p_crit_que_slots = (gtm_uint64_t)addr->queslots;		/* free = total number of slots */
-		csa->probecrit_rec.p_crit_que_slots -= verify_queue_lock((que_head_ptr_t)&addr->prochead, csa); /* less used slots*/
-		sys_get_curr_time(&atstart);							/* start time for the probecrit */
-	}
-	do
-	{	/* master loop */
-		in_crit_pid = cnl->in_crit;
-		sleep_spin_cnt = -1;
-		MUTEX_TRACE_CNTR(mutex_trc_w_atmpts);
-		do
-		{	/* fast grab loop for the master lock */
-			for (status = cdb_sc_nolock, hard_spin_cnt = -1; hard_spin_cnt; --hard_spin_cnt)
-			{	/* hard spin loop for the master lock - don't admit any MUTEX_LOCK_WRITE_IMMEDIATE to try a bit '*/
-				ONE_MUTEX_TRY(csa, addr, crash_count, process_id, MUTEX_LOCK_WRITE, spins, hard_spin_cnt,
-					yields, sleep_spin_cnt, queue_sleeps, epoch_count, atstart, state);
-				if (try_recovery)
-				{
-					mutex_salvage(reg);
-					try_recovery = FALSE;
-				}
-				if (-1 == hard_spin_cnt)	/* save memory reference on fast path */
-				{
-					hard_spin_cnt = num_additional_processors ? mutex_spin_parms->mutex_hard_spin_count : 1;
-					spins += hard_spin_cnt;			/* start with max */
-				}
-			}
-				/* Sleep for a very short duration */
-#			ifdef MUTEX_TRACE
-			if (MUTEX_LOCK_WRITE == mutex_lock_type)
-				MUTEX_TRACE_CNTR(mutex_trc_wt_short_slp);
-			else
-				MUTEX_TRACE_CNTR(mutex_trc_wtim_short_slp);
-#			endif
-			if (-1 == sleep_spin_cnt)	/* save memory reference on fast path */
-			{
-				sleep_spin_cnt = mutex_spin_parms->mutex_sleep_spin_count;
-				if (0 == sleep_spin_cnt)
+					mutex_switched = TRUE;
 					break;
-				yields += sleep_spin_cnt;				/* start with max */
-			}
-			assert(!csa->now_crit);
-			GTM_REL_QUANT(mutex_spin_parms->mutex_spin_sleep_mask);
-		} while (--sleep_spin_cnt);
-		MUTEX_DPRINT4("%d: Could not acquire WRITE %sLOCK, held by %d\n", process_id,
-			(MUTEX_LOCK_WRITE == mutex_lock_type) ? "" : "IMMEDIATE ", addr->semaphore.u.parts.latch_pid);
-		if (MUTEX_LOCK_WRITE_IMMEDIATE == mutex_lock_type)	/* immediate gets 1 last try which returns regardless */
-			ONE_MUTEX_TRY(csa, addr, crash_count, process_id, mutex_lock_type,	/* use real lock type here */
-				spins, (gtm_int64_t)-1, yields, (gtm_int64_t)-1, queue_sleeps, epoch_count, atstart, state);
-		try_recovery = FALSE;		/* only try recovery once per MUTEXLCKALERT */
-		assert(cdb_sc_nolock == status);
-		time(&curr_time);
-		assert(MAXUINT4 > curr_time);
-		curr_time_uint4 = (uint4)curr_time;
-		next_alert_uint4 = csa->critical->stuckexec.cas_time;
-		assert(save_jnlpool == jnlpool);
-		assert(!csa->jnlpool || (csa->jnlpool == jnlpool));
-		assert((curr_time_uint4 <= next_alert_uint4) || (!csa->jnlpool || (csa->jnlpool == jnlpool)));
-		if ((curr_time_uint4 > next_alert_uint4) && !IS_REPL_INST_FROZEN)
-		{	/* We've waited long enough and the Instance is not frozen - might be time to send MUTEXLCKALERT */
-			if (COMPSWAP_LOCK(&csa->critical->stuckexec.time_latch, next_alert_uint4,
-				(curr_time_uint4 + MUTEXLCKALERT_INTERVAL)))
-			{	/* and no one else beat us to it */
-				MUTEX_DPRINT3("%d: Acquired STUCKEXEC time lock, to trace %d\n", process_id, in_crit_pid);
-				if (process_id == in_crit_pid)
-				{	/* This is just a precaution - shouldn't ever happen and has no code to maintain gvstats */
-					assert(FALSE);
-					SET_CSA_NOW_CRIT_TRUE(csa);
-					return (cdb_sc_normal);
 				}
-				if (in_crit_pid && (in_crit_pid == cnl->in_crit) && is_proc_alive(in_crit_pid, 0))
-				{	/* and we're waiting on some living process */
-					if (local_crit_cycle == csa->critical->crit_cycle)
-					{	/* and things aren't moving */
-						uint4	onln_rlbk_pid;
+				UPDATE_CRIT_COUNTER(csa, state);
+				in_crit_pid = cnl->in_crit;
+				MUTEX_TRACE_CNTR(mutex_trc_w_atmpts);
+				for (sleep_spin_cnt = max_sleep_spin_count; 0 <= sleep_spin_cnt; sleep_spin_cnt--)
+				{	/* fast grab loop for the master lock */
+					hard_spin_cnt = max_hard_spin_count;
+					for ( ; hard_spin_cnt; --hard_spin_cnt)
+					{	/* hard spin loop for the master lock */
+						if (addr->curr_mutex_type != curr_mutex_type)
+						{	/* We did not yet get the ydb mutex lock but mutex type
+							 * concurrently switched from ydb to pthread. Go back to
+							 * trying to get the pthread mutex lock.
+							 */
+							mutex_switched = TRUE;
+							break;
+						}
+						ONE_MUTEX_TRY(csa, cnl, addr, atstart, save_jnlpool, curr_mutex_type);
+						/* Note: The above macro would have done a "continue" if it detected the
+						 * current mutex type concurrently changed to pthread. In that case, we
+						 * would do a "break" in the next iteration of this "for" loop.
+						 */
+						if (try_recovery)
+						{
+							mutex_salvage(csa);
+							try_recovery = FALSE;
+						}
+						SPINLOCK_PAUSE;
+					}
+					if (mutex_switched)
+						break;
+					if ((cnl->gvstats_rec.n_crit_yields - n_crit_yields) >= max_sleep_spin_count)
+						break;	/* A lot of sleeps have already happened across all crit waiting
+							 * processes. So avoid wasting kernel time (in context switching)
+							 * by going to msem wait outside this loop.
+							 */
+					if (0 != addr->prochead.que.fl)
+						break;	/* There is already at least one process waiting in msem wait for
+							 * crit. So do not waste system call sleeping potentially multiple
+							 * times for this process and instead go to msem wait as well as
+							 * the latter is just 1 system call.
+							 */
+					/* Sleep for a very short duration */
+					assert(!csa->now_crit);
+					INCR_GVSTATS_COUNTER(csa, cnl, n_crit_yields, 1);
+					GTM_REL_QUANT(mutex_spin_parms->mutex_spin_sleep_mask);
+				}
+				if (mutex_switched)
+					break;
+				max_hard_spin_count = 1;
+				max_sleep_spin_count = 0;
+				try_recovery = FALSE;		/* only try recovery once per MUTEXLCKALERT */
+				time(&curr_time);
+				assert(MAXUINT4 > curr_time);
+				curr_time_uint4 = (uint4)curr_time;
+				next_alert_uint4 = addr->stuckexec.cas_time;
+				assert(save_jnlpool == jnlpool);
+				assert(!csa->jnlpool || (csa->jnlpool == jnlpool));
+				assert((curr_time_uint4 <= next_alert_uint4) || (!csa->jnlpool || (csa->jnlpool == jnlpool)));
+				if ((curr_time_uint4 > next_alert_uint4) && !IS_REPL_INST_FROZEN)
+				{	/* We've waited long enough and the Instance is not frozen
+					 * - might be time to send MUTEXLCKALERT.
+					 */
+					if (COMPSWAP_LOCK(&addr->stuckexec.time_latch, next_alert_uint4,
+						(curr_time_uint4 + MUTEXLCKALERT_INTERVAL)))
+					{	/* and no one else beat us to it */
+						MUTEX_DPRINT3("%d: Acquired STUCKEXEC time lock, to trace %d\n",
+							process_id, in_crit_pid);
+						assert(process_id != in_crit_pid);
+						if (in_crit_pid && (in_crit_pid == cnl->in_crit) && is_proc_alive(in_crit_pid, 0))
+						{	/* and we're waiting on some living process */
+							if (local_crit_cycle == addr->crit_cycle)
+							{	/* and things aren't moving */
+								uint4	onln_rlbk_pid;
 
-						assert(local_crit_cycle);
-						if (IS_REPL_INST_FROZEN)		/* recheck to minimize spurious reports */
-							continue;
-						onln_rlbk_pid = cnl->onln_rlbk_pid;
-						if (0 == onln_rlbk_pid)
-						{	/* not rollback - send_msg after trace less likely to lose process */
-							GET_C_STACK_FROM_SCRIPT("MUTEXLCKALERT", process_id, in_crit_pid,
-								csa->critical->crit_cycle);
-							send_msg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_MUTEXLCKALERT, 4,
-									DB_LEN_STR(reg), in_crit_pid, csa->critical->crit_cycle);
+								assert(local_crit_cycle);
+								if (IS_REPL_INST_FROZEN) /* recheck to minimize spurious reports */
+									continue;
+								onln_rlbk_pid = cnl->onln_rlbk_pid;
+								if (0 == onln_rlbk_pid)
+								{	/* not rollback - send_msg after trace
+									 * less likely to lose process.
+									 */
+									GET_C_STACK_FROM_SCRIPT("MUTEXLCKALERT",
+										process_id, in_crit_pid, addr->crit_cycle);
+									send_msg_csa(CSA_ARG(csa) VARLSTCNT(6)
+										ERR_MUTEXLCKALERT, 4, DB_LEN_STR(csa->region),
+										in_crit_pid, addr->crit_cycle);
+									try_recovery = TRUE;	/* set off a salvage */
+									continue;	/* make sure to act on it soon,
+											 * likely this process.
+											 */
+								}
+								/* If the holding PID belongs to online rollback which holds
+								 * crit on database and journal pool for its entire duration,
+								 * use a different message.
+								 */
+								send_msg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_ORLBKINPROG, 3,
+										onln_rlbk_pid, DB_LEN_STR(csa->region));
+							}
+						} else
+						{	/* nobody home */
+							local_crit_cycle = addr->crit_cycle;
 							try_recovery = TRUE;	/* set off a salvage */
 							continue;	/* make sure to act on it soon, likely this process */
 						}
-						/* If the holding PID belongs to online rollback which holds crit on database and
-						 * journal pool for its entire duration, use a different message
-						 */
-						send_msg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_ORLBKINPROG, 3,
-								onln_rlbk_pid, DB_LEN_STR(reg));
+					} else
+					{	/* didn't get resource to do the MUTEXLCKALERT and procestuckexec */
+						MUTEX_DPRINT2("%d: Could not acquire STUCKEXEC time lock", process_id);
 					}
-				} else
-				{	/* nobody home */
-					local_crit_cycle = csa->critical->crit_cycle;
-					try_recovery = TRUE;	/* set off a salvage */
-					continue;		/* make sure to act on it soon, likely this process */
 				}
-			} else
-			{	/* didn't get resource to do the MUTEXLCKALERT and procestuckexec */
-				MUTEX_DPRINT2("%d: Could not acquire STUCKEXEC time lock", process_id);
-			}
-		}
-		/* time to try for a slot on the mutex queue in order to wait for a wake up when someone releases crit */
-		if (0 == local_crit_cycle)
-			local_crit_cycle = csa->critical->crit_cycle;	/* sync first time waiter */
-		MUTEX_TRACE_CNTR(mutex_trc_mutex_slp_fn);
-		MUTEX_DPRINT2("%d: looking for mutex queue slot\n", process_id);
-		if (LOCK_AVAILABLE == addr->semaphore.u.parts.latch_pid) /* there is nobody in crit */
-		{	/* The above condition is an optimistic check to speed hings up by not letting a process sleep.
-		 	* In an n-way SMP, there is a possibility that n processes including at least one writer might run in
-		 	*  lock-step,testing the above condition almost at the same time and deciding that nobody is in crit.
-		 	* This might go on until one of them grabs crit, or lock-attempts cross a threshold leading to recovery.
-			*/
-			if (--optimistic_attempts)
-			{	/* To avoid such an undesireable scenario, we test the number of times we have run into this
-				 * a situation d if too many, sleep sleep as if the latch were held.
+				/* Time to try for a slot on the mutex queue in order to wait
+				 * for a wake up when someone releases crit.
 				 */
-				MUTEX_DPRINT2("%d: Nobody in crit (I) wake procs\n", process_id);
-				MUTEX_TRACE_CNTR(mutex_trc_mutex_slp_fn_noslp);
-				if (cdb_sc_normal == mutex_wakeup(addr, mutex_spin_parms))
-					continue;
-				return (cdb_sc_dbccerr);
-			}
-		}
-		for (redo_cntr = MUTEX_MAX_WAIT_FOR_PROGRESS_CNTR; redo_cntr;)
-		{	/* loop on getting a slot on the queue - every time through, if crit is available, grab it and go */
-			if (mu_upgrade_in_prog && IS_ONLNRLBK_ACTIVE(csa))
-				RTS_ERROR_CSA_ABT(CSA_ARG(NULL) VARLSTCNT(7) ERR_REORGUPCNFLCT, 5,
-						LEN_AND_LIT("REORG -UPGRADE"),
-						LEN_AND_LIT("MUPIP ROLLBACK -ONLINE in progress"),
-						csa->nl->onln_rlbk_pid);
-			ONE_MUTEX_TRY(csa, addr, crash_count, process_id, mutex_lock_type,	/* lock type is MUTEX_LOCK_WRITE */
-				spins, (gtm_int64_t)-1, yields, (gtm_int64_t)-1, queue_sleeps, epoch_count, atstart, state);
-			free_slot = (mutex_que_entry_ptr_t)REMQHI((que_head_ptr_t)&addr->freehead);
-#			ifdef MUTEX_MSEM_WAKE
-			msem_slot = free_slot;
-#			endif
-			if ((NULL != free_slot) && (mutex_que_entry_ptr_t)INTERLOCK_FAIL != free_slot)
-			{
-				free_slot->pid = process_id;
-				free_slot->mutex_wake_instance = mutex_expected_wake_instance;
-#				ifdef MUTEX_MSEM_WAKE
-				mutex_wake_msem_ptr = &free_slot->mutex_wake_msem;
-				/* this loop makes sure that the msemaphore is locked initially before the process goes to
-				 * long sleep
+				if (0 == local_crit_cycle)
+					local_crit_cycle = addr->crit_cycle;	/* sync first time waiter */
+				if (mu_upgrade_in_prog && IS_ONLNRLBK_ACTIVE(csa))
+					RTS_ERROR_CSA_ABT(CSA_ARG(NULL) VARLSTCNT(7) ERR_REORGUPCNFLCT, 5,
+							LEN_AND_LIT("REORG -UPGRADE"),
+							LEN_AND_LIT("MUPIP ROLLBACK -ONLINE in progress"),
+							csa->nl->onln_rlbk_pid);
+				/* Try to get a slot on the queue. But first if crit is available, grab it and go */
+				ONE_MUTEX_TRY(csa, cnl, addr, atstart, save_jnlpool, curr_mutex_type);
+				/* Note: The above macro would have done a "continue" if it detected the
+				 * current mutex type concurrently changed to pthread.
 				 */
-				do
+				free_slot = (mutex_que_entry_ptr_t)REMQHI((que_head_ptr_t)&addr->freehead);
+				if ((mutex_que_entry_ptr_t)INTERLOCK_FAIL == free_slot)
 				{
-					rc = MSEM_LOCKNW(mutex_wake_msem_ptr);
-					if ((-1 != rc) || (EINTR != errno))
-						break;
-					eintr_handling_check();
-				} while (TRUE);
-				HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
-#				endif
-				/*
-				 * Significance of mutex_wake_instance field : After queueing itself, a process might go to
-				 * sleep -select call in mutex_long_sleep- awaiting a wakeup message or a timeout. It is
-				 * possible that a wakeup message might arrive after timeout. In this case, a later attempt
-				 * at waiting for a wakeup message will falsely succeed on an old wakeup message. We use the
-				 * mutex_wake_instance field (value 0 or 1) to distinguish between an old and a new wakeup
-				 * message. Since at any given time there is atmost one entry in the queue for a process,
-				 * the only values we need for mutex_wake_instance are 0 and 1.
-				 */
-				mutex_expected_wake_instance = BIN_TOGGLE(mutex_expected_wake_instance);
-				hard_spin_cnt = sleep_spin_cnt = -1;
-				assert(MUTEX_LOCK_WRITE == mutex_lock_type);
-				do
+					assert(save_jnlpool == jnlpool);
+					DEBUG_YDB_MUTEX_ONLY(INTERLOCK_ADD(&addr->n_crit_waiters, -1));
+					return (cdb_sc_dbccerr);
+				}
+				if (NULL != free_slot)
 				{
+					free_slot->pid = process_id;
+					/* this loop makes sure that the msemaphore is locked initially before the process goes to
+					 * long sleep
+					 */
 					do
 					{
-						if (INTERLOCK_FAIL !=
-							INSQTI((que_ent_ptr_t)free_slot, (que_head_ptr_t)&addr->prochead))
-						{
-							queue_sleeps++;
-							MUTEX_DPRINT3("%d: Inserted %d into wait queue\n", process_id,
-								free_slot->pid);
-							if (cdb_sc_normal
-								== mutex_long_sleep(addr, csa, mutex_spin_parms))
-									break;
-						}
-						if (-1 == hard_spin_cnt)		/* save memory reference on fast path */
-						{
-							hard_spin_cnt = num_additional_processors
-								? mutex_spin_parms->mutex_hard_spin_count : 1;
-							spins += hard_spin_cnt;		/* start with max */
-						}
-					} while (--hard_spin_cnt);
-					if (hard_spin_cnt)
-						break;
-					if (-1 == sleep_spin_cnt)		/* save memory reference on fast path */
-					{
-						sleep_spin_cnt = mutex_spin_parms->mutex_sleep_spin_count;
-						if (0 == sleep_spin_cnt)
+						rc = sem_trywait(&free_slot->mutex_wake_msem);
+						if ((-1 != rc) || (EINTR != errno))
 							break;
-						sleep_spin_cnt = MAX(E_4 - mutex_spin_parms->mutex_hard_spin_count, sleep_spin_cnt);
-						yields += sleep_spin_cnt;	/* start with max */
-					}
-#					ifndef MUTEX_MSEM_WAKE
-					if (wake_this_pid != process_id)
-						mutex_wake_proc((sm_int_ptr_t)&wake_this_pid, wake_instance);
-#					endif
-					if (0 != (--sleep_spin_cnt))
+						eintr_handling_check();
+					} while (TRUE);
+					HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
+					assert(MUTEX_LOCK_WRITE == mutex_lock_type);
+					status = INSQTI((que_ent_ptr_t)free_slot, (que_head_ptr_t)&addr->prochead);
+					if (INTERLOCK_FAIL == status)
 					{
-						if (save_jnlpool != jnlpool)
-							jnlpool = save_jnlpool;
+						assert(save_jnlpool == jnlpool);
+						DEBUG_YDB_MUTEX_ONLY(INTERLOCK_ADD(&addr->n_crit_waiters, -1));
+						return (cdb_sc_dbccerr);
+					}
+					INTERLOCK_ADD(&addr->n_msem_waiters, 1);
+					INCR_GVSTATS_COUNTER(csa, cnl, n_crit_que_slps, 1);
+					MUTEX_DPRINT3("%d: Inserted %d into wait queue\n", process_id, free_slot->pid);
+					status = mutex_long_sleep(addr, csa, free_slot);
+					if (cdb_sc_normal != status)
+					{
+						assert(cdb_sc_dbccerr == status);
+						assert(save_jnlpool == jnlpool);
+						DEBUG_YDB_MUTEX_ONLY(INTERLOCK_ADD(&addr->n_crit_waiters, -1));
 						return (cdb_sc_dbccerr);	/* Too many failures */
 					}
-					assert(!csa->now_crit);
-					GTM_REL_QUANT(mutex_spin_parms->mutex_spin_sleep_mask);
-				} while (sleep_spin_cnt);		/* actually terminated by the return three lines above */
-			}
-			if (sleep_spin_cnt)
-			{
-				redo_cntr = 0;
-				break;
-			}
-			if ((mutex_que_entry_ptr_t)NULL == free_slot)
-			{
-				/* Record queue full event in db file header if applicable.  Take care not to do it for
-				 * jnlpool which has no concept of a db cache.  In that case csa->hdr is NULL so use
-				 * PROBE_BG_TRACE_PRO_ANY macro.
-				 */
-				PROBE_BG_TRACE_PRO_ANY(csa, mutex_queue_full);
-				csa->probecrit_rec.p_crit_que_full++;
-				MUTEX_DPRINT2("%d: Free Queue full\n", process_id);
-				/* When I can't find a free slot in the queue repeatedly, it means that there is no progress
-				 * in the system. A recovery attempt might be warranted in this scenario. The trick is to
-				 * return cdb_sc_normal which in turn causes another spin-loop initiation (or recovery when
-				 * implemented).  The objective of mutex_sleep is achieved (partially) in that sleep is
-				 * done, though queueing isn't.
-				 */
-			}
-			mutex_deadlock_check(addr, csa);
-			if (redo_cntr--)
-			{
-				yields++;
-				SLEEP_USEC(HUNDRED_MSEC, FALSE);	/* Wait .1 second or until interrupted, then try again */
-				continue;
-			}
-		} while (redo_cntr);
-	} while (TRUE);
-#	endif
+					ONE_MUTEX_TRY(csa, cnl, addr, atstart, save_jnlpool, curr_mutex_type);
+					/* Note: The above macro would have done a "continue" if it detected the
+					 * current mutex type concurrently changed to pthread.
+					 */
+				} else
+				{
+					/* Record queue full event in db file header if applicable.  Take care not to do it for
+					 * jnlpool which has no concept of a db cache.  In that case csa->hdr is NULL so use
+					 * PROBE_BG_TRACE_PRO_ANY macro.
+					 */
+					PROBE_BG_TRACE_PRO_ANY(csa, mutex_queue_full);
+					csa->probecrit_rec.p_crit_que_full++;
+					MUTEX_DPRINT2("%d: Free Queue full\n", process_id);
+					/* When I can't find a free slot in the queue repeatedly, it means that there is no
+					 * progress in the system. A recovery attempt might be warranted in this scenario.
+					 * The trick is to return cdb_sc_normal which in turn causes another spin-loop
+					 * initiation (or recovery when implemented).  The objective of mutex_sleep is achieved
+					 * (partially) in that sleep is done, though queueing isn't.
+					 */
+				}
+				mutex_deadlock_check(addr, csa);
+				SLEEP_USEC(HUNDRED_MSEC, FALSE); /* Wait until interrupted by a wake up. Then try again. */
+			} while (TRUE);
+		}
+	}
 }
 
-enum cdb_sc mutex_unlockw(gd_region *reg, int crash_count)
+enum cdb_sc mutex_unlockw(sgmnt_addrs *csa)
 {
 	/* Unlock write access to the mutex at addr */
+	mutex_struct_ptr_t 	addr;
+	boolean_t		woke_self_or_none;
+	enum cdb_sc		status;
 
-	uint4		already_clear;
-	sgmnt_addrs	*csa;
-        DCL_THREADGBL_ACCESS;
-
-        SETUP_THREADGBL_ACCESS;
-	csa = &FILE_INFO(reg)->s_addrs;
-#	ifdef CRIT_USE_PTHREAD_MUTEX
-	pthread_mutex_unlock(&csa->critical->mutex);
-	SET_CSA_NOW_CRIT_FALSE(csa);
-	return cdb_sc_normal;
-#	else
-	if (crash_count != csa->critical->crashcnt)
-		return (cdb_sc_critreset);
+	addr = csa->critical;
 	assert(csa->now_crit);
-	MUTEX_TEST_SIGNAL_HERE("WRTUNLCK NOW CRIT\n", FALSE);
-	assert(csa->critical->semaphore.u.parts.latch_pid == process_id);
-	RELEASE_SWAPLOCK(&csa->critical->semaphore);
-	SET_CSA_NOW_CRIT_FALSE(csa);
-	MUTEX_DPRINT2("%d: WRITE LOCK RELEASED\n", process_id);
-	return (mutex_wakeup(csa->critical, NULL != csa->hdr
-		? (mutex_spin_parms_ptr_t)(&csa->hdr->mutex_spin_parms)
-		: (mutex_spin_parms_ptr_t)((sm_uc_ptr_t)csa->critical + JNLPOOL_CRIT_SPACE)));
-#	endif
-}
-
-void mutex_cleanup(gd_region *reg)
-{
-#	ifndef CRIT_USE_PTHREAD_MUTEX
-	sgmnt_addrs	*csa;
-
-	/* mutex_cleanup is called after doing a rel_crit/rel_lock on the same area so if we still own the lock
-	 * it is because csa->now_crit was not in sync with our semaphore. At this point, if we own
-	 * the lock, go ahead and release it.
-	 */
-	csa = &FILE_INFO(reg)->s_addrs;
-	if (csa->critical->semaphore.u.parts.latch_pid == process_id)
+	if (IS_MUTEX_TYPE_PTHREAD(addr->curr_mutex_type))
 	{
-		if (COMPSWAP_UNLOCK(&csa->critical->semaphore, process_id, LOCK_AVAILABLE))
-			MUTEX_DPRINT2("%d  mutex_cleanup : released lock\n", process_id);
+		pthread_mutex_unlock(&addr->mutex);
+		status = cdb_sc_normal;
+	} else
+	{
+		MUTEX_TEST_SIGNAL_HERE("WRTUNLCK NOW CRIT\n", FALSE);
+		assert(addr->semaphore.u.parts.latch_pid == process_id);
+		RELEASE_SWAPLOCK(&addr->semaphore);
+		MUTEX_DPRINT2("%d: WRITE LOCK RELEASED\n", process_id);
+		status = ((0 == addr->prochead.que.fl) ? cdb_sc_normal : mutex_wakeup(addr, &woke_self_or_none));
 	}
-#	endif
-}
-
-void mutex_seed_init(void)
-{
-#	ifndef CRIT_USE_PTHREAD_MUTEX
-	time_t mutex_seed;
-
-	mutex_seed = time(NULL) * process_id;
-	next_rand[0] = (unsigned short)(mutex_seed & ((1U << (SIZEOF(unsigned short) * 8)) - 1));
-	mutex_seed >>= (SIZEOF(unsigned short) * 8);
-	next_rand[1] = (unsigned short)(mutex_seed & ((1U << (SIZEOF(unsigned short) * 8)) - 1));
-	mutex_seed >>= (SIZEOF(unsigned short) * 8);
-	next_rand[2] = (unsigned short)(mutex_seed & ((1U << (SIZEOF(unsigned short) * 8)) - 1));
-#	endif
+	csa->now_crit = FALSE;
+	return status;
 }
 
 /* Release the COMPSWAP lock AFTER setting cnl->in_crit to 0 as an assert in
@@ -1424,10 +1296,9 @@ void mutex_clean_dead_owner(gd_region* reg, uint4 holder_pid)
 	}
 }
 
-#ifndef CRIT_USE_PTHREAD_MUTEX
-void mutex_salvage(gd_region *reg)
+/* This function is called only with ydb mutex (not with pthread mutex) */
+void mutex_salvage(sgmnt_addrs *csa)
 {
-	sgmnt_addrs		*csa;
 	node_local		*cnl;
 	int			index1, index2, orig_index2, salvage_status;
 	uint4			holder_pid, onln_rlbk_pid, start_freeaddr, orig_freeaddr;
@@ -1442,7 +1313,6 @@ void mutex_salvage(gd_region *reg)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	csa = &FILE_INFO(reg)->s_addrs;
 	cnl = csa->nl;
 	if (0 != (holder_pid = csa->critical->semaphore.u.parts.latch_pid))
 	{
@@ -1455,7 +1325,7 @@ void mutex_salvage(gd_region *reg)
 		{	/* Release the COMPSWAP lock AFTER setting cnl->in_crit to 0 as an assert in
 			 * grab_crit (checking that cnl->in_crit is 0) relies on this order.
 			 */
-			mutex_clean_dead_owner(reg, holder_pid);
+			mutex_clean_dead_owner(csa->region, holder_pid);
 			COMPSWAP_UNLOCK(&csa->critical->semaphore, holder_pid, LOCK_AVAILABLE);
 			mutex_salvaged = TRUE;
 			/* Reset jbp->blocked as well if the holder_pid had it set */
@@ -1482,34 +1352,8 @@ void mutex_salvage(gd_region *reg)
 								   * since we already checked for csa->hdr non-NULL.
 								   */
 			send_msg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_WCBLOCKED, 6, LEN_AND_LIT("wcb_mutex_salvage"),
-				process_id, &csa->ti->curr_tn, DB_LEN_STR(reg));
+				process_id, &csa->ti->curr_tn, DB_LEN_STR(csa->region));
 		}
 	}
 }
-#endif
 
-/* Do the per process initialization of mutex stuff. This function should be invoked only once per process. The only
- * exception is the receiver server which could invoke this twice. Once through the receiver server startup command when
- * it does "jnlpool_init" and the second through the child receiver server process initialization. The second initialization
- * is needed to set the mutex structures up to correspond to the child process id (and not the parent pid). The function below
- * has to be coded to ensure that the second call nullifies any effects of the first call.
- */
-void	mutex_per_process_init(void)
-{
-	int4	status;
-
-	assert(process_id != mutex_per_process_init_pid);
-	mutex_seed_init();
-#	ifndef MUTEX_MSEM_WAKE
-	if (mutex_per_process_init_pid)
-	{	/* Close socket opened by the first call. But don't delete the socket file as the parent process will do that. */
-		assert(FD_INVALID != mutex_sock_fd);
-		if (FD_INVALID != mutex_sock_fd)
-			CLOSEFILE_RESET(mutex_sock_fd, status);	/* resets "mutex_sock_fd" to FD_INVALID */
-	}
-	assert(FD_INVALID == mutex_sock_fd);
-	mutex_sock_init();
-	assert(FD_INVALID != mutex_sock_fd);
-#	endif
-	mutex_per_process_init_pid = process_id;
-}

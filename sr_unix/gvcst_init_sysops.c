@@ -384,7 +384,6 @@ GBLREF	gd_addr			*gd_header;
 GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	jnlpool_addrs_ptr_t	jnlpool_head;
 GBLREF	node_local_ptr_t	locknl;
-GBLREF	uint4			mutex_per_process_init_pid;
 GBLREF  uint4                   process_id;
 GBLREF	jnl_gbls_t		jgbl;
 GBLREF	uint4			mu_reorg_encrypt_in_prog;
@@ -392,9 +391,6 @@ GBLREF	int			pool_init;
 GBLREF	boolean_t		jnlpool_init_needed;
 GBLREF	mstr			extnam_str;
 GBLREF	mval			dollar_zgbldir;
-#ifndef MUTEX_MSEM_WAKE
-GBLREF	int 	mutex_sock_fd;
-#endif
 
 LITREF  char                    ydb_release_name[];
 LITREF  int4                    ydb_release_name_len;
@@ -806,9 +802,6 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 			? (sgmnt_data_ptr_t)(TREF(dio_buff)).aligned : &tsdbuff; /* If O_DIRECT, use aligned buffer */
 	memset(machine_name, 0, SIZEOF(machine_name));
 	csa = &udi->s_addrs;
-	assert(!mutex_per_process_init_pid || mutex_per_process_init_pid == process_id);
-	if (!mutex_per_process_init_pid)
-		mutex_per_process_init();
 	/* Since "gethostname" does not ensure null termination, do it ourselves by passing in 1 lesser size */
 	machine_name[MAX_MCNAMELEN - 1] = '\0';
 	ydb_hostname_ptr = ydb_getenv(YDBENVINDX_HOSTNAME, NULL_SUFFIX, NULL_IS_YDB_ENV_MATCH);
@@ -1353,7 +1346,7 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 			DSE_VERIFY_AND_RESTORE(csa, tsd, blk_size);
 		}
 	}
-	csa->critical = (CRIT_PTR_T)(csa->db_addrs[0] + NODE_LOCAL_SIZE);
+	csa->critical = (mutex_struct_ptr_t)(csa->db_addrs[0] + NODE_LOCAL_SIZE);
 	assert(((INTPTR_T)csa->critical & 0xf) == 0); /* critical should be 16-byte aligned */
 #	ifdef CACHELINE_SIZE
 	assert(0 == ((INTPTR_T)csa->critical & (CACHELINE_SIZE - 1)));

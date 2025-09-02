@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -33,7 +33,6 @@
 #include "jnl.h"
 #include "gtmimagename.h"
 
-GBLREF	short 			crash_count;
 GBLREF	volatile int4		crit_count;
 GBLREF	uint4 			process_id;
 GBLREF	node_local_ptr_t	locknl;
@@ -63,7 +62,7 @@ void	rel_crit(gd_region *reg)
 		CRIT_TRACE(csa, crit_ops_rw);		/* see gdsbt.h for comment on placement */
 		csa->nl->in_crit = 0;
 		DEBUG_ONLY(locknl = csa->nl;)	/* for DEBUG_ONLY LOCK_HIST macro */
-		status = mutex_unlockw(reg, crash_count);
+		status = mutex_unlockw(csa);
 		DEBUG_ONLY(locknl = NULL;)	/* restore "locknl" to default value */
 		if (status != cdb_sc_normal)
 		{

@@ -3,7 +3,7 @@
 ; Copyright (c) 2015-2022 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
-; Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	;
+; Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	;
 ; All rights reserved.						;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -59,6 +59,7 @@
 	else  if "sgmnt_addrs"=first do:""=regindex error("PARMREQ",first,aregname) set mnemonicandreg="CSAREG:"_regindex
 	else  if "sgmnt_data"=first do:""=regindex error("PARMREQ",first,aregname) set mnemonicandreg="FHREG:"_regindex
 	else  if "unix_db_info"=first do:""=regindex error("PARMREQ",first,aregname) set mnemonicandreg="UDIREG:"_regindex
+	else  if "mutex_struct"=first do:""=regindex error("PARMREQ",first,aregname) set mnemonicandreg="CRITREG:"_regindex
 	else  if "gd_region"=first do:""=regindex error("PARMREQ",first,aregname) set mnemonicandreg="GDRREG:"_regindex
 	else  if "gd_segment"=first do:""=regindex error("PARMREQ",first,aregname) set mnemonicandreg="GDSSEG:"_regindex
 	else  if "gtmsrc_lcl"=first do:""=regindex error("PARMREQ",first,anindexval) set mnemonicandreg="GLFREPL:"_regindex
@@ -190,6 +191,7 @@ struct	;  listed below, in alphabetical order, structures currently supported by
 	;jnl_buffer
 	;jnl_private_control
 	;jnlpool_ctl_struct
+	;mutex_struct
 	;node_local
 	;recvpool_ctl_struct
 	;repl_inst_hdr

@@ -77,6 +77,7 @@ typedef enum
 	PO_JBFREG,	/* 15 Journal buffer information - jnl_buffer_ptr_t */
 	PO_GDSSEG,	/* 16 Segment information - gd_segment struct - process private structure */
 	PO_UDIREG,	/* 17 Region information - unix_db_info_struct - process private structure */
+	PO_CRITREG,	/* 18 Database shared memory information - mutex_struct - shared structure */
 } zpeek_mnemonic;
 
 GBLREF boolean_t        	created_core;
@@ -107,37 +108,39 @@ typedef struct
 /* Lookup tables for first argument - Note names are limited to NAME_ENTRY_SZ bytes each */
 LITDEF nametabent zpeek_names[] =
 {					/* Array offsets */
-	{3, "CSA"}, {6, "CSAREG"}	/* 0, 1 */
-	,{2, "FH"}, {5, "FHREG"}	/* 2, 3 */
-	,{3, "GDR"}, {6, "GDRREG"}	/* 4, 5 */
-	,{3, "GDS"}, {6, "GDSSEG"}	/* 6, 7 */
-	,{3, "GLF"}, {7, "GLFREPL"}	/* 8, 9 */
-	,{3, "GRL"}, {7, "GRLREPL"}	/* 10, 11 */
-	,{3, "GSL"}, {7, "GSLREPL"}	/* 12, 13 */
-	,{3, "JBF"}, {6, "JBFREG"}	/* 14, 15 */
-	,{3, "JPC"}, {7, "JPCREPL"}	/* 16, 17 */
-	,{3, "JNL"}, {6, "JNLREG"}	/* 18, 19 */
-	,{2, "NL"}, {5, "NLREG"}	/* 20, 21 */
-	,{6, "NLREPL"}			/* 22 */
-	,{4, "PEEK"}			/* 23 */
-	,{3, "RIH"}, {7, "RIHREPL"}	/* 24, 25 */
-	,{3, "RPC"}, {7, "RPCREPL"}	/* 26, 27 */
-	,{3, "UDI"}, {6, "UDIREG"}	/* 28, 29 */
-	,{3, "UHC"}, {7, "UHCREPL"}	/* 30, 31 */
-	,{3, "UPL"}, {7, "UPLREPL"}	/* 32, 33 */
-	                                /* Total length 34 */
+	{4, "CRIT"}, {7, "CRITREG"}	/* 0, 1 */
+	,{3, "CSA"}, {6, "CSAREG"}	/* 2, 3 */
+	,{2, "FH"}, {5, "FHREG"}	/* 4, 5 */
+	,{3, "GDR"}, {6, "GDRREG"}	/* 6, 7 */
+	,{3, "GDS"}, {6, "GDSSEG"}	/* 8, 9 */
+	,{3, "GLF"}, {7, "GLFREPL"}	/* 10, 11 */
+	,{3, "GRL"}, {7, "GRLREPL"}	/* 12, 13 */
+	,{3, "GSL"}, {7, "GSLREPL"}	/* 14, 15 */
+	,{3, "JBF"}, {6, "JBFREG"}	/* 16, 17 */
+	,{3, "JPC"}, {7, "JPCREPL"}	/* 18, 19 */
+	,{3, "JNL"}, {6, "JNLREG"}	/* 20, 21 */
+	,{2, "NL"}, {5, "NLREG"}	/* 22, 23 */
+	,{6, "NLREPL"}			/* 24 */
+	,{4, "PEEK"}			/* 25 */
+	,{3, "RIH"}, {7, "RIHREPL"}	/* 26, 27 */
+	,{3, "RPC"}, {7, "RPCREPL"}	/* 28, 29 */
+	,{3, "UDI"}, {6, "UDIREG"}	/* 30, 31 */
+	,{3, "UHC"}, {7, "UHCREPL"}	/* 32, 33 */
+	,{3, "UPL"}, {7, "UPLREPL"}	/* 34, 35 */
+	                                /* Total length 36 */
 };
 /* Index to first entry with given starting letter */
 LITDEF unsigned char zpeek_index[] =
 {
-	 0,  0,  0,  2,  2,  2,  4, 14, 14,	/* a b c d e f g h i */
-	14, 20, 20, 20, 20, 23, 23, 24, 24,	/* j k l m n o p q r */
-	28, 28, 28, 34, 34, 34, 34, 34, 34,	/* s t u v w x y z ~ */
+	 0,  0,  0,  4,  4,  4,  6, 16, 16,	/* a b c d e f g h i */
+	16, 22, 22, 22, 22, 25, 25, 26, 26,	/* j k l m n o p q r */
+	30, 30, 30, 36, 36, 36, 36, 36, 36,	/* s t u v w x y z ~ */
 };
 /* Associated fetch code for each entry with flag for whether arguments accepted after code (e.g. CSAREG:MUMPS) */
 LITDEF zpeek_data_typ zpeek_data[] =
 {
-	{PO_CSAREG, 1}, {PO_CSAREG, 1}
+	{PO_CRITREG, 1}, {PO_CRITREG, 1}
+	,{PO_CSAREG, 1}, {PO_CSAREG, 1}
 	,{PO_FHREG, 1}, {PO_FHREG, 1}
 	,{PO_GDRREG, 1}, {PO_GDRREG, 1}
 	,{PO_GDSSEG, 1}, {PO_GDSSEG, 1}
@@ -514,6 +517,7 @@ void	op_fnzpeek(mval *structid, int offset, int len, mval *format, mval *ret)
 		case PO_JNLREG:
 		case PO_JBFREG:
 		case PO_UDIREG:
+		case PO_CRITREG:
 			/* Uppercase the region name since that is what GDE does when creating them.
 			 * But we want the ability to do $zpeek on statsdb regions (lower-case regions)
 			 * so first check if region as is does exist. If so use that. If not, do uppercase.
@@ -663,6 +667,14 @@ void	op_fnzpeek(mval *structid, int offset, int len, mval *format, mval *ret)
 				zpeekadr = FILE_INFO(r_ptr);
 			}
 			break;
+		case PO_CRITREG:	/* r_ptr set from option processing */
+			if (arg_supplied)
+			{
+				assert(r_ptr);
+				csa = &FILE_INFO(r_ptr)->s_addrs;
+				zpeekadr = csa->critical;
+			}
+			break;
 		case PO_GLFREPL:	/* This set of opcodes all require the journal pool to be initialized. Verify it */
 		case PO_GSLREPL:
 		case PO_JPCREPL:
@@ -784,6 +796,9 @@ void	op_fnzpeek(mval *structid, int offset, int len, mval *format, mval *ret)
 			break;
 		case PO_UDIREG:
 			maxlen = SIZEOF(unix_db_info);
+			break;
+		case PO_CRITREG:
+			maxlen = SIZEOF(mutex_struct);
 			break;
 		case PO_GLFREPL:
 			maxlen = SIZEOF(gtmsrc_lcl);

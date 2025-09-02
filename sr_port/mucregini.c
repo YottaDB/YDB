@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -310,6 +310,15 @@ void mucregini(block_id blk_init_size, enum db_ver desired_db_ver)
 		/* Assert that we never create a statsdb with NOSTATS in corresponding baseDB */
 		assert(baseDBreg->open);
 		assert(!(RDBF_NOSTATS & baseDBreg->reservedDBFlags));
+		/* For STATSDB, "gtm_mutex_init()" sets mutex type to a hardcoded value of YDB (see comment there).
+		 * Therefore, set the statsdb file header to also have the same value (so user sees exactly what mutex
+		 * type is in use in case they do a DSE ALL -DUMP while the .gst statsdb files are also open).
+		 */
+		csd->mutex_type = mutex_type_ydb;
+	} else
+	{	/* Set default mutex manager type to be ADAPTIVE (and YDB to start with inside that) */
+		assert(0 == mutex_type_adaptive_ydb);
+		csd->mutex_type = mutex_type_adaptive_ydb;
 	}
 	csd->reservedDBFlags = gv_cur_region->reservedDBFlags;
 	cs_addrs->bmm = MM_ADDR(csd);

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -139,7 +139,7 @@ enum gtmsecshr_mesg_type
         WAKE_MESSAGE = 1,
         REMOVE_SEM,
         REMOVE_SHM,
-	REMOVE_FILE,
+	REMOVE_FILE,		/* currently unused in YottaDB (usage removed in r2.04) */
 	CONTINUE_PROCESS,
 	FLUSH_DB_IPCS_INFO,
 	/* From here down are response codes. These codes are never processed but all except INVALID_COMMAND (for which there is

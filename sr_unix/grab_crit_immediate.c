@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -52,7 +52,6 @@ boolean_t grab_crit_immediate(gd_region *reg, boolean_t ok_for_wcs_recover, wait
 	sgmnt_data_ptr_t	csd;
 	node_local_ptr_t	cnl;
 	enum cdb_sc		status;
-	mutex_spin_parms_ptr_t	mutex_spin_parms;
 	intrpt_state_t		prev_intrpt_state;
 	DCL_THREADGBL_ACCESS;
 
@@ -65,8 +64,7 @@ boolean_t grab_crit_immediate(gd_region *reg, boolean_t ok_for_wcs_recover, wait
 	{
 		DEFER_INTERRUPTS(INTRPT_IN_CRIT_FUNCTION, prev_intrpt_state);
 		DEBUG_ONLY(locknl = cnl;)	/* for DEBUG_ONLY LOCK_HIST macro */
-		mutex_spin_parms = (mutex_spin_parms_ptr_t)&csd->mutex_spin_parms;
-		status = gtm_mutex_lock(reg, mutex_spin_parms, crash_count, MUTEX_LOCK_WRITE_IMMEDIATE, state);
+		status = gtm_mutex_lock(csa, MUTEX_LOCK_WRITE_IMMEDIATE, state);
 		DEBUG_ONLY(locknl = NULL;)	/* restore "locknl" to default value */
 		if (status != cdb_sc_normal)
 		{

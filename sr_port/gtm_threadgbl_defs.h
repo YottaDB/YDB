@@ -542,9 +542,6 @@ THREADGBLDEF(ydb_aio_nr_events,			uint4)		/* Indicates the value of the nr_event
 								 * use by io_setup().
 								 */
 #endif
-THREADGBLDEF(crit_reg_count,			int4)		/* A count of the number of regions/jnlpools where this process
-								 * has crit
-								 */
 THREADGBLDEF(ok_to_see_statsdb_regs,		boolean_t)	/* FALSE implies statsdb regions are hidden at "gd_load" time */
 THREADGBLDEF(was_open_reg_seen,			boolean_t)	/* TRUE => there is at least one region with reg->was_open = TRUE */
 THREADGBLDEF(nontp_jbuf_rsrv,			jbuf_rsrv_struct_t *)	/* Pointer to structure corresponding to reservations

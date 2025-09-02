@@ -397,14 +397,6 @@ GBLDEF	int			gtmrecv_srv_count;
 GBLDEF	volatile int4		db_fsync_in_prog;
 GBLDEF	volatile int4		jnl_qio_in_prog;
 GBLDEF	gtmsiginfo_t		signal_info;
-#ifndef MUTEX_MSEM_WAKE
-GBLDEF	int			mutex_sock_fd = FD_INVALID;
-GBLDEF	struct sockaddr_un	mutex_sock_address;
-GBLDEF	struct sockaddr_un	mutex_wake_this_proc;
-GBLDEF	int			mutex_wake_this_proc_len;
-GBLDEF	int			mutex_wake_this_proc_prefix_len;
-GBLDEF	fd_set			mutex_wait_on_descs;
-#endif
 GBLDEF	void			(*call_on_signal)();
 GBLDEF	enum gtmImageTypes	image_type;	/* initialized at startup i.e. in dse.c, lke.c, gtm.c, mupip.c, gtmsecshr.c etc. */
 
@@ -794,7 +786,6 @@ GBLDEF	boolean_t	holds_sem[NUM_SEM_SETS][NUM_SRC_SEMS];	/* whether a particular 
 GBLDEF	boolean_t	detail_specified;	/* Set to TRUE if -DETAIL is specified in MUPIP REPLIC -JNLPOOL or -EDITINST */
 GBLDEF	boolean_t	in_mupip_ftok;		/* Used by an assert in repl_inst_read */
 GBLDEF	uint4		section_offset;		/* Used by PRINT_OFFSET_PREFIX macro in repl_inst_dump.c */
-GBLDEF	uint4		mutex_per_process_init_pid;	/* pid that invoked "mutex_per_process_init" */
 GBLDEF	boolean_t	ydb_quiet_halt;		/* Suppress FORCEDHALT message */
 #ifdef UTF8_SUPPORTED
 /* UTF8 line terminators.  In addition to the following

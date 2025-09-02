@@ -3,7 +3,7 @@
  * Copyright (c) 2005-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -338,6 +338,7 @@ boolean_t shmpool_lock_hdr(gd_region *reg)
 					shmpool_abandoned_blk_chk(reg, TRUE);
 				return TRUE;
 			}
+			SPINLOCK_PAUSE;
 		}
 		if (retries & 0x3)
 			/* On all but every 4th pass, do a simple rel_quant */

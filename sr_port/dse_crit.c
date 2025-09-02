@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2025 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -93,9 +96,7 @@ void dse_crit(void)
 		if (gv_cur_region->read_only)
 			RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
 		cs_addrs->hdr->image_count = 0;
-#		ifdef CRIT_USE_PTHREAD_MUTEX
 		crash = TRUE;
-#		endif
 		gtm_mutex_init(gv_cur_region, NUM_CRIT_ENTRY(cs_addrs->hdr), crash);
 		cs_addrs->nl->in_crit = 0;
 		cs_addrs->now_crit = FALSE;
@@ -111,9 +112,8 @@ void dse_crit(void)
 			util_out_print("!/The write critical section is unowned!/", TRUE);
 			return;
 		}
-#		ifndef CRIT_USE_PTHREAD_MUTEX
-		assert(LOCK_AVAILABLE != cs_addrs->critical->semaphore.u.parts.latch_pid);
-#		endif
+		assert(!IS_MUTEX_TYPE_YDB(cs_addrs->critical->curr_mutex_type)
+			|| (LOCK_AVAILABLE != cs_addrs->critical->semaphore.u.parts.latch_pid));
 		cs_addrs->now_crit = TRUE;
 		cs_addrs->nl->in_crit = process_id;
 		UPDATE_CRASH_COUNT(cs_addrs, crash_count);
@@ -143,15 +143,16 @@ void dse_crit(void)
 	}
 	if (crash)
 	{
-#		ifndef CRIT_USE_PTHREAD_MUTEX
-		memcpy(util_buff, "!/Critical section crash count is ", 34);
-		util_len = 34;
-		util_len += i2hex_nofill(cs_addrs->critical->crashcnt, (uchar_ptr_t)&util_buff[util_len], 8);
-		memcpy(&util_buff[util_len], "!/", 2);
-		util_len += 2;
-		util_buff[util_len] = 0;
-		util_out_print(util_buff, TRUE);
-#		endif
+		if (IS_MUTEX_TYPE_YDB(cs_addrs->critical->curr_mutex_type))
+		{
+			memcpy(util_buff, "!/Critical section crash count is ", 34);
+			util_len = 34;
+			util_len += i2hex_nofill(cs_addrs->critical->crashcnt, (uchar_ptr_t)&util_buff[util_len], 8);
+			memcpy(&util_buff[util_len], "!/", 2);
+			util_len += 2;
+			util_buff[util_len] = 0;
+			util_out_print(util_buff, TRUE);
+		}
 		return;
 	}
 	if (cli_present("ALL") == CLI_PRESENT)

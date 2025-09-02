@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -68,7 +68,6 @@ GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	recvpool_addrs		recvpool;
 GBLREF	mur_gbls_t		murgbl;
 GBLREF	mur_opt_struct		mur_options;
-GBLREF	uint4			mutex_per_process_init_pid;
 GBLREF	uint4			process_id;
 
 LITREF char             	ydb_release_name[];
@@ -139,7 +138,7 @@ int     mu_rndwn_replpool2(replpool_identifier *replpool_id, repl_inst_hdr_ptr_t
 		assert(NULL != jnlpool->jnlpool_dummy_reg);
 		udi = FILE_INFO(jnlpool->jnlpool_dummy_reg);
 		csa = &udi->s_addrs;
-		csa->critical = (CRIT_PTR_T)((sm_uc_ptr_t)jnlpool->jnlpool_ctl + JNLPOOL_CTL_SIZE);
+		csa->critical = (mutex_struct_ptr_t)((sm_uc_ptr_t)jnlpool->jnlpool_ctl + JNLPOOL_CTL_SIZE);
 		csa->nl = (node_local_ptr_t)((sm_uc_ptr_t)csa->critical + JNLPOOL_CRIT_SPACE + SIZEOF(mutex_spin_parms_struct));
 		/* secshr_db_clnup uses this relationship */
 		assert(jnlpool->jnlpool_ctl->filehdr_off);

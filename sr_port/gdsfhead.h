@@ -1360,7 +1360,7 @@ MBSTART {													\
 														\
 	assert(CSA && CSA->critical && CSA->nl); /* should have been setup in mu_rndwn_replpool */		\
 	assert(jnlpool && jnlpool->jnlpool_ctl);								\
-	assert(CSA->critical == (CRIT_PTR_T)((sm_uc_ptr_t)jnlpool->jnlpool_ctl + JNLPOOL_CTL_SIZE));	\
+	assert(CSA->critical == (mutex_struct_ptr_t)((sm_uc_ptr_t)jnlpool->jnlpool_ctl + JNLPOOL_CTL_SIZE));	\
 	assert(CSA->nl == (node_local_ptr_t) ((sm_uc_ptr_t)CSA->critical + JNLPOOL_CRIT_SPACE			\
 		+ SIZEOF(mutex_spin_parms_struct)));								\
 	assert(jnlpool->jnlpool_ctl->filehdr_off);								\
@@ -1374,18 +1374,10 @@ MBSTART {													\
 			+ jnlpool->jnlpool_ctl->sourcelocal_array_off));					\
 } MBEND
 
-#ifdef CRIT_USE_PTHREAD_MUTEX
 #define UPDATE_CRASH_COUNT(CSA, CRASH_COUNT)							\
 MBSTART {											\
 	/* Do Nothing */									\
 } MBEND
-#else
-#define UPDATE_CRASH_COUNT(CSA, CRASH_COUNT)							\
-MBSTART {											\
-	if ((CSA) && (CSA)->critical)								\
-		CRASH_COUNT = (CSA)->critical->crashcnt;					\
-} MBEND
-#endif
 
 /* Explanation for why we need the following macro.
  *
@@ -2207,12 +2199,13 @@ typedef struct sgmnt_data_struct
 	int4		filler_5k;
 	/************* SECSHR_DB_CLNUP RELATED FIELDS (now moved to node_local) ***********/
 	int4		secshr_ops_index_filler;
-	int4		secshr_ops_array_filler[249];
+	int4		secshr_ops_array_filler[248];
 	/************** YottaDB specific fields *********************
 	 * We keep these fields at the end of what used to be a filler section (SECSHR_DB_CLNUP fields).
 	 * The hope is that even if GT.M starts using this filler section, they will use the first half so
 	 * YottaDB new fields will be added from the end of this section.
 	 */
+	mutex_type_t	mutex_type;		/* mutex algorithm type (ydb, pthread or adaptive); Default is adaptive */
 	max_procs_t	max_procs;		/* count of the largest number of processes accessing the database
 						 * along with a timestamp. Needs 8-byte alignment.
 						 * This used to be at offset "SGMNT_DATA_OFFSET_R134_max_procs" in YottaDB r1.34.
@@ -2711,7 +2704,7 @@ typedef struct	sgmnt_addrs_struct
 	th_rec_ptr_t				th_base;
 	th_index_ptr_t				ti;
 	node_local_ptr_t			nl;
-	CRIT_PTR_T				critical;
+	mutex_struct_ptr_t			critical;
 	struct shmpool_buff_hdr_struct		*shmpool_buffer;	/* 1MB chunk of shared memory that we micro manage */
 	sm_uc_ptr_t				db_addrs[2];
 	struct mlk_ctldata_struct		*mlkctl;

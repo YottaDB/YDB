@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2025 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -103,7 +106,6 @@ void  updproc_stop(boolean_t exit)
 		repl_log(updproc_log_fp, TRUE, TRUE, "REPL INFO - Current Receive Pool Seqno : %llu\n", log_seqno);
 		if (!INST_FREEZE_ON_ERROR_POLICY)
 		{
-			mutex_cleanup(jnlpool->jnlpool_dummy_reg);
 			JNLPOOL_SHMDT(jnlpool, status, save_errno);
 			if (0 > status)
 				repl_log(stderr, TRUE, TRUE, "Error detaching from jnlpool : %s\n", STRERROR(save_errno));

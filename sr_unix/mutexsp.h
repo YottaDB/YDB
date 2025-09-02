@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -16,42 +16,16 @@
 #ifndef MUTEXSP_H
 #define MUTEXSP_H
 
-#ifdef MUTEX_MSEM_WAKE
-#ifdef POSIX_MSEM
-#include "gtm_semaphore.h"
-#else
-#include <sys/mman.h>
-#endif
-#endif
+#include "gtm_semaphore.h"		/* needed only with ydb mutex (not with pthread mutex) */
 
 #define MUTEX_INIT_SEMVAL		LOCK_AVAILABLE
-#define MUTEX_IMPOSSIBLE_SEMVAL		-1024 /* Any value other than
-					       * GLOBAL_LOCK_AVAILABLE,
-					       * GLOBAL_LOCK_IN_USE, and
-					       * REC_UNDER_PROGRESS */
-
 #define MUTEX_CONST_TIMEOUT_VAL		16
 
-#define MUTEX_NUM_WAIT_BITS		19 /* max p such that 2**p <= 10**6 */
-
-#define MUTEX_INTR_SLPCNT		2
-
-#define WRTPND_LSBIT_MASK 		1
-
-#define DEFAULT_MUTEX_SOCK_DIR          DEFAULT_GTM_TMP
-#define MUTEX_SOCK_FILE_PREFIX          "ydb_mutex"
-#define MAX_MUTEX_SOCKFILE_NAME_LEN	(SIZEOF(MUTEX_SOCK_FILE_PREFIX) + MAX_DIGITS_IN_INT)
-
-#define BIN_TOGGLE(x) ((x) ? 0 : 1)
-
 #define HUNDRED_MSEC 			100000
-#define E_4				10000
-#define ONE_MILLION 			1000000
 
 typedef struct
 {
 	uint4	pid;
-	int	mutex_wake_instance;
 } mutex_wake_msg_t;
 
 typedef enum
@@ -66,50 +40,16 @@ typedef enum
  */
 void		gtm_mutex_init(gd_region *reg, int n, bool crash);
 
-/* gtm_mutex_lock - lock access to mutex for region reg */
+/* gtm_mutex_lock - lock access to mutex for region reg corresponding to "csa" */
 /* gtm prefix added because solaris icu has a mutex_lock */
-enum cdb_sc gtm_mutex_lock(gd_region *reg,
-			      mutex_spin_parms_ptr_t mutex_spin_parms,
-			      int crash_count,
-			      mutex_lock_t mutex_lock_type,
-			      wait_state state);
+enum cdb_sc gtm_mutex_lock(sgmnt_addrs *csa, mutex_lock_t mutex_lock_type, wait_state state);
 
 /* mutex_unlockw - unlock write access to mutex for region reg */
-enum	cdb_sc	mutex_unlockw(gd_region *reg, int crash_count);
+enum	cdb_sc	mutex_unlockw(sgmnt_addrs *csa);
 
-/* mutex_seed_init - set the seed for pseudo random mutex sleep times */
-void 		mutex_seed_init(void);
-
-void mutex_cleanup(gd_region *reg);
-
-#ifdef MUTEX_MSEM_WAKE
-#  ifdef POSIX_MSEM
-void mutex_wake_proc(sem_t *mutex_wake_msem_ptr);
-#  else
-void mutex_wake_proc(msemaphore *mutex_wake_msem_ptr);
-#  endif
-#else
-void mutex_wake_proc(sm_int_ptr_t pid, int mutex_wake_instance);
-#endif
-
-void mutex_sock_init(void);
-void mutex_sock_cleanup(void);
-unsigned char *pid2ascx(unsigned char *pid_str, pid_t pid);
-
-void mutex_per_process_init(void);
-
-#ifdef MUTEX_MSEM_WAKE
-#ifdef POSIX_MSEM
-#  define MSEM_LOCKW(X)	 sem_wait(X)
-#  define MSEM_LOCKNW(X) sem_trywait(X)
-#  define MSEM_UNLOCK(X) sem_post(X)
-#else
-#  define MSEM_LOCKW(X)	 msem_lock(X, 0)
-#  define MSEM_LOCKNW(X) msem_lock(X, MSEM_IF_NOWAIT)
-#  define MSEM_UNLOCK(X) msem_unlock(X, 0)
-#endif
-#endif
-
+/* The following functions are used only with ydb mutex (not with pthread mutex) */
+void		mutex_wake_proc(sem_t *mutex_wake_msem_ptr);
+enum cdb_sc	mutex_wakeup(mutex_struct_ptr_t addr, boolean_t *woke_self_or_none);
 
 #if defined(MUTEX_DEBUG) || defined(MUTEX_TRACE) || defined(MUTEX_TEST_RECOVERY)
 #include "gtm_stdio.h"
@@ -229,25 +169,5 @@ if (!mutex_trc_dump_done) \
 #define MUTEX_TEST_PRINT5(p, q, r, s, t)
 
 #endif /* MUTEX_TEST */
-
-#define TOO_MANY_REGIONS	1025	/* An arbitrary number that is a value much higher than the
-					 * total # of database regions + jnlpools that a process is
-					 * supposed to attach to. Used only in debug to ensure
-					 * TREF(crit_reg_count) does not go too high.
-					 */
-
-#define SET_CSA_NOW_CRIT_TRUE(CSA)								\
-MBSTART {											\
-	(CSA)->now_crit = TRUE;									\
-	(TREF(crit_reg_count))++;								\
-	assert((0 < TREF(crit_reg_count)) && (TOO_MANY_REGIONS > TREF(crit_reg_count)));	\
-} MBEND
-
-#define SET_CSA_NOW_CRIT_FALSE(CSA)								\
-MBSTART {											\
-	(CSA)->now_crit = FALSE;								\
-	(TREF(crit_reg_count))--;								\
-	assert((0 <= TREF(crit_reg_count)) && (TOO_MANY_REGIONS > TREF(crit_reg_count)));	\
-} MBEND
 
 #endif /* MUTEXSP_H */

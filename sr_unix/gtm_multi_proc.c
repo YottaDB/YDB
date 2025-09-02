@@ -3,7 +3,7 @@
  * Copyright (c) 2015-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -63,7 +63,6 @@
 GBLREF	VSIG_ATOMIC_T	forced_exit;
 GBLREF	uint4		process_id;
 GBLREF	boolean_t	skip_exit_handler;
-GBLREF	uint4		mutex_per_process_init_pid;
 
 static	const	char	shmget_caller_freeze[] = "called by MUPIP freeze";
 static	const	char	shmget_caller_recover[] = "called by MUPIP recover -forward";
@@ -262,13 +261,6 @@ void	gtm_multi_proc_helper(void)
 #	ifdef MUR_DEBUG
 	fprintf(stderr, "pid = %d : Started\n", process_id);
 #	endif
-	/* Do process-level reinitialization of a few things (see gtmrecv.c, gtmsource.c for example usage) */
-	/* Re-initialize mutex socket, memory semaphore etc. with child's pid if already done by parent */
-	if (mutex_per_process_init_pid)
-	{
-		assert(mutex_per_process_init_pid != process_id);
-		mutex_per_process_init();
-	}
 	/* process-level reinitialization is done */
 	mp_hdr = multi_proc_shm_hdr;
 	ntasks = mp_hdr->ntasks;

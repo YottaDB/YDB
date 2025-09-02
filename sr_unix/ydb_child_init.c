@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -24,7 +24,6 @@
 #include "jnl.h"
 #include "dpgbldir.h"	/* for "get_next_gdr" prototype and other data structures */
 #include "getjobname.h"	/* for "getjobname" prototype */
-#include "mutex.h"	/* for "mutex_per_process_init" prototype */
 #include "ftok_sems.h"
 #include "gtm_semutils.h"
 #include "interlock.h"
@@ -49,7 +48,6 @@ typedef enum
 
 STATICFNDCL void ydb_child_init_sem_incrcnt(gd_region *reg, ydb_reg_type_t reg_type, jnlpool_addrs_ptr_t tmp_jnlpool);
 
-GBLREF	uint4			mutex_per_process_init_pid;
 GBLREF	boolean_t		skip_exit_handler;
 GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	jnlpool_addrs_ptr_t	jnlpool_head;
@@ -110,9 +108,6 @@ int	ydb_child_init(void *param)
 	clear_timers();	/* see comment before FORK macro in fork_init.h for why this is needed in child pid */
 	getjobname();	/* set "process_id" and $job to a value different from parent */
 	dollar_zjob = 0;	/* reset $zjob in child at process startup */
-	/* Re-initialize mutex socket, memory semaphore etc. with child's pid if already done by parent */
-	if (mutex_per_process_init_pid)
-		mutex_per_process_init();
 	if (NULL != prc_vec)
 		jnl_prc_vector(prc_vec);	/* Reinitialize prc_vec based on new process_id */
 	/* Record the fact that this process is interested in the relinkctl files inherited from the parent by

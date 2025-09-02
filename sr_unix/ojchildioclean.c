@@ -3,7 +3,7 @@
  * Copyright (c) 2009-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -31,8 +31,6 @@
 #include "gtmio.h"
 #include "gtmcrypt.h"
 #include "relinkctl.h"
-
-GBLREF	int			mutex_sock_fd;
 
 void ojchildioclean(void)
 {
@@ -68,11 +66,6 @@ void ojchildioclean(void)
 			}
 		}
 	}
-#ifndef MUTEX_MSEM_WAKE
-	/* We don't need the parent's mutex socket anymore either (if we are using the socket) */
-	if (FD_INVALID != mutex_sock_fd)
-		CLOSEFILE_RESET(mutex_sock_fd, rc);	/* resets "mutex_sock_fd" to FD_INVALID */
-#endif
 	/* Since we are removing artifacts from the originating process (which still has these files open), there is
 	 * no need to decrement the counts (they will increase if this process links the same files). The FALSE
 	 * argument prevents the relinkctl-attach & rtnobj-reference counts from being modified in this cleanup.

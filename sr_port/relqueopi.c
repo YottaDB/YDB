@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  * Copyright (c) 2017 Stephen L Johnson. All rights reserved.	*
@@ -85,6 +85,7 @@ int insqhi2(que_ent_ptr_t new, que_head_ptr_t base)
 				assert(0 <= fast_lock_count);
 				return QUEUE_INSERT_SUCCESS;
 			}
+			SPINLOCK_PAUSE;
 		}
 		if (retries & 0x3)
 			/* On all but every 4th pass, do a simple rel_quant */
@@ -132,6 +133,7 @@ int insqti2(que_ent_ptr_t new, que_head_ptr_t base)
 				assert(0 <= fast_lock_count);
 				return QUEUE_INSERT_SUCCESS;
 			}
+			SPINLOCK_PAUSE;
 		}
 		if (retries & 0x3)
 			/* On all but every 4th pass, do a simple rel_quant */
@@ -187,6 +189,7 @@ void_ptr_t remqhi1(que_head_ptr_t base)
 				assert(0 <= fast_lock_count);
 				return (void_ptr_t)ret;
 			}
+			SPINLOCK_PAUSE;
 		}
 		if (retries & 0x3)
 			/* On all but every 4th pass, do a simple rel_quant */
@@ -242,6 +245,7 @@ void_ptr_t remqti1(que_head_ptr_t base)
 				assert(0 <= fast_lock_count);
 				return (void_ptr_t)ret;
 			}
+			SPINLOCK_PAUSE;
 		}
 		if (retries & 0x3)
 			/* On all but every 4th pass, do a simple rel_quant */

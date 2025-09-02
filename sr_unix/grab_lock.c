@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -58,7 +58,6 @@ boolean_t grab_lock(gd_region *reg, boolean_t is_blocking_wait, uint4 onln_rlbk_
 	unix_db_info 		*udi;
 	sgmnt_addrs		*csa;
 	enum cdb_sc		status;
-	mutex_spin_parms_ptr_t	mutex_spin_parms;
 	intrpt_state_t		prev_intrpt_state;
 	char			scndry_msg[OUT_BUFF_SIZE];
 #	ifdef DEBUG
@@ -76,13 +75,10 @@ boolean_t grab_lock(gd_region *reg, boolean_t is_blocking_wait, uint4 onln_rlbk_
 		DEBUG_ONLY(locknl = csa->nl);	/* for DEBUG_ONLY LOCK_HIST macro */
 		assert(jnlpool && jnlpool->jnlpool_ctl);	/* pool_init not yet set when called from jnlpool_init */
 		assert(reg == jnlpool->jnlpool_dummy_reg);
-		mutex_spin_parms = (mutex_spin_parms_ptr_t)((sm_uc_ptr_t)csa->critical + JNLPOOL_CRIT_SPACE);
-		/* This assumes that mutex_spin_parms_t is located immediately after the crit structures */
-		/* As of 10/07/98, crashcnt field in mutex_struct is not changed by any function for the dummy  region */
 		if (is_blocking_wait)
-			status = gtm_mutex_lock(reg, mutex_spin_parms, 0, MUTEX_LOCK_WRITE, NOT_APPLICABLE);
+			status = gtm_mutex_lock(csa, MUTEX_LOCK_WRITE, NOT_APPLICABLE);
 		else
-			status = gtm_mutex_lock(reg, mutex_spin_parms, 0, MUTEX_LOCK_WRITE_IMMEDIATE, NOT_APPLICABLE);
+			status = gtm_mutex_lock(csa, MUTEX_LOCK_WRITE_IMMEDIATE, NOT_APPLICABLE);
 		DEBUG_ONLY(locknl = NULL);	/* restore "locknl" to default value */
 		if (status != cdb_sc_normal)
 		{

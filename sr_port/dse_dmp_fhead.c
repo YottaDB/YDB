@@ -112,6 +112,7 @@ void dse_dmp_fhead (void)
 	time_t			backup_start_tmp;
 	struct tm		backup_start_tm_tmp;
 	char			backup_start_buf[100];
+	mutex_type_t		curr_mutex_type;
 
 	is_dse_all = dse_all_dump;
 	dse_all_dump = FALSE;
@@ -263,7 +264,23 @@ void dse_dmp_fhead (void)
 		util_out_print("  Index Reserved Bytes          !12UL", TRUE, csd->i_reserved_bytes);
 		util_out_print("  Max conc proc time         !22UL", FALSE, csd->max_procs.time);
 		util_out_print("  Max Concurrent processes         !9UL", TRUE, csd->max_procs.cnt);
-		util_out_print("  Reorg Sleep Nanoseconds         !17UL", TRUE, csd->reorg_sleep_nsec);
+		util_out_print("  Reorg Sleep Nanoseconds         !17UL", FALSE, csd->reorg_sleep_nsec);
+		assert(mutex_type_adaptive_pthread != csd->mutex_type);
+		assert((mutex_type_adaptive_ydb == csd->mutex_type)
+			|| (mutex_type_pthread == csd->mutex_type) || (mutex_type_ydb == csd->mutex_type));
+		curr_mutex_type = csa->critical->curr_mutex_type;
+		assert((mutex_type_adaptive_ydb != csd->mutex_type) || (mutex_type_adaptive_ydb == curr_mutex_type));
+		assert((mutex_type_adaptive_pthread != csd->mutex_type) || (mutex_type_adaptive_pthread == curr_mutex_type));
+		assert((mutex_type_adaptive_ydb != csd->mutex_type)
+			|| (mutex_type_adaptive_ydb == curr_mutex_type) ||(mutex_type_adaptive_pthread == curr_mutex_type));
+		util_out_print("  Mutex Manager Type      !AZ", TRUE,
+				((mutex_type_adaptive_ydb == curr_mutex_type)
+					? "    ADAPTIVE (YDB)"
+					: ((mutex_type_adaptive_pthread == curr_mutex_type)
+						? "ADAPTIVE (PTHREAD)"
+						: ((mutex_type_pthread == csd->mutex_type)
+							? "           PTHREAD"
+							: "               YDB"))));
 	}
 	if (CLI_PRESENT == cli_present("ALL"))
 	{	/* Only dump these if -/ALL as if part of above display */

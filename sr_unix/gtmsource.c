@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -106,7 +106,6 @@ GBLREF	int			gtmsource_srv_count;
 GBLREF	gd_region		*ftok_sem_reg;
 GBLREF	boolean_t		holds_sem[NUM_SEM_SETS][NUM_SRC_SEMS];
 GBLREF	IN_PARMS		*cli_lex_in_ptr;
-GBLREF	uint4			mutex_per_process_init_pid;
 GBLREF	bool			mu_ctrlc_occurred;
 GBLREF	io_pair			io_std_device;
 
@@ -414,12 +413,6 @@ int gtmsource()
 	TREF(error_on_jnl_file_lost) = JNL_FILE_LOST_ERRORS; /* source server should never switch journal files even on errors */
 	OPERATOR_LOG_MSG;
 	SET_PROCESS_ID;
-	/* Initialize mutex socket, memory semaphore etc. before any "grab_lock" is done by this process on the journal pool.
-	 * Note that the initialization would already have been done by the parent receiver startup command but we need to
-	 * redo the initialization with the child process id.
-	 */
-	assert(mutex_per_process_init_pid && (mutex_per_process_init_pid != process_id));
-	mutex_per_process_init();
 	log_init_status = repl_log_init(REPL_GENERAL_LOG, &gtmsource_log_fd, gtmsource_options.log_file);
 	assert(SS_NORMAL == log_init_status);
 	PRO_ONLY(UNUSED(log_init_status));

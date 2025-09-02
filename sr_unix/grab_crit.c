@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -43,7 +43,6 @@
 #include "anticipatory_freeze.h"
 
 GBLREF	volatile int4		crit_count;
-GBLREF	short			crash_count;
 GBLREF	uint4 			process_id;
 GBLREF	node_local_ptr_t	locknl;
 GBLREF	jnlpool_addrs_ptr_t	jnlpool;
@@ -63,7 +62,6 @@ void	grab_crit(gd_region *reg, wait_state state)
 	node_local_ptr_t        cnl;
 	sgmnt_data_ptr_t	csd;
 	enum cdb_sc		status;
-	mutex_spin_parms_ptr_t	mutex_spin_parms;
 	intrpt_state_t		prev_intrpt_state;
 #	ifdef DEBUG
 	sgmnt_addrs		*jnlpool_csa;
@@ -117,8 +115,7 @@ void	grab_crit(gd_region *reg, wait_state state)
 		DEFER_INTERRUPTS(INTRPT_IN_CRIT_FUNCTION, prev_intrpt_state);
 		TREF(grabbing_crit) = reg;
 		DEBUG_ONLY(locknl = cnl;)	/* for DEBUG_ONLY LOCK_HIST macro */
-		mutex_spin_parms = (mutex_spin_parms_ptr_t)&csd->mutex_spin_parms;
-		status = gtm_mutex_lock(reg, mutex_spin_parms, crash_count, MUTEX_LOCK_WRITE, state);
+		status = gtm_mutex_lock(csa, MUTEX_LOCK_WRITE, state);
 		assert((NULL == local_jnlpool) || (local_jnlpool == jnlpool));
 #		ifdef DEBUG
 		if (ydb_white_box_test_case_enabled

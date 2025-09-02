@@ -3,7 +3,7 @@
  * Copyright (c) 2006-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -80,7 +80,6 @@ int gtmsource_end1(boolean_t auto_shutdown)
 	DEBUG_ONLY(repl_csa = &FILE_INFO(jnlpool->jnlpool_dummy_reg)->s_addrs;)
 	assert(!repl_csa->hold_onto_crit);	/* so it is ok to invoke and "rel_lock" unconditionally */
 	rel_lock(jnlpool->jnlpool_dummy_reg);
-	mutex_cleanup(jnlpool->jnlpool_dummy_reg);
 	exit_status = NORMAL_SHUTDOWN;
 	if (!auto_shutdown)
 		jnlpool->gtmsource_local->shutdown = NORMAL_SHUTDOWN;

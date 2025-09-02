@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -532,17 +532,14 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 				assert(NULL != csa->critical);
 				/* as long as csa->hold_onto_crit is FALSE, we should have released crit if we held it at entry */
 				assert(!csa->now_crit || csa->hold_onto_crit);
-#				ifndef CRIT_USE_PTHREAD_MUTEX
 				/* Note: Do not release crit if we still hold it. As we want the next process to grab crit to invoke
 				 * "mutex_salvage" (to cleanup stuff) in case we terminate while holding crit. Hence the below line
 				 * is commented out.
 				 *
 				 * RELEASE_LATCH_IF_OWNER(&csa->critical->semaphore);
 				 */
-				RELEASE_LATCH_IF_OWNER(&csa->critical->crashcnt_latch);
 				RELEASE_LATCH_IF_OWNER(&csa->critical->prochead.latch);
 				RELEASE_LATCH_IF_OWNER(&csa->critical->freehead.latch);
-#				endif
 			}	/* For all regions */
 		}	/* For all glds */
 		if (jnlpool_head)

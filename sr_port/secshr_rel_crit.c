@@ -3,6 +3,9 @@
  * Copyright (c) 2017-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2025 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -27,7 +30,6 @@
 #include "caller_id.h"	/* for CRIT_TRACE macro */
 #endif
 
-GBLREF	short			crash_count;
 GBLREF	volatile int4		crit_count;
 GBLREF	uint4			process_id;
 #ifdef DEBUG
@@ -44,7 +46,6 @@ void secshr_rel_crit(gd_region *reg, boolean_t is_exiting, boolean_t is_repl_reg
 {
 	sgmnt_addrs		*csa;
 	node_local_ptr_t	cnl;
-	int			crashcnt;
 	intrpt_state_t		prev_intrpt_state;
 
 #	ifdef DEBUG
@@ -74,8 +75,7 @@ void secshr_rel_crit(gd_region *reg, boolean_t is_exiting, boolean_t is_repl_reg
 			cnl->in_crit = 0;
 		csa->hold_onto_crit = FALSE;
 		DEBUG_ONLY(locknl = cnl;)	/* for DEBUG_ONLY LOCK_HIST macro */
-		crashcnt = (is_repl_reg ? 0 : crash_count);
-		mutex_unlockw(reg, crashcnt);	/* roll forward Step (CMT15) */
+		mutex_unlockw(csa);		/* roll forward Step (CMT15) */
 		assert(!csa->now_crit);
 		DEBUG_ONLY(locknl = NULL;)	/* restore "locknl" to default value */
 		ENABLE_INTERRUPTS(INTRPT_IN_CRIT_FUNCTION, prev_intrpt_state);

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -129,9 +129,6 @@ void gv_rundown(void)
 	jnlpool = save_jnlpool;
 	cs_addrs = NULL;
 	gtmsecshr_sock_cleanup(CLIENT);
-#	ifndef MUTEX_MSEM_WAKE
-	mutex_sock_cleanup();
-#	endif
 	for (jnlpool = jnlpool_head; jnlpool; jnlpool = jnlpool->next)
 		jnlpool_detach();
 	/* Once upon a time this used ftok_sem_reg to release a possibly still held semaphore, but attempts to do that exploded if

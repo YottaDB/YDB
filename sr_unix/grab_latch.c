@@ -81,6 +81,7 @@ boolean_t grab_latch(sm_global_latch_ptr_t latch, int max_timeout_in_secs, wait_
 				assert(0 <= fast_lock_count);
 				return TRUE;
 			}
+			SPINLOCK_PAUSE;
 		}
 		--fast_lock_count;
 		if (!max_timeout_in_secs)

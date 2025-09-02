@@ -128,7 +128,6 @@ GBLREF	boolean_t		jnlpool_init_needed;
 GBLREF	backup_reg_list		*mu_repl_inst_reg_list;
 GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	jnlpool_addrs_ptr_t	jnlpool_head;
-GBLREF	uint4			mutex_per_process_init_pid;
 GBLREF	boolean_t		holds_sem[NUM_SEM_SETS][NUM_SRC_SEMS];
 GBLREF	usr_reg_que		*usr_spec_regions;
 GBLREF	int			pool_init;
@@ -1131,7 +1130,7 @@ repl_inst_bkup_done1:
 					 */
 					csa = &udi->s_addrs;
 					assert(csa->critical
-						== (CRIT_PTR_T)((sm_uc_ptr_t)jnlpool->jnlpool_ctl + JNLPOOL_CTL_SIZE));
+						== (mutex_struct_ptr_t)((sm_uc_ptr_t)jnlpool->jnlpool_ctl + JNLPOOL_CTL_SIZE));
 					grab_lock(jnlpool->jnlpool_dummy_reg, TRUE, ASSERT_NO_ONLINE_ROLLBACK);
 					jnl_seqno = jnlpool->jnlpool_ctl->jnl_seqno;
 					if (repl_instance.num_histinfo != jnlpool->repl_inst_filehdr->num_histinfo)

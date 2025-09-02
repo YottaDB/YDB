@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2025 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -125,14 +128,9 @@ void	wcs_clean_dbsync(TID tid, int4 hd_len, sgmnt_addrs **csaptr)
 		 *	Note that the function "mutex_deadlock_check" resets crit_count to 0 temporarily even though we
 		 *	might actually be in the midst of acquiring crit. Therefore we should not interrupt mainline code
 		 *	if we are in the "mutex_deadlock_check" as otherwise it presents reentrancy issues.
-		 *   2) We have crit on any region/jnlpool OR are in the middle of commit for this region (even though
+		 *   2) We have crit on the current region OR are in the middle of commit for this region (even though
 		 *	we dont hold crit) OR are in wcs_wtstart (potentially holding write interlock and keeping another
-		 *	process in crit waiting) OR we need to wait to obtain crit. At least one reason why we should not wait
-		 *	to obtain crit is because the timeout mechanism for the critical section is currently (as of 2004 May)
-		 *	driven by heartbeat on Tru64, AIX, Solaris and HPUX. The periodic heartbeat handler cannot pop as
-		 *	it is a SIGALRM handler and cannot nest while we are already in a SIGALRM handler for the wcs_clean_dbsync.
-		 *   	Were this to happen, we could end up waiting for crit, not being able to interrupt the wait
-		 *   	with a timeout resulting in a hang until crit became available.
+		 *	process in crit waiting) OR we need to wait to obtain crit.
 		 *   3) We are in a "fast lock".
 		 *   4) We are in gtm_malloc. Don't want to recurse on malloc.
 		 * Other deadlock causing conditions that need to be taken care of
@@ -148,9 +146,8 @@ void	wcs_clean_dbsync(TID tid, int4 hd_len, sgmnt_addrs **csaptr)
 			&& (0 == fast_lock_count)
 			&& (!db_fsync_in_prog)
 			&& (!jpc || (LOCK_AVAILABLE == jbp->fsync_in_prog_latch.u.parts.latch_pid))
-			&& (0 == TREF(crit_reg_count))
-			&& ((NULL == check_csaddrs) || !T_IN_COMMIT_OR_WRITE(check_csaddrs))
-			&& !T_IN_COMMIT_OR_WRITE(csa)
+			&& ((NULL == check_csaddrs) || (!T_IN_COMMIT_OR_WRITE(check_csaddrs) && !check_csaddrs->now_crit))
+			&& (!T_IN_COMMIT_OR_WRITE(csa) && !csa->now_crit)
 			&& (FALSE != grab_crit_immediate(reg, OK_FOR_WCS_RECOVER_FALSE, NOT_APPLICABLE)))
 		{ 	/* Note that if we are here, we have obtained crit using grab_crit_immediate. */
 			assert(csa->ti->early_tn == csa->ti->curr_tn);

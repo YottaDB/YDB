@@ -184,6 +184,13 @@ static CLI_ENTRY mup_jnl_fences_qual[] = {		/* JOURNAL -FENCES */
 { "" }
 };
 
+static CLI_ENTRY mutex_type_qual[] = {			/* MUTEX_TYPE */
+{ "ADAPTIVE", 0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NON_NEG, VAL_N_A, 0 },
+{ "PTHREAD",  0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NON_NEG, VAL_N_A, 0 },
+{ "YDB",      0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NON_NEG, VAL_N_A, 0 },
+{ "" }
+};
+
 static CLI_ENTRY mup_null_subs_qual[] = {		/* NULLSUBS */
 { "ALWAYS",   0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NON_NEG, VAL_STR, 0 },
 { "EXISTING", 0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NON_NEG, VAL_STR, 0 },
@@ -765,6 +772,7 @@ static	CLI_ENTRY	mup_set_qual[] = {		/* SET */
 { "LCK_SHARES_DB_CRIT",   mupip_set, 0, 0,                  0,                    0, 0, VAL_DISALLOWED, 1, NEG,     VAL_N_A,  0       },
 { "LOCK_SPACE",           mupip_set, 0, 0,                  0,                    0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM,  0       },
 { "MUTEX_SLOTS",          mupip_set, 0, 0,                  0,                    0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM,  0       },
+{ "MUTEX_TYPE",           mupip_set, 0, 0,                  mutex_type_qual,      0, 0, VAL_REQ,        1, NON_NEG, VAL_STR,  0       },
 { "NULL_SUBSCRIPTS",      mupip_set, 0, 0,                  mup_null_subs_qual,   0, 0, VAL_REQ,        1, NON_NEG, VAL_STR,  0       },
 { "PARTIAL_RECOV_BYPASS", mupip_set, 0, 0,                  0,                    0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A,  0       },
 { "PREVJNLFILE",          mupip_set, 0, 0,                  0,                    0, 0, VAL_REQ,        1, NEG,     VAL_STR,  0       },

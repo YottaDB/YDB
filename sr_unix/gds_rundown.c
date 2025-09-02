@@ -297,10 +297,7 @@ int4 gds_rundown(boolean_t cleanup_udi)
 		REL_LOCK_CRIT(pctl, FALSE);
 	}
 	if (!was_crit)
-	{
 		rel_crit(reg);		/* get locks to known state */
-		mutex_cleanup(reg);
-	}
 	/* The only process that can invoke "gds_rundown" while holding access control semaphore is RECOVER/ROLLBACK. All the
 	* others (like MUPIP SET -FILE/MUPIP EXTEND would have invoked db_ipcs_reset() before invoking "gds_rundown" (from
 	 * mupip_exit_handler). The only exception is when these processes encounter a terminate signal and they reach

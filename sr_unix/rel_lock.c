@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -66,8 +66,7 @@ void	rel_lock(gd_region *reg)
 		CRIT_TRACE(csa, crit_ops_rw);		/* see gdsbt.h for comment on placement */
 		csa->nl->in_crit = 0;
 		DEBUG_ONLY(locknl = csa->nl;)	/* for DEBUG_ONLY LOCK_HIST macro */
-		/* As of 10/07/98, crashcnt field in mutex_struct is not changed by any function for the dummy  region */
-		status = mutex_unlockw(reg, 0);
+		status = mutex_unlockw(csa);
 		DEBUG_ONLY(locknl = NULL;)	/* restore "locknl" to default value */
 		if (status != cdb_sc_normal)
 		{

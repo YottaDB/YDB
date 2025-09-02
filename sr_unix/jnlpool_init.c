@@ -76,7 +76,6 @@ GBLREF	enum gtmImageTypes			image_type;
 GBLREF	node_local_ptr_t			locknl;
 GBLREF	uint4					log_interval;
 GBLREF	boolean_t				is_updproc;
-GBLREF	uint4					mutex_per_process_init_pid;
 GBLREF	repl_conn_info_t			*this_side, *remote_side;
 GBLREF	int4					strm_index;
 GBLREF	is_anticipatory_freeze_needed_t		is_anticipatory_freeze_needed_fnptr;
@@ -340,6 +339,7 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 	tmp_jnlpool->recv_pool = (tmp_jnlpool->jnlpool_dummy_reg == recvpool.recvpool_dummy_reg);
 	udi = FILE_INFO(reg);
 	csa = &udi->s_addrs;
+	csa->region = reg;
 	seg = reg->dyn.addr;
 	assert(!udi->s_addrs.hold_onto_crit); /* so that we can do unconditional grab_locks and rel_locks */
 	assert(NULL != repl_gld);	/* rts_error should have been issued by repl_inst_get_name if error */
@@ -678,7 +678,7 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 	 * journal pool.
 	 */
 	assert(MERRORS_ARRAY_SZ > merrors_ctl.msg_cnt);
-	csa->critical = (CRIT_PTR_T)((sm_uc_ptr_t)jnlpool->jnlpool_ctl + JNLPOOL_CTL_SIZE);
+	csa->critical = (mutex_struct_ptr_t)((sm_uc_ptr_t)jnlpool->jnlpool_ctl + JNLPOOL_CTL_SIZE);
 	assert(jnlpool->jnlpool_ctl == REPLCSA2JPL(csa));	/* secshr_db_clnup uses this relationship */
 	jnlpool_mutex_spin_parms = (mutex_spin_parms_ptr_t)((sm_uc_ptr_t)csa->critical + JNLPOOL_CRIT_SPACE);
 	csa->nl = (node_local_ptr_t)((sm_uc_ptr_t)jnlpool_mutex_spin_parms + SIZEOF(mutex_spin_parms_struct));
@@ -696,9 +696,6 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 	jnlpool->gtmsrc_lcl_array = (gtmsrc_lcl_ptr_t)((sm_uc_ptr_t)jnlpool->repl_inst_filehdr + REPL_INST_HDR_SIZE);
 	jnlpool->gtmsource_local_array = (gtmsource_local_ptr_t)((sm_uc_ptr_t)jnlpool->gtmsrc_lcl_array + GTMSRC_LCL_SIZE);
 	jnlpool->jnldata_base = (sm_uc_ptr_t)jnlpool->jnlpool_ctl + JNLDATA_BASE_OFF;
-	assert(!mutex_per_process_init_pid || mutex_per_process_init_pid == process_id);
-	if (!mutex_per_process_init_pid)
-		mutex_per_process_init();
 	if (new_ipc)
 	{
 		jnlpool->jnlpool_ctl->instfreeze_environ_inited = FALSE;
@@ -1309,7 +1306,6 @@ void jnlpool_detach(void)
 	{
 		assert(NULL != jnlpool);
 		rel_lock(jnlpool->jnlpool_dummy_reg);
-		mutex_cleanup(jnlpool->jnlpool_dummy_reg);
 		if (jnlpool->gtmsource_local && (process_id == jnlpool->gtmsource_local->gtmsource_srv_latch.u.parts.latch_pid))
  			rel_gtmsource_srv_latch(&jnlpool->gtmsource_local->gtmsource_srv_latch);
 		DETACH_FROM_JNLPOOL_IF_NEEDED(jnlpool, rts_error_csa);

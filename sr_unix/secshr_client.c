@@ -253,11 +253,8 @@ int send_mesg2gtmsecshr(unsigned int code, unsigned int id, char *path, int path
 		req_code = mesg.code = code;
 		send_len = (int4)(GTM_MESG_HDR_SIZE);
   		if (REMOVE_FILE == code)
-		{
-			assert(YDB_PATH_MAX > path_len);	/* Name is not user supplied so simple check */
-			memcpy(mesg.mesg.path, path, path_len);
-			send_len += path_len;
-		} else if (FLUSH_DB_IPCS_INFO == code)
+			assert(FALSE);	/* this is an unreachable code path */
+		else if (FLUSH_DB_IPCS_INFO == code)
 		{
 			assert(YDB_PATH_MAX > db_ipcs.fn_len);
 			/* Most of the time file length is much smaller than YDB_PATH_MAX, hence the fn_len + 1 below */
@@ -387,18 +384,7 @@ int send_mesg2gtmsecshr(unsigned int code, unsigned int id, char *path, int path
 			switch(req_code)
 			{
 				case REMOVE_FILE:
-					/* Called from mutex_sock_init(). Path (and length) contain null terminator byte.
-					 * See if file still exists (may have been deleted by earlier attempt). Caller
-					 * handles actual error.
-					 */
-					if ((-1 != Stat(path, &stat_buf)) || (ENOENT != ret_code))
-						send_msg_csa(CSA_ARG(NULL) VARLSTCNT(14) ERR_GTMSECSHRSRVFIL, 7,
-								RTS_ERROR_TEXT("Client"),
-							 	process_id, mesg.pid, req_code, RTS_ERROR_TEXT(mesg.mesg.path),
-								ERR_TEXT, 2, RTS_ERROR_STRING(secshr_fail_mesg_code[req_code]),
-								mesg.code);
-					else
-						ret_code = 0;	/* File is gone so this or a previous try actually worked */
+					assert(FALSE);	/* this is an unreachable code path */
 					break;
 				case REMOVE_SEM:
 					/* See if semaphore still eixsts (may have been removed by earlier attempt that

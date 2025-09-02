@@ -65,6 +65,7 @@
 #include "get_fs_block_size.h"
 #include "interlock.h"
 #include "min_max.h"
+#include "mutex.h"		/* for "mutex_wakeup()" prototype */
 
 GBLREF	bool			in_backup;
 GBLREF	bool			region;
@@ -142,6 +143,8 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 	uint4			fsb_size, reservedDBFlags;
 	unsigned short		acc_spec_len = MAX_ACC_METH_LEN, ver_spec_len = MAX_DB_VER_LEN;
 	ZOS_ONLY(int 		realfiletag;)
+	int			mutex_type_status;
+	mutex_type_t		old_mutex_type, new_mutex_type;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -366,6 +369,18 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 			exit_stat |= EXIT_ERR;
 		}
 		need_standalone = TRUE;
+	}
+	if ((mutex_type_status = cli_present("MUTEX_TYPE")))
+	{
+		if (cli_present("MUTEX_TYPE.ADAPTIVE"))
+			new_mutex_type = mutex_type_adaptive_ydb;
+		else if (cli_present("MUTEX_TYPE.PTHREAD"))
+			new_mutex_type = mutex_type_pthread;
+		else
+		{
+			assert(cli_present("MUTEX_TYPE.YDB"));
+			new_mutex_type = mutex_type_ydb;
+		}
 	}
 	if ((null_subs_status = cli_present("NULL_SUBSCRIPTS")))
 	{
@@ -1006,6 +1021,75 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 				csd->n_wrt_per_flu = new_wrt_per_flu;
 			if (reorg_sleep_nsec_status)
 				csd->reorg_sleep_nsec = reorg_sleep_nsec;
+			if (mutex_type_status)
+			{
+				mutex_struct_ptr_t	addr;
+				node_local_ptr_t	cnl;
+
+				/* We can change the mutex type in the file header safely now.
+				 * But if we do not have standalone access, we need to change the mutex type in
+				 * the database shared memory as well. And that needs to be done carefully so
+				 * a later "rel_crit()" call will release the right mutex lock.
+				 */
+				old_mutex_type = csd->mutex_type;
+				csd->mutex_type = new_mutex_type;
+
+				if (!got_standalone)
+				{
+					/* Get the new type of mutex lock if it is different than the old/current type */
+					assert(cs_addrs->now_crit);
+					assert(process_id == cs_addrs->nl->in_crit);
+					addr = cs_addrs->critical;
+					if (IS_MUTEX_TYPE_PTHREAD(old_mutex_type))
+					{
+						if (!IS_MUTEX_TYPE_PTHREAD(new_mutex_type))
+						{
+							assert(0 == addr->semaphore.u.parts.latch_pid);
+							assertpro(GET_SWAPLOCK(&addr->semaphore));
+							assert(process_id == addr->semaphore.u.parts.latch_pid);
+						}
+					} else
+					{
+						if (!IS_MUTEX_TYPE_YDB(new_mutex_type))
+							assertpro(0 == pthread_mutex_trylock(&addr->mutex));
+					}
+					/* Change the mutex type now that we hold both types of locks */
+					addr->curr_mutex_type = new_mutex_type;
+					/* Reset counters that the adaptive ydb and adaptive pthread algorithms rely on */
+					cnl = cs_addrs->nl;
+					cnl->prev_n_crit_que_slps = cnl->gvstats_rec.n_crit_que_slps;
+					cnl->prev_n_crit_failed = cnl->gvstats_rec.n_crit_failed;
+					cnl->switch_streak = 0;
+					/* Release the old mutex type of lock */
+					/* A later "rel_crit()" will take care of releasing the new mutex type of lock */
+					if (IS_MUTEX_TYPE_PTHREAD(old_mutex_type))
+					{
+						if (!IS_MUTEX_TYPE_PTHREAD(new_mutex_type))
+						{
+							assertpro(0 == pthread_mutex_unlock(&addr->mutex));
+						}
+					} else
+					{
+						if (!IS_MUTEX_TYPE_YDB(new_mutex_type))
+						{
+							assert(process_id == addr->semaphore.u.parts.latch_pid);
+							RELEASE_SWAPLOCK(&addr->semaphore);
+							assert(0 == addr->semaphore.u.parts.latch_pid);
+						}
+						if (!IS_MUTEX_TYPE_YDB(new_mutex_type))
+						{	/* Wake up all processes in msem wait queue
+							 * so they can switch to pthread mutex.
+							 */
+							for ( ; 0 != addr->prochead.que.fl; )
+							{
+								boolean_t	woke_self_or_none;
+
+								mutex_wakeup(addr, &woke_self_or_none);
+							}
+						}
+					}
+				}
+			}
 			/* --------------------- report results ------------------------- */
 			if (asyncio_status)
 			{
@@ -1087,6 +1171,12 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 			if (d_rsrvd_bytes_status)
 				util_out_print("Database file !AD now has !UL data reserved bytes",
 						TRUE, fn_len, fn, csd->reserved_bytes);
+			if (mutex_type_status)
+				util_out_print("Database file !AD now has mutex type set to !AZ",
+						TRUE, fn_len, fn,
+						((mutex_type_adaptive_ydb == csd->mutex_type)
+							? "ADAPTIVE"
+							: ((mutex_type_pthread == csd->mutex_type) ? "PTHREAD" : "YDB")));
 			if (got_standalone)
 			{
 				assert(FD_INVALID != fd);

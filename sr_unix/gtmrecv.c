@@ -3,7 +3,7 @@
  * Copyright (c) 2006-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -83,7 +83,6 @@ GBLREF	uint4			log_interval;
 GBLREF	boolean_t		holds_sem[NUM_SEM_SETS][NUM_SRC_SEMS];
 GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	IN_PARMS		*cli_lex_in_ptr;
-GBLREF	uint4			mutex_per_process_init_pid;
 GBLREF	io_pair			io_std_device;
 GBLREF	gd_addr			*gd_header;
 
@@ -416,12 +415,6 @@ int gtmrecv(void)
 	is_rcvr_server = first_syslog = TRUE;
 	SET_PROCESS_ID;
 	OPERATOR_LOG_MSG;
-	/* Initialize mutex socket, memory semaphore etc. before any "grab_lock" is done by this process on the journal pool.
-	 * Note that the initialization would already have been done by the parent receiver startup command but we need to
-	 * redo the initialization with the child process id.
-	 */
-	assert(mutex_per_process_init_pid && mutex_per_process_init_pid != process_id);
-	mutex_per_process_init();
 	/* Take a copy of the fact whether an -UPDATERESYNC was specified or not. Note this down in shared memory.
 	 * We will clear the shared memory copy as soon as the first history record gets written to the instance file
 	 * after the first time this receiver connects to a source. Future connects of this same receiver with the same

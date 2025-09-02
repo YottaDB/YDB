@@ -28,7 +28,6 @@
 
 #ifdef __linux__
 # include <features.h>  /* Needed to define __GLIBC__ if it exists */
-# define CRIT_USE_PTHREAD_MUTEX
 # if defined(__GLIBC__)
 #  define GLIBC_ONLY(X) X
 #  define NON_GLIBC_ONLY(X)
@@ -1004,9 +1003,10 @@ typedef struct compswap_time_field_struct
 	 * a constant size (size of global_latch_t varies), pad the latch with sufficient space to match the
 	 * size of global_latch_t's largest size (on HPUX).
 	 */
-global_latch_t	time_latch;
-int4		hp_latch_space[4];	/* padding only on non-hpux systems */
+	global_latch_t	time_latch;
+	int4		hp_latch_space[4];	/* padding only on non-hpux systems */
 } compswap_time_field;
+
 /* takes value of time() but needs to be 4 byte so can use compswap on it. Not using time_t, as that is an indeterminate size on
  * various platforms. Value is time (in seconds) in a compare/swap updated field so only one process performs a given task in a
  * given interval

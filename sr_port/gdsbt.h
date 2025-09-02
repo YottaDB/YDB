@@ -18,13 +18,7 @@
 /* this requires gdsroot.h */
 
 #include <sys/types.h>
-#ifdef MUTEX_MSEM_WAKE
-#ifdef POSIX_MSEM
-#  include "gtm_semaphore.h"
-#else
-#  include <sys/mman.h>
-#endif
-#endif
+#include "gtm_semaphore.h"	/* needed only with ydb mutex (not pthread mutex) */
 
 #include <gtm_limits.h>		/* for _POSIX_HOST_NAME_MAX */
 #if defined(SUNOS) && !defined(_POSIX_HOST_NAME_MAX)
@@ -122,15 +116,6 @@ typedef struct th_rec_struct
 	sm_off_t	cache_index;
 } th_rec;
 
-/* This structure is used to maintain all cache records.  The BT queue contains
- * a history of those blocks that have been updated.
- */
-
-/*
- *	Definitions for GT.M Mutex Control
- *
- *	See MUTEX.MAR for VMS functional implementation
- */
 typedef struct
 {
 	struct
@@ -139,21 +124,12 @@ typedef struct
 			bl;
 	}		que;
 	int4		pid;
-	void		*super_crit;
+	int4		filler_8byte_align;
 	/*
 	 * Make sure that the size of mutex_que_entry is a multiple of 8 bytes
 	 * for quadword alignment requirements of remqhi and insqti.
 	 */
-	int4		mutex_wake_instance;
-	int4		filler1; /* for dword alignment 		 */
-#ifdef MUTEX_MSEM_WAKE
-# ifdef POSIX_MSEM
 	sem_t		mutex_wake_msem; /* Not two ints .. somewhat larger */
-# else
-	msemaphore	mutex_wake_msem; /* Two ints (incidentally two int4s) */
-# endif
-
-#endif
 } mutex_que_entry;
 
 typedef struct
@@ -166,30 +142,67 @@ typedef struct
 	global_latch_t	latch;
 } mutex_que_head;
 
-typedef struct
+typedef enum
 {
-	FILL8DCL(uint4, crit_cycle, 1);
-	global_latch_t	semaphore;
-	CACHELINE_PAD(8 + SIZEOF(global_latch_t), 2);	/* 8 for the FILL8DCL */
-	FILL8DCL(latch_t, crashcnt, 3);
-	global_latch_t	crashcnt_latch;
-	CACHELINE_PAD(8 + SIZEOF(global_latch_t), 4);	/* 8 for the FILL8DCL */
-	compswap_time_field	stuckexec;
-	CACHELINE_PAD(SIZEOF(compswap_time_field), 5);
-	FILL8DCL(latch_t, queslots, 6);
-	CACHELINE_PAD(SIZEOF(latch_t) + SIZEOF(latch_t), 7);
-	mutex_que_head	prochead;
-	CACHELINE_PAD(SIZEOF(mutex_que_head), 8);
-	mutex_que_head	freehead;
-	CACHELINE_PAD(SIZEOF(mutex_que_head), 9);
-} mutex_struct;
+	mutex_type_adaptive_ydb     = 0,/* Adaptive mutex manager (with ydb mutex being current setting).
+					 * enum set to 0 so this is the default mutex type value for new databases.
+					 */
+	mutex_type_adaptive_pthread = 1,/* Adaptive mutex manager (with pthread mutex being current setting) */
+	mutex_type_ydb              = 2,/* ONLY ydb mutex manager */
+	mutex_type_pthread          = 3,/* ONLY pthread mutex manager */
+} mutex_type_t;
+
+/* Note: The first macro below is faster than (mutex_type_pthread == MUTEX_TYPE) || (mutex_type_adaptive_pthread == MUTEX_TYPE).
+ * The other macros are also structured in similar fashion. There are asserts in "gtm_mutex_init()" that verify their correctness.
+ */
+#define	IS_MUTEX_TYPE_PTHREAD(MUTEX_TYPE)	(MUTEX_TYPE & 1)
+#define	IS_MUTEX_TYPE_YDB(MUTEX_TYPE)		(!IS_MUTEX_TYPE_PTHREAD(MUTEX_TYPE))
+#define	IS_MUTEX_TYPE_ADAPTIVE(MUTEX_TYPE)	!(MUTEX_TYPE & 2)
+
+/* Uncomment the following line to enable mutex switch debugging */
+/* #define DEBUG_YDB_MUTEX */
+
+#ifdef DEBUG_YDB_MUTEX
+#	define	DEBUG_YDB_MUTEX_ONLY(X)		X
+#else
+#	define	DEBUG_YDB_MUTEX_ONLY(X)
+#endif
 
 typedef struct
 {
-	FILL8DCL(uint4, crit_cycle, 1);
-	FILL8DCL(uint4, stuck_cycle, 2);
+	mutex_type_t		curr_mutex_type;	/* can be "mutex_type_ydb" or "mutex_type_pthread".
+							 * Initial value is "mutex_type_ydb".
+							 */
+	CACHELINE_PAD(SIZEOF(mutex_type_t), 1);
+	/* ------------- The below is used by BOTH the ydb mutex AND pthread mutex logic ---------- */
+	uint4			crit_cycle;			/* used by both ydb mutex AND pthread mutex logic */
+	CACHELINE_PAD(SIZEOF(uint4), 2);
+	/* ------------- The below is only used by the pthread mutex logic ---------- */
 	pthread_mutex_t		mutex;
-} pth_mutex_struct;
+	CACHELINE_PAD(SIZEOF(pthread_mutex_t), 3);
+	/* ------------- The below is used only by the ydb mutex logic ---------- */
+	uint4			stuck_cycle;
+	CACHELINE_PAD(SIZEOF(uint4), 4);
+	global_latch_t		semaphore;
+	CACHELINE_PAD(SIZEOF(global_latch_t), 5);
+	latch_t			crashcnt;
+	CACHELINE_PAD(SIZEOF(latch_t), 6);
+	compswap_time_field	stuckexec;
+	CACHELINE_PAD(SIZEOF(compswap_time_field), 7);
+	DEBUG_YDB_MUTEX_ONLY(int8	n_crit_waiters);	/* number of processes waiting to get crit */
+	DEBUG_YDB_MUTEX_ONLY(CACHELINE_PAD(SIZEOF(int8), 8));
+	int8			n_msem_waiters;	/* number of processes waiting in sem_wait() */
+	CACHELINE_PAD(SIZEOF(int8), 9);
+	latch_t			queslots;
+	CACHELINE_PAD(SIZEOF(latch_t), 10);
+	mutex_que_head		prochead;
+	CACHELINE_PAD(SIZEOF(mutex_que_head), 11);
+	/* Note: The following 2 lines need to be the last lines in this structure.
+	 * "q_free_entry" initializion in "clean_initialize()" relies on this assumption.
+	 */
+	mutex_que_head		freehead;
+	CACHELINE_PAD(SIZEOF(mutex_que_head), 12);
+} mutex_struct;
 
 typedef struct {
 	int4	mutex_hard_spin_count;
@@ -742,6 +755,9 @@ typedef struct node_local_struct
 	global_latch_t		lock_crit;		/* mutex for LOCK processing */
 	volatile block_id	tp_hint;
 	char			max_procs[MAX_PROCS_ARRAY_SIZE];
+	/* The following 2 fields are used by logic that determines whether the ydb mutex needs to be switched to pthread mutex */
+	uint8			prev_n_crit_que_slps, prev_n_crit_yields, prev_n_crit_failed;
+	uint8			switch_streak;
 } node_local;
 
 #define UPDATE_MAX_PROCS_STRING(NODE, MPS)	SNPRINTF(NODE->max_procs, MAX_PROCS_ARRAY_SIZE, "%d,%lu", MPS.cnt, MPS.time)
@@ -1000,11 +1016,7 @@ MBSTART {								\
 #define MIN_CRIT_ENTRY				64		/* keep this in sync with gdeinit.m minseg("MUTEX_SLOTS") */
 #define MAX_CRIT_ENTRY				32768		/* keep this in sync with gdeinit.m maxseg("MUTEX_SLOTS") */
 #define DEFAULT_NUM_CRIT_ENTRY			1024		/* keep this in sync with gdeget.m tmpseg("MUTEX_SLOTS") */
-#ifdef CRIT_USE_PTHREAD_MUTEX
-#define CRIT_SPACE(ENTRIES)			SIZEOF(pth_mutex_struct)
-#else
 #define CRIT_SPACE(ENTRIES)			((ENTRIES) * SIZEOF(mutex_que_entry) + SIZEOF(mutex_struct))
-#endif
 #define NUM_CRIT_ENTRY(CSD)			(CSD)->mutex_spin_parms.mutex_que_entry_space_size
 #define JNLPOOL_CRIT_SPACE			CRIT_SPACE(DEFAULT_NUM_CRIT_ENTRY)
 #define NODE_LOCAL_SIZE				(ROUND_UP(SIZEOF(node_local), OS_PAGE_SIZE))
@@ -1120,17 +1132,10 @@ typedef bt_rec	*bt_rec_ptr_t;
 typedef th_rec	*th_rec_ptr_t;
 typedef th_index *th_index_ptr_t;
 typedef mutex_struct *mutex_struct_ptr_t;
-typedef pth_mutex_struct *pth_mutex_struct_ptr_t;
 
 typedef mutex_spin_parms_struct *mutex_spin_parms_ptr_t;
 typedef mutex_que_entry	*mutex_que_entry_ptr_t;
 typedef node_local *node_local_ptr_t;
-
-#ifdef CRIT_USE_PTHREAD_MUTEX
-typedef pth_mutex_struct_ptr_t	CRIT_PTR_T;
-#else
-typedef mutex_struct_ptr_t	CRIT_PTR_T;
-#endif
 
 #define OLDEST_HIST_TN(CSA)		(DBG_ASSERT(CSA->hdr) DBG_ASSERT(CSA->hdr->acc_meth != dba_mm)	\
 						((th_rec_ptr_t)((sm_uc_ptr_t)CSA->th_base + CSA->th_base->tnque.fl))->tn)

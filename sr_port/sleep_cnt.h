@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -108,12 +108,7 @@ GBLREF int	num_additional_processors;	/* needed by a few macros below */
 							 * experimentation and fine-tuning.
 							 */
 
-/* To compute the maximum duration of an inner spinloop, the following macro can be
- * used. The theory behind this macro is that the basic definition of LOCK_SPINS is
- * good for approximately 8 processors but needs to be appropriately increased for
- * each additional 4 processors.
- */
-#define MAX_LOCK_SPINS(base, proc) (base + MAX(0, ((((proc - 7) * LOCK_SPINS_PER_4PROC) / 4))))
+#define MAX_LOCK_SPINS(base, proc)	128
 
 /* Maximum duration (in minutes) that a process waits for the completion of read or write in-progress after which
  * it stops waiting but rather continue fixing the remaining cache records. This is done to avoid

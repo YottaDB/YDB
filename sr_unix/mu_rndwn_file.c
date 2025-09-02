@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -1196,7 +1196,7 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 					cnl->statsdb_rundown_clean = statsDBrundown_status;
 				}
 			}
-			csa->critical = (CRIT_PTR_T)(csa->db_addrs[0] + NODE_LOCAL_SIZE);
+			csa->critical = (mutex_struct_ptr_t)(csa->db_addrs[0] + NODE_LOCAL_SIZE);
 			assert(((INTPTR_T)csa->critical & 0xf) == 0);	/* critical should be 16-byte aligned */
 #			ifdef CACHELINE_SIZE
 			assert(0 == ((INTPTR_T)csa->critical & (CACHELINE_SIZE - 1)));

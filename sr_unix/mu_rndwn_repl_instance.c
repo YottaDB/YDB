@@ -146,6 +146,8 @@ boolean_t mu_rndwn_repl_instance(replpool_identifier *replpool_id, boolean_t imm
 	assert(0 == instfilename[reg->dyn.addr->fname_len]);
 	memcpy((char *)reg->dyn.addr->fname, instfilename, reg->dyn.addr->fname_len + 1);
 	udi = FILE_INFO(reg);
+	repl_csa = &udi->s_addrs;
+	repl_csa->region = reg;
 	udi->fn = (char *)reg->dyn.addr->fname;
 	ftok_sem_reg = NULL;	/* clean any residue from region work as we have now moved on to an instance */
 	/* Lock replication instance using ftok semaphore so that no other replication process can startup until we are done with
@@ -368,18 +370,16 @@ boolean_t mu_rndwn_repl_instance(replpool_identifier *replpool_id, boolean_t imm
 						 * if the journal pool is available
 						 */
 						assert(INVALID_SHMID != repl_instance.jnlpool_shmid);
-						repl_csa = &FILE_INFO(jnlpool->jnlpool_dummy_reg)->s_addrs;
+						assert(reg == jnlpool->jnlpool_dummy_reg);
 						assert(!repl_csa->now_crit);
 						assert(!repl_csa->hold_onto_crit);
 						was_crit = repl_csa->now_crit;
-						/* Since we do grab_lock, below, we need to do a per-process initialization. */
-						mutex_per_process_init();
 						if (!was_crit)
-							grab_lock(jnlpool->jnlpool_dummy_reg, TRUE, GRAB_LOCK_ONLY);
+							grab_lock(reg, TRUE, GRAB_LOCK_ONLY);
 					}
 					repl_inst_recvpool_reset();
 					if (((NULL != jnlpool) && (NULL != jnlpool->jnlpool_ctl)) && !was_crit)
-						rel_lock(jnlpool->jnlpool_dummy_reg);
+						rel_lock(reg);
 				}
 				assert(!holds_sem[RECV][RECV_POOL_ACCESS_SEM]);
 			}

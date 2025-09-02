@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -19,6 +19,16 @@
 #include "compswap.h"
 #include "aswp.h"
 #include "memcoherency.h"
+
+#ifdef __x86_64__
+#	include <immintrin.h>		/* needed only with ydb mutex (not with pthread mutex) */
+#elif defined(__aarch64__)
+/* #	include <arm_acle.h> */		/* needed if we were using __yield() ACLE intrinsic in the SPINLOCK_PAUSE macro below.
+					 * But that does not work (see macro definition below). So this #include is commented now.
+					 */
+#else
+#	error UNSUPPORTED PLATFORM
+#endif
 
 /* Define memory barrier macro to use in LOCK_BUFF_FOR_READ/RELEASE_BUFF_READ_LOCK macros below. On AIX
  * the locking macros have no memory barrier connotation because they use load/store_locked instructions.
@@ -104,4 +114,19 @@
 #define RELEASE_SWAPLOCK(X)		COMPSWAP_UNLOCK((X), process_id, LOCK_AVAILABLE)
 
 #define	GRAB_LATCH_INDEFINITE_WAIT	-1	/* special value indicating infinite timeout input to "grab_latch" */
+
+#ifdef __x86_64__
+#	define	SPINLOCK_PAUSE	_mm_pause()	/* This intrinsic expands to the PAUSE instruction on x86_64 which provides a
+						 * hint to the processor that is beneficial in hardspin/spinlock loops. It can
+						 * a) Reduce power consumption and
+						 * b) More importantly improve spin loop (like this for loop) performance
+						 *    by preventing memory-order mis-speculation and avoiding pipeline flushes.
+						 */
+#elif defined(__aarch64__)
+#	define	SPINLOCK_PAUSE	__asm__ __volatile__ ("yield")	/* This is needed because __yield() ACLE intrinsic does not work.
+								 * See https://stackoverflow.com/a/70076751 for more details.
+								 */
+#else
+#	error UNSUPPORTED PLATFORM
+#endif
 

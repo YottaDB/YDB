@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -110,6 +110,7 @@ void mupip_set(void)
 		|| (CLI_NEGATED == cli_present("LCK_SHARES_DB_CRIT"))
 		|| (CLI_PRESENT == cli_present("LOCK_SPACE"))
 		|| (CLI_PRESENT == cli_present("MUTEX_SLOTS"))
+		|| (CLI_PRESENT == cli_present("MUTEX_TYPE"))
 		|| (CLI_PRESENT == cli_present("NULL_SUBSCRIPTS"))
 		|| (CLI_PRESENT == cli_present("PARTIAL_RECOV_BYPASS"))
 		|| (CLI_NEGATED == cli_present("QDBRUNDOWN"))
