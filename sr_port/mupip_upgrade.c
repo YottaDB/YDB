@@ -528,7 +528,7 @@ void mupip_upgrade(void)
 		}
 		if (was_asyncio_enabled)
 		{
-			util_out_print("Region !AD : Restoring ASYNCIO setting fo !AD", TRUE, REG_LEN_STR(reg), DB_LEN_STR(reg));
+			util_out_print("Region !AD : Restoring ASYNCIO setting for !AD", TRUE, REG_LEN_STR(reg), DB_LEN_STR(reg));
 			csa->hdr->asyncio = TRUE;
 		}
 		RELEASE_ACCESS_SEMAPHORE_AND_RUNDOWN(gv_cur_region, error);
