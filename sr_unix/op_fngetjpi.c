@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2022-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2022-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -35,6 +35,8 @@
 GBLREF spdesc 	stringpool;
 GBLREF uint4	process_id;
 
+LITREF	mval	literal_null;
+
 typedef char	keyword[MAX_KEY];
 
 #define	MAX_KEY_LEN	20	/* maximum length across all keywords in the key[] array below */
@@ -43,6 +45,7 @@ error_def	(ERR_BADJPIPARAM);
 error_def	(ERR_SYSCALL);
 
 static keyword	key[]= {
+	"CMDLINE",
 	"CPUTIM",
 	"CSTIME",
 	"CUTIME",
@@ -53,6 +56,7 @@ static keyword	key[]= {
 } ;
 
 enum 	kwind {
+	kw_cmdline,
 	kw_cputim,
 	kw_cstime,
 	kw_cutime,
@@ -61,7 +65,7 @@ enum 	kwind {
 	kw_utime,
 	kw_end
 };
-
+/* Implements the $zgetjpi function */
 void op_fngetjpi(mint jpid, mval *kwd, mval *ret)
 {
 	struct tms	proc_times;
@@ -82,7 +86,7 @@ void op_fngetjpi(mint jpid, mval *kwd, mval *ret)
 
 	lower_to_upper((uchar_ptr_t)upcase, (uchar_ptr_t)kwd->str.addr, (int)kwd->str.len);
 
-	keywd_indx = kw_cputim ;
+	keywd_indx = kw_cmdline ; /* This needs to be the first keyword in kwind */
 	/* future enhancement:
 	 * 	(i) since keywords are sorted, we can exit the while loop if 0 < memcmp.
 	 * 	(ii) also, the current comparison relies on kwd->str.len which means a C would imply CPUTIM instead of CSTIME
@@ -101,6 +105,66 @@ void op_fngetjpi(mint jpid, mval *kwd, mval *ret)
 	{
 		info = (process_id != jpid) ? is_proc_alive(jpid, 0) : 1;
 		ui82mval(ret, info);
+	} else if (kw_cmdline == keywd_indx)
+	{
+		/* In this case, the function needs to read /proc/[PID]/cmdline not /proc/[PID]/stat */
+		/* here is documentation about /proc/[PID]/cmdline https://man7.org/linux/man-pages/man5/proc_pid_cmdline.5.html */
+		char		filename[64];/* The file name is "/proc/PID/cmdline". Since PID is at most a 20 byte number
+						 * 64 bytes is much more than enough to store this name.
+						 */
+		FILE		*fp;
+		int		status;
+
+		SNPRINTF(filename, sizeof(filename), "/proc/%d/cmdline", jpid);
+		Fopen(fp, filename, "r");
+		if (NULL != fp)
+		{
+			char    file_contents[1024]; /* ZGETJPI only gives the first 1024 chars of the command line. */
+			size_t	buffer_size, ret_size;
+			int     save_errno;
+
+			buffer_size = SIZEOF(file_contents);
+			GTM_FREAD(file_contents, 1, buffer_size, fp, ret_size, save_errno);
+			if ((ret_size < buffer_size) && save_errno)
+			{
+				char	errstr[128];
+				SNPRINTF(errstr, SIZEOF(errstr), "fread() : %s : Expected = %lld : Actual = %lld",
+								fp, (long long)buffer_size, (long long)ret_size);
+				/* ERROR encountered during GTM_FREAD */
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8)
+						ERR_SYSCALL, 5, LEN_AND_STR(errstr), CALLFROM, save_errno);
+
+			} else
+			{
+				size_t adjusted_ret_size;
+				char *ptr, *ptr_top;
+				int num_trailing_nulls = 0;
+
+				/* Linux adds null bytes to separate arguments in command line.
+				* To ensure that it parses and displays correctly,
+				* all except any trailing nulls are replaced with spaces.
+				* The trailing nulls are not displayed at all, this matches ps.
+				*/
+				ptr_top = file_contents + ret_size;
+				while(ptr_top > file_contents && *(ptr_top - 1) == '\0')
+					ptr_top--;
+				for (ptr = file_contents; ptr < ptr_top; ptr++)
+				{
+					if ('\0' == *ptr)
+						*ptr = ' ';
+				}
+				adjusted_ret_size = ptr_top - file_contents; /* Output should not include trailing spaces */
+				assert(NULL != file_contents);
+				ENSURE_STP_FREE_SPACE(adjusted_ret_size);
+				ret->str.addr = (char *)stringpool.free;
+				memcpy(ret->str.addr, file_contents, adjusted_ret_size); /* No NULL here as this is M String */
+				ret->mvtype = MV_STR;
+				ret->str.len = adjusted_ret_size;
+				stringpool.free += adjusted_ret_size;
+			}
+			FCLOSE(fp, status);
+		} else  /* File open failed or fopen did not have permission. Return "" in this case. */
+			*ret = literal_null;
 	} else
 	{	/* It is a time keyword. Get the time values from the /proc/<pid>/stat file.
 		 * See /proc/[pid]/stat section in https://man7.org/linux/man-pages/man5/proc.5.html
@@ -179,7 +243,7 @@ void op_fngetjpi(mint jpid, mval *kwd, mval *ret)
 		long		field16;	/* cutime %ld */
 		long		field17;	/* cstime %ld */
 
-		sprintf(filename, "/proc/%d/stat", jpid);
+		SNPRINTF(filename, sizeof(filename), "/proc/%d/stat", jpid);
 		Fopen(fp, filename, "r");
 		if (NULL != fp)
 		{
