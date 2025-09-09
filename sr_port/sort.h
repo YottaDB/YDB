@@ -1,7 +1,7 @@
 /* Copyright (c) 2010-2019 Christopher Swenson. */
 /* Copyright (c) 2012 Vojtech Fried. */
 /* Copyright (c) 2012 Google Inc. All Rights Reserved. */
-/* Copyright (c) 2021 YottaDB LLC. */
+/* Copyright (c) 2021-2025 YottaDB LLC. */
 /* This file is a copy of https://github.com/swenson/sort/raw/master/sort.h with some custom changes */
 
 #include <stdlib.h>
@@ -52,7 +52,7 @@
 
 static int compute_minrun(const uint64_t);
 
-/* From http://oeis.org/classic/A102549 */
+/* From https://oeis.org/A102549 */
 static const uint64_t shell_gaps[48] = {1, 4, 10, 23, 57, 132, 301, 701, 1750, 4376, 10941, 27353, 68383, 170958, 427396, 1068491, 2671228, 6678071, 16695178, 41737946, 104344866, 260862166, 652155416, 1630388541, 4075971353LL, 10189928383LL, 25474820958LL, 63687052396LL, 159217630991LL, 398044077478LL, 995110193696LL, 2487775484241LL, 6219438710603LL, 15548596776508LL, 38871491941271LL, 97178729853178LL, 242946824632946LL, 607367061582366LL, 1518417653955916LL, 3796044134889791LL, 9490110337224478LL, 23725275843061196LL, 59313189607652991LL, 148282974019132478LL, 370707435047831196LL, 926768587619577991LL, 2316921469048944978LL, 5792303672622362446LL};
 
 #ifndef CLZ
@@ -878,7 +878,7 @@ void SORT_DELETE_BUFFER(SORT_TYPE* pointer) {
 
 
 /* Shell sort implementation based on Wikipedia article
-   http://en.wikipedia.org/wiki/Shell_sort
+   https://en.wikipedia.org/wiki/Shell_sort
 */
 void SHELL_SORT(SORT_TYPE *dst, const size_t size) {
   /* don't bother sorting an array of size 0 or 1 */
@@ -1570,7 +1570,7 @@ static void TIM_SORT_RESIZE(TEMP_STORAGE_T *store, const size_t new_size) {
   size_t nsize;
   if ((store->storage == NULL) || (store->alloc < new_size)) {
     nsize = 1.4 * new_size;
-    /* A factor of 1.4 was chosen to reduce the load on the memory allocation mechanism. 
+    /* A factor of 1.4 was chosen to reduce the load on the memory allocation mechanism.
     This value is often used in other algorithms. 1.0 is almost never used. */
     /* SORT_TYPE *tempstore = (SORT_TYPE *)realloc(store->storage, nsize * sizeof(SORT_TYPE)); */
     SORT_TYPE *tempstore = (SORT_TYPE *)malloc(nsize * sizeof(SORT_TYPE));
@@ -1580,7 +1580,7 @@ static void TIM_SORT_RESIZE(TEMP_STORAGE_T *store, const size_t new_size) {
       /* Expansion, copy and free previous buffer required */
       memcpy (tempstore, store->storage, (store->alloc) * sizeof(SORT_TYPE));
       free (store->storage);
-        
+
     }
 
     gstore = tempstore;
@@ -1767,7 +1767,7 @@ void TIM_SORT(SORT_TYPE *dst, const size_t size) {
   if (0 == gstore_size)
   {
      gstore_size = 32768;
-     /* SORT_TYPE * tempstore = (SORT_TYPE *)realloc(gstore, gstore_size * sizeof(SORT_TYPE)); 
+     /* SORT_TYPE * tempstore = (SORT_TYPE *)realloc(gstore, gstore_size * sizeof(SORT_TYPE));
      Since the size is 0, this is the initial memory allocation and we can replace the realloc with malloc */
      SORT_TYPE * tempstore = (SORT_TYPE *)malloc(gstore_size * sizeof(SORT_TYPE));
      gstore = tempstore;

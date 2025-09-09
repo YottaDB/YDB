@@ -1189,7 +1189,7 @@
 3 ICU
    ICU
 
-   ICU is a widely used, defacto standard package (see http://icu-project.org
+   ICU is a widely used, defacto standard package (see https://icu.unicode.org/
    for more information) that YottaDB relies on for most operations that require
    knowledge of the Unicode(R) character sets, such as text boundary
    detection, character string conversion between UTF-8 and UTF-16, and
@@ -12695,7 +12695,7 @@
    +------------------------------------------------------------------------+
 
    For a description of the Unicode general categories, refer to
-   http://unicode.org/charts/.
+   https://unicode.org/charts/.
 
    Example:
 

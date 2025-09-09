@@ -7697,7 +7697,7 @@
    event it is unable to establish a TLS connection. [Note: YottaDB versions
    prior to V6.1-000 did not support TLS for replication - if needed it could
    be implemented with an external application such as stunnel
-   (http://stunnel.org).] If PLAINTEXTFALLBACK is in effect, in the event of
+   (https://stunnel.org).] If PLAINTEXTFALLBACK is in effect, in the event of
    a failure to establish a TLS connection, YottaDB issues REPLNOTLS as a
    warning. Once a permitted plaintext replication connection is established
    for a connection session, YottaDB never attempts to switch that connection

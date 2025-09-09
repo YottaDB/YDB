@@ -161,7 +161,7 @@ error_def(ERR_TEXT);
  *
  *
  * The version number extension for renamed symbols from ICU 3.6 until ICU 4.2 was (confirmed on
- * http://icu-project.org/apiref/icu4c/uvernum_8h.html, search for U_ICU_ENTRY_POINT_RENAME)
+ * https://icu-project.org/apiref/icu4c/uvernum_8h.html, search for U_ICU_ENTRY_POINT_RENAME)
  * 	_<major> _ <minor>
  * As of ICU 4.4, the version number extension changed to (note the missing underscore)
  * 	_<major><minor>

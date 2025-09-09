@@ -1,4 +1,5 @@
-/* md5hash.h is adapted to work with YottaDB (http://yottadb.com) and FIS GT.M (http://fis-gtm.com) from
+/* md5hash.h is adapted to work with YottaDB (http://yottadb.com) and
+ * FIS GT.M (https://sourceforge.net/projects/fis-gtm/) from
  * source code at http://cvsweb.xfree86.org/cvsweb/cvs/lib/md5.h?rev=1.6
  * to which no claim of Copyright was made by the authors. No claim of
  * copyright is made by Fidelity Information Services, Inc. with respect

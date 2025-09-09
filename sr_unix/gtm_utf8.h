@@ -3,7 +3,7 @@
  * Copyright (c) 2006-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2022-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -693,7 +693,7 @@ LITREF signed int 	utf8_followlen[];
  *	Zp (paragraph separators)   -> C
  *	C* (all control codepoints) -> C
  *
- * For a description of the general categories see http://unicode.org/versions/Unicode4.0.0/ch04.pdf (section 4.5)
+ * For a description of the general categories see https://unicode.org/versions/Unicode4.0.0/ch04.pdf (section 4.5)
  *
  * E = A + P + N + C and the classifications A, P, N, and C are mutually exclusive.
  *

@@ -3,7 +3,7 @@
  * Copyright (c) 2011-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -1539,7 +1539,7 @@ lvTreeNode *lvAvlTreeLookup(lvTree *lvt, treeKeySubscr *key, lvTreeNode **lookup
  * Cases (a) and (b) can be taken into a "Balanced" state by just ONE rotation (implemented by lvAvlTreeSingleRotation).
  * Cases (c) and (d) need TWO rotations to take them to a "Balanced" state as shown below (implemented by lvAvlTreeDoubleRotation).
  *
- * In the below illustration (courtesy of http://en.wikipedia.org/wiki/AVL_tree) key points to note are
+ * In the below illustration (courtesy of https://en.wikipedia.org/wiki/AVL_tree) key points to note are
  *	-> 3,4,5 are nodes with those key values.
  *	-> A,B,C,D are arbitrary subtrees (not necessarily nodes).
  *	-> The double-width link (\\ or //) in each tree is where the rotation happens

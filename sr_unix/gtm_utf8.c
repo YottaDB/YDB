@@ -3,7 +3,7 @@
  * Copyright (c) 2006-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2022-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -189,7 +189,7 @@ int gtm_wcswidth(unsigned char* ptr, int len, boolean_t strict, int nonprintwidt
  * platforms and its incorrect behavior for several characters (even on Linux).
  *
  * ICU does not provide a direct API for display width, however, it does provide API
- * for the property "East Asian Width" specified in UAX#11 (http://unicode.org/reports/tr11/)
+ * for the property "East Asian Width" specified in UAX#11 (https://unicode.org/reports/tr11/)
  * which provides guidelines to determine the width for the entire repertoire.
  *
  * Using "East Asian Width" and "General Category" properties. gtm_wcwidth() determines

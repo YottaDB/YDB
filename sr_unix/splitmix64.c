@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
-* Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+* Copyright (c) 2019-2025 YottaDB LLC and/or its subsidiaries.	*
 * All rights reserved.						*
 *								*
 *	This source code contains the intellectual property	*
@@ -15,13 +15,13 @@
 	 and related and neighboring rights to this software to the public domain
 	 worldwide. This software is distributed without any warranty.
 
-See <http://creativecommons.org/publicdomain/zero/1.0/>. */
+See <https://creativecommons.org/publicdomain/zero/1.0/>. */
 
 #include "xoshiro.h"
 
 /* This is a fixed-increment version of Java 8's SplittableRandom generator
-   See http://dx.doi.org/10.1145/2714064.2660195 and
-   http://docs.oracle.com/javase/8/docs/api/java/util/SplittableRandom.html
+   See https://dl.acm.org/doi/10.1145/2714064.2660195 and
+   https://docs.oracle.com/javase/8/docs/api/java/util/SplittableRandom.html
 
    It is a very fast generator passing BigCrush, and it can be useful if
    for some reason you absolutely want 64 bits of state. */
@@ -31,7 +31,7 @@ See <http://creativecommons.org/publicdomain/zero/1.0/>. */
  * other code in YottaDB. This is intentional, at least for the initial version,
  * in order to allow for comparison with the original. This may be cleaned up
  * in future versions, as no revisions to the original public domain code are
- * expected. The original code is hosted at http://xoshiro.di.unimi.it .
+ * expected. The original code is hosted at https://prng.di.unimi.it/splitmix64.c
  *
  *
  */

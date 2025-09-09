@@ -1184,7 +1184,7 @@ if [ -z "$ydb_distrib" ] ; then
 	ydb_distrib="https://gitlab.com/api/v4/projects/7957109/repository/tags"
 fi
 if [ "Y" = "$gtm_gtm" ] ; then
-	ydb_distrib="http://sourceforge.net/projects/fis-gtm"
+	ydb_distrib="https://sourceforge.net/projects/fis-gtm"
 fi
 
 tmpdir=`mktmpdir`
@@ -1193,7 +1193,7 @@ mkdir $gtm_tmpdir/tmp
 latest=`echo "$ydb_version" | tr LATES lates`
 if [ -z "$ydb_version" ] || [ "latest" = "$latest" ] ; then
 	case $ydb_distrib in
-		http://sourceforge.net/projects/fis-gtm | https://sourceforge.net/projects/fis-gtm)
+		https://sourceforge.net/projects/fis-gtm)
 			gtm_gtm="Y"
 			if [ "Y" = "$gtm_verbose" ] ; then
 				echo wget ${ydb_distrib}/files/${gtm_sf_dirname}/latest to determine latest version
@@ -1254,7 +1254,7 @@ else
 		if [ "Y" = "$gtm_gtm" ] ; then ydb_filename=gtm_${tmp}_${gtm_hostos}_${ydb_flavor}_${gtm_buildtype}.tar.gz ; fi
 	fi
 	case $ydb_distrib in
-		http://sourceforge.net/projects/fis-gtm | https://sourceforge.net/projects/fis-gtm)
+		https://sourceforge.net/projects/fis-gtm)
 			if [ "Y" = "$gtm_verbose" ] ; then
 				echo wget ${ydb_distrib}/files/${gtm_sf_dirname}/${ydb_version}/${ydb_filename} to download tarball
 				echo Check proxy settings if wget hangs

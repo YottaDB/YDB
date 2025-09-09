@@ -2,7 +2,7 @@
  *								*
  * Copyright 2011, 2014 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -35,7 +35,7 @@
  * other code in YottaDB/GT.M. This is intentional, at least for the initial version,
  * in order to allow for comparison with the original. This may be cleaned up
  * in future versions, as no revisions to the original public domain code are
- * expected. The original code is hosted at http://code.google.com/p/smhasher/ .
+ * expected. The original code is hosted at https://github.com/aappleby/smhasher
  *
  * Note also that YottaDB/GT.M is currently only using the 32 bit hash function,
  * MurmurHash3_x86_32(). The 128 bit functions MurmurHash3_x86_128() and MurmurHash3_x64_128()
