@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
-* Copyright (c) 2019-2025 YottaDB LLC and/or its subsidiaries.	*
+* Copyright (c) 2025 YottaDB LLC and/or its subsidiaries.	*
 * All rights reserved.						*
 *								*
 *	This source code contains the intellectual property	*
@@ -10,48 +10,53 @@
 *								*
 ****************************************************************/
 
-/* Written in 2018 by David Blackman and Sebastiano Vigna (vigna@acm.org)
-	 To the extent possible under law, the author has dedicated all copyright
-	 and related and neighboring rights to this software to the public domain
-	 worldwide. This software is distributed without any warranty.
-
-	 See <https://creativecommons.org/publicdomain/zero/1.0/>. */
-
-#include "xoshiro.h"
-
-/* This is xoshiro256+ 1.0, our best and fastest generator for floating-point
-   numbers. We suggest to use its upper bits for floating-point
-   generation, as it is slightly faster than xoshiro256++/xoshiro256**. It
-   passes all tests we are aware of except for the lowest three bits,
-   which might fail linearity tests (and just those), so if low linear
-   complexity is not considered an issue (as it is usually the case) it
-   can be used to generate 64-bit outputs, too.
-
-   We suggest to use a sign test to extract a random Boolean value, and
-   right shifts to extract subsets of bits.
-
-   The state must be seeded so that it is not everywhere zero. If you have
-   a 64-bit seed, we suggest to seed a splitmix64 generator and use its
-   output to fill s. */
-
 /*
  * Since this code is largely third-party, its form is somewhat different than
  * other code in YottaDB. This is intentional, at least for the initial version,
  * in order to allow for comparison with the original. This may be cleaned up
  * in future versions, as no revisions to the original public domain code are
- * expected. The original code is hosted at https://prng.di.unimi.it/xoshiro256plus.c
- *
- *
+ * expected. The original code is hosted at https://prng.di.unimi.it/xoshiro256plusplus.c
  */
 
- GBLDEF uint64_t x256_s[4];
+/*  Written in 2019 by David Blackman and Sebastiano Vigna (vigna@acm.org)
 
- static inline uint64_t x256_rotl(const uint64_t x, int k) {
- 	return (x << k) | (x >> (64 - k));
- }
+To the extent possible under law, the author has dedicated all copyright
+and related and neighboring rights to this software to the public domain
+worldwide.
+
+Permission to use, copy, modify, and/or distribute this software for any
+purpose with or without fee is hereby granted.
+
+THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR
+IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE. */
+
+#include "xoshiro.h"
+
+/* This is xoshiro256++ 1.0, one of our all-purpose, rock-solid generators.
+   It has excellent (sub-ns) speed, a state (256 bits) that is large
+   enough for any parallel application, and it passes all tests we are
+   aware of.
+
+   For generating just floating-point numbers, xoshiro256+ is even faster.
+
+   The state must be seeded so that it is not everywhere zero. If you have
+   a 64-bit seed, we suggest to seed a splitmix64 generator and use its
+   output to fill s. */
+
+static inline uint64_t rotl(const uint64_t x, int k) {
+	return (x << k) | (x >> (64 - k));
+}
+
+
+GBLDEF uint64_t x256_s[4];
 
 uint64_t x256_next(void) {
-	const uint64_t result = x256_s[0] + x256_s[3];
+	const uint64_t result = rotl(x256_s[0] + x256_s[3], 23) + x256_s[0];
 
 	const uint64_t t = x256_s[1] << 17;
 
@@ -62,7 +67,7 @@ uint64_t x256_next(void) {
 
 	x256_s[2] ^= t;
 
-	x256_s[3] = x256_rotl(x256_s[3], 45);
+	x256_s[3] = rotl(x256_s[3], 45);
 
 	return result;
 }
@@ -97,9 +102,10 @@ void x256_jump(void) {
 }
 
 
+
 /* This is the long-jump function for the generator. It is equivalent to
    2^192 calls to x256_next(); it can be used to generate 2^64 starting points,
-   from each of which x256_jump() will generate 2^64 non-overlapping
+   from each of which x256_long_jump() will generate 2^64 non-overlapping
    subsequences for parallel distributed computations. */
 
 void x256_long_jump(void) {
