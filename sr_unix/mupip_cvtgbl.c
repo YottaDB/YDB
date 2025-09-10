@@ -234,7 +234,7 @@ int get_load_format(char **line1_ptr, char **line3_ptr, int *line1_len, int *lin
 	uint4	max_io_size;
 
 	max_io_size = MAX_IO_BLOCK_SIZE - 1;				/* label gets less room */
-	*max_rec_size = MAX_STRLEN + ZWR_EXP_RATIO(MAX_KEY_SZ);		/* go for max to avoid interaction with the regex stuff */
+	*max_rec_size = ZWR_EXP_RATIO(MAX_KEY_SZ + MAX_STRLEN);		/* go for max to avoid interaction with the regex stuff */
 	line1 = *line1_ptr = malloc(*max_rec_size);			/* no corresponding free; released at MUPIP termination */
 	line3 = *line3_ptr = malloc(*max_rec_size);			/*  ditto */
 	*line1_len = file_input_read_xchar(line1, CHAR_TO_READ_LINE1_BIN);
