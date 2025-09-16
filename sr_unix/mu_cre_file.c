@@ -145,7 +145,6 @@ error_def(ERR_FILECREERR);
 error_def(ERR_FNTRANSERROR);
 error_def(ERR_LOWSPACECRE);
 error_def(ERR_MUCREFILERR);
-error_def(ERR_MUNOSTRMBKUP);
 error_def(ERR_NOCREMMBIJ);
 error_def(ERR_NOCRENETFILE);
 error_def(ERR_NOSPACECRE);
@@ -526,8 +525,6 @@ unsigned char mu_cre_file(boolean_t caller_is_mupip_create)
 		CLEANUP(EXIT_WRN);
 		return EXIT_WRN;
 	}
-	if ((32 * 1024 - SIZEOF(shmpool_blk_hdr)) < cs_data->blk_size)
-		PUTMSG_WARN_CSA(cs_addrs, 5, ERR_MUNOSTRMBKUP, 3, RTS_ERROR_STRING(path), 32 * 1024 - DISK_BLOCK_SIZE);
 	/* If MUPIP CREATE is caller, then print a message indicating the database file got created even if it is an AUTODB
 	 * region. Otherwise the caller is "gvcst_cre_autoDB()" where the AUTODB file creation is supposed to be invisible
 	 * to the user so skip the file-created message in that case.

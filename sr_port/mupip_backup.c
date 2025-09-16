@@ -158,7 +158,6 @@ error_def(ERR_JNLSTATE);
 error_def(ERR_KILLABANDONED);
 error_def(ERR_MUNOACTION);
 error_def(ERR_MUNOFINISH);
-error_def(ERR_MUNOSTRMBKUP);
 error_def(ERR_MUPCLIERR);
 error_def(ERR_MUSELFBKUP);
 error_def(ERR_NOTRNDMACC);
@@ -562,17 +561,6 @@ void mupip_backup(void)
 		if (gv_cur_region->read_only)
 		{
 			gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
-			rptr->not_this_time = give_up_before_create_tempfile;
-			continue;
-		}
-		/* Used to have MAX_RMS_RECORDSIZE here (instead of 32 * 1024) but this def does not exist, though we
-		 * are making the same restriction due to lack of testing more than anything else so the hard-coded
-		 * value will do for now. SE 5/2005
-		 */
-		if (incremental && ((32 * 1024) - SIZEOF(shmpool_blk_hdr)) < cs_data->blk_size)
-		{
-			gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(5) MAKE_MSG_TYPE(ERR_MUNOSTRMBKUP, ERROR), 3,
-					DB_LEN_STR(gv_cur_region), 32 * 1024 - DISK_BLOCK_SIZE);
 			rptr->not_this_time = give_up_before_create_tempfile;
 			continue;
 		}

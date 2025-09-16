@@ -1067,7 +1067,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* TNWARN */
 	   0,	/* TNTOOLARGE */
 	   0,	/* SHMPLRECOV */
-	   0,	/* MUNOSTRMBKUP */
+	   0,	/* UNUSEDMSG1236 */
 	   0,	/* EPOCHTNHI */
 	   0,	/* CHNGTPRSLVTM */
 	   0,	/* JNLUNXPCTERR */

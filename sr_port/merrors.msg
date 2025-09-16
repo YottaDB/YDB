@@ -1233,7 +1233,7 @@ MUUPGRDNRDY	<Database !AD has not been completely upgraded to !AD format - still
 TNWARN		<Database file !AD has 0x!16@XQ more transactions to go before reaching the transaction number limit (0x!16@XQ). Renew database with MUPIP INTEG TN_RESET>/warning/fao=4!/ansi=0
 TNTOOLARGE	<Database file !AD has reached the transaction number limit (0x!16@XQ). Renew database with MUPIP INTEG TN_RESET>/error/fao=3!/ansi=0
 SHMPLRECOV	<Shared memory pool block recovery invoked for region !AD>/info/fao=2!/ansi=0
-MUNOSTRMBKUP	<Database !AD has a block size larger than !UL and thus cannot use stream (incremental) backup>/warning/fao=3!/ansi=0
+UNUSEDMSG1236 <MUNOSTRMBKUP nixed in r2.04 because MUPIP BACKUP BYTESTREAM is now able to backup database regions with all block sizes>/warning/fao=3!/ansi=0
 EPOCHTNHI	<At the EPOCH record at offset !UL of !AD transaction number [0x!16@XQ] is higher than database transaction number [0x!16@XQ]>/error/fao=5!/ansi=0
 CHNGTPRSLVTM	<Mupip will change tp_resolve_time from !UL to !UL because expected EPOCH or EOF record was not found in Journal File !AD>/info/fao=4!/ansi=0
 JNLUNXPCTERR	<Unexpected error encountered for Journal !AD at disk address 0x!XL>/error/fao=3!/ansi=0
