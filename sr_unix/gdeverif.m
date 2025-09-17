@@ -3,7 +3,7 @@
 ; Copyright (c) 2006-2020 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
-; Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	;
+; Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	;
 ; All rights reserved.						;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -186,7 +186,7 @@ allocchk(rquals)
 	s qn="EXTENSION",ext=$s($d(rquals(qn)):rquals(qn),$d(regs(REGION,qn)):regs(REGION,qn),1:tmpreg(qn))
 	s qn="ALLOCATION",alloc=$s($d(rquals(qn)):rquals(qn),$d(regs(REGION,qn)):regs(REGION,qn),1:tmpreg(qn))
 	s qn="AUTOSWITCHLIMIT",asl=$s($d(rquals(qn)):rquals(qn),$d(regs(REGION,qn)):regs(REGION,qn),1:tmpreg(qn))
-	i alloc>asl s verified=0 d message^GDE(gdeerr("VALTOOBIG"),$zwrite(alloc)_":"_$zwrite(asl)_" (AUTOSWITCHLIMIT)"":""ALLOCATION""") q
+	i alloc>asl s verified=0 d message^GDE(gdeerr("VALTOOBIG"),$zwrite(alloc)_":"_$zwrite(asl)_":""(AUTOSWITCHLIMIT) for a ALLOCATION""") q
 	i alloc'=asl,ext+alloc>asl d
 	. s rquals("ALLOCATION")=asl
 	. d message^GDE(gdeerr("JNLALLOCGROW"),$zwrite(alloc)_":"_$zwrite(asl)_":""region"":"_$zwrite(REGION))
