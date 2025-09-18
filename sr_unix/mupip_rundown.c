@@ -85,6 +85,7 @@ error_def(ERR_REPLPOOLINST);
 error_def(ERR_SEMREMOVED);
 error_def(ERR_SYSCALL);
 error_def(ERR_TEXT);
+error_def(ERR_FILENOTFND);
 
 void mupip_rundown(void)
 {
@@ -167,36 +168,38 @@ void mupip_rundown(void)
 				instfilename = &replpool_id.instfilename[0];
 				status = filename_to_id(&instfilename_gdid, instfilename);
 				if (SS_NORMAL != status)
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_REPLINSTACC, 2, full_len, instfilename,
-						status);
-				if (!mu_rndwn_repl_instance(&replpool_id, !anticipatory_freeze_available, TRUE,
-												&jnlpool_sem_created))
-				{	/* It is possible, we attached to the journal pool (and did not run it down because there
-					 * were other processes still attached to it) but got an error while trying to grab the
-					 * access control semaphore for the receive pool (because a receiver server was still
-					 * running) and because anticipatory_freeze_available is TRUE, we did not detach from
-					 * the journal pool inside "mu_rndwn_repl_instance". We need to do the detach here,
-					 * except if IFOE is configured, in which case we need the journal pool attached
-					 * so that we can check for instance freeze in database rundown.
-					 * In that case, the detach will happen automatically when the process terminates.
-					 * No need to do any instance file cleanup since there is nothing to rundown there
-					 * from either the journal pool or receive pool.
-					 */
-					assert((!jnlpool || (NULL == jnlpool->jnlpool_ctl)) || anticipatory_freeze_available);
-					if ((jnlpool && (NULL != jnlpool->jnlpool_ctl)) && !anticipatory_freeze_available)
-					{
-						shmid = jnlpool->repl_inst_filehdr->jnlpool_shmid;
-						JNLPOOL_SHMDT(jnlpool, status, save_errno);
-						if (0 > status)
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) MAKE_MSG_WARNING(ERR_FILENOTFND), 2, STRLEN(instfilename), instfilename, status);
+				else
+				{
+					if (!mu_rndwn_repl_instance(&replpool_id, !anticipatory_freeze_available, TRUE,
+													&jnlpool_sem_created))
+					{	/* It is possible, we attached to the journal pool (and did not run it down because there
+						* were other processes still attached to it) but got an error while trying to grab the
+						* access control semaphore for the receive pool (because a receiver server was still
+						* running) and because anticipatory_freeze_available is TRUE, we did not detach from
+						* the journal pool inside "mu_rndwn_repl_instance". We need to do the detach here,
+						* except if IFOE is configured, in which case we need the journal pool attached
+						* so that we can check for instance freeze in database rundown.
+						* In that case, the detach will happen automatically when the process terminates.
+						* No need to do any instance file cleanup since there is nothing to rundown there
+						* from either the journal pool or receive pool.
+						*/
+						assert((!jnlpool || (NULL == jnlpool->jnlpool_ctl)) || anticipatory_freeze_available);
+						if ((jnlpool && (NULL != jnlpool->jnlpool_ctl)) && !anticipatory_freeze_available)
 						{
-							ISSUE_REPLPOOLINST(save_errno, shmid, instfilename, "shmdt()");
-							mupip_exit(ERR_MUNOTALLSEC);
+							shmid = jnlpool->repl_inst_filehdr->jnlpool_shmid;
+							JNLPOOL_SHMDT(jnlpool, status, save_errno);
+							if (0 > status)
+							{
+								ISSUE_REPLPOOLINST(save_errno, shmid, instfilename, "shmdt()");
+								mupip_exit(ERR_MUNOTALLSEC);
+							}
 						}
-					}
-					exit_status = ERR_MUNOTALLSEC;
-				} else
-					do_jnlpool_detach = (NULL != jnlpool) && (NULL != jnlpool->jnlpool_ctl);
-				ENABLE_FREEZE_ON_ERROR;
+						exit_status = ERR_MUNOTALLSEC;
+					} else
+						do_jnlpool_detach = (NULL != jnlpool) && (NULL != jnlpool->jnlpool_ctl);
+					ENABLE_FREEZE_ON_ERROR;
+				}
 			}
 		}
 		for ( ; NULL != rptr; rptr = rptr->fPtr)
