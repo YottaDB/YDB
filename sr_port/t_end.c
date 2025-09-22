@@ -914,17 +914,18 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 			} else
 			{
 				cr = t1->cr;
+				assert(t1->cycle <= cr->cycle);
+				if (cr->cycle != t1->cycle)
+				{
+					assert(CDB_STAGNATE > t_tries);
+					status = cdb_sc_lostcr;
+					goto failed;
+				}
 				if (0 != cr->bt_index)
 				{
 					bt = (bt_rec_ptr_t)GDS_REL2ABS(cr->bt_index);
 					assert(NULL != bt);
 					assert(cr->blk == bt->blk);
-					if (cr->cycle != t1->cycle)
-					{
-						assert(CDB_STAGNATE > t_tries);
-						status = cdb_sc_lostcr;
-						goto failed;
-					}
 				} else if (0 != cr->twin)
 				{	/* Update "cr" to point to newer twin */
 					cr = (cache_rec_ptr_t)GDS_ANY_REL2ABS(csa, cr->twin);
@@ -941,13 +942,8 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 						status = cdb_sc_losthist;
 						goto failed;
 					}
-					if (cr->cycle != t1->cycle)
-					{
-						assert(CDB_STAGNATE > t_tries);
-						status = cdb_sc_lostcr;
-						goto failed;
-					}
 				}
+				assert(t1->blk_num == cr->blk);
 				if (NULL != bt)
 				{
 					assert(bt->killtn <= bt->tn);
@@ -1088,17 +1084,18 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 		} else
 		{
 			cr = cs->cr;
+			assert(cs->cycle <= cr->cycle);
+			if (cr->cycle != cs->cycle)
+			{
+				assert(CDB_STAGNATE > t_tries);
+				status = cdb_sc_lostbmlcr;
+				goto failed;
+			}
 			if (0 != cr->bt_index)
 			{
 				bt = (bt_rec_ptr_t)GDS_REL2ABS(cr->bt_index);
 				assert(NULL != bt);
 				assert(cr->blk == bt->blk);
-				if (cr->cycle != cs->cycle)
-				{
-					assert(CDB_STAGNATE > t_tries);
-					status = cdb_sc_lostbmlcr;
-					goto failed;
-				}
 				if (cs->tn <= bt->tn)
 				{
 					assert(CDB_STAGNATE > t_tries);
@@ -1119,13 +1116,8 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 					status = cdb_sc_lostbmlhist;
 					goto failed;
 				}
-				if (cr->cycle != cs->cycle)
-				{
-					assert(CDB_STAGNATE > t_tries);
-					status = cdb_sc_lostbmlcr;
-					goto failed;
-				}
 			}
+			assert(cs->blk == cr->blk);
 			assert((sm_long_t)GDS_REL2ABS(cr->buffaddr) == (sm_long_t)cs->old_block);
 			PIN_CACHE_RECORD(cr, cr_array, cr_array_index);
 			/* Note down "bt" in "cs->bt" to avoid a "bt_put()" call in "bg_update_phase1()".
