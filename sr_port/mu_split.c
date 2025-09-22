@@ -906,7 +906,7 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 				BLK_SEG(bs_ptr2, bn_ptr2, blk_id_sz);
 			} else
 			{
-				assert(old_blk_after_currec == new_blk1_top);
+				assert((old_blk_after_currec == new_blk1_top) || (CDB_STAGNATE > t_tries));
 				BLK_SEG(bs_ptr2, (sm_uc_ptr_t)star_rec_hdr, SIZEOF(rec_hdr));
 				ins_off = blk_seg_cnt;
 				BLK_SEG(bs_ptr2, zeroes, blk_id_sz);
