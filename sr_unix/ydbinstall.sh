@@ -1564,7 +1564,7 @@ elif [ -n "$gtm_copyenv" ] ; then
 fi
 if [ -n "$gtm_linkexec" ] ; then
 	dirensure $gtm_linkexec
-	( cd $gtm_linkexec ; \rm -f ydb gtm ydbsh ; ln -s $ydb_installdir/ydb $ydb_installdir/gtm $ydb_installdir/ydbsh ./ )
+	( cd $gtm_linkexec ; \rm -f ydb gtm ydbsh yottadb ; ln -s $ydb_installdir/ydb $ydb_installdir/gtm $ydb_installdir/ydbsh $ydb_installdir/yottadb ./ )
 	if [ "Y" = "$gtm_verbose" ] ; then echo Linked exec ; ls -l $gtm_linkexec ; fi
 elif [ -n "$gtm_copyexec" ] ; then
 	dirensure $gtm_copyexec
