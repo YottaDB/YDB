@@ -60,21 +60,8 @@ STATICFNDCL void receive_child_locals_finalize(char **local_buff);
 error_def(ERR_CLOSEFAIL);
 error_def(ERR_JOBSETUP);
 error_def(ERR_STRINGOFLOW);
-error_def(ERR_JOBLABOFF);
 error_def(ERR_JOBLVN2LONG);
 error_def(ERR_MAXACTARG);
-
-static CONDITION_HANDLER(job_addr_ch)
-{
-	joberr_t		joberr;
-	int			rc;
-	START_CH(FALSE);
-
-	joberr = joberr_rtn;
-	DOWRITERC(setup_fd, &joberr, SIZEOF(joberr), rc);
-	/* Ignore rc, as it is more important to report the underlying error than it is to report problems reporting it. */
-	NEXTCH;
-}
 
 /*
  * ------------------------------------------------
@@ -96,7 +83,6 @@ void ojchildparms(job_params_type *jparms, gcall_args *g_args, mval *arglst)
 	socket_struct		*socketptr;
 	char			*local_buff = NULL;
 	mval			*command_str;
-	joberr_t		joberr;
 	rhdtyp			*rtnhdr;
 	char			*transfer_addr;
 	DCL_THREADGBL_ACCESS;
@@ -109,7 +95,8 @@ void ojchildparms(job_params_type *jparms, gcall_args *g_args, mval *arglst)
 		g_args->callargs = 0;
 	while(!setup_done)
 	{
-		int	rc;
+		int		rc;
+		boolean_t	need_rtnobj_shm_free;
 
 		DOREADRC(setup_fd, &setup_op, SIZEOF(setup_op), rc);
 		if (rc < 0)
@@ -127,24 +114,10 @@ void ojchildparms(job_params_type *jparms, gcall_args *g_args, mval *arglst)
 			/* Validate the routine and label */
 			MSTR_DEF(routine_mstr, jparms->params.routine.len, jparms->params.routine.buffer);
 			MSTR_DEF(label_mstr, jparms->params.label.len, jparms->params.label.buffer);
-			ESTABLISH(job_addr_ch);
-			if (!job_addr(&routine_mstr, &label_mstr, jparms->params.offset, (char **)&rtnhdr, &transfer_addr))
-			{
-				REVERT;
-				/* Send routine status */
-				joberr = joberr_rtn;
-				DOWRITERC(setup_fd, &joberr, SIZEOF(joberr), rc);
-				/* Ignore rc, as it is more important to report the underlying error than it is
-				 * to report problems reporting it.
-				 */
-				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(2) ERR_JOBLABOFF, 0);
-			}
-			REVERT;
-			/* Send routine status */
-			joberr = joberr_ok;
-			DOWRITERC(setup_fd, &joberr, SIZEOF(joberr), rc);
-			if (rc < 0)
-				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_JOBSETUP, 2, LEN_AND_LIT("routine status"), errno, 0);
+			if (!job_addr(&routine_mstr, &label_mstr, jparms->params.offset,
+					(char **)&rtnhdr, &transfer_addr, &need_rtnobj_shm_free))
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_RTNLABOFF, 5, label_mstr.len, label_mstr.addr,
+					jparms->params.offset, routine_mstr.len, routine_mstr.addr);
 			break;
 		case job_set_parm_list:
 			DOREADRC(setup_fd, &arg_count, SIZEOF(arg_count), rc);

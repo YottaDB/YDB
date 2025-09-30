@@ -112,7 +112,7 @@ LITDEF	err_msg merrors[] = {
 	{ "MUPIPINFO", "!AD", 2, 0 },
 	{ "UNUSEDMSG277", "IVTIME nixed in r1.20 because it is a VMS only error", 0, 0 },
 	{ "JOBFAIL", "JOB command failure", 0, 0 },
-	{ "JOBLABOFF", "Label and offset not found in created process", 0, 0 },
+	{ "RTNLABOFF", "Label !AD and/or offset !UL not found in routine !AD", 5, 0 },
 	{ "JOBPARNOVAL", "This job parameter cannot take a value", 0, 0 },
 	{ "JOBPARNUM", "The value of this job parameter must be an integer", 0, 0 },
 	{ "JOBPARSTR", "The value of this job parameter must be a string", 0, 0 },

@@ -103,7 +103,6 @@ error_def(ERR_FMLLSTMISSING);
 error_def(ERR_YDBDISTUNDEF);
 error_def(ERR_GTMSECSHRPERM);
 error_def(ERR_INVYDBEXIT);
-error_def(ERR_JOBLABOFF);
 error_def(ERR_MAXACTARG);
 error_def(ERR_MAXSTRLEN);
 error_def(ERR_SYSCALL);
@@ -218,6 +217,7 @@ int ydb_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 	char			**arg_blob_ptr;
 	int			*java_arg_type;
 	boolean_t		ci_ret_code_quit_needed = FALSE;
+	boolean_t		need_rtnobj_shm_free;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -251,10 +251,13 @@ int ydb_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 	ESTABLISH_RET(gtmci_ch, mumps_status);
 	entry = ci_load_table_rtn_entry(c_rtn_name, &ci_tab);   /* load ci table, locate entry for return name */
 	lref_parse((unsigned char*)entry->label_ref.addr, &routine, &label, &i);
-	/* The 3rd argument is NULL because we will get lnr_adr via TABENT_PROXY. */
-	if (!job_addr(&routine, &label, 0, (char **)&base_addr, &xfer_addr))
-		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_JOBLABOFF);
-	/* Thejob_addr() call above has done a zlink of the routine we want to drive if needed and has give us
+	/* 3rd argument is 0 because we don't support a line offset from a label in call-ins.
+	 * See comment in ojstartchild.c about "need_rtnobj_shm_free". It is not used here because we will
+	 * decrement rtnobj reference counts at exit time in relinkctl_rundown (called by gtm_exit_handler).
+	 */
+	if (!job_addr(&routine, &label, 0, (char **)&base_addr, &xfer_addr, &need_rtnobj_shm_free))
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_RTNLABOFF, 5, label.len, label.addr, 0, routine.len, routine.addr);
+	/* The job_addr() call above has done a zlink of the routine we want to drive if needed and has given us
 	 * the routine header and execution address we need. But it did not do an autorelink check so do that now
 	 * before we put these values into a stackframe as this call may change what is needing to go there.
 	 */
@@ -561,6 +564,7 @@ int ydb_ci_exec(const char *c_rtn_name, ci_name_descriptor *ci_info, va_list tem
 	intrpt_state_t		old_intrpt_state;
 	boolean_t		ci_ret_code_quit_needed = FALSE;
 	boolean_t		unwind_here = FALSE;
+	boolean_t		need_rtnobj_shm_free;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -643,10 +647,13 @@ int ydb_ci_exec(const char *c_rtn_name, ci_name_descriptor *ci_info, va_list tem
 			ci_info->handle = entry;
 	}
 	lref_parse((unsigned char*)entry->label_ref.addr, &routine, &label, &i);
-	/* 3rd argument is 0 because we don't support a line offset from a label in call-ins */
-	if (!job_addr(&routine, &label, 0, (char **)&base_addr, &xfer_addr))
-		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_JOBLABOFF);
-	/* Thejob_addr() call above has done a zlink of the routine we want to drive if needed and has give us
+	/* 3rd argument is 0 because we don't support a line offset from a label in call-ins.
+	 * See comment in ojstartchild.c about "need_rtnobj_shm_free". It is not used here because we will
+	 * decrement rtnobj reference counts at exit time in relinkctl_rundown (called by gtm_exit_handler).
+	 */
+	if (!job_addr(&routine, &label, 0, (char **)&base_addr, &xfer_addr, &need_rtnobj_shm_free))
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_RTNLABOFF, 5, label.len, label.addr, 0, routine.len, routine.addr);
+	/* The job_addr() call above has done a zlink of the routine we want to drive if needed and has given us
 	 * the routine header and execution address we need. But it did not do an autorelink check so do that now
 	 * before we put these values into a stackframe as this call may change what is needing to go there.
 	 */

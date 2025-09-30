@@ -276,7 +276,7 @@ IONOTOPEN	<Attempt to USE an I/O device which has not been opened>/error/fao=0!/
 MUPIPINFO	<!AD>/info/fao=2!/ansi=0
 UNUSEDMSG277	<IVTIME nixed in r1.20 because it is a VMS only error>/error/fao=0!/ansi=0
 JOBFAIL		<JOB command failure>/error/fao=0!/ansi=0
-JOBLABOFF	<Label and offset not found in created process>/error/fao=0!/ansi=13
+RTNLABOFF	<Label !AD and/or offset !UL not found in routine !AD>/error/fao=5!/ansi=13
 JOBPARNOVAL	<This job parameter cannot take a value>/error/fao=0!/ansi=0
 JOBPARNUM	<The value of this job parameter must be an integer>/error/fao=0!/ansi=0
 JOBPARSTR	<The value of this job parameter must be a string>/error/fao=0!/ansi=0

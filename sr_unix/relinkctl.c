@@ -67,7 +67,6 @@ GBLREF	uint4		process_id;
 GBLREF	rtn_tabent	*rtn_names, *rtn_names_end;
 GBLREF	stack_frame	*frame_pointer;
 GBLREF	int		process_exiting;
-GBLREF	boolean_t	gtm_pipe_child;
 OS_PAGE_SIZE_DECLARE
 
 STATICFNDCL void relinkctl_map(open_relinkctl_sgm *linkctl);
@@ -1075,7 +1074,7 @@ void relinkctl_rundown(boolean_t decr_attached, boolean_t do_rtnobj_shm_free)
 		if (decr_attached)
 		{	/* MUPIP RUNDOWN -RELINKCTL should still hold a lock. */
 			assert(linkctl->locked == is_mu_rndwn_rlnkctl);
-			if (!is_mu_rndwn_rlnkctl && !gtm_pipe_child)
+			if (!is_mu_rndwn_rlnkctl)
 				relinkctl_lock_exclu(linkctl);
 			hdr = linkctl->hdr;
 			assert((INVALID_SHMID != hdr->relinkctl_shmid) || is_mu_rndwn_rlnkctl);
@@ -1094,7 +1093,7 @@ void relinkctl_rundown(boolean_t decr_attached, boolean_t do_rtnobj_shm_free)
 				shm_hdr = NULL;
 				nattached = -1;
 			}
-			if ((0 == nattached) && !gtm_pipe_child)
+			if (0 == nattached)
 			{
 				DBGARLNK((stderr, "relinkctl_rundown : nattached = 0\n"));
 				remove_shm = remove_rctl = TRUE;
@@ -1137,7 +1136,6 @@ void relinkctl_rundown(boolean_t decr_attached, boolean_t do_rtnobj_shm_free)
 				}
 			} else
 			{
-				assert(!gtm_pipe_child || (0 != nattached));
 				remove_shm = FALSE;
 				remove_rctl = FALSE;
 			}
@@ -1234,8 +1232,7 @@ void relinkctl_rundown(boolean_t decr_attached, boolean_t do_rtnobj_shm_free)
 			}
 			linkctl->rec_base = NULL;
 			linkctl->shm_hashbase = NULL;
-			if (!gtm_pipe_child)
-				relinkctl_unlock_exclu(linkctl);
+			relinkctl_unlock_exclu(linkctl);
 		}
 		relinkctl_unmap(linkctl);	/* sets "linkctl->hdr" to NULL */
 		nextctl = linkctl->next;

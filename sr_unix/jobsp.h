@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -53,39 +53,11 @@ GBLREF int job_errno;
  *
  * Additions to this enum must match the joberrs array in joberr.h.
  *********************************************************************************************************************/
-
 typedef enum
-{	joberr_ok,
-	joberr_gen,
-	joberr_io_stdin_open,
-	joberr_io_stdin_dup,
-	joberr_io_stdout_creat,
-	joberr_io_stdout_open,
-	joberr_io_stdout_dup,
-	joberr_io_stderr_creat,
-	joberr_io_stderr_open,
-	joberr_io_stderr_dup,
-	joberr_cd_toolong,
-	joberr_cd,
-	joberr_rtn,
-	joberr_sid,
-	joberr_sp,
-	joberr_frk,
-	joberr_stdout_rename,
-	joberr_stderr_rename,
-	joberr_pipe_mp,
-	joberr_pipe_mgc,
-	joberr_stdin_socket_lookup,
-	joberr_stdout_socket_lookup,
-	joberr_stderr_socket_lookup,
-	joberr_io_stdin_socket_dup,
-	joberr_io_stdout_socket_dup,
-	joberr_io_stderr_socket_dup,
-	joberr_io_setup_op_write,
-	joberr_io_setup_write,
-	joberr_sig,
-	joberr_stp,			/* These two should stay at the end of the enum. */
-	joberr_end
+{
+#	define	JOBERR_TABLE_ENTRY(JOBERR_ENUM, JOBERR_STRING)	JOBERR_ENUM,
+#	include "joberr_table.h"
+#	undef JOBERR_TABLE_ENTRY
 } joberr_t;
 
 typedef struct job_parm_struct

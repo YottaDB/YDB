@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -58,7 +58,6 @@ error_def(ERR_RUNPARAMERR);
 error_def(ERR_TEXT);
 error_def(ERR_SYSCALL);
 error_def(ERR_JOBSTARTCMDFAIL);
-error_def(ERR_JOBLABOFF);
 
 CONDITION_HANDLER(job_init_ch)
 {
@@ -80,6 +79,7 @@ void jobchild_init(void)
 	mstr		routine, label;
 	int		offset;
 	int		status;
+	boolean_t	need_rtnobj_shm_free;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -110,8 +110,13 @@ void jobchild_init(void)
 		}
 		MSTR_DEF(routine_mstr, jparms.params.routine.len, jparms.params.routine.buffer);
 		MSTR_DEF(label_mstr, jparms.params.label.len, jparms.params.label.buffer);
-		if (!job_addr(&routine_mstr, &label_mstr, jparms.params.offset, (char **)&base_addr, (char **)&transfer_addr))
-			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_JOBLABOFF);
+		/* See comment in ojstartchild.c about "need_rtnobj_shm_free". It is not used here because we will
+		 * decrement rtnobj reference counts at exit time in relinkctl_rundown (called by gtm_exit_handler).
+		 */
+		if (!job_addr(&routine_mstr, &label_mstr, jparms.params.offset,
+				(char **)&base_addr, (char **)&transfer_addr, &need_rtnobj_shm_free))
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_RTNLABOFF, 5,
+				label_mstr.len, label_mstr.addr, jparms.params.offset, routine_mstr.len, routine_mstr.addr);
 		/* Set process priority */
 		if (jparms.params.baspri)
 		{	/* send message to system log if nice fails */
@@ -139,7 +144,11 @@ void jobchild_init(void)
 			else
 				rtn_name = run_file_name;
 			lref_parse((unsigned char *)rtn_name, &routine, &label, &offset);
-			ret = job_addr(&routine, &label, offset, (char **)&base_addr, (char **)&transfer_addr);
+			/* See comment in ojstartchild.c about "need_rtnobj_shm_free". It is not used here because we will
+			 * decrement rtnobj reference counts at exit time in relinkctl_rundown (called by gtm_exit_handler).
+			 */
+			ret = job_addr(&routine, &label, offset,
+					(char **)&base_addr, (char **)&transfer_addr, &need_rtnobj_shm_free);
 			if (shebang_invocation && created_tmpdir)
 			{	/* Remove the temporary object directory now that .o file has been linked into the process.
 				 * The object directory would have been added as the first element of "$zroutines".
@@ -169,7 +178,8 @@ void jobchild_init(void)
 				}
 			}
 			if (!ret)
-				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_JOBLABOFF);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_RTNLABOFF, 5,
+					label.len, label.addr, offset, routine.len, routine.addr);
 		} else if (MUMPS_CALLIN & invocation_mode) /* call-in mode */
 		{
 			base_addr = make_dmode();

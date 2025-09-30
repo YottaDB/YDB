@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -24,11 +24,10 @@
 
 GBLREF mident_fixed     zlink_mname;
 
-error_def(ERR_JOBLABOFF);
 error_def(ERR_ZLINKFILE);
 error_def(ERR_ZLMODULE);
 
-boolean_t job_addr(mstr *rtn, mstr *label, int4 offset, char **hdr, char **labaddr)
+boolean_t job_addr(mstr *rtn, mstr *label, int4 offset, char **hdr, char **labaddr, boolean_t *need_rtnobj_shm_free)
 {
 	rhdtyp		*rt_hdr;
 	int4		*lp;
@@ -45,8 +44,10 @@ boolean_t job_addr(mstr *rtn, mstr *label, int4 offset, char **hdr, char **labad
 		if (NULL == rt_hdr)
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_ZLINKFILE, 2, rtn->len, rtn->addr,
 				ERR_ZLMODULE, 2, STRLEN(&zlink_mname.c[0]), &zlink_mname);
+		*need_rtnobj_shm_free = ARLINK_ONLY(rt_hdr->shared_object) NON_ARLINK_ONLY(FALSE);
 		*hdr = (char *)rt_hdr;
-	}
+	} else
+		*need_rtnobj_shm_free = FALSE;
 	lp = NULL;
 	if ((rt_hdr->compiler_qlf & CQ_LINE_ENTRY) || (0 == offset))
 		/* Label offset with routine compiled with NOLINE_ENTRY should cause error. */

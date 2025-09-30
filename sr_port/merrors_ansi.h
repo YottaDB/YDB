@@ -110,7 +110,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* MUPIPINFO */
 	   0,	/* UNUSEDMSG277 */
 	   0,	/* JOBFAIL */
-	  13,	/* JOBLABOFF */
+	  13,	/* RTNLABOFF */
 	   0,	/* JOBPARNOVAL */
 	   0,	/* JOBPARNUM */
 	   0,	/* JOBPARSTR */
