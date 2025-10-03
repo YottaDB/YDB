@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-; Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	;
+; Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	;
 ; All rights reserved.						;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -521,7 +521,7 @@ ExportEnv(var,value)
 	;   unless one already exists (since invoking the set label is idempotent)
 	; Else add to the list of variables to be unset when the unset label is invoked
 	; currenv and ppid should have been set prior to calling this label
-	new $test,envsav,envval,$test
+	new $test,envsav,envval
 	write setcmd,var,setsep,"'",value,"'",!	; write even if already in the environment because it may not have been exported
 	if $data(currenv(var)) do
 	. set envsav="ydb_sav_"_ppid_"_"_var

@@ -1,9 +1,9 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries.*
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -84,6 +84,7 @@ LITDEF	err_msg ydberrors[] = {
 	{ "ZYENCODEINCOMPL", "Error encountered during ZYENCODE; operation may be incomplete", 0, 0 },
 	{ "ZYENCODESRCUNDEF", "Error encountered during ZYENCODE; source variable must not be undefined", 0, 0 },
 	{ "BADZYENZYDENEST", "Unsupported nesting of ZYENCODE or ZYDECODE command", 0, 0 },
+	{ "DUPLICATENEW", "Variable !AD appears twice in the same NEW command", 2, 0 },
 };
 
 
@@ -97,7 +98,7 @@ GBLDEF	err_ctl ydberrors_ctl = {
 	256,
 	"YDB",
 	&ydberrors[0],
-	67,
+	68,
 	&ydberrors_undocarr[0],
 	0
 };

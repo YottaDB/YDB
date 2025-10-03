@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -86,6 +86,7 @@
 #include "gtm_putmsg_list.h"
 #include "gvt_inline.h"
 #include "deferred_events.h"
+#include "duplicatenew_cleanup.h"
 #ifdef GTM_TRIGGER
 #include "gv_trigger.h"
 #include "gtm_trigger.h"
@@ -283,6 +284,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 	if (NULL != alias_retarg)
 		CLEAR_ALIAS_RETARG;
 	bool_zysqlnull_finish_error_if_needed();	/* Clean up any in-progress boolean expression evaluation */
+	duplicatenew_cleanup();
 	if ((int)ERR_UNSOLCNTERR == SIGNAL)
 	{
 		/* This is here for linking purposes.  We want to delay the receipt of

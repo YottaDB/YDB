@@ -3,7 +3,7 @@
 ! Copyright (c) 2001-2017 Fidelity National Information		!
 ! Services, Inc. and/or its subsidiaries. All rights reserved.	!
 !								!
-! Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries.	!
+! Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries.	!
 ! All rights reserved.						!
 !								!
 !	This source code contains the intellectual property	!
@@ -93,6 +93,7 @@ ZYENCODEDESC	<ZYENCODE operation not possible: !AD is a descendant of !AD>/error
 ZYENCODEINCOMPL	<Error encountered during ZYENCODE; operation may be incomplete>/warning/fao=0
 ZYENCODESRCUNDEF	<Error encountered during ZYENCODE; source variable must not be undefined>/error/fao=0
 BADZYENZYDENEST	<Unsupported nesting of ZYENCODE or ZYDECODE command>/error/fao=0
+DUPLICATENEW	<Variable !AD appears twice in the same NEW command>/warning/fao=2
 !
 ! If there are UNUSEDMSG* lines unused for more than one year and at least two non-patch releases, use them before adding new lines.
 !

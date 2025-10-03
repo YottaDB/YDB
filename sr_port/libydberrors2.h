@@ -1,9 +1,9 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries.*
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -80,3 +80,4 @@
 #define YDB_ERR_ZYENCODEINCOMPL -151028232
 #define YDB_ERR_ZYENCODESRCUNDEF -151028242
 #define YDB_ERR_BADZYENZYDENEST -151028250
+#define YDB_ERR_DUPLICATENEW -151028256

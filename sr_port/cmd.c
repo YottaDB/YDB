@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2020-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2020-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -322,7 +322,8 @@ int cmd(void)
 		if ((EXPR_FAIL == (rval = (*cmd_data[x].fcn)())) || (TK_COMMA != TREF(window_token)))	/* NOTE assignment */
 			break;
 		else
-		{	advancewindow();
+		{
+			advancewindow();
 			if ((TK_SPACE == TREF(window_token)) || (TK_EOL == TREF(window_token)))
 			{
 				if (NULL != oldchain)
