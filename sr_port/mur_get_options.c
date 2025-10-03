@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2023 Fidelity National Information	*
+ * Copyright (c) 2003-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -48,7 +48,7 @@ GBLREF	boolean_t	mupip_jnl_recover;
 GBLREF	bool		mupip_error_occurred;
 GBLREF	io_pair		io_curr_device;
 
-error_def(ERR_UNIQNAME);
+error_def(ERR_FILENAMETOOLONG);
 error_def(ERR_INVERRORLIM);
 error_def(ERR_INVGLOBALQUAL);
 error_def(ERR_NULLPATTERN);
@@ -61,6 +61,7 @@ error_def(ERR_INVTRNSQUAL);
 error_def(ERR_MUPCLIERR);
 error_def(ERR_NOTPOSITIVE);
 error_def(ERR_RSYNCSTRMVAL);
+error_def(ERR_UNIQNAME);
 
 #define EXCLUDE_CHAR	'~'
 #define STR2PID		asc2i
@@ -344,7 +345,7 @@ void	mur_get_options(void)
 		if (!CLI_GET_STR_ALL("REDIRECT", qual_buffer, &length))
 			mupip_exit(ERR_MUPCLIERR);
 		qual_buffer_ptr = qual_buffer;
-		for (ctop = qual_buffer + length;  qual_buffer_ptr < ctop;)
+		for (ctop = qual_buffer + length; qual_buffer_ptr < ctop;)
 		{
 			if (!cli_get_str_ele(qual_buffer_ptr, entry, &length, FALSE))
 				mupip_exit(ERR_MUPCLIERR);
@@ -687,6 +688,26 @@ void	mur_get_options(void)
 		}
 		mur_options.selection = TRUE;
 	}
+	if (cli_present("JNLDIR") == CLI_PRESENT)
+	{
+		length = MAX_LINE;
+		if (!CLI_GET_STR_ALL("JNLDIR", qual_buffer, &length))
+			mupip_exit(ERR_MUPCLIERR);
+		if (MAX_FN_LEN < length)
+		{	/* Limit the length for this parameter */
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_FILENAMETOOLONG);
+			mupip_exit(ERR_MUPCLIERR);
+		}
+		mur_options.jnldir = (select_list *)malloc(SIZEOF(select_list));
+		mur_options.jnldir->len = length;
+		mur_options.jnldir->buff = (char *)malloc(mur_options.jnldir->len + 1);
+		memcpy(mur_options.jnldir->buff, qual_buffer, mur_options.jnldir->len);
+		mur_options.jnldir->buff[mur_options.jnldir->len] = '\0';
+		mur_options.jnldir->next = NULL;
+	}
+	mur_options.ignorelostjnl = FALSE; /* By Default or specified with negation */
+	if ((status = cli_present("IGNORELOSTJNL")) == CLI_PRESENT)
+		mur_options.ignorelostjnl = TRUE;
 	/*----- 	-GVPATFILE=(list of strings to search for)	-----*/
 	if (cli_present("GVPATFILE") == CLI_PRESENT)
 	{

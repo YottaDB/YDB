@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2021 Fidelity National Information	*
+ * Copyright (c) 2006-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -27,6 +27,7 @@
 #include "repl_instance.h"
 #include "jnl.h"
 #include "change_reg.h"
+#include "repl_shutdcode.h"
 
 GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	uint4			process_id;
@@ -37,6 +38,7 @@ GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
 
 error_def(ERR_JNLEXTEND);
+error_def(ERR_JNLPOOLSETUP);
 
 /* This function is called primarily to append a new histinfo record to the replication instance file by one of the following
  *	1) MUPIP REPLIC -SOURCE -START -ROOTPRIMARY command (after forking the child source server) if it created the journal pool.
@@ -53,12 +55,28 @@ void	gtmsource_rootprimary_init(seq_num start_seqno)
 	jnl_private_control	*jpc;
 	jnl_buffer_ptr_t	jbp;
 	uint4			jnl_status;
+	sgmnt_addrs             *csa;
 
 	assert(NULL != jnlpool);
 	udi = FILE_INFO(jnlpool->jnlpool_dummy_reg);
 	assert(NULL != jnlpool->repl_inst_filehdr);
 	/* Update journal pool fields to reflect this is a root primary startup and updates are enabled */
 	assert(!udi->s_addrs.hold_onto_crit || jgbl.onlnrlbk);
+	for (reg = gd_header->regions, region_top = gd_header->regions + gd_header->n_regions; reg < region_top; reg++)
+	{
+		gv_cur_region = reg;
+		if (reg_cmcheck(reg))
+			continue;
+		assert(reg->open);
+		csa = &FILE_INFO(reg)->s_addrs;
+		if (reg->read_only && REPL_ALLOWED(csa))
+		{
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_JNLPOOLSETUP, 0, ERR_TEXT, 2,
+					RTS_ERROR_LITERAL("Source Server does not have write permissions to one or "
+						"more database files that are replicated"));
+			gtmsource_exit(ABNORMAL_SHUTDOWN);
+		}
+	}
 	was_crit = udi->s_addrs.now_crit;
 	if (!was_crit)
 		grab_lock(jnlpool->jnlpool_dummy_reg, TRUE, ASSERT_NO_ONLINE_ROLLBACK);

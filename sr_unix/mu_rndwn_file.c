@@ -92,6 +92,7 @@ GBLREF	gd_region		*ftok_sem_reg;
 GBLREF	mur_opt_struct		mur_options;
 GBLREF	mval			dollar_zgbldir;
 GBLREF 	boolean_t		mu_region_found;
+GBLREF	uint4			process_id;
 #ifdef DEBUG
 GBLREF	boolean_t		in_mu_rndwn_file;
 #endif
@@ -359,6 +360,7 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone, boolean_t delete_s
 	gd_region		*statsDBreg, *save_ftok_sem_reg;
 	jnl_buffer_ptr_t	jbp;
 	int			mlk_shmid;
+	char			ctime_buf[26];
 #	ifdef DEBUG
 	boolean_t		already_grabbed_ftok_sem = FALSE;
 #	endif
@@ -1114,11 +1116,17 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone, boolean_t delete_s
 				}
 				udi->counter_acc_incremented = TRUE;
 			}
-			/* If db & shm are in sync AND we aren't alone in using it, we can do nothing */
+			/* If db & shm are in sync AND we aren't alone in using it, we can do nothing except print some
+			 * information about the contention.
+			 */
 			if (0 != shm_buf.shm_nattch)
 			{
-				util_out_print("!AD [!UL]-> File is in use by another process.",
-						TRUE, DB_LEN_STR(reg), udi->shmid);
+				ctime_r(&shm_buf.shm_atime, ctime_buf);
+				ctime_buf[24] = '\0';
+				util_out_print("Process !UL found !AD [!UL]-> File is in use by !UL process(es)."
+					"  CPID = !UL, LPID = !UL last attach time !AD",
+					TRUE, process_id, DB_LEN_STR(reg), udi->shmid, shm_buf.shm_nattch, shm_buf.shm_cpid,
+					shm_buf.shm_lpid, LEN_AND_STR(ctime_buf));
 				MU_RNDWN_FILE_CLNUP(reg, udi, tsd, sem_created, udi->counter_acc_incremented);
 				return FALSE;
 			}

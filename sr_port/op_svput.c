@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -196,7 +196,7 @@ void op_svput(int varnum, mval *v)
 			        MV_FORCE_INT(save_mval_ptr);
 			        save_mval_ptr->mvtype = MV_INT | MV_NM;
 			}
-			if (!((0 > save_mval_ptr->m[1]) || (TPTIMEOUT_MAX_TIME < save_mval_ptr->m[1])))
+			if (!((0 >= (save_mval_ptr->m[1] / TPTIMEOUT_GRACE_RNDS)) || (TPTIMEOUT_MAX_TIME < save_mval_ptr->m[1])))
 			        TREF(dollar_zmaxtptime) = save_mval_ptr->m[1];
 			if ((MVST_MVAL == mv_chain->mv_st_type) && (save_mval_ptr == &mv_chain->mv_st_cont.mvs_mval))
 			        POP_MV_STENT();
@@ -236,7 +236,7 @@ void op_svput(int varnum, mval *v)
 #ifdef			DEBUG
 			if (WBTEST_ENABLED(WBTEST_MUNMAP_FREE) && (3 == gtm_white_box_test_case_count))
 				INVOKE_STP_GCOL(stringpool.top - stringpool.free + 1);
-			if (WBTEST_ENABLED(WBTEST_ZTTEST))
+			if (WBTEST_ENABLED(WBTEST_GCOL) && (1 == gtm_white_box_test_case_count))
 				INVOKE_STP_GCOL(MAX_SRCLINE);
 			if (WBTEST_ENABLED(WBTEST_MUNMAP_FREE) && (3 == gtm_white_box_test_case_count))
 				INVOKE_STP_GCOL(stringpool.top - stringpool.free + 1);

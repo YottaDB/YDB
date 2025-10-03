@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -358,7 +358,8 @@ uint4	mur_output_record(reg_ctl_list *rctl)
 			 * easy to keep the db in sync with the jnl tn so do not skip the curr_tn increment in that case.
 			 */
 			assert((rec->jrec_inctn.prefix.tn == csd->trans_hist.curr_tn)
-				|| ((rec->jrec_inctn.prefix.tn + 1) == csd->trans_hist.curr_tn) || mur_options.notncheck);
+				|| ((rec->jrec_inctn.prefix.tn + 1) == csd->trans_hist.curr_tn)
+				|| mur_options.notncheck || mur_options.jnldir);
 			if (mur_options.notncheck || (rec->jrec_inctn.prefix.tn >= csd->trans_hist.curr_tn))
 			{
 				if (FALSE == ((was_crit = csa->now_crit)))

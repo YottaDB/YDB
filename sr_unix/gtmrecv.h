@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2023 Fidelity National Information	*
+ * Copyright (c) 2006-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -221,6 +221,7 @@ typedef struct
 	volatile uint4	restart;		/* Used by receiver server to coordinate crash restart with update process */
 	volatile uint4	changelog;		/* Boolean - change the log file */
 	volatile uint4	log_interval;		/* Interval (in seqnos) at which receiver logs its progress */
+	int4		recv_filter_pid;	/* Process ID of the receiver filter */
 	char		filter_cmd[MAX_FILTER_CMD_LEN];	/* Receiver filters incoming records using this process */
 	char		log_file[MAX_FN_LEN + 1];	/* File to log receiver progress */
 	char		statslog_file[MAX_FN_LEN + 1];	/* File to log statistics */
@@ -237,6 +238,7 @@ typedef struct
 	boolean_t	updresync_cross_endian;	/* is the -updateresync instance file cross endian relative to current instance */
 	int4		updresync_num_histinfo_strm[MAX_SUPPL_STRMS];	/* "last_histinfo_num[]" member of instance file header
 									 * from -UPDATERESYNC=<INSTFILE> */
+	int4		filler_8byte_align;	/* Keep size % 8 == 0 */
 	repl_inst_uuid	updresync_lms_group;	/* "lms_group_info" member of instance file header from -UPDATERESYNC=<INSTFILE> */
 	seq_num		updresync_jnl_seqno;	/* "jnl_seqno" member of instance file header from -UPDATERESYNC=<INSTFILE> */
 	repl_inst_uuid	remote_lms_group;	/* "lms_group_info" member of remote instance file header.

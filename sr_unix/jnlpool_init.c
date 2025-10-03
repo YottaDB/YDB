@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -1212,6 +1212,7 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 			gtmsourcelocal_ptr->log_interval = log_interval = gtmsource_options.src_log_interval;
 			gtmsourcelocal_ptr->statslog_file[0] = '\0';
 			gtmsourcelocal_ptr->last_flush_resync_seqno = 0;
+			gtmsourcelocal_ptr->src_filter_pid = 0;
 			gtmsourcelocal_ptr->next_histinfo_seqno = 0;/* fully initialized when source server connects to receiver */
 			gtmsourcelocal_ptr->next_histinfo_num = 0;  /* fully initialized when source server connects to receiver */
 			gtmsourcelocal_ptr->num_histinfo = 0;  /* fully initialized when source server connects to receiver */

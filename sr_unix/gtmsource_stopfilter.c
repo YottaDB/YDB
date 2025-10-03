@@ -59,6 +59,7 @@ int gtmsource_stopfilter(void)
 		return (ABNORMAL_SHUTDOWN);
 	}
 	jnlpool->gtmsource_local->filter_cmd[0] = '\0';
+	jnlpool->gtmsource_local->src_filter_pid = 0;
 	if (GTMSOURCE_MODE_PASSIVE == jnlpool->gtmsource_local->mode)
 		util_out_print("Disabling filter on passive source server", TRUE);
 	else

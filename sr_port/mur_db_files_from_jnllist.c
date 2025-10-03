@@ -46,6 +46,7 @@
 
 GBLREF	gd_region	*gv_cur_region;
 GBLREF	gd_addr		*gd_header;
+GBLREF	mur_opt_struct	mur_options;
 
 error_def(ERR_JNLREAD);
 error_def(ERR_PREMATEOF);
@@ -62,6 +63,7 @@ gld_dbname_list *mur_db_files_from_jnllist(char *jnl_file_list, unsigned short j
 	char 			*cptr, *ctop, *cptr_last, db_fname[GTM_PATH_MAX];
 	jnl_ctl_list		jctl_temp, *jctl = &jctl_temp;
 	jnl_file_header		*jfh;
+	unsigned char		*ptr_fname = NULL;
 #if defined(VMS)
 	io_status_block_disk	iosb;
 #endif
@@ -106,7 +108,11 @@ gld_dbname_list *mur_db_files_from_jnllist(char *jnl_file_list, unsigned short j
 		cptr_last = cptr;
 		while (0 != *cptr && ',' != *cptr && '"' != *cptr &&  ' ' != *cptr)
 			++cptr;
-		if (!get_full_path(cptr_last, (unsigned int)(cptr - cptr_last),
+		if (mur_options.jnldir)
+		{
+			memset(jctl->jnl_fn, 0, jctl->jnl_fn_len);
+			COPY_JNL_PATH(jctl, cptr, cptr_last, mur_options.jnldir);
+		} else if (!get_full_path(cptr_last, (unsigned int)(cptr - cptr_last),
 					(char *)jctl->jnl_fn, &jctl->jnl_fn_len, MAX_FN_LEN, &ustatus))
 		{
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_FILEPARSE, 2, cptr - cptr_last, cptr_last, ustatus);
@@ -147,6 +153,12 @@ gld_dbname_list *mur_db_files_from_jnllist(char *jnl_file_list, unsigned short j
 				if ((seg->fname_len == jfh->data_file_name_length)
 						&& !memcmp(seg->fname, jfh->data_file_name, seg->fname_len))
 					break; /* Found db in gld file. Use that region structure. */
+				if (mur_options.jnldir)
+				{
+					IGNORE_JNL_PATH(ptr_fname, jfh, seg);
+					if (NULL != ptr_fname)
+						break; /* Use that region structure */
+				}
 			}
 			if (reg == reg_top)
 			{	/* Could not find db in gld file or empty gld file. Allocate region structure */

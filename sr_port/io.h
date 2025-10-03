@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -495,7 +495,7 @@ MBSTART {												\
 	MV.str.len = (unsigned char)(*(PP->str.addr + P_OFF));						\
 	MV.str.addr = (char *)(PP->str.addr + P_OFF + 1);						\
 	MV_P = push_mval(&MV);										\
-	if (WBTEST_ENABLED(WBTEST_ZTTEST))								\
+	if (WBTEST_ENABLED(WBTEST_GCOL) && (1 == gtm_white_box_test_case_count))			\
 		INVOKE_STP_GCOL(8192);									\
 	if (!(ZTRAP_ENTRYREF & TREF(ztrap_form)))							\
 	{												\

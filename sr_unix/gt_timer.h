@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -215,7 +215,6 @@ void		hiber_start_wall_time(uint4 milliseconds);
 void		hiber_start_wait_any(uint4 milliseconds);
 void		gtm_start_timer(TID tid, int4 time_to_expir, void(* handler)(), int4 data_length, void *handler_data);
 void		start_timer(TID tid, int4 time_to_expir, void(* handler)(), int4 data_length, void *handler_data);
-ABS_TIME	sub_abs_time(ABS_TIME *atp1, ABS_TIME *atp2);
 void		sys_get_curr_time(ABS_TIME *tp);
 void		sys_get_wall_time(ABS_TIME *atp);
 void		prealloc_gt_timers(void);
@@ -238,5 +237,34 @@ STATICFNDCL GT_TIMER	*add_timer(ABS_TIME *atp, TID tid, int4 time_to_expir, void
 					void *hdata, boolean_t safe_timer);
 STATICFNDCL void	remove_timer(TID tid);
 STATICFNDCL void	init_timers(void);
+
+/*
+ * ------------------------------------------------------
+ * Substract absolute time atp2 from absolute time atp1
+ *	Absolute time structure is seconds & microseconds.
+ *	Integer value is in milliseconds.
+ *
+ * Arguments:
+ *	atp1	- source time structure
+ *	atp2	- destination time structure
+ *
+ * Return:
+ *	difference time structure
+ * ------------------------------------------------------
+ */
+static inline ABS_TIME sub_abs_time(ABS_TIME *atp1, ABS_TIME *atp2)
+{
+	ABS_TIME	dat;
+	int4		ival;
+
+	dat.at_sec = atp1->at_sec - atp2->at_sec;
+	dat.at_usec = atp1->at_usec - atp2->at_usec;
+	if (0 > dat.at_usec)
+	{       /* need to "borrow" from seconds */
+		dat.at_usec += MICROSECS_IN_SEC;
+		dat.at_sec--;							/* carry (off) */
+	}
+	return (dat);
+}
 
 #endif

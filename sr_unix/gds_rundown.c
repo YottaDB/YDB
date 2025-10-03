@@ -125,7 +125,6 @@ error_def(ERR_MEMORY);
 error_def(ERR_OUTOFSPACE);
 error_def(ERR_RESRCINTRLCKBYPAS);
 error_def(ERR_RNDWNSEMFAIL);
-error_def(ERR_RNDWNSKIPCNT);
 error_def(ERR_STACKOFLOW);
 error_def(ERR_STACKOFLOW);
 error_def(ERR_TEXT);

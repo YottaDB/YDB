@@ -46,6 +46,8 @@
 #include "gtmio.h"
 #include "sgtm_putmsg.h"
 #include "copy.h"
+#include "repl_errno.h"
+#include <sys/wait.h>
 
 GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	int			gtmsource_sock_fd;
@@ -84,6 +86,7 @@ int gtmsource_poll_actions(boolean_t poll_secondary)
 	int			status;
 	time_t			temp_time;
 	gtm_time4_t		time4;
+	int			filter_exit_status, waitpid_res;
 
 	gtmsource_local = jnlpool->gtmsource_local;
 	if (SHUTDOWN == gtmsource_local->shutdown)
@@ -210,6 +213,12 @@ int gtmsource_poll_actions(boolean_t poll_secondary)
 		repl_log(gtmsource_log_fp, TRUE, TRUE, "Stopping filter\n");
 		repl_stop_filter();
 		gtmsource_filter &= ~EXTERNAL_FILTER;
+	}
+	if (gtmsource_filter & EXTERNAL_FILTER)
+	{
+		WAITPID(gtmsource_local->src_filter_pid, &filter_exit_status, WNOHANG, waitpid_res);
+		if (waitpid_res > 0)
+			repl_filter_error(jnlpool->jnlpool_ctl->jnl_seqno, repl_errno = EREPL_FILTERNOTALIVE);
 	}
 	return (SS_NORMAL);
 }

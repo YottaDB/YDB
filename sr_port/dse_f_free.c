@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -55,8 +55,6 @@ void dse_f_free(void)
 	blk = SIMPLE_FIND_FREE_BLK(hint, nocrit_present, FALSE);
 	if (NO_FREE_SPACE == blk)
 		util_out_print("Error: database full.", TRUE);
-	else if (MAP_RD_FAIL == blk)
-		RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(1) nocrit_present ? ERR_DSEBLKRDFAIL : MAKE_MSG_INFO(ERR_DSEBLKRDFAIL));
 	else if (0 == (blk - ((blk / bplmap) * bplmap)))
 	{
 		memcpy(util_buff, "Error: bit map in block ", SIZEOF("Error: bit map in block "));

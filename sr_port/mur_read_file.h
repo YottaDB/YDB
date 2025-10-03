@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2015 Fidelity National Information	*
+ * Copyright (c) 2003-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -22,21 +22,21 @@
 #if defined (MUR_USE_AIO) || defined(VMS)
 
 /* #GTM_THREAD_SAFE : The below macro (MUR_FREAD_START) is thread-safe */
-#define MUR_FREAD_START(JCTL, BUFF_DESC, RET_STATUS)				\
-{										\
-	RET_STATUS = mur_fread_start(JCTL, BUFF_DESC);				\
+#define MUR_FREAD_START(JCTL, BUFF_DESC, RET_STATUS)					\
+{											\
+	RET_STATUS = mur_fread_start(JCTL, BUFF_DESC);					\
 }
 
 /* #GTM_THREAD_SAFE : The below macro (MUR_FREAD_WAIT) is thread-safe */
-#define MUR_FREAD_WAIT(JCTL, BUFF_DESC, RET_STATUS)				\
-{										\
-	RET_STATUS = mur_fread_wait(JCTL, BUFF_DESC);				\
+#define MUR_FREAD_WAIT(JCTL, BUFF_DESC, RET_STATUS)					\
+{											\
+	RET_STATUS = mur_fread_wait(JCTL, BUFF_DESC);					\
 }
 
 /* #GTM_THREAD_SAFE : The below macro (MUR_FREAD_CANCEL) is thread-safe */
-#define MUR_FREAD_CANCEL(JCTL, MUR_DESC, RET_STATUS)				\
-{										\
-	RET_STATUS = mur_fread_cancel(JCTL);					\
+#define MUR_FREAD_CANCEL(JCTL, MUR_DESC, RET_STATUS)					\
+{											\
+	RET_STATUS = mur_fread_cancel(JCTL);						\
 }
 
 #else /* !MUR_USE_AIO && !VMS */
@@ -53,22 +53,67 @@
 }
 
 /* #GTM_THREAD_SAFE : The below macro (MUR_FREAD_WAIT) is thread-safe */
-#define MUR_FREAD_WAIT(JCTL, BUFF_DESC, RET_STATUS)				\
-{										\
-	assert((BUFF_DESC)->read_in_progress);					\
-	(BUFF_DESC)->read_in_progress = FALSE;					\
-	RET_STATUS = SS_NORMAL;							\
+#define MUR_FREAD_WAIT(JCTL, BUFF_DESC, RET_STATUS)					\
+{											\
+	assert((BUFF_DESC)->read_in_progress);						\
+	(BUFF_DESC)->read_in_progress = FALSE;						\
+	RET_STATUS = SS_NORMAL;								\
 }
 
 /* #GTM_THREAD_SAFE : The below macro (MUR_FREAD_CANCEL) is thread-safe */
-#define MUR_FREAD_CANCEL(JCTL, MUR_DESC, RET_STATUS)				\
-{										\
-	MUR_DESC->seq_buff[0].read_in_progress = FALSE;				\
-	MUR_DESC->seq_buff[1].read_in_progress = FALSE;				\
-	RET_STATUS = SS_NORMAL;							\
+#define MUR_FREAD_CANCEL(JCTL, MUR_DESC, RET_STATUS)					\
+{											\
+	MUR_DESC->seq_buff[0].read_in_progress = FALSE;					\
+	MUR_DESC->seq_buff[1].read_in_progress = FALSE;					\
+	RET_STATUS = SS_NORMAL;								\
 }
 
 #endif /* MUR_USE_AIO */
+#define COPY_JNL_PATH(JCTL, CPTR, CPTR_LAST, NEW_PATH)					\
+MBSTART {										\
+	memcpy((JCTL)->jnl_fn, (NEW_PATH)->buff, (NEW_PATH)->len);			\
+	(JCTL)->jnl_fn[(NEW_PATH)->len] = '/';						\
+	memcpy((JCTL)->jnl_fn + (NEW_PATH)->len + 1, CPTR_LAST, (CPTR - CPTR_LAST));	\
+	(JCTL)->jnl_fn_len = (NEW_PATH)->len + (CPTR - CPTR_LAST) + 1;			\
+} MBEND
+
+#define OVERRIDE_JNL_PATH(JCTL, FILENAME, FILENAME_LEN, NEW_PATH)			\
+MBSTART {										\
+	int			filename_len;						\
+	unsigned char		*last_slash;						\
+											\
+	for (last_slash = FILENAME + FILENAME_LEN - 1;					\
+			last_slash >= FILENAME; --last_slash)				\
+	{										\
+		if ('/' == *last_slash)							\
+			break;								\
+	}										\
+	assert(last_slash >= FILENAME);							\
+	filename_len = FILENAME + FILENAME_LEN - last_slash;				\
+	assert(0 < filename_len);							\
+	memcpy((JCTL)->jnl_fn, (NEW_PATH)->buff, (NEW_PATH)->len);			\
+	memcpy((JCTL)->jnl_fn + (NEW_PATH)->len, last_slash, filename_len);		\
+	(JCTL)->jnl_fn_len = (NEW_PATH)->len + filename_len;				\
+} MBEND
+
+#define IGNORE_JNL_PATH(PTR, JFH, ADDR)							\
+MBSTART {										\
+	unsigned char		*ptr_fname2;						\
+											\
+	for (PTR = (JFH)->data_file_name + (JFH)->data_file_name_length - 1,		\
+		ptr_fname2 = (ADDR)->fname + (ADDR)->fname_len - 1;			\
+			PTR >= (JFH)->data_file_name; --PTR, --ptr_fname2)		\
+	{										\
+		if (*PTR != *ptr_fname2)						\
+		{									\
+			PTR = NULL;							\
+			break;								\
+		}									\
+		if ('/' == *PTR)							\
+			break;								\
+	}										\
+	assert(ptr_fname2 >= (ADDR)->fname);						\
+} MBEND
 
 uint4	mur_fread_eof(jnl_ctl_list *jctl, reg_ctl_list *rctl);
 uint4	mur_fread_eof_crash(jnl_ctl_list *jctl, off_jnl_t lo_off, off_jnl_t hi_off);

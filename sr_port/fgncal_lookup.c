@@ -22,25 +22,6 @@ GBLREF	symval			*curr_symval;
 
 mval *fgncal_lookup(mval *x)
 {
-	mval		*ret_val;
-	ht_ent_mname 	*tabent;
-	var_tabent	targ_key;
-	mident		ident;
-
-	MV_FORCE_DEFINED(x);
-	assert(MV_IS_STRING(x));
-	ret_val = NULL;
-	ident = x->str;
-	if (ident.len > MAX_MIDENT_LEN)
-		ident.len = MAX_MIDENT_LEN;
-	if (valid_mname(&ident))
-	{
-		targ_key.var_name = ident;
-		COMPUTE_HASH_MNAME(&targ_key);
-		targ_key.marked = NOT_MARKED;
-		if (add_hashtab_mname_symval(&curr_symval->h_symtab, &targ_key, NULL, &tabent))
-			lv_newname(tabent, curr_symval);
-		ret_val = (mval *) tabent->value;
-	}
-	return ret_val;
+	assert(FALSE); /* Unmaintained stub */
+	return NULL;
 }

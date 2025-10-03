@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2024 Fidelity National Information	*
+ * Copyright (c) 2006-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -30,11 +30,11 @@ LITREF unsigned char 	lower_to_upper_table[];
 error_def(ERR_MAXSTRLEN);
 
 #define W1252		"W-1252"
-#define W1252_LEN	STRLEN(W1252)
+#define W1252_LEN	STR_LIT_LEN(W1252)
 #define UTF8		"UTF-8"
-#define UTF8_LEN	STRLEN(UTF8)
+#define UTF8_LEN	STR_LIT_LEN(UTF8)
 #define UTF16		"UTF-16"
-#define UTF16_LEN	STRLEN(UTF16)
+#define UTF16_LEN	STR_LIT_LEN(UTF16)
 
 /* Routine to verify given parameter against supported case conversion codes.
  * Valid arguments (case-insensitive):

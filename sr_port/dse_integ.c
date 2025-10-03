@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -60,7 +60,7 @@ void dse_integ(void)
 	nocrit_present = (CLI_NEGATED == cli_present("CRIT"));
 	DSE_GRAB_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit, nocrit_present, cs_addrs, gv_cur_region);
 	if (!(bp = t_qread(blk, &dummy_int, &dummy_cr)))
-		RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(1) ERR_DSEBLKRDFAIL);
+		RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(3) ERR_DSEBLKRDFAIL, 1, blk);
 	if (0 == ((blk_hdr_ptr_t)bp)->levl)
 	{
 		r_ptr = (unsigned char *)((sm_uc_ptr_t)bp + SIZEOF(blk_hdr)) + SIZEOF(rec_hdr);

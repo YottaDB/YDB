@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2004-2024 Fidelity National Information	*
+ * Copyright (c) 2004-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -383,6 +383,7 @@ void	gtm_env_init(void)
 		TREF(jnl_extract_nocol) = trans_numeric(&val, &is_defined, TRUE);
 #		endif
 		/* Initialize dollar_zmaxtptime */
+		TREF(dollar_zmaxtptime) = TPTIMEOUT_DEFAULT_TIME;
 		val.addr = GTM_ZMAXTPTIME;
 		val.len = SIZEOF(GTM_ZMAXTPTIME) - 1;
 		if (SS_NORMAL == (status = TRANS_LOG_NAME(&val, &trans, buf, SIZEOF(buf), do_sendmsg_on_log2long)))
@@ -394,7 +395,7 @@ void	gtm_env_init(void)
 			assert(MV_BIAS == MILLISECS_IN_SEC);				/* check math if this changes */
 			time *= MV_BIAS;
 			i = (int)time;
-			if ((ERANGE != save_errno) && (0 <= i) && (TPTIMEOUT_MAX_TIME >= i))
+			if ((ERANGE != save_errno) && (0 < (i / TPTIMEOUT_GRACE_RNDS)) && (TPTIMEOUT_MAX_TIME >= i))
 				TREF(dollar_zmaxtptime) = i;
 		}
 		/* See if $gtm_ztrap_new/GTM_ZTRAP_NEW has been specified */
@@ -429,6 +430,12 @@ void	gtm_env_init(void)
 		ret = logical_truth_value(&val, FALSE, &is_defined);
 		if (is_defined)
 		        gtm_nofflf = ret;
+		/* gtm_dynamic_varnames. Default is FALSE */
+		val.addr = GTM_DYNAMIC_VARNAMES;
+		val.len = SIZEOF(GTM_DYNAMIC_VARNAMES) - 1;
+		ret = logical_truth_value(&val, FALSE, &is_defined);
+		if (is_defined)
+			TREF(gtm_dynamic_varnames) = ret;
 		/* Platform specific initializations */
 		gtm_env_init_sp();
 	}

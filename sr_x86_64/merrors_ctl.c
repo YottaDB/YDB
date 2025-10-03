@@ -51,7 +51,7 @@ LITDEF	err_msg merrors[] = {
 	{ "DEVPARUNK", "Deviceparameter unknown", 0, 0 },
 	{ "DEVPARVALREQ", "A value is required for this device parameter", 0, 0 },
 	{ "DEVPARMNEG", "Deviceparameter must be a positive value", 0, 0 },
-	{ "DSEBLKRDFAIL", "Failed attempt to read block", 0, 0 },
+	{ "DSEBLKRDFAIL", "Failed attempt to read block 0x!XJ", 1, 0 },
 	{ "DSEFAIL", "DSE failed.  Failure code: !AD.", 2, 0 },
 	{ "NOTALLREPLON", "Replication off for !AD regions", 2, 0 },
 	{ "BADLKIPARAM", "!AD is not a legal parameter for $ZGETLKI()", 2, 0 },
@@ -633,7 +633,7 @@ LITDEF	err_msg merrors[] = {
 	{ "REPLFILTER", "Replication filter subsystem failure", 0, 0 },
 	{ "GBLMODFAIL", "Global variable Conflict Test failed.  Failure code: !AD.", 2, 0 },
 	{ "TTLENGTHTOOBIG", "Terminal LENGTH exceeds the maximum allowed limit", 0, 0 },
-	{ "TPTIMEOUT", "Transaction timeout", 0, 0 },
+	{ "TPTIMEOUT", "Transaction timeout after !UL restart(s) and !UL grace period(s) !AD !AD !AD", 8, 0 },
 	{ "NORTN", "Routine name missing", 0, 0 },
 	{ "JNLFILNOTCHG", "Journal file not changed", 0, 0 },
 	{ "EVENTLOGERR", "Error in event logging subsystem", 0, 0 },
@@ -671,7 +671,7 @@ LITDEF	err_msg merrors[] = {
 	{ "REORGINC", "Reorg was incomplete.  Not all globals were reorged.", 0, 0 },
 	{ "ASC2EBCDICCONV", "ASCII/EBCDIC conversion failed when calling !AD", 2, 0 },
 	{ "GTMSECSHRSTART", "!AD - !UL : gtmsecshr failed to startup", 3, 0 },
-	{ "UNUSEDMSG840", "DBVERPERFWARN1 removed from code in V7.1-004 Sep 2024", 0, 0 },
+	{ "LOSTJNLFILE", "Journal file !AD has a transaction number [0x!16@XQ] -- the last one generated for database !AD with ROLLBACK -FORWARD -JNLDIR -IGNORELOSTJNL", 5, 0 },
 	{ "FILEIDGBLSEC", "File ID in global section does not match with the database file !AD", 2, 0 },
 	{ "GBLSECNOTGDS", "Global Section !AD is not a GT.M global section", 2, 0 },
 	{ "BADGBLSECVER", "Global Section !AD does not match the current database version", 2, 0 },
@@ -1152,7 +1152,7 @@ LITDEF	err_msg merrors[] = {
 	{ "CRYPTNOMM", "!AD is an encrypted database. Cannot support MM access method.", 2, 0 },
 	{ "READONLYNOBG", "Read-only cannot be enabled on non-MM databases", 0, 0 },
 	{ "CRYPTKEYFETCHFAILED", "Could not retrieve encryption key corresponding to file !AD. !AD", 4, 0 },
-	{ "CRYPTKEYFETCHFAILEDNF", "Could not retrieve encryption key during !AD operation key. !AD", 4, 0 },
+	{ "UNUSEDMSG1321", "CRYPTKEYFETCHFAILEDNF last used in V6.0-000 Sep 2012", 0, 0 },
 	{ "CRYPTHASHGENFAILED", "Could not generate cryptographic hash for symmetric key corresponding to file !AD. !AD", 4, 0 },
 	{ "CRYPTNOKEY", "No encryption key specified", 0, 0 },
 	{ "BADTAG", "Unable to use file !AD (CCSID !UL) with CCSID !UL", 4, 0 },
@@ -1464,9 +1464,9 @@ LITDEF	err_msg merrors[] = {
 	{ "DBNULCOL", "!AD NULL collation representation differs from the database file header setting", 2, 4 },
 	{ "UTF16ENDIAN", "The device previously set UTF-16 endianness to !AD and cannot change to !AD", 4, 0 },
 	{ "OFRZACTIVE", "Region !AD has an Online Freeze", 2, 0 },
-	{ "OFRZAUTOREL", "Online Freeze automatically released for region !AD", 2, 0 },
-	{ "OFRZCRITREL", "Proceeding with a write to region !AD after Online Freeze while holding crit", 2, 0 },
-	{ "OFRZCRITSTUCK", "Unable to proceed with a write to region !AD with Online Freeze while holding crit. Region stuck until freeze is removed.", 2, 0 },
+	{ "OFRZAUTOREL", "Online Freeze automatically released for region !AD (!AD)", 4, 0 },
+	{ "OFRZCRITREL", "Proceeding with a write to region !AD (!AD) after Online Freeze while holding crit", 4, 0 },
+	{ "OFRZCRITSTUCK", "Unable to proceed with a write to region !AD (!AD) with Online Freeze while holding crit. Region stuck until freeze is removed.", 4, 0 },
 	{ "OFRZNOTHELD", "Online Freeze had been automatically released for at least one region", 0, 0 },
 	{ "AIOBUFSTUCK", "Waited !UL minutes for PID: !UL to finish AIO disk write of block: !@UQ [0x!16@XQ] aio_error=!UL", 5, 0 },
 	{ "DBDUPNULCOL", "Discarding !AD=!AD key due to duplicate null collation record", 4, 0 },
@@ -2187,7 +2187,7 @@ LITDEF	int ERR_REPLLOGOPN = 418812746;
 LITDEF	int ERR_REPLFILTER = 150377298;
 LITDEF	int ERR_GBLMODFAIL = 150377306;
 LITDEF	int ERR_TTLENGTHTOOBIG = 150377314;
-LITDEF	int ERR_TPTIMEOUT = 150377322;
+LITDEF	int ERR_TPTIMEOUT = 150377320;
 LITDEF	int ERR_NORTN = 150377330;
 LITDEF	int ERR_JNLFILNOTCHG = 150377338;
 LITDEF	int ERR_EVENTLOGERR = 150377346;
@@ -2225,7 +2225,7 @@ LITDEF	int ERR_EXCLUDEREORG = 150377592;
 LITDEF	int ERR_REORGINC = 150377600;
 LITDEF	int ERR_ASC2EBCDICCONV = 150377610;
 LITDEF	int ERR_GTMSECSHRSTART = 150377618;
-LITDEF	int ERR_UNUSEDMSG840 = 150377626;
+LITDEF	int ERR_LOSTJNLFILE = 150377624;
 LITDEF	int ERR_FILEIDGBLSEC = 150377634;
 LITDEF	int ERR_GBLSECNOTGDS = 150377642;
 LITDEF	int ERR_BADGBLSECVER = 150377650;
@@ -2706,7 +2706,7 @@ LITDEF	int ERR_UNUSEDMSG1317 = 150381442;
 LITDEF	int ERR_CRYPTNOMM = 150381450;
 LITDEF	int ERR_READONLYNOBG = 150381458;
 LITDEF	int ERR_CRYPTKEYFETCHFAILED = 418816922;
-LITDEF	int ERR_CRYPTKEYFETCHFAILEDNF = 150381474;
+LITDEF	int ERR_UNUSEDMSG1321 = 150381474;
 LITDEF	int ERR_CRYPTHASHGENFAILED = 150381482;
 LITDEF	int ERR_CRYPTNOKEY = 150381490;
 LITDEF	int ERR_BADTAG = 150381498;

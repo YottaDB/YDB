@@ -88,6 +88,7 @@ int gtmsource_end1(boolean_t auto_shutdown)
 		jnlpool_strm_seqno[idx] = jnlpool->jnlpool_ctl->strm_seqno[idx];
 	assert(process_id == jnlpool->gtmsource_local->gtmsource_pid);
 	UNSET_SRC_NEEDS_JPLWRITES(jnlpool, jnlpool->gtmsource_local);
+	jnlpool->gtmsource_local->src_filter_pid = 0;
 	jnlpool->gtmsource_local->gtmsource_pid = 0;
 	jnlpool->gtmsource_local->gtmsource_state = GTMSOURCE_DUMMY_STATE;
 	/* Detach from journal pool, except if IFOE is configured, in which case we need the journal pool attached

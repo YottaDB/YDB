@@ -669,7 +669,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* REORGINC */
 	   0,	/* ASC2EBCDICCONV */
 	   0,	/* GTMSECSHRSTART */
-	   0,	/* UNUSEDMSG840 */
+	   0,	/* LOSTJNLFILE */
 	   0,	/* FILEIDGBLSEC */
 	   0,	/* GBLSECNOTGDS */
 	   0,	/* BADGBLSECVER */
@@ -1150,7 +1150,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* CRYPTNOMM */
 	   0,	/* READONLYNOBG */
 	   0,	/* CRYPTKEYFETCHFAILED */
-	   0,	/* CRYPTKEYFETCHFAILEDNF */
+	   0,	/* UNUSEDMSG1321 */
 	   0,	/* CRYPTHASHGENFAILED */
 	   0,	/* CRYPTNOKEY */
 	   0,	/* BADTAG */

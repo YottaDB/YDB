@@ -44,7 +44,7 @@ STATICFNDCL void fix_tphold_mvc(char *target, char *srcstart, char *srcend);
 error_def(ERR_STACKCRIT);
 error_def(ERR_STACKOFLOW);
 
-void flush_jmp (rhdtyp *rtn_base, unsigned char *context, unsigned char *transfer_addr)
+void flush_jmp(rhdtyp *rtn_base, unsigned char *context, unsigned char *transfer_addr)
 {
 	mv_stent		*mv_st_ent, *mv_st_prev;
 	char			*top;

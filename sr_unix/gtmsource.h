@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2024 Fidelity National Information	*
+ * Copyright (c) 2006-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -471,7 +471,7 @@ typedef struct
 							 */
 	int4			next_histinfo_num;	/* Index of the histinfo record whose "start_seqno" is "next_histinfo_seqno"
 							 * Initialized when the source server connects to the receiver.*/
-	unsigned char		filler1_align_8[4];
+	int4			src_filter_pid;		/* Process ID of the source filter */
 	seq_num			next_histinfo_seqno;	/* "start_seqno" of the histinfo record that follows the one corresponding
 							 * to the the current "gtmsource_local->read_jnl_seqno". Initialized when
 							 * the source server connects to the receiver.

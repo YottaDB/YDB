@@ -175,7 +175,7 @@ boolean_t	mur_select_rec(jnl_ctl_list *jctl)
 					&& (('(' == asc_key_buff[i]) || (')' == asc_key_buff[i]) || (',' == asc_key_buff[i]))))
 			{
 					SET_INCFLAG_OR_RETURN(sl_ptr);
-					if(IS_FUPD_TUPD(rectype) || IS_GUPD_UUPD(rectype))
+					if (IS_FUPD_TUPD(rectype) || IS_GUPD_UUPD(rectype))
 						uupd_tstart = (0 == uupd_cnt++) ? TRUE : FALSE;
 			}
 		}

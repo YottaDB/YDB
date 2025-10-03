@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -26,6 +26,7 @@
 #include "interlock.h"
 #include "jnl.h"
 #include "buddy_list.h"		/* needed for tp.h */
+#include "io.h"
 #include "tp.h"
 #include "tpnotacid_chk_inline.h"
 #include "repl_msg.h"		/* for gtmsource.h */

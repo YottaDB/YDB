@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2015-2024 Fidelity National Information	*
+ * Copyright (c) 2015-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -486,7 +486,7 @@ void mupip_reorg_encrypt(void)
 			csd->encryption_hash_cutoff = curbmp;
 			bml_sm_buff = t_qread(curbmp, (sm_int_ptr_t)&cycle, &cr); /* now that in crit, note down stable buffer */
 			if (NULL == bml_sm_buff)
-				RTS_ERROR_CSA_ABT(csa, VARLSTCNT(1) ERR_DSEBLKRDFAIL);
+				RTS_ERROR_CSA_ABT(csa, VARLSTCNT(3) ERR_DSEBLKRDFAIL, 1, curbmp);
 			/* Take a copy of the shared memory bitmap buffer into process-private memory before releasing crit. We are
 			 * interested in those blocks that are currently marked as USED in the bitmap. It is possible that once we
 			 * release crit, concurrent updates change the bitmap state of those blocks. In that case, those updates

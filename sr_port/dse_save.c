@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -37,6 +37,7 @@ GBLREF sgmnt_data_ptr_t	cs_data;
 
 error_def(ERR_DSEBLKRDFAIL);
 error_def(ERR_DSEMAXBLKSAV);
+error_def(ERR_BLKINVALID);
 
 void dse_save(void)
 {
@@ -134,12 +135,13 @@ void dse_save(void)
 	patch_save_set[patch_save_count].region = gv_cur_region;
 	patch_save_set[patch_save_count].bp = (char *)malloc(cs_addrs->hdr->blk_size);
 	if (blk >= cs_addrs->ti->total_blks)
-		RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(1) ERR_DSEBLKRDFAIL);
+		RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(6) ERR_BLKINVALID, 4, blk, DB_LEN_STR(gv_cur_region),
+				&(cs_addrs->ti->total_blks));
 	was_crit = cs_addrs->now_crit;
 	nocrit_present = (CLI_NEGATED == cli_present("CRIT"));
 	DSE_GRAB_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit, nocrit_present, cs_addrs, gv_cur_region);
 	if (!(bp = t_qread(blk, &dummy_int, &dummy_cr)))
-		RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(1) ERR_DSEBLKRDFAIL);
+		RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(3) ERR_DSEBLKRDFAIL, 1, blk);
 	memcpy(patch_save_set[patch_save_count].bp, bp, cs_addrs->hdr->blk_size);
 	DSE_REL_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit, nocrit_present, cs_addrs, gv_cur_region);
 	buff_len = MAX_COMMENT_LEN - 1;

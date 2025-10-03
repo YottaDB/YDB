@@ -49,7 +49,7 @@ void op_newvar(uint4 arg1)
 	stack_frame	*fp, *fp_prev, *fp_fix;
 	unsigned char	*old_sp, *top;
 	lv_val		*new;
-	var_tabent	*varname;
+	var_tabent	*varname, lcl_varname;
 	mvs_ntab_struct *ptab;
 	tp_frame	*tpp;
 	int		indx;
@@ -57,7 +57,16 @@ void op_newvar(uint4 arg1)
 	DBGRFCT_ONLY(mident_fixed vname;)
 
 	varname = &(((var_tabent *)frame_pointer->vartab_ptr)[arg1]);
-	DEBUG_ONLY(tabent = lookup_hashtab_mname(&curr_symval->h_symtab, varname);)
+#	ifdef DEBUG
+	if ((INDIR_MARKED != varname->marked) && DYNAMIC_VARNAMES_ACTIVE(frame_pointer))
+	{
+		lcl_varname = *varname;
+		RELOCATE(lcl_varname.var_name.addr, char *, frame_pointer->rvector->literal_text_adr);
+		tabent = lookup_hashtab_mname(&curr_symval->h_symtab, &lcl_varname);
+		/* Don't reassign varname, so any dangling reference to it created below needs fixup if DYNAMIC_VARNAMES */
+	} else
+		tabent = lookup_hashtab_mname(&curr_symval->h_symtab, varname);
+#	endif
 	assert(tabent);	/* variable must be defined and fetched by this point */
 	assert(tabent == frame_pointer->l_symtab[arg1]);
 	tabent = frame_pointer->l_symtab[arg1];
@@ -93,7 +102,13 @@ void op_newvar(uint4 arg1)
 	/* Finish initializing restoration structures */
 	ptab->save_value = (lv_val *)tabent->value;
 	ptab->hte_addr = tabent;
-	DEBUG_ONLY(ptab->nam_addr = varname);
+#ifdef	DEBUG
+	ptab->nam_addr = varname;
+	/* Strictly speaking the following is only necessary in the PVAL case, when a flush_jmp retains the PVAL but clobbers
+	 * the rvector and makes the relative offset no longer accurate. So store the literal_text_adr for later use.
+	 */
+	ptab->cur_ltext_addr = DYNAMIC_VARNAMES_ACTIVE(frame_pointer) ? frame_pointer->rvector->literal_text_adr : NULL;
+#endif
 	DBGRFCT_ONLY(
 		memcpy(vname.c, tabent->key.var_name.addr, tabent->key.var_name.len);
 		vname.c[tabent->key.var_name.len] = '\0';

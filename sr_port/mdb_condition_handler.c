@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -144,8 +144,6 @@ error_def(ERR_TERMHANGUP);
 error_def(ERR_TLVLZERO);
 error_def(ERR_TPRETRY);
 error_def(ERR_TPRESTNESTERR);
-error_def(ERR_TPSTACKCRIT);
-error_def(ERR_TPSTACKOFLOW);
 error_def(ERR_TPTIMEOUT);
 error_def(ERR_UNSOLCNTERR);
 error_def(ERR_ZINTRECURSEIO);

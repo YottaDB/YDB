@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2019 Fidelity National Information		*
+ * Copyright (c) 2019-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -45,6 +45,7 @@ int gtmrecv_stopfilter(void)
 		return (ABNORMAL_SHUTDOWN);
 	}
 	recvpool.gtmrecv_local->filter_cmd[0] = '\0';
+	recvpool.gtmrecv_local->recv_filter_pid = 0;
 	util_out_print("Stop filter initiated", TRUE);
 	return (NORMAL_SHUTDOWN);
 

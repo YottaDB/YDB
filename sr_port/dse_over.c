@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -145,7 +145,7 @@ void dse_over(void)
 	t_begin_crit(ERR_DSEFAIL);
 	blkhist.blk_num = blk;
 	if (!(blkhist.buffaddr = t_qread(blkhist.blk_num, &blkhist.cycle, &blkhist.cr)))
-		RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(1) ERR_DSEBLKRDFAIL);
+		RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(3) ERR_DSEBLKRDFAIL, 1, blkhist.blk_num);
 	size = ((blk_hdr_ptr_t)blkhist.buffaddr)->bsiz;
 	if (size < SIZEOF(blk_hdr))
 		size = SIZEOF(blk_hdr);

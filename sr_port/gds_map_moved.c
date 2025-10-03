@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -47,7 +47,11 @@ void gds_map_moved(sm_uc_ptr_t new_base, sm_uc_ptr_t old_base, sm_uc_ptr_t old_t
 	assert((NULL == csa->sgm_info_ptr) || (csa->hdr == csa->sgm_info_ptr->tp_csd));
 	assert(csa->bmm == MM_ADDR(cs_data));
 	assert(csa->ti == &cs_data->trans_hist);
-	csa->db_addrs[1] = new_base + mmap_sz - 1;
+	assert((NULL != csa->bt_header) ? (old_top == (sm_uc_ptr_t)csa->bt_header) : (dba_mm == cs_data->acc_meth));
+	csa->db_addrs[1] = (new_base + mmap_sz - 1);
+	csa->bt_header = (bt_rec_ptr_t)csa->db_addrs[1];
+	assert((csa->nl->bt_header_off) ? (csa->bt_header == (bt_rec_ptr_t)((sm_uc_ptr_t)cs_data + csa->nl->bt_header_off))
+		: (dba_mm == cs_data->acc_meth));
 	/* The following adjustment needs to be done only if new_base is different from old_base */
 	if (new_base == old_base)
 		return;

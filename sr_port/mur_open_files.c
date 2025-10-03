@@ -76,6 +76,7 @@
 #include "anticipatory_freeze.h"
 #include "gtmrecv.h"
 #include "gtm_ipc.h"
+#include "eintr_wrappers.h"
 
 #define RELEASE_ACCESS_CONTROL(REGLIST)												\
 {																\
@@ -146,8 +147,9 @@ GBLREF	uint4			process_id;
 #ifdef DEBUG
 GBLREF	bool			only_usr_jnlpool_flush;
 #endif
-GBLREF int			in_rlbk;
-GBLREF boolean_t		repl_inst_rlbk_fd;
+GBLREF	int			in_rlbk;
+GBLREF	boolean_t		repl_inst_rlbk_fd;
+GBLREF	boolean_t		gtmcrypt_initialized;
 
 error_def(ERR_CRITSEMFAIL);
 error_def(ERR_DBFILOPERR);
@@ -160,6 +162,7 @@ error_def(ERR_FILEPARSE);
 error_def(ERR_JNLBADRECFMT);
 error_def(ERR_JNLDBTNNOMATCH);
 error_def(ERR_JNLDBSEQNOMATCH);
+error_def(ERR_LOSTJNLFILE);
 error_def(ERR_JNLFILEDUP);
 error_def(ERR_JNLFILEOPNERR);
 error_def(ERR_JNLNMBKNOTPRCD);
@@ -188,7 +191,14 @@ error_def(ERR_ORLBKRESTART);
 error_def(ERR_ORLBKREL);
 error_def(ERR_REPLPOOLINST);
 
-#define		STAR_QUOTE "\"*\""
+#define		STAR_QUOTE	"\"*\""
+#define		JNLDIR		"_jnldir"
+#define		JNLDIR_LEN	STR_LIT_LEN(JNLDIR)
+#define		DAT_NAME	"dat: \""
+#define		DAT_NAME_LEN	STR_LIT_LEN(DAT_NAME)
+#define		KEY_NAME	"key: \""
+#define		ENCRYPT_NAME	"/* Database encryption"
+#define		ENCRYPT_LEN	STR_LIT_LEN(ENCRYPT_NAME)
 
 /* Release all locks, in general follow the direction of mur_close_files. We do not reset fields
  * more than the required, and also do not remove shm etc, because we know we are goign to retry
@@ -269,11 +279,110 @@ void release_all_locks(unix_db_info *udi, gtmsource_local_ptr_t gtmsourcelocal_p
 		assert(FALSE);
 }
 
+void override_jnl_tls_file(void)
+{
+	FILE		*fp, *fp_new;
+	char		*config_env, *fgets_rc, *keys_found, *last_slash;
+	char		errstr[GTM_PATH_MAX], gtmcrypt_config[GTM_PATH_MAX], line[MAX_LINE], line_new[MAX_LINE];
+	unsigned int	last_slash_len;
+	boolean_t	errored_out = FALSE, start_override = FALSE;
+	int		save_errno;
+	size_t		ret_size;
+
+	if (!gtmcrypt_initialized)
+		return;
+	memcpy(gtmcrypt_config, mur_options.jnldir->buff, mur_options.jnldir->len);
+	gtmcrypt_config[mur_options.jnldir->len] = '/';
+	config_env = getenv("gtmcrypt_config");
+	if (NULL == config_env)
+	{	/* no environment variable to define encryption */
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("getenv()"), CALLFROM, errno);
+		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("getenv()"), CALLFROM, errno);
+		return;
+	}
+	for (last_slash = config_env + strlen(config_env) - 1; last_slash > config_env ; --last_slash)
+	{
+		if ('/' == *last_slash)
+			break;
+		/* if no '/' was found, the entire string is a filename */
+	}
+	last_slash_len = config_env + strlen(config_env) - last_slash;
+	memcpy(gtmcrypt_config + mur_options.jnldir->len + 1, last_slash, last_slash_len);
+	gtmcrypt_config[mur_options.jnldir->len + last_slash_len + 1] = '\0';
+	Fopen(fp, gtmcrypt_config, "r");
+	if (NULL == fp)
+	{	/* Log, and try to finish JNLDIR without TLS handling */
+		save_errno = errno;
+		SNPRINTF(errstr, SIZEOF(errstr), "fopen() : %s", gtmcrypt_config);
+		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_STR(errstr), CALLFROM, save_errno);
+		return;
+	}
+	memcpy(gtmcrypt_config + mur_options.jnldir->len + last_slash_len + 1, JNLDIR, JNLDIR_LEN);
+	gtmcrypt_config[mur_options.jnldir->len + last_slash_len + JNLDIR_LEN + 1] = '\0';
+	Fopen(fp_new, gtmcrypt_config, "w");
+	if (NULL == fp_new)
+	{	/* Log, and try to finish JNLDIR without TLS handling */
+		save_errno = errno;
+		SNPRINTF(errstr, SIZEOF(errstr), "fopen() : %s", gtmcrypt_config);
+		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_STR(errstr), CALLFROM, save_errno);
+		return;
+	}
+	while (TRUE)
+	{
+		FGETS_FILE(line, SIZEOF(line), fp, fgets_rc);
+		if (NULL == fgets_rc)
+		{
+			if (feof(fp))
+				break;
+			else if (ferror(fp))
+			{
+				save_errno = errno;
+				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
+						RTS_ERROR_LITERAL("fgets()"), CALLFROM, save_errno);
+				return;
+			}
+		} else if ((TRUE == start_override) || (0 == memcmp(line, ENCRYPT_NAME, ENCRYPT_LEN)))
+		{
+			start_override = TRUE;
+			keys_found = strstr(line, DAT_NAME);
+			if (NULL == keys_found)
+				keys_found = strstr(line, KEY_NAME);
+			if (NULL != keys_found)
+			{
+				keys_found += DAT_NAME_LEN;
+				memcpy(line_new, line, keys_found - line);
+				memcpy(line_new + (keys_found - line), mur_options.jnldir->buff, mur_options.jnldir->len);
+				for (last_slash = line + strlen(line) - 1; last_slash >= line ; --last_slash)
+				{
+					if ('/' == *last_slash)
+						break;
+				}
+				assert(last_slash >= line);
+				last_slash_len = line + strlen(line) - last_slash;
+				memcpy(line_new + (keys_found - line) + mur_options.jnldir->len, last_slash, last_slash_len);
+				GTM_FWRITE(line_new, 1, (keys_found - line) + mur_options.jnldir->len + last_slash_len,
+												fp_new, ret_size, errored_out);
+				memset(line_new, 0, SIZEOF(line_new));
+			} else
+				GTM_FWRITE(line, 1, strlen(line), fp_new, ret_size, errored_out);
+		} else
+			GTM_FWRITE(line, 1, strlen(line), fp_new, ret_size, errored_out);
+	}
+	FCLOSE(fp, save_errno);
+	assert(!save_errno);
+	FCLOSE(fp_new, save_errno);
+	assert(!save_errno);
+	if (0 != setenv("gtmcrypt_config", gtmcrypt_config, TRUE))
+		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("setenv()"), CALLFROM, errno);
+	return;
+}
+
 int4 mur_open_files(boolean_t retry)
 {
 	boolean_t			interrupted_rollback;
 	int                             jnl_total, jnlno, regno, max_reg_total, errcode;
 	unsigned int			full_len;
+	unsigned char			*ptr_fname = NULL;
 	static unsigned short		jnl_file_list_len; /* cli_get_str requires a short */
 	static char			jnl_file_list[MAX_LINE];
 	char				*cptr, *cptr_last, *ctop;
@@ -909,8 +1018,16 @@ int4 mur_open_files(boolean_t retry)
 				jctl = (jnl_ctl_list *)malloc(SIZEOF(jnl_ctl_list));
 				memset(jctl, 0, SIZEOF(jnl_ctl_list));
 				rctl->jctl_head = rctl->jctl = jctl;
-				jctl->jnl_fn_len = csd->jnl_file_len;
-				memcpy(jctl->jnl_fn, csd->jnl_file_name, csd->jnl_file_len);
+				if (mur_options.jnldir)
+				{
+					OVERRIDE_JNL_PATH(jctl, csd->jnl_file_name, csd->jnl_file_len, mur_options.jnldir);
+					if (rctl == mur_ctl)
+						override_jnl_tls_file();
+				} else
+				{
+					jctl->jnl_fn_len = csd->jnl_file_len;
+					memcpy(jctl->jnl_fn, csd->jnl_file_name, csd->jnl_file_len);
+				}
 				jctl->jnl_fn[jctl->jnl_fn_len] = 0;
 				/* If system crashed during rename, following will fix it .
 				 * Following function is directly related to cre_jnl_file_common
@@ -961,12 +1078,19 @@ int4 mur_open_files(boolean_t retry)
 				}
 				if (!is_file_identical((char *)jctl->jfh->data_file_name, (char *)rctl->gd->dyn.addr->fname))
 				{
-					csa = &udi->s_addrs;
-					assert((csa == rctl->csa) || !mur_options.update);
-					gtm_putmsg_csa(csa, VARLSTCNT(8) ERR_DBJNLNOTMATCH, 6, DB_LEN_STR(rctl->gd),
-						jctl->jnl_fn_len, jctl->jnl_fn,
-						jctl->jfh->data_file_name_length, jctl->jfh->data_file_name);
-					return FALSE;
+					if (mur_options.jnldir)
+					{
+						IGNORE_JNL_PATH(ptr_fname, jctl->jfh, rctl->gd->dyn.addr);
+					}
+					if (NULL == ptr_fname)
+					{
+						csa = &udi->s_addrs;
+						assert((csa == rctl->csa) || !mur_options.update);
+						gtm_putmsg_csa(csa, VARLSTCNT(8) ERR_DBJNLNOTMATCH, 6, DB_LEN_STR(rctl->gd),
+							jctl->jnl_fn_len, jctl->jnl_fn,
+							jctl->jfh->data_file_name_length, jctl->jfh->data_file_name);
+						return FALSE;
+					}
 				}
 			}
 		} /* End rctl->db_present */
@@ -980,17 +1104,19 @@ int4 mur_open_files(boolean_t retry)
 	 */
 	if (!star_specified)
 	{
-		jnlno = 0;
-		cptr = jnl_file_list;
-		ctop = &jnl_file_list[jnl_file_list_len];
-		while (cptr < ctop)
+		for (cptr = jnl_file_list, ctop = &jnl_file_list[jnl_file_list_len], jnlno = 0; cptr < ctop; jnlno++)
 		{
 			jctl = (jnl_ctl_list *)malloc(SIZEOF(jnl_ctl_list));
 			memset(jctl, 0, SIZEOF(jnl_ctl_list));
 			cptr_last = cptr;
 			while (0 != *cptr && ',' != *cptr && '"' != *cptr &&  ' ' != *cptr)
 				++cptr;
-			if (!get_full_path(cptr_last, (unsigned int)(cptr - cptr_last),
+			if (mur_options.jnldir)
+			{
+				COPY_JNL_PATH(jctl, cptr, cptr_last, mur_options.jnldir);
+				if (0 == jnlno)
+					override_jnl_tls_file();
+			} else if (!get_full_path(cptr_last, (unsigned int)(cptr - cptr_last),
 						(char *)jctl->jnl_fn, &jctl->jnl_fn_len, MAX_FN_LEN, &jctl->status2))
 			{
 				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_FILEPARSE, 2, cptr - cptr_last, cptr_last,
@@ -1006,6 +1132,12 @@ int4 mur_open_files(boolean_t retry)
 						(0 == memcmp(jctl->jfh->data_file_name, rctl->gd->dyn.addr->fname,
 								rctl->gd->dyn.addr->fname_len)))
 					break;
+				if (mur_options.jnldir)
+				{
+					IGNORE_JNL_PATH(ptr_fname, jctl->jfh, rctl->gd->dyn.addr);
+					if (NULL != ptr_fname)
+						break;
+				}
 			}
 			if (rctl == rctl_top)
 			{
@@ -1155,8 +1287,9 @@ int4 mur_open_files(boolean_t retry)
 			{	/* User might have not specified journal file starting tn matching database curr_tn.
 				 * So try to open previous generation journal files and add to linked list */
 				rctl->jctl = jctl;	/* asserted by mur_insert_prev */
-				while ((jctl->jfh->bov_tn > csd->trans_hist.curr_tn)
-						|| (mur_options.rollback && (jctl->jfh->start_seqno > csd->reg_seqno)))
+				while ((jctl->jfh->bov_tn > csd->trans_hist.curr_tn) ||
+					(mur_options.rollback && (jctl->jfh->start_seqno > csd->reg_seqno)) ||
+						(mur_options.jnldir && (0 < jctl->jfh->prev_jnl_file_name_length)))
 				{
 					if (0 == jctl->jfh->prev_jnl_file_name_length)
 					{
@@ -1173,14 +1306,26 @@ int4 mur_open_files(boolean_t retry)
 								jctl->jnl_fn_len, jctl->jnl_fn);
 						return FALSE;
 					} else if (!mur_insert_prev(&jctl))
+					{
+						if (mur_options.ignorelostjnl)
+						{
+							gtm_putmsg_csa(CSA_ARG(JCTL2CSA(jctl)) VARLSTCNT(7) ERR_LOSTJNLFILE, 5,
+								jctl->jnl_fn_len, jctl->jnl_fn, &jctl->jfh->bov_tn,
+								DB_LEN_STR(rctl->gd));
+							send_msg_csa(CSA_ARG(JCTL2CSA(jctl)) VARLSTCNT(7) ERR_LOSTJNLFILE, 5,
+								jctl->jnl_fn_len, jctl->jnl_fn, &jctl->jfh->bov_tn,
+								DB_LEN_STR(rctl->gd));
+							break;
+						}
 						return FALSE;
+					}
 				}
 			}
 			if (mur_options.forward)
 			{
 				assert(!mur_options.rollback || !mur_options.notncheck); /* -ROLLBACK -FORWARD does not support
 											  * -NOCHECKTN. Asserted above. */
-				if (!mur_options.notncheck)
+				if (!mur_options.notncheck && !mur_options.jnldir)
 				{
 					if (jctl->jfh->bov_tn != csd->trans_hist.curr_tn)
 					{

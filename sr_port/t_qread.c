@@ -116,7 +116,7 @@ error_def(ERR_DBFILERR);
 error_def(ERR_GVPUTFAIL);
 
 void	bg_read_complete(node_local_ptr_t cnl);
-void	bg_read_wait(sgmnt_addrs *csa, node_local_ptr_t cnl);
+void	bg_read_wait(sgmnt_addrs *csa, node_local_ptr_t cnl, ABS_TIME *atp);
 
 void bg_read_complete(node_local_ptr_t cnl)
 {
@@ -160,7 +160,7 @@ void bg_read_complete(node_local_ptr_t cnl)
 #	endif
 }
 
-void bg_read_wait(sgmnt_addrs *csa, node_local_ptr_t cnl)
+void bg_read_wait(sgmnt_addrs *csa, node_local_ptr_t cnl, ABS_TIME *atp)
 {
 #	if PTHREAD_MUTEX_ROBUST_SUPPORTED
 	int4			status;
@@ -169,7 +169,10 @@ void bg_read_wait(sgmnt_addrs *csa, node_local_ptr_t cnl)
 
 	status = clock_gettime(CLOCK_REALTIME, &waketime);
 	assert(0 == status);
-	waketime.tv_nsec += 1000 * NANOSECS_IN_USEC; /* Match the old sleep; consider reducing. */
+	assert(atp);
+	atp->at_sec = waketime.tv_sec;
+	atp->at_usec = waketime.tv_nsec / NANOSECS_IN_USEC;
+	waketime.tv_nsec += 1000 * NANOSECS_IN_USEC * 10; /* Match the old sleep time cap. */
 	if (NANOSECS_IN_SEC <= waketime.tv_nsec)
 	{
 		waketime.tv_sec++;
@@ -235,7 +238,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 	cache_rec_ptr_t		cr;
 	bt_rec_ptr_t		bt;
 	boolean_t		clustered, hold_onto_crit, was_crit, wrong_keys = FALSE, sync_needed;
-	int			dummy, exceed_sleep_count, lcnt, ocnt;
+	int			dummy, exceed_sleep_count, lcnt, ocnt, mins;
 	cw_set_element		*cse;
 	block_ref		chain1;
 	register sgmnt_addrs	*csa;
@@ -254,9 +257,11 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 	uint4			buffs_per_flush, flush_target;
 	enc_info_t		*encr_ptr;
 	boolean_t		twinning_on;
+	ABS_TIME		loop_start_time, last_time, curr_time, time_diff;
 #	ifdef DEBUG
 	cache_rec_ptr_t		cr_lo, bt_cr;
 	uint4			lcl_bml_pin;
+	static int 		wbox_tqread_count = 0;
 #	endif
 	unsigned char		tmp_levl;
 	DCL_THREADGBL_ACCESS;
@@ -278,19 +283,15 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 		lcl_tqread_grab_bml = FALSE;
 	assert(FALSE == TREF(tqread_grab_bml));
 	twinning_on = TWINNING_ON(csd);
-	/* We better hold crit in the final retry (TP & non-TP). Only exception is journal recovery */
 #	ifdef DEBUG
-	assert((t_tries < CDB_STAGNATE) || csa->now_crit || mupip_jnl_recover || mu_reorg_encrypt_in_prog);
-	if (TREF(in_mupip_integ) && TREF(instance_frozen_crit_skipped))
+	if (WBTEST_ENABLED(WBTEST_BLKRDFAIL_TQREAD) && (wbox_tqread_count >= gtm_white_box_test_case_count))
 	{
-		assert(!dollar_tlevel);
-		if (WBTEST_ENABLED(WBTEST_MUINTEG_TQREAD))
-		{
-			util_out_print("Whitebox test : t_qread returns NULL", TRUE);
-			return (sm_uc_ptr_t)NULL;
-		}
+		return (sm_uc_ptr_t)NULL;
 	}
+	wbox_tqread_count++;
 #	endif
+	/* We better hold crit in the final retry (TP & non-TP). Only exception is journal recovery */
+	assert((t_tries < CDB_STAGNATE) || csa->now_crit || mupip_jnl_recover || mu_reorg_encrypt_in_prog);
 	if (dollar_tlevel)
 	{
 		assert(sgm_info_ptr);
@@ -535,11 +536,6 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 	{
 		if (NULL == (cr = db_csh_get(blk)))
 		{	/* not in memory */
-			if (TREF(in_mupip_integ) && TREF(instance_frozen_crit_skipped))
-			{	/* We don't want to read the block from Disk when retrying the block in case of integ errors*/
-				rel_crit(gv_cur_region);
-				return (sm_uc_ptr_t)NULL;
-			}
 			if (clustered && (NULL != (bt = bt_get(blk))) && (FALSE == bt->flushing))
 				bt = NULL;
 			if (!csa->now_crit)
@@ -613,6 +609,9 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 				/* read outside of crit may be of a stale block but should be detected by t_end or tp_tend */
 				assert(0 == cr->dirty);
 				assert(cr->read_in_progress >= 0);
+				if (WBTEST_ENABLED(WBTEST_HOLD_BUFFER) && !gtm_white_box_test_case_count++)
+					LONG_SLEEP(55); /* Sleep for long enough to surpass the incorrect 6-second time fixed by
+							 * GTM-11307 but not the correct 60 second time. */
 				CR_BUFFER_CHECK(gv_cur_region, csa, csd, cr);
 				buffaddr = (sm_uc_ptr_t)GDS_REL2ABS(cr->buffaddr);
 #				ifdef DEBUG
@@ -726,6 +725,8 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 		SHM_READ_MEMORY_BARRIER;
 		sleep_invoked = FALSE;
 		exceed_sleep_count = 1;
+		sys_get_wall_time(&loop_start_time);
+		curr_time = last_time = loop_start_time;
 		for (lcnt = 1;  ; lcnt++)
 		{
 			if (0 > cr->read_in_progress)
@@ -890,8 +891,15 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 			}
 			if (blk != cr->blk)
 				break;
+#			if PTHREAD_MUTEX_ROBUST_SUPPORTED
+			time_diff = sub_abs_time(&curr_time, &last_time);
+			if (time_diff.at_sec >= 60)
+#			else
 			if (lcnt >= BUF_OWNER_STUCK && (0 == (lcnt % BUF_OWNER_STUCK)))
+#			endif
 			{
+				assert(lcnt != 1); /* Assert that curr_time is initialized */
+				last_time = curr_time; /* Keep the once-per-lcnt-modulo behavior */
 				if (!csa->now_crit)
 				{
 					assert(!hold_onto_crit);
@@ -930,9 +938,15 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 								rel_crit(gv_cur_region);
 							send_msg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_DBFILERR, 2,
 									DB_LEN_STR(gv_cur_region));
+#							if PTHREAD_MUTEX_ROBUST_SUPPORTED
+							time_diff = sub_abs_time(&curr_time, &loop_start_time);
+							mins = time_diff.at_sec / MINUTE;
+#							else
+							mins = lcnt / BUF_OWNER_STUCK;
+#							endif
 							send_msg_csa(CSA_ARG(csa) VARLSTCNT(9) ERR_BUFOWNERSTUCK, 7, process_id,
 									blocking_pid, &(cr->blk), &(cr->blk),
-									(lcnt / BUF_OWNER_STUCK), cr->read_in_progress,
+									mins, cr->read_in_progress,
 									cr->rip_latch.u.parts.latch_pid);
 							stuck_cnt++;
 							GET_C_STACK_FROM_SCRIPT("BUFOWNERSTUCK", process_id, blocking_pid,
@@ -985,7 +999,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 					INCR_GVSTATS_COUNTER(csa, cnl, n_wait_read_long, 1);
 				}
 #				if PTHREAD_MUTEX_ROBUST_SUPPORTED
-				bg_read_wait(csa, cnl);
+				bg_read_wait(csa, cnl, &curr_time);
 #				else
 				wcs_sleep(lcnt);
 #				endif

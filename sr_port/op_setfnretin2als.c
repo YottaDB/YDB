@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2010-2025 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -55,7 +56,7 @@ GBLREF mval		*alias_retarg;
 void op_setfnretin2als(mval *srcmv, int destindx)
 {
 	ht_ent_mname	*tabent;
-	mname_entry	*varname;
+	mname_entry	*varname = NULL;
 	lv_val		*srclvc, *dstlv;
 	int4		srcsymvlvl;
 	boolean_t	added;
@@ -75,11 +76,10 @@ void op_setfnretin2als(mval *srcmv, int destindx)
 	varname = &(((mname_entry *)frame_pointer->vartab_ptr)[destindx]);
 	DEBUG_ONLY(added = FALSE);
 	/* Find hash table entry */
+	/* If no fast path to hash table entry -- look it up the hard(er) way */
 	if (NULL == (tabent = (ht_ent_mname *)frame_pointer->l_symtab[destindx]))	/* note tabent assignment */
-	{	/* No fast path to hash table entry -- look it up the hard(er) way */
-		varname = &(((mname_entry *)frame_pointer->vartab_ptr)[destindx]);
-		added = add_hashtab_mname_symval(&curr_symval->h_symtab, varname, NULL, &tabent);
-	}
+		added = add_hashtab_mname_symval(&curr_symval->h_symtab, varname, NULL, &tabent, TRUE);
+	varname = NULL;
 	assert(tabent);
 	assert(tabent || added);
 	dstlv = (lv_val *)tabent->value;

@@ -235,6 +235,7 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 	jnl_buffer_ptr_t	jbp;
 	trans_num		ret_tn;
 	mstr			*gn;
+	uint4			reorg_upgrade_pid;
 #	ifdef UNIX
 	DEBUG_ONLY(unsigned int	lcl_t_tries;)
 #	endif
@@ -287,9 +288,9 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 		return TRUE;
 	}
 	long_blk_id = (BLK_ID_32_VER < cs_data->desired_db_format);
-	if (IS_REORG_UP_ACTIVE(cs_addrs->nl))
+	if (IS_REORG_UP_ACTIVE(cs_addrs->nl ,reorg_upgrade_pid))
 	{	/* Avoid running REORG -UPGRADE concurrently with another REORG */
-		MSG_REORGUPCNFLCT(cs_addrs, "REORG", "MUPIP REORG -UPGRADE in progress")
+		MSG_REORGUPCNFLCT(reorg_upgrade_pid, "REORG", "MUPIP REORG -UPGRADE in progress")
 		return FALSE;
 	}
 	memcpy(&gv_currkey_next_reorg->base[0], &gv_currkey->base[0], gv_currkey->end + 1);
@@ -346,11 +347,15 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 		while(pending_levels)	/* === START WHILE COMPLETE_MERGE === */
 		{
 			assert(pending_levels >= 0);
-			if (mu_ctrlc_occurred || mu_ctrly_occurred || (IS_REORG_UP_ACTIVE(cs_addrs->nl)))
+			if (mu_ctrlc_occurred || mu_ctrly_occurred)
 			{
-				if (IS_REORG_UP_ACTIVE(cs_addrs->nl))
-					/* Avoid running REORG -UPGRADE concurrently with another REORG */
-					MSG_REORGUPCNFLCT(cs_addrs, "REORG", "MUPIP REORG -UPGRADE in progress")
+				SAVE_REORG_RESTART;
+				return FALSE;
+			}
+			if (IS_REORG_UP_ACTIVE(cs_addrs->nl, reorg_upgrade_pid))
+			{
+				/* Avoid running REORG -UPGRADE concurrently with another REORG */
+				MSG_REORGUPCNFLCT(reorg_upgrade_pid, "REORG", "MUPIP REORG -UPGRADE in progress")
 				SAVE_REORG_RESTART;
 				return FALSE;
 			}
@@ -651,12 +656,16 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 			}/* === SPLIT-COALESCE LOOP END === */
 			t_abort(gv_cur_region, cs_addrs);	/* do crit and other cleanup */
 		}/* === START WHILE COMPLETE_MERGE === */
-		if (mu_ctrlc_occurred || mu_ctrly_occurred || (IS_REORG_UP_ACTIVE(cs_addrs->nl)))
+		if (mu_ctrlc_occurred || mu_ctrly_occurred)
 		{
 			SAVE_REORG_RESTART;
-			if (IS_REORG_UP_ACTIVE(cs_addrs->nl))
-				/* Avoid running REORG -UPGRADE concurrently with another REORG */
-				MSG_REORGUPCNFLCT(cs_addrs, "REORG", "MUPIP REORG -UPGRADE in progress")
+			return FALSE;
+		}
+		if (IS_REORG_UP_ACTIVE(cs_addrs->nl, reorg_upgrade_pid))
+		{
+			/* Avoid running REORG -UPGRADE concurrently with another REORG */
+			MSG_REORGUPCNFLCT(reorg_upgrade_pid, "REORG", "MUPIP REORG -UPGRADE in progress")
+			SAVE_REORG_RESTART;
 			return FALSE;
 		}
 		/* Now swap the working block */
@@ -749,12 +758,16 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 			}	/* === END OF SWAP LOOP === */
 			t_abort(gv_cur_region, cs_addrs);	/* do crit and other cleanup */
 		}
-		if (mu_ctrlc_occurred || mu_ctrly_occurred || (IS_REORG_UP_ACTIVE(cs_addrs->nl)))
+		if (mu_ctrlc_occurred || mu_ctrly_occurred)
 		{
 			SAVE_REORG_RESTART;
-			if (IS_REORG_UP_ACTIVE(cs_addrs->nl))
-				/* Avoid running REORG -UPGRADE concurrently with another REORG */
-				MSG_REORGUPCNFLCT(cs_addrs, "REORG", "MUPIP REORG -UPGRADE in progress")
+			return FALSE;
+		}
+		if (IS_REORG_UP_ACTIVE(cs_addrs->nl, reorg_upgrade_pid))
+		{
+			/* Avoid running REORG -UPGRADE concurrently with another REORG */
+			MSG_REORGUPCNFLCT(reorg_upgrade_pid, "REORG", "MUPIP REORG -UPGRADE in progress")
+			SAVE_REORG_RESTART;
 			return FALSE;
 		}
 		if (end_of_tree)

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -469,6 +469,7 @@ void recvpool_init(recvpool_user pool_user, boolean_t gtmrecv_startup)
 		recvpool.upd_proc_local->read_jnl_seqno = 0;
 		recvpool.upd_proc_local->read = 0;
 		recvpool.gtmrecv_local->recv_serv_pid = process_id;
+		recvpool.gtmrecv_local->recv_filter_pid = 0;
 		assert((NULL != jnlpool) && (NULL != jnlpool->jnlpool_ctl));
 		if ((NULL != jnlpool) && (NULL != jnlpool->jnlpool_ctl))
 			jnlpool->jnlpool_ctl->gtmrecv_pid = process_id;

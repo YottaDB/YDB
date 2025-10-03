@@ -38,6 +38,7 @@
 #include "buddy_list.h"		/* needed for tp.h */
 #include "tp.h"
 #include "tp_timeout.h"
+#include "tpnotacid_chk_inline.h"
 #include "op.h"
 #include "have_crit.h"
 #include "gtm_caseconv.h"
@@ -501,7 +502,7 @@ void	op_tstart(int implicit_flag, ...) /* value of $T when TSTART */
 				DBGRFCT((stderr, "\nop_tstart: Processing var %.*s\n", tpvent.var_name.len, tpvent.var_name.addr));
 				COMPUTE_HASH_MNAME(&tpvent);
 				tpvent.marked = NOT_MARKED;
-				if (add_hashtab_mname_symval(&curr_symval->h_symtab, &tpvent, NULL, &tabent))
+				if (add_hashtab_mname_symval(&curr_symval->h_symtab, &tpvent, NULL, &tabent, FALSE))
 					lv_newname(tabent, curr_symval);
 				lv = (lv_val *)tabent->value;
 				assert(lv);
@@ -639,8 +640,11 @@ void	op_tstart(int implicit_flag, ...) /* value of $T when TSTART */
 			si->tlvl_info_head = new_tli;
 	}
 	/* If starting first TP level, also start TP timer if set to non-default value */
-	assert(0 <= TREF(dollar_zmaxtptime));
-	if ((0 < TREF(dollar_zmaxtptime)) && (1 == dollar_tlevel))
-		(*tp_timeout_start_timer_ptr)(TREF(dollar_zmaxtptime));
+	assert(0 < TREF(dollar_zmaxtptime));
+	if (1 == dollar_tlevel)
+	{
+		TREF(tptimeout_grace_periods) = TPTIMEOUT_GRACE_RNDS;
+		(*tp_timeout_start_timer_ptr)(TREF(dollar_zmaxtptime) / TPTIMEOUT_GRACE_RNDS);
+	}
 	DBGRFCT((stderr, "\nop_tstart: complete\n"));
 }

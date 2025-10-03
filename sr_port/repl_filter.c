@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -54,6 +54,9 @@
 #include "fork_init.h"
 #include "wbox_test_init.h"
 #include "gtm_poll.h"
+#include "repl_msg.h"
+#include "gtmsource.h"
+#include "gtmrecv.h"
 #ifdef GTM_TRIGGER
 #include "trigger.h"
 #endif
@@ -442,6 +445,8 @@ GBLREF	repl_conn_info_t	*this_side, *remote_side;
 GBLREF	uint4			process_id;
 GBLREF	boolean_t		err_same_as_out;
 GBLREF	volatile boolean_t	timer_in_handler;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
+GBLREF	recvpool_addrs		recvpool;
 
 LITREF	char			*trigger_subs[];
 
@@ -454,7 +459,7 @@ error_def(ERR_TEXT);
 error_def(ERR_UNIMPLOP);
 error_def(ERR_FILTERTIMEDOUT);
 
-static	pid_t	repl_filter_pid = -1;
+static	int4	repl_filter_pid = -1;
 static	int	repl_srv_filter_fd[2] = {FD_INVALID, FD_INVALID};
 static	int	repl_filter_srv_fd[2] = {FD_INVALID, FD_INVALID};
 static	char	*extract_buff;
@@ -571,6 +576,10 @@ int repl_filter_init(char *filter_cmd)
 		 * from the pipe) until we read data that it has already written to its write end of the pipe.
 		 */
 		FCNTL3(repl_srv_filter_fd[WRITE_END], F_SETFL, O_NONBLOCK, fcntl_res);
+		if (is_src_server)
+			jnlpool->gtmsource_local->src_filter_pid = repl_filter_pid;
+		else
+			recvpool.gtmrecv_local->recv_filter_pid = repl_filter_pid;
 		if (0 > fcntl_res)
 		{
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLFILTER, 0, ERR_TEXT, 2,

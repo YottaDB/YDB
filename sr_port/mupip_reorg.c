@@ -124,7 +124,7 @@ void mupip_reorg(void)
 	node_local_ptr_t	cnl;
 	trunc_region		*reg_list, *tmp_reg, *reg_iter, *prev_reg;
 	uint4			fs;
-	uint4			lcl_pid;
+	uint4			lcl_pid, reorg_upgrade_pid;
 	mval			keep_mval = DEFINE_MVAL_STRING(MV_STR | MV_NUM_APPROX, 0 , 0 , 0, 0, 0, 0), *keep_mval_ptr;
 	DCL_THREADGBL_ACCESS;
 
@@ -398,9 +398,9 @@ void mupip_reorg(void)
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_REORGCTRLY);
 			mupip_exit(ERR_MUNOFINISH);
 		}
-		if (IS_REORG_UP_ACTIVE(cs_addrs->nl))
+		if (IS_REORG_UP_ACTIVE(cs_addrs->nl, reorg_upgrade_pid))
 		{	/* Avoid running REORG -UPGRADE concurrently with another REORG */
-			MSG_REORGUPCNFLCT(cs_addrs, "REORG", "MUPIP REORG -UPGRADE in progress")
+			MSG_REORGUPCNFLCT(reorg_upgrade_pid, "REORG", "MUPIP REORG -UPGRADE in progress")
 			mupip_exit(ERR_MUNOFINISH);
 		}
 	}
@@ -419,9 +419,9 @@ void mupip_reorg(void)
 			csd = cs_data;
 			csa = cs_addrs;
 			cnl = csa->nl;
-			if (IS_REORG_UP_ACTIVE(cnl))
+			if (IS_REORG_UP_ACTIVE(cnl, reorg_upgrade_pid))
 			{	/* Avoid running REORG -UPGRADE concurrently with another REORG */
-				MSG_REORGUPCNFLCT(REG2CSA(gv_cur_region), "REORG -TRUNCATE", "MUPIP REORG -UPGRADE in progress")
+				MSG_REORGUPCNFLCT(reorg_upgrade_pid, "REORG -TRUNCATE", "MUPIP REORG -UPGRADE in progress")
 				mupip_exit(ERR_MUNOFINISH);
 			}
 		}
@@ -444,7 +444,7 @@ void mupip_reorg(void)
 			gv_target->root = 0; /* Recompute gv_target->root in case mu_reorg changed things around */
 			inctn_opcode = inctn_invalid_op;	/* needed for GVCST_ROOT_SEARCH */
 			GVCST_ROOT_SEARCH;			/* set gv_target->root */
-			if ((0 == gv_target->root) || (IS_REORG_UP_ACTIVE(cnl)))
+			if ((0 == gv_target->root) || (IS_REORG_UP_ACTIVE(cnl, reorg_upgrade_pid)))
 				continue;
 			hasht_gl.reg = gv_cur_region;
 			hasht_gl.gvt = gv_target;
@@ -477,10 +477,10 @@ void mupip_reorg(void)
 						REG_LEN_STR(gv_cur_region));
 				continue;
 			}
-			if (IS_REORG_UP_ACTIVE(cnl))
+			if (IS_REORG_UP_ACTIVE(cnl, reorg_upgrade_pid))
 			{	/* REORG -UPGRADE cannot run concurrently with TRUNCATE and is higher priority. Stop */
 				rel_crit(gv_cur_region);
-				MSG_REORGUPCNFLCT(REG2CSA(gv_cur_region), "REORG -TRUNCATE", "MUPIP REORG -UPGRADE in progress")
+				MSG_REORGUPCNFLCT(reorg_upgrade_pid, "REORG -TRUNCATE", "MUPIP REORG -UPGRADE in progress")
 				mupip_exit(ERR_MUNOFINISH);
 			}
 			cnl->trunc_pid = process_id;

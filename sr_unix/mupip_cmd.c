@@ -437,7 +437,9 @@ static	CLI_ENTRY	mup_journal_qual[] = {		/* JOURNAL */
 { "GLOBAL",            mupip_recover, 0, 0,                     0,                     0, 0, VAL_REQ,        1, NON_NEG, VAL_STR, 0 },
 { "GVPATFILE",         mupip_recover, 0, 0,                     0,                     0, 0, VAL_REQ,        1, NON_NEG, VAL_STR, 0 },
 { "ID",                mupip_recover, 0, 0,                     0,                     0, 0, VAL_REQ,        1, NON_NEG, VAL_STR, 0 },
+{ "IGNORELOSTJNL",     mupip_recover, 0, 0,                     0,                     0, 0, VAL_DISALLOWED, 1, NEG,     VAL_N_A, 0 },
 { "INTERACTIVE",       mupip_recover, 0, 0,                     0,                     0, 0, VAL_DISALLOWED, 1, NEG,     VAL_N_A, 0 },
+{ "JNLDIR",            mupip_recover, 0, 0,                     0,                     0, 0, VAL_REQ,        1, NON_NEG, VAL_STR, 0 },
 { "LOOKBACK_LIMIT",    mupip_recover, 0, mup_jnl_lookback_parm, mur_jnl_lookback_qual, 0, 0, VAL_NOT_REQ,    1, NEG,     VAL_STR, 0 },
 { "LOSTTRANS",         mupip_recover, 0, mup_jnl_lost_fn,       0,                     0, 0, VAL_REQ,        1, NEG,     VAL_STR, 0 },
 { "ONLINE",            mupip_recover, 0, 0,                     0,                     0, 0, VAL_DISALLOWED, 1, NEG,     VAL_N_A, 0 },
@@ -702,7 +704,7 @@ static	CLI_ENTRY	mup_restore_qual[] = {	/* RESTORE */
 
 static	CLI_PARM	mup_rundown_parm[] = {
 { "R_OR_F_NAME", "File or Region: ", PARM_REQ},
-{ "WHAT",   "Dir: ",            PARM_REQ}, /* required when rundown and relinkctl called together*/
+{ "WHAT",        "Dir: ",            PARM_REQ}, /* required when rundown and relinkctl called together*/
 { "", "", PARM_REQ}
 };
 

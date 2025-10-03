@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2021 Fidelity National Information	*
+ * Copyright (c) 2012-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -186,6 +186,7 @@ void push_parm(UNIX_ONLY_COMMA(unsigned int totalcnt) int truth_value, ...)
 			mv_chain->mv_st_cont.mvs_pval.mvs_ptab.save_value = NULL;	/* Filled in by op_bindparm. */
 			mv_chain->mv_st_cont.mvs_pval.mvs_ptab.hte_addr = NULL;
 			DEBUG_ONLY(mv_chain->mv_st_cont.mvs_pval.mvs_ptab.nam_addr = NULL);
+			DEBUG_ONLY(mv_chain->mv_st_cont.mvs_pval.mvs_ptab.cur_ltext_addr = NULL);
 			*act_list_ptr = (lv_val *)&mv_chain->mv_st_cont.mvs_pval;
 		} else
 			/* Dotted pass-by-reference parm. No save of previous value, just pass lvval. */

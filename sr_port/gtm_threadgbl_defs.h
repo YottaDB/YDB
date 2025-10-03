@@ -94,6 +94,7 @@ THREADGBLDEF(fetch_control,			fetch_ctrl)			/* structure for managing lvn fetche
 /* Database */
 THREADGBLDEF(dbinit_max_delta_secs,		uint4)				/* max time before we bail out in db_init */
 THREADGBLDEF(dollar_zmaxtptime, 		int4)				/* tp timeout in milliseconds */
+THREADGBLDEF(tptimeout_grace_periods,		int4)				/* grace periods for not crit transactions */
 THREADGBLAR1DEF(save_xfer_root,		save_xfer_entry, DEFERRED_EVENTS)	/* array of deferred events with the zeroth
 										 * acting as the root of a queue identified by the
 										 * _ptr item immediately following
@@ -523,6 +524,9 @@ THREADGBLDEF(in_bm_getfree_gdsfilext,           boolean_t)	/* bm_getfree() did a
 								 */
 THREADGBLDEF(ok_to_leave_statsdb_unopened,	boolean_t)	/* Whether or not it is okay to leave a statsdb unopened */
 THREADGBLDEF(enable_autodelete,			boolean_t)	/* Enables autodelete if MUPIP/DSE/LKE */
+THREADGBLDEF(gtm_dynamic_varnames,		boolean_t)	/* Whether or not newly linked-in routine should have dynamic
+								 * variable name handling
+								 */
 /* Debug values */
 #ifdef DEBUG
 THREADGBLDEF(donot_commit,			boolean_t)			/* debug-only - see gdsfhead.h for purpose */

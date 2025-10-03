@@ -34,6 +34,7 @@
 
 GBLREF	bool			undef_inhibit;
 GBLREF	symval			*curr_symval;
+GBLREF	stack_frame		*frame_pointer;
 
 error_def(ERR_UNDEF);
 
@@ -54,7 +55,7 @@ lv_val *op_rfrshlvn(uint4 indx, opctype oc)
 	targ_key.var_name = slot->lvname->str;
 	COMPUTE_HASH_MNAME(&targ_key);
 	targ_key.marked = NOT_MARKED;
-	if (add_hashtab_mname_symval(&curr_symval->h_symtab, &targ_key, NULL, &tabent))
+	if (add_hashtab_mname_symval(&curr_symval->h_symtab, &targ_key, NULL, &tabent, FALSE))
 		lv_newname(tabent, curr_symval);
 	lvn_info = (lvname_info *)&slot->glvn_info;
 	lvn_info->start_lvp = (lv_val *)tabent->value;

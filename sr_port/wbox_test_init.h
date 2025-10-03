@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2005-2024 Fidelity National Information	*
+ * Copyright (c) 2005-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -212,7 +212,7 @@ typedef enum {
 	WBTEST_SOCKET_KEEPALIVE,		/* 163 : shorten keepalive parameters so test fails fast */
 	WBTEST_FETCHCOMM_ERR,			/* 164 : Communication error during fetchresync rollback */
 	WBTEST_FETCHCOMM_HISTINFO,		/* 165 : Communication error during fetchresync rollback HISTINFO */
-	WBTEST_MUINTEG_TQREAD,			/* 166 : Force t_qread to return NULL. To test integ with frozen instance */
+	WBTEST_BLKRDFAIL_TQREAD,		/* 166 : Force t_qread to return NULL.To test block number in DSEBLKRDFAIL error*/
 	WBTEST_FULLBLKWRT_DB,			/* 167 : Full disk blk writes for new blocks */
 	WBTEST_OPENFILE_DB,			/* 168 : Make OPENFILE_DB fail on a RW db */
 	WBTEST_REPL_TLS_RECONN,			/* 169 : Try reconnect in case of transient TLS errors */
@@ -235,10 +235,11 @@ typedef enum {
 	WBTEST_PHS1_NOSPACE,			/* 185 : Set fake enospc right before releasing instance crit. */
 	WBTEST_MUNMAP_FREE,			/* 186 : Verify that munmap() returns memory to the OS */
 	WBTEST_JNL_CLEANUP,			/* 187 : Various asynchronous events in a jnl cleanup */
-	WBTEST_ZTTEST,				/* 188 : Inject garbage collection at awkward place in sv_put.c SV_ZTRAP code */
+	WBTEST_GCOL,				/* 188 : Inject garbage collection at awkward places */
 	WBTEST_JNL_PREAD,			/* 189 : Benchmark pread() against lseek()+read() */
 	WBTEST_INTEG_RTS_ERR,			/* 190 : Force an RTS_ERROR inside of mu_int_maps */
-	WBTEST_REPEAT_DBFILOPN			/* 191 : force dbfilopn to return -2 to the parent to call for a repeat. */
+	WBTEST_REPEAT_DBFILOPN,			/* 191 : force dbfilopn to return -2 to the parent to call for a repeat. */
+	WBTEST_HOLD_BUFFER			/* 192 : force process to hold a buffer for >6 but <60 seconds. */
 
 	/* Note 1: when adding new white box test cases, please make use of WBTEST_ENABLED and WBTEST_ASSIGN_ONLY (defined below)
 	 * whenever applicable

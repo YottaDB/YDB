@@ -1,6 +1,6 @@
 /***************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -742,6 +742,7 @@ typedef struct
 				extract_full,
 				show_head_only,
 				dump_all_blocks,
+				ignorelostjnl,
 				extr[TOT_EXTR_TYPES];
 	char			transaction;
 	redirect_list		*redirect;
@@ -749,6 +750,7 @@ typedef struct
 				*database,
 				*patterns,
 				*global,
+				*jnldir,
 				*process;
 	long_list		*id;
 	long_long_list		*seqno;
@@ -1351,6 +1353,7 @@ void			mur_sort_files(void);
 boolean_t		mur_ztp_lookback(void);
 void			release_all_locks(unix_db_info *udi, gtmsource_local_ptr_t gtmsourcelocal_ptr,
 			gld_dbname_list *curr, int max_reg_total, onln_rlbk_reg_list *rl_last);
+void			override_jnl_tls_file(void);
 int			format_time(jnl_proc_time proc_time, char *string, int string_len, int time_format);
 
 #endif /* MUPREC_H_INCLUDED */

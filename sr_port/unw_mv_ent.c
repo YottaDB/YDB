@@ -103,6 +103,7 @@ boolean_t unw_mv_ent(mv_stent *mv_st_ent, boolean_t unwind_newvars)
 	d_socket_struct		*dsocketptr;
 	d_tt_struct		*tt_ptr;
 	int4			lcl_outofband;
+	var_tabent		lcl_tabent, *tabent_ptr;
 	intrpt_state_t		prev_intrpt_state;
 	ht_ent_mname		*hte;
 	lv_blk			*lp, *lpnext;
@@ -243,7 +244,16 @@ boolean_t unw_mv_ent(mv_stent *mv_st_ent, boolean_t unwind_newvars)
 				return FALSE;
 			return TRUE;
 		case MVST_NTAB:
-			DEBUG_ONLY(hte = lookup_hashtab_mname(&curr_symval->h_symtab, mv_st_ent->mv_st_cont.mvs_ntab.nam_addr));
+#			ifdef DEBUG
+			tabent_ptr = mv_st_ent->mv_st_cont.mvs_ntab.nam_addr;
+			if ((INDIR_MARKED != tabent_ptr->marked) && mv_st_ent->mv_st_cont.mvs_ntab.cur_ltext_addr)
+			{
+				lcl_tabent = *tabent_ptr;
+				tabent_ptr = &lcl_tabent;
+				RELOCATE(tabent_ptr->var_name.addr, char *, frame_pointer->rvector->literal_text_adr);
+			}
+			hte = lookup_hashtab_mname(&curr_symval->h_symtab, tabent_ptr);
+#			endif
 			assert(hte);
 			assert(hte == mv_st_ent->mv_st_cont.mvs_ntab.hte_addr);
 			hte = mv_st_ent->mv_st_cont.mvs_ntab.hte_addr;
@@ -264,8 +274,17 @@ boolean_t unw_mv_ent(mv_stent *mv_st_ent, boolean_t unwind_newvars)
 			if (mv_st_ent->mv_st_cont.mvs_pval.mvs_ptab.hte_addr)
 			{
 				assert(mv_st_ent->mv_st_cont.mvs_pval.mvs_ptab.nam_addr);
-				DEBUG_ONLY(hte = lookup_hashtab_mname(&curr_symval->h_symtab,
-								      mv_st_ent->mv_st_cont.mvs_pval.mvs_ptab.nam_addr));
+#				ifdef DEBUG
+				tabent_ptr = mv_st_ent->mv_st_cont.mvs_pval.mvs_ptab.nam_addr;
+				if (INDIR_MARKED != tabent_ptr->marked && mv_st_ent->mv_st_cont.mvs_pval.mvs_ptab.cur_ltext_addr)
+				{
+					lcl_tabent = *tabent_ptr;
+					tabent_ptr = &lcl_tabent;
+					RELOCATE(tabent_ptr->var_name.addr, char *,
+							mv_st_ent->mv_st_cont.mvs_pval.mvs_ptab.cur_ltext_addr);
+				}
+				hte = lookup_hashtab_mname(&curr_symval->h_symtab, tabent_ptr);
+#				endif
 				assert(hte);
 				assert(hte == mv_st_ent->mv_st_cont.mvs_pval.mvs_ptab.hte_addr);
 				hte = mv_st_ent->mv_st_cont.mvs_pval.mvs_ptab.hte_addr;

@@ -70,6 +70,7 @@ GBLREF	boolean_t		argumentless_rundown;
 GBLREF	semid_queue_elem	*keep_semids;
 GBLREF	boolean_t		in_relinkctl;
 GBLDEF	boolean_t		in_rundown;
+GBLREF	uint4			process_id;
 
 error_def(ERR_MUFILRNDWNSUC);
 error_def(ERR_MUJPOOLRNDWNFL);
@@ -100,6 +101,7 @@ void mupip_rundown(void)
 	unsigned int		full_len;
 	char			*instfilename;
 	unsigned char		ipcs_buff[MAX_IPCS_ID_BUF], *ipcs_ptr;
+	char			ctime_buf[26];
 	semid_queue_elem	*prev_elem;
 	gd_segment		*seg;
 	DCL_THREADGBL_ACCESS;
@@ -292,8 +294,17 @@ void mupip_rundown(void)
 					}
 				} else
 				{
-					util_out_print("Replpool segment (id = !UL) for replication instance !AD is in"
-							" use by another process.", TRUE, shmid, LEN_AND_STR(instfilename));
+					/* If this happens, we would really like to know the pid for the other process(es).
+					 *  However, it is almost impossible to find the pids attached to a shared memory
+					 *  segment.  The best we can do is give the pid that encountered the problem (our pid),
+					 *  the number of pids currently attached, and the create and last touching pid
+					 */
+					ctime_r(&shm_buf.shm_atime, ctime_buf);
+					ctime_buf[24] = '\0';
+					util_out_print("Process !UL found !AD [!UL]-> File is in use by !UL process(es)."
+						"  CPID = !UL, LPID = !UL last attach time !AD",
+						TRUE, process_id, LEN_AND_STR(instfilename), shmid, shm_buf.shm_nattch,
+						shm_buf.shm_cpid, shm_buf.shm_lpid, LEN_AND_STR(ctime_buf));
 					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUJPOOLRNDWNFL, 4, LEN_AND_STR(ipcs_buff),
 								LEN_AND_STR(instfilename));
 				}

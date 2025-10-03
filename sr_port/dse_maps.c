@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -131,7 +131,7 @@ void dse_maps(void)
 			blk_ptr = bml_list + (bml_index * bml_size);
 			blkhist.blk_num = blk_index;
 			if (!(blkhist.buffaddr = t_qread(blkhist.blk_num, &blkhist.cycle, &blkhist.cr)))
-				RTS_ERROR_CSA_ABT(csa, VARLSTCNT(1) ERR_DSEBLKRDFAIL);
+				RTS_ERROR_CSA_ABT(csa, VARLSTCNT(3) ERR_DSEBLKRDFAIL, 1, blkhist.blk_num);
 			BLK_INIT(bs_ptr, bs1);
 			BLK_SEG(bs_ptr, blk_ptr + SIZEOF(blk_hdr), bml_size - SIZEOF(blk_hdr));
 			BLK_FINI(bs_ptr, bs1);
@@ -195,7 +195,7 @@ void dse_maps(void)
 		{
 			assert(dba_bg == csd->acc_meth);
 			if (!(bp = t_qread(bml_blk, &dummy_int, &dummy_cr)))
-				RTS_ERROR_CSA_ABT(csa, VARLSTCNT(1) ERR_DSEBLKRDFAIL);
+				RTS_ERROR_CSA_ABT(csa, VARLSTCNT(3) ERR_DSEBLKRDFAIL, 1, bml_blk);
 		}
 		if ((csa->ti->total_blks / bplmap) * bplmap == bml_blk)
 			total_blks = (csa->ti->total_blks - bml_blk);

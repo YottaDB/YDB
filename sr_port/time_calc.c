@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -59,12 +59,11 @@ int4	abs_time_comp(ABS_TIME *atp1, ABS_TIME *atp2)
  * ---------------------------------------------------------------------
  */
 void	add_int_to_abs_time(ABS_TIME *atps, int4 ival,ABS_TIME *atpd)
-{
+{	/* some callers of this function rely on it correctly handling the case where atps and atpd point to the same structure */
 	int4	ival_sec, ival_usec;
 
 	if (ival < 0)
-	{
-		/* Negative values won't work properly; they're probably
+	{	/* Negative values won't work properly; they're probably
 		 * also an indication of arithmetic overflow when
 		 * multiplying by 1000 to convert from seconds to
 		 * milliseconds.
@@ -73,42 +72,10 @@ void	add_int_to_abs_time(ABS_TIME *atps, int4 ival,ABS_TIME *atpd)
 	}
 	ival_sec  = ival / MILLISECS_IN_SEC;					/* milliseconds -> seconds */
 	ival_usec = (ival - (ival_sec * MILLISECS_IN_SEC)) * MICROSECS_IN_MSEC;	/* microsecond remainder */
-	atpd->at_sec = atps->at_sec + ival_sec;
-	if ((atpd->at_usec = atps->at_usec + ival_usec) >= MICROSECS_IN_SEC)
-	{
-		/* microsecond overflow */
+	if ((atpd->at_usec = atps->at_usec + ival_usec) >= MICROSECS_IN_SEC)    /* WARNING: assignment */
+	{       /* microsecond overflow */
 		atpd->at_usec -= MICROSECS_IN_SEC;
-		atpd->at_sec  += 1;		/* carry */
+		ival_sec  += 1;							/* carry */
 	}
-}
-
-
-/*
- * ------------------------------------------------------
- * Substract absolute time atp2 from absolute time atp1
- *	Absolute time structure is seconds & microseconds.
- *	Integer value is in milliseconds.
- *
- * Arguments:
- *	atp1	- source time structure
- *	atp2	- destination time structure
- *
- * Return:
- *	difference time structure
- * ------------------------------------------------------
- */
-ABS_TIME	sub_abs_time(ABS_TIME *atp1, ABS_TIME *atp2)
-{
-	ABS_TIME	dat;
-	int4		ival;
-
-	dat.at_sec = atp1->at_sec - atp2->at_sec;
-	dat.at_usec = atp1->at_usec - atp2->at_usec;
-
-	if (atp2->at_usec > atp1->at_usec)
-	{
-		dat.at_usec += MICROSECS_IN_SEC;
-		dat.at_sec--;
-	}
-	return (dat);
+	atpd->at_sec = atps->at_sec + ival_sec;
 }

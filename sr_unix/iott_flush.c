@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -23,14 +23,18 @@
 #include "send_msg.h"
 #include "have_crit.h"
 #include "iott_flush_time.h"
+#include "util.h"
+#include "svnames.h"
 #include "deferred_events.h"
 #include "deferred_events_queue.h"
 
-GBLREF boolean_t	prin_out_dev_failure;
+GBLREF boolean_t	hup_on, prin_in_dev_failure, prin_out_dev_failure;
 GBLREF int		process_exiting;
-GBLREF int4		error_condition;
+GBLREF int4		error_condition, exi_condition;
 GBLREF io_pair		io_curr_device, io_std_device;
+GBLREF mval		dollar_zstatus;
 
+error_def(ERR_NOPRINCIO);
 error_def(ERR_TERMHANGUP);
 error_def(ERR_TERMWRITE);
 
@@ -42,6 +46,8 @@ void iott_flush_buffer(io_desc *io_ptr, boolean_t new_write_flag)
 	boolean_t	ch_set;
 
 	tt_ptr = io_ptr->dev_sp;
+	if (ERR_TERMHANGUP == error_condition)
+		TERMHUP_NOPRINCIO_CHECK(TRUE);	/* ensure we never partially lose the HANGUP */
 	if (!tt_ptr->write_active)
 		return;	/* Was assert but that ended up causing endless loops -- now we just survive */
 	ESTABLISH_GTMIO_CH(&io_ptr->pair, ch_set);
@@ -66,7 +72,8 @@ void iott_flush_buffer(io_desc *io_ptr, boolean_t new_write_flag)
 			tt_ptr->write_active = FALSE;				/* In case we come back this-a-way */
 			if ((io_ptr == io_std_device.out) && !prin_out_dev_failure)
 			{
-				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_TERMWRITE, 0, status);
+				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(3)
+					ERR_TERMHANGUP != error_condition ? ERR_TERMWRITE : ERR_TERMHANGUP, 0, status);
 				prin_out_dev_failure = TRUE;			/* set flag for NOPRINCIO, to give app a chance */
 			}
 			xfer_set_handlers(defer_error, status, FALSE);

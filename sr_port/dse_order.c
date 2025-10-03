@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -58,7 +58,7 @@ int dse_order(block_id srch,
 	last = 0;
 	patch_path_count++;
 	if (!(bp = t_qread(srch, &dummy_int, &dummy_cr)))
-		RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(1) ERR_DSEBLKRDFAIL);
+		RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(3) ERR_DSEBLKRDFAIL, 1, srch);
 	if (((blk_hdr_ptr_t)bp)->bver > BLK_ID_32_VER)
 	{
 #		ifdef BLK_NUM_64BIT

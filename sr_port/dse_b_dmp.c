@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -102,7 +102,7 @@ boolean_t dse_b_dmp(void)
 	if (CLI_PRESENT == cli_present("IMAGE"))
 	{
 		if (FALSE == cli_get_str("IMAGE", image_fn, &image_fn_len))
-			RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(1) ERR_DSEBLKRDFAIL);
+			return FALSE;
 		image_fn[image_fn_len] = '\0';
 		image_fd = OPEN(image_fn, O_RDONLY);
 		if (FD_INVALID == image_fd)
@@ -139,7 +139,7 @@ boolean_t dse_b_dmp(void)
 		if (!use_image && !(bp = t_qread(blk, &dummy_int, &cr)))
 		{
 			DSE_REL_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit, nocrit_present, cs_addrs, gv_cur_region);
-			RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(1) ERR_DSEBLKRDFAIL);
+			RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(3) ERR_DSEBLKRDFAIL, 1, blk);
 		}
 #ifdef CAN_USE_IMAGE
 		else if (use_image)

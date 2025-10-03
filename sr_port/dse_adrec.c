@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -93,7 +93,7 @@ void dse_adrec(void)
 	blk_size = csa->hdr->blk_size;
 	blkhist.blk_num = blk;
 	if (!(blkhist.buffaddr = t_qread(blkhist.blk_num, &blkhist.cycle, &blkhist.cr)))
-		RTS_ERROR_CSA_ABT(csa, VARLSTCNT(1) ERR_DSEBLKRDFAIL);
+		RTS_ERROR_CSA_ABT(csa, VARLSTCNT(3) ERR_DSEBLKRDFAIL, 1, blkhist.blk_num);
 	lbp = (uchar_ptr_t)malloc(blk_size);
 	memcpy(lbp, blkhist.buffaddr, blk_size);
 	if (((blk_hdr_ptr_t)lbp)->bver > BLK_ID_32_VER) /* Check blk version to see if using 32 or 64 bit block_id */

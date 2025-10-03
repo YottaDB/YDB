@@ -37,7 +37,6 @@
 #include "jnl.h"
 #include "buddy_list.h"		/* needed for tp.h */
 #include "tp.h"
-#include "tpnotacid_chk_inline.h"
 #include "gtm_stdlib.h"		/* for ATOI */
 #include "gtmimagename.h"
 #include "cryptdef.h"
@@ -69,6 +68,7 @@
 #include "getzposition.h"
 #include "gtmio.h"
 #include "io.h"
+#include "tpnotacid_chk_inline.h"
 #include "ipcrmid.h"
 #include "gtm_ipc.h"
 #include "gtm_semutils.h"

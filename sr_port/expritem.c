@@ -98,7 +98,7 @@ LITDEF nametabent svn_names[] =
 	,{ 4, "ZKEY" }
 	,{ 6, "ZLEVEL" }
 	,{10, "ZMALLOCLIM" }
-	,{13, "ZMAXTPTIMEOUT" }
+	,{10, "ZMAXTPTIME" }
 	,{ 8, "ZMLKHASH" }
 	,{ 5, "ZMODE" }
 	,{ 9, "ZONLNRLBK" }

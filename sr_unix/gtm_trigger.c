@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2024 Fidelity National Information	*
+ * Copyright (c) 2010-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -726,7 +726,8 @@ int gtm_trigger(gv_trigger_t *trigdsc, gtm_trigger_parms *trigprm)
 		lvval = lv_getslot(curr_symval);		/* Allocate an lvval to put into symbol table */
 		LVVAL_INIT(lvval, curr_symval);
 		lvval->v = *lvvalue;				/* Copy mval into lvval */
-		added = add_hashtab_mname_symval(&curr_symval->h_symtab, mne_p, lvval, &tabent);
+		assert(mne_p->marked != INDIR_MARKED);
+		added = add_hashtab_mname_symval(&curr_symval->h_symtab, mne_p, lvval, &tabent, FALSE);
 		assert(added);
 		assert(NULL != tabent);
 	}

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -116,7 +116,7 @@ void dse_range(void)
 		if (!(blk % cs_addrs->hdr->bplmap))
 			continue;
 		if (!(bp = t_qread(blk, &dummy_int, &dummy_cr)))
-			RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(1) ERR_DSEBLKRDFAIL);
+			RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(3) ERR_DSEBLKRDFAIL, 1, blk);
 		if (((blk_hdr_ptr_t)bp)->bver > BLK_ID_32_VER)
 		{
 #			ifdef BLK_NUM_64BIT
@@ -207,7 +207,7 @@ void dse_range(void)
 				} else
 					GET_BLK_ID_32(blk_child, key_top);
 				if (!(bp = t_qread(blk_child, &dummy_int, &dummy_cr)))
-					RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(1) ERR_DSEBLKRDFAIL);
+					RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(3) ERR_DSEBLKRDFAIL, 1, blk_child);
 				if (((blk_hdr_ptr_t)bp)->bver > BLK_ID_32_VER)
 				{
 #					ifdef BLK_NUM_64BIT

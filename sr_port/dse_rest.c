@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -55,6 +55,7 @@ error_def(ERR_DSEBLKRDFAIL);
 error_def(ERR_DSEFAIL);
 error_def(ERR_DSENOTOPEN);
 error_def(ERR_NOREGION);
+error_def(ERR_BLKINVALID);
 
 void dse_rest(void)
 {
@@ -185,11 +186,12 @@ void dse_rest(void)
 	util_out_print("!/", TRUE);
 	t_begin_crit(ERR_DSEFAIL);
 	if (to >= cs_addrs->ti->total_blks)
-		RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(1) ERR_DSEBLKRDFAIL);
+		RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(6) ERR_BLKINVALID, 4, to, DB_LEN_STR(gv_cur_region),
+			&(cs_addrs->ti->total_blks));
 	blk_size = cs_addrs->hdr->blk_size;
 	blkhist.blk_num = to;
 	if (!(blkhist.buffaddr = t_qread(blkhist.blk_num, &blkhist.cycle, &blkhist.cr)))
-		RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(1) ERR_DSEBLKRDFAIL);
+		RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(3) ERR_DSEBLKRDFAIL, 1, blkhist.blk_num);
 	lbp = (uchar_ptr_t)patch_save_set[i].bp;
 
 	BLK_INIT(bs_ptr, bs1);

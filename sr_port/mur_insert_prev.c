@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -50,6 +50,7 @@ boolean_t mur_insert_prev(jnl_ctl_list **jjctl)
 	jnl_ctl_list	*new_jctl, *cur_jctl, *jctl;
 	redirect_list	*rl_ptr;
 	boolean_t	proceed;
+	unsigned char	*ptr_fname = NULL;
 
 	jctl = *jjctl;
 	rctl = jctl->reg_ctl;
@@ -57,8 +58,15 @@ boolean_t mur_insert_prev(jnl_ctl_list **jjctl)
    	assert(rctl->jctl == jctl);
 	new_jctl = (jnl_ctl_list *)malloc(SIZEOF(jnl_ctl_list));
 	memset(new_jctl, 0, SIZEOF(jnl_ctl_list));
-	memcpy(new_jctl->jnl_fn, jctl->jfh->prev_jnl_file_name, jctl->jfh->prev_jnl_file_name_length);
-	new_jctl->jnl_fn_len = jctl->jfh->prev_jnl_file_name_length;
+	if (mur_options.jnldir)
+	{
+		OVERRIDE_JNL_PATH(new_jctl, jctl->jfh->prev_jnl_file_name, jctl->jfh->prev_jnl_file_name_length,
+			mur_options.jnldir);
+	} else
+	{
+		memcpy(new_jctl->jnl_fn, jctl->jfh->prev_jnl_file_name, jctl->jfh->prev_jnl_file_name_length);
+		new_jctl->jnl_fn_len = jctl->jfh->prev_jnl_file_name_length;
+	}
 	assert(0 != new_jctl->jnl_fn_len);
 	if (SS_NORMAL != mur_fopen(new_jctl, rctl))
 	{
@@ -108,6 +116,10 @@ boolean_t mur_insert_prev(jnl_ctl_list **jjctl)
 		|| (0 != memcmp(new_jctl->jfh->data_file_name, rctl->gd->dyn.addr->fname,
 								rctl->gd->dyn.addr->fname_len)))
 	{
+		if (mur_options.jnldir)
+		{
+			IGNORE_JNL_PATH(ptr_fname, new_jctl->jfh, rctl->gd->dyn.addr);
+		}
 		for (rl_ptr = mur_options.redirect;  (NULL != rl_ptr);  rl_ptr = rl_ptr->next)
 		{
 			if ((new_jctl->jfh->data_file_name_length == rl_ptr->org_name_len)
@@ -115,7 +127,7 @@ boolean_t mur_insert_prev(jnl_ctl_list **jjctl)
 					rl_ptr->org_name, rl_ptr->org_name_len)))
 				break;
 		}
-		if (NULL == rl_ptr)
+		if ((NULL == rl_ptr) && (NULL == ptr_fname))
 		{
 			gtm_putmsg_csa(CSA_ARG(rctl->csa) VARLSTCNT(8) ERR_DBJNLNOTMATCH,
 				6, DB_LEN_STR(rctl->gd), new_jctl->jnl_fn_len, new_jctl->jnl_fn,

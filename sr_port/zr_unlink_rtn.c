@@ -102,7 +102,9 @@ void zr_unlink_rtn(rhdtyp *old_rhead, boolean_t free_all)
 		old_rhead->ptext_adr = old_rhead->ptext_end_adr = NULL;
 		old_rhead->lnrtab_adr = NULL;
 	}
-	free(RW_REL_START_ADR(old_rhead));	/* Release the read-write releasable segments */
+	/* Following is proxy for 'is there not really a rw_rel_sect?' */
+	if (RW_REL_START_ADR(old_rhead) && (RW_REL_START_ADR(old_rhead) != (char *)LABTAB_ADR(old_rhead)))
+		free(RW_REL_START_ADR(old_rhead));	/* Release the read-write releasable segments */
 	old_rhead->literal_adr = NULL;
 	old_rhead->vartab_adr = NULL;
 	free(old_rhead->linkage_adr);		/* Release the old linkage section */

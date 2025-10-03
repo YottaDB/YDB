@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2023 Fidelity National Information	*
+ * Copyright (c) 2006-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -133,6 +133,7 @@ int gtmrecv_end1(boolean_t auto_shutdown)
 	strm_idx = recvpool.gtmrecv_local->strm_index;
 	/* Detach from receive pool */
 	recvpool.gtmrecv_local->shutdown = exit_status;
+	recvpool.gtmrecv_local->recv_filter_pid = 0;
 	recvpool.gtmrecv_local->recv_serv_pid = 0;
 	if (0 > SHMDT(recvpool.recvpool_ctl))
 	{

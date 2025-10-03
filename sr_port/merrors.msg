@@ -217,7 +217,7 @@ DEVPARTOOBIG	<String deviceparameter exceeds 255 character limit>/error/fao=0!/a
 DEVPARUNK	<Deviceparameter unknown>/error/fao=0!/ansi=0
 DEVPARVALREQ	<A value is required for this device parameter>/error/fao=0!/ansi=0
 DEVPARMNEG	<Deviceparameter must be a positive value>/error/fao=0!/ansi=0
-DSEBLKRDFAIL	<Failed attempt to read block>/error/fao=0!/ansi=0
+DSEBLKRDFAIL	<Failed attempt to read block 0x!XJ>/error/fao=1!/ansi=0
 DSEFAIL		<DSE failed.  Failure code: !AD.>/error/fao=2!/ansi=0
 NOTALLREPLON	<Replication off for !AD regions>/warning/fao=2!/ansi=0
 BADLKIPARAM	<!AD is not a legal parameter for $ZGETLKI()>/error/fao=2!/ansi=0
@@ -799,7 +799,7 @@ REPLLOGOPN	<Replication subsystem could not open log file !AD: !AD.  Logging don
 REPLFILTER	<Replication filter subsystem failure>/error/fao=0!/ansi=0
 GBLMODFAIL	<Global variable Conflict Test failed.  Failure code: !AD.>/error/fao=2!/ansi=0
 TTLENGTHTOOBIG	<Terminal LENGTH exceeds the maximum allowed limit>/error/fao=0!/ansi=0
-TPTIMEOUT	<Transaction timeout>/error/fao=0!/ansi=0
+TPTIMEOUT	<Transaction timeout after !UL restart(s) and !UL grace period(s) !AD !AD !AD>/warning/fao=8!/ansi=0
 NORTN		<Routine name missing>/error/fao=0!/ansi=0
 JNLFILNOTCHG	<Journal file not changed>/error/fao=0!/ansi=0
 EVENTLOGERR	<Error in event logging subsystem>/error/fao=0!/ansi=0
@@ -837,7 +837,7 @@ EXCLUDEREORG	<Global: !AD is present in the EXCLUDE option.  REORG will skip the
 REORGINC	<Reorg was incomplete.  Not all globals were reorged.>/warning/fao=0!/ansi=0
 ASC2EBCDICCONV	<ASCII/EBCDIC conversion failed when calling !AD>/error/fao=2!/ansi=0
 GTMSECSHRSTART	<!AD - !UL : gtmsecshr failed to startup>/error/fao=3!/ansi=0
-UNUSEDMSG840	<DBVERPERFWARN1 removed from code in V7.1-004 Sep 2024>/error/fao=0!/ansi=0
+LOSTJNLFILE	<Journal file !AD has a transaction number [0x!16@XQ] -- the last one generated for database !AD with ROLLBACK -FORWARD -JNLDIR -IGNORELOSTJNL>/warning/fao=5!/ansi=0
 FILEIDGBLSEC	<File ID in global section does not match with the database file !AD>/error/fao=2!/ansi=0
 GBLSECNOTGDS	<Global Section !AD is not a GT.M global section>/error/fao=2!/ansi=0
 BADGBLSECVER	<Global Section !AD does not match the current database version>/error/fao=2!/ansi=0
@@ -1318,7 +1318,7 @@ UNUSEDMSG1317		<CRYPTNOV4 last used in V6.3-014 Oct 2022>/error/fao=0!/ansi=0
 CRYPTNOMM		<!AD is an encrypted database. Cannot support MM access method.>/error/fao=2!/ansi=0
 READONLYNOBG		<Read-only cannot be enabled on non-MM databases>/error/fao=0!/ansi=0
 CRYPTKEYFETCHFAILED	<Could not retrieve encryption key corresponding to file !AD. !AD>/error/fao=4!/ansi=0//1
-CRYPTKEYFETCHFAILEDNF	<Could not retrieve encryption key during !AD operation key. !AD>/error/fao=4!/ansi=0
+UNUSEDMSG1321		<CRYPTKEYFETCHFAILEDNF last used in V6.0-000 Sep 2012>/error/fao=0!/ansi=0
 CRYPTHASHGENFAILED	<Could not generate cryptographic hash for symmetric key corresponding to file !AD. !AD>/error/fao=4!/ansi=0
 CRYPTNOKEY	<No encryption key specified>/error/fao=0!/ansi=0
 BADTAG		<Unable to use file !AD (CCSID !UL) with CCSID !UL>/error/fao=4!/ansi=0
@@ -1632,9 +1632,9 @@ RESYNCSEQLOW	<MUPIP JOURNAL -ROLLBACK -FORWARD -RESYNC=!@ZQ [0x!16@XQ] requested
 DBNULCOL	<!AD NULL collation representation differs from the database file header setting>/error/fao=2!/ansi=0/I
 UTF16ENDIAN	<The device previously set UTF-16 endianness to !AD and cannot change to !AD>/error/fao=4!/ansi=0
 OFRZACTIVE	<Region !AD has an Online Freeze>/warning/fao=2!/ansi=0
-OFRZAUTOREL	<Online Freeze automatically released for region !AD>/warning/fao=2!/ansi=0
-OFRZCRITREL	<Proceeding with a write to region !AD after Online Freeze while holding crit>/warning/fao=2!/ansi=0
-OFRZCRITSTUCK	<Unable to proceed with a write to region !AD with Online Freeze while holding crit. Region stuck until freeze is removed.>/warning/fao=2!/ansi=0
+OFRZAUTOREL	<Online Freeze automatically released for region !AD (!AD)>/warning/fao=4!/ansi=0
+OFRZCRITREL	<Proceeding with a write to region !AD (!AD) after Online Freeze while holding crit>/warning/fao=4!/ansi=0
+OFRZCRITSTUCK	<Unable to proceed with a write to region !AD (!AD) with Online Freeze while holding crit. Region stuck until freeze is removed.>/warning/fao=4!/ansi=0
 OFRZNOTHELD	<Online Freeze had been automatically released for at least one region>/warning/fao=0!/ansi=0
 AIOBUFSTUCK	<Waited !UL minutes for PID: !UL to finish AIO disk write of block: !@UQ [0x!16@XQ] aio_error=!UL>/error/fao=5!/ansi=0
 DBDUPNULCOL	<Discarding !AD=!AD key due to duplicate null collation record>/error/fao=4!/ansi=0

@@ -16,6 +16,7 @@
 #include "error.h"
 #include "send_msg.h"
 #include "gtmmsg.h"
+#include "cmd_qlf.h"
 #include <rtnhdr.h>
 #include "hashtab_mname.h"
 #include "gdsroot.h"
@@ -27,9 +28,10 @@
 #include "stringpool.h"
 
 GBLREF symval			*curr_symval;
+GBLREF stack_frame		*frame_pointer;
+GBLREF spdesc			rts_stringpool;
 
 #define MNAME_HASH
-
 /* The below include generates the hash table routines for the "mname" hash type */
 #include "hashtab_implementation.h"
 
@@ -41,7 +43,8 @@ GBLREF symval			*curr_symval;
    Note that there are currently no direct callers of expand_hashtab_mname() (except in op_view) that we
    don't already protect or of delete_hashtab_mname() or they would need similar wrappers here.
 */
-boolean_t add_hashtab_mname_symval(hash_table_mname *table, mname_entry *key, void *value, ht_ent_mname **tabentptr)
+boolean_t add_hashtab_mname_symval(hash_table_mname *table, mname_entry *key, void *value, ht_ent_mname **tabentptr,
+		boolean_t fixup)
 {
 	boolean_t		retval;
 	int			table_size_orig;
@@ -52,12 +55,19 @@ boolean_t add_hashtab_mname_symval(hash_table_mname *table, mname_entry *key, vo
 	   to be taken care of here and in EXPAND_HASHTAB in hashtab_implementation.h
 	*/
 	assert(table == &curr_symval->h_symtab || table == &curr_symval->last_tab->h_symtab);
-	if (INDIR_MARKED == key->marked)
+	if (INDIR_MARKED == key->marked || (fixup && DYNAMIC_VARNAMES_ACTIVE(frame_pointer)))
 	{
 		lcl_mname = *key;
 		lcl_mname.marked = NOT_MARKED;
-		if (!IS_IN_STRINGPOOL(lcl_mname.var_name.addr, lcl_mname.var_name.len))
-			s2pool(&lcl_mname.var_name);
+		if (INDIR_MARKED == key->marked)
+		{
+			assert(stringpool.base == rts_stringpool.base);
+			if (!IS_IN_STRINGPOOL(lcl_mname.var_name.addr, lcl_mname.var_name.len))
+				s2pool(&lcl_mname.var_name);
+		} else if (fixup && DYNAMIC_VARNAMES_ACTIVE(frame_pointer))
+		{
+			RELOCATE(lcl_mname.var_name.addr, char *, frame_pointer->rvector->literal_text_adr);
+		}
 #		ifdef DEBUG
 		COMPUTE_HASH_MNAME(&lcl_mname);
 		assert(lcl_mname.hash_code == key->hash_code);

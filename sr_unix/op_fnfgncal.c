@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -38,6 +38,7 @@
 #include "gtmdbglvl.h"		/* for gtm_malloc.h */
 #include "gtm_malloc.h"		/* for VERIFY_STORAGE_CHAINS */
 #include "send_msg.h"
+#include "io.h"
 #include "tpnotacid_chk_inline.h"
 
 /******************************************************************************
@@ -104,21 +105,20 @@
  *
  ******************************************************************************/
 
-GBLREF stack_frame      *frame_pointer;
-GBLREF unsigned char    *msp;
-GBLREF spdesc 		stringpool;
-GBLREF int    		(*callintogtm_vectortable[])();
-GBLREF int		mumps_status;
+GBLREF int    		(*callintogtm_vectortable[])(), mumps_status;
+GBLREF spdesc		stringpool;
+GBLREF stack_frame     *frame_pointer;
+GBLREF uint4		dollar_tlevel, dollar_trestart;
+GBLREF unsigned char   *msp;
 GBLREF volatile int4	gtmMallocDepth;
 #ifdef GTM_PTHREAD
-GBLREF boolean_t	gtm_jvm_process;
-GBLREF pthread_t	gtm_main_thread_id;
-GBLREF boolean_t	gtm_main_thread_id_set;
+GBLREF boolean_t	gtm_jvm_process, gtm_main_thread_id, gtm_main_thread_id_set;
 #endif
 
-LITREF	mval		literal_null;
-LITREF mval		skiparg;
+LITREF mval		literal_null, skiparg;
 
+error_def(ERR_EXTCALLBOUNDS);
+error_def(ERR_EXCEEDSPREALLOC);
 error_def(ERR_JNI);
 error_def(ERR_MAXSTRLEN);
 error_def(ERR_TEXT);
@@ -134,8 +134,6 @@ error_def(ERR_ZCSTATUSRET);
 error_def(ERR_ZCUSRRTN);
 error_def(ERR_ZCVECTORINDX);
 error_def(ERR_XCRETNULLREF);
-error_def(ERR_EXTCALLBOUNDS);
-error_def(ERR_EXCEEDSPREALLOC);
 
 #define EXCALLSTR "CALL OUT"
 
@@ -543,15 +541,16 @@ STATICFNDEF int extarg_getsize(void *src, enum gtm_types typ, mval *dst, struct 
 }
 
 STATICFNDEF void op_fgnjavacal(mval *dst, mval *package, mval *extref, uint4 mask, int4 argcnt, int4 entry_argcnt,
-    struct extcall_package_list *package_ptr, struct extcall_entry_list *entry_ptr, va_list var)
+	struct extcall_package_list *package_ptr, struct extcall_entry_list *entry_ptr, va_list var)
 {
-	boolean_t	error_in_xc = FALSE;
+	ABS_TIME	b_time;
+	boolean_t	error_in_xc = FALSE, safe;
 	char		*free_string_pointer, *free_string_pointer_start, jtype_char;
 	char		str_buffer[MAX_NAME_LENGTH], *tmp_buff_ptr, *jni_err_buf;
 	char		*types_descr_ptr, *types_descr_dptr, *xtrnl_table_name;
 	gparam_list	*param_list;
 	gtm_long_t	*free_space_pointer;
-	int		i, j, save_mumps_status;
+	int		grace, i, j, save_mumps_status;
 	int4 		m1, m2, n, space_n, call_buff_size;
 	INTPTR_T	status;
 	mval		*v;
@@ -659,9 +658,9 @@ STATICFNDEF void op_fgnjavacal(mval *dst, mval *package, mval *extref, uint4 mas
 		m2 >>= 1;
 	}
 	va_end(var);
-        /* Allocate space for argument handling. Overall, the allocated space has the following structure:
+	/* Allocate space for argument handling. Overall, the allocated space has the following structure:
 	 *   ___________________________________________
-	 *  |            |              |               |
+	 *  |		 |		|		|
 	 *  | param_list | space buffer | string buffer |
 	 *  |____________|______________|_______________|
 	 *
@@ -672,9 +671,7 @@ STATICFNDEF void op_fgnjavacal(mval *dst, mval *package, mval *extref, uint4 mas
 	 */
 	/* Note that this is the nominal buffer size; or, explicitly, the size of buffer without the protection tags*/
 	call_buff_size = n;
-
 	char	buff[(call_buff_size + 2*buff_border_len)]	__attribute__((aligned));
-
 	param_list = set_up_buffer(buff, n);
 	param_list->arg[0] = (void *)types_descr_ptr;
 	/* Adding 3 to account for type descriptions, class name, and method name arguments. */
@@ -803,15 +800,19 @@ STATICFNDEF void op_fgnjavacal(mval *dst, mval *package, mval *extref, uint4 mas
 	assert((char *)free_space_pointer <= free_string_pointer_start);
 	va_end(var_copy);
 	param_list->n = argcnt + 3;		/* Take care of the three implicit parameters. */
+	safe = 0 != entry_ptr->ext_call_behaviors[SIGSAFE];
 	VERIFY_STORAGE_CHAINS;
 	TPNOTACID_CHECK(EXCALLSTR);
 	save_mumps_status = mumps_status; 	/* Save mumps_status as a callin from external call may change it. */
-	assert(INTRPT_OK_TO_INTERRUPT == intrpt_ok_state);	/* Expected for DEFERRED_EXIT_HANDLING_CHECK below */
+	if (dollar_tlevel)
+		sys_get_curr_time(&b_time);				/* time starting the external call */
+	assert(INTRPT_OK_TO_INTERRUPT == intrpt_ok_state);		/* Expected for DEFERRED_EXIT_HANDLING_CHECK below */
+	grace = TREF(tptimeout_grace_periods);
 	TREF(in_ext_call) = TRUE;
 	status = callg((callgfnptr)entry_ptr->fcn, param_list);
 	TREF(in_ext_call) = FALSE;
+	TPTIMEOUT_POST_CALLG(safe, b_time, grace);			/* deal with potential signal disruption primarily in TP */
 	verify_buffer((char *)param_list, n, entry_ptr->entry_name.addr);
-	check_for_timer_pops(!entry_ptr->ext_call_behaviors[SIGSAFE]);
 	mumps_status = save_mumps_status;
 	/* The first byte of the type description argument gets set to 0xFF in case error happened in JNI glue code,
 	 * so check for that and act accordingly.
@@ -902,10 +903,11 @@ STATICFNDEF void op_fgnjavacal(mval *dst, mval *package, mval *extref, uint4 mas
 
 void op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 mask, int4 argcnt, ...)
 {
-	boolean_t	java = FALSE;
+	ABS_TIME	b_time;
+	boolean_t	java = FALSE, safe;
 	char		*free_string_pointer, *free_string_pointer_start;
 	char		str_buffer[MAX_NAME_LENGTH], *tmp_buff_ptr, *xtrnl_table_name;
-	int		i, pre_alloc_size, rslt, save_mumps_status;
+	int		grace, i, pre_alloc_size, rslt, save_mumps_status;
 	int4 		callintogtm_vectorindex, n, call_buff_size;
 	gparam_list	*param_list;
 	gtm_long_t	*free_space_pointer;
@@ -1013,9 +1015,9 @@ void op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 ma
 		}
 	}
 	va_end(var);
-        /* Double the size, to take care of any alignments in the middle. Overall, the allocated space has the following structure:
+	/* Double the size, to take care of any alignments in the middle. Overall, the allocated space has the following structure:
 	 *   ___________________________________________
-	 *  |            |              |               |
+	 *  |		 |		|		|
 	 *  | param_list | space buffer | string buffer |
 	 *  |____________|______________|_______________|
 	 *
@@ -1205,15 +1207,19 @@ void op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 ma
 	assert((char *)free_space_pointer <= free_string_pointer_start);
 	va_end(var);
 	param_list->n = argcnt;
+	safe = 0 != entry_ptr->ext_call_behaviors[SIGSAFE];
 	VERIFY_STORAGE_CHAINS;
 	TPNOTACID_CHECK(EXCALLSTR);
 	save_mumps_status = mumps_status; /* Save mumps_status as a callin from external call may change it */
-	assert(INTRPT_OK_TO_INTERRUPT == intrpt_ok_state);              /* Expected for DEFERRED_EXIT_HANDLING_CHECK below */
+	if (dollar_tlevel)
+		sys_get_curr_time(&b_time);				/* time starting the external call */
+	assert(INTRPT_OK_TO_INTERRUPT == intrpt_ok_state);		/* Expected for DEFERRED_EXIT_HANDLING_CHECK below */
+	grace = TREF(tptimeout_grace_periods);
 	TREF(in_ext_call) = TRUE;
 	status = callg((callgfnptr)entry_ptr->fcn, param_list);
 	TREF(in_ext_call) = FALSE;
+	TPTIMEOUT_POST_CALLG(safe, b_time, grace);			/* deal with potential signal siruption primarily in TP */
 	verify_buffer((char *)param_list, (2*n), entry_ptr->entry_name.addr);
-	check_for_timer_pops(!entry_ptr->ext_call_behaviors[SIGSAFE]);
 	mumps_status = save_mumps_status;
 	/* Exit from the residual call-in environment(SFF_CI and base frames) which might
 	 * still exist on M stack when the externally called function in turn called

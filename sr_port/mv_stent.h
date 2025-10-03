@@ -25,6 +25,7 @@ typedef struct
 	ht_ent_mname		*hte_addr;	/* Hash table entry for name (updated automagically when ht expands) */
 	struct lv_val_struct	*save_value;	/* value to restore to hashtab and lst_addr (if supplied) on pop */
 	DEBUG_ONLY(var_tabent	*nam_addr;)	/* Name associated with hash table entry for the saved value (for asserts) */
+	DEBUG_ONLY(unsigned char *cur_ltext_addr;) /* Current literal text address. */
 } mvs_ntab_struct;
 
 /* PVAL includes NTAB plus a pointer to the new value created which may or may not be in the hashtable anymore

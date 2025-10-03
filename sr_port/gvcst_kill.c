@@ -142,7 +142,7 @@ void	gvcst_kill(boolean_t do_subtree)
 	DEBUG_ONLY(save_dollar_tlevel = dollar_tlevel);
 	if (do_subtree)
 	{	/* If we're killing the whole subtree, that includes any spanning nodes. No need to do anything special */
-		if (!cs_addrs->now_crit)	/* Do not sleep while holding crit */
+		if (!dollar_tlevel && !cs_addrs->now_crit)      /* Do not sleep while in TP or holding crit */
 			WAIT_ON_INHIBIT_KILLS(cs_addrs->nl, MAXWAIT2KILL);
 		gvcst_kill2(TRUE, NULL, FALSE);
 		assert(save_dollar_tlevel == dollar_tlevel);
@@ -757,7 +757,7 @@ research:
 			if (0 < kill_set_head.used)		/* increase kill_in_prog */
 			{
 				need_kip_incr = TRUE;
-				if (!csa->now_crit)	/* Do not sleep while holding crit */
+				if (!dollar_tlevel && !csa->now_crit)   /* Do not sleep while in TP or holding crit */
 					WAIT_ON_INHIBIT_KILLS(cnl, MAXWAIT2KILL);
 			}
 			if ((trans_num)0 == t_end(gvt_hist, alt_hist, TN_NOT_SPECIFIED))

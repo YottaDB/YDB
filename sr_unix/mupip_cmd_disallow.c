@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2002-2023 Fidelity National Information	*
+ * Copyright (c) 2002-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -190,6 +190,12 @@ boolean_t cli_disallow_mupip_journal(void)
 	disallow_return_value =  d_c_cli_present("REDIRECT") && !d_c_cli_present("RECOVER");
 	CLI_DIS_CHECK_N_RESET;
 	disallow_return_value =  d_c_cli_present("REDIRECT") && d_c_cli_present("BACKWARD");
+	CLI_DIS_CHECK_N_RESET;
+	disallow_return_value =  d_c_cli_present("JNLDIR") && d_c_cli_present("RECOVER");
+	CLI_DIS_CHECK_N_RESET;
+	disallow_return_value =  d_c_cli_present("JNLDIR") && d_c_cli_present("BACKWARD");
+	CLI_DIS_CHECK_N_RESET;
+	disallow_return_value =  d_c_cli_present("IGNORELOSTJNL") && !d_c_cli_present("JNLDIR");
 	CLI_DIS_CHECK_N_RESET;
 	disallow_return_value =  d_c_cli_present("BACKWARD") && d_c_cli_negated("CHAIN");
 	CLI_DIS_CHECK_N_RESET;

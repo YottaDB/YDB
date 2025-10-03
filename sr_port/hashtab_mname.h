@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -13,6 +13,8 @@
 #define HASHTAB_MNAME_H
 
 #include "hashtab.h"	/* needed for STR_HASH (in COMPUTE_HASH_MNAME) */
+#include "mdef.h"
+#include <rtnhdr.h>
 
 typedef struct
 {
@@ -64,7 +66,8 @@ typedef struct hash_table_mname_struct
 void init_hashtab_mname(hash_table_mname *table, int minsize, boolean_t dont_compact, boolean_t dont_keep_spare_table);
 void expand_hashtab_mname(hash_table_mname *table, int minsize);
 boolean_t add_hashtab_mname(hash_table_mname *table, mname_entry *key, void *value, ht_ent_mname **tabentptr);
-boolean_t add_hashtab_mname_symval(hash_table_mname *table, mname_entry *key, void *value, ht_ent_mname **tabentptr);
+boolean_t add_hashtab_mname_symval(hash_table_mname *table, mname_entry *key, void *value, ht_ent_mname **tabentptr,
+		boolean_t fixup);
 void *lookup_hashtab_mname(hash_table_mname *table, mname_entry *key);
 void delete_hashtab_ent_mname(hash_table_mname *table, ht_ent_mname *tabent);
 boolean_t delete_hashtab_mname(hash_table_mname *table, mname_entry *key);

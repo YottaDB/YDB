@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -251,6 +251,7 @@ int 	mu_rndwn_replpool(replpool_identifier *replpool_id, repl_inst_hdr_ptr_t rep
 	sm_uc_ptr_t		start_addr;
 	struct shmid_ds		shm_buf;
 	boolean_t		force_attach;
+	char			ctime_buf[26];
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -269,8 +270,18 @@ int 	mu_rndwn_replpool(replpool_identifier *replpool_id, repl_inst_hdr_ptr_t rep
 	nattch = shm_buf.shm_nattch;
 	if ((0 != nattch) && !force_attach)
 	{
-		util_out_print("Replpool segment (id = !UL) for replication instance !AD is in use by another process.",
-				TRUE, shm_id, LEN_AND_STR(instfilename));
+		/* If this happens, we would really like to know the pid for the other process(es).
+		 *  However, it is almost impossible to find the pids attached to a shared memory
+		 *  segment.  The best we can do is give the pid that encountered the problem (our pid),
+		 *  the number of pids currently attached, and the create and last touching pid
+		 */
+		ctime_r(&shm_buf.shm_atime, ctime_buf);
+		ctime_buf[24] = '\0';
+		util_out_print("Process !UL found !AD [!UL]-> File is in use by !UL process(es)."
+			"  CPID = !UL, LPID = !UL last attach time !AD",
+			TRUE, process_id, LEN_AND_STR(instfilename), shm_id,
+			shm_buf.shm_nattch, shm_buf.shm_cpid, shm_buf.shm_lpid,
+			LEN_AND_STR(ctime_buf));
 		return -1;
 	}
 	if (-1 == (sm_long_t)(start_addr = (sm_uc_ptr_t) do_shmat(shm_id, 0, 0)))

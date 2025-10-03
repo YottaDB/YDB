@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -89,7 +89,7 @@ void dse_chng_bhead(void)
 	t_begin_crit(ERR_DSEFAIL);
 	blkhist.blk_num = blk;
 	if (!(blkhist.buffaddr = t_qread(blkhist.blk_num, &blkhist.cycle, &blkhist.cr)))
-		RTS_ERROR_CSA_ABT(csa, VARLSTCNT(1) ERR_DSEBLKRDFAIL);
+		RTS_ERROR_CSA_ABT(csa, VARLSTCNT(3) ERR_DSEBLKRDFAIL, 1, blkhist.blk_num);
 	new_hdr = *(blk_hdr_ptr_t)blkhist.buffaddr;
 	if (CLI_PRESENT == cli_present("LEVEL"))
 	{
@@ -163,7 +163,7 @@ void dse_chng_bhead(void)
 		assert(csa->ti->early_tn == csa->ti->curr_tn);
 		if (NULL == (blkhist.buffaddr = t_qread(blkhist.blk_num, &blkhist.cycle, &blkhist.cr)))
 		{
-			gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(1) ERR_DSEBLKRDFAIL);
+			gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(3) ERR_DSEBLKRDFAIL, 1, blkhist.blk_num);
 			t_abort(gv_cur_region, csa);
 			return;
 		}

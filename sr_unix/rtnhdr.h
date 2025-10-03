@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -12,7 +12,9 @@
 #ifndef RTNHDR_H_INCLUDED
 #define RTNHDR_H_INCLUDED
 
+#include "mdef.h"
 #include "srcline.h"
+#include "cmd_qlf.h"
 
 /* rtnhdr.h - routine header for shared binary Unix platforms */
 
@@ -104,6 +106,7 @@ typedef struct	rhead_struct
 	mident			routine_name;		/* External routine name */
 	var_tabent		*vartab_adr;		/* (#) Address of variable table (offset in original rtnhdr) */
 	int4			vartab_len;		/* (#) Number of variable table entries */
+	boolean_t		dynamic_varnames;	/* (#) Whether or not the given routine uses dynamic variable names */
 	lab_tabent		*labtab_adr;		/* Address of label table (offset in original rtnhdr) */
 	int4			labtab_len;		/* Number of label table entries */
 	lnr_tabent		*lnrtab_adr;		/* Address of linenumber table (offset in original rtnhdr) */
@@ -172,6 +175,7 @@ typedef struct
 	int			filler1;		/* 64 bit alignment */
 } lnk_tabent_proxy;
 #define TABENT_PROXY TREF(lnk_proxy)
+#define RELOCATE(field, type, base) field = (type)((unsigned char *)(field) + (UINTPTR_T)(base))
 
 /* Byte offset of the routine_name field in the routine headers of pre-V5 releases */
 #define PRE_V5_RTNHDR_RTNOFF		24
@@ -210,7 +214,13 @@ typedef struct
 #define CODE_OFFSET(rtnhdr, addr) ((char *)(addr) - (char *)(rtnhdr->ptext_adr))
 
 #define DYNAMIC_LITERALS_ENABLED(rtnhdr) ((rtnhdr)->compiler_qlf & CQ_DYNAMIC_LITERALS)
-#define RW_REL_START_ADR(rtnhdr) (((DYNAMIC_LITERALS_ENABLED(rtnhdr)) ? (char *)VARTAB_ADR(rtnhdr) : (char *)LITERAL_ADR(rtnhdr)))
+#define DYNAMIC_VARNAMES_ENABLED(rtnhdr) ((rtnhdr)->dynamic_varnames)
+#define	DYNAMIC_VARNAMES_ACTIVE(fp) ((fp) && !((fp)->flags & SFF_INDCE) && DYNAMIC_VARNAMES_ENABLED((fp)->rvector))
+#define RW_REL_START_ADR(rtnhdr) (((DYNAMIC_LITERALS_ENABLED(rtnhdr)) ? \
+			(DYNAMIC_VARNAMES_ENABLED(rtnhdr) ? \
+			 	(char *)(LABTAB_ADR(rtnhdr)) \
+			 	: (char *)(VARTAB_ADR(rtnhdr))) \
+			 : (char *)LITERAL_ADR(rtnhdr)))
 #define PTEXT_OFFSET SIZEOF(rhdtyp)
 
 /* Macro to determine if given address is inside code segment. Note that even though

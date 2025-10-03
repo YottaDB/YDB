@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -17,6 +17,7 @@
 #include "min_max.h"
 
 #define SIMPLE_FIND_FREE_BLK(HINT, NOCRIT_PRESENT, UPGRADE)  simple_find_free(HINT, NOCRIT_PRESENT, UPGRADE)
+error_def(ERR_DSEBLKRDFAIL);
 
 static inline block_id simple_find_free(block_id hint, boolean_t nocrit_present, boolean_t upgrade)
 {
@@ -79,7 +80,7 @@ static inline block_id simple_find_free(block_id hint, boolean_t nocrit_present,
 		{
 			assert(!upgrade);
 			DSE_REL_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit, nocrit_present, csa, gv_cur_region);
-			return MAP_RD_FAIL;
+			RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(3) ERR_DSEBLKRDFAIL, 1, bml);
 		}
 		lmap_bit = bml_find_free(lmap_hint, lmap_base + SIZEOF(blk_hdr), (!in_last_bmap) ?  bplmap : (total_blks - bml));
 		if (lmap_bit >= lmap_hint)	/* Found free after hint */

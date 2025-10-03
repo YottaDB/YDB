@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2009, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2009-2025 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -37,13 +38,19 @@ GBLREF uint4		dollar_tlevel;
 void op_killalias(int srcindx)
 {
 	ht_ent_mname	*tabent;
-	mname_entry	*varname;
+	mname_entry	*varname, lcl_varname;
 	lv_val		*lv;
 	int4		symvlvl;
 
 	SET_ACTIVE_LV(NULL, TRUE, actlv_op_killalias); /* If we get here, subscript set was successful.
 							* Clear active_lv to avoid later cleanup issues */
 	varname = &(((mname_entry *)frame_pointer->vartab_ptr)[srcindx]);
+	if ((INDIR_MARKED != varname->marked) && DYNAMIC_VARNAMES_ACTIVE(frame_pointer))
+	{
+		lcl_varname = *varname;
+		varname = &lcl_varname;
+		RELOCATE(varname->var_name.addr, char *, frame_pointer->rvector->literal_text_adr);
+	}
 	tabent = lookup_hashtab_mname(&curr_symval->h_symtab, varname);		/* Retrieve hash tab entry this var */
 	if (tabent)
 	{

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -17,6 +17,9 @@
 #include "op.h"
 #include "toktyp.h"
 #include "gtm_ctype.h"
+#ifdef DEBUG
+#include "wbox_test_init.h"
+#endif
 
 #ifdef UTF8_SUPPORTED
 #include "hashtab_int4.h"
@@ -296,6 +299,7 @@ void op_fntranslate_fast(mval *src, mval *rplc, mval *m_xlate, mval *dir, mval *
 	hash_table_int4		*xlate_hash;  /* translation table to hold all multi-byte character mappings */
 	int4			*xlate;
 	translate_direction	direction;
+	int			size_gcol;
 
 	assert(gtm_utf8_mode);							/* compiler only uses this for UTF-8) */
 	assert(MV_STR & m_xlate->mvtype);
@@ -314,7 +318,12 @@ void op_fntranslate_fast(mval *src, mval *rplc, mval *m_xlate, mval *dir, mval *
 		MV_FORCE_LEN_SILENT(dir);
 	}
 	/* ensure space for dst without stp_gcol moving xlate_table; src can only increase from current to maximum byte length */
-	ENSURE_STP_FREE_SPACE((gtm_utf8_mode ? (src->str.char_len * MAX_CHAR_LEN) : src->str.len) + m_xlate->str.len);
+	size_gcol = ((gtm_utf8_mode ? (src->str.char_len * MAX_CHAR_LEN) : src->str.len) + m_xlate->str.len);
+	ENSURE_STP_FREE_SPACE(size_gcol);
+#	ifdef DEBUG
+	if ((WBTEST_ENABLED(WBTEST_GCOL)) && (2 == gtm_white_box_test_case_count))
+		INVOKE_STP_GCOL(size_gcol);
+#	endif
 	xlate = (int4 *)m_xlate->str.addr;
 	xlate_hash = m_xlate_hash->str.len ? activate_hashtab_in_buffer_int4((sm_uc_ptr_t)m_xlate_hash->str.addr, NULL) : NULL;
 	GET_DIRERCTION(dir, &direction)

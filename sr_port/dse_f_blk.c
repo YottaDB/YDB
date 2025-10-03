@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -78,7 +78,7 @@ void dse_f_blk(void)
 	do
 	{
 		if (!(bp = t_qread(look, &dummy_int, &dummy_cr)))
-			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_DSEBLKRDFAIL);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_DSEBLKRDFAIL, 1, look);
 		if (((blk_hdr_ptr_t)bp)->bver > BLK_ID_32_VER) /* Check blk version to see if using 32 or 64 bit block_id */
 		{
 #			ifdef BLK_NUM_64BIT
@@ -277,7 +277,8 @@ void dse_f_blk(void)
 			{
 				if (!(sp = t_qread(patch_find_root_search ? patch_path[lvl] : patch_path1[lvl], &dummy_int,
 					&dummy_cr)))
-						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_DSEBLKRDFAIL);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_DSEBLKRDFAIL, 1,
+							(patch_find_root_search ? patch_path[lvl] : patch_path1[lvl]));
 				if (((blk_hdr_ptr_t)sp)->bver > BLK_ID_32_VER) /* Check to see if using 32 or 64 bit block_id */
 				{
 #					ifdef BLK_NUM_64BIT
@@ -361,7 +362,7 @@ void dse_f_blk(void)
 				for (lvl++; lvl < (patch_find_root_search ? patch_dir_path_count : patch_path_count); lvl++)
 				{
 					if (!(sp = t_qread(last, &dummy_int, &dummy_cr)))
-						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_DSEBLKRDFAIL);
+						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_DSEBLKRDFAIL, 1, last);
 					if (((blk_hdr_ptr_t)sp)->bver > BLK_ID_32_VER) /* Check if using 32 or 64 bit block_id */
 					{
 #						ifdef BLK_NUM_64BIT
@@ -427,7 +428,8 @@ void dse_f_blk(void)
 			{
 				if (!(sp = t_qread(patch_find_root_search ? patch_path[lvl] : patch_path1[lvl], &dummy_int,
 					&dummy_cr)))
-					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_DSEBLKRDFAIL);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_DSEBLKRDFAIL, 1,
+						(patch_find_root_search ? patch_path[lvl] : patch_path1[lvl]));
 				if (((blk_hdr_ptr_t)sp)->bver > BLK_ID_32_VER) /* Check to see if using 32 or 64 bit block_id */
 				{
 #					ifdef BLK_NUM_64BIT
@@ -517,7 +519,7 @@ void dse_f_blk(void)
 				for (lvl++; lvl < (patch_find_root_search ? patch_dir_path_count : patch_path_count); lvl++)
 				{
 					if (!(sp = t_qread(look, &dummy_int, &dummy_cr)))	/* NOTE assignment */
-						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_DSEBLKRDFAIL);
+						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_DSEBLKRDFAIL, 1, look);
 					if (((blk_hdr_ptr_t)sp)->bver > BLK_ID_32_VER) /* Check if using 32 or 64 bit block_id */
 					{
 #						ifdef BLK_NUM_64BIT

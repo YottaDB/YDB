@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -47,7 +47,6 @@ error_def(ERR_CEUSRERROR);
 error_def(ERR_DIVZERO);
 error_def(ERR_ERRORSUMMARY);
 error_def(ERR_FMLLSTMISSING);
-error_def(ERR_FMLLSTPRESENT);
 error_def(ERR_FOROFLOW);
 error_def(ERR_INVDLRCVAL);
 error_def(ERR_LABELMISSING);

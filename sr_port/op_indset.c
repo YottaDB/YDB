@@ -21,8 +21,10 @@
 #include "op.h"
 #include <rtnhdr.h>
 #include "valid_mname.h"
+#include "stack_frame.h"
 
 GBLREF	symval			*curr_symval;
+GBLREF stack_frame	*frame_pointer;
 
 error_def(ERR_VAREXPECTED);
 
@@ -50,7 +52,7 @@ void	op_indset(mval *target, mval *value)
 			targ_key.var_name = target->str;
 			COMPUTE_HASH_MNAME(&targ_key);
 			targ_key.marked = NOT_MARKED;
-			if (add_hashtab_mname_symval(&curr_symval->h_symtab, &targ_key, NULL, &tabent))
+			if (add_hashtab_mname_symval(&curr_symval->h_symtab, &targ_key, NULL, &tabent, FALSE))
 				lv_newname(tabent, curr_symval);
 			((lv_val *)tabent->value)->v = *value;
 			return;

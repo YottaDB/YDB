@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2009-2021 Fidelity National Information	*
+ * Copyright (c) 2009-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -48,7 +48,7 @@ error_def(ERR_ALIASEXPECTED);
 void op_setalsctin2als(lv_val *srclv, int destindx)
 {
 	ht_ent_mname	*tabent;
-	mname_entry	*varname;
+	mname_entry	*varname = NULL;
 	lv_val		*srclvc, *dstlv, *src_baselv;
 	int4		srcsymvlvl;
 	boolean_t	added;
@@ -69,11 +69,12 @@ void op_setalsctin2als(lv_val *srclv, int destindx)
 	varname = &(((mname_entry *)frame_pointer->vartab_ptr)[destindx]);
 	DEBUG_ONLY(added = FALSE);
 	/* Find hash table entry */
+	/* If no fast path to hash table entry -- look it up the hard(er) way */
 	if (NULL == (tabent = (ht_ent_mname *)frame_pointer->l_symtab[destindx]))	/* note tabent assignment */
-	{	/* No fast path to hash table entry -- look it up the hard(er) way */
-		varname = &(((mname_entry *)frame_pointer->vartab_ptr)[destindx]);
-		added = add_hashtab_mname_symval(&curr_symval->h_symtab, varname, NULL, &tabent);
-	}
+		added = add_hashtab_mname_symval(&curr_symval->h_symtab, varname, NULL, &tabent, TRUE);
+	varname = NULL; /* Don't store varname anywhere - where it points not guaranteed to outlast the execution of the current
+			 * frame, and it might have a relative addr offset if dynamic varnames are enabled;
+			 */
 	assert(tabent);
 	assert(tabent || added);
 	dstlv = (lv_val *)tabent->value;

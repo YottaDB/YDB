@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -66,7 +66,7 @@ void dse_m_rest	(block_id		blk,		/* block number */
 	unsigned char	util_buff[MAX_UTIL_LEN];
 
 	if (!(bp = t_qread (blk, &dummy_int, &dummy_cr)))
-		RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(1) ERR_DSEBLKRDFAIL);
+		RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(3) ERR_DSEBLKRDFAIL, 1, blk);
 	if (((blk_hdr_ptr_t) bp)->bsiz > cs_addrs->hdr->blk_size)
 		b_top = bp + cs_addrs->hdr->blk_size;
 	else if (((blk_hdr_ptr_t) bp)->bsiz < SIZEOF(blk_hdr))
@@ -94,7 +94,7 @@ void dse_m_rest	(block_id		blk,		/* block number */
 		if (in_dir_tree || level > 1)	/* reread block because it may have been flushed from read */
 		{
 			if (!(np = t_qread(blk,&dummy_int,&dummy_cr))) /* cache due to LRU buffer scheme and reads in recursive */
-				RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(1) ERR_DSEBLKRDFAIL);	/* calls to dse_m_rest. */
+				RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(3) ERR_DSEBLKRDFAIL, 1, blk);	/* calls to dse_m_rest. */
 			if (np != bp)
 			{
 				b_top = np + (b_top - bp);

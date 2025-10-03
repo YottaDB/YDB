@@ -643,34 +643,33 @@ STATICFNDEF int keystore_refresh(void)
 	if (0 != gc_update_passwd(GTM_PASSWD_ENV, &gtmcrypt_pwent, GTMCRYPT_DEFAULT_PASSWD_PROMPT,
 					GTMCRYPT_OP_INTERACTIVE_MODE & gtmcrypt_init_flags))
 		return -1;
-	if (CONFIG_FILE_UNREAD)
-	{	/* First, make sure we have a proper environment varible and a regular configuration file. */
-		if (NULL != (config_env = getenv("gtmcrypt_config")))
+	config_env = getenv("gtmcrypt_config");
+	if (NULL == config_env)
+	{	/* Undefined environment varible */
+		UPDATE_ERROR_STRING(ENV_UNDEF_ERROR, "gtmcrypt_config");
+		return -1;
+	}
+	if (CONFIG_FILE_UNREAD || (0 != strcmp(config_env, gc_config_filename)))
+	{	/* Check there is a regular configuration file. */
+		if (0 == (envvar_len = strlen(config_env))) /* inline assignment */
 		{
-			if (0 == (envvar_len = strlen(config_env))) /* inline assignment */
-			{
-				UPDATE_ERROR_STRING(ENV_EMPTY_ERROR, "gtmcrypt_config");
-				return -1;
-			}
-			if (GTM_PATH_MAX <= envvar_len)
-			{
-				UPDATE_ERROR_STRING(ENV_TOOLONG_ERROR, "gtmcrypt_config", (int)envvar_len);
-				return -1;
-			}
-			if (0 != stat(config_env, &stat_info))
-			{
-				UPDATE_ERROR_STRING("Cannot stat configuration file: " STR_ARG ". %s", ELLIPSIZE(config_env),
-					strerror(errno));
-				return -1;
-			}
-			if (!S_ISREG(stat_info.st_mode))
-			{
-				UPDATE_ERROR_STRING("Configuration file " STR_ARG " is not a regular file", ELLIPSIZE(config_env));
-				return -1;
-			}
-		} else
+			UPDATE_ERROR_STRING(ENV_EMPTY_ERROR, "gtmcrypt_config");
+			return -1;
+		}
+		if (GTM_PATH_MAX <= envvar_len)
 		{
-			UPDATE_ERROR_STRING(ENV_UNDEF_ERROR, "gtmcrypt_config");
+			UPDATE_ERROR_STRING(ENV_TOOLONG_ERROR, "gtmcrypt_config", (int)envvar_len);
+			return -1;
+		}
+		if (0 != stat(config_env, &stat_info))
+		{
+			UPDATE_ERROR_STRING("Cannot stat configuration file: " STR_ARG ". %s", ELLIPSIZE(config_env),
+				strerror(errno));
+			return -1;
+		}
+		if (!S_ISREG(stat_info.st_mode))
+		{
+			UPDATE_ERROR_STRING("Configuration file " STR_ARG " is not a regular file", ELLIPSIZE(config_env));
 			return -1;
 		}
 		/* The gtmcrypt_config variable is defined and accessible. Copy it to a global for future references. */

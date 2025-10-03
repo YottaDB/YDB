@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -44,7 +44,7 @@ static uint4		nesting_level = 0;
 #endif
 
 /* Skip frame for send_msg/send_msg_csa */
-#define PRINT_CALLERID util_out_print(" -- generated from 0x!XJ.", NOFLUSH_OUT, caller_id(1))
+#define PRINT_CALLERID if (caller_id(1)) util_out_print(" -- generated from 0x!XJ.", NOFLUSH_OUT, caller_id(1))
 
 void send_msg_va(void *csa, int arg_count, va_list var);
 

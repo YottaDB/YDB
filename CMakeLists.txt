@@ -10,8 +10,7 @@
 #								#
 #################################################################
 
-# Min version of cmake on RHEL 6
-cmake_minimum_required(VERSION 3.6.0)
+cmake_minimum_required(VERSION 3.16.0)
 if(POLICY CMP0087)
   # Policy needed since cmake 3.16
   cmake_policy(SET CMP0087 NEW)
@@ -29,7 +28,7 @@ foreach(lang ${languages})
 endforeach()
 
 # Defaults
-set(version ${V7.1-008})
+set(version ${V7.1-009})
 if("${version}" STREQUAL "")
         set(version V9.9-0)
 endif()
@@ -104,9 +103,9 @@ set(extralibs "")
 message("--> OS = ${CMAKE_SYSTEM_NAME} / ARCH = ${CMAKE_SYSTEM_PROCESSOR}")
 # Establish platform
 # Except for Solaris, CMAKE_COMPILER_IS_GNUCC is true
-if(${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
+if("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
   include(sr_linux/platform.cmake)
-elseif(${CMAKE_SYSTEM_NAME} STREQUAL "AIX")
+elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "AIX")
   include(sr_aix/platform.cmake)
 else()
   message(FATAL_ERROR "--> OS = ${CMAKE_SYSTEM_NAME} / ARCH = ${CMAKE_SYSTEM_PROCESSOR}")
@@ -382,7 +381,8 @@ add_custom_command(
   OUTPUT ${gtmthreadgblasmhdr}
   DEPENDS gtm_threadgbl_deftypes
   COMMAND gtm_threadgbl_deftypes > ${gtmthreadgblasmhdr}.new
-  COMMAND cmp -s ${gtmthreadgblasmhdr} ${gtmthreadgblasmhdr}.new && rm -f ${gtmthreadgblasmhdr}.new || mv ${gtmthreadgblasmhdr}.new ${gtmthreadgblasmhdr}
+  COMMAND cmp -s ${gtmthreadgblasmhdr} ${gtmthreadgblasmhdr}.new &&
+		rm -f ${gtmthreadgblasmhdr}.new || mv ${gtmthreadgblasmhdr}.new ${gtmthreadgblasmhdr}
   )
 # gtm_threadgbl_deftypes_asm.si
 set(gtmthreadgblasmfile   "gen/gtm_threadgbl_deftypes_asm.si")
@@ -817,7 +817,7 @@ install(FILES ${scripts}
   PERMISSIONS ${install_permissions_script}
   )
 
-if(${CMAKE_SYSTEM_NAME} STREQUAL "AIX")
+if("${CMAKE_SYSTEM_NAME}" STREQUAL "AIX")
   set(gtm_icu_version "")
 else()
   find_program(ICUCONFIG NAMES icu-config)

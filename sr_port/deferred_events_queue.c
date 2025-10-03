@@ -223,7 +223,6 @@ void empty_xfer_queue_entries(void)
 	save_xfer_entry	*entry;
 	DCL_THREADGBL_ACCESS;
 
-	DBGDFRDEVNT((stderr, "%d %s: empty_xfer_queue_entries event_type: %d\n", __LINE__, __FILE__, entry->outofband));
 	SETUP_THREADGBL_ACCESS;
 	dqloop((TREF(save_xfer_root_ptr)), ev_que, entry)
 	{

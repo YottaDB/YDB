@@ -5206,35 +5206,43 @@
    appropriate combination of qualifiers by moving horizontally from the
    Action column extending to the Selection column:
 
-   +----------------------------------------------------------------------------------------------------------------------------------------------------------------+
-   |         Action         |Direction|           Time (optional)            |Sequence Number (optional) |     Control (optional)     |    Selection (optional)     |
-   |------------------------+---------+--------------------------------------+---------------------------+----------------------------+-----------------------------|
-   |One or more             |Only one |One or more                           |Only one                   |One or more                 |One or more                  |
-   |------------------------+---------+--------------------------------------+---------------------------+----------------------------+-----------------------------|
-   |                        |         |                                      |                           |-[NO]APPLY_AFTER_IMAGE      |                             |
-   |                        |         |                                      |                           |                            |                             |
-   |                        |         |                                      |                           |-[NO]BROKENTRANS[=file_name]|                             |
-   |                        |         |                                      |                           |                            |                             |
-   |                        |         |                                      |                           |-[NO]CHAIN                  |                             |
-   |                        |         |                                      |                           |                            |                             |
-   |-EXTRACT[=file          |         |                                      |                           |-[NO]CHECKTN                |                             |
-   |specification]          |         |-AFTER=time                           |                           |                            |                             |
-   |                        |         |                                      |                           |-[NO]ERRORLIMIT[=integer]   |-GLOBAL=global-list          |
-   |-RECOVER                |         |-BEFORE=time                          |                           |                            |                             |
-   |                        |-BACKWARD|                                      |-FETCH_RESYNC=port-number  |-FENCES=fence option        |-ID=pid-list                 |
-   |-ROLLBACK               |         |-[NO]LOOKBACK_TIME[=lookback option   |                           |                            |                             |
-   |                        |-FORWARD |list]                                 |-RESYNC=jnl sequence-number|-FULL                       |-TRANSACTION=transaction-type|
-   |-SHOW[=show-option-list]|         |                                      |                           |                            |                             |
-   |                        |         |-SINCE=time                           |                           |-[NO]INTERACTIVE            |-USER=user-list              |
-   |-[NO]VERIFY             |         |                                      |                           |                            |                             |
-   |                        |         |                                      |                           |-[NO]LOSTTRANS[=file_name]  |                             |
-   |                        |         |                                      |                           |                            |                             |
-   |                        |         |                                      |                           |-REDIRECT=file pair list    |                             |
-   |                        |         |                                      |                           |                            |                             |
-   |                        |         |                                      |                           |-VERBOSE                    |                             |
-   |                        |         |                                      |                           |                            |                             |
-   |                        |         |                                      |                           |-DETAIL                     |                             |
-   +----------------------------------------------------------------------------------------------------------------------------------------------------------------+
+   +-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+   |                               | Principal  |                                           |                             |                              |                               |
+   |            Action             | Processing |              Time (optional)              | Sequence Number (optional)  |      Control (optional)      |     Selection (optional)      |
+   |                               | Direction  |                                           |                             |                              |                               |
+   |-------------------------------+------------+-------------------------------------------+-----------------------------+------------------------------+-------------------------------|
+   |One or more                    |Only one    |One or more                                |Only one                     |One or more                   |One or more                    |
+   |-------------------------------+------------+-------------------------------------------+-----------------------------+------------------------------+-------------------------------|
+   |                               |            |                                           |                             |-[NO]APPLY_AFTER_IMAGE        |                               |
+   |                               |            |                                           |                             |                              |                               |
+   |                               |            |                                           |                             |-[NO]BROKENTRANS[=file-name]  |                               |
+   |                               |            |                                           |                             |                              |                               |
+   |                               |            |                                           |                             |-[NO]CHAIN                    |                               |
+   |                               |            |                                           |                             |                              |                               |
+   |                               |            |                                           |                             |-[NO]CHECKTN                  |                               |
+   |                               |            |                                           |                             |                              |                               |
+   |                               |            |                                           |                             |-DETAIL                       |                               |
+   |                               |            |                                           |                             |                              |                               |
+   |-EXTRACT[=file-specification]  |            |                                           |                             |-[NO]ERRORLIMIT[=integer]     |                               |
+   |                               |            |-AFTER=time                                |                             |                              |-GLOBAL=global-list            |
+   |-RECOVER                       |            |                                           |                             |-FENCES=fence-option          |                               |
+   |                               |-BACKWARD   |-BEFORE=time                               |-FETCH_RESYNC=port-number    |                              |-ID=pid-list                   |
+   |-ROLLBACK                      |            |                                           |                             |-FULL                         |                               |
+   |                               |-FORWARD    |-[NO]LOOKBACK_TIME[=lookback-option-list]  |-RESYNC=jnl-sequence-number  |                              |-TRANSACTION=transaction-type  |
+   |-SHOW[=show-option-list]       |            |                                           |                             |-[NO]IGNORELOSTJNL            |                               |
+   |                               |            |-SINCE=time                                |                             |                              |-USER=user-list                |
+   |-[NO]VERIFY                    |            |                                           |                             |-[NO]INTERACTIVE              |                               |
+   |                               |            |                                           |                             |                              |                               |
+   |                               |            |                                           |                             |-JNLDIR=path-to-jnl-dir       |                               |
+   |                               |            |                                           |                             |                              |                               |
+   |                               |            |                                           |                             |-[NO]LOSTTRANS[=file_name]    |                               |
+   |                               |            |                                           |                             |                              |                               |
+   |                               |            |                                           |                             |-[NO]ONLINE                   |                               |
+   |                               |            |                                           |                             |                              |                               |
+   |                               |            |                                           |                             |-REDIRECT=file-pair-list      |                               |
+   |                               |            |                                           |                             |                              |                               |
+   |                               |            |                                           |                             |-VERBOSE                      |                               |
+   +-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 
    Also ensure that you adhere to the following rules:
 
@@ -5254,29 +5262,32 @@
     9. -FORWARD is incompatible with -BACKWARD, -FETCHRESYNC,
        -LOOKBACK_LIMIT, -ONLINE and -SINCE.
    10. -FULL is compatible only with -EXTRACT, -SHOW, or -VERIFY.
-   11. -[NO]LOSTTRANS is compatible only with -RECOVER, -ROLLBACK, or
+   11. -[NO]IGNORELOSTJNL is only compatible with -JNLDIR.
+   12. -JNLIR is compatible only with -ROLLBACK and -FORWARD.
+   13. -[NO]LOSTTRANS is compatible only with -RECOVER, -ROLLBACK, or
        -EXTRACT.
-   12. -REDIRECT is compatible only with -BACKWARD and -RECOVER.
-   13. -RESYNC is only compatible with the -ROLLBACK action and incompatible
+   14. -[NO]NOLINE is compatible only with -ROLLBACK and -BACKWARD.
+   15. -REDIRECT is compatible only with -BACKWARD and -RECOVER.
+   16. -RESYNC is only compatible with the -ROLLBACK action and incompatible
        with FETCHRESYNC.
-   14. -ROLLBACK is incompatible with -RECOVER, -CHAIN, -CHECKTN, -REDIRECT,
+   17. -ROLLBACK is incompatible with -RECOVER, -CHAIN, -CHECKTN, -REDIRECT,
        time qualifiers of -SHOW except -BEFORE.
-   15. -SINCE is incompatible with -FORWARD.
-   16. -TRANSACTION is compatible only with -EXTRACT and -SHOW.
-   17. -USER is compatible only with -EXTRACT and -SHOW.
-   18. file list must not be asterisk (*) for -REDIRECT.
-   19. file list must be asterisk (*) for -BACKWARD -ROLLBACK; -ROLLBACK
+   18. -SINCE is incompatible with -FORWARD.
+   19. -TRANSACTION is compatible only with -EXTRACT and -SHOW.
+   20. -USER is compatible only with -EXTRACT and -SHOW.
+   21. file list must not be asterisk (*) for -REDIRECT.
+   22. file list must be asterisk (*) for -BACKWARD -ROLLBACK; -ROLLBACK
        -FORWARD accepts a list of journal file names.
-   20. Journal selection qualifiers are incompatible with -RECOVER,
+   23. Journal selection qualifiers are incompatible with -RECOVER,
        -ROLLBACK, and -VERIFY.
-   21. If -BEFORE (time-based) and -FETCHRESYNC/-RESYNC
+   24. If -BEFORE (time-based) and -FETCHRESYNC/-RESYNC
        (sequence-number-based) are specified in the same MUPIP JOURNAL
        -ROLLBACK command, the qualifier that corresponds to an earlier
        database state or point in time prevails. For example, -BEFORE
        prevails when the update corresponding to the sequence number obtained
        through the -FETCHRESYNC command happened at a later time relative to
        the -BEFORE qualifier and vice versa.
-   22. -FETCHRESYNC, -ONLINE, and -RSYNC_STRM qualifiers are not compatible
+   25. -FETCHRESYNC, -ONLINE, and -RSYNC_STRM qualifiers are not compatible
        with -ROLLBACK -FORWARD.
 
    For example, MUPIP JOURNAL -EXTRACT=gtm.mjf -FORWARD -DETAIL is a valid
@@ -6199,6 +6210,18 @@
 
    -FULL qualifier is compatible with -EXTRACT only.
 
+   -[NO]IGNORELOSTJNL
+
+   -IGNORELOSTJNL specifies that JOURNAL -JNLDIR=path-to-jnl-dir stops
+   iterating and issues a LOSTJNLFILE warning message if a journal file is
+   missing, and continues processing. In this case, it completes its
+   operation using all available journal files in path-to-jnl-dir up to the
+   first error or missing journal file.
+
+   -NOIGNORELOSTJNL is the default.
+
+   -IGNORELOSTJNL is only compatible with -JNLDIR.
+
    -[NO]IN[TERACTIVE]
 
    Specifies whether, for each error over the -ERROR_LIMIT, JOURNAL
@@ -6211,6 +6234,38 @@
 
    This qualifier applies when the MUPIP command is entered from a terminal.
    The default is -INTERACTIVE.
+
+   -JNLDIR=path-to-jnl-dir
+
+   -JNLDIR="path-to-jnl-dir" specifies a directory containing a set of
+   journal files, it uses the selected path to replay journal files and match
+   them by name to database files rather than using the information in the
+   database file header(s).
+
+   Note that, the $gtmcrypt_config environment variable locates the
+   encryption key configuration file, and if the journal files are encrypted,
+   it is critical to copy the configuration file along with all associated
+   "dat_key" files to "path-to-jnl-dir" to ensure proper alignment with the
+   journal files.
+
+   By default, JOURNAL directs -ROLLBACK to the database file from which the
+   journal was made.
+
+   -JNLDIR is only compatible with -ROLLBACK -FORWARD.
+
+   **Caution**
+
+   Since -JNLDIR eliminates one safeguard against operational error, use it
+   with caution, as it poses a risk to application integrity. Application
+   relying on data continuity should account for this behavior. When using
+   -JNLDIR, note that any global updates performed after the rollback point
+   are permanently discarded.
+
+   For example, if data was written to ^x after the last valid journal state,
+   that data will not be preserved once ROLLBACK is executed. This is
+   expected behavior and reflects the intended semantics of this qualifier:
+   the database is restored to its prior consistent state, with all
+   subsequent updates undone.
 
    -[NO]LOST[TRANS]=<extract file>
 
@@ -9246,13 +9301,19 @@
    |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
    |                                      |                          |-FETCHRESYNC                              |           |            |
    |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
-   |                                      |                          |-LOOKBACK_LIMIT=<lookback_limit_options>  |           |            |
+   |                                      |                          |-[NO]IGNORELOSTJNL                        |V7.1-009   |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-JNLDIR=path-to-jnl-dir                   |V7.1-009   |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-LOOKBACK_LIMIT=<lookback-limit-options>  |           |            |
    |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
    |                                      |                          |-[NO]LOSTTRANS[=file]                     |           |            |
    |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
    |                                      |                          |-ONLINE                                   |V5.5-000   |            |
    |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
    |                                      |                          |-PARA[LLEL][=n]                           |V6.3-000   |            |
+   |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
+   |                                      |                          |-RED[IRECT]=file-pair-list                |           |            |
    |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|
    |                                      |                          |-RES[YNC]=hexa;journal_sequence_number    |           |            |
    |--------------------------------------+--------------------------+------------------------------------------+-----------+------------|

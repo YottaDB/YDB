@@ -1936,8 +1936,8 @@ MBSTART {														\
 			(CSD)->freeze = FALSE;										\
 			(CSD)->image_count = 0;										\
 			(CSA)->nl->freeze_online = CHILLED_AUTORELEASE_MASK | CHILLED_AUTORELEASE_REPORT_MASK;		\
-			send_msg_csa(CSA_ARG(CSA) VARLSTCNT(9) ERR_OFRZAUTOREL, 2, REG_LEN_STR((CSA)->region),		\
-					ERR_ERRCALL, 3, CALLFROM);							\
+			send_msg_csa(CSA_ARG(CSA) VARLSTCNT(11) ERR_OFRZAUTOREL, 4, REG_LEN_STR((CSA)->region),		\
+				DB_LEN_STR((CSA)->region), ERR_ERRCALL, 3, CALLFROM);					\
 		}													\
 		if (!was_latch)												\
 			rel_latch(&(CSA)->nl->freeze_latch);								\
@@ -4108,14 +4108,16 @@ MBSTART {														\
 		}													\
 		else if ((CSA)->now_crit && !crit_stuck)								\
 		{													\
-			send_msg_csa(CSA_ARG(CSA) VARLSTCNT(4) ERR_OFRZCRITSTUCK, 2, REG_LEN_STR((CSA)->region));	\
+			send_msg_csa(CSA_ARG(CSA) VARLSTCNT(6) ERR_OFRZCRITSTUCK, 4, REG_LEN_STR((CSA)->region),	\
+				DB_LEN_STR((CSA)->region));								\
 			crit_stuck = TRUE;										\
 		}													\
-		if (MAXHARDCRITS < lcnt1)      									\
-			wcs_backoff(lcnt1);    									\
+		if (MAXHARDCRITS < lcnt1)										\
+			wcs_backoff(lcnt1);										\
 	}														\
 	if (crit_stuck)													\
-		send_msg_csa(CSA_ARG(CSA) VARLSTCNT(4) ERR_OFRZCRITREL, 2, REG_LEN_STR((CSA)->region));			\
+		send_msg_csa(CSA_ARG(CSA) VARLSTCNT(6) ERR_OFRZCRITREL, 4, REG_LEN_STR((CSA)->region),			\
+			DB_LEN_STR((CSA)->region));									\
 } MBEND
 
 /* Since this macro is called from "t_retry", we need to ensure encryption cycles are synced as part of

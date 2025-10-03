@@ -54,7 +54,6 @@ typedef enum
 	LINK_PPRIVOBJ		/* 0003 Link a process-private object */
 } linktype;
 
-#define RELOCATE(field, type, base) field = (type)((unsigned char *)(field) + (UINTPTR_T)(base))
 #define RELREAD 50		/* number of relocation entries to buffer */
 
 /* This macro will check if the file is an old non-shared-binary variant of GT.M code and if
@@ -159,7 +158,7 @@ boolean_t incr_link(int *file_desc, zro_ent *zro_entry, uint4 fname_len, char *f
 	int			sect_ro_rel_size, sect_rw_rel_size, name_buf_len, alloc_len, order, zerofd;
 	bool			order_valid;
 	uint4			lcl_compiler_qlf;
-	boolean_t		dynlits;
+	boolean_t		dynlits, dynvars;
 	ssize_t	 		status, sect_rw_nonrel_size, sect_ro_rel_offset;
 	size_t			offset_correction, rtnname_off;
 	lab_tabent		*lbt_ent, *lbt_bot, *lbt_top, *olbt_ent, *olbt_bot, *olbt_top;
@@ -576,6 +575,8 @@ boolean_t incr_link(int *file_desc, zro_ent *zro_entry, uint4 fname_len, char *f
 	 * Read-only releasable section
 	 */
 	dynlits = DYNAMIC_LITERALS_ENABLED(hdr);
+	hdr->dynamic_varnames = TREF(gtm_dynamic_varnames) && dynlits;
+	dynvars = DYNAMIC_VARNAMES_ENABLED(hdr);
 	rw_rel_start = RW_REL_START_ADR(hdr);	/* Marks end of R/O-release section and start of R/W-release section */
 	/* Assert that relinkctl_bkptr is NULL for LINK_SHRLIB and LINK_PPRIVOBJ. This is assumed by the link-bypass
 	 * code above (which returns IL_DONE) which uses "hdr->relinkctl_bkptr" without regard to linktyp of that routine.
@@ -647,30 +648,67 @@ boolean_t incr_link(int *file_desc, zro_ent *zro_entry, uint4 fname_len, char *f
 	RELOCATE(hdr->lnrtab_adr, lnr_tabent *, rel_base);
 	RELOCATE(hdr->literal_text_adr, unsigned char *, rel_base);
 	RELOCATE(hdr->linkage_names, mstr *, rel_base);
-	if (dynlits)
-		RELOCATE(hdr->literal_adr, mval *, rel_base);
-	/* Read-write releasable section */
-	sect_rw_rel_size = (int)((INTPTR_T)hdr->labtab_adr - (INTPTR_T)rw_rel_start);
-	sect_rw_rel = malloc(sect_rw_rel_size);
-	switch(linktyp)
+	sect_rw_rel_size = (int)((INTPTR_T)LABTAB_ADR(hdr) - (INTPTR_T)rw_rel_start);
+	if (dynlits || !sect_rw_rel_size)
 	{
-		case LINK_SHROBJ:
-		case LINK_SHRLIB:
-			memcpy(sect_rw_rel, shdr + (INTPTR_T)rw_rel_start, sect_rw_rel_size);
-			break;
-		case LINK_PPRIVOBJ:
-			DOREADRC_OBJFILE(*file_desc, sect_rw_rel, sect_rw_rel_size, status);
-			if (0 != status)
-				zl_error(NULL, linktyp, file_desc, ERR_INVOBJFILE, fname_len, fname, 0, NULL);
-			break;
-		default:
-			assert(FALSE /* Invalid link type */);
+		if (hdr->literal_len)
+		{
+			assert(dynlits);
+			RELOCATE(hdr->literal_adr, mval *, rel_base);
+		} else
+			hdr->literal_adr = NULL;
 	}
-	offset_correction = (size_t)rw_rel_start;
-	rel_base = sect_rw_rel - offset_correction;
-	if (!dynlits)
-		RELOCATE(hdr->literal_adr, mval *, rel_base);
-	RELOCATE(hdr->vartab_adr, var_tabent *, rel_base);
+	if (!sect_rw_rel_size)
+	{
+		if (hdr->vartab_len)
+		{
+			assert(dynvars);
+			RELOCATE(hdr->vartab_adr, var_tabent *, rel_base);
+		} else
+			hdr->vartab_adr = NULL;
+	}
+	/* Read-write releasable section */
+	if (sect_rw_rel_size)
+	{
+		assert(!dynvars);
+		sect_rw_rel = malloc(sect_rw_rel_size);
+		switch(linktyp)
+		{
+			case LINK_SHROBJ:
+			case LINK_SHRLIB:
+				memcpy(sect_rw_rel, shdr + (INTPTR_T)rw_rel_start, sect_rw_rel_size);
+				break;
+			case LINK_PPRIVOBJ:
+				/* Four cases:
+				 * NODYNAMIC_LITERALS and NODYNAMIC_VARNAMES - secd_rw_rel has both literal table and vartab;
+				 * 	neither yet red from file.
+				 * DYNAMIC_LITERALS and NODYNAMIC_VARNAMES - sect_ro_rel has literal table, secd_rw_rel has vartab;
+				 * 	literal table already read into sect_ro_rel.
+				 * DYNAMIC_LTERALS and DYNAMIC_VARNAMES - can't be here since sect_rw_rel_size is 0.
+				 * NODYNAMIC_LITERALS and DYNAMIC_VARNAMES - presents implementation challenges and limited use,
+				 * 	prohibited.
+				 */
+				DOREADRC_OBJFILE(*file_desc, sect_rw_rel, sect_rw_rel_size, status);
+				if (0 != status)
+					zl_error(NULL, linktyp, file_desc, ERR_INVOBJFILE, fname_len, fname, 0, NULL);
+				break;
+			default:
+				assert(FALSE /* Invalid link type */);
+		}
+		offset_correction = (size_t)rw_rel_start;
+		rel_base = sect_rw_rel - offset_correction;
+		if (!dynlits)
+		{
+			if (hdr->literal_len)
+				RELOCATE(hdr->literal_adr, mval *, rel_base);
+			else
+				hdr->literal_adr = NULL;
+		}
+		if (hdr->vartab_len)
+			RELOCATE(hdr->vartab_adr, var_tabent *, rel_base);
+		else
+			hdr->vartab_adr = NULL;
+	}
 	/* Also read-write releasable is the linkage section which had no initial value and was thus
 	 * not resident in the object. The values in this section will be setup later by addr_fix()
 	 * and/or auto-zlink. Note we always allocate at least one element here just so we don't get
@@ -691,10 +729,13 @@ boolean_t incr_link(int *file_desc, zro_ent *zro_entry, uint4 fname_len, char *f
 			if (curlit->str.len)
 				RELOCATE(curlit->str.addr, char *, hdr->literal_text_adr);
 	}
-	for (curvar = hdr->vartab_adr, vartop = curvar + hdr->vartab_len; curvar < vartop; ++curvar)
+	if (!dynvars)
 	{
-		assert(0 < curvar->var_name.len);
-		RELOCATE(curvar->var_name.addr, char *, hdr->literal_text_adr);
+		for (curvar = hdr->vartab_adr, vartop = curvar + hdr->vartab_len; curvar < vartop; ++curvar)
+		{
+			assert(0 < curvar->var_name.len);
+			RELOCATE(curvar->var_name.addr, char *, hdr->literal_text_adr);
+		}
 	}
 	/* Fixup header's source path and routine names as they both point to the offsets from the
 	 * beginning of the literal text pool.
@@ -822,6 +863,7 @@ boolean_t incr_link(int *file_desc, zro_ent *zro_entry, uint4 fname_len, char *f
 		old_rhead->src_full_name = hdr->src_full_name;
 		old_rhead->compiler_qlf = hdr->compiler_qlf;		/* added Jan. 2019 */
 		assert(old_rhead->objlabel == hdr->objlabel);		/* added Jan. 2019 */
+		old_rhead->dynamic_varnames = hdr->dynamic_varnames;
 		old_rhead->routine_name = hdr->routine_name;
 		old_rhead->vartab_len = hdr->vartab_len;
 		old_rhead->vartab_adr = hdr->vartab_adr;
@@ -834,12 +876,6 @@ boolean_t incr_link(int *file_desc, zro_ent *zro_entry, uint4 fname_len, char *f
 		 */
 		old_rhead->lnrtab_adr = hdr->lnrtab_adr;
 		old_rhead->lnrtab_len = hdr->lnrtab_len;
-		if (0 < old_rhead->literal_text_len)	/* section added Jan. 2019; seems right, but no test case proving need */
-		{	/* move any string literals used by current mvals to the string pool before we lose track of them */
-			assert(old_rhead->literal_text_adr);
-			stp_move((char *)old_rhead->literal_text_adr,
-				 (char *)(old_rhead->literal_text_adr + old_rhead->literal_text_len));
-		}
 		old_rhead->literal_text_adr = hdr->literal_text_adr;
 		old_rhead->literal_text_len = hdr->literal_text_len;	/* added Jan. 2019 */
 		/* shared_object should characterize this old header */

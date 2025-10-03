@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -24,7 +24,7 @@
 #ifdef DEBUG_TPTIMEOUT_DEFERRAL
 #  include "gtm_time.h"
 #endif
-
+#include "gdsroot.h"
 #include "gt_timer.h"
 #include "xfer_enum.h"
 #include "have_crit.h"
@@ -36,8 +36,10 @@
 #include "gtm_time.h"
 #include "io.h"
 #include "gtmio.h"
+#include "anticipatory_freeze.h"
+#include "tpnotacid_chk_inline.h"
 
-#define TP_TIMER_ID (TID)&tp_start_timer
+#define TP_TIMER_ID (TID)&tp_start_timer	/* TODO: move to tp_timeout.h */
 #define TP_QUEUE_ID &tptimeout_set
 
 /* External variables */
@@ -45,14 +47,16 @@ GBLREF boolean_t			in_timed_tn, tp_timeout_set_xfer, ztrap_explicit_null;
 GBLREF dollar_ecode_type		dollar_ecode;
 GBLREF int				process_exiting;
 GBLREF intrpt_state_t			intrpt_ok_state;
+GBLREF jnlpool_addrs_ptr_t		jnlpool;
+GBLREF mval				dollar_zdir;
+GBLREF stack_frame			*frame_pointer;
+GBLREF uint4				dollar_tlevel, dollar_trestart;
+GBLREF unsigned int			t_tries;
 GBLREF volatile  boolean_t		dollar_zininterrupt;
 GBLREF volatile int4			outofband;
 GBLREF xfer_entry_t     		xfer_table[];
 
 error_def(ERR_TPTIMEOUT);
-
-void tptimeout_set(int4 dummy_param);
-STATICFNDCL void tp_expire_now(void);
 
 /* =============================================================================
  * FILE-SCOPE FUNCTIONS
@@ -61,14 +65,37 @@ STATICFNDCL void tp_expire_now(void);
 /* ------------------------------------------------------------------
  * Timer handler (Set -> Expired)
  * - Should only happen if a timeout has been started (and not cancelled), and has not yet expired.
- * - Static because it's for internal use only.
- * ------------------------------------------------------------------
+  * - May be called by op_fnfgncal in case of signal disruption of TP
+  * ------------------------------------------------------------------
  */
-STATICFNDEF void tp_expire_now(void)
+void tp_expire_now(void)
 {
+	boolean_t		letitbe;
+	jnlpool_ctl_ptr_t	jctl;
+	DCL_THREADGBL_ACCESS;
+
+	SETUP_THREADGBL_ACCESS;
 	SHOWTIME(asccurtime);
-	DBGDFRDEVNT((stderr, "%d %s %s: tp_expire_now: Driving xfer_set_handlers\n", __LINE__, __FILE__, asccurtime));
+	DBGDFRDEVNT((stderr, "%d %s: tp_expire_now: %s Driving xfer_set_handlers\n", __LINE__, __FILE__, asccurtime));
 	assert(in_timed_tn);
+	jctl = (NULL != jnlpool) ? jnlpool->jnlpool_ctl : NULL;
+	if (!dollar_tlevel)							/* must be in a TP to matter */
+		return;
+	/* a bit awkward, but skip all this if not in TP */
+	letitbe = ((frame_pointer->type & SFT_DM)				/* direct mode implies debugging */
+		|| IS_REPL_INST_FROZEN(TREF(defer_instance_freeze))		/* frozen instance */
+		|| ((NULL != jctl)						/* no replication journal pool */
+		&& jctl->onln_rlbk_pid));					/* active online rollback; TODO: freeze in jctl ? */
+	letitbe = letitbe || (TREF(tptimeout_grace_periods)			/* or Still have grace periods */
+		&& (--TREF(tptimeout_grace_periods)));				/* -- only if none of above*/
+	if (letitbe)
+	{	/* unlimited grace periods or grace periods left */
+		start_timer(TP_TIMER_ID, TREF(dollar_zmaxtptime) / TPTIMEOUT_GRACE_RNDS, &tp_expire_now, 0, NULL);
+		assert(0 < TREF(tptimeout_grace_periods));			/* should come here with positive grace */
+		DBGDFRDEVNT((stderr, "%d %s: let it be: %s; grace: %d if stagnate %d log\n", __LINE__, __FILE__, asccurtime,
+			TREF(tptimeout_grace_periods), dollar_trestart));
+		return;
+	}
 	tp_timeout_set_xfer = xfer_set_handlers(tptimeout, 0, FALSE);
 	DBGDFRDEVNT((stderr, "%d %s: tp_expire_now: tp_timeout_set_xfer: %d\n", __LINE__, __FILE__, tp_timeout_set_xfer));
 }
@@ -121,9 +148,8 @@ void tptimeout_set(int4 dummy_param)
  */
 void tp_start_timer(int4 timeout_milliseconds)
 {
-	assert(!in_timed_tn);
 	SHOWTIME(asccurtime);
-	DBGDFRDEVNT((stderr, "%d %s %s: tp_start_timer - tptimeout: %d\n", __LINE__, __FILE__, asccurtime, timeout_seconds));
+	DBGDFRDEVNT((stderr, "%d %s %s: tp_start_timer - tptimeout: %d\n", __LINE__, __FILE__, asccurtime, timeout_milliseconds));
 	in_timed_tn = TRUE;
 	start_timer(TP_TIMER_ID, timeout_milliseconds, &tp_expire_now, 0, NULL);
 }
@@ -140,7 +166,7 @@ void tp_start_timer(int4 timeout_milliseconds)
  *   to simply return value of tp_timeout_set_xfer when entered.
  * ------------------------------------------------------------------
  */
-void tp_clear_timeout(void)
+void tp_clear_timeout(boolean_t clear_in_timed_tn)
 {
 	boolean_t	already_ev_handling;
 	intrpt_state_t	prev_intrpt_state;
@@ -175,7 +201,8 @@ void tp_clear_timeout(void)
 		}
 #		endif
 		/* For unambiguous state, clear this flag after cancelling timer and before clearing expired flag */
-		in_timed_tn = FALSE;
+		if (clear_in_timed_tn)	/* Reset in_timed_tn, unless directed not to. Only start sets to TRUE */
+			in_timed_tn = FALSE;
 		DBGDFRDEVNT((stderr, "%d %s: tptimeout_clear_timer - clearing in_timed_tn: %d\n",
 			     __LINE__, __FILE__, entry->event_state));
 		/* -----------------------------------------------------
@@ -220,6 +247,7 @@ void tp_clear_timeout(void)
 void tp_timeout_action(void)
 {	/* driven at tp timeout recognition point by async_action() */
 	intrpt_state_t	prev_intrpt_state;
+	mval		zpos;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -229,7 +257,7 @@ void tp_timeout_action(void)
 	DBGDFRDEVNT((stderr, "%d %s %s: tp_timeout_action - driving TP timeout error\n", __LINE__, __FILE__, asccurtime));
 	assert((active == TAREF1(save_xfer_root, tptimeout).event_state)
 		|| (pending == TAREF1(save_xfer_root, tptimeout).event_state));
-	tp_clear_timeout();
+	tp_clear_timeout(TRUE);
 	if (dollar_zininterrupt)
 	{	/* safety play */
 		assert(!dollar_zininterrupt);
@@ -238,8 +266,18 @@ void tp_timeout_action(void)
 		dollar_zininterrupt = FALSE;
 	}
 	TAREF1(save_xfer_root, tptimeout).event_state = not_in_play;
-	DBGDFRDEVNT((stderr, "%d %s: tp_timeout_action - changing pending to event_state: %d\n", __LINE__, __FILE__,
+	DBGDFRDEVNT((stderr, "%d %s %s: tp_timeout_action - changing pending to event_state: %d\n", __LINE__, __FILE__, asccurtime,
 		TAREF1(save_xfer_root, tptimeout).event_state));
 	ENABLE_EVENT_INTERRUPTS(prev_intrpt_state);
-	RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_TPTIMEOUT);
+	if (dollar_tlevel)	/* if the transaction has completed no need for the error */
+	{
+		getzposition(&zpos);
+			DBGDFRDEVNT((stderr, "%d %s %s: sending TPTIMEOUT\n", __LINE__, __FILE__, asccurtime));
+		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(10) MAKE_MSG_ERROR(ERR_TPTIMEOUT), 8, dollar_trestart,
+			TPTIMEOUT_GRACE_RNDS - TREF(tptimeout_grace_periods),
+			RTS_ERROR_LITERAL("from"), zpos.str.len, zpos.str.addr,	 dollar_zdir.str.len, dollar_zdir.str.addr);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(10) MAKE_MSG_ERROR(ERR_TPTIMEOUT), 8, dollar_trestart,
+			TPTIMEOUT_GRACE_RNDS - TREF(tptimeout_grace_periods),
+			RTS_ERROR_LITERAL("from"), zpos.str.len, zpos.str.addr,	 dollar_zdir.str.len, dollar_zdir.str.addr);
+	}
 }

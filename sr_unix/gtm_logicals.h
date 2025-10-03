@@ -128,6 +128,7 @@
 #define	GTM_AUTORELINK_SHM 		"$gtm_autorelink_shm"
 #define	GTM_AUTORELINK_KEEPRTN		"$gtm_autorelink_keeprtn"	/* do not let go of objects in rtnobj shm */
 #define	GTM_AUTORELINK_CTLMAX		"$gtm_autorelink_ctlmax"
+#define	GTM_DYNAMIC_VARNAMES		"$gtm_dynamic_varnames"
 
 /* Global shared stats related */
 #define GTM_STATSHARE			"$gtm_statshare"

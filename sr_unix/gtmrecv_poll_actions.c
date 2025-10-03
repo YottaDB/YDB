@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2008-2023 Fidelity National Information	*
+ * Copyright (c) 2008-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -120,6 +120,7 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 	upd_helper_ctl_ptr_t	upd_helper_ctl;
 	pid_t			waitpid_res;
 	int4			msg_type, msg_len = 0;
+	int			filter_exit_status;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -608,6 +609,12 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 		repl_log(gtmrecv_log_fp, TRUE, TRUE, "Stopping filter\n");
 		repl_stop_filter();
 		gtmrecv_filter &= ~EXTERNAL_FILTER;
+	}
+	if (gtmrecv_filter &  EXTERNAL_FILTER)
+	{
+		WAITPID(gtmrecv_local->recv_filter_pid, &filter_exit_status, WNOHANG, waitpid_res);
+		if (waitpid_res > 0)
+			repl_filter_error(recvpool_ctl->jnl_seqno, repl_errno = EREPL_FILTERNOTALIVE);
 	}
 	if (0 == *pending_data_len)
 	{

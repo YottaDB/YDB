@@ -36,7 +36,8 @@ ht_ent_mname *lookup_variable_htent(unsigned int x)
 	boolean_t	added;
 
 	assert(x < frame_pointer->vartab_len);
-	added = add_hashtab_mname_symval(&curr_symval->h_symtab, ((var_tabent *)frame_pointer->vartab_ptr + x), NULL, &tabent);
+	added = add_hashtab_mname_symval(&curr_symval->h_symtab, ((var_tabent *)frame_pointer->vartab_ptr + x), NULL, &tabent,
+			TRUE);
 	assert(tabent);
 	if (NULL == tabent->value)
 	{

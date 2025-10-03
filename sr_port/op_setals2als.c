@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2009, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2009-2025 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -41,7 +42,7 @@ GBLREF uint4		dollar_tlevel;
 void op_setals2als(lv_val *srclv, int destindx)
 {
 	ht_ent_mname	*tabent;
-	mname_entry	*varname;
+	mname_entry	*varname = NULL;
 	lv_val		*dstlv;
 	boolean_t	added;
 
@@ -54,7 +55,8 @@ void op_setals2als(lv_val *srclv, int destindx)
 	if (NULL == (tabent = (ht_ent_mname *)frame_pointer->l_symtab[destindx]))	/* note tabent assignment */
 	{	/* No fast path to hash table entry -- look it up the hard(er) way */
 		varname = &(((mname_entry *)frame_pointer->vartab_ptr)[destindx]);
-		added = add_hashtab_mname_symval(&curr_symval->h_symtab, varname, NULL, &tabent);
+		added = add_hashtab_mname_symval(&curr_symval->h_symtab, varname, NULL, &tabent, TRUE);
+		varname = NULL; /* If need varname to be valid, do fixup before calling add_hashtab_mname_symval and pass FALSE */
 	}
 	assert(tabent);
 	dstlv = (lv_val *)tabent->value;

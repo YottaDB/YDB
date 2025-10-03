@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -32,9 +32,11 @@ void tp_start_timer(int4 timer_milliseconds);
  *     (Expired -> Clearing -> Clear)
  * Valid even if no timeout was set.
  */
-void tp_clear_timeout(void);
+void tp_clear_timeout(boolean_t clear_in_timed_tn);
 
 /* Used in transfer table for signaling exception */
 void tp_timeout_action(void);
+void tp_expire_now(void);
+void tptimeout_set(int4 dummy_param);
 
 #endif

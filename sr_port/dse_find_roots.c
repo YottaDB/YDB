@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -45,8 +45,8 @@ void dse_find_roots(block_id index)
 	short		temp_short;
 	sm_uc_ptr_t	bp, b_top, rp, r_top, key_top;
 
-	if (!(bp = t_qread(index,&dummy_int,&dummy_cr)))
-		RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(1) ERR_DSEBLKRDFAIL);
+	if (!(bp = t_qread(index, &dummy_int, &dummy_cr)))
+		RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(3) ERR_DSEBLKRDFAIL, 1, index);
 	if (((blk_hdr_ptr_t)bp)->bver > BLK_ID_32_VER) /* Check blk version to see if using 32 or 64 bit block_id */
 	{
 #		ifdef BLK_NUM_64BIT

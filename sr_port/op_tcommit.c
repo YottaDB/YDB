@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -261,6 +261,8 @@ enum cdb_sc	op_tcommit(void)
 				csd = cs_data;
 				cnl = csa->nl;
 				is_mm = (dba_mm == csa->hdr->acc_meth);
+				if (!csa->now_crit)
+					WAIT_ON_INHIBIT_KILLS(csa->nl, MAXWAIT2KILL);
 				si->cr_array_index = 0;
 #				ifdef DEBUG /* This code is shared by two WB tests */
 				if (WBTEST_ENABLED(WBTEST_MM_CONCURRENT_FILE_EXTEND) ||
@@ -544,6 +546,8 @@ enum cdb_sc	op_tcommit(void)
 		/* Commit was successful */
 		dollar_trestart = 0;
 		t_tries = 0;
+		if (in_timed_tn)
+			(*tp_timeout_clear_ptr)(TRUE);  /* cancel/clear pending TP timeout if real commit (i.e. outermost commit) */
 		/* the following section is essentially deferred garbage collection, freeing release block a bitmap at a time */
 		if (NULL != first_sgm_info)
 		{
@@ -572,9 +576,6 @@ enum cdb_sc	op_tcommit(void)
 		if (!forw_recov_lgtrig_only && (!jgbl.forw_phase_recovery || (NULL != gv_target)))
 			DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC(CHECK_CSA_TRUE);
 #		endif
-		/* Cancel or clear any pending TP timeout only if real commit (i.e. outermost commit) */
-		if (in_timed_tn)
-			(*tp_timeout_clear_ptr)(TRUE);
 	} else		/* an intermediate commit */
 		tp_incr_commit();
 	assert(dollar_tlevel);

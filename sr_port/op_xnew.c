@@ -95,12 +95,12 @@ void op_xnew(unsigned int argcnt_arg, mval *s_arg, ...)
 			lvent.var_name.len = MAX_MIDENT_LEN;
 		COMPUTE_HASH_MNAME(&lvent);
 		lvent.marked = NOT_MARKED;
-		if (add_hashtab_mname_symval(htold, &lvent, NULL, &tabent1))
+		if (add_hashtab_mname_symval(htold, &lvent, NULL, &tabent1, FALSE))
 			lv_newname(tabent1, curr_symval->last_tab);
 		lvtab1 = (lv_val *)tabent1->value;
 		assert(lvtab1);
 		assert(LV_IS_BASE_VAR(lvtab1));
-		added = add_hashtab_mname_symval(htnew, &lvent, NULL, &tabent2);
+		added = add_hashtab_mname_symval(htnew, &lvent, NULL, &tabent2, FALSE);
 		if (added)
 		{	/* This var has NOT been specified twice */
 			tabent2->value = tabent1->value;

@@ -26,6 +26,7 @@
 #include "lockdefs.h"
 #include "cdb_sc.h"
 #include "jnl.h"
+#include "io.h"
 #include "tpnotacid_chk_inline.h"
 #include "gtmimagename.h"
 #include "cmidef.h"		/* for cmmdef.h */
