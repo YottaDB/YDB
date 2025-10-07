@@ -79,6 +79,7 @@ GBLREF	mstr_len_t		sizeof_pat_everything;
 GBLREF	io_pair			io_curr_device;
 GBLREF	boolean_t		exit_handler_active;
 GBLREF	boolean_t		skip_exit_handler;
+GBLREF	boolean_t		err_same_as_out;
 
 static  joberr_t		joberr = joberr_gen;
 static	int			pipe_fd;
@@ -510,6 +511,7 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 		/* attempt to open output files. This also redirects stdin/out/err, so any error messages by this process during the
 		 * creation of the Job will get redirected.
 		 */
+		err_same_as_out = FALSE;
 		if ((status = ojchildioset(jparms)))
 		{
 			DOWRITERC(pipe_fds[1], &job_errno, SIZEOF(job_errno), pipe_status);
