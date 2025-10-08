@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -48,7 +48,7 @@ void lref_parse(unsigned char *label_ref, mstr* routine, mstr* label, int* offse
 					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_RUNPARAMERR);
 				c = c1 + 1;
 			}
-			assert(top > c);
+			assert(top >= c);
 			routine->addr = (char *)c;
 			routine->len = INTCAST(top - c);
 			break;
