@@ -3,7 +3,7 @@
  * Copyright (c) 2009-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -32,7 +32,7 @@
 #include "gtmimagename.h"
 
 GBLDEF		gid_t		*gid_list = NULL;
-GBLDEF		int		gid_list_len = 0;
+GBLDEF		int		gid_list_len = -1;/* set to -1 if list uninitialized */
 
 GBLREF		char		ydb_dist[YDB_PATH_MAX];
 GBLREF		boolean_t	ydb_dist_ok_to_use;
@@ -56,7 +56,11 @@ void gtm_init_gid_list(void)
 			free(gid_list);
 			gid_list = NULL;
 		}
-	}
+	} else /* most likely tmp_gid_list_len==0, also possible getgroups returned -1 as an error */
+		gid_list_len = 0; /* Set to 0 to indicate that gtm_init_gid_list has been called and no supplementary groups were found,
+				   * so the length of the supplementary group list is 0.
+				   * Its length was previously -1 to indicate that it was uninitialized.
+				   */
 }
 
 /* Search through the supplementary gid list for a match */
@@ -64,7 +68,7 @@ boolean_t	gtm_gid_in_gid_list(gid_t gid)
 {
 	int	i;
 
-	assert(NULL != gid_list);
+	assert(0 <= gid_list_len); /* Implies that the one time call to gtm_init_gid_list has already happened. */
 	if (NULL == gid_list)
 		return FALSE;
 	for (i = 0; i < gid_list_len; i++)

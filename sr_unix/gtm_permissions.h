@@ -3,6 +3,9 @@
  * Copyright (c) 2009-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2025 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -55,7 +58,8 @@ error_def(ERR_PERMGENDIAG);
 GBLREF	gid_t		*gid_list;
 GBLREF	int		gid_list_len;
 
-#define GID_IN_GID_LIST(GID)	((NULL == gid_list) ? (gtm_init_gid_list(), gtm_gid_in_gid_list(GID)) : gtm_gid_in_gid_list(GID))
+/* Returns TRUE if GID is in the supplementary GID list of calling process, otherwise FALSE */
+#define GID_IN_GID_LIST(GID)	((0 > gid_list_len) ? (gtm_init_gid_list(), gtm_gid_in_gid_list(GID)) : gtm_gid_in_gid_list(GID))
 
 void		gtm_init_gid_list(void);
 boolean_t	gtm_gid_in_gid_list(gid_t);
