@@ -406,6 +406,7 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 	boolean_t		need_rtnobj_shm_free;
 	boolean_t		job_addr_status;
 	boolean_t		error_encountered;
+	open_relinkctl_sgm	*linkctl;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -558,6 +559,7 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 			job_addr_status = job_addr(&routine_mstr, &label_mstr, jparms->params.offset,
 							(char **)&rtnhdr, &transfer_addr, &need_rtnobj_shm_free);
 		REVERT;
+		linkctl = TREF(open_relinkctl_list);
 
 		joberr = joberr_sid;
 		if (-1 == setsid())
@@ -751,12 +753,19 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 			SEND(setup_fds[0], &setup_op, SIZEOF(setup_op), 0, rc);
 			if (rc < 0)
 				SETUP_OP_FAIL();
+			/* Wait for grandchild to have reached a safe point where it has done the relinkctl_rundown()
+			 * before returning grandchild pid ($JOB) to parent process. Or else relinkctl shm can be left around
+			 * in case the parent later sends a SIGTERM to the grandchild. Do not do this wait in case there
+			 * are no relinkctl files attached by the middle child process (and hence even the grandchild process).
+			 */
+			if (NULL != linkctl)
+				DOREADRC(setup_fds[0], &joberr, SIZEOF(joberr), rc); /* Ignore errors as it is only a syncpoint */
+			ARLINK_ONLY(relinkctl_rundown(FALSE, FALSE));	/* do not decrement counters, just shmdt */
 			/* Write child_pid into pipe to be read by parent process(P) for $ZJOB */
 			/* Ignore the status if this fails, as the child is already running, and there is likely not a parent
 			 * to report to.
 			 */
 			DOWRITERC(pipe_fds[1], &child_pid, SIZEOF(child_pid), pipe_status);
-			ARLINK_ONLY(relinkctl_rundown(FALSE, FALSE));	/* do not decrement counters, just shmdt */
 			UNDERSCORE_EXIT(EXIT_SUCCESS);
 		}
 		/* This is now the grandchild process (actual Job process) -- an orphan as soon as the EXIT(EXIT_SUCCESS) above
@@ -975,7 +984,14 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 		 * but that is a no-op since we have already done it in the above RELINKCTL_RUNDOWN_MIDDLE_PARENT invocation.
 		 */
 		ojchildioclean();
-
+		if (NULL != linkctl)
+		{	/* Now that the grandchild has rundown relinkctl files (if any), send a message to middle child
+			 * that it is okay for it to return grandchild pid (i.e. $JOB) to the parent JOB command.
+			 * Doing so before this point could lead to leftover relinkctl shm in case grandchild is killed by
+			 * SIGTERM by the parent M program after it has access to $JOB.
+			 */
+			SEND(setup_fds[1], &joberr, SIZEOF(joberr), 0, rc);	 /* Ignore errors as it is only a syncpoint */
+		}
 #ifdef KEEP_zOS_EBCDIC
 		__getEstring1_a_copy(tbuff2, STR_AND_LEN(tbuff));
 		argv[0] = tbuff2;
