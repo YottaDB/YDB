@@ -113,6 +113,19 @@ error_def(ERR_TEXT);
 	}													\
 }
 
+/* Condition handler called when relinkctl_attach() fails. We need to enable interrupts before driving next condition handler */
+CONDITION_HANDLER(relinkctl_attach_ch)
+{
+	int	rc;
+
+	START_CH(TRUE);
+	/* It is safe to use INTRPT_OK_TO_INTERRUPT below (instead of "prev_intrpt_state" which is not
+	 * accessible here) due to an assert in "relinkctl_attach()" that they are identical.
+	 */
+	ENABLE_INTERRUPTS(INTRPT_IN_RELINKCTL_ATTACH, INTRPT_OK_TO_INTERRUPT);
+	NEXTCH;
+}
+
 /* Routine called to see if a relinkctl structure already exists for the given zroutines element.
  *
  * Parameters:
@@ -133,6 +146,8 @@ open_relinkctl_sgm *relinkctl_attach(mstr *obj_container_name, mstr *objpath, in
 	char			*pathptr;
 	boolean_t		obj_dir_found;
 	char			relinkctl_path[YDB_PATH_MAX], *ptr;
+	intrpt_state_t          prev_intrpt_state;
+
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -215,10 +230,23 @@ open_relinkctl_sgm *relinkctl_attach(mstr *obj_container_name, mstr *objpath, in
 	 * It is also possible to get a non-zero return status if the caller is MUPIP RUNDOWN -RELINKCTL and the relinkctl file does
 	 * not exist and therefore does not need to be run down.
 	 */
+	/* Note that any SIGTERM etc. in the middle of relinkctl_open() should be deferred until we are done adding
+	 * the relinkctl structure to TREF(open_relinkctl_list). Or else we would have incremented "hdr->nattached"
+	 * inside "relinkctl_open()" but we will not decrement it at rundown time (due to SIGTERM etc.) because this
+	 * relinkctl is still not added to the global linked list of relinkctls TREF(open_relinkctl_list). Therefore
+	 * enclose this block of code inside a DEFER_INTERRUPTS/ENABLE_INTERRUPTS window. And because there are
+	 * rts_error_csa() calls possible inside "relinkctl_open()", establish a condition handler
+	 * "relinkctl_attach_ch()" to take care of the ENABLE_INTERRUPTS in case of an error.
+	 */
+	ESTABLISH_RET(relinkctl_attach_ch, NULL);
+	DEFER_INTERRUPTS(INTRPT_IN_RELINKCTL_ATTACH, prev_intrpt_state);
+	assert(INTRPT_OK_TO_INTERRUPT == prev_intrpt_state);	/* relied upon in relinkctl_attach_ch() */
 	if (0 != relinkctl_open(&new_link, !obj_dir_found))
 	{
 		if (!obj_dir_found)
 			errno = save_errno;
+		ENABLE_INTERRUPTS(INTRPT_IN_RELINKCTL_ATTACH, prev_intrpt_state);
+		REVERT;
 		return NULL;
 	}
 	/* No errors were raised so far, so copy the segment information into a malloced space. */
@@ -233,6 +261,8 @@ open_relinkctl_sgm *relinkctl_attach(mstr *obj_container_name, mstr *objpath, in
 	/* Add to open list. */
 	new_link_ptr->next = TREF(open_relinkctl_list);
 	TREF(open_relinkctl_list) = new_link_ptr;
+	ENABLE_INTERRUPTS(INTRPT_IN_RELINKCTL_ATTACH, prev_intrpt_state);
+	REVERT;
 	return new_link_ptr;
 #	else
 	return NULL;

@@ -99,6 +99,7 @@ typedef enum
 
 	/****************** Below interrupt states are YottaDB-ONLY **************/
 	INTRPT_IN_SS_DESTROY_CONTEXT,	/* Deferring interrupts in ss_destroy_context() */
+	INTRPT_IN_RELINKCTL_ATTACH,	/* Deferring interrupts in relinkctl_attach() */
 
 	/****************** Below interrupt states are common to both GT.M and YottaDB **************/
 	INTRPT_NUM_STATES		/* Should be the *last* one in the enum. */

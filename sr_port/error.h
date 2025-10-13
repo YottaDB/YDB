@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -143,6 +143,7 @@ CONDITION_HANDLER(mur_multi_rehash_ch);
 CONDITION_HANDLER(ojch);
 CONDITION_HANDLER(op_fnzatransform_ch);
 CONDITION_HANDLER(region_init_ch);
+CONDITION_HANDLER(relinkctl_attach_ch);
 CONDITION_HANDLER(replication_ch);
 CONDITION_HANDLER(stp_gcol_ch);
 CONDITION_HANDLER(t_ch);
