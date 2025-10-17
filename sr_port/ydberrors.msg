@@ -85,6 +85,14 @@ GVDBGNAKEDMISMATCH	<Invalid GVNAKED in gv_optimize: $REFERENCE did not match OP_
 JANSSONDLERROR	<Attempt to load Jansson JSON library failed: !AD - in !AD call>/error/fao=4
 JANSSONINVALIDJSON	<Invalid JSON: !AD - in !AD call>/error/fao=4
 JANSSONENCODEERROR	<JSON encoding error: !AD - in !AD call>/error/fao=4
+JANSSONINVSTRLEN	<Invalid string length !UJ: max !UJ>/error/fao=2
+ZYDECODEDESC	<ZYDECODE operation not possible: !AD is a descendant of !AD>/error/fao=4
+ZYDECODEINCOMPL	<Error encountered during ZYDECODE; operation may be incomplete>/warning/fao=0
+ZYDECODEWRONGCNT	<Error encountered during ZYDECODE; JSON chunk count in root of source variable must be a positive integer>/error/fao=0
+ZYENCODEDESC	<ZYENCODE operation not possible: !AD is a descendant of !AD>/error/fao=4
+ZYENCODEINCOMPL	<Error encountered during ZYENCODE; operation may be incomplete>/warning/fao=0
+ZYENCODESRCUNDEF	<Error encountered during ZYENCODE; source variable must not be undefined>/error/fao=0
+BADZYENZYDENEST	<Unsupported nesting of ZYENCODE or ZYDECODE command>/error/fao=0
 !
 ! If there are UNUSEDMSG* lines unused for more than one year and at least two non-patch releases, use them before adding new lines.
 !

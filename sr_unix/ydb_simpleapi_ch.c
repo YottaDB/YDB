@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -57,6 +57,7 @@
 #include "gtm_multi_thread.h"
 #include "trace_table.h"
 #include "gvt_inline.h"
+#include "deferred_events_queue.h"
 
 GBLREF	stack_frame		*frame_pointer;
 GBLREF	boolean_t		created_core;
@@ -86,6 +87,8 @@ GBLREF	unsigned char		t_fail_hist[CDB_MAX_TRIES];
 GBLREF	pthread_mutex_t		thread_mutex;
 GBLREF	uint4			process_id;
 GBLREF  mval			dollar_zstatus;
+GBLREF int			zydecode_args;
+GBLREF int			zyencode_args;
 #ifdef DEBUG
 GBLREF	char			*thread_mutex_holder_rtn;
 GBLREF	int			thread_mutex_holder_line;
@@ -347,7 +350,7 @@ CONDITION_HANDLER(ydb_simpleapi_ch)
 	TREF(sapi_mstrs_for_gc_indx) = 0;
 	TREF(sapi_query_node_subs_cnt) = 0;
 	/* If this message was SUCCESS or INFO, just return to caller. Else UNWIND back to where we were established */
-	if ((SUCCESS == SEVERITY) || (INFO == SEVERITY))
+	if (((SUCCESS == SEVERITY) || (INFO == SEVERITY)) && !zydecode_args && !zyencode_args)
 		CONTINUE;
 	LIBYOTTADB_DONE;
 	UNWIND(NULL, NULL); 		/* Return back to ESTABLISH_NORET() in caller */

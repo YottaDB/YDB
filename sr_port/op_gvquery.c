@@ -34,6 +34,7 @@ GBLREF gv_key		*gv_currkey, *gv_altkey;
 GBLREF spdesc		stringpool;
 GBLREF gd_region	*gv_cur_region;
 GBLREF mstr             extnam_str;
+GBLREF int		zyencode_args;
 
 /* This function is the entry point for $query(gvn) or $query(gvn,1) that indicates a "formward" query.
  * "gv_currkey" already points to the input "gvn".
@@ -120,7 +121,12 @@ void op_gvquery(mval *v)
 		gv_currkey->end -= 2;
 		gv_currkey->base[gv_currkey->end] = KEY_DELIMITER;
 	}
-	is_simpleapi_mode = IS_SIMPLEAPI_MODE;
+	/* The M runtime command, ZYENCODE, runs in an executable frame, but it calls in to the SimpleAPI to do its work.
+	 * So when it calls this function, it needs to execute like it's in SimpleAPI mode, but the IS_SIMPLEAPI_MODE macro
+	 * returns false because the top stack frame isn't a call-in frame, as mentioned. zyencode_args is > 0 when the
+	 * ZYENCODE command is currently active.
+	 */
+	is_simpleapi_mode = IS_SIMPLEAPI_MODE || zyencode_args;
 	assert((is_simpleapi_mode && (NULL == v)) || (!is_simpleapi_mode && (NULL != v)));
 	if (!is_simpleapi_mode)
 		v->mvtype = 0;	/* So STP_GCOL (if invoked below) can free up space

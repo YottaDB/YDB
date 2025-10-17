@@ -414,7 +414,14 @@ enum actlv_type
 	actlv_tp_unwind_restart,	/* = 20 */
 	actlv_tp_unwind_rollback,	/* = 21 */
 	actlv_tp_unwind_commit,		/* = 22 */
-	actlv_ydb_simpleapi_ch		/* = 23 */
+	actlv_ydb_simpleapi_ch,		/* = 23 */
+	actlv_zyen_zyde_desc_check1,	/* = 24 */
+	actlv_zyen_zyde_desc_check2,	/* = 25 */
+	actlv_op_zydecode1,		/* = 26 */
+	actlv_op_zydecode2,		/* = 27 */
+	actlv_op_zydecode3,		/* = 28 */
+	actlv_op_zyencode1,		/* = 29 */
+	actlv_op_zyencode2		/* = 30 */
 };
 
 #ifdef DEBUG
@@ -502,6 +509,67 @@ void	set_active_lv(lv_val *newlv, boolean_t do_assert, int type);
 	sym->lvtreenode_flist = LV;							\
 }
 
+/* The variable was indirect, and was not found in the frame's l_symtab by the caller, so scan the curr_symval to find it
+ *	BASE_LV {lv_val *} (input) is the local symbol base pointer
+ *	NAME_BUFF {unsigned char *} (input/output) is the buffer that stores the symbol's name after resolving indirection
+ *	END_BUFF {unsigned char *} (input/output) points to the end of NAME_BUFF
+ */
+#define FIND_INDIRECT_SYMBOL_NAME(BASE_LV, NAME_BUFF, END_BUFF)					\
+{												\
+	ht_ent_mname	*ent;									\
+												\
+	GBLREF symval	*curr_symval;								\
+												\
+	for (ent = curr_symval->h_symtab.base; ent < curr_symval->h_symtab.top; ent++)		\
+	{											\
+		if (BASE_LV == ent->value)							\
+		{										\
+			memcpy(NAME_BUFF, ent->key.var_name.addr, ent->key.var_name.len);	\
+			END_BUFF += ent->key.var_name.len;					\
+			break;									\
+		}										\
+	}											\
+}												\
+
+/* Build an lvname_info struct for use by format_key_mvals()
+ *	LVN {lv_val *} (input) is the local variable used to build the lvname_info struct
+ *	SUBS {mval [MAX_LVSUBSCRIPTS]} (input) is a preallocated array large enough to hold all of LVN's subscripts
+ *	LVN_INFO {lvname_info *} (input/output) is a pointer to an lvname_info struct that is later passed to format_key_mvals()
+ *
+ *	NOTE: SUBS needs to be preallocated because LVN_INFO will point to memory in SUBS when later calling format_key_mvals()
+ */
+#define BUILD_FORMAT_KEY_MVALS(LVN, SUBS, LVN_INFO)			\
+{									\
+	int			i = 0, num = 0;				\
+	unsigned char		end;					\
+	boolean_t		is_base;				\
+	lv_val			*base;					\
+	lvTree			*tree;					\
+	lvTreeNode		*tNode, *tNodep[MAX_LVSUBSCRIPTS];	\
+									\
+	is_base = LV_IS_BASE_VAR(LVN);					\
+	base = !is_base ? LV_GET_BASE_VAR(LVN) : LVN;			\
+	(LVN_INFO)->start_lvp = base;					\
+	(LVN_INFO)->total_lv_subs = 1;					\
+	i = num = 0;							\
+	while (LVN != base)						\
+	{								\
+		tNodep[i++] = (lvTreeNode *)LVN;			\
+		tree = LV_GET_PARENT_TREE(LVN);				\
+		LVN = (lv_val *)LVT_PARENT(tree);			\
+	}								\
+	for (int j = --i; j >= 0; j--)					\
+	{								\
+		tNode = tNodep[j];					\
+		num = i - j;						\
+		LV_NODE_GET_KEY(tNode, &SUBS[num]);			\
+		(LVN_INFO)->lv_subs[num] = &SUBS[num];			\
+		MV_FORCE_STR((LVN_INFO)->lv_subs[num]);			\
+		num++;							\
+	}								\
+	(LVN_INFO)->total_lv_subs += num;				\
+}
+
 /* Call function pointer, if not NULL, to consume formatted output.
  * Currently only used for ojpassvar_hook().
  */
@@ -562,7 +630,7 @@ lv_val   *op_putindx(UNIX_ONLY_COMMA(int argcnt) lv_val *start, ...);
 lv_val   *op_srchindx(UNIX_ONLY_COMMA(int argcnt_arg) lv_val *lv, ...);
 lv_val   *op_m_srchindx(UNIX_ONLY_COMMA(int4 count) lv_val *lvarg, ...);
 
-/* Function Prototypes for local variables functions of merge */
+/* Function Prototypes for local variables functions of merge, zydecode, and zyencode */
 boolean_t 	lcl_arg1_is_desc_of_arg2(lv_val *cur, lv_val *ref);
 unsigned char	*format_key_mvals(unsigned char *buff, int size, lvname_info *lvnp);
 unsigned char   *format_key_lv_val(lv_val *lvpin, unsigned char *buff, int size);

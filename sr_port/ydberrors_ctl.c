@@ -76,6 +76,14 @@ LITDEF	err_msg ydberrors[] = {
 	{ "JANSSONDLERROR", "Attempt to load Jansson JSON library failed: !AD - in !AD call", 4, 0 },
 	{ "JANSSONINVALIDJSON", "Invalid JSON: !AD - in !AD call", 4, 0 },
 	{ "JANSSONENCODEERROR", "JSON encoding error: !AD - in !AD call", 4, 0 },
+	{ "JANSSONINVSTRLEN", "Invalid string length !UJ: max !UJ", 2, 0 },
+	{ "ZYDECODEDESC", "ZYDECODE operation not possible: !AD is a descendant of !AD", 4, 0 },
+	{ "ZYDECODEINCOMPL", "Error encountered during ZYDECODE; operation may be incomplete", 0, 0 },
+	{ "ZYDECODEWRONGCNT", "Error encountered during ZYDECODE; JSON chunk count in root of source variable must be a positive integer", 0, 0 },
+	{ "ZYENCODEDESC", "ZYENCODE operation not possible: !AD is a descendant of !AD", 4, 0 },
+	{ "ZYENCODEINCOMPL", "Error encountered during ZYENCODE; operation may be incomplete", 0, 0 },
+	{ "ZYENCODESRCUNDEF", "Error encountered during ZYENCODE; source variable must not be undefined", 0, 0 },
+	{ "BADZYENZYDENEST", "Unsupported nesting of ZYENCODE or ZYDECODE command", 0, 0 },
 };
 
 
@@ -89,7 +97,7 @@ GBLDEF	err_ctl ydberrors_ctl = {
 	256,
 	"YDB",
 	&ydberrors[0],
-	59,
+	67,
 	&ydberrors_undocarr[0],
 	0
 };

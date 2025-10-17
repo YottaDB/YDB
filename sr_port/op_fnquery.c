@@ -37,6 +37,7 @@ GBLREF mv_stent		*mv_chain;
 GBLREF spdesc		stringpool;
 GBLREF symval		*curr_symval;
 GBLREF unsigned char	*msp, *stackwarn, *stacktop;
+GBLREF int		zyencode_args;
 
 LITREF	mval		literal_null;
 
@@ -116,7 +117,12 @@ void op_fnquery_va(int sbscnt, mval *dst, va_list var)
 		assert((NULL == lvt) || (LV_GET_CHILD(v) == lvt));
 	} else
 		lvt = NULL;
-	is_simpleapi_mode = IS_SIMPLEAPI_MODE;
+	/* The M runtime command, ZYENCODE, runs in an executable frame, but it calls in to the SimpleAPI to do its work.
+	 * So when it calls this function, it needs to execute like it's in SimpleAPI mode, but the IS_SIMPLEAPI_MODE macro
+	 * returns false because the top stack frame isn't a call-in frame, as mentioned. zyencode_args is > 0 when the
+	 * ZYENCODE command is currently active.
+	 */
+	is_simpleapi_mode = IS_SIMPLEAPI_MODE || zyencode_args;
 	if (NULL == lvt)
 	{
 		if (!is_simpleapi_mode)

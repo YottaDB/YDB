@@ -14,12 +14,16 @@
 
 #include "libyottadb_int.h"
 #include "ydb_encode_decode.h"
+#include "op_zyencode_zydecode.h"		/* for zyencode_glvn_ptr */
 #include "namelook.h"
 #include "deferred_events_queue.h"
 
-GBLREF	volatile int4	outofband;
+GBLREF	volatile int4		outofband;
+GBLREF	int			zyencode_args;
+GBLREF	zyencode_glvn_ptr	eglvnp;
 
-STATICDEF	char	*errmsg = NULL;
+STATICDEF	ydb_var_types	encode_type;
+STATICDEF	char		*errmsg = NULL;
 
 /* Routine to encode a local or global in to a formatted string
  *
@@ -34,7 +38,6 @@ int	ydb_encode_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t 
 			const char *format, ydb_buffer_t *ret_value)
 {
 	boolean_t	error_encountered;
-	ydb_var_types	encode_type;
 	unsigned int	data_value;
 	int		encode_svn_index, status;
 	json_t		*jansson_object = NULL;
@@ -47,16 +50,16 @@ int	ydb_encode_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t 
 					 * scenarios from not resetting this global variable even though this function returns.
 					 */
 	assert(!yed_lydb_rtn);	/* ydb_encode_s() and ydb_decode_s() set to TRUE, and they should never be nested */
-	/* Verify entry conditions, make sure YDB CI environment is up etc. */
-	LIBYOTTADB_INIT(LYDB_RTN_ENCODE, (int));	/* Note: macro could return from this function in case of errors */
+	if (zyencode_args)     /* zyencode_args is > 0 if called by op_zyencode() */
+		TREF(libyottadb_active_rtn) = LYDB_RTN_ENCODE;	/* set active routine when called by op_zyencode() */
+	else
+		/* Verify entry conditions, make sure YDB CI environment is up etc. */
+		LIBYOTTADB_INIT(LYDB_RTN_ENCODE, (int));        /* Note: macro could return from this function in case of errors */
 	ESTABLISH_NORET(ydb_simpleapi_ch, error_encountered);
 	if (error_encountered)
 	{
-		if (NULL != errmsg)
-		{
-			system_free(errmsg);
-			errmsg = NULL;
-		}
+		system_free(errmsg);
+		errmsg = NULL;
 		YED_OBJECT_DELETE(jansson_object);
 		yed_lydb_rtn = FALSE;
 		REVERT;
@@ -68,14 +71,11 @@ int	ydb_encode_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t 
 	yed_lydb_rtn = TRUE;
 	/* Do some validation */
 	VALIDATE_VARNAME(varname, subs_used, FALSE, LYDB_RTN_ENCODE, -1, encode_type, encode_svn_index);
-	if (0 > subs_used)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MINNRSUBSCRIPTS);
-	if (YDB_MAX_SUBS < subs_used)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXNRSUBSCRIPTS);
 	if (NULL == ret_value)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,
 			LEN_AND_LIT("NULL ret_value"), LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_ENCODE)));
-	if (NULL == ret_value->buf_addr)
+	/* If ret_value is empty, that signals that Jansson should return a buffer, which we will later have to free */
+	if ((NULL == ret_value->buf_addr) && ((0 < ret_value->len_alloc) || (0 < ret_value->len_used)))
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,
 			LEN_AND_LIT("NULL ret_value->buf_addr"), LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_ENCODE)));
 	for (int i = 0; i < subs_used; i++)
@@ -112,8 +112,9 @@ int	ydb_encode_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t 
 	if (!yed_dl_complete)
 		yed_dl_load((char *)LYDBRTNNAME(LYDB_RTN_ENCODE));
 	jansson_object = yed_new_object();
-	status = yed_encode_tree(varname, subs_used, subsarray, encode_type, encode_svn_index,
-			data_value, jansson_object, NULL, NULL);
+	status = yed_encode_tree(varname, subs_used, subsarray, data_value, jansson_object, NULL, NULL);
+	if (YDB_ERR_NODEEND == status)	/* YDB_ERR_NODEEND is not a real error */
+		status = YDB_OK;
 	if (YDB_OK != status)
 	{
 		switch (status)
@@ -137,23 +138,38 @@ int	ydb_encode_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t 
 		}
 		return status;
 	}
-	size = yed_output_json(jansson_object, ret_value->buf_addr, ret_value->len_alloc, 0);
-	if (0 == size)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_JANSSONINVALIDJSON, 4,
-			LEN_AND_LIT("Empty JSON returned"), LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_ENCODE)));
-	if (ret_value->len_alloc < size + 1)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_INVSTRLEN, 2, size + 1, ret_value->len_alloc);
+	if ((0 == ret_value->len_alloc) && (0 == ret_value->len_used) && (NULL == ret_value->buf_addr))
+	{	/* If ret_value is empty, that signals that Jansson should return a buffer, which we will later have to free */
+		ret_value->buf_addr = yed_dump_json(jansson_object, 0);
+		if (NULL == ret_value->buf_addr)
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_JANSSONINVALIDJSON, 4,
+				LEN_AND_LIT("Empty JSON returned"), LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_ENCODE)));
+		size = strlen(ret_value->buf_addr);
+		if (UINT_MAX < (size + 1))	/* add 1 for the NUL */
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_JANSSONINVSTRLEN, 2, size + 1, UINT_MAX);
+		ret_value->len_alloc = ret_value->len_used = size;
+		ret_value->len_alloc++;	/* add 1 for the NUL */
+	}
+	else
+	{	/* Otherwise, caller has passed in their own buffer */
+		size = yed_output_json(jansson_object, ret_value->buf_addr, ret_value->len_alloc, 0);
+		if (0 == size)
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_JANSSONINVALIDJSON, 4,
+				LEN_AND_LIT("Empty JSON returned"), LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_ENCODE)));
+		if (ret_value->len_alloc < size + 1)
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_JANSSONINVSTRLEN, 2, size + 1, ret_value->len_alloc);
+		ret_value->len_used = size;
+		ret_value->buf_addr[ret_value->len_used] = '\0';
+	}
 	YED_OBJECT_DELETE(jansson_object);
-	ret_value->len_used = size;
-	ret_value->buf_addr[ret_value->len_used] = '\0';
 	yed_lydb_rtn = FALSE;
 	LIBYOTTADB_DONE;
 	REVERT;
 	return status;
 }
 
-int yed_encode_tree(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *subsarray, ydb_var_types encode_type,
-			int encode_svn_index, unsigned int data_value, json_t *obj, int *ret_subs_used, ydb_buffer_t *ret_subsarray)
+int yed_encode_tree(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *subsarray,
+			unsigned int data_value, json_t *obj, int *ret_subs_used, ydb_buffer_t *ret_subsarray)
 {
 	ydb_buffer_t	cur_subsarray[YDB_MAX_SUBS] = {0}, next_subsarray[YDB_MAX_SUBS] = {0}, cur_value = {0};
 	const char	*root;
@@ -171,9 +187,13 @@ int yed_encode_tree(const ydb_buffer_t *varname, int subs_used, const ydb_buffer
 			 * An empty string is allowed as a key in JSON, but not as a subscript in M (by default).
 			 */
 	if (LYDB_VARREF_GLOBAL == encode_type)
-		string_size = MAX_KEY_SZ;
+		if (zyencode_args)	/* zyencode_args is > 0 if called by op_zyencode() */
+			string_size = eglvnp->gblp[1]->s_gv_cur_region->max_key_size;
+		else
+			string_size = MAX_KEY_SZ;
 	else
 		string_size = YDB_MAX_STR;
+	string_size++;	/* add 1 for the NUL needed later when passed to the Jansson library */
 	curpool = system_malloc(YDB_MAX_SUBS * string_size);
 	nextpool = system_malloc(YDB_MAX_SUBS * string_size);
 	for (i = 0; YDB_MAX_SUBS > i; i++)
@@ -190,7 +210,11 @@ int yed_encode_tree(const ydb_buffer_t *varname, int subs_used, const ydb_buffer
 	}
 	cur_subs_used = subs_used;
 	next_subs_used = YDB_MAX_SUBS;
-	cur_value.len_alloc = YDB_MAX_STR;
+	if ((LYDB_VARREF_GLOBAL == encode_type) && zyencode_args)	/* zyencode_args is > 0 if called by op_zyencode() */
+		cur_value.len_alloc = eglvnp->gblp[1]->s_gv_cur_region->max_rec_size;
+	else
+		cur_value.len_alloc = YDB_MAX_STR;
+	cur_value.len_alloc++;	/* add 1 for the NUL needed later when passed to the Jansson library */
 	valuepool = system_malloc(cur_value.len_alloc);
 	cur_value.buf_addr = valuepool;
 	if (data_value % 2)	/* handle root of tree's value if it has one */
@@ -257,7 +281,7 @@ int yed_encode_tree(const ydb_buffer_t *varname, int subs_used, const ydb_buffer
 		return ERR_MAXNRSUBSCRIPTS;
 	}
 	status = ydb_node_next_s(varname, cur_subs_used, cur_subsarray, &next_subs_used, next_subsarray);
-	if (YDB_OK != status && YDB_ERR_NODEEND != status)
+	if (YDB_OK != status)
 	{
 		system_free(curpool);
 		system_free(nextpool);
@@ -267,8 +291,11 @@ int yed_encode_tree(const ydb_buffer_t *varname, int subs_used, const ydb_buffer
 	while (0 != next_subs_used)
 	{
 		assert(YDB_OK == status);
-		if (!yed_is_descendant_of(subs_used, subsarray, next_subs_used, next_subsarray))
-		{	/* The next node is not part of this subtree. Return. */
+		if (!yed_is_descendant_of(subs_used, subsarray, next_subs_used, next_subsarray) ||
+			yed_same_node_next(cur_subs_used, cur_subsarray, next_subs_used, next_subsarray))
+		{	/* The next node is not part of this subtree or it's a local variable with its
+			 * last node ending in a null subscript, so return.
+			 */
 			if (NULL != ret_subs_used)
 			{	/* If this isn't the top level call to this function,
 				 * update the return subsarray for the calling function
@@ -330,8 +357,8 @@ int yed_encode_tree(const ydb_buffer_t *varname, int subs_used, const ydb_buffer
 				system_free(valuepool);
 				return ERR_JANSSONENCODEERROR;
 			}
-			status = yed_encode_tree(varname, subs_used + 1, next_subsarray, encode_type,
-					encode_svn_index, data_value, val, &cur_subs_used, cur_subsarray);
+			status = yed_encode_tree(varname, subs_used + 1, next_subsarray,
+					data_value, val, &cur_subs_used, cur_subsarray);
 			if (YDB_OK != status)
 			{
 				system_free(curpool);
@@ -368,8 +395,8 @@ int yed_encode_tree(const ydb_buffer_t *varname, int subs_used, const ydb_buffer
 				system_free(valuepool);
 				return ERR_JANSSONENCODEERROR;
 			}
-			status = yed_encode_tree(varname, next_subs_used, next_subsarray, encode_type,
-					encode_svn_index, data_value, val, &cur_subs_used, cur_subsarray);
+			status = yed_encode_tree(varname, next_subs_used, next_subsarray,
+					data_value, val, &cur_subs_used, cur_subsarray);
 			if (YDB_OK != status)
 			{
 				system_free(curpool);
@@ -462,7 +489,7 @@ int yed_encode_tree(const ydb_buffer_t *varname, int subs_used, const ydb_buffer
 		}
 		next_subs_used = YDB_MAX_SUBS;
 		status = ydb_node_next_s(varname, cur_subs_used, cur_subsarray, &next_subs_used, next_subsarray);
-		if (YDB_OK != status && YDB_ERR_NODEEND != status)
+		if (YDB_OK != status)
 		{
 			system_free(curpool);
 			system_free(nextpool);
@@ -584,6 +611,23 @@ inline boolean_t yed_is_descendant_of(int subs_used, const ydb_buffer_t *subsarr
 		if (subsarray[i].len_used != next_subsarray[i].len_used)
 			return FALSE;
 		if (strncmp(subsarray[i].buf_addr, next_subsarray[i].buf_addr, subsarray[i].len_used))
+			return FALSE;
+	}
+	if (subs_used == next_subs_used)	/* null subscripts must be enabled, so not actually a descendant */
+		return FALSE;
+	return TRUE;
+}
+
+inline boolean_t yed_same_node_next(int cur_subs_used, const ydb_buffer_t *cur_subsarray,
+		int next_subs_used, ydb_buffer_t *next_subsarray)
+{
+	if (cur_subs_used != next_subs_used)
+		return FALSE;
+	for (int i = 0; i < cur_subs_used; i++)
+	{
+		if (cur_subsarray[i].len_used != next_subsarray[i].len_used)
+			return FALSE;
+		if (strncmp(cur_subsarray[i].buf_addr, next_subsarray[i].buf_addr, cur_subsarray[i].len_used))
 			return FALSE;
 	}
 	return TRUE;

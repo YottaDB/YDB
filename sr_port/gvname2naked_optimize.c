@@ -401,6 +401,10 @@ static boolean_t gv_dataflow(triple *curtrip, DEBUG_ONLY_COMMA(boolean_t *oc_see
 	case OC_INDDEVPARMS:/* open "file":@x */
 	case OC_INDMERGE:   /* merge a=@x */
 	case OC_INDMERGE2:  /* merge a=@x in context of side effects */
+	case OC_INDZYDECODE:/* zydecode a=@x */
+	case OC_INDZYDECODE2:/* zydecode a=@x in context of side effects */
+	case OC_INDZYENCODE:/* zyencode a=@x */
+	case OC_INDZYENCODE2:/* zyencode a=@x in context of side effects */
 	case OC_INDFNNAME:  /* $name(@a) */
 	case OC_INDFNNAME2: /* $name(@a) */
 	case OC_TROLLBACK:  /* trollback */

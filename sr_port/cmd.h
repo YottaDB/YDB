@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2022-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -73,4 +73,6 @@ int m_ztrigger(void);
 int m_ztstart(void);
 int m_zwithdraw(void);
 int m_zwrite(void);
+int m_zydecode(void);
+int m_zyencode(void);
 #endif

@@ -216,6 +216,10 @@ void	op_indq2(mval *dst, uint4 indx, mval *value);
 void	op_indrzshow(mval *s1, mval *s2, mint level);
 void	op_indset(mval *target, mval *value);
 void	op_indtext(mval *lab, mint offset, mval *rtn, mval *dst);
+void	op_indzydecode(mval *glvn_mv, mval *arg1_or_arg2);
+void	op_indzydecode2(uint4 indx);
+void	op_indzyencode(mval *glvn_mv, mval *arg1_or_arg2);
+void	op_indzyencode2(uint4 indx);
 void	op_iocontrol(UNIX_ONLY_COMMA(int4 n) mval *vparg, ...);
 void	op_iretmval(mval *v, mval *dst);
 int	op_job(int4 argcnt, ...);
@@ -341,6 +345,10 @@ void	op_zut(mval *s);
 void	op_zwritesvn(int svn);
 void	op_zst_over_retarg_helper(void);
 void	op_zstepretarg_helper(void);
+/*	op_zydecode     : prototype defined separately in op_zydecode.h */
+/*	op_zydecode_arg : prototype defined separately in op_zydecode.h */
+/*	op_zyencode     : prototype defined separately in op_zyencode.h */
+/*	op_zyencode_arg : prototype defined separately in op_zyencode.h */
 
 void	op_equnul_retmval(mval *u, mval *ret);
 void	op_nequnul_retmval(mval *u, mval *ret);

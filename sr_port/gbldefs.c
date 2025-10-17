@@ -99,6 +99,7 @@
 /* FOR MERGE RELATED GLOBALS */
 #include "gvname_info.h"
 #include "op_merge.h"
+#include "op_zyencode_zydecode.h"
 #include "cli.h"
 #include "invocation_mode.h"
 #include "fgncal.h"
@@ -424,6 +425,11 @@ GBLDEF	sgmnt_addrs		*kip_csa;
 GBLDEF	boolean_t		need_kip_incr;
 GBLDEF	int			merge_args;
 GBLDEF	merge_glvn_ptr		mglvnp;
+GBLDEF	int			zydecode_args;
+GBLDEF	zydecode_glvn_ptr	dglvnp;
+GBLDEF	int			zyencode_args;
+GBLDEF	zyencode_glvn_ptr	eglvnp;
+GBLDEF	ydb_buffer_t		zyencode_ret;
 GBLDEF	boolean_t		ztrap_new;
 GBLDEF	int4			wtfini_in_prog;
 #ifdef DEBUG

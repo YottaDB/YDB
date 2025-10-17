@@ -1051,7 +1051,7 @@ FILTERBADCONV	<Bad conversion of seqno !16@XQ by filter>/error/fao=1!/ansi=0
 PRIMARYISROOT	<Attempted operation not valid on root primary instance !AD>/error/fao=2!/ansi=0
 GVQUERYGETFAIL	<Global variable QUERY and GET failed.  Failure code: !AD.>/error/fao=2!/ansi=0
 BSIZTOOLARGE	<!AD Block larger than specified maximum size>/error/fao=2!/ansi=0/B
-MERGEDESC	<Merge operation not possible.  !AD is descendent of !AD.>/error/fao=4!/ansi=19
+MERGEDESC	<MERGE operation not possible. !AD is a descendant of !AD.>/error/fao=4!/ansi=19
 MERGEINCOMPL	<Error encountered during MERGE; operation may be incomplete>/warning/fao=0!/ansi=0
 DBNAMEMISMATCH	<Database file !AD points to shared memory (id = !UL) which in turn points to an inaccessible database file !AZ>/error/fao=4!/ansi=0
 DBIDMISMATCH	<Database file !AZ (region !AD) id does not match file id in shared memory (id = !UL).>/error/fao=4!/ansi=0

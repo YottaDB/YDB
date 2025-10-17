@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -38,6 +38,7 @@
 #include "tp.h"			/* needed by "gvname_info.h" */
 #include "gvname_info.h"	/* needed by "op_merge.h" */
 #include "op_merge.h"
+#include "op_zyencode_zydecode.h"
 #include "mint2mval.h"
 #include "mval2mint.h"
 #include "bool2mint.h"
@@ -55,8 +56,9 @@ int op_bxrelop(), op_currtn(),
     op_restartpc(), op_sto(), op_zhelp(), opp_break(), opp_commarg(),
     opp_hardret(), opp_inddevparms(), opp_indfnname(), opp_indfun(), opp_indglvn(), opp_indincr(), opp_indlvadr(),
     opp_indlvarg(), opp_indlvnamadr(), opp_indmerge(), opp_indpat(), opp_indrzshow(), opp_indsavglvn(), opp_indsavlvn(),
-    opp_indset(), opp_indtext(), opp_iretmval(), opp_newintrinsic(), opp_newvar(), opp_rterror(), opp_setzbrk(), opp_svput(),
-    opp_tcommit(), opp_trestart(), opp_trollback(), opp_tstart(), opp_xnew(), opp_zcont(), opp_zg1(), opp_zgoto();
+    opp_indset(), opp_indtext(), opp_indzydecode(), opp_indzyencode(), opp_iretmval(), opp_newintrinsic(), opp_newvar(),
+    opp_rterror(), opp_setzbrk(), opp_svput(), opp_tcommit(), opp_trestart(), opp_trollback(), opp_tstart(), opp_xnew(),
+    opp_zcont(), opp_zg1(), opp_zgoto();
 
 #ifndef UTF8_SUPPORTED
 /* Call "z" counterparts for non-utf8 flavor of these functions on unsupported platforms */

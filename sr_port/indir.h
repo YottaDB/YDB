@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -97,3 +97,9 @@ INDIR(indir_fndata,		f_data,		OC_FNDATA)
 ,INDIR(indir_zrupdate,		m_zrupdate,	0)
 #endif
 ,INDIR(indir_fnreversequery1,	f_reversequery1,OC_FNREVERSEQUERY)
+,INDIR(indir_zydecode,		m_zydecode,	0)
+,INDIR(indir_zydecode1,		m_zydecode,	0)
+,INDIR(indir_zydecode2,		m_zydecode,	0)
+,INDIR(indir_zyencode,		m_zyencode,	0)
+,INDIR(indir_zyencode1,		m_zyencode,	0)
+,INDIR(indir_zyencode2,		m_zyencode,	0)

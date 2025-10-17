@@ -745,7 +745,8 @@ MBSTART {	/* If threaded API but in worker thread, that is OK */						\
 			 * "ydb_cip_t" so account for that in the assert.					\
 			 */											\
 			assert((LYDB_RTN_NONE == TREF(libyottadb_active_rtn))					\
-				|| (LYDB_RTN_YDB_CI == TREF(libyottadb_active_rtn)));				\
+				|| (LYDB_RTN_YDB_CI == TREF(libyottadb_active_rtn))				\
+				|| (LYDB_RTN_YDB_CIP == TREF(libyottadb_active_rtn)));				\
 			return YDB_ERR_SIMPLEAPINOTALLOWED;							\
 		}												\
 		caller_func_is_stapi = FALSE;									\

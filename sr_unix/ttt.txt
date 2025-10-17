@@ -1283,3 +1283,27 @@ OC_BXRELOP_NLT:		pushl	val.4
 OC_FNZYCOMPILE:		pushab  val.0
 			pushab  val.1
 			calls   #2,xfer.xf_fnzycompile
+OC_ZYDECODE:		calls	#0,xfer.xf_zydecode
+OC_ZYDECODE_GVARG:	pushl	#0
+			pushl	val.1
+			calls	#2,xfer.xf_zydecode_arg
+OC_ZYDECODE_LVARG:	pushab	val.2
+			pushl	val.1
+			calls	#2,xfer.xf_zydecode_arg
+OC_INDZYDECODE:		pushab	val.1
+			pushab	val.2
+			jsb	xfer.xf_indzydecode
+OC_INDZYDECODE2:	pushab	val.1
+			calls	#1,xfer.xf_indzydecode2
+OC_ZYENCODE:		calls	#0,xfer.xf_zyencode
+OC_ZYENCODE_GVARG:	pushl	#0
+			pushl	val.1
+			calls	#2,xfer.xf_zyencode_arg
+OC_ZYENCODE_LVARG:	pushab	val.2
+			pushl	val.1
+			calls	#2,xfer.xf_zyencode_arg
+OC_INDZYENCODE:		pushab	val.1
+			pushab	val.2
+			jsb	xfer.xf_indzyencode
+OC_INDZYENCODE2:	pushab	val.1
+			calls	#1,xfer.xf_indzyencode2

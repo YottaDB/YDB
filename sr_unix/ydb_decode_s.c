@@ -16,11 +16,14 @@
 
 #include "libyottadb_int.h"
 #include "ydb_encode_decode.h"
+#include "op_zyencode_zydecode.h"		/* for zydecode_glvn_ptr */
 #include "dlopen_handle_array.h"
 #include "namelook.h"
 #include "deferred_events_queue.h"
 
-GBLREF	volatile int4	outofband;
+GBLREF	volatile int4		outofband;
+GBLREF	int			zydecode_args;
+GBLREF	zydecode_glvn_ptr	dglvnp;
 
 /* Jansson function pointers */
 GBLDEF	json_t		*(*yed_decode_json)(const char *, size_t, json_error_t *), *(*yed_obj_next_value)(void *),
@@ -30,9 +33,12 @@ GBLDEF	json_t		*(*yed_decode_json)(const char *, size_t, json_error_t *), *(*yed
 GBLDEF	void		*(*yed_get_obj_iter)(json_t *), *(*yed_obj_iter_next)(json_t *, void *), (*yed_object_delete)(json_t *);
 GBLDEF	const char	*(*yed_obj_next_key)(void *), *(*yed_get_string_value)(const json_t *);
 GBLDEF	size_t		(*yed_get_size)(const json_t *), (*yed_output_json)(const json_t *, char *, size_t, size_t);
+GBLDEF	char		*(*yed_dump_json)(const json_t *, size_t);
 GBLDEF	long long	(*yed_get_int_value)(const json_t *);
 GBLDEF	double		(*yed_get_real_value)(const json_t *);
 GBLDEF	int		(*yed_set_object)(json_t *, const char *, json_t *);
+
+STATICDEF	ydb_var_types	decode_type;
 
 /* Routine to decode a formatted string in to a local or global
  *
@@ -47,7 +53,6 @@ int ydb_decode_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t 
 {
 	ydb_buffer_t	cur_subsarray[YDB_MAX_SUBS] = {0};
 	boolean_t	error_encountered;
-	ydb_var_types	decode_type;
 	json_t		*jansson_object = NULL;
 	json_error_t	jansson_error;
 	int		decode_svn_index, json_type, i, string_size, status;
@@ -60,13 +65,15 @@ int ydb_decode_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t 
 					 * scenarios from not resetting this global variable even though this function returns.
 					 */
 	assert(!yed_lydb_rtn);	/* ydb_encode_s() and ydb_decode_s() set to TRUE, and they should never be nested */
-	/* Verify entry conditions, make sure YDB CI environment is up etc. */
-	LIBYOTTADB_INIT(LYDB_RTN_DECODE, (int));	/* Note: macro could return from this function in case of errors */
+	if (zydecode_args)     /* zydecode_args is > 0 if called by op_zydecode() */
+		TREF(libyottadb_active_rtn) = LYDB_RTN_DECODE;	/* set active routine when called by op_zydecode() */
+	else
+		/* Verify entry conditions, make sure YDB CI environment is up etc. */
+		LIBYOTTADB_INIT(LYDB_RTN_DECODE, (int));        /* Note: macro could return from this function in case of errors */
 	ESTABLISH_NORET(ydb_simpleapi_ch, error_encountered);
 	if (error_encountered)
 	{
-		if (NULL != curpool)
-			system_free(curpool);
+		system_free(curpool);
 		YED_OBJECT_DELETE(jansson_object);
 		yed_lydb_rtn = FALSE;
 		REVERT;
@@ -78,10 +85,6 @@ int ydb_decode_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t 
 	yed_lydb_rtn = TRUE;
 	/* Do some validation */
 	VALIDATE_VARNAME(varname, subs_used, FALSE, LYDB_RTN_DECODE, -1, decode_type, decode_svn_index);
-	if (0 > subs_used)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MINNRSUBSCRIPTS);
-	if (YDB_MAX_SUBS < subs_used)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXNRSUBSCRIPTS);
 	if (NULL == value)
 		return YDB_OK;
 	for (i = 0; i < subs_used; i++)
@@ -102,7 +105,10 @@ int ydb_decode_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t 
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_JANSSONINVALIDJSON, 4,
 			LEN_AND_STR(jansson_error.text), LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_DECODE)));
 	if (LYDB_VARREF_GLOBAL == decode_type)
-		string_size = MAX_KEY_SZ;
+		if (zydecode_args)	/* zydecode_args is > 0 if called by op_zydecode() */
+			string_size = dglvnp->gblp[0]->s_gv_cur_region->max_key_size;
+		else
+			string_size = MAX_KEY_SZ;
 	else
 		string_size = YDB_MAX_STR;
 	curpool = system_malloc(YDB_MAX_SUBS * string_size);
@@ -118,9 +124,9 @@ int ydb_decode_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t 
 	}
 	json_type = jansson_object->type;
 	if (JSON_OBJECT == json_type)		/* object */
-		status = yed_decode_object(varname, subs_used, cur_subsarray, jansson_object, decode_type, decode_svn_index);
+		status = yed_decode_object(varname, subs_used, cur_subsarray, jansson_object);
 	else if (JSON_ARRAY == json_type)	/* array */
-		status = yed_decode_array(varname, subs_used, cur_subsarray, jansson_object, decode_type, decode_svn_index);
+		status = yed_decode_array(varname, subs_used, cur_subsarray, jansson_object);
 	else
 	{
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_JANSSONINVALIDJSON, 4,
@@ -134,8 +140,7 @@ int ydb_decode_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t 
 	return status;
 }
 
-int yed_decode_object(const ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, json_t *jansson_object,
-			ydb_var_types decode_type, int decode_svn_index)
+int yed_decode_object(const ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, json_t *jansson_object)
 {
 	void		*iterator;
 	json_t		*value;
@@ -158,44 +163,43 @@ int yed_decode_object(const ydb_buffer_t *varname, int subs_used, ydb_buffer_t *
 			if (YDB_MAX_SUBS == cur_subs_used)
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXNRSUBSCRIPTS);
 			str_size = strlen(key);
-			if (subsarray[cur_subs_used].len_alloc > str_size)
+			if (subsarray[cur_subs_used].len_alloc < str_size)
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,
+					LEN_AND_LIT("buf_addr is too small for at least 1 key in JSON input"),
+					LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_DECODE)));
+			else
 			{
 				subsarray[cur_subs_used].len_used = str_size;
 				memcpy(subsarray[cur_subs_used].buf_addr, key, str_size);
 				cur_subs_used++;
 			}
-			else
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,
-					LEN_AND_LIT("buf_addr is too small for at least 1 key in JSON input"),
-					LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_DECODE)));
 		}
 		value = yed_obj_next_value(iterator);
 		switch (value->type)
 		{
 			case JSON_OBJECT:	/* object */
-				status = yed_decode_object(varname, cur_subs_used, subsarray, value, decode_type, decode_svn_index);
+				status = yed_decode_object(varname, cur_subs_used, subsarray, value);
 				break;
 			case JSON_ARRAY:	/* array */
-				status = yed_decode_array(varname, cur_subs_used, subsarray, value, decode_type, decode_svn_index);
+				status = yed_decode_array(varname, cur_subs_used, subsarray, value);
 				break;
 			case JSON_STRING:	/* string */
-				status = yed_decode_string(varname, cur_subs_used, subsarray, value, decode_type, decode_svn_index);
+				status = yed_decode_string(varname, cur_subs_used, subsarray, value);
 				break;
 			case JSON_INTEGER:	/* integer */
-				status = yed_decode_integer(varname, cur_subs_used, subsarray,
-						value, decode_type, decode_svn_index);
+				status = yed_decode_integer(varname, cur_subs_used, subsarray, value);
 				break;
 			case JSON_REAL:		/* real */
-				status = yed_decode_real(varname, cur_subs_used, subsarray, value, decode_type, decode_svn_index);
+				status = yed_decode_real(varname, cur_subs_used, subsarray, value);
 				break;
 			case JSON_TRUE:		/* true */
-				status = yed_decode_bool(varname, cur_subs_used, subsarray, decode_type, decode_svn_index, 1);
+				status = yed_decode_bool(varname, cur_subs_used, subsarray, 1);
 				break;
 			case JSON_FALSE:	/* false */
-				status = yed_decode_bool(varname, cur_subs_used, subsarray, decode_type, decode_svn_index, 0);
+				status = yed_decode_bool(varname, cur_subs_used, subsarray, 0);
 				break;
 			default:		/* null */
-				status = yed_decode_bool(varname, cur_subs_used, subsarray, decode_type, decode_svn_index, 2);
+				status = yed_decode_bool(varname, cur_subs_used, subsarray, 2);
 		}
 		if (YDB_OK != status)
 			return status;
@@ -204,8 +208,7 @@ int yed_decode_object(const ydb_buffer_t *varname, int subs_used, ydb_buffer_t *
 	return YDB_OK;
 }
 
-int yed_decode_array(const ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, json_t *jansson_object,
-			ydb_var_types decode_type, int decode_svn_index)
+int yed_decode_array(const ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, json_t *jansson_object)
 {
 	json_t		*value;
 	int		cur_subs_used, status;
@@ -232,29 +235,28 @@ int yed_decode_array(const ydb_buffer_t *varname, int subs_used, ydb_buffer_t *s
 		switch (value->type)
 		{
 			case JSON_OBJECT:	/* object */
-				status = yed_decode_object(varname, cur_subs_used, subsarray, value, decode_type, decode_svn_index);
+				status = yed_decode_object(varname, cur_subs_used, subsarray, value);
 				break;
 			case JSON_ARRAY:	/* array */
-				status = yed_decode_array(varname, cur_subs_used, subsarray, value, decode_type, decode_svn_index);
+				status = yed_decode_array(varname, cur_subs_used, subsarray, value);
 				break;
 			case JSON_STRING:	/* string */
-				status = yed_decode_string(varname, cur_subs_used, subsarray, value, decode_type, decode_svn_index);
+				status = yed_decode_string(varname, cur_subs_used, subsarray, value);
 				break;
 			case JSON_INTEGER:	/* integer */
-				status = yed_decode_integer(varname, cur_subs_used, subsarray,
-						value, decode_type, decode_svn_index);
+				status = yed_decode_integer(varname, cur_subs_used, subsarray, value);
 				break;
 			case JSON_REAL:		/* real */
-				status = yed_decode_real(varname, cur_subs_used, subsarray, value, decode_type, decode_svn_index);
+				status = yed_decode_real(varname, cur_subs_used, subsarray, value);
 				break;
 			case JSON_FALSE:	/* false */
-				status = yed_decode_bool(varname, cur_subs_used, subsarray, decode_type, decode_svn_index, 0);
+				status = yed_decode_bool(varname, cur_subs_used, subsarray, 0);
 				break;
 			case JSON_TRUE:		/* true */
-				status = yed_decode_bool(varname, cur_subs_used, subsarray, decode_type, decode_svn_index, 1);
+				status = yed_decode_bool(varname, cur_subs_used, subsarray, 1);
 				break;
 			default:		/* null */
-				status = yed_decode_bool(varname, cur_subs_used, subsarray, decode_type, decode_svn_index, 2);
+				status = yed_decode_bool(varname, cur_subs_used, subsarray, 2);
 		}
 		if (YDB_OK != status)
 			return status;
@@ -262,31 +264,29 @@ int yed_decode_array(const ydb_buffer_t *varname, int subs_used, ydb_buffer_t *s
 	return YDB_OK;
 }
 
-int yed_decode_string(const ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, json_t *jansson_object,
-			ydb_var_types decode_type, int decode_svn_index)
+int yed_decode_string(const ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, json_t *jansson_object)
 {
 	const char	*value;
 	ydb_buffer_t	value_buffer = {0};
 	char		done;
-	int		status;
+	int		status, string_size;
 
 	value = yed_get_string_value(jansson_object);
 	assert(NULL != value);	/* This function should only be called if jansson_object was previously confirmed to be a string */
-	value_buffer.len_alloc = strlen(value);
-	if (YDB_MAX_STR < value_buffer.len_alloc)
+	value_buffer.len_used = value_buffer.len_alloc = strlen(value);
+	if ((LYDB_VARREF_GLOBAL == decode_type) && zydecode_args)	/* zydecode_args is > 0 if called by op_zydecode() */
+		string_size = dglvnp->gblp[0]->s_gv_cur_region->max_rec_size;
+	else
+		string_size = YDB_MAX_STR;
+	if (string_size < value_buffer.len_alloc++)	/* add 1 post-conditionally for the NUL */
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,
-			LEN_AND_LIT("Size for string value is > YDB_MAX_STR in JSON input"),
+			LEN_AND_LIT("Size for string value is > max string size in JSON input"),
 			LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_DECODE)));
-	value_buffer.buf_addr = system_malloc(value_buffer.len_alloc);
-	YDB_COPY_STRING_TO_BUFFER(value, &value_buffer, done);
-	assert(TRUE == done);
-	status = ydb_set_s(varname, subs_used, subsarray, &value_buffer);
-	system_free(value_buffer.buf_addr);
-	return status;
+	value_buffer.buf_addr = (char *)value;
+	return ydb_set_s(varname, subs_used, subsarray, &value_buffer);
 }
 
-int yed_decode_integer(const ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, json_t *jansson_object,
-			ydb_var_types decode_type, int decode_svn_index)
+int yed_decode_integer(const ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, json_t *jansson_object)
 {
 	long long	value;
 	ydb_buffer_t	value_buffer;
@@ -299,8 +299,7 @@ int yed_decode_integer(const ydb_buffer_t *varname, int subs_used, ydb_buffer_t 
 	return ydb_set_s(varname, subs_used, subsarray, &value_buffer);
 }
 
-int yed_decode_real(const ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, json_t *jansson_object,
-			ydb_var_types decode_type, int decode_svn_index)
+int yed_decode_real(const ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, json_t *jansson_object)
 {
 	double		value;
 	ydb_buffer_t	value_buffer;
@@ -329,8 +328,7 @@ int yed_decode_real(const ydb_buffer_t *varname, int subs_used, ydb_buffer_t *su
  *		1 for true
  *		2 for null
  */
-int yed_decode_bool(const ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray,
-			ydb_var_types decode_type, int decode_svn_index, int bool_type)
+int yed_decode_bool(const ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, int bool_type)
 {
 	ydb_buffer_t	value_buffer;
 

@@ -887,7 +887,7 @@ LITDEF	err_msg merrors[] = {
 	{ "PRIMARYISROOT", "Attempted operation not valid on root primary instance !AD", 2, 0 },
 	{ "GVQUERYGETFAIL", "Global variable QUERY and GET failed.  Failure code: !AD.", 2, 0 },
 	{ "BSIZTOOLARGE", "!AD Block larger than specified maximum size", 2, 2 },
-	{ "MERGEDESC", "Merge operation not possible.  !AD is descendent of !AD.", 4, 0 },
+	{ "MERGEDESC", "MERGE operation not possible. !AD is a descendant of !AD.", 4, 0 },
 	{ "MERGEINCOMPL", "Error encountered during MERGE; operation may be incomplete", 0, 0 },
 	{ "DBNAMEMISMATCH", "Database file !AD points to shared memory (id = !UL) which in turn points to an inaccessible database file !AZ", 4, 0 },
 	{ "DBIDMISMATCH", "Database file !AZ (region !AD) id does not match file id in shared memory (id = !UL).", 4, 0 },

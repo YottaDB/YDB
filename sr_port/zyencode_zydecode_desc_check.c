@@ -1,9 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
- * Services, Inc. and/or its subsidiaries. All rights reserved.	*
- *								*
- * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -15,41 +12,27 @@
 
 #include "mdef.h"
 
-#include "gtm_string.h"
-#include "min_max.h"
 #include "gdsroot.h"
-#include "gdskill.h"
 #include "gtm_facility.h"
-#include "fileinfo.h"
 #include "gdsbt.h"
 #include "gdsfhead.h"
-#include "zshow.h"
 #include "zwrite.h"
-#include "filestruct.h"
-#include "gdscc.h"
-#include "copy.h"
-#include "jnl.h"
-#include "buddy_list.h"
-#include "tp.h"
-#include "merge_def.h"
-#include "gvname_info.h"
-#include "op_merge.h"
+#include "zyencode_zydecode_def.h"
+#include "op_zyencode_zydecode.h"
 #include "format_targ_key.h"
-#include "mvalconv.h"
 #include "gvcst_protos.h"	/* needed by OPEN_BASEREG_IF_STATSREG */
 
-GBLREF int              merge_args;
-GBLREF merge_glvn_ptr	mglvnp;
+GBLREF int			zydecode_args;
+GBLREF int			zyencode_args;
+GBLREF zydecode_glvn_ptr	dglvnp;
+GBLREF zyencode_glvn_ptr	eglvnp;
 
-error_def(ERR_MERGEDESC);
-
-/* returns 1 if no descendant issues found;
- * returns 0 if src and dst keys of merge are identical (i.e. NOOP - merge self);
- * issues MERGEDESC error otherwise.
+/* Returns if no descendant issues found,
+ * or issues ERR_ZYENCODEDESC or ERR_ZYDECODEDESC error otherwise.
  */
-boolean_t merge_desc_check(void)
+void zyencode_zydecode_desc_check(int desc_error)
 {
-	boolean_t		intersect, *is_reg_in_array, mergereg_array[256];
+	boolean_t		intersect, *is_reg_in_array, reg_array[256];
 	char			*base;
 	enum db_acc_method	acc_meth1, acc_meth2;
 	gd_addr			*addr;
@@ -60,32 +43,32 @@ boolean_t merge_desc_check(void)
 	gvname_info		*gblp1, *gblp2;
 	gvnh_reg_t		*gvnh_reg1, *gvnh_reg2;
 	lvname_info		lvn_info;
-	int			dollardata_src, max_fid_index;
+	int			max_fid_index, args;
 	lv_val			*dst, *src;
 	mval			subsc_arr[MAX_LVSUBSCRIPTS];
-	mval			tmp_mval;
 	sgmnt_addrs		*csa;
 	unsigned char		buff1[MAX_ZWR_KEY_SZ], buff2[MAX_ZWR_KEY_SZ], *end1, *end2;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	if (MARG1_IS_GBL(merge_args) && MARG2_IS_GBL(merge_args))
+	args = (ERR_ZYENCODEDESC == desc_error) ? zyencode_args : zydecode_args;
+	if (ARG1_IS_GBL(args) && ARG2_IS_GBL(args))
 	{
-		gblp1 = mglvnp->gblp[IND1];
-		gblp2 = mglvnp->gblp[IND2];
-		/* Check if one global name is a descent of the other. If not, we know for sure there is no issue.
+		gblp1 = (ERR_ZYENCODEDESC == desc_error) ? eglvnp->gblp[IND1] : dglvnp->gblp[IND1];
+		gblp2 = (ERR_ZYENCODEDESC == desc_error) ? eglvnp->gblp[IND2] : dglvnp->gblp[IND2];
+		/* Check if one global name is a descendant of the other. If not, we know for sure there is no issue.
 		 * If yes, further check if the database files involved in the source and target global are identical/intersect.
 		 * If either of the globals span multiple regions, we need to check if the database files that the subscripted
-		 * global reference (involved in the merge command) span across intersect in the source and destination globals.
-		 * If intersection found issue MERGEDESC error. If not (e.g. two globals have same name but belong to different
-		 * gld/db) no error needed.
+		 * global reference (involved in the command) span across intersect in the source and destination globals.
+		 * If intersection found issue ERR_ZYENCODEDESC or ERR_ZYDECODEDESC error. If not (e.g. two globals have same
+		 * name but belong to different gld/db) no error needed.
 		 */
 		gvkey1 = gblp1->s_gv_currkey;
 		gvkey2 = gblp2->s_gv_currkey;
 		if (0 != memcmp(gvkey1->base, gvkey2->base, MIN(gvkey1->end, gvkey2->end)))
-			return 1;
+			return;
 		if (gblp1->s_gd_targ_addr != gblp2->s_gd_targ_addr)
-		{	/* both globals involved in the merge correspond to different gld.
+		{	/* both globals involved in the command correspond to different gld.
 			 * check if corresponding db files intersect.
 			 */
 			reg1 = gblp1->s_gv_cur_region;
@@ -113,9 +96,9 @@ boolean_t merge_desc_check(void)
 				{	/* One global spans multiple regions, while another is remote. They cannot intersect
 					 * as a global can never span to remote regions (i.e. no dba_cm).
 					 */
-					return 1;
+					return;
 				}
-				/* The merge command is MERGE ^gvn1(subs1)=^gvn2(subs2) where "subs1" and "subs2" are
+				/* The command is ZYENCODE/ZYDECODE ^gvn1(subs1)=^gvn2(subs2) where "subs1" and "subs2" are
 				 * a comma-separated list of one or more subscripts. Find out regions spanned by
 				 * ^gvn1(subs1) as well as ^gvn2(subs2) and check for intersections in these two lists.
 				 */
@@ -157,12 +140,12 @@ boolean_t merge_desc_check(void)
 					if (!reg->open)
 						gv_init_reg(reg);
 				}
-				/* At this point, all regions involved in the merge ^gvn1(subs1)=^gvn2(subs2) are open
-				 * so we can use max_fid_index without issues.
+				/* At this point, all regions involved in the zyencode/zydecode ^gvn1(subs1)=^gvn2(subs2)
+				 * are open so we can use max_fid_index without issues.
 				 */
 				max_fid_index = TREF(max_fid_index);
-				if (max_fid_index < ARRAYSIZE(mergereg_array))
-					is_reg_in_array = &mergereg_array[0];
+				if (max_fid_index < ARRAYSIZE(reg_array))
+					is_reg_in_array = &reg_array[0];
 				else
 					is_reg_in_array = (boolean_t *)malloc(SIZEOF(boolean_t) * (max_fid_index + 1));
 				memset(is_reg_in_array, 0, SIZEOF(boolean_t) * (max_fid_index + 1));
@@ -187,10 +170,10 @@ boolean_t merge_desc_check(void)
 						break;
 					}
 				}
-				if (is_reg_in_array != &mergereg_array[0])
+				if (is_reg_in_array != &reg_array[0])
 					free(is_reg_in_array);
 				if (!intersect)
-					return 1;
+					return;
 			} else
 			{	/* Both globals map only to one region (no spanning).
 				 * if (!(both are bg/mm regions && dbs are same) &&
@@ -206,44 +189,42 @@ boolean_t merge_desc_check(void)
 						&& (reg1->cmx_regnum == reg2->cmx_regnum)))
 				{
 					UNIX_ONLY(assert((dba_usr != acc_meth1) && (dba_usr != acc_meth2));)
-					return 1;
+					return;
 				}
 			}
-		} else if (gvkey1->end == gvkey2->end)
-			return 0; /* NOOP - merge self */
+		}
 		/* Else glds are identical and global names are identical and one is a descendant of other.
-		 * So need to issue MERGEDESC error for sure (does not matter whether global spans regions
-		 * or not, does not matter if region is remote or not etc.). No other checks necessary.
+		 * So need to issue ERR_ZYENCODEDESC or ERR_ZYDECODEDESC error for sure (does not matter whether global
+		 * spans regions or not, does not matter if region is remote or not etc.). No other checks necessary.
 		 */
 		if (0 == (end1 = format_targ_key(buff1, MAX_ZWR_KEY_SZ, gvkey1, TRUE)))
 			end1 = &buff1[MAX_ZWR_KEY_SZ - 1];
 		if (0 == (end2 = format_targ_key(buff2, MAX_ZWR_KEY_SZ, gvkey2, TRUE)))
 			end2 = &buff2[MAX_ZWR_KEY_SZ - 1];
-		if (gvkey1->end > gvkey2->end)
-			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_MERGEDESC, 4, end1 - buff1, buff1, end2 - buff2, buff2);
+		if (ERR_ZYENCODEDESC == desc_error)
+			zyencode_args = 0;	/* Must reset to zero to reuse zyencode */
 		else
-			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_MERGEDESC, 4, end2 - buff2, buff2, end1 - buff1, buff1);
-	} else if (MARG1_IS_LCL(merge_args) && MARG2_IS_LCL(merge_args))
+			zydecode_args = 0;	/* Must reset to zero to reuse zydecode */
+		if (gvkey1->end > gvkey2->end)
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) desc_error, 4, end1 - buff1, buff1, end2 - buff2, buff2);
+		else
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) desc_error, 4, end2 - buff2, buff2, end1 - buff1, buff1);
+	} else if (ARG1_IS_LCL(args) && ARG2_IS_LCL(args))
 	{
-		dst = mglvnp->lclp[IND1];
-		src = mglvnp->lclp[IND2];
-		if ((dst == src) || (NULL == src))
-		{	/* NOOP - merge self OR empty subscripted source */
-			UNDO_ACTIVE_LV(actlv_merge_desc_check1); /* kill "dst" and parents as applicable if $data(dst)=0 */
-			return 0;
-		}
-		if (lcl_arg1_is_desc_of_arg2(dst, src))
+		dst = (ERR_ZYENCODEDESC == desc_error) ? eglvnp->lclp[IND1] : dglvnp->lclp[IND1];
+		src = (ERR_ZYENCODEDESC == desc_error) ? eglvnp->lclp[IND2] : dglvnp->lclp[IND2];
+		if ((dst == src) || lcl_arg1_is_desc_of_arg2(dst, src))
 		{
 			BUILD_FORMAT_KEY_MVALS(dst, subsc_arr, &lvn_info);
 			end1 = format_key_mvals(buff1, SIZEOF(buff1), &lvn_info);
-			UNDO_ACTIVE_LV(actlv_merge_desc_check2); /* kill "dst" and parents as applicable if $data(dst)=0 */
-			op_fndata(src, &tmp_mval);
-			dollardata_src = MV_FORCE_INTD(&tmp_mval);
-			if (0 == dollardata_src)
-				return 0; /* NOOP - merge x(subs)=x, but x is undefined */
 			BUILD_FORMAT_KEY_MVALS(src, subsc_arr, &lvn_info);
 			end2 = format_key_mvals(buff2, SIZEOF(buff2), &lvn_info);
-			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_MERGEDESC, 4, end1 - buff1, buff1, end2 - buff2, buff2);
+			UNDO_ACTIVE_LV(actlv_zyen_zyde_desc_check2); /* kill "dst" and parents as applicable if $data(dst)=0 */
+			if (ERR_ZYENCODEDESC == desc_error)
+				zyencode_args = 0;	/* Must reset to zero to reuse zyencode */
+			else
+				zydecode_args = 0;	/* Must reset to zero to reuse zydecode */
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) desc_error, 4, end1 - buff1, buff1, end2 - buff2, buff2);
 		}
 		if (lcl_arg1_is_desc_of_arg2(src, dst))
 		{
@@ -252,18 +233,12 @@ boolean_t merge_desc_check(void)
 			end1 = format_key_mvals(buff1, SIZEOF(buff1), &lvn_info);
 			BUILD_FORMAT_KEY_MVALS(src, subsc_arr, &lvn_info);
 			end2 = format_key_mvals(buff2, SIZEOF(buff2), &lvn_info);
-			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_MERGEDESC, 4, end2 - buff2, buff2, end1 - buff1, buff1);
-		}
-		if (LV_IS_BASE_VAR(src))
-		{	/* source is unsubscripted. check if source is empty */
-			op_fndata(src, &tmp_mval);
-			dollardata_src = MV_FORCE_INTD(&tmp_mval);
-			if (0 == dollardata_src)
-			{	/* NOOP - merge with empty unsubscripted source local variable */
-				UNDO_ACTIVE_LV(actlv_merge_desc_check3); /* kill "dst" and parents as applicable if $data(dst)=0 */
-				return 0;
-			}
+			if (ERR_ZYENCODEDESC == desc_error)
+				zyencode_args = 0;	/* Must reset to zero to reuse zyencode */
+			else
+				zydecode_args = 0;	/* Must reset to zero to reuse zydecode */
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) desc_error, 4, end2 - buff2, buff2, end1 - buff1, buff1);
 		}
 	}
-	return 1;
+	return;
 }

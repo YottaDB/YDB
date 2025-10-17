@@ -131,6 +131,9 @@ GBLREF	volatile boolean_t	dollar_zininterrupt;
 GBLREF	volatile int4		gtmMallocDepth, outofband;
 GBLREF	xfer_entry_t		xfer_table[];
 GBLREF	unsigned short		lks_this_cmd;		/* Locks in the current command */
+GBLREF	int			zydecode_args;
+GBLREF	int			zyencode_args;
+GBLREF	ydb_buffer_t		zyencode_ret;
 #ifdef DEBUG
 GBLREF	boolean_t		donot_INVOKE_MUMTSTART;
 #endif
@@ -303,6 +306,13 @@ CONDITION_HANDLER(mdb_condition_handler)
 	 * easy to establish a condition handler there. Easy solution is following one line code.
 	 */
 	NULLIFY_MERGE_ZWRITE_CONTEXT;
+	/* op_zydecode() and op_zyencode() clear these, but errors can happen in deeper non-SimpleAPI calls
+	 * that can can't be cleared normally, so we clear them here, and free the buffer if necessary.
+	 */
+	zydecode_args = zyencode_args = 0;
+	system_free(zyencode_ret.buf_addr);	/* Created by Jansson in ydb_encode_s() */
+	zyencode_ret.buf_addr = NULL;
+	zyencode_ret.len_alloc = zyencode_ret.len_used = 0;
 	/* If a function like "dm_read" is erroring out after having done a "iott_setterm", but before doing the "iott_resetterm"
 	 * do that cleanup here. There are a few exceptions. The only one currently is a job interrupt in which case
 	 * it is possible we are in direct mode read or a READ command that was interrupted by the job interrupt. In that

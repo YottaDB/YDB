@@ -108,6 +108,8 @@ LITDEF nametabent cmd_names[] =
 	,{7, "ZTSTART"}
 	,{9, "ZWITHDRAW"}
 	,{6, "ZWRITE"}
+	,{4, "ZYDE"}, {8, "ZYDECODE"}
+	,{4, "ZYEN"}, {8, "ZYENCODE"}
 };
 /*
  * cmd_index is an array indexed by the first alphabet of the command-name
@@ -115,7 +117,7 @@ LITDEF nametabent cmd_names[] =
  * The cmd_index[n] holds the index of the first element in cmd_names
  * 	whose command-name begins with the same 'n'th letter of the alphabet - A is 1st letter but in C terms get the 0 index.
  * if there are no cmds_starting with the letter the index does not change
- * 	e.g. with no cmd starting with 'A' cmd0] and cmd[1] both have values of 0
+ * 	e.g. with no cmd starting with 'A' cmd[0] and cmd[1] both have values of 0
  * Example:
  * Say, [B]REAK is the command.
  * 'B'-'A' = 1. and cmd_index[1] = 0, and cmd_index[1+1]=2, so names for BREAK are within cmd_names[0] and cmd_names[1]
@@ -132,7 +134,7 @@ LITDEF unsigned char cmd_index[27] =
 {
 	 0,  0,  2,  4,  6,  8, 10, 12, 15,	/* a b c d e f g h i */
 	17, 19, 21, 23 ,25, 27, 29, 29, 31,	/* j k l m n o p q r */
-	33, 35, 43, 45, 47, 49 ,51, 51, 76	/* s t u v w x y z ~ */
+	33, 35, 43, 45, 47, 49 ,51, 51, 80	/* s t u v w x y z ~ */
 	GTMTRIG_ONLY(+ 1) ARLINK_ONLY(+ 1)	/* add ztrigger and zrupdate, respectively */
 };
 LITDEF struct
@@ -201,6 +203,8 @@ LITDEF struct
 	,{m_ztstart, 1, 1, ALL_SYS}
 	,{m_zwithdraw, 0, 1, ALL_SYS}
 	,{m_zwrite, 1, 1, ALL_SYS}
+	,{m_zydecode, 0, 1, ALL_SYS}, {m_zydecode, 0, 1, ALL_SYS}
+	,{m_zyencode, 0, 1, ALL_SYS}, {m_zyencode, 0, 1, ALL_SYS}
 };
 
 int cmd(void)
