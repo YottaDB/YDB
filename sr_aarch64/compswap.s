@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 # Copyright (c) 2018 Stephen L Johnson. All rights reserved.	#
@@ -33,12 +33,12 @@
  */
 
 ENTRY compswap_lock
+trylock_loop:
 	ldxr	w3, [x0]		/* get latch value */
 	cmp	w3, w1
 	b.ne	nomatch
 	stlxr	w3, w2, [x0]		/* only do swap if latch value matches comparison value */
-	cmp	w3, #1
-	b.eq	notset			/* store-exclusive failed */
+	cbnz	w3, trylock_loop
 	dmb	ish			/* ensures that all subsequent accesses are observed (by a concurrent process)
 					 * AFTER the gaining of the lock is observed.
 					 */
@@ -47,7 +47,6 @@ ENTRY compswap_lock
 	ret
 nomatch:
 	clrex				/* reset exclusive status */
-notset:
 	mov	x0, xzr			/* return failure */
 	cmp	x0, xzr
 	ret
