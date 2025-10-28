@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2020-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2020-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *                                                              *
  *      This source code contains the intellectual property     *
@@ -54,13 +54,15 @@ void	bool_init(void)
 	/* Assert that current boolexpr nesting depth is not too much. This was useful to have in the early stages of
 	 * development when due to a bug, the nesting depth was getting bumped up uncontrollably. Having an alert about
 	 * the depth when it goes to a high value would have caught that bug. Hence this check in debug code.
-	 * 4 is considered a good enough max depth by default.
+	 * 4 was initially the chosen value, but we found that VistA needed up to 8 nested expressions.
+	 * To be safe, set the minimum to 16.
+	 *
 	 * There are some tests in the YDBTest repo that encounter errors in boolean expressions and continue on to executing
 	 * more such cases before returning from that M frame so those need a higher depth. They set an env var accordingly
-	 * so check that dbg-only env var if it is set. If not use 4.
+	 * so check that dbg-only env var if it is set. If not, use 16.
 	 */
 	ydb_max_boolexpr_nesting_depth = getenv("ydb_max_boolexpr_nesting_depth");
-	max_boolexpr_nesting_depth = (NULL != ydb_max_boolexpr_nesting_depth) ? atoi(ydb_max_boolexpr_nesting_depth) : 4;
+	max_boolexpr_nesting_depth = (NULL != ydb_max_boolexpr_nesting_depth) ? atoi(ydb_max_boolexpr_nesting_depth) : 16;
 	assert(max_boolexpr_nesting_depth > boolZysqlnull->boolexpr_nesting_depth);
 #	endif
 	boolZysqlnull->frame_pointer = frame_pointer;
