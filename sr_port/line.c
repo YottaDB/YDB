@@ -61,6 +61,7 @@ boolean_t line(uint4 *lnc)
 	parmbase = NULL;
 	success = TRUE;
 	curlin = (mline *)mcalloc(SIZEOF(*curlin));
+	added_ret = NULL;
 	curlin->line_number = *lnc;
 	*lnc = *lnc + 1;
 	curlin->table = TRUE;
@@ -125,11 +126,11 @@ boolean_t line(uint4 *lnc)
 					added_ret = (mline *)mcalloc(SIZEOF(*added_ret));
 					added_ret->externalentry = first_triple;
 					added_ret->table = FALSE;
-					added_ret->line_number = *lnc;
+					added_ret->line_number = curlin->line_number;
 					added_ret->block_ok = FALSE;
 					added_ret->parent = &mline_root;
-					added_ret->child = added_ret->sibling = NULL;
-					mline_tail = added_ret;
+					added_ret->child = NULL;
+					added_ret->sibling = curlin;
 				}
 				e = maketriple(OC_RTERROR);
 				e->operand[0] = put_ilit(ERR_FALLINTOFLST);
@@ -219,7 +220,7 @@ boolean_t line(uint4 *lnc)
 		}
 		if ((NULL != parmbase) && dot_count)
 		{
-			dot_count = TREF(block_level);
+			dot_count = 0;
 			stx_error(ERR_NESTFORMP);	/* Should be warning */
 			success = FALSE;
 		}
@@ -238,6 +239,7 @@ boolean_t line(uint4 *lnc)
 	}
 	if ((TREF(block_level) < dot_count) || (mline_tail == &mline_root))
 	{
+		assert(NULL == added_ret);
 		mline_tail->child = curlin;
 		curlin->parent = mline_tail;
 		TREF(block_level) = dot_count;
@@ -246,8 +248,14 @@ boolean_t line(uint4 *lnc)
 		for (; dot_count < TREF(block_level); (TREF(block_level))--)
 			if (NULL != mline_tail->parent)
 				mline_tail = mline_tail->parent;
-		mline_tail->sibling = curlin;
 		curlin->parent = mline_tail->parent;
+		if (NULL == added_ret)
+			mline_tail->sibling = curlin;
+		else
+		{
+			mline_tail->sibling = added_ret;
+			assert(mline_tail->parent == added_ret->parent); /* Siblings should have the same parent. */
+		}
 	}
 	mline_tail = curlin;
 	if (success)
