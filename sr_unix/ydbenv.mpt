@@ -799,7 +799,7 @@ Defaults
 	; gtmver:::env(ydbvar)#/g#/o#/o/utf8#/r:"ln -s "_env(ydbvar)_" "_env(gtmvar):$zpiece($zversion," ",2)_"_"_$zpiece($zversion," ",4)
 
 ;	Error message texts
-U237	;"-F-CREATEFAIL unable to create directory "_dir
+U237	;"-F-CREATEFAIL unable to create directory "_dir_" with error code "_$zclose
 U238	;"-F-GLDCREATEERR Create global directory failed, stderr at ",err
 U239	;"-F-NOTAPATH Path "_file_" does not exist"
 U240	;"-F-NOTAGLDFILE "_file_ " is not a global directory file"
