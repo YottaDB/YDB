@@ -170,12 +170,15 @@ typedef enum
 
 typedef struct
 {
-	mutex_type_t		curr_mutex_type;	/* can be "mutex_type_ydb" or "mutex_type_pthread".
-							 * Initial value is "mutex_type_ydb".
+	mutex_type_t		curr_mutex_type;	/* can be "mutex_type_ydb", "mutex_type_pthread",
+							 *   "mutex_type_adaptive_ydb", or "mutex_type_adaptive_pthread".
+							 * Initial value is copied over from the file header
+							 * (i.e. "cs_data->mutex_type") if caller is db_init() etc.
+							 * and set to "mutex_type_ydb" if caller is jnlpool_init().
 							 */
 	CACHELINE_PAD(SIZEOF(mutex_type_t), 1);
 	/* ------------- The below is used by BOTH the ydb mutex AND pthread mutex logic ---------- */
-	uint4			crit_cycle;			/* used by both ydb mutex AND pthread mutex logic */
+	uint4			crit_cycle;
 	CACHELINE_PAD(SIZEOF(uint4), 2);
 	/* ------------- The below is only used by the pthread mutex logic ---------- */
 	pthread_mutex_t		mutex;

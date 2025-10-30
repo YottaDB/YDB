@@ -370,7 +370,7 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 		}
 		need_standalone = TRUE;
 	}
-	if ((mutex_type_status = cli_present("MUTEX_TYPE")))
+	if ((mutex_type_status = cli_present("MUTEX_TYPE")))	/* NOTE: assignment */
 	{
 		if (cli_present("MUTEX_TYPE.ADAPTIVE"))
 			new_mutex_type = mutex_type_adaptive_ydb;
@@ -1075,9 +1075,7 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 							assert(process_id == addr->semaphore.u.parts.latch_pid);
 							RELEASE_SWAPLOCK(&addr->semaphore);
 							assert(0 == addr->semaphore.u.parts.latch_pid);
-						}
-						if (!IS_MUTEX_TYPE_YDB(new_mutex_type))
-						{	/* Wake up all processes in msem wait queue
+							/* Wake up all processes in msem wait queue
 							 * so they can switch to pthread mutex.
 							 */
 							for ( ; 0 != addr->prochead.que.fl; )

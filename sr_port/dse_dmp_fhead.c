@@ -265,14 +265,19 @@ void dse_dmp_fhead (void)
 		util_out_print("  Max conc proc time         !22UL", FALSE, csd->max_procs.time);
 		util_out_print("  Max Concurrent processes         !9UL", TRUE, csd->max_procs.cnt);
 		util_out_print("  Reorg Sleep Nanoseconds         !17UL", FALSE, csd->reorg_sleep_nsec);
+		/* Assert that csd->mutex_type (mutex algorithm set by user) can only be 1 of 3 values whereas
+		 * csa->critical->curr_mutex_type (current mutex algorithm) can be 1 of 4 values. When the user
+		 * specifies ADAPTIVE, it is stored in the file header as mutex_type_adaptive_ydb so a value of
+		 * mutex_type_adaptive_pthread is never possible in the file header whereas it is in csa->critical.
+		 */
 		assert(mutex_type_adaptive_pthread != csd->mutex_type);
 		assert((mutex_type_adaptive_ydb == csd->mutex_type)
 			|| (mutex_type_pthread == csd->mutex_type) || (mutex_type_ydb == csd->mutex_type));
 		curr_mutex_type = csa->critical->curr_mutex_type;
-		assert((mutex_type_adaptive_ydb != csd->mutex_type) || (mutex_type_adaptive_ydb == curr_mutex_type));
-		assert((mutex_type_adaptive_pthread != csd->mutex_type) || (mutex_type_adaptive_pthread == curr_mutex_type));
+		assert((mutex_type_ydb != csd->mutex_type) || (mutex_type_ydb == curr_mutex_type));
+		assert((mutex_type_pthread != csd->mutex_type) || (mutex_type_pthread == curr_mutex_type));
 		assert((mutex_type_adaptive_ydb != csd->mutex_type)
-			|| (mutex_type_adaptive_ydb == curr_mutex_type) ||(mutex_type_adaptive_pthread == curr_mutex_type));
+			|| (mutex_type_adaptive_ydb == curr_mutex_type) || (mutex_type_adaptive_pthread == curr_mutex_type));
 		util_out_print("  Mutex Manager Type      !AZ", TRUE,
 				((mutex_type_adaptive_ydb == curr_mutex_type)
 					? "    ADAPTIVE (YDB)"

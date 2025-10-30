@@ -399,7 +399,7 @@ static	enum cdb_sc mutex_long_sleep(mutex_struct_ptr_t addr, sgmnt_addrs *csa, m
 			 * the check for EINTR below is valid and should not be converted to an EINTR
 			 * wrapper macro, because another condition is checked for the while loop.
 			 */
-			while (0 != (wakeup_status = sem_timedwait(&free_slot->mutex_wake_msem, &abs_time)))
+			while (0 != (wakeup_status = sem_timedwait(&free_slot->mutex_wake_msem, &abs_time))) /* NOTE: Assignment */
 			{
 				save_errno = errno;
 				if (ETIMEDOUT == save_errno)	/* semaphore lock attempt timed out */
