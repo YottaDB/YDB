@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -116,7 +116,10 @@ void send_msg_va(void *csa, int arg_count, va_list var)
 		assert((EXIT_IMMED == exit_state) || in_fake_enospc);
 		return;
 	}
-	/* Like in rts_error_csa() do some checking we aren't nesting too deep due to error loop */
+	PTHREAD_MUTEX_LOCK_IF_NEEDED(was_holder); /* get thread lock in case threads are in use */
+	/* Like in rts_error_csa() do some checking we aren't nesting too deep due to error loop.
+	 * But do it only after getting the thread lock as we are manipulating global variables here.
+	 */
 	if (MAX_RTS_ERROR_DEPTH < ++(TREF(rts_error_depth)))
 	{	/* Too many errors nesting - stop it here - fatally. What we do is the following:
 		 *   1. Put a message in syslog (not using send_msg_csa()) about what happened.
@@ -141,7 +144,6 @@ void send_msg_va(void *csa, int arg_count, va_list var)
 			ydb_dmp_tracetbl();
 		DUMP_CORE;			/* Terminate *THIS* thread/process and produce a core */
 	}
-	PTHREAD_MUTEX_LOCK_IF_NEEDED(was_holder); /* get thread lock in case threads are in use */
 	/* Since send_msg uses a global variable buffer, reentrant calls to send_msg will use the same buffer.
 	 * Ensure we never overwrite an under-construction send_msg buffer with a nested send_msg call. One
 	 * exception to this is if the nested call to send_msg is done by exit handling code in which case the
@@ -199,6 +201,6 @@ void send_msg_va(void *csa, int arg_count, va_list var)
          */
 	DEBUG_ONLY(nesting_level--);
 	FREEZE_INSTANCE_IF_NEEDED(csa, freeze_needed, freeze_msg_id, local_jnlpool);
+	--(TREF(rts_error_depth));			/* All done, remove our bump. But do it before releasing the thread lock */
 	PTHREAD_MUTEX_UNLOCK_IF_NEEDED(was_holder);	/* release exclusive thread lock if needed */
-	--(TREF(rts_error_depth));			/* All done, remove our bump */
 }
