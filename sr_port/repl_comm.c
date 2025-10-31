@@ -158,6 +158,7 @@ int fd_ioready(int sock_fd, int poll_direction, int timeout)
 
 	assert((timeout >= 0) && (timeout < MILLISECS_IN_SEC));
 	fds.fd = sock_fd;
+	assert((REPL_POLLIN == poll_direction) || (REPL_POLLOUT == poll_direction));
 	fds.events = (REPL_POLLIN == poll_direction) ? POLLIN : POLLOUT;
 	while (-1 == (status = poll(&fds, 1, timeout)))
 	{
@@ -196,7 +197,15 @@ int fd_ioready(int sock_fd, int poll_direction, int timeout)
 		}
 	}
 	if (-1 != status)
+	{
 		HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
+		if ((0 < status)
+			&& (((REPL_POLLIN == poll_direction) && !(POLLIN & fds.revents))
+				|| ((REPL_POLLOUT == poll_direction) && !(POLLOUT & fds.revents))))
+		{
+			status = 0;
+		}
+	}
 	return status;
 }
 
