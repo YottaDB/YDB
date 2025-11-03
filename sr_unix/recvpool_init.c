@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -74,17 +74,29 @@ error_def(ERR_SYSCALL);
 
 #define MAX_RES_TRIES		620 		/* Also defined in gvcst_init_sysops.c */
 
-#define REMOVE_OR_RELEASE_SEM(NEW_IPC)									\
+#define REMOVE_OR_RELEASE_SEM(NEW_SEMID)									\
 {														\
-	if (NEW_IPC)												\
+	if (NEW_SEMID)												\
 		remove_sem_set(RECV);										\
 	else													\
 		rel_sem_immediate(RECV, RECV_POOL_ACCESS_SEM);							\
 }
 
+#define	DETACH_AND_REMOVE_SHM(RECVPOOL, NEW_SHMID, UDI)							\
+{													\
+	SHMDT(RECVPOOL.recvpool_ctl);	/* ignore errors as it is a secondary error */			\
+	RECVPOOL.recvpool_ctl = NULL;									\
+	if (NEW_SHMID)											\
+	{												\
+		if (0 != shm_rmid(UDI->shmid))								\
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_RECVPOOLSETUP, 0,			\
+				ERR_TEXT, 2, RTS_ERROR_LITERAL("Error removing recvpool "), errno);	\
+	}												\
+}
+
 void recvpool_init(recvpool_user pool_user, boolean_t gtmrecv_startup)
 {
-	boolean_t	shm_created, new_ipc = FALSE, ftok_counter_halted;
+	boolean_t	shm_created, ftok_counter_halted;
 	char		instfilename[MAX_FN_LEN + 1];
         char           	machine_name[MAX_MCNAMELEN];
 	char		scndry_msg[OUT_BUFF_SIZE];
@@ -101,6 +113,7 @@ void recvpool_init(recvpool_user pool_user, boolean_t gtmrecv_startup)
 	jnlpool_addrs_ptr_t	tmp_jnlpool, save_jnlpool;
 	pthread_mutexattr_t	write_updated_ctl_attr;
 	pthread_condattr_t	write_updated_attr;
+	boolean_t		new_shmid, new_semid;
 	DEBUG_ONLY(int4	semval;)
 
         memset(machine_name, 0, SIZEOF(machine_name));
@@ -171,6 +184,7 @@ void recvpool_init(recvpool_user pool_user, boolean_t gtmrecv_startup)
 	udi->counter_ftok_incremented = udi->counter_ftok_incremented && (INVALID_SHMID == repl_instance.jnlpool_shmid);
 	if (INVALID_SEMID == repl_instance.recvpool_semid)
 	{
+		new_semid = TRUE;	/* need to create new sem for recvpool */
 		assertpro(INVALID_SHMID == repl_instance.recvpool_shmid);
 		if (GTMRECV != pool_user || !gtmrecv_startup)
 		{
@@ -178,7 +192,6 @@ void recvpool_init(recvpool_user pool_user, boolean_t gtmrecv_startup)
 			jnlpool = save_jnlpool;
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_NORECVPOOL, 2, full_len, udi->fn);
 		}
-		new_ipc = TRUE;
 		assert((int)NUM_SRC_SEMS == (int)NUM_RECV_SEMS);
 		if (INVALID_SEMID == (udi->semid = init_sem_set_recvr(IPC_PRIVATE, NUM_RECV_SEMS, RWDALL | IPC_CREAT)))
 		{
@@ -217,7 +230,9 @@ void recvpool_init(recvpool_user pool_user, boolean_t gtmrecv_startup)
 		}
 		udi->gt_sem_ctime = semarg.buf->sem_ctime;
 	} else
-	{	/* find create time of semaphore from the file header and check if the id is reused by others */
+	{
+		new_semid = FALSE;	/* no need to create new sem for recvpool as one already exists */
+		/* find create time of semaphore from the file header and check if the id is reused by others */
 		semarg.buf = &semstat;
 		if (-1 == semctl(repl_instance.recvpool_semid, DB_CONTROL_SEM, IPC_STAT, semarg))
 		{
@@ -248,6 +263,8 @@ void recvpool_init(recvpool_user pool_user, boolean_t gtmrecv_startup)
 	if (SS_NORMAL != status)
 	{
 		save_errno = errno;
+		if (new_semid)
+			remove_sem_set(RECV);
 		ftok_sem_release(recvpool.recvpool_dummy_reg, udi->counter_ftok_incremented, TRUE);
 		jnlpool = save_jnlpool;
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
@@ -280,42 +297,44 @@ void recvpool_init(recvpool_user pool_user, boolean_t gtmrecv_startup)
 		assert(!repl_instance.file_corrupt);
 		/* Ensure that NO one has yet incremented the RECV_SERV_COUNT_SEM (as implied by all the 3 cases above) */
 		assert(0 == (semval = semctl(udi->semid, RECV_SERV_COUNT_SEM, GETVAL))); /* semval = number of processes attached */
-		new_ipc = TRUE; /* need to create a new IPC */
+		new_shmid = TRUE; /* need to create new shared memory for recvpool */
 	} else if (-1 == shmctl(repl_instance.recvpool_shmid, IPC_STAT, &shmstat))
 	{	/* shared memory ID was removed form the system by an IPCRM command or we have a permission issue (or such) */
 		save_errno = errno;
-		REMOVE_OR_RELEASE_SEM(new_ipc);
+		REMOVE_OR_RELEASE_SEM(new_semid);
 		ftok_sem_release(recvpool.recvpool_dummy_reg, udi->counter_ftok_incremented, TRUE);
 		jnlpool = save_jnlpool;
 		SNPRINTF(scndry_msg, OUT_BUFF_SIZE, "Error with shmctl on Receive Pool SHMID (%d)", repl_instance.recvpool_shmid);
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(9) ERR_REPLREQROLLBACK, 2, full_len, udi->fn,
 			ERR_TEXT, 2, LEN_AND_STR(scndry_msg), save_errno);
+		assert(FALSE);	/* we should never reach here and so it is okay to not initialize "new_shmid" in this case */
 	} else if (shmstat.shm_ctime != repl_instance.recvpool_shmid_ctime)
 	{	/* shared memory was possibly reused (causing shm_ctime and jnlpool_shmid_ctime to be different. We can't rely
 		 * on the shmid as it could be connected to a valid instance file in a different environment. Create new IPCs
 		 */
-		new_ipc = TRUE; /* need to create a new IPC */
+		new_shmid = TRUE; /* need to create new shared memory for recvpool */
 	} else
 	{
+		new_shmid = FALSE; /* no need to create new shared memory for recvpool as one already exists */
 		recvpool_shmid = udi->shmid = repl_instance.recvpool_shmid;
 		udi->gt_shm_ctime = repl_instance.recvpool_shmid_ctime;
 	}
-	if (new_ipc && (GTMRECV != pool_user || !gtmrecv_startup))
+	if (new_shmid && (GTMRECV != pool_user || !gtmrecv_startup))
 	{
-		REMOVE_OR_RELEASE_SEM(new_ipc);
+		REMOVE_OR_RELEASE_SEM(new_semid);
 		ftok_sem_release(recvpool.recvpool_dummy_reg, udi->counter_ftok_incremented, TRUE);
 		jnlpool = save_jnlpool;
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_NORECVPOOL, 2, full_len, udi->fn);
 	}
 	shm_created = FALSE;
-	if (new_ipc)
+	if (new_shmid)
 	{	/* create new shared memory */
 		if (-1 == (udi->shmid = recvpool_shmid =
 				gtm_shmget(IPC_PRIVATE, gtmrecv_options.buffsize, IPC_CREAT | RWDALL, TRUE, JOURNAL_POOL, udi->fn)))
 		{
 			udi->shmid = recvpool_shmid = INVALID_SHMID;
 			save_errno = errno;
-			remove_sem_set(RECV);		/* Remove what we created */
+			REMOVE_OR_RELEASE_SEM(new_semid);
 			ftok_sem_release(recvpool.recvpool_dummy_reg, udi->counter_ftok_incremented, TRUE);
 			jnlpool = save_jnlpool;
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
@@ -327,7 +346,7 @@ void recvpool_init(recvpool_user pool_user, boolean_t gtmrecv_startup)
 			if (0 != shm_rmid(udi->shmid))
 				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
 					 RTS_ERROR_LITERAL("Error removing recvpool "), errno);
-			remove_sem_set(RECV);		/* Remove what we created */
+			REMOVE_OR_RELEASE_SEM(new_semid);
 			ftok_sem_release(recvpool.recvpool_dummy_reg, udi->counter_ftok_incremented, TRUE);
 			jnlpool = save_jnlpool;
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
@@ -341,10 +360,13 @@ void recvpool_init(recvpool_user pool_user, boolean_t gtmrecv_startup)
 	if (-1 == status_l)
 	{
 		save_errno = errno;
-		if (new_ipc)
-			remove_sem_set(RECV);
-		else
-			rel_sem_immediate(RECV, RECV_POOL_ACCESS_SEM);
+		if (new_shmid)
+		{
+			if (0 != shm_rmid(udi->shmid))
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
+					 RTS_ERROR_LITERAL("Error removing recvpool "), errno);
+		}
+		REMOVE_OR_RELEASE_SEM(new_semid);
 		udi->grabbed_access_sem = FALSE;
 		udi->counter_acc_incremented = FALSE;
 		ftok_sem_release(recvpool.recvpool_dummy_reg, udi->counter_ftok_incremented, TRUE);
@@ -367,10 +389,8 @@ void recvpool_init(recvpool_user pool_user, boolean_t gtmrecv_startup)
 	{
 		if (GTMRECV != pool_user || !gtmrecv_startup)
 		{
-			if (new_ipc)
-				remove_sem_set(RECV);
-			else
-				rel_sem_immediate(RECV, RECV_POOL_ACCESS_SEM);
+			DETACH_AND_REMOVE_SHM(recvpool, new_shmid, udi);
+			REMOVE_OR_RELEASE_SEM(new_semid);
 			udi->grabbed_access_sem = FALSE;
 			udi->counter_acc_incremented = FALSE;
 			ftok_sem_release(recvpool.recvpool_dummy_reg, udi->counter_ftok_incremented, TRUE);
@@ -397,6 +417,11 @@ void recvpool_init(recvpool_user pool_user, boolean_t gtmrecv_startup)
 		status = pthread_mutexattr_init(&write_updated_ctl_attr);
 		if (0 != status)
 		{
+			DETACH_AND_REMOVE_SHM(recvpool, new_shmid, udi);
+			REMOVE_OR_RELEASE_SEM(new_semid);
+			udi->grabbed_access_sem = FALSE;
+			udi->counter_acc_incremented = FALSE;
+			ftok_sem_release(recvpool.recvpool_dummy_reg, udi->counter_ftok_incremented, TRUE);
 			jnlpool = save_jnlpool;
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5,
 				LEN_AND_LIT("pthread_mutexattr_init"), CALLFROM, status, 0);
@@ -404,12 +429,22 @@ void recvpool_init(recvpool_user pool_user, boolean_t gtmrecv_startup)
 		status = pthread_mutexattr_settype(&write_updated_ctl_attr, PTHREAD_MUTEX_ERRORCHECK);
 		if (0 != status)
 		{
+			DETACH_AND_REMOVE_SHM(recvpool, new_shmid, udi);
+			REMOVE_OR_RELEASE_SEM(new_semid);
+			udi->grabbed_access_sem = FALSE;
+			udi->counter_acc_incremented = FALSE;
+			ftok_sem_release(recvpool.recvpool_dummy_reg, udi->counter_ftok_incremented, TRUE);
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5,
 				LEN_AND_LIT("pthread_mutexattr_settype"), CALLFROM, status, 0);
 		}
 		status = pthread_mutexattr_setpshared(&write_updated_ctl_attr, PTHREAD_PROCESS_SHARED);
 		if (0 != status)
 		{
+			DETACH_AND_REMOVE_SHM(recvpool, new_shmid, udi);
+			REMOVE_OR_RELEASE_SEM(new_semid);
+			udi->grabbed_access_sem = FALSE;
+			udi->counter_acc_incremented = FALSE;
+			ftok_sem_release(recvpool.recvpool_dummy_reg, udi->counter_ftok_incremented, TRUE);
 			jnlpool = save_jnlpool;
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5,
 				LEN_AND_LIT("pthread_mutexattr_setpshared"), CALLFROM, status, 0);
@@ -418,6 +453,11 @@ void recvpool_init(recvpool_user pool_user, boolean_t gtmrecv_startup)
 		status = pthread_mutexattr_setrobust(&write_updated_ctl_attr, PTHREAD_MUTEX_ROBUST);
 		if (0 != status)
 		{
+			DETACH_AND_REMOVE_SHM(recvpool, new_shmid, udi);
+			REMOVE_OR_RELEASE_SEM(new_semid);
+			udi->grabbed_access_sem = FALSE;
+			udi->counter_acc_incremented = FALSE;
+			ftok_sem_release(recvpool.recvpool_dummy_reg, udi->counter_ftok_incremented, TRUE);
 			jnlpool = save_jnlpool;
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5,
 				LEN_AND_LIT("pthread_mutexattr_setrobust"), CALLFROM, status, 0);
@@ -426,6 +466,11 @@ void recvpool_init(recvpool_user pool_user, boolean_t gtmrecv_startup)
 		status = pthread_mutex_init(&recvpool.recvpool_ctl->write_updated_ctl, &write_updated_ctl_attr);
 		if (0 != status)
 		{
+			DETACH_AND_REMOVE_SHM(recvpool, new_shmid, udi);
+			REMOVE_OR_RELEASE_SEM(new_semid);
+			udi->grabbed_access_sem = FALSE;
+			udi->counter_acc_incremented = FALSE;
+			ftok_sem_release(recvpool.recvpool_dummy_reg, udi->counter_ftok_incremented, TRUE);
 			jnlpool = save_jnlpool;
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5,
 				LEN_AND_LIT("pthread_mutex_init"), CALLFROM, status, 0);
@@ -433,6 +478,11 @@ void recvpool_init(recvpool_user pool_user, boolean_t gtmrecv_startup)
 		status = pthread_condattr_init(&write_updated_attr);
 		if (0 != status)
 		{
+			DETACH_AND_REMOVE_SHM(recvpool, new_shmid, udi);
+			REMOVE_OR_RELEASE_SEM(new_semid);
+			udi->grabbed_access_sem = FALSE;
+			udi->counter_acc_incremented = FALSE;
+			ftok_sem_release(recvpool.recvpool_dummy_reg, udi->counter_ftok_incremented, TRUE);
 			jnlpool = save_jnlpool;
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5,
 				LEN_AND_LIT("pthread_condattr_init"), CALLFROM, status, 0);
@@ -440,6 +490,11 @@ void recvpool_init(recvpool_user pool_user, boolean_t gtmrecv_startup)
 		status = pthread_condattr_setpshared(&write_updated_attr, PTHREAD_PROCESS_SHARED);
 		if (0 != status)
 		{
+			DETACH_AND_REMOVE_SHM(recvpool, new_shmid, udi);
+			REMOVE_OR_RELEASE_SEM(new_semid);
+			udi->grabbed_access_sem = FALSE;
+			udi->counter_acc_incremented = FALSE;
+			ftok_sem_release(recvpool.recvpool_dummy_reg, udi->counter_ftok_incremented, TRUE);
 			jnlpool = save_jnlpool;
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5,
 				LEN_AND_LIT("pthread_condattr_setpshared"), CALLFROM, status, 0);
@@ -447,6 +502,11 @@ void recvpool_init(recvpool_user pool_user, boolean_t gtmrecv_startup)
 		status = pthread_cond_init(&recvpool.recvpool_ctl->write_updated, &write_updated_attr);
 		if (0 != status)
 		{
+			DETACH_AND_REMOVE_SHM(recvpool, new_shmid, udi);
+			REMOVE_OR_RELEASE_SEM(new_semid);
+			udi->grabbed_access_sem = FALSE;
+			udi->counter_acc_incremented = FALSE;
+			ftok_sem_release(recvpool.recvpool_dummy_reg, udi->counter_ftok_incremented, TRUE);
 			jnlpool = save_jnlpool;
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5,
 				LEN_AND_LIT("pthread_cond_init"), CALLFROM, status, 0);
@@ -497,7 +557,7 @@ void recvpool_init(recvpool_user pool_user, boolean_t gtmrecv_startup)
 		recvpool.recvpool_ctl->initialized = TRUE;
 		recvpool.recvpool_ctl->fresh_start = TRUE;
 	}
-	if (new_ipc)
+	if (new_semid || new_shmid)
 	{	/* Flush shmid/semid changes to the instance file header if this process created the receive pool.
 		 * Also update the instance file header section in the journal pool with the recvpool sem/shm ids.
 		 * Before updating jnlpool fields, ensure the journal pool lock is grabbed.
@@ -527,6 +587,11 @@ void recvpool_init(recvpool_user pool_user, boolean_t gtmrecv_startup)
 		udi->counter_acc_incremented = FALSE;
 		if (!ftok_sem_release(recvpool.recvpool_dummy_reg, FALSE, FALSE))
 		{
+			/* Note: We do not invoke the DETACH_AND_REMOVE_SHM and/or REMOVE_OR_RELEASE_SEM macros
+			 * (like we usually do in the error code paths above) as we do not hold any locks at this point.
+			 * It is okay to not remove the semid/shmid as those have already been noted down in the
+			 * replication instance file header above.
+			 */
 			jnlpool = save_jnlpool;
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_RECVPOOLSETUP);
 		}
@@ -541,10 +606,11 @@ void recvpool_init(recvpool_user pool_user, boolean_t gtmrecv_startup)
 	if ((GTMRECV == pool_user) && gtmrecv_options.start && (0 != grab_sem(RECV, RECV_SERV_OPTIONS_SEM)))
 	{
 		save_errno = errno;
-		if (new_ipc)
-			remove_sem_set(RECV);
-		else
-			rel_sem_immediate(RECV, RECV_POOL_ACCESS_SEM);
+		/* Note: We do not invoke the DETACH_AND_REMOVE_SHM and/or REMOVE_OR_RELEASE_SEM macros
+		 * (like we usually do in the error code paths above) as we do not hold any locks at this point.
+		 * It is okay to not remove the semid/shmid as those have already been noted down in the
+		 * replication instance file header above.
+		 */
 		udi->grabbed_access_sem = FALSE;
 		udi->counter_acc_incremented = FALSE;
 		ftok_sem_release(recvpool.recvpool_dummy_reg, udi->counter_ftok_incremented, TRUE);
