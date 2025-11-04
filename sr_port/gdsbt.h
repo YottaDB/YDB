@@ -215,9 +215,13 @@ typedef struct {
 } mutex_spin_parms_struct;
 
 enum crit_ops
-{	crit_ops_gw = 1,	/* grab [write] crit */
-	crit_ops_rw,		/* rel [write] crit */
-	crit_ops_nocrit		/* did a rel_crit when now_crit flag was off */
+{	crit_ops_gw = 1,		/* grab [write] crit */
+	crit_ops_rw,			/* rel [write] crit */
+	crit_ops_nocrit,		/* did a rel_crit when now_crit flag was off */
+	crit_ops_gw_ydb_mutex,		/* grabbed ydb mutex while holding pthread mutex lock in mupip_set_file.c */
+	crit_ops_gw_pthread_mutex,	/* grabbed pthread mutex while holding ydb mutex lock in mupip_set_file.c */
+	crit_ops_rw_ydb_mutex,		/* released ydb mutex while holding pthread mutex lock in mupip_set_file.c */
+	crit_ops_rw_pthread_mutex,	/* released pthread mutex while holding ydb mutex lock in mupip_set_file.c */
 };
 
 typedef struct

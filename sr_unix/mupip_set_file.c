@@ -66,6 +66,7 @@
 #include "interlock.h"
 #include "min_max.h"
 #include "mutex.h"		/* for "mutex_wakeup()" prototype */
+#include "caller_id.h"		/* for "caller_id()" prototype (used in CRIT_TRACE macro) */
 
 GBLREF	bool			in_backup;
 GBLREF	bool			region;
@@ -1043,15 +1044,34 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 					if (IS_MUTEX_TYPE_PTHREAD(old_mutex_type))
 					{
 						if (!IS_MUTEX_TYPE_PTHREAD(new_mutex_type))
-						{
-							assert(0 == addr->semaphore.u.parts.latch_pid);
-							assertpro(GET_SWAPLOCK(&addr->semaphore));
+						{	/* Grab the YDB type mutex lock. We cannot use "grab_crit()"
+							 * since we have not yet changed addr->curr_mutex_type. Note that
+							 * it is possible some other process is holding this lock for a
+							 * short duration (because it has still not seen the transition from
+							 * ydb mutex to pthread mutex that already happened either automatically
+							 * or through a MUPIP SET -MUTEX_TYPE=PTHREAD command). Therefore we need
+							 * to wait for this lock (i.e. one GET_SWAPLOCK() call is not enough).
+							 */
+							grab_latch(&addr->semaphore,
+								GRAB_LATCH_INDEFINITE_WAIT, NOT_APPLICABLE, cs_addrs);
 							assert(process_id == addr->semaphore.u.parts.latch_pid);
+							CRIT_TRACE(cs_addrs, crit_ops_gw_ydb_mutex);
 						}
 					} else
 					{
 						if (!IS_MUTEX_TYPE_YDB(new_mutex_type))
-							assertpro(0 == pthread_mutex_trylock(&addr->mutex));
+						{	/* Grab the PTHREAD type mutex lock. We cannot use "grab_crit()"
+							 * since we have not yet changed addr->curr_mutex_type. Note that
+							 * it is possible some other process is holding this lock for a
+							 * short duration (because it has still not seen the transition from
+							 * pthread mutex to ydb mutex that already happened either automatically
+							 * or through a MUPIP SET -MUTEX_TYPE=YDB command). Therefore we need
+							 * to wait for this lock (i.e. pthread_mutex_trylock() is not enough).
+							 */
+							status = pthread_mutex_lock(&addr->mutex);
+							assert(0 == status);
+							CRIT_TRACE(cs_addrs, crit_ops_gw_pthread_mutex);
+						}
 					}
 					/* Change the mutex type now that we hold both types of locks */
 					addr->curr_mutex_type = new_mutex_type;
@@ -1066,15 +1086,17 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 					{
 						if (!IS_MUTEX_TYPE_PTHREAD(new_mutex_type))
 						{
-							assertpro(0 == pthread_mutex_unlock(&addr->mutex));
+							CRIT_TRACE(cs_addrs, crit_ops_rw_pthread_mutex);
+							status = pthread_mutex_unlock(&addr->mutex);
+							assert(0 == status);
 						}
 					} else
 					{
 						if (!IS_MUTEX_TYPE_YDB(new_mutex_type))
 						{
+							CRIT_TRACE(cs_addrs, crit_ops_rw_ydb_mutex);
 							assert(process_id == addr->semaphore.u.parts.latch_pid);
 							RELEASE_SWAPLOCK(&addr->semaphore);
-							assert(0 == addr->semaphore.u.parts.latch_pid);
 							/* Wake up all processes in msem wait queue
 							 * so they can switch to pthread mutex.
 							 */
