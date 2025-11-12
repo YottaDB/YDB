@@ -141,30 +141,33 @@ CONDITION_HANDLER(ydb_simpleapi_ch)
 	if ((int)ERR_TPRETRY == SIGNAL)
 	{	/* the below code is similar to that in "mdb_condition_handler" */
 		assert(!donot_INVOKE_MUMTSTART || gtm_trigger_depth);
-		TRIGGER_BASE_FRAME_UNWIND_IF_NOMANSLAND;
-		/* Some of the below code is similar to that in "ydb_tp_s" */
 		assert(!tp_pointer->ydb_tp_s_tstart
 			|| (simpleapi_dollar_trestart == dollar_trestart) || (simpleapi_dollar_trestart == (dollar_trestart - 1)));
-		if (!tp_pointer->ydb_tp_s_tstart || (simpleapi_dollar_trestart == dollar_trestart))
+		if (!zyencode_args && !zydecode_args)
 		{
-			preemptive_db_clnup(ERROR);	/* Cleanup "reset_gv_target", TREF(expand_prev_key) etc. */
-			if (cdb_sc_normal == t_fail_hist[t_tries])
-			{	/* User-induced TP restart. In that case, simulate TRESTART command in M.
-				 * This is relied upon by an assert in "tp_restart".
-				 */
-				op_trestart_set_cdb_code();
-			}
-			rc = tp_restart(1, TP_RESTART_HANDLES_ERRORS);
-			if (0 != rc)
-			{	/* The only time "tp_restart" will return non-zero is if the error needs to be
-				 * rethrown. To accomplish that, we will unwind this handler which will return to
-				 * the inner most initiating dm_start() with the return code set to whatever mumps_status
-				 * is set to.
-				 */
-				assert(TPRESTART_STATE_NORMAL != tprestart_state);
-				assert(rc == SIGNAL);
-				assertpro((SFT_TRIGR & frame_pointer->type) && (0 < gtm_trigger_depth));
-				mumps_status = rc;
+			TRIGGER_BASE_FRAME_UNWIND_IF_NOMANSLAND;
+			/* Some of the below code is similar to that in "ydb_tp_s" */
+			if (!tp_pointer->ydb_tp_s_tstart || (simpleapi_dollar_trestart == dollar_trestart))
+			{
+				preemptive_db_clnup(ERROR);	/* Cleanup "reset_gv_target", TREF(expand_prev_key) etc. */
+				if (cdb_sc_normal == t_fail_hist[t_tries])
+				{	/* User-induced TP restart. In that case, simulate TRESTART command in M.
+					 * This is relied upon by an assert in "tp_restart".
+					 */
+					op_trestart_set_cdb_code();
+				}
+				rc = tp_restart(1, TP_RESTART_HANDLES_ERRORS);
+				if (0 != rc)
+				{	/* The only time "tp_restart" will return non-zero is if the error needs to be
+					 * rethrown. To accomplish that, we will unwind this handler which will return to
+					 * the inner most initiating dm_start() with the return code set to whatever mumps_status
+					 * is set to.
+					 */
+					assert(TPRESTART_STATE_NORMAL != tprestart_state);
+					assert(rc == SIGNAL);
+					assertpro((SFT_TRIGR & frame_pointer->type) && (0 < gtm_trigger_depth));
+					mumps_status = rc;
+				}
 			}
 		}
 		/* The "tp_restart" call above can change dollar_tlevel. In that case, the UNWIND that is done below

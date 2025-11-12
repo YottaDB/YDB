@@ -12,6 +12,9 @@
 
 #ifndef ZYENCODE_ZYDECODE_DEF_DEFINED
 
+#include "cdb_sc.h"
+#include "t_retry.h"
+
 #define ARG1_LCL 1
 #define ARG1_GBL 2
 #define ARG2_LCL 4
@@ -33,12 +36,17 @@
 	unsigned long long	len1, len2;											\
 	char			*zs1, *zs2, *zs3, *zs4, zstatus[YDB_MAX_ERRORMSG + 160], error_str[YDB_MAX_ERRORMSG];		\
 																\
+	GBLREF	unsigned char	t_fail_hist[CDB_MAX_TRIES];									\
+																\
 	/* YDB_MAX_ERRORMSG is not quite large enough for YDB_ERR_GVSUBOFLOW */							\
 	ydb_zstatus(zstatus, YDB_MAX_ERRORMSG + 160);										\
 																\
 	/* STATUS codes other than YDB_TP_RESTART are negative, we need positive for rts_error_csa(), hence -STATUS below */	\
 	switch(STATUS)														\
 		{														\
+		case YDB_TP_RESTART:												\
+			t_retry(t_fail_hist[t_tries]);										\
+			break;													\
 		case YDB_ERR_GVSUBOFLOW:											\
 			/* NOTE: This might need to change if the ERR_GVSUBOFLOW format changes */				\
 			zs1 = strstr(zstatus, "YDB-I-GVIS, ");									\
