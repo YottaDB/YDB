@@ -3,7 +3,7 @@
  * Copyright (c) 2016-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -159,15 +159,18 @@ int	wcs_wtfini(gd_region *reg, boolean_t do_is_proc_alive_check, cache_rec_ptr_t
 								|| WBTEST_ENABLED(WBTEST_MURUNDOWN_KILLCMT06));
 							SET_TRACEABLE_VAR(cnl->wc_blocked, WC_BLOCK_RECOVER);
 							ret_value = ERR_DBCCERR;
-							break;
+							csr = NULL;	/* done so we break out of "for" loop (after a few lines) */
+						} else
+						{
+							csr->state_que.bl = (sm_off_t)0;
+							csr->state_que.fl = (sm_off_t)0;
 						}
-						csr->state_que.bl = (sm_off_t)0;
-						csr->state_que.fl = (sm_off_t)0;
 					} else
-						/* The entry is still in the active queue waiting to be inserted into the wip
-						 * queue.
+					{	/* The entry is still in the active queue waiting to be inserted
+						 * into the wip queue.
 						*/
 						csr = NULL;
+					}
 					rel_latch(&whead->latch);
 				} else
 					csr = NULL; /* did not get the lock */
