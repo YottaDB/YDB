@@ -99,11 +99,11 @@ build-test:
 .docker-create:
   stage: docker-create
   script:
-    - docker build --platform=${PLATFORM} ${ARGS} --pull -t yottadb/${REPO}:${DOCKERHUBTAG} -f ${DOCKERFILE} .
-    - docker login -u $HUB_USERNAME -p $HUB_PASSWORD
+    - docker build --platform=${PLATFORM} ${ARGS} --provenance=false --pull -t yottadb/${REPO}:${DOCKERHUBTAG} -f ${DOCKERFILE} .
+    - echo "$HUB_PASSWORD" | docker login --password-stdin -u "$HUB_USERNAME"
     - docker push yottadb/${REPO}:${DOCKERHUBTAG}
     - 'echo -e "FROM yottadb/${REPO}:${DOCKERHUBTAG}\n ENTRYPOINT []" > BareDockerfile'
-    - docker build --platform=${PLATFORM} --pull -t yottadb/${REPO}-base:${DOCKERHUBTAG} -f BareDockerfile .
+    - docker build --platform=${PLATFORM} --provenance=false --pull -t yottadb/${REPO}-base:${DOCKERHUBTAG} -f BareDockerfile .
     - docker push yottadb/${REPO}-base:${DOCKERHUBTAG}
   only:
     - master@YottaDB/DB/YDB
@@ -112,14 +112,14 @@ build-test:
 .docker-manifest:
   stage: docker-manifest
   script:
-    - docker login -u $HUB_USERNAME -p $HUB_PASSWORD
-    - docker pull yottadb/${REPO}:${DOCKERHUBTAG}-amd64
-    - docker pull yottadb/${REPO}:${DOCKERHUBTAG}-aarch64
+    - echo "$HUB_PASSWORD" | docker login --password-stdin -u "$HUB_USERNAME"
+    - docker pull --platform=linux/amd64 yottadb/${REPO}:${DOCKERHUBTAG}-amd64
+    - docker pull --platform=linux/aarch64 yottadb/${REPO}:${DOCKERHUBTAG}-aarch64
     - docker manifest create yottadb/${REPO}:${DOCKERHUBTAG} yottadb/${REPO}:${DOCKERHUBTAG}-amd64 yottadb/${REPO}:${DOCKERHUBTAG}-aarch64
     - docker manifest inspect yottadb/${REPO}:${DOCKERHUBTAG}
     - docker manifest push yottadb/${REPO}:${DOCKERHUBTAG}
-    - docker pull yottadb/${REPO}-base:${DOCKERHUBTAG}-amd64
-    - docker pull yottadb/${REPO}-base:${DOCKERHUBTAG}-aarch64
+    - docker pull --platform=linux/amd64 yottadb/${REPO}-base:${DOCKERHUBTAG}-amd64
+    - docker pull --platform=linux/aarch64 yottadb/${REPO}-base:${DOCKERHUBTAG}-aarch64
     - docker manifest create yottadb/${REPO}-base:${DOCKERHUBTAG} yottadb/${REPO}-base:${DOCKERHUBTAG}-amd64 yottadb/${REPO}-base:${DOCKERHUBTAG}-aarch64
     - docker manifest inspect yottadb/${REPO}-base:${DOCKERHUBTAG}
     - docker manifest push yottadb/${REPO}-base:${DOCKERHUBTAG}
@@ -132,7 +132,7 @@ build-test:
 .docker-manifest-tag-with-version:
   stage: docker-tag
   script:
-    - docker login -u $HUB_USERNAME -p $HUB_PASSWORD
+    - echo "$HUB_PASSWORD" | docker login --password-stdin -u "$HUB_USERNAME"
     - docker buildx imagetools create -t yottadb/${REPO}:$(grep YDB_ZYRELEASE sr_*/release_name.h | grep -o '\(r[0-9.]*\)' | grep -v '^r$' | sort -u) yottadb/${REPO}:latest
   only:
     - tags
