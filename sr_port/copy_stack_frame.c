@@ -57,9 +57,12 @@ void copy_stack_frame(void)
 	sf->ret_value = NULL;
 	sf->dollar_test = -1;		/* initialize it with -1 for indication of not yet being used */
 	frame_pointer = sf;
-	/* When `-line_entry` is enabled, I could not find any compile-time difference between the start of a function and any other
-	 * code. Set a runtime flag on each function call so we don't misoptimize. */
-	gv_namenaked_state = NAMENAKED_UNKNOWNREFERENCE;
+	/* This is the start of a function. Set a runtime flag on each function call so we don't misoptimize. Note also that
+	 * function calls can happen inside interrupt code in which case we should not touch the runtime flag as that needs
+	 * to stay set to the interrupt state (NAMENAKED_ININTERRUPT) until the outermost interrupt frame exits.
+	 */
+	if (NAMENAKED_LEGAL == gv_namenaked_state)
+		gv_namenaked_state = NAMENAKED_UNKNOWNREFERENCE;
 	DBGEHND((stderr, "copy_stack_frame: Added stackframe at addr 0x"lvaddr"  old-msp: 0x"lvaddr"  new-msp: 0x"lvaddr"\n",
 		 sf, msp_save, msp));
 	assert((frame_pointer < frame_pointer->old_frame_pointer) || (NULL == frame_pointer->old_frame_pointer));

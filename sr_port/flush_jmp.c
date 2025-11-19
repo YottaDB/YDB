@@ -74,7 +74,8 @@ void flush_jmp (rhdtyp *rtn_base, unsigned char *context, unsigned char *transfe
 	GTMTRIG_ONLY(DBGTRIGR((stderr, "flush_jmp: Disabling SFF_NORET_VIA_MUMTSTART_OFF in frame 0x"lvaddr"\n", frame_pointer)));
 	USHBIN_ONLY(old_rtnhdr = frame_pointer->rvector);
 	frame_pointer->rvector = rtn_base;
-	gv_namenaked_state = NAMENAKED_UNKNOWNREFERENCE; /* ZGOTO; we cannot predict the state of $REFERENCE at compile time */
+	if (NAMENAKED_LEGAL == gv_namenaked_state)
+		gv_namenaked_state = NAMENAKED_UNKNOWNREFERENCE; /* ZGOTO; cannot predict the state of $REFERENCE at compile time */
 	/* Now that fp->rvector has been overwritten to new routine, check if the older routine had a "rtn_relinked" flag set
 	 * and if so that cleanup can be performed now.
 	 */
@@ -83,9 +84,9 @@ void flush_jmp (rhdtyp *rtn_base, unsigned char *context, unsigned char *transfe
 	frame_pointer->vartab_len = frame_pointer->rvector->vartab_len;
 	frame_pointer->mpc = transfer_addr;
 	frame_pointer->ctxt = context;
-#ifdef HAS_LITERAL_SECT
+#	ifdef HAS_LITERAL_SECT
 	frame_pointer->literal_ptr = (int4 *)LITERAL_ADR(rtn_base);
-#endif
+#	endif
 	frame_pointer->temp_mvals = frame_pointer->rvector->temp_mvals;
 	size = rtn_base->temp_size;
 	frame_pointer->temps_ptr = (unsigned char *)frame_pointer - size;

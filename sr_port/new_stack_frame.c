@@ -92,8 +92,13 @@ void new_stack_frame(rhdtyp *rtn_base, unsigned char *context, unsigned char *tr
 	memset(msp, 0, x1 + x2);
 	frame_pointer = sf;
 	assert((frame_pointer < frame_pointer->old_frame_pointer) || (NULL == frame_pointer->old_frame_pointer));
-	if (NAMENAKED_LEGAL == gv_namenaked_state) /* function calls can occur inside interupts; don't forget that we're in an interrupt */
-		gv_namenaked_state = NAMENAKED_UNKNOWNREFERENCE; /* function call or GOTO; we cannot predict $REFERENCE at compile time */
+	/* This is a function call or GOTO. We cannot predict $REFERENCE at compile time so set a runtime flag that way
+	 * we don't misoptimize. Note also that this can happen inside interrupt code in which case we should not touch
+	 * the runtime flag as that needs to stay set to the interrupt state (NAMENAKED_ININTERRUPT) until the outermost
+	 * interrupt frame exits.
+	 */
+	if (NAMENAKED_LEGAL == gv_namenaked_state)
+		gv_namenaked_state = NAMENAKED_UNKNOWNREFERENCE;
 	DBGEHND((stderr, "new_stack_frame: Added stackframe at addr 0x"lvaddr"  old-msp: 0x"lvaddr"  new-msp: 0x"lvaddr
 		 " for routine %.*s (rtnhdr 0x"lvaddr")\n", sf, msp_save, msp, rtn_base->routine_name.len,
 		 rtn_base->routine_name.addr, rtn_base));

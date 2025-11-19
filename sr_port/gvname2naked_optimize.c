@@ -29,7 +29,7 @@ GBLREF char 		*oc_tab_graphic[];
 GBLREF uint4		ydbDebugLevel;
 
 struct ctvar { /* compile-time variable */
-	mliteral	*subs[MAX_GVSUBSCRIPTS]; /* Includes variable name, but not the final subscript */
+	mstr		subs[MAX_GVSUBSCRIPTS]; /* Includes variable name, but not the final subscript */
 	uint8_t		len;
 };
 
@@ -42,11 +42,12 @@ boolean_t gvname2naked_optimize(triple *chainstart)
 	/* NOTE: although this is named dollar_reference, it is not the same as $REFERENCE, which is a runtime value.
 	 * This is instead a compile-time approximation of $REFERENCE.
 	 * In particular, any kind of XECUTE or DO will reset this to NULL instead of having the true runtime value. */
-	struct ctvar	dollar_reference = {{0}, 0};
+	struct ctvar	dollar_reference;
 	oprtype		*j, *k;
 	triple		*nested_trip, *tripref;
 	DEBUG_ONLY(boolean_t	oc_seen[OC_LASTOPCODE] = {0};)
 
+	dollar_reference.len = 0;
 	COMPDBG(printf("\n\n\n**************************** Begin gvname2naked_optimize rewrite ***********************\n"););
 	/* Iterate over all triples in the translation unit */
 	dqloop(chainstart, exorder, curtrip) {
@@ -77,10 +78,10 @@ boolean_t gvname2naked_optimize(triple *chainstart)
 static void ctvar_print(struct ctvar *var) {
 	if (!var->len)
 		return;
-	printf("^%.*s(", var->subs[0]->v.str.len, var->subs[0]->v.str.addr);
+	printf("^%.*s(", var->subs[0].len, var->subs[0].addr);
 	for (int i = 1; i < var->len; ++i) {
-		mval *v = &var->subs[i]->v;
-		printf("%.*s, ", v->str.len, v->str.addr);
+		mstr *ms = &var->subs[i];
+		printf("%.*s, ", ms->len, ms->addr);
 	}
 	/* NOTE: since ctvars do not contain the trailing subscript, it is not printed. Note that. */
 	printf("_)");
@@ -94,29 +95,26 @@ static void unset_reference(DEBUG_ONLY_COMMA(boolean_t *oc_seen) struct ctvar *d
 }
 
 static boolean_t optimize_gvname(triple *curtrip, DEBUG_ONLY_COMMA(boolean_t *oc_seen) struct ctvar *dollar_reference) {
-	triple		*hashtrip, *lastsubscript, *literaltrip, *subscriptstrip;
-	int4		names;
+	triple		*hashtrip, *lastsubscript, *cursub, *first_opr;
+	int4		gvname_nparms;
 	oprtype		opcodes;
 	triple		*litc;
-
-	triple	*subs_param, *opcodes_param, *deletetrip;
-	mval	tmp_mval = { 0 };
-	int	oc_len = 0;
-	char	*oc_ptr;
+	triple		*subs_param, *opcodes_param, *deletetrip;
+	mval		tmp_mval = { 0 };
+	int		oc_len = 0;
+	char		*oc_ptr;
+	int		sub, old_len;
+	boolean_t	new_access;
 
 	assert(OC_GVNAME == curtrip->opcode);
-	/* Set subscriptstrip to the subscripts triple. */
 	assert(TRIP_REF == curtrip->operand[0].oprclass);
-	subscriptstrip = curtrip->operand[0].oprval.tref;
-	assert(OC_ILIT == subscriptstrip->opcode);
+	first_opr = curtrip->operand[0].oprval.tref;
+	assert(OC_ILIT == first_opr->opcode);
 	/* Set subscripts to the number of subscripts. */
-	assert(ILIT_REF == subscriptstrip->operand[0].oprclass);
-	names = subscriptstrip->operand[0].oprval.ilit;
-	/* This is passing the argument count, not the number of subscripts. Adjust it not to include the hash count. */
-	assert(1 < names);
-	--names;
-
-	if (2 > names) {
+	assert(ILIT_REF == first_opr->operand[0].oprclass);
+	gvname_nparms = first_opr->operand[0].oprval.ilit;
+	assert(1 < gvname_nparms);
+	if (2 >= gvname_nparms) {
 		/* We don't have any subscripts (e.g. ^X=1). Doing a naked reference is illegal. */
 		unset_reference(DEBUG_ONLY_COMMA(oc_seen) dollar_reference, "OC_GVNAME with 0 subscripts", "");
 		return false;
@@ -126,43 +124,60 @@ static boolean_t optimize_gvname(triple *curtrip, DEBUG_ONLY_COMMA(boolean_t *oc
 	assert(TRIP_REF == curtrip->operand[1].oprclass);
 	hashtrip = curtrip->operand[1].oprval.tref;
 	assert(OC_PARAMETER == hashtrip->opcode);
-	/* Set lastsubscript to the literal parameter. */
+	/* Set lastsubscript to the global variable name at the start */
 	assert(TRIP_REF == hashtrip->operand[1].oprclass);
 	lastsubscript = hashtrip->operand[1].oprval.tref;
 
 	/* Copy all our triple parameters into a local array so they aren't overwritten.
 	 * NOTE: this is a shallow copy, so it's not as expensive as it looks. */
-	int sub = 0, old_len = dollar_reference->len;
-	boolean_t new_access = 0 == old_len;
-	mliteral *current_sub;
+	sub = 0;
+	old_len = dollar_reference->len;
+	new_access = (0 == old_len);
 	assert((NO_REF == lastsubscript->operand[1].oprclass) || (TRIP_REF == lastsubscript->operand[1].oprclass));
 	/* This stops just before the last subscript, since it's overwritten when doing a naked reference. */
 	for (; NO_REF != lastsubscript->operand[1].oprclass; ++sub, lastsubscript = lastsubscript->operand[1].oprval.tref) {
-		/* Set literaltrip to the literal value triple. */
 		assert(OC_PARAMETER == lastsubscript->opcode);
 		assert(TRIP_REF == lastsubscript->operand[0].oprclass);
-		literaltrip = lastsubscript->operand[0].oprval.tref;
+		cursub = lastsubscript->operand[0].oprval.tref;
 		/* If this is a dynamic literal, follow the indirect reference. */
-		if ((cmd_qlf.qlf & CQ_DYNAMIC_LITERALS) && OC_LITC == literaltrip->opcode) {
-			assert(TRIP_REF == literaltrip->operand[0].oprclass);
-			literaltrip = literaltrip->operand[0].oprval.tref;
+		if ((cmd_qlf.qlf & CQ_DYNAMIC_LITERALS) && OC_LITC == cursub->opcode) {
+			assert(TRIP_REF == cursub->operand[0].oprclass);
+			cursub = cursub->operand[0].oprval.tref;
 		}
-		if (OC_LIT != literaltrip->opcode) {
-			/* This is not a literal parameter; for example `^X(y)`. We don't know how to optimize it, so don't try.
-			 * It may be possible to extend this in the future. But it would be a lot of work.
-			 * We would have to extend this dataflow analysis to all local variables, not just to $REFERENCE. */
-			unset_reference(DEBUG_ONLY_COMMA(oc_seen) dollar_reference, "non-literal subscript",
-				oc_tab_graphic[literaltrip->opcode]);
+		/* At this point in time, we only optimize global variable references that have LITERAL or LOCAL VARIABLE
+		 * subscripts. e.g. "^x(2,...)" "^x(i,...)" as these are considered to be the most frequently encountered
+		 * patterns in M code. Anything else we do not optimize. e.g. "^x(i+2,...)".  These can be optimized
+		 * in the future if/when a need arises.
+		 */
+		switch(cursub->opcode) {
+		case OC_LIT:;
+			/* Check if the subscript is the same as the previous access, and update dollar_reference. */
+			mliteral *sub_lit;
+
+			assert(MLIT_REF == cursub->operand[0].oprclass);
+			sub_lit = cursub->operand[0].oprval.mlit;
+			assert(MV_IS_STRING(&sub_lit->v));
+			new_access |= ((old_len > sub) && !MSTR_EQ(&dollar_reference->subs[sub], &sub_lit->v.str));
+			dollar_reference->subs[sub] = sub_lit->v.str;
+			break;
+		case OC_VAR:;
+			/* Check if the subscript is the same as the previous access, and update dollar_reference. */
+			mvar *sub_varname;
+
+			assert(MVAR_REF == cursub->operand[0].oprclass);
+			sub_varname = cursub->operand[0].oprval.vref;
+			new_access |= ((old_len > sub) && !MSTR_EQ(&dollar_reference->subs[sub], &sub_varname->mvname));
+			dollar_reference->subs[sub] = sub_varname->mvname;
+			break;
+		default:
+			unset_reference(DEBUG_ONLY_COMMA(oc_seen) dollar_reference, "non-literal non-local-varname subscript",
+				oc_tab_graphic[cursub->opcode]);
 			return false;
+			break;
 		}
-		/* Check if the subscript is the same as the previous access, and update dollar_reference. */
-		assert(MLIT_REF == literaltrip->operand[0].oprclass);
-		current_sub = literaltrip->operand[0].oprval.mlit;
-		new_access |= (old_len > sub && !is_equ(&dollar_reference->subs[sub]->v, &current_sub->v));
-		dollar_reference->subs[sub] = current_sub;
 		assert((NO_REF == lastsubscript->operand[1].oprclass) || (TRIP_REF == lastsubscript->operand[1].oprclass));
 	}
-	assert(sub + 1 == names);
+	assert((sub + 2) == gvname_nparms);
 	new_access |= (old_len > sub);
 	dollar_reference->len = sub;
 
@@ -253,7 +268,6 @@ static boolean_t gv_dataflow(triple *curtrip, DEBUG_ONLY_COMMA(boolean_t *oc_see
 	triple 		*svtrip, *subscriptstrip;
 	int4		subscripts;
 	enum isvopcode	sv;
-	struct ctvar	new = {{0}, 0};
 
 	DEBUG_ONLY(oc_seen[curtrip->opcode] = true;)
 

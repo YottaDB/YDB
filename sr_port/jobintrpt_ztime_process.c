@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -72,6 +72,7 @@ void jobintrpt_ztime_process(boolean_t ztime)
 		OP_COMMARG_S2POOL(&((TREF(dollar_ztimeout)).ztimeout_vector));
 	} else
 		op_commarg(&dollar_zinterrupt, indir_linetail);
+	gv_namenaked_state = NAMENAKED_ININTERRUPT; /* $ZTIMEOUT or $ZINTERRUPT interrupt */
 	frame_pointer->type = proc_act_type;	/* The mark of zorro.. */
 	proc_act_type = 0;
 	/* Now we need to preserve our current environment. This MVST_ZINTR mv_stent type will hold
