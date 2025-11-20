@@ -342,10 +342,6 @@ static boolean_t gv_dataflow(triple *curtrip, DEBUG_ONLY_COMMA(boolean_t *oc_see
 	 * NOTE: this is not *strictly* neccessary; e.g. ZWRITE @(...) is ok.
 	 * But telling the difference is hard, and indirection is rare, so just mark them all as invalidating the optimization. */
 	case OC_COMMARG:
-	case OC_RESTARTPC:	/* This is where M code restarts execution after a MUPIP INTRPT and so we should not
-				 * optimize if this lies in between 2 OC_GVNAME opcodes.
-				 * See https://gitlab.com/YottaDB/DB/YDB/-/issues/665#note_2693154599 for more details.
-				 */
 		unset_reference(DEBUG_ONLY_COMMA(oc_seen) dollar_reference, oc_tab_graphic[curtrip->opcode], "");
 		break;
 	case OC_NEWINTRINSIC: /* new $ZGBLDIR */
