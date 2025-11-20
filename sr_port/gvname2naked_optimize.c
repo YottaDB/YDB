@@ -342,6 +342,7 @@ static boolean_t gv_dataflow(triple *curtrip, DEBUG_ONLY_COMMA(boolean_t *oc_see
 	 * NOTE: this is not *strictly* neccessary; e.g. ZWRITE @(...) is ok.
 	 * But telling the difference is hard, and indirection is rare, so just mark them all as invalidating the optimization. */
 	case OC_COMMARG:
+	case OC_ZSHOW:	/* can modify $REFERENCE if target is a global (e.g. zshow "*":^gbl) */
 		unset_reference(DEBUG_ONLY_COMMA(oc_seen) dollar_reference, oc_tab_graphic[curtrip->opcode], "");
 		break;
 	case OC_NEWINTRINSIC: /* new $ZGBLDIR */
