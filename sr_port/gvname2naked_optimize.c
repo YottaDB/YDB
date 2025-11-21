@@ -31,6 +31,9 @@ GBLREF uint4		ydbDebugLevel;
 struct ctvar { /* compile-time variable */
 	mstr		subs[MAX_GVSUBSCRIPTS]; /* Includes variable name, but not the final subscript */
 	uint8_t		len;
+	boolean_t	has_lvn_subscript;	/* has at least one subscript (excluding the final subscript) that is
+						 * an unsubscripted local variable name.
+						 */
 };
 
 static boolean_t gv_dataflow(triple *curtrip, DEBUG_ONLY_COMMA(boolean_t *oc_seen) struct ctvar *dollar_reference);
@@ -46,6 +49,7 @@ boolean_t gvname2naked_optimize(triple *chainstart)
 	DEBUG_ONLY(boolean_t	oc_seen[OC_LASTOPCODE] = {0};)
 
 	dollar_reference.len = 0;
+	dollar_reference.has_lvn_subscript = FALSE;
 	COMPDBG(printf("\n\n\n**************************** Begin gvname2naked_optimize rewrite ***********************\n"););
 	/* Iterate over all triples in the translation unit */
 	dqloop(chainstart, exorder, curtrip) {
@@ -133,6 +137,7 @@ static void unset_reference(DEBUG_ONLY_COMMA(boolean_t *oc_seen) struct ctvar *d
 	COMPDBG(printf("unset global reference for %s %s\n", why, extra_why);)
 	DEBUG_ONLY(memset(oc_seen, false, sizeof(boolean_t) * OC_LASTOPCODE);)
 	dollar_reference->len = 0;
+	dollar_reference->has_lvn_subscript = FALSE;
 }
 
 static boolean_t optimize_gvname(triple *curtrip, DEBUG_ONLY_COMMA(boolean_t *oc_seen) struct ctvar *dollar_reference) {
@@ -209,6 +214,7 @@ static boolean_t optimize_gvname(triple *curtrip, DEBUG_ONLY_COMMA(boolean_t *oc
 			sub_varname = cursub->operand[0].oprval.vref;
 			new_access |= ((old_len > sub) && !MSTR_EQ(&dollar_reference->subs[sub], &sub_varname->mvname));
 			dollar_reference->subs[sub] = sub_varname->mvname;
+			dollar_reference->has_lvn_subscript = TRUE;
 			break;
 		default:
 			unset_reference(DEBUG_ONLY_COMMA(oc_seen) dollar_reference, "non-literal non-local-varname subscript",
@@ -431,6 +437,60 @@ static boolean_t gv_dataflow(triple *curtrip, DEBUG_ONLY_COMMA(boolean_t *oc_see
 	 * optimization at compile time.
 	*/
 	default:
+		break;
+	/* Below are opcodes that can modify the value of a local variable. If so, they need to disable the naked
+	 * reference optimization for future identical global references if the current $reference had local variables
+	 * as subscripts. For example, "set a=1 set ^x(a,1)=2 set a=2 set ^x(a,1)=3" should not use a naked reference
+	 * for the "set ^x(a,1)=3" because "a" changed in value from 1 to 2 in between the 2 "^x(a,1)" references.
+	 */
+	case OC_STO:		/* set a=2 */
+	case OC_STOLITC:	/* OC_STO can get converted into OC_STOLITC in "resolve_ref()" so treat latter like OC_STO */
+	case OC_FNINCR: 	/* if $incr(a) */
+	case OC_KILL:		/* kill a */
+	case OC_KILLALL:	/* kill */
+	case OC_XKILL:		/* kill (b) */
+	case OC_LVZWITHDRAW:	/* zkill a */
+	case OC_NEWVAR:		/* new a */
+	case OC_XNEW:		/* new (b) */
+	case OC_READ:		/* read a */
+	case OC_RDONE:		/* read *a */
+	case OC_READFL:		/* read a#2 */
+	case OC_SETPIECE:	/* set $piece(a,"abcd",1)=2 */
+	case OC_SETZP1:		/* set $piece(a,"2")=2 in M     mode */
+	case OC_SETP1:		/* set $piece(a,"2")=2 in UTF-8 mode */
+	case OC_SETEXTRACT:	/* set $extract(a,"2")=2 */
+	case OC_SETZEXTRACT:	/* set $zextract(a,"2")=2 */
+	case OC_SETZPIECE:	/* set $zpiece(a,"23")=2 */
+	case OC_MERGE_LVARG:	/* merge a=^x(a,1) */
+	case OC_SETALS2ALS:	/* set *a=b */
+	case OC_SETALSCTIN2ALS:	/* set *a=b(1) */
+	case OC_SETFNRETIN2ALS:	/* set *a=$$^b */
+	case OC_KILLALIAS:	/* kill *a */
+	case OC_KILLALIASALL:	/* kill * */
+		if (dollar_reference->has_lvn_subscript)
+		{	/* Internal reference has at least one local variable subscript (excluding the final subscript).
+			 * In that case, it is possible that local variable is being modified by the OC_STO etc. opcode.
+			 * Therefore reset the internal $reference to avoid naked misoptimization in the next global reference.
+			 * For example, "set a=1,^x(a,1)=2,a=2,^x(a,1)=3" should not optimize the second "^x(a,1)" to a naked
+			 * reference because the local variable "a" changed from 1 to 2 between the 2 references.
+			 */
+			unset_reference(DEBUG_ONLY_COMMA(oc_seen) dollar_reference, "Local variable subscript", "");
+		}
+		/* Below opcodes can also modify the value of a local variable. But it is OC_STO that gets transformed to the
+		 * below opcodes in "alloc_reg()" and that call has not yet happened and so we will see OC_STO first and will
+		 * disable the optimization. Therefore these opcodes are currently commented out.
+		 *
+		 * OC_ADD:	set a=a+1`
+		 * OC_SUB:	set a=a-1`
+		 * OC_MUL:	set a=a*2`
+		 * OC_DIV:	set a=a/0.5`
+		 * OC_IDIV:	set a=a\0.5`
+		 * OC_MOD:	set a=a#1`
+		 * OC_NEG:	set a=-a`
+		 * OC_FORCENUM:	set a=+(a-2)`
+		 * OC_CAT:	set a=a_2`
+		 * OC_STOLIT:	set a=2
+		 */
 		break;
 	}
 
