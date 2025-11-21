@@ -43,8 +43,6 @@ boolean_t gvname2naked_optimize(triple *chainstart)
 	 * This is instead a compile-time approximation of $REFERENCE.
 	 * In particular, any kind of XECUTE or DO will reset this to NULL instead of having the true runtime value. */
 	struct ctvar	dollar_reference;
-	oprtype		*j, *k;
-	triple		*nested_trip, *tripref;
 	DEBUG_ONLY(boolean_t	oc_seen[OC_LASTOPCODE] = {0};)
 
 	dollar_reference.len = 0;
@@ -52,25 +50,7 @@ boolean_t gvname2naked_optimize(triple *chainstart)
 	/* Iterate over all triples in the translation unit */
 	dqloop(chainstart, exorder, curtrip) {
 		gv_dataflow(curtrip, DEBUG_ONLY_COMMA(oc_seen) &dollar_reference);
-		/* Iterate over all parameters of the current triple */
-		for (j = curtrip->operand, nested_trip = curtrip; j < ARRAYTOP(nested_trip->operand); ) {
-			k = j;
-			while (INDR_REF == k->oprclass)
-				k = k->oprval.indr;
-			if (TRIP_REF == k->oprclass) {
-				tripref = k->oprval.tref;
-				gv_dataflow(tripref, DEBUG_ONLY_COMMA(oc_seen) &dollar_reference);
-				if (OC_PARAMETER == tripref->opcode)
-				{
-					nested_trip = tripref;
-					j = nested_trip->operand;
-					continue;
-				}
-			}
-			j++;
-		}
 	}
-
 	return false;
 }
 
