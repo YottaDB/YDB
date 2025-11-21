@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -53,24 +53,19 @@ void ins_errtriple(int4 in_error)
 		assert((NULL == x) || (NULL != x->exorder.fl));
 		if (NULL != x)
 		{
-			/* If first error in the current line/cmd, delete all triples and replace them with an OC_RTERROR triple. */
+			/* If first error in the current line/cmd, delete all triples and replace them with an OC_RTERROR triple.
+			 * If second error in the current line/cmd, do not add a new OC_RTERROR triple as there is already one
+			 *    and so leave the triple chain untouched (i.e. do not delete any existing triples as there is
+			 *    no need to replace them with an OC_RTERROR triple and attempting deletion can be tricky).
+			 */
 			add_rterror_triple = (OC_RTERROR != x->exorder.fl->opcode);
-			if (!add_rterror_triple)
-			{	/* This is the second error in this line/cmd. Check for triples added after OC_RTERROR and remove them
-				 * as there could be dangling references amongst them which could later cause assertpro() in emit_code.
-				 */
-				x = x->exorder.fl;
-				assert(OC_RTERROR == x->opcode);/* corresponds to newtriple(OC_RTERROR) in previous ins_errtriple */
-				x = x->exorder.fl;
-				assert(OC_ILIT == x->opcode);	/* corresponds to put_ilit(in_error) in previous ins_errtriple */
-				x = x->exorder.fl;
-				assert(OC_ILIT == x->opcode);	/* corresponds to put_ilit(FALSE) in previous ins_errtriple */
+			if (add_rterror_triple)
+			{	/* delete all trailing triples (and replace them further down with an OC_RTERROR triple) */
+				dqdelchain(x, TREF(curtchain), exorder);
+				CHKTCHAIN(TREF(curtchain), exorder, FALSE);
+				assert((TREF(pos_in_chain)).exorder.bl->exorder.fl == TREF(curtchain));
+				assert((TREF(curtchain))->exorder.bl == (TREF(pos_in_chain)).exorder.bl);
 			}
-			/* delete all trailing triples and if the first, replace them below with an OC_RTERROR triple */
-			dqdelchain(x, TREF(curtchain), exorder);
-			CHKTCHAIN(TREF(curtchain), exorder, FALSE);
-			assert(!add_rterror_triple || ((TREF(pos_in_chain)).exorder.bl->exorder.fl == TREF(curtchain)));
-			assert(!add_rterror_triple || ((TREF(curtchain))->exorder.bl == (TREF(pos_in_chain)).exorder.bl));
 		} else
 		{	/* We have not yet started processing the current line and so add OC_RTERROR triple */
 			add_rterror_triple = TRUE;
