@@ -271,22 +271,32 @@ static boolean_t gv_dataflow(triple *curtrip, DEBUG_ONLY_COMMA(boolean_t *oc_see
 
 	DEBUG_ONLY(oc_seen[curtrip->opcode] = true;)
 
+	/* If current triple branches elsewhere, reset internal $REFERENCE as first global reference after this triple
+	 * can not be safely assumed to be a consecutive global reference due to the change in control flow.
+	 */
 	if (OCT_JUMP & oc_tab[curtrip->opcode].octype) {
-		/* branching elsewhere; following control flow is not immediately consecutive */
 		unset_reference(DEBUG_ONLY_COMMA(oc_seen) dollar_reference, "OCT_JUMP", oc_tab_graphic[curtrip->opcode]);
 		return false;
 	}
+
+	/* If current triple is a jump target of some other triple (prior or later), reset internal $REFERENCE as first
+	 * global reference after this triple can not be safely assumed to be a consecutive global reference since the
+	 * immediately previous global reference could be prior to the triple whose jump target is the current triple
+	 * and not necessarily the previous global reference in the execution chain.
+	 */
+	if (curtrip->jmplist.que.fl != &curtrip->jmplist)
+		unset_reference(DEBUG_ONLY_COMMA(oc_seen) dollar_reference, "Jump Target", oc_tab_graphic[curtrip->opcode]);
 
 	switch (curtrip->opcode) {
 	case OC_GVNAME:
 		optimized = optimize_gvname(curtrip, DEBUG_ONLY_COMMA(oc_seen) dollar_reference);
 		break;
 	case OC_GVNAKED:
-	/* Naked references can themselves modify $REFERENCE.
-	 * Consider for example `S ^V(1)=2,^(1,2)=3`, which results in $REFERENCE=^V(1,2).
-	 * For now, we only allow naked references if they have exactly one subscript, which we know cannot cause modifications.
-	 * In the future, we should update `dollar_reference` to match the new runtime value.
-	 */
+		/* Naked references can themselves modify $REFERENCE.
+		 * Consider for example `S ^V(1)=2,^(1,2)=3`, which results in $REFERENCE=^V(1,2).
+		 * For now, we only allow naked references if they have exactly one subscript, which we know cannot
+		 * cause modifications. In the future, we should update `dollar_reference` to match the new runtime value.
+		 */
 		/* Set subscriptstrip to the subscripts triple. */
 		assert(TRIP_REF == curtrip->operand[0].oprclass);
 		subscriptstrip = curtrip->operand[0].oprval.tref;
