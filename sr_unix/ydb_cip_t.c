@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -17,6 +17,7 @@
 
 #include "libyottadb_int.h"
 #include "error.h"
+#include "error_trap.h"
 #include "gtmci.h"
 
 /* Routine to drive ydb_cip() in a worker thread so YottaDB access is isolated. Note because this drives
@@ -41,10 +42,15 @@ int ydb_cip_t(uint64_t tptoken, ydb_buffer_t *errstr, ci_name_descriptor *ci_inf
 	threaded_api_ydb_engine_lock(tptoken, errstr, LYDB_RTN_YDB_CIP, &save_active_stapi_rtn, &save_errstr, &get_lock, &retval);
 	if (YDB_OK == retval)
 	{
+		/* We want to start and end ydb_ci_t in a clean, non-error state.
+		 * To get that, we clear dollar_ecode BEFORE and AFTER the ydb_cip_helper() function call.
+		 */
+		NULLIFY_DOLLAR_ECODE;
 		retval = ydb_cip_helper(LYDB_RTN_YDB_CIP, ci_info, &var); /* Note: "va_end(var)" done inside "ydb_cip_helper()" */
 		if (0 != retval)
 			/* Set errstr from $zstatus before releasing the YottaDB multi-threaded engine lock */
 			SET_ERRSTR_FROM_ZSTATUS_IF_NOT_NULL(errstr);
+		NULLIFY_DOLLAR_ECODE;
 		threaded_api_ydb_engine_unlock(tptoken, errstr, save_active_stapi_rtn, save_errstr, get_lock);
 	} else
 		va_end(var);
