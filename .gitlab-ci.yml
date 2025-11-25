@@ -90,8 +90,13 @@ build-test:
       - testarea2/
       - testarea3/
       - pipeline-test-ydb-build.out
+      - coverage.xml
     expire_in: 1 month
     when: always
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage.xml
   script:
     - /usr/library/gtm_test/T999/docker/pipeline-test-ydb.csh
 
