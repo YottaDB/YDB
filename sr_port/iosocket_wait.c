@@ -519,6 +519,10 @@ boolean_t iosocket_wait(io_desc *iod, uint8 nsec_timeout, mval *whatop, mval *ha
 		socketptr = dsocketptr->socket[oldesteventindex];
 		if (socket_listening == socketptr->state)
 		{
+			socketptr->pendingevent &= ~SOCKPEND_READ;		/* Clear READ bit if set */
+			assert(!(SOCKPEND_WRITE & socketptr->pendingevent));	/* WRITE bit never set for listening socket */
+			assert(!(SOCKPEND_BUFFER & socketptr->pendingevent));	/* BUFFER bit never set for listening socket */
+			assert(FALSE == socketptr->pendingevent);
 			rv = iosocket_accept(dsocketptr, socketptr, FALSE);
 			if (0 < rv)
 			{
