@@ -247,7 +247,7 @@ void	tab_to_column(int col);
 			code_buf[code_idx++] = CODE_BUF_GEN_D_IMM16_SHIFT(AARCH64_INS_MOVK, reg, (imval & 0xffff0000) >> 16, 1);\
 	} else															\
 	{															\
-		if ((2 >= SIZEOF(imval)) || (MAX_16BIT >= -imval))								\
+		if ((2 >= SIZEOF(imval)) || (-MAX_16BIT < imval))								\
 			code_buf[code_idx++] = CODE_BUF_GEN_D_IMM16(AARCH64_INS_MOV_INV, reg, (-1 * imval) - 1); 		\
 		else														\
 		{														\
