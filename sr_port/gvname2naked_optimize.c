@@ -50,6 +50,67 @@ boolean_t gvname2naked_optimize(triple *chainstart)
 	/* Iterate over all triples in the translation unit */
 	dqloop(chainstart, exorder, curtrip) {
 		gv_dataflow(curtrip, DEBUG_ONLY_COMMA(oc_seen) &dollar_reference);
+#		ifdef DEBUG
+		/* 1) Previously, we used to invoke "gv_dataflow()" on all triple parameters too. But this was considered
+		 *    unnecessary because we should have already seen all parameters in the execution chain in a prior
+		 *    iteration of this "dqloop()" block.
+		 * 2) Additionally, as https://gitlab.com/YottaDB/DB/YDB/-/merge_requests/1782#note_2925315026 noted,
+		 *    there were cases where a naked reference optimization was missed out so it was actually doing harm
+		 *    even if unintentionally.
+		 *
+		 * Therefore the triple parameter invocation logic was removed. But to be safe, we now have logic that
+		 * verifies that all triple parameters would have been already found in the execution chain in a prior
+		 * iteration.
+		 *
+		 * We verify that by going through the "->exorder.fl" links starting from the parameter triple and expect to
+		 * eventually land on the current triple "curtrip".
+		 *
+		 * But just in case the parameter triple does not lead to the current triple, we do not want to loop
+		 * indefinitely and so use a "tortoise and hare" algorithm to stop if ever an infinite loop is detected
+		 * and assert fail below. "triptmp" is the tortoise pointer and "triptmp2" is the hare pointer below.
+		 */
+		oprtype		*j, *k;
+		triple		*nested_trip, *tripref, *triptmp, *triptmp2;
+		struct ctvar	save_dollar_reference;
+		int		i;
+
+		save_dollar_reference = dollar_reference;
+		/* Iterate over all parameters of the current triple */
+		for (j = curtrip->operand, nested_trip = curtrip; j < ARRAYTOP(nested_trip->operand); ) {
+			k = j;
+			while (INDR_REF == k->oprclass)
+				k = k->oprval.indr;
+			if (TRIP_REF == k->oprclass) {
+				tripref = k->oprval.tref;
+				switch (tripref->opcode) {
+				case OC_PARAMETER:
+					nested_trip = tripref;
+					j = nested_trip->operand;
+					continue;
+					break;
+				case OC_ILIT:
+				case OC_LIT:
+					/* It is possible literal triples are not part of the execution chain (there are
+					 * lots of places in the code base where we only do a "maketriple()" of these opcodes
+					 * and not a "ins_triple()"). But literal triples do not affect the gvname optimization
+					 * and so should not affect the "gv_dataflow()" call. So skip these while checking that
+					 * all triple parameters eventually lead to the current triple in the execution chain.
+					 */
+					break;
+				default:
+					triptmp = triptmp2 = tripref;
+					while (triptmp != curtrip)
+					{
+						triptmp = triptmp->exorder.fl;
+						triptmp2 = triptmp2->exorder.fl;
+						triptmp2 = triptmp2->exorder.fl;
+						assert(triptmp != triptmp2);	/* == implies an infinite loop situation */
+					}
+				}
+			}
+			j++;
+		}
+#		endif
 	}
 	return false;
 }
