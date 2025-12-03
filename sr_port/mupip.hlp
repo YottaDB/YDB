@@ -500,6 +500,8 @@
 
    -RET[RY]=<count>
 
+     o -RETRY is compatible only with -DATABASE.
+
 3 SHowprogress
    SHowprogress
 
@@ -3943,10 +3945,8 @@
 
    -T[RIGGER_FLUSH]=integer
 
-   MUPIP SET -FILE -GLOBAL_BUFFERS= implicitly adjusts trigger_flush to
-   maintain the same ratio as it had with the previous global buffer
-   settings, unless the same command includes a -TRIGGER_FLUSH_LIMIT
-   specification.
+   MUPIP SET -FILE -GLOBAL_BUFFERS adjusts trigger_flush as long as it within
+   the range of 1/8th to 15/16th of the number of global buffers.
 
 3 Version
    Version

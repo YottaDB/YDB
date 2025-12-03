@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -68,6 +68,7 @@ boolean_t	mlk_check_own(mlk_pvtblk *x)
 		} else if (BLOCKING_PROC_DEAD(x, time, icount, status))
 		{	/* process that owned lock has died, free lock. */
 			x->blocked->owner = 0;
+			x->blocked->pstart = 0;
 			csa->hdr->trans_hist.lock_sequence++;
 			ret_val = TRUE;
 		}

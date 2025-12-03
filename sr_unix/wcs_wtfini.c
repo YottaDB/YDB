@@ -90,7 +90,7 @@ int	wcs_wtfini(gd_region *reg, boolean_t do_is_proc_alive_check, cache_rec_ptr_t
 	unix_db_info		*udi;
 	unsigned int		n_bts;
 	int			lcnt;
-	uint4			epid;
+	uint4			epid, epid_pstarttime;
 	ht_ent_int4		*tabent;
 	que_ent_ptr_t		next, prev, qent;
 	void_ptr_t		retcsrptr;
@@ -220,6 +220,7 @@ int	wcs_wtfini(gd_region *reg, boolean_t do_is_proc_alive_check, cache_rec_ptr_t
 		restart_errno = 0;
 		requeue = REQUEUE_TO_WIP;
 		epid = cr->epid;
+		epid_pstarttime = cr->epid_pstarttime;
 		if (EINPROGRESS == aio_errno)
 		{
 			if (do_is_proc_alive_check && (process_id != epid))
@@ -238,7 +239,7 @@ int	wcs_wtfini(gd_region *reg, boolean_t do_is_proc_alive_check, cache_rec_ptr_t
 					pid_alive = (boolean_t)(UINTPTR_T)tabent->value - 1;
 				else
 				{
-					pid_alive = is_proc_alive(epid, 0);
+					pid_alive = is_proc_alive(epid, epid_pstarttime);
 					new_pid = add_hashtab_int4(&wtfini_pid_ht, (uint4 *)&epid,
 								(void *)(UINTPTR_T)(pid_alive + 1), &tabent);
 					assert(new_pid);
@@ -264,6 +265,7 @@ int	wcs_wtfini(gd_region *reg, boolean_t do_is_proc_alive_check, cache_rec_ptr_t
 					{
 						requeue = REQUEUE_TO_ACTIVE;
 						cr->epid = 0;	/* Clear this since the process that issued the write is dead */
+						cr->epid_pstarttime = 0;
 					}
 				}
 			}
@@ -307,8 +309,11 @@ int	wcs_wtfini(gd_region *reg, boolean_t do_is_proc_alive_check, cache_rec_ptr_t
 				 * We need to see whether the update process is still alive. If not, reset in_cw_set.
 				 */
 				assert(REQUEUE_TO_WIP == requeue);
-				if (!cr->bt_index && cr->in_cw_set && !is_proc_alive(cr->in_cw_set, 0))
+				if (!cr->bt_index && cr->in_cw_set && !is_proc_alive(cr->in_cw_set, cr->in_cw_set_pstarttime))
+				{
 					cr->in_cw_set = 0;
+					cr->in_cw_set_pstarttime = 0;
+				}
 				if (cr->bt_index || !cr->in_cw_set)
 					requeue = REQUEUE_TO_FREE;
 			} else
@@ -317,7 +322,7 @@ int	wcs_wtfini(gd_region *reg, boolean_t do_is_proc_alive_check, cache_rec_ptr_t
 				 * Assert accordingly.
 				 */
 				assert((0 < aio_errno)
-					|| ((0 == aio_errno) && (!dbg_skip_wcs_wt_restart || (epid && !is_proc_alive(epid, 0)))));
+					|| ((0 == aio_errno) && (!dbg_skip_wcs_wt_restart || (epid && !is_proc_alive(epid, epid_pstarttime)))));
 				WCS_OPS_TRACE(csa, process_id, wcs_ops_wtfini3, cr->blk, GDS_ANY_ABS2REL(csa,cr),	\
 					cr->dirty, dbg_wtfini_lcnt, aio_errno);
 				/* Now that the IO is complete with some sort of error, handle the asyncio like is done in
@@ -369,6 +374,7 @@ int	wcs_wtfini(gd_region *reg, boolean_t do_is_proc_alive_check, cache_rec_ptr_t
 			cr->dirty = 0;
 			cnl->wcs_buffs_freed++;
 			cr->epid = 0;
+			cr->epid_pstarttime = 0;
 			SUB_ENT_FROM_WIP_QUE_CNT(cnl);
 			ADD_ENT_TO_FREE_QUE_CNT(cnl);
 			if (cr->twin)

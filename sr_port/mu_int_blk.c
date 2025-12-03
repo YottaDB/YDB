@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -331,16 +331,16 @@ boolean_t mu_int_blk(
 	if (debug_mupip)
 		util_out_print("MUPIP INFO: 0x!@XQ:!UL:!UL", TRUE, &blk, ((blk_hdr_ptr_t)blk_base)->bver, blk_levl);
 #endif
-	if (!muint_fast)
-	{	/* conditions of the if below may need adjustment as versions go forward */
-		if ((GDSV7m == mu_int_data.certified_for_upgrade_to) && (BLK_ID_32_VER >= ondsk_blkver)
-				&& (LCL_MAP_LEVL != blk_levl))
+	/* conditions of the if below may need adjustment as versions go forward */
+	if ((GDSV7m == mu_int_data.certified_for_upgrade_to)
+			&& (BLK_ID_32_VER >= ondsk_blkver)
+			&& (LCL_MAP_LEVL != blk_levl)
+			&& (0 != blk_levl))	/* in GDSV7m only count index blocks */
 			mu_int_blks_to_upgrd++;
-		if (tn_reset_this_reg)
-		{
-			((blk_hdr_ptr_t)blk_base)->tn = 1;
-			mu_int_write(blk, blk_base);
-		}
+	if (!muint_fast && tn_reset_this_reg)
+	{
+		((blk_hdr_ptr_t)blk_base)->tn = 1;
+		mu_int_write(blk, blk_base);
 	}
 	/* pstar indicates that the current block is a (root block with only a star key) or not.
 		This is passed into mu_int_blk() as eb_ok */

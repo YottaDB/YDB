@@ -93,7 +93,7 @@ typedef union {
 		+ SIZEOF(sm_off_t) + SIZEOF(struct aiocb) + SIZEOF(uint4))
 #define SIZEOF_SECOND_HALF_CR (SIZEOF(cr_que_struct) + SIZEOF(cr_interlock) + SIZEOF(off_jnl_t) + (3 * SIZEOF(trans_num))\
 		+ SIZEOF(boolean_t) + (4 * SIZEOF(int4)) + (2 * SIZEOF(sm_off_t)) + (4 * SIZEOF(bool)) + SIZEOF(global_latch_t)\
-		+ SIZEOF(uint4) + BMLBLKSZ)
+		+ SIZEOF(uint4) + (4 * SIZEOF(uint4)) + BMLBLKSZ)
 typedef struct cache_rec_struct
 {
 	cr_que_struct	blkque; /* cache records whose block numbers hash to the same location */
@@ -165,6 +165,10 @@ typedef struct cache_rec_struct
 	bool		needs_first_write;	/* If this block needs to be written to disk for the first time,
 						 *  note it (only applicable for fullblockwrites) */
 	uint4		bml_pin;	/* PID of "holder" set in t_qread on behalf of callers */
+	uint4		r_epid_pstarttime; /* start time for r_epid */
+	uint4		in_tend_pstarttime;	/* Process start time for pid in in_tend */
+	uint4		epid_pstarttime;	/* Process start time for pid in epid */
+	uint4		in_cw_set_pstarttime;	/* Process start time for pid in in_cw_set */
 #ifdef	DEBUG_BML_PIN
 	block_id	bml_pin_blk;	/* PID of "holder" set in t_qread on behalf of callers */
 #endif
@@ -238,6 +242,10 @@ typedef struct cache_state_rec_struct
 	bool		needs_first_write;	/* If this block needs to be written to disk for the first time,
 						 *  note it (only applicable for fullblockwrites) */
 	uint4		bml_pin;	/* PID of "holder" set in t_qread on behalf of callers */
+	uint4		r_epid_pstarttime; /* start time for r_epid */
+	uint4		in_tend_pstarttime;	/* Process start time for pid in in_tend */
+	uint4		epid_pstarttime;	/* Process start time for pid in epid */
+	uint4		in_cw_set_pstarttime;	/* Process start time for pid in in_cw_set */
 #ifdef	DEBUG_BML_PIN
 	block_id	bml_pin_blk;	/* PID of "holder" set in t_qread on behalf of callers */
 #endif
@@ -1172,6 +1180,7 @@ MBSTART {												\
 	crarray[crarrayindex] = cr;									\
 	crarrayindex++;											\
 	cr->in_cw_set = process_id;									\
+	cr->in_cw_set_pstarttime = pstarttime;								\
 } MBEND
 
 /* Macro to be used whenever cr->in_cw_set needs to be re-set (UNPIN) in TP or non-TP) */
@@ -1194,6 +1203,7 @@ MBSTART {										\
 		assert((process_id == in_tend) || (0 == in_tend));			\
 		assert((process_id == data_invalid) || (0 == data_invalid));		\
 		cr->in_cw_set = 0;							\
+		cr->in_cw_set_pstarttime = 0;						\
 	}										\
 } MBEND
 
@@ -1263,6 +1273,7 @@ MBSTART {									\
 	SHM_WRITE_MEMORY_BARRIER;												\
 	assert(process_id == CR->in_tend);	/* should still be valid */							\
 	CR->in_tend = 0;													\
+	CR->in_tend_pstarttime = 0;												\
 }
 
 /* Macro to check that UNPIN of cr is complete (i.e. cr->in_cw_set has been reset to 0) for the entire cr_array in case of a
@@ -1760,6 +1771,23 @@ MBSTART {															\
 	ATOMIC_FETCH_ADD(&(CSA)->gvstats_rec_p->COUNTER, INCREMENT, memory_order_relaxed);	/* private or shared stats */	\
 	ATOMIC_FETCH_ADD(&(CNL)->gvstats_rec.COUNTER, INCREMENT, memory_order_relaxed);		/* database stats */		\
 } MBEND
+
+#define INCR_LCL_GVSTATS_COUNTER(CSA, COUNTER, INCREMENT)				\
+MBSTART {										\
+	(CSA)->COUNTER += (INCREMENT);							\
+} MBEND
+
+#define	ACCUMULATE_LCL_GVSTATS_COUNTER(CSA, CNL, COUNTER)									\
+MBSTART {															\
+	/* If CNL is invalid, just continue to increment locally (INCR_LCL) */							\
+	if ((CNL) && (CSA) && (CSA)->COUNTER)											\
+	{															\
+		ATOMIC_FETCH_ADD(&(CSA)->gvstats_rec_p->COUNTER, (CSA)->COUNTER, memory_order_relaxed);	/* solo/shared stats */	\
+		ATOMIC_FETCH_ADD(&(CNL)->gvstats_rec.COUNTER, (CSA)->COUNTER, memory_order_relaxed);	/* database stats */	\
+		(CSA)->COUNTER = 0;												\
+	}															\
+} MBEND
+
 
 #define	SYNC_RESERVEDDBFLAGS_REG_CSA_CSD(REG, CSA, CSD, CNL)								\
 MBSTART {														\
@@ -2909,6 +2937,7 @@ typedef struct	sgmnt_addrs_struct
 							 * if internal. Set by GRAB_LOCK_CRIT_AND_SYNC().
 							 */
 	boolean_t	in_read_wait;		/* TRUE if we are waiting in tq_read() for another process to complete a read */
+	unsigned long	n_cache_reads;
 } sgmnt_addrs;
 
 typedef struct gd_binding_struct

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -14,7 +14,7 @@
 
 /* Declare parms for mlk_prcblk_add.c */
 
-boolean_t	mlk_prcblk_add(gd_region *region, mlk_ctldata_ptr_t ctl, mlk_shrblk_ptr_t d, uint4 pid);
+boolean_t	mlk_prcblk_add(gd_region *region, mlk_ctldata_ptr_t ctl, mlk_shrblk_ptr_t d, uint4 pid, uint4 pstarttime);
 
 #define MLK_PRCBLK_ADD_DEFINED
 

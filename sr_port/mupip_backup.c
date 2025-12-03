@@ -1209,7 +1209,7 @@ repl_inst_bkup_done2:
 				memcpy(&sbufh_p->shadow_file_header, cs_data, SGMNT_HDR_LEN);
 				if (BACKUP_NOT_IN_PROGRESS != cs_addrs->nl->nbb)
 				{
-					if (TRUE == is_proc_alive(sbufh_p->backup_pid, sbufh_p->backup_image_count))
+					if (TRUE == is_proc_alive(sbufh_p->backup_pid, 0))
 					{
 					    	/* someone else is doing the backup */
 						gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(5) ERR_BKUPRUNNING, 3,

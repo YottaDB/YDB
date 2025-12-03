@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -14,9 +14,11 @@
 
 #include "gtm_unistd.h"
 #include "getjobnum.h"
+#include "is_proc_alive.h"
 
 GBLREF	uint4	process_id;
 GBLREF	uid_t	user_id;
+GBLREF	uint4	pstarttime;
 
 void getjobnum(void)
 {
@@ -25,4 +27,5 @@ void getjobnum(void)
 	SETUP_THREADGBL_ACCESS;
 	process_id = getpid();
 	user_id = (uint4)getuid();
+	pstarttime = getpstart(process_id);
 }

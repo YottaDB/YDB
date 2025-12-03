@@ -242,6 +242,7 @@ typedef struct gvtr_invoke_parms_struct
 			 */													\
 			assert(!jgbl.forw_phase_recovery);									\
 			LCL_TSTART = TRUE;											\
+			DEBUG_ONLY(ACCUMULATE_LCL_GVSTATS_COUNTER(CSA, CSA->nl, n_cache_reads));				\
 			 /* 0 ==> save no locals but RESTART OK */ 								\
 			op_tstart((IMPLICIT_TSTART + IMPLICIT_TRIGGER_TSTART), TRUE, &literal_batch, 0);			\
 			/* Ensure that the op_tstart done above has set up the TP frame and that the first entry is		\

@@ -339,7 +339,7 @@ void	mur_extract_epoch(jnl_ctl_list *jctl, enum broken_type recstat, jnl_record 
 	EXTQW(rec->jrec_epoch.blks_to_upgrd);
 	EXTQW(rec->jrec_epoch.free_blocks);
 	EXTQW(rec->jrec_epoch.total_blks);
-	EXTINT(rec->jrec_epoch.fully_upgraded); /* actually boolean_t */
+	EXTQW(rec->jrec_epoch.offset);
 	/* Extract upto 16 strm_seqno only if they are non-zero */
 	for (idx = 0; idx < MAX_SUPPL_STRMS; idx++)
 	{
@@ -350,6 +350,7 @@ void	mur_extract_epoch(jnl_ctl_list *jctl, enum broken_type recstat, jnl_record 
 			EXT_STRM_SEQNO(strm_seqno);
 		}
 	}
+	EXTINT(rec->jrec_epoch.fully_upgraded); /* actually boolean_t */
 	jnlext_write(jctl, rec, recstat, murgbl.extr_buff, extract_len);
 }
 

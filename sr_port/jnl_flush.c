@@ -24,6 +24,7 @@
 #include "gtm_threadgbl.h"
 
 GBLREF uint4 process_id;
+GBLREF uint4 pstarttime;
 
 uint4	jnl_flush(gd_region *reg)
 {
@@ -46,6 +47,7 @@ uint4	jnl_flush(gd_region *reg)
 		return SS_NORMAL;
 	jb = jpc->jnl_buff;
 	jb->blocked = process_id;
+	jb->blocked_pstarttime = pstarttime;
 	assert(jb->rsrv_freeaddr >= jb->freeaddr);
 	assert((jb->rsrv_freeaddr >= jb->dskaddr)
 		|| (gtm_white_box_test_case_enabled && (WBTEST_JNL_FILE_LOST_DSKADDR == gtm_white_box_test_case_number)));
@@ -66,5 +68,6 @@ uint4	jnl_flush(gd_region *reg)
 		|| TREF(gtm_test_fake_enospc)
 		|| (gtm_white_box_test_case_enabled && (WBTEST_JNL_FILE_LOST_DSKADDR == gtm_white_box_test_case_number)));
 	jb->blocked = 0;
+	jb->blocked_pstarttime = 0;
 	return status;
 }

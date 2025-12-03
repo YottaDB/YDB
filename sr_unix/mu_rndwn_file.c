@@ -336,7 +336,7 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone, boolean_t delete_s
 	struct stat		stat_buf;
 	struct semid_ds		semstat;
 	union semun		semarg;
-	uint4			status_msg, ss_pid;
+	uint4			status_msg, ss_pid, ss_pid_pstarttime;
 	shm_snapshot_t		*ss_shm_ptr;
 	gtm_uint64_t		sec_size, mmap_sz = 0;
 	gd_segment		*seg, *baseDBseg;
@@ -1316,7 +1316,8 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone, boolean_t delete_s
 			ss_get_lock(gv_cur_region); /* Snapshot initiator will wait until this cleanup is done */
 			ss_shm_ptr = (shm_snapshot_ptr_t)SS_GETSTARTPTR(csa);
 			ss_pid = ss_shm_ptr->ss_info.ss_pid;
-			if (ss_pid && !is_proc_alive(ss_pid, 0))
+			ss_pid_pstarttime = ss_shm_ptr->ss_info.ss_pid_pstarttime;
+			if (ss_pid && !is_proc_alive(ss_pid, ss_pid_pstarttime))
 				ss_release(NULL);
 			ss_release_lock(gv_cur_region);
 			/* If cnl->donotflush_dbjnl is set, it means mupip recover/rollback was interrupted and

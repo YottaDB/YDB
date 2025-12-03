@@ -560,6 +560,7 @@ enum cdb_sc	op_tcommit(void)
 				}
 				ENABLE_WBTEST_ABANDONEDKILL;
 				TP_CHANGE_REG_IF_NEEDED(si->gv_cur_region);
+				ACCUMULATE_LCL_GVSTATS_COUNTER(cs_addrs, cs_addrs->nl, n_cache_reads);
 				sgm_info_ptr = si;	/* needed in gvcst_expand_free_subtree */
 				gvcst_expand_free_subtree(si->kill_set_head);
 				assert(NULL != si->kill_set_head);

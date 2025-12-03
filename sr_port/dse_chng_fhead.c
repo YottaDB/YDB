@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -352,7 +352,6 @@ void dse_chng_fhead(void)
 				if (0 == STRCMP(buf, gtm_dbversion_table[index_x]))
 				{
 					cs_data->desired_db_format = (enum db_ver)index_x;
-					cs_data->fully_upgraded = FALSE;
 					break;
 				}
 			if (GDSVLAST <= index_x)
@@ -541,10 +540,7 @@ void dse_chng_fhead(void)
 	if ((CLI_PRESENT == cli_present("B_RECORD")) && (cli_get_hex64("B_RECORD", &tn)))
 		cs_data->last_rec_backup = tn;
 	if ((CLI_PRESENT == cli_present("BLKS_TO_UPGRADE")) && (cli_get_hex64("BLKS_TO_UPGRADE", (gtm_uint64_t *)&blkcnt)))
-	{
 		cs_data->blks_to_upgrd = blkcnt;
-		cs_data->fully_upgraded = FALSE;
-	}
 	if ((CLI_PRESENT == cli_present("MBM_SIZE")) && (cli_get_int("MBM_SIZE", &x)))
 	{
 		if (x < DIVIDE_ROUND_UP(BLK_ZERO_OFF(cs_data->start_vbn) - SGMNT_HDR_LEN, DISK_BLOCK_SIZE))
@@ -779,6 +775,7 @@ void dse_chng_fhead(void)
 		else
 			cs_data->writer_trigger_factor = x;
 	}
+	fileheader_sync(gv_cur_region);
 	DSE_REL_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit, nocrit_present, cs_addrs, gv_cur_region);
 	return;
 }

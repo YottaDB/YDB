@@ -80,6 +80,7 @@ GBLREF	gd_region		*gv_cur_region;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	uint4			pipe_child;
+GBLREF	uint4			pipe_child_pstarttime;
 GBLREF	uint4			process_id;
 GBLREF	boolean_t		debug_mupip;
 GBLREF	int4			backup_write_errno;
@@ -230,6 +231,7 @@ bool	mubinccpy (backup_reg_list *list)
 			break;
 		case backup_to_exec:
 			pipe_child = 0;
+			pipe_child_pstarttime = 0;
 			common_write = exec_write;
 			backup = (BFILE *)malloc(SIZEOF(BFILE));
 			backup->blksiz = DISK_BLOCK_SIZE;
@@ -649,7 +651,7 @@ bool	mubinccpy (backup_reg_list *list)
 			}
 			CLOSEFILE_RESET(backup->fd, rc);	/* resets "backup->fd" to FD_INVALID */
 			/* needs to wait till the child dies, because of the rundown issues */
-			if ((pipe_child > 0) && (FALSE != is_proc_alive(pipe_child, 0)))
+			if ((pipe_child > 0) && (FALSE != is_proc_alive(pipe_child, pipe_child_pstarttime)))
 			{
 				pid_t waitpid_res;
 
@@ -714,7 +716,7 @@ void exec_write(BFILE *bf, char *buf, int nbytes)
 	{
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) errno);
 		CLOSEFILE_RESET(bf->fd, rc);	/* resets "bf->fd" to FD_INVALID */
-		if ((pipe_child > 0) && (FALSE != is_proc_alive(pipe_child, 0)))
+		if ((pipe_child > 0) && (FALSE != is_proc_alive(pipe_child, pipe_child_pstarttime)))
 			WAITPID(pipe_child, (int *)&status, 0, waitpid_res);
 		backup_write_errno = errno;
 	}

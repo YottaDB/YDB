@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2021 Fidelity National Information	*
+ * Copyright (c) 2012-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -55,8 +55,13 @@ void recover_truncate(sgmnt_addrs *csa, sgmnt_data_ptr_t csd, gd_region* reg)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	if (NULL != csa->nl && csa->nl->trunc_pid && !is_proc_alive(csa->nl->trunc_pid, 0))
+interact1:
+	if (NULL != csa->nl && csa->nl->trunc_pid && !is_proc_alive(csa->nl->trunc_pid, csa->nl->trunc_pstart))
+	{
 		csa->nl->trunc_pid = 0;
+		csa->nl->trunc_pstart = 0;
+	}
+interact2:
 	if (!csd->before_trunc_total_blks)
 		return;
 	assert(((GDSVCURR == csd->desired_db_format) || (GDSV7m == csd->desired_db_format)
@@ -109,4 +114,8 @@ void recover_truncate(sgmnt_addrs *csa, sgmnt_data_ptr_t csd, gd_region* reg)
 			RTS_ERROR_CSA_ABT(csa, VARLSTCNT(4) ERR_DBFILERR, 2, DB_LEN_STR(reg));
 	}
 	csd->before_trunc_total_blks = 0; /* indicate CONSISTENT */
+	return;
+	assertpro(FALSE);	/* ensure we never reach the goto below */
+	goto interact1;		/* This suppresses the compiler warning about an used label. */
+	goto interact2;		/* This suppresses the compiler warning about an used label. */
 }

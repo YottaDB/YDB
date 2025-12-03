@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -37,9 +37,15 @@ GBLREF uint4	process_id;
 
 #define PROC_TABLE_SIZE 16384
 
-void fill_pid_table(mlk_shrblk_ptr_t d, pid_t *table, mlk_pvtctl_ptr_t pctl);
-void check_pids(pid_t *table, char *dead_table, sgmnt_addrs *csa);
-void clean_pids(mlk_shrblk_ptr_t d, pid_t *pid_table, char *dead_table, mlk_pvtctl_ptr_t pctl);
+typedef struct
+{
+        pid_t pid;
+        unsigned int pstart;
+} pidandstart_t;
+
+void fill_pid_table(mlk_shrblk_ptr_t d, pidandstart_t *table, mlk_pvtctl_ptr_t pctl);
+void check_pids(pidandstart_t *table, char *dead_table, sgmnt_addrs *csa);
+void clean_pids(mlk_shrblk_ptr_t d, pidandstart_t *pid_table, char *dead_table, mlk_pvtctl_ptr_t pctl);
 
 /**
  * Clears the orphaned locks in region
@@ -51,12 +57,12 @@ void mlk_shrclean(mlk_pvtctl_ptr_t pctl)
 {
 	boolean_t	was_crit;
 	char		dead_table[PROC_TABLE_SIZE];
-	pid_t		pid_table[PROC_TABLE_SIZE];
+	pidandstart_t	pid_table[PROC_TABLE_SIZE];
 
 	was_crit = LOCK_CRIT_HELD(pctl->csa);
 	assert(was_crit && (INTRPT_IN_MLK_SHM_MODIFY == intrpt_ok_state));
 	assert(pctl->ctl->lock_gc_in_progress.u.parts.latch_pid == process_id);
-	memset(pid_table, 0, SIZEOF(pid_t) * PROC_TABLE_SIZE);
+	memset(pid_table, 0, SIZEOF(pidandstart_t) * PROC_TABLE_SIZE);
 	memset(dead_table, 0, SIZEOF(char) * PROC_TABLE_SIZE);
 	if (!pctl->ctl->blkroot)
 		return;
@@ -77,7 +83,7 @@ void mlk_shrclean(mlk_pvtctl_ptr_t pctl)
  * @param [out] table which will contain the PID's currently holding locks or on the queue
  * @param [in] ctl pointer to the lock table control structure
  */
-void fill_pid_table(mlk_shrblk_ptr_t d, pid_t *table, mlk_pvtctl_ptr_t pctl)
+void fill_pid_table(mlk_shrblk_ptr_t d, pidandstart_t *table, mlk_pvtctl_ptr_t pctl)
 {
 	int4			index;
 	mlk_prcblk_ptr_t	p;
@@ -104,12 +110,14 @@ void fill_pid_table(mlk_shrblk_ptr_t d, pid_t *table, mlk_pvtctl_ptr_t pctl)
 		if (d->owner)
 		{
 			index = d->owner % PROC_TABLE_SIZE;
-			table[index] = d->owner;
+			table[index].pid = d->owner;
+			table[index].pstart = d->pstart;
 		}
 		for (p = d->pending ? (mlk_prcblk_ptr_t)R2A(d->pending) : 0; p && p->next; p = (mlk_prcblk_ptr_t)R2A(p->next))
 		{
 			index = p->process_id % PROC_TABLE_SIZE;
-			table[index] = p->process_id;
+			table[index].pid = p->process_id;
+			table[index].pstart = p->process_start;
 		}
 		if (d2 == d)
 			break;
@@ -124,22 +132,22 @@ void fill_pid_table(mlk_shrblk_ptr_t d, pid_t *table, mlk_pvtctl_ptr_t pctl)
  * @param [out] dead_table will contain 1 in dead_table[i] if the table[i] is dead
  * @param [in] csa used to verify we don't hold lock crit
 */
-void check_pids(pid_t *pid_table, char *dead_table, sgmnt_addrs *csa)
+void check_pids(pidandstart_t *pid_table, char *dead_table, sgmnt_addrs *csa)
 {
 	uint4	i;
 
 	assert(INTRPT_IN_MLK_SHM_MODIFY == intrpt_ok_state);
 	for (i = 0; i < PROC_TABLE_SIZE; i++)
 	{
-		if (pid_table[i] != 0)
+		if (pid_table[i].pid != 0)
 		{
-			dead_table[i] = !is_proc_alive(pid_table[i], 0);
+			dead_table[i] = !is_proc_alive(pid_table[i].pid, pid_table[i].pstart);
 		}
 	}
 	WBTEST_ONLY(WBTEST_MLOCK_HANG_AFTER_SCAN, SLEEP_USEC(10000ULL * MILLISECS_IN_SEC, 0););
 }
 
-void clean_pids(mlk_shrblk_ptr_t d, pid_t *pid_table, char *dead_table, mlk_pvtctl_ptr_t pctl)
+void clean_pids(mlk_shrblk_ptr_t d, pidandstart_t *pid_table, char *dead_table, mlk_pvtctl_ptr_t pctl)
 {
 	boolean_t		deleted;
 	int4			index;
@@ -157,18 +165,20 @@ void clean_pids(mlk_shrblk_ptr_t d, pid_t *pid_table, char *dead_table, mlk_pvtc
 		for (p = cur->pending ? (mlk_prcblk_ptr_t)R2A(cur->pending) : 0; p && p->next; p = (mlk_prcblk_ptr_t)R2A(p->next))
 		{
 			index = p->process_id % PROC_TABLE_SIZE;
-			if (p->process_id && ((pid_table[index] == p->process_id) && dead_table[index]))
+			if (p->process_id && ((pid_table[index].pid == p->process_id) && dead_table[index]))
 			{
 				p->process_id = 0;
+				p->process_start = 0;
 				p->ref_cnt = 0;
 			}
 		}
 		mlk_prcblk_delete(pctl, cur, 0);
 		index = cur->owner % PROC_TABLE_SIZE;
-		if (cur->owner == 0 || ((pid_table[index] == cur->owner) && dead_table[index]))
+		if (cur->owner == 0 || ((pid_table[index].pid == cur->owner) && dead_table[index]))
 		{
 			assertpro(cur->lsib != INVALID_LSIB_MARKER);
 			cur->owner = 0;
+			cur->pstart = 0;
 			cur->sequence = pctl->csa->hdr->trans_hist.lock_sequence++;
 			deleted = mlk_shrblk_delete_if_empty(pctl, cur);
 		} else

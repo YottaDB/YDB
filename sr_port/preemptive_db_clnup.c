@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2020 Fidelity National Information	*
+ * Copyright (c) 2012-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -82,9 +82,11 @@ void preemptive_db_clnup(int preemptive_severe)
 	{
 		for (si = first_sgm_info;  si != NULL; si = si->next_sgm_info)
 		{
+			csa = si->tp_csa;
+			/* The equivalent of the below for the non-tp case is done inside of t_abort_cleanup() */
+			ACCUMULATE_LCL_GVSTATS_COUNTER(csa, csa->nl, n_cache_reads);
 			if (NULL != si->kip_csa)
 			{
-				csa = si->tp_csa;
 				assert(si->tp_csa == si->kip_csa);
 				DECR_KIP(csa->hdr, csa, si->kip_csa);
 			}

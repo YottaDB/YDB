@@ -38,7 +38,9 @@ typedef enum
 typedef struct snapshot_info_struct
 {
 	uint4		ss_pid;				/* PID of the process doing the snapshot */
+	uint4		ss_pid_pstarttime;		/* Start time of the process */
 	uint4		db_blk_size; 			/* Database block size */
+	uint4		uint4_filler; 			/* Padding */
 	trans_num	snapshot_tn;			/* Transaction number at which the snapshot started */
 	block_id	free_blks;			/* Free blocks at the time of snapshot */
 	block_id	total_blks;			/* Total blocks at the time of snapshot */
@@ -121,6 +123,7 @@ typedef snapshot_context_t	*snapshot_context_ptr_t;
 #define SS_DEFAULT_INIT_INFO(ss_ptr)				\
 {								\
 	ss_ptr->ss_info.ss_pid = 0;				\
+	ss_ptr->ss_info.ss_pid_pstarttime = 0;			\
 	ss_ptr->ss_info.snapshot_tn = 0;			\
 	ss_ptr->ss_info.db_blk_size = 0;			\
 	ss_ptr->ss_info.free_blks = 0;				\

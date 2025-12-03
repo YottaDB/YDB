@@ -90,6 +90,7 @@ int gtmsource_end1(boolean_t auto_shutdown)
 	UNSET_SRC_NEEDS_JPLWRITES(jnlpool, jnlpool->gtmsource_local);
 	jnlpool->gtmsource_local->src_filter_pid = 0;
 	jnlpool->gtmsource_local->gtmsource_pid = 0;
+	jnlpool->gtmsource_local->gtmsource_pstarttime = 0;
 	jnlpool->gtmsource_local->gtmsource_state = GTMSOURCE_DUMMY_STATE;
 	/* Detach from journal pool, except if IFOE is configured, in which case we need the journal pool attached
 	 * so that we can check for instance freeze in database rundown, or if auto_shutdown is set.

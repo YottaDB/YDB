@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -90,6 +90,7 @@ void gtcml_chklck(cm_lckblkreg *reg, bool timed)
 								if (PROC_DEAD(d, time, icount, status))
 								{	/* process that owned lock has died, free lock */
 									d->owner = 0;
+									d->pstart = 0;
 									lck->sequence = csa->hdr->trans_hist.lock_sequence++;
 								}
 							} else

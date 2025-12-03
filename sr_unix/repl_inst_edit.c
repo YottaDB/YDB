@@ -325,6 +325,7 @@ void	repl_inst_edit(void)
 					gtmsourcelocal_ptr->connect_jnl_seqno = 0;
 					UNSET_SRC_NEEDS_JPLWRITES(jnlpool,gtmsourcelocal_ptr);
 					gtmsourcelocal_ptr->gtmsource_pid = 0;
+					gtmsourcelocal_ptr->gtmsource_pstarttime = 0;
 					/* Clean the corresponding gtmsrc_lcl structure */
 					COPY_GTMSOURCELOCAL_TO_GTMSRCLCL(gtmsourcelocal_ptr, gtmsrclcl_ptr);
 					gtmsourcelocal_ptr->last_flush_resync_seqno = gtmsourcelocal_ptr->read_jnl_seqno;

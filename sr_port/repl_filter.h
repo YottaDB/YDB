@@ -74,6 +74,8 @@ typedef int (*intlfltr_t)(uchar_ptr_t, uint4 *, uchar_ptr_t, uint4 *, uint4);
  *					The filter format did not change because ALIGN record is not replicated.
  *	V24	V28	GT.M V7.0-000	Block IDs were extended from 32-bit to 64-bit
  *					The filter format did not change since none of the modified records are replicated.
+ *	V24	V29	GT.M V7.1-010	EPOCH record reorganized and fillers combined to support csd->offset inclusion
+ *					Filter format unchanged since EPOCH records are not replicated
  */
 
 typedef enum
@@ -101,6 +103,7 @@ typedef enum
 	REPL_JNL_V26,		/* enum corresponding to journal format V26 */
 	REPL_JNL_V27,		/* enum corresponding to journal format V27 */
 	REPL_JNL_V28,		/* enum corresponding to journal format V28 */
+	REPL_JNL_V29,		/* enum corresponding to journal format V29 */
 	REPL_JNL_MAX
 } repl_jnl_t;
 
@@ -171,6 +174,7 @@ GBLREF	intlfltr_t repl_filter_cur2old[JNL_VER_THIS - JNL_VER_EARLIEST_REPL + 1];
 #define V26_JNL_VER		26
 #define V27_JNL_VER		27
 #define V28_JNL_VER		28
+#define V29_JNL_VER		29
 
 #define	V17_NULL_RECLEN		40	/* size of a JRT_NULL record in V17/V18 jnl format */
 #define	V19_NULL_RECLEN		40	/* size of a JRT_NULL record in V19/V20 jnl format */

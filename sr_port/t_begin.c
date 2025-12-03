@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -29,6 +29,8 @@
 #include "db_snapshot.h"
 #ifdef DEBUG
 #include "tp_frame.h"
+#include "mu_upgrade_bmm.h"
+#include "mupip_reorg_encrypt.h"
 #endif
 
 GBLREF	boolean_t		mu_reorg_process, need_kip_incr;
@@ -47,6 +49,8 @@ GBLREF	volatile int4		fast_lock_count;
 #ifdef DEBUG
 GBLREF	sgmnt_addrs		*reorg_encrypt_restart_csa;
 GBLREF	uint4			bml_save_dollar_tlevel;
+GBLREF	uint4			mu_upgrade_in_prog;
+GBLREF  uint4			mu_reorg_encrypt_in_prog;
 #endif
 
 error_def(ERR_MMREGNOACCESS);
@@ -77,6 +81,13 @@ void t_begin(uint4 err, uint4 upd_trans) 	/* err --> error code for current gvcs
 	update_trans = upd_trans;
 	t_err = err;
 	csa = cs_addrs;
+	/* MUPIP UPGRADE runs standalone, making it safe, in some cases, to not bracket its work with t_start/end/retry/abort  */
+	/* MUPIP REORG -UPGRADE is not standalone. Nevertheless it seems it does not bracket its work with symmetrical
+	 * t_start/end/retry.
+	 */
+	assert(!csa->n_cache_reads || IS_DSE_IMAGE || (MUPIP_REORG_IN_PROG_TRUE == mu_reorg_encrypt_in_prog)
+			|| (MUPIP_UPGRADE_IN_PROGRESS == mu_upgrade_in_prog)
+			|| (MUPIP_REORG_UPGRADE_IN_PROGRESS == mu_upgrade_in_prog));
 	if ((NULL == csa->db_addrs[0]) && (dba_mm == csa->hdr->acc_meth))
 	{
 		RTS_ERROR_CSA_ABT(csa, VARLSTCNT(6) ERR_MMREGNOACCESS, 4, REG_LEN_STR(csa->region),

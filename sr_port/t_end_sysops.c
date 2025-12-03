@@ -148,7 +148,7 @@ GBLREF	sgm_info		*sgm_info_ptr;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	uint4			mu_reorg_encrypt_in_prog;	/* non-zero if MUPIP REORG is in progress */
-GBLREF	uint4			dollar_tlevel, process_id, update_array_size;
+GBLREF	uint4			dollar_tlevel, process_id, pstarttime, update_array_size;
 GBLREF	uint4			mu_upgrade_in_prog;		/* non-zero if MUPIP REORG UPGRADE/DOWNGRADE is in progress */
 GBLREF	unsigned char		cw_set_depth;
 GBLREF	unsigned int		cr_array_index, t_tries;
@@ -560,6 +560,7 @@ enum cdb_sc bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 				{	/* release the r_epid lock on the valid cache-record returned from db_csh_getn */
 					assert(save_cr->r_epid == process_id);
 					save_cr->r_epid = 0;
+					save_cr->r_epid_pstarttime = 0;
 					assert(0 == save_cr->read_in_progress);
 					RELEASE_BUFF_READ_LOCK(save_cr);
 				}
@@ -607,6 +608,7 @@ enum cdb_sc bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 		 * new cr with cr->stopped=TRUE got created).
 		 */
 		cr->in_tend = process_id;
+		cr->in_tend_pstarttime = pstarttime;
 		if (gds_t_writemap == mode)
 			BML_RSRV_SET(cr, blkid, process_id);
 		assert(0 == cr->dirty);
@@ -635,6 +637,7 @@ enum cdb_sc bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 				if (gds_t_writemap == mode)
 					BML_RSRV_IF_EXP(cr, CR_BLKEMPTY, process_id, 0);
 				cr->in_tend = 0;
+				cr->in_tend_pstarttime = 0;
 				return cdb_sc_cacheprob;
 			}
 		} else
@@ -678,6 +681,7 @@ enum cdb_sc bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 		assert(0 == cr->in_tend);
 		assert(0 == cr->data_invalid);
 		cr->in_tend = process_id;
+		cr->in_tend_pstarttime = pstarttime;
 		if (gds_t_writemap == mode)
 			BML_RSRV_SET(cr, blkid, process_id);
 		wait_for_rip = FALSE;
@@ -705,6 +709,7 @@ enum cdb_sc bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 					if (gds_t_writemap == mode)
 						BML_RSRV_IF_EXP(cr, CR_BLKEMPTY, process_id, 0);
 					cr->in_tend = 0;
+					cr->in_tend_pstarttime = 0;
 					return cdb_sc_cacheprob;
 				}
 			}
@@ -749,6 +754,7 @@ enum cdb_sc bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 						retcrptr = remqh((que_ent_ptr_t)((sm_uc_ptr_t)save_cr + save_cr->blkque.bl));
 						assert(retcrptr == save_cr);
 						save_cr->r_epid = 0;
+						save_cr->r_epid_pstarttime = 0;
 						assert(0 == save_cr->read_in_progress);
 						RELEASE_BUFF_READ_LOCK(save_cr);
 						assert(blkid == save_cr->blk);
@@ -763,6 +769,7 @@ enum cdb_sc bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 					if (gds_t_writemap == mode)
 						BML_RSRV_IF_EXP(cr, CR_BLKEMPTY, process_id, 0);
 					cr->in_tend = 0;
+					cr->in_tend_pstarttime = 0;
 					return cdb_sc_cacheprob;
 				}
 				assert(NULL != cr_new);
@@ -792,7 +799,9 @@ enum cdb_sc bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 							BML_RSRV_IF_EXP(cr, CR_BLKEMPTY, process_id, 0);
 						assert(process_id == cr->in_tend);
 						cr->in_tend = 0;
+						cr->in_tend_pstarttime = 0;
 						cr_new->in_tend = process_id;
+						cr_new->in_tend_pstarttime = pstarttime;
 						cr_new->ondsk_blkver = cr->ondsk_blkver; /* copy blk version from old cache rec */
 						if (gds_t_writemap == mode)
 						{	/* gvcst_map_build doesn't do first_copy */
@@ -874,6 +883,7 @@ enum cdb_sc bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 						 */
 						assert(process_id == cr_new->r_epid);	/* "db_csh_getn" returned "cr_new" */
 						cr_new->r_epid = 0;
+						cr_new->r_epid_pstarttime = 0;
 						assert(0 == cr_new->read_in_progress);
 						RELEASE_BUFF_READ_LOCK(cr_new);
 						TREF(block_now_locked) = NULL;
@@ -912,6 +922,7 @@ enum cdb_sc bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 				if (gds_t_writemap == mode)
 					BML_RSRV_IF_EXP(cr, CR_BLKEMPTY, process_id, 0);
 				cr->in_tend = 0;
+				cr->in_tend_pstarttime = 0;
 				return cdb_sc_cacheprob;
 			}
 			assert(-1 == cr->read_in_progress);
@@ -943,6 +954,7 @@ enum cdb_sc bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 		}
 		assert(cr->r_epid == process_id);
 		cr->r_epid = 0;
+		cr->r_epid_pstarttime = 0;
 		assert(0 == cr->read_in_progress);
 		RELEASE_BUFF_READ_LOCK(cr);
 		TREF(block_now_locked) = NULL;
@@ -955,8 +967,8 @@ enum cdb_sc bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 		|| (inctn_blkupgrd != inctn_opcode) || (cr->ondsk_blkver == desired_db_format));
 	assert(!mu_upgrade_in_prog || !mu_reorg_encrypt_in_prog || (gds_t_acquired != mode));
 	assert((gds_t_write_recycled != mode) || mu_upgrade_in_prog || mu_reorg_encrypt_in_prog);
-	if (!cs_data->fully_upgraded)
-	{
+	if (!cs_data->fully_upgraded && (0 == csd->blks_to_upgrd_subzero_error))
+	{	/* rare failure to commit after doing this here may cause count error, but, moving it to phase 2, risks deadlock */
 		assert(GDSV6 < cs_data->desired_db_format);
 		if (GDSV7m != cs->ondsk_blkver)
 		{
@@ -1119,6 +1131,10 @@ enum cdb_sc bg_update_phase2(cw_set_element *cs, trans_num ctn, trans_num effect
 	}
 	/* Update cr->ondsk_blkver to reflect the current desired_db_format. */
 	SET_ONDSK_BLKVER(cr, csd, ctn);
+#ifdef	DEBUG
+	if (csd->fully_upgraded && cs->level)
+		assert((cs->ondsk_blkver >= csd->desired_db_format) && (cr->ondsk_blkver >= csd->desired_db_format));
+#endif
 	if (SNAPSHOTS_IN_PROG(cs_addrs) && (NULL != cs->old_block))
 	{
 		lcl_ss_ctx = SS_CTX_CAST(csa->ss_ctx);

@@ -185,6 +185,7 @@ void gvcst_redo_root_search()
 
 	SETUP_THREADGBL_ACCESS;
 	ESTABLISH(gvcst_redo_root_search_ch);
+	ACCUMULATE_LCL_GVSTATS_COUNTER(cs_addrs, cs_addrs->nl, n_cache_reads);
 	assert(!TREF(in_gvcst_redo_root_search)); /* Should never recurse. However, can be called from non-redo gvcst_root_search,
 						   * e.g. from op_gvname. In that case, the results of gvcst_redo_root_search are
 						   * discarded and the outer root search correctly sets gv_target->root.

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -41,11 +41,15 @@
 #include "repl_comm.h"
 #include "sgtm_putmsg.h"
 #include "repl_msg.h"
+#include "repl_shutdcode.h"
+#include "read_db_files_from_gld.h"
+#include "updproc.h"
 
 GBLDEF	int                	gtmrecv_listen_sock_fd = FD_INVALID;
 GBLREF	gtmrecv_options_t  	gtmrecv_options;
 GBLREF	intrpt_state_t		intrpt_ok_state;
 GBLREF  FILE                    *gtmrecv_log_fp;
+GBLREF	boolean_t		is_rcvr_server;
 
 error_def(ERR_GETADDRINFO);
 error_def(ERR_REPLCOMM);
@@ -168,8 +172,17 @@ int gtmrecv_comm_init(in_port_t port)
 		freeaddrinfo(ai_ptr);
 		ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 		CLOSEFILE_RESET(gtmrecv_listen_sock_fd, rc);	/* resets "gtmrecv_listen_sock_fd" to FD_INVALID */
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
 				RTS_ERROR_STRING(err_buffer), ERRNO);
+		/* A bind failure is fatal. If running as a Receiver Server, perform a full shutdown to clean up
+		 * the Update Process and the Helpers.
+		 */
+		if (is_rcvr_server)
+		{
+			gtmrecv_endupd();
+			gtmrecv_end_helpers(TRUE);
+		}
+		gtmrecv_exit(ABNORMAL_SHUTDOWN);
 		return (-1);
 	}
 

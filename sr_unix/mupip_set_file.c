@@ -63,7 +63,8 @@
 #include "get_fs_block_size.h"
 #include "interlock.h"
 #include "min_max.h"
-
+#define TIME_SIZE	15		/* hh:mm:ss:dd + buffer */
+#define ONE_HOUR	(10 * 100 * 60 * 60)
 GBLREF	bool			in_backup;
 GBLREF	bool			region;
 GBLREF	gd_region		*gv_cur_region;
@@ -96,6 +97,7 @@ error_def(ERR_OFRZACTIVE);
 error_def(ERR_READONLYNOBG);
 error_def(ERR_SETQUALPROB);
 error_def(ERR_TEXT);
+error_def(ERR_TIMRBADVAL);
 error_def(ERR_WCERRNOTCHG);
 error_def(ERR_WCWRNNOTCHG);
 
@@ -113,14 +115,15 @@ MBSTART {									\
 int4 mupip_set_file(int db_fn_len, char *db_fn)
 {
 	boolean_t		bypass_partial_recov, flush_buffers = FALSE, got_standalone, need_standalone = FALSE,
-				acc_meth_changing, long_blk_id;
+				acc_meth_changing, long_blk_id, flush_time_status;
 	char			acc_spec[MAX_ACC_METH_LEN + 1], *command = "MUPIP SET VERSION", *errptr, exit_stat, *fn,
 				ver_spec[MAX_DB_VER_LEN + 1];
 	enum db_acc_method	access, access_new;
-	uint4			fbwsize;
+	uint4			fbwsize, new_flush_time;
 	int4			dblksize;
 	gd_region		*temp_cur_region;
 	gd_segment		*seg;
+	char			timebuf[TIME_SIZE], secbuf[32];
 	int			asyncio_status, defer_allocate_status, defer_status, disk_wait_status, d_rsrvd_bytes_status,
 				encryptable_status,encryption_complete_status, epoch_taper_status, extn_count_status, fd,
 				fn_len, glbl_buff_status, gtmcrypt_errno, hard_spin_status, inst_freeze_on_error_status,
@@ -223,6 +226,15 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 			exit_stat |= EXIT_ERR;
 		}
 		flush_buffers = TRUE;
+	}
+	if ((flush_time_status = cli_present("FLUSH_TIME")))
+	{
+		flush_time_status = cli_get_time("FLUSH_TIME", &new_flush_time);
+		if ((FALSE == flush_time_status) || ((ONE_HOUR < new_flush_time  || 0 >= new_flush_time)))
+		{
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) MAKE_MSG_WARNING(ERR_TIMRBADVAL));
+				exit_stat |= EXIT_ERR;
+		}
 	}
 	if ((full_blkwrt_status = cli_present("FULLBLKWRT")))
 	{
@@ -955,9 +967,8 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 				csd->problksplit = (uint4)new_problksplit;
 			if (extn_count_status)
 				csd->extension_size = (uint4)new_extn_count;
-			change_fhead_timer("FLUSH_TIME", csd->flush_time,
-					   (dba_bg == access_new ? TIM_FLU_MOD_BG : TIM_FLU_MOD_MM),
-					   FALSE);
+			if (flush_time_status)
+				csd->flush_time[0] = new_flush_time;
 			if (CLI_NEGATED == inst_freeze_on_error_status)
 				csd->freeze_on_fail = FALSE;
 			else if (CLI_PRESENT == inst_freeze_on_error_status)
@@ -1050,6 +1061,15 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 			if (d_rsrvd_bytes_status)
 				util_out_print("Database file !AD now has !UL data reserved bytes",
 						TRUE, fn_len, fn, csd->reserved_bytes);
+			if (flush_time_status)
+			{
+				SNPRINTF(timebuf, TIME_SIZE, "%2.2d:%2.2d:%2.2d:%2.2d", *csd->flush_time / 3600000,
+					(*csd->flush_time % 3600000) / 60000, (*csd->flush_time % 60000) / 1000,
+					(*csd->flush_time % 1000) / 10);
+				SNPRINTF(secbuf, sizeof(secbuf), "%.2f", (double)(*csd->flush_time) / 1000.0);
+				util_out_print("Database file !AD has flush_time set to !AD seconds (!AD)",
+						TRUE, fn_len, fn, LEN_AND_STR(secbuf), LEN_AND_STR(timebuf));
+			}
 			if (got_standalone)
 			{
 				assert(FD_INVALID != fd);

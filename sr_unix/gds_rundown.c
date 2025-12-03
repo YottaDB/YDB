@@ -155,7 +155,7 @@ int4 gds_rundown(boolean_t cleanup_udi, boolean_t delete_statsdb)
 	jnl_private_control	*jpc;
 	jnl_buffer_ptr_t	jbp;
 	shm_snapshot_t		*ss_shm_ptr;
-	uint4			ss_pid, onln_rlbk_pid, holder_pid;
+	uint4			ss_pid, ss_pid_pstarttime, onln_rlbk_pid, holder_pid, onln_rlbk_pstarttime;
 	boolean_t		is_statsDB, was_crit;
 	boolean_t		safe_mode; /* Do not flush or take down shared memory. */
 	boolean_t		bypassed_ftok = FALSE, bypassed_access = FALSE, may_bypass_ftok, inst_is_frozen;
@@ -317,7 +317,8 @@ int4 gds_rundown(boolean_t cleanup_udi, boolean_t delete_statsdb)
 	 * needs the access control lock as well. The only expection is we are online rollback and currently running down.
 	 */
 	onln_rlbk_pid = cnl->onln_rlbk_pid;
-	assert(!have_standalone_access || mupip_jnl_recover || !onln_rlbk_pid || !is_proc_alive(onln_rlbk_pid, 0));
+	onln_rlbk_pstarttime = cnl->onln_rlbk_pstarttime;
+	assert(!have_standalone_access || mupip_jnl_recover || !onln_rlbk_pid || !is_proc_alive(onln_rlbk_pid, onln_rlbk_pstarttime));
 	if (!have_standalone_access)
 	{
 		if (-1 == (ftok_semval = semctl(udi->ftok_semid, DB_COUNTER_SEM, GETVAL))) /* Check # of procs counted on FTOK */
@@ -500,6 +501,7 @@ int4 gds_rundown(boolean_t cleanup_udi, boolean_t delete_statsdb)
 	assert(1 == MAX_SNAPSHOTS);
 	ss_shm_ptr = (shm_snapshot_ptr_t)SS_GETSTARTPTR(csa);
 	ss_pid = ss_shm_ptr->ss_info.ss_pid;
+	ss_pid_pstarttime = ss_shm_ptr->ss_info.ss_pid_pstarttime;
 	is_cur_process_ss_initiator = (process_id == ss_pid);
 	if (ss_pid && (is_cur_process_ss_initiator || we_are_last_user))
 	{	/* Try getting snapshot crit latch. If we don't get latch, we won't hang for eternity and will skip
@@ -507,7 +509,7 @@ int4 gds_rundown(boolean_t cleanup_udi, boolean_t delete_statsdb)
 		 * INTEG or by a MUPIP RUNDOWN.
 		 */
 		if (ss_get_lock_nowait(reg) && (ss_pid == ss_shm_ptr->ss_info.ss_pid)
-		    && (is_cur_process_ss_initiator || !is_proc_alive(ss_pid, 0)))
+		    && (is_cur_process_ss_initiator || !is_proc_alive(ss_pid, ss_pid_pstarttime)))
 		{
 			ss_release(NULL);
 			ss_release_lock(reg);
@@ -879,7 +881,10 @@ int4 gds_rundown(boolean_t cleanup_udi, boolean_t delete_statsdb)
 	 * Do it before releasing crit (t_end relies on this ordering when accessing cnl->onln_rlbk_pid).
 	 */
 	if (jgbl.onlnrlbk)
+	{
 		cnl->onln_rlbk_pid = 0;
+		cnl->onln_rlbk_pstarttime = 0;
+	}
 	rel_crit(reg); /* Since we are about to detach from the shared memory, release crit and reset onln_rlbk_pid */
 	/* If we had skipped flushing journal and database buffers due to a concurrent online rollback, increment the counter
 	 * indicating that in the shared memory so that online rollback can report the # of such processes when it shuts down.

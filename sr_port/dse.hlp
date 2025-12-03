@@ -2540,11 +2540,6 @@
      o DSE SPAWN works with an argument. If the argument contains spaces,
        enclose it with quotes.
 
-   The SPAWN command has no qualifiers.
-
-   DSE SPAWN works with an argument. If the argument contains spaces, enclose
-   it with quotes.
-
 3 Examples
    Examples
 

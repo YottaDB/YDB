@@ -394,7 +394,7 @@ void clear_fake_enospc_if_master_dead(void)
 	assert(!multi_thread_in_use);	/* fake-enospc would not have been set if in threaded-code */
 	assert(jnlpool && jnlpool->jnlpool_ctl);
 	if((jnlpool->jnlpool_ctl->jnlpool_creator_pid != process_id)
-		&& !is_proc_alive(jnlpool->jnlpool_ctl->jnlpool_creator_pid, 0))
+		&& !is_proc_alive(jnlpool->jnlpool_ctl->jnlpool_creator_pid, jnlpool->jnlpool_ctl->jnlpool_creator_pstarttime))
 	{
 		for (addr_ptr = get_next_gdr(NULL); addr_ptr; addr_ptr = get_next_gdr(addr_ptr))
 		{

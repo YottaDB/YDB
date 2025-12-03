@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2019-2024 Fidelity National Information	*
+ * Copyright (c) 2019-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -82,7 +82,7 @@ void mlk_rehash(mlk_pvtctl_ptr_t pctl)
 		} else
 			break;
 	} while (count < 0);
-	assert((pctl->ctl->max_blkcnt - pctl->ctl->blkcnt) == count);
+	assert((NULL == root) || (pctl->ctl->max_blkcnt - pctl->ctl->blkcnt) == count);
 	pctl->ctl->gc_needed = FALSE;
 	pctl->ctl->resize_needed = FALSE;
 	pctl->ctl->rehash_needed = FALSE;

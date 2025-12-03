@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2017-2024 Fidelity National Information	*
+ * Copyright (c) 2017-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -167,7 +167,8 @@ int secshr_finish_CMT18(sgmnt_addrs *csa,
 				&& (0 != inctn_detail.blknum_struct.blknum)
 				&& (GDSV7m > (cs-1)->ondsk_blkver) && !(cs-1)->done) /* Prior cse has block info */
 			{
-				DECR_BLKS_TO_UPGRD(csa, csd, 1);
+				if (0 == csd->blks_to_upgrd_subzero_error)
+					DECR_BLKS_TO_UPGRD(csa, csd, 1);
 #ifdef				DEBUG_BLKS_TO_UPGRD
 				util_out_print("!UL - !AD:0x!@XQ:!UL:!UL:!UL 18", TRUE, cs_data->blks_to_upgrd,
 						REG_LEN_STR(gv_cur_region), &cs->blk, cs->ondsk_blkver, cs->level);

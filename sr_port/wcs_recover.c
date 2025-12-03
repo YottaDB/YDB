@@ -121,7 +121,7 @@ void wcs_recover(gd_region *reg)
 	sgmnt_data_ptr_t	csd;
 	node_local_ptr_t	cnl;
 	int4			dummy_errno, blk_size;
-	uint4			jnl_status, epid = 0, r_epid;
+	uint4			jnl_status, epid = 0, epid_pstarttime = 0, r_epid, r_epid_pstarttime;
 	int4			bt_buckets;
 	inctn_opcode_t		save_inctn_opcode;
 	unsigned int		bplmap, lcnt, total_rip_wait;
@@ -301,6 +301,7 @@ void wcs_recover(gd_region *reg)
 			 * particularly before calling is_proc_alive as we don't want to call it with a 0 r_epid.
 			 */
 			r_epid = cr->r_epid;
+			r_epid_pstarttime = cr->r_epid_pstarttime;
 			if (cr->read_in_progress < -1)
 			{
 				send_msg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_INVALIDRIP, 2, DB_LEN_STR(reg));
@@ -310,7 +311,7 @@ void wcs_recover(gd_region *reg)
 				SHMPOOL_FREE_CR_RFMT_BLOCK(reg, csa, cr);
 				assert(cr->r_epid == 0);
 				assert(0 == cr->dirty);
-			} else if ((0 != r_epid) && ((r_epid == process_id) || (FALSE == is_proc_alive(r_epid, 0))))
+			} else if ((0 != r_epid) && ((r_epid == process_id) || (FALSE == is_proc_alive(r_epid, r_epid_pstarttime))))
 			{
 				INTERLOCK_INIT(cr);	/* Process gone, release that process's lock */
 				cr->cycle++;	/* increment cycle whenever blk number changes (tp_hist depends on this) */
@@ -319,7 +320,10 @@ void wcs_recover(gd_region *reg)
 			} else
 			{
 				if (1 == lcnt)
+				{
 					epid = r_epid;
+					epid_pstarttime = r_epid_pstarttime;
+				}
 				else if ((BUF_OWNER_STUCK < lcnt) || (MAX_WAIT_FOR_RIP <= total_rip_wait))
 				{	/* If we have already waited for atleast 4 minutes, no longer wait but fixup
 					 * all following cr's. If r_epid is 0 and also read in progress, we identify
@@ -357,12 +361,17 @@ void wcs_recover(gd_region *reg)
 		/* reset cr->rip_latch. it is unused in VMS, but wcs_verify() checks it hence the reset in both Unix and VMS */
 		SET_LATCH_GLOBAL(&(cr->rip_latch), LOCK_AVAILABLE);
 		cr->r_epid = 0;		/* the processing above should make this appropriate */
+		cr->r_epid_pstarttime = 0;
 		cr->blkque.fl = cr->blkque.bl = 0;		/* take no chances that the blkques are messed up */
 		cr->state_que.fl = cr->state_que.bl = 0;	/* take no chances that the state_ques are messed up */
 		cr->in_cw_set = 0;	/* this has crit and is here, so in_cw_set must no longer be non-zero */
+		cr->in_cw_set_pstarttime = 0;
 		/* If asyncio is TRUE and cr->epid is non-zero, it is a WIP record. Do not touch it */
 		if (!asyncio)
+		{
 			cr->epid = 0;
+			cr->epid_pstarttime = 0;
+		}
 		if (0 != cr->twin)
 		{
 			cr->twin = 0; /* Clean up "twin" link. We will set it afresh further down below */
@@ -461,6 +470,7 @@ void wcs_recover(gd_region *reg)
 					cr_alt->dirty = 0;
 					cr_alt->flushed_dirty_tn = 0;
 					cr_alt->in_tend = 0;
+					cr_alt->in_tend_pstarttime = 0;
 					SHMPOOL_FREE_CR_RFMT_BLOCK(reg, csa, cr_alt);
 					WRITE_LATCH_VAL(cr_alt) = LATCH_CLEAR;
 					cr_alt->jnl_addr = 0;
@@ -488,7 +498,9 @@ void wcs_recover(gd_region *reg)
 			cr->flushed_dirty_tn = 0;	/* need to be less than cr->dirty. we choose 0. */
 			BML_RSRV_RESET(cr);
 			cr->epid = 0;
+			cr->epid_pstarttime = 0;
 			cr->in_tend = 0;
+			cr->in_tend_pstarttime = 0;
 			cr->data_invalid = 0;
 			WRITE_LATCH_VAL(cr) = LATCH_CLEAR;
 			cr->refer = TRUE;
@@ -499,7 +511,7 @@ void wcs_recover(gd_region *reg)
 			ADD_ENT_TO_ACTIVE_QUE_CNT(cnl);
 			continue;
 		}
-		if (cr->in_tend && !is_proc_alive(cr->in_tend,0))
+		if (cr->in_tend && !is_proc_alive(cr->in_tend,cr->in_tend_pstarttime))
 		{	/* Some process was shot (kill -9 in Unix) in the middle of an update.
 			 * We cannot discard this buffer so send a warning to the user and proceed.
 			 */
@@ -528,7 +540,9 @@ void wcs_recover(gd_region *reg)
 			cr->dirty = 0;
 			cr->flushed_dirty_tn = 0;
 			cr->epid = 0;
+			cr->epid_pstarttime = 0;
 			cr->in_tend = 0;
+			cr->in_tend_pstarttime = 0;
 			SHMPOOL_FREE_CR_RFMT_BLOCK(reg, csa, cr);
 			WRITE_LATCH_VAL(cr) = LATCH_CLEAR;
 			cr->jnl_addr = 0;
@@ -591,6 +605,7 @@ void wcs_recover(gd_region *reg)
 				}
 			}
 			cr->epid = 0;
+			cr->epid_pstarttime = 0;
 			WRITE_LATCH_VAL(cr) = LATCH_CLEAR;
 			continue;
 		}
@@ -655,6 +670,7 @@ void wcs_recover(gd_region *reg)
 			 * Use Active queue in either case.
 			 */
 			cr->epid = 0;
+			cr->epid_pstarttime = 0;
 			WRITE_LATCH_VAL(cr) = LATCH_CLEAR;
 			insqt((que_ent_ptr_t)&cr->state_que, (que_ent_ptr_t)active_head);
 			ADD_ENT_TO_ACTIVE_QUE_CNT(cnl);

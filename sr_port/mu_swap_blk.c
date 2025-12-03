@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -200,7 +200,7 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 		 * if bitmap indicates block is free, we will not read the destination block
 		 */
 		bmp_buff = get_lmap(dest_blk_id, &x_blk_lmap, (sm_int_ptr_t)&bmlhist.cycle, &bmlhist.cr);
-		assert((!bmlhist.cr) || (process_id != bmlhist.cr->bml_pin));
+		assert((!bmp_buff) || (!bmlhist.cr) || (process_id != bmlhist.cr->bml_pin));
 		if (!bmp_buff || BLK_MAPINVALID == x_blk_lmap ||
 			((blk_hdr_ptr_t)bmp_buff)->bsiz != BM_SIZE(BLKS_PER_LMAP) ||
 			((blk_hdr_ptr_t)bmp_buff)->levl != LCL_MAP_LEVL)
@@ -407,7 +407,18 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 		assert(gv_target->hist.h[level].buffaddr == work_blk_ptr);
 		tmpcse = t_write(&gv_target->hist.h[level], bs1, 0, 0,
 					dest_blk_level, TRUE, TRUE, GDS_WRITE_KILLTN);
-		assert(!cs_data->fully_upgraded || (tmpcse->ondsk_blkver == dest_blk_ver) || (0 == level));
+		/* In this code block we are writing the changeset to transform what is now the 'working block'
+		 * into the 'destination block'. We also do the opposite, and in doing both we swap the working
+		 * and destination blocks. The destination block is earlier in the database than the working block.
+		 * This assert says that if the database is fully upgraded, then we should never be writing out a
+		 * prior version index block. Before V7 upgrade, the analogue of this assert simply promised:
+		 * 	"This operation does not juggle different block versions, unless !fully_upgraded"
+		 * This assert is no longer true in cases where the user allows non-free V6 data blocks to persist
+		 * with manual setting to fully_upgraded.
+		 * If this assert ever fails, consider making it a TREF(donot_commit) as it may technically warrant.
+		 * This assert only valid for V6->V7 upgrades.
+		 */
+		assert(!cs_data->fully_upgraded || (cs_data->desired_db_format == dest_blk_ver) || (0 == dest_blk_level));
 		tmpcse->ondsk_blkver = dest_blk_ver;
 	}
 	/* 2: work_blk_id into dest_blk_id */
@@ -453,7 +464,7 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 		assert(dest_blk_ptr == dest_hist_ptr->h[dest_blk_level].buffaddr);
 		tmpcse = t_write(&dest_hist_ptr->h[dest_blk_level], bs1, 0, 0,
 				level, TRUE, TRUE, GDS_WRITE_KILLTN);
-		assert(!cs_data->fully_upgraded || (tmpcse->ondsk_blkver == work_blk_ver) || (0 == level));
+		assert(!cs_data->fully_upgraded || (cs_data->desired_db_format == work_blk_ver) || (0 == level));
 		tmpcse->ondsk_blkver = work_blk_ver;
 	} else /* free block or, when working block does not move vertically (swap with parent/child) */
 	{
@@ -501,7 +512,7 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 					 * "old_block->bsiz". Restart if we ever access a buffer whose size is greater
 					 * than the db block size.
 					 */
-					 assert(0 == upg_mv_block);
+					assert(0 == upg_mv_block);
 					bsiz = ((blk_hdr_ptr_t)(tmpcse->old_block))->bsiz;
 					if (bsiz > blk_size)
 					{
@@ -520,7 +531,7 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 			assert(dest_blk_ptr == hist_ptr->buffaddr);
 			tmpcse = t_write(hist_ptr, bs1, 0, 0, level, TRUE, TRUE, GDS_WRITE_KILLTN);
 		}
-		assert(!cs_data->fully_upgraded || (tmpcse->ondsk_blkver == work_blk_ver) || (0 == level));
+		assert(!cs_data->fully_upgraded || (cs_data->desired_db_format == work_blk_ver) || (0 == level));
 		tmpcse->ondsk_blkver = work_blk_ver;
 	}
 	if (!blk_was_free)
@@ -662,7 +673,8 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 				TREF(tqread_grab_bml) = (dba_bg == cs_data->acc_meth)
 					&& (DEFAULT_BITMAP_PREPIN == cs_data->nobitmap_prepin);
 				bmp_buff = get_lmap(child1, &x_blk_lmap, (sm_int_ptr_t)&bmlhist2.cycle, &bmlhist2.cr);
-				assert((!bmlhist2.cr) || (bmp_buff) || (process_id != bmlhist2.cr->bml_pin));
+				assert((!bmp_buff) || (!bmlhist2.cr) || (!TREF(tqread_grab_bml))
+					|| (process_id == bmlhist2.cr->bml_pin));
 			} while ((0 < lcnt--) && (NULL == bmp_buff) && (cdb_sc_tqreadnowait == (enum cdb_sc)rdfail_detail));
 			if (!bmp_buff || (BLK_BUSY != x_blk_lmap) || (bmlhist.cr != bmlhist2.cr)
 				|| ((blk_hdr_ptr_t)bmp_buff)->bsiz != BM_SIZE(BLKS_PER_LMAP)

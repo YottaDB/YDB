@@ -105,7 +105,7 @@ GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	uint4			dollar_tlevel;
 GBLREF	trans_num		start_tn;
 GBLREF	unsigned int		t_tries;
-GBLREF	uint4			t_err, process_id;
+GBLREF	uint4			t_err, process_id, pstarttime;
 GBLREF	unsigned char		cw_set_depth, cw_map_depth;
 GBLREF	unsigned char		rdfail_detail;
 GBLREF	jnlpool_addrs_ptr_t	jnlpool;
@@ -449,6 +449,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 		t_tries = 0;	/* commit was successful so reset t_tries */
 		INCR_GVSTATS_COUNTER(csa, cnl, n_nontp_readonly, 1);
 		INCR_GVSTATS_COUNTER(csa, cnl, n_nontp_blkread, n_blks_validated);
+		ACCUMULATE_LCL_GVSTATS_COUNTER(csa, cnl, n_cache_reads);
 		assert(tmp_jnlpool == jnlpool);
 		if (save_jnlpool != jnlpool)
 		{
@@ -2067,6 +2068,7 @@ skip_cr_array:
 	INCR_GVSTATS_COUNTER(csa, cnl, n_nontp_readwrite, 1);
 	INCR_GVSTATS_COUNTER(csa, cnl, n_nontp_blkread, n_blks_validated);
 	INCR_GVSTATS_COUNTER(csa, cnl, n_nontp_blkwrite, cw_set_depth);
+	ACCUMULATE_LCL_GVSTATS_COUNTER(csa, cnl, n_cache_reads);
 	GVSTATS_SET_CSA_STATISTIC(csa, db_curr_tn, dbtn);
 	/* "secshr_db_clnup/t_commit_cleanup" assume an active non-TP transaction if cw_set_depth is non-zero
 	 * or if update_trans is set to T_COMMIT_STARTED. Now that the transaction is complete, reset these fields.

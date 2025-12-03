@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -234,7 +234,7 @@ int gtmrecv_upd_proc_init(boolean_t fresh_start)
 		return(UPDPROC_START_ERR);
 	}
 #endif
-	repl_log(gtmrecv_log_fp, TRUE, FALSE, "Update Process started. PID %d [0x%X]\n", upd_pid, upd_pid);
+	repl_log(gtmrecv_log_fp, TRUE, TRUE, "Update Process started. PID %d [0x%X]\n", upd_pid, upd_pid);
 	return(UPDPROC_STARTED);
 }
 

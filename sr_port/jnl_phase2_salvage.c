@@ -47,7 +47,7 @@ void	jnl_phase2_salvage(sgmnt_addrs *csa, jnl_buffer_ptr_t jbp, jbuf_phase2_in_p
 	jnl_record		jrec;
 	jnl_private_control	*jpc;
 
-	assert(!is_proc_alive(deadCmt->process_id, 0));
+	assert(!is_proc_alive(deadCmt->process_id, deadCmt->pstarttime));
 	if (!deadCmt->in_phase2)
 	{	/* A process in "jnl_write" got killed after it did the UPDATE_JBP_RSRV_FREEADDR call but before it did
 		 * the JNL_PHASE2_WRITE_COMPLETE call. The corresponding journal record was already written to the journal

@@ -493,6 +493,7 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 					{
 						assert(csa->now_crit);
 						jbp->blocked = 0;
+						jbp->blocked_pstarttime = 0;
 					}
 				}
 				if (csa->freeze && (csd->freeze == process_id) && !csa->persistent_freeze)

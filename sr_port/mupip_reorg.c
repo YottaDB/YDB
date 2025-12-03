@@ -101,6 +101,7 @@ GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	tp_region		*grlist;
 GBLREF	uint4			process_id;
+GBLREF	uint4			pstarttime;
 
 static readonly mval literal_poollimit =
 	DEFINE_MVAL_LITERAL(MV_STR | MV_NUM_APPROX, 0, 0, (SIZEOF("POOLLIMIT") - 1), "POOLLIMIT", 0, 0);
@@ -124,7 +125,7 @@ void mupip_reorg(void)
 	node_local_ptr_t	cnl;
 	trunc_region		*reg_list, *tmp_reg, *reg_iter, *prev_reg;
 	uint4			fs;
-	uint4			lcl_pid, reorg_upgrade_pid;
+	uint4			lcl_pid, lcl_pstart, reorg_upgrade_pid;
 	mval			keep_mval = DEFINE_MVAL_STRING(MV_STR | MV_NUM_APPROX, 0 , 0 , 0, 0, 0, 0), *keep_mval_ptr;
 	DCL_THREADGBL_ACCESS;
 
@@ -470,7 +471,9 @@ void mupip_reorg(void)
 			/* Ensure only one truncate process at a time operates on given region */
 			grab_crit(gv_cur_region, WS_69);
 			lcl_pid = cnl->trunc_pid;
-			if (lcl_pid && is_proc_alive(lcl_pid, 0))
+			lcl_pstart = cnl->trunc_pstart;
+interact1:
+			if (lcl_pid && is_proc_alive(lcl_pid, lcl_pstart))
 			{
 				rel_crit(gv_cur_region);
 				send_msg_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(4) ERR_MUTRUNC1ATIME, 3, lcl_pid,
@@ -484,6 +487,7 @@ void mupip_reorg(void)
 				mupip_exit(ERR_MUNOFINISH);
 			}
 			cnl->trunc_pid = process_id;
+			cnl->trunc_pstart = pstarttime;
 			cnl->highest_lbm_with_busy_blk = 0;
 			rel_crit(gv_cur_region);
 			if (!mu_truncate(truncate_percent, &keep_mval))
@@ -491,6 +495,7 @@ void mupip_reorg(void)
 			grab_crit(gv_cur_region, WS_70);
 			assert(cnl->trunc_pid == process_id);
 			cnl->trunc_pid = 0;
+			cnl->trunc_pstart = 0;
 			rel_crit(gv_cur_region);
 			if (mu_ctrlc_occurred || mu_ctrly_occurred)
 			{
@@ -500,4 +505,6 @@ void mupip_reorg(void)
 		}
 	}
 	mupip_exit(status);
+	assertpro(FALSE);	/* ensure we never reach the goto below */
+	goto interact1;		/* This suppresses the compiler warning about an used label. */
 }

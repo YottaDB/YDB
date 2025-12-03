@@ -94,7 +94,7 @@ boolean_t	wcs_write_in_progress_wait(node_local_ptr_t cnl, cache_rec_ptr_t cr, w
 								cr->epid, &(cr->blk), DB_LEN_STR(gv_cur_region));
 						GET_C_STACK_FROM_SCRIPT("WRITEWAITPID", process_id, cr->epid,
 									DEBUG_ONLY(TWICE) PRO_ONLY(ONCE));
-						if (cr->dirty && cr->epid && !is_proc_alive(cr->epid, 0))
+						if (cr->dirty && cr->epid && !is_proc_alive(cr->epid, cr->epid_pstarttime))
 							return FALSE;
 					}
 					assert((WBTEST_DB_WRITE_HANG == gtm_white_box_test_case_number)

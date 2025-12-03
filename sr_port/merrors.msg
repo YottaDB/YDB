@@ -1206,7 +1206,7 @@ DBWCVERIFYEND	<Database file !AD, write cache verification finished by pid !UL [
 MUPIPSIG	<!AD (signal !UL) issued from process !UL [0x!XL] to process !UL [0x!XL]>/info/fao=7!/ansi=0
 HTSHRINKFAIL	<Hash table compaction failed to allocate new smaller table due to lack of memory>/warning/fao=0!/ansi=0
 STPEXPFAIL	<Stringpool expansion failed. It could not expand to !UL bytes.>/error/fao=1!/ansi=0
-DBBTUWRNG	<The blocks-to-upgrade file-header field is incorrect. Expected 0x!16@XQ, found 0x!16@XQ>/warning/fao=2!/ansi=0/T
+DBBTUWRNG	<The blocks-to-upgrade file-header field is incorrect. Counted: 0x!16@XQ, but Header: 0x!16@XQ>/warning/fao=2!/ansi=0/T
 DBBTUFIXED	<The blocks-to-upgrade file-header field has been changed to the correct value>/info/fao=0!/ansi=0
 DBMAXREC2BIG	<Maximum record size (!UL) is too large for this block size (!UL) - Maximum is !UL>/error/fao=3!/ansi=0
 SOCKHANGUP	<Socket has disconnected>/error/fao=0!/ansi=0

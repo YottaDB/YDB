@@ -24,8 +24,8 @@
 /* Uncomment the below line to debug the flow of "mur_forward" with multiple parallel processes */
 /* #define	MUR_DEBUG */
 
-#define JNL_EXTR_LABEL		"GDSJEX07"	/* format of the simple journal extract */
-#define JNL_DET_EXTR_LABEL	"GDSJDX08"	/* format of the detailed journal extract */
+#define JNL_EXTR_LABEL		"GDSJEX08"	/* format of the simple journal extract */
+#define JNL_DET_EXTR_LABEL	"GDSJDX09"	/* format of the detailed journal extract */
 
 error_def(ERR_MUINFOSTR);
 error_def(ERR_MUINFOUINT4);

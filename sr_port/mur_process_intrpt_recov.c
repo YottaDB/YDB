@@ -129,6 +129,7 @@ uint4 mur_process_intrpt_recov()
 		 */
 		csd->blks_to_upgrd = jnlrec->jrec_epoch.blks_to_upgrd;
 		csd->blks_to_upgrd += rctl->blks_to_upgrd_adjust;
+		csd->offset = jnlrec->jrec_epoch.offset;
 #		ifdef GTM_TRIGGER
 		/* online rollback can potentially take the database to a point in the past where the triggers that were
 		 * previously installed are no longer a part of the current database state and so any process that restarts

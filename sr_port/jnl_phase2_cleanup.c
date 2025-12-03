@@ -44,7 +44,7 @@ MBSTART {										\
 /* The below code is very similar to "repl_phase2_cleanup" */
 void	jnl_phase2_cleanup(sgmnt_addrs *csa, jnl_buffer_ptr_t jbp)
 {
-	uint4			currFreeaddr, newFreeaddr, stuckPid;
+	uint4			currFreeaddr, newFreeaddr, stuckPid, stuckPstarttime;
 	int			index1, index2;
 	jbuf_phase2_in_prog_t	*phs2cmt, *deadCmt, *begCmt, *maxCmt, *topCmt;
 	boolean_t		was_latch_owner;
@@ -85,6 +85,7 @@ void	jnl_phase2_cleanup(sgmnt_addrs *csa, jnl_buffer_ptr_t jbp)
 				if (deadCmt->write_complete)
 					break;
 				stuckPid = deadCmt->process_id;
+				stuckPstarttime = deadCmt->pstarttime;
 				/* Note that we can reach here with stuckPid == process_id. An example call graph follows
 				 *	t_end -> jnl_write_phase2 -> jnl_write_pblk -> jnl_write -> jnl_write_attempt
 				 *									-> jnl_phase2_cleanup
@@ -93,7 +94,7 @@ void	jnl_phase2_cleanup(sgmnt_addrs *csa, jnl_buffer_ptr_t jbp)
 				if (stuckPid == process_id)
 					break;
 				BG_TRACE_PRO_ANY(csa, jnlbuff_phs2cmt_isprcalv);
-				if (is_proc_alive(stuckPid, 0))
+				if (is_proc_alive(stuckPid, stuckPstarttime))
 					break;
 				jnl_phase2_salvage(csa, jbp, deadCmt);
 				assert(deadCmt->write_complete);

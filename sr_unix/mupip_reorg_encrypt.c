@@ -77,6 +77,7 @@ GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF sgmnt_data_ptr_t	cs_data;
 GBLREF tp_region	*grlist;
 GBLREF uint4		process_id;
+GBLREF uint4		pstarttime;
 GBLREF uint4		update_array_size;		/* for the BLK_INIT/BLK_SEG/BLK_ADDR macros */
 GBLREF uint4		update_trans;
 GBLREF unsigned char	cw_map_depth;
@@ -119,6 +120,7 @@ MBSTART {														\
 	{														\
 		assert((CNL)->reorg_encrypt_pid == process_id);								\
 		(CNL)->reorg_encrypt_pid = 0;										\
+		(CNL)->reorg_encrypt_pid_pstarttime = 0;								\
 	}														\
 	if (HAVE_CRIT)													\
 		rel_crit(REG);												\
@@ -166,7 +168,7 @@ void mupip_reorg_encrypt(void)
 	sm_uc_ptr_t		bptr, buff;
 	blk_hdr			new_hdr;
 	unsigned char		save_cw_set_depth;
-	uint4			lcl_update_trans, pid, bptr_size;
+	uint4			lcl_update_trans, pid, pid_pstarttime, bptr_size;
 	jnl_private_control	*jpc;
 #	ifdef DEBUG
 	uint4			reencryption_count = 0;
@@ -307,7 +309,8 @@ void mupip_reorg_encrypt(void)
 					RTS_ERROR_LITERAL("MUPIP REORG -ENCRYPT"), REG_LEN_STR(reg), DB_LEN_STR(reg)));
 		}
 		pid = cnl->reorg_encrypt_pid;
-		if (pid && is_proc_alive(pid, 0))
+		pid_pstarttime = cnl->reorg_encrypt_pid_pstarttime;
+		if (pid && is_proc_alive(pid, pid_pstarttime))
 		{
 			CONTINUE_TO_NEXT_REGION(csa, csd, cnl, reg, reg_status, status,
 				REORG_IN_PROG_NOT_SET, HOLDING_CRIT, IS_ERROR,
@@ -322,6 +325,7 @@ void mupip_reorg_encrypt(void)
 				" not been marked complete. Run MUPIP SET -ENCRYPTIONCOMPLETE to do so", TRUE, REG_LEN_STR(reg)));
 		}
 		cnl->reorg_encrypt_pid = process_id;
+		cnl->reorg_encrypt_pid_pstarttime = pstarttime;
 		is_encrypted = csd->is_encrypted;
 		if (IS_ENCRYPTED(is_encrypted))
 		{
@@ -798,6 +802,7 @@ void mupip_reorg_encrypt(void)
 		}
 		curr_tn = csd->trans_hist.curr_tn;
 		cnl->reorg_encrypt_pid = 0;
+		cnl->reorg_encrypt_pid_pstarttime = 0;
 		rel_crit(reg);
 		release_ftok_semaphore(reg, csa, csd);
 		/* Issue success or failure message for this region */

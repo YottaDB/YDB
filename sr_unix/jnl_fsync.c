@@ -43,6 +43,7 @@
 #endif
 
 GBLREF	uint4		process_id;
+GBLREF	uint4		pstarttime;
 GBLREF	jnl_gbls_t	jgbl;
 
 error_def(ERR_JNLFSYNCERR);
@@ -60,6 +61,7 @@ void jnl_fsync(gd_region *reg, uint4 fsync_addr)
 	int			fsync_ret, save_errno;
 	intrpt_state_t		prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;
 	DEBUG_ONLY(uint4	onln_rlbk_pid;)
+	DEBUG_ONLY(uint4	onln_rlbk_pstarttime;)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -132,7 +134,8 @@ void jnl_fsync(gd_region *reg, uint4 fsync_addr)
 				 * to that effect.
 				 */
 				DEBUG_ONLY(onln_rlbk_pid = csa->nl->onln_rlbk_pid);
-				assert(jgbl.onlnrlbk || !onln_rlbk_pid || !is_proc_alive(onln_rlbk_pid, 0)
+				DEBUG_ONLY(onln_rlbk_pstarttime = csa->nl->onln_rlbk_pstarttime);
+				assert(jgbl.onlnrlbk || !onln_rlbk_pid || !is_proc_alive(onln_rlbk_pid, onln_rlbk_pstarttime)
 						|| (onln_rlbk_pid != csa->nl->in_crit));
 				GTM_JNL_FSYNC(csa, jpc->channel, fsync_ret);
 				GTM_WHITE_BOX_TEST(WBTEST_FSYNC_SYSCALL_FAIL, fsync_ret, -1);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2008-2024 Fidelity National Information	*
+ * Copyright (c) 2008-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -140,6 +140,7 @@ TAB_GVSTATS_REC(ms_flu_critsleeps    , "WFCS", "ms of sleep time for wcs_flu in 
 TAB_GVSTATS_REC(ms_getn_critsleeps   , "GCS",  "ms of sleep time for csh_getn in crit ")
 /* Cacheline border (128-byte and 64-byte) */
 TAB_GVSTATS_REC(n_increment          , "INC",  "# of INCREMENT operations             ")
+TAB_GVSTATS_REC(n_cache_reads	     , "CRD",  "# of cache reads                      ")
 /* If new stats are added beyond this point, edit gvstats_rec_cnl2csd in gvstats_rec.c */
 
 /*

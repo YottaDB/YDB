@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -203,7 +203,8 @@ STATICFNDEF void scan_behavioral_words(char *c, struct extcall_entry_list *entry
 		gtm_ext_call_behavior	bwords;
 		const char		*str;
 	} conversion [] = {
-		{SIGSAFE, "SIGSAFE"}
+		{SIGSAFE, "SIGSAFE"},
+		{ACIDTP, "ACIDTP"}
 	};
 
 	/* scan until : or null if no list of behavioral words */

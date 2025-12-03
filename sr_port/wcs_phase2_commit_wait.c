@@ -83,8 +83,9 @@ boolean_t	wcs_phase2_commit_wait(sgmnt_addrs *csa, cache_rec_ptr_t cr)
 {
 	sgmnt_data_ptr_t	csd;
 	node_local_ptr_t        cnl;
-	uint4			lcnt, lcnt_isprcalv_freq, lcnt_isprcalv_next, blocking_pid, start_in_tend;
-	int4			value;
+	uint4			lcnt, lcnt_isprcalv_freq, lcnt_isprcalv_next, blocking_pid, blocking_pid_pstarttime, start_in_tend;
+	uint4			value;
+	uint4			value_pstarttime;
 	boolean_t		is_alive, was_crit;
 	boolean_t		timedout, any_blocked;
 	block_id		blk;
@@ -150,7 +151,7 @@ boolean_t	wcs_phase2_commit_wait(sgmnt_addrs *csa, cache_rec_ptr_t cr)
 		SHM_READ_MEMORY_BARRIER; /* read memory barrier done to minimize time spent spinning waiting for value to change */
 		if (NULL == cr)
 		{
-			value = cnl->wcs_phase2_commit_pidcnt;
+			value = (uint4) cnl->wcs_phase2_commit_pidcnt;
 			if (!value)
 				return TRUE;
 			if (lcnt == lcnt_isprcalv_next)
@@ -162,6 +163,7 @@ boolean_t	wcs_phase2_commit_wait(sgmnt_addrs *csa, cache_rec_ptr_t cr)
 				for (curcr = cr_lo; curcr < cr_top;  curcr++)
 				{
 					blocking_pid = curcr->in_tend;
+					blocking_pid_pstarttime = curcr->in_tend_pstarttime;
 					if (!blocking_pid || (blocking_pid == process_id))
 						continue;
 					any_blocked = TRUE;
@@ -181,7 +183,7 @@ boolean_t	wcs_phase2_commit_wait(sgmnt_addrs *csa, cache_rec_ptr_t cr)
 							break;
 					if (index == crarray_index)
 					{	/* cache-record with PID different from what we have seen till now */
-						is_alive = is_proc_alive(blocking_pid, 0);
+						is_alive = is_proc_alive(blocking_pid, blocking_pid_pstarttime);
 						if (!is_alive && !was_crit)
 							return FALSE;	/* Process is not alive. We can return
 									 * right away with failure.
@@ -220,6 +222,7 @@ boolean_t	wcs_phase2_commit_wait(sgmnt_addrs *csa, cache_rec_ptr_t cr)
 		} else
 		{
 			value = cr->in_tend;
+			value_pstarttime = cr->in_tend_pstarttime;
 			if (value != start_in_tend)
 			{
 				assert(!was_crit || !value);
@@ -234,7 +237,7 @@ boolean_t	wcs_phase2_commit_wait(sgmnt_addrs *csa, cache_rec_ptr_t cr)
 			}
 			if (lcnt == lcnt_isprcalv_next)
 			{	/* Do "is_proc_alive" check */
-				if (!is_proc_alive(value, 0))
+				if (!is_proc_alive(value, value_pstarttime))
 					return FALSE;	/* Process is not alive. We can return right away with failure. */
 				lcnt_isprcalv_next += lcnt_isprcalv_freq;
 			}

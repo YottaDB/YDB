@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -180,6 +180,7 @@ void	gvcst_expand_free_subtree(kill_set *ks_head)
 		assert(1 >= dollar_tlevel);
 		dollar_tlevel = 0;	/* temporarily for gvcst_bmp_mark_free */
 		update_trans = 0;
+		DEBUG_ONLY(ACCUMULATE_LCL_GVSTATS_COUNTER(csa, csa->nl, n_cache_reads);)
 		GVCST_BMP_MARK_FREE(ks, ret_tn, inctn_invalid_op, inctn_bmp_mark_free_gtm, inctn_opcode, csa)
 		update_trans = save_update_trans;
 		dollar_tlevel = bml_save_dollar_tlevel;

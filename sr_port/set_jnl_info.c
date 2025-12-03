@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -106,6 +106,7 @@ void set_jnl_info(gd_region *reg, jnl_create_info *jnl_info)
 	jnl_info->autoswitchlimit = csd->autoswitchlimit;
 	assert(jnl_info->autoswitchlimit == ALIGNED_ROUND_DOWN(jnl_info->autoswitchlimit, jnl_info->alloc, jnl_info->extend));
 	jnl_info->blks_to_upgrd = csd->blks_to_upgrd; /* will be copied over to EPOCH record in newly created journal */
+	jnl_info->offset = csd->offset; /* Will be copied over to EPOCH record in newly created journal */
 	jnl_info->free_blocks   = csd->trans_hist.free_blocks; /* will be copied over to EPOCH record in newly created journal */
 	jnl_info->total_blks    = csd->trans_hist.total_blks; /* will be copied over to EPOCH record in newly created journal */
 	GTMCRYPT_COPY_ENCRYPT_SETTINGS(csd, jnl_info);

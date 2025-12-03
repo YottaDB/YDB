@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -128,6 +128,11 @@ int4	dsk_read (block_id blk, sm_uc_ptr_t buff, enum db_ver *ondsk_blkver, boolea
 	fully_upgraded = csd->fully_upgraded;
 	assert(0 == (long)buff % SIZEOF(block_id));
 	assert(NULL != cnl);
+	/* We only accumulate the local cache read updates into the shared variable here to maintain our guarantee that the
+	 * value is valid when used in tandem with the dsk_read statistic. That is: any cache reads which preceded a given disk
+	 * read need to be recognized prior to the recognition of the disk read.
+	 */
+	ACCUMULATE_LCL_GVSTATS_COUNTER(csa, cnl, n_cache_reads);
 	INCR_GVSTATS_COUNTER(csa, cnl, n_dsk_read, 1);
 	enc_save_buff = buff;
 	/* The value of MUPIP_REORG_IN_PROG_LOCAL_DSK_READ indicates that this is a direct call from mupip_reorg_encrypt, operating

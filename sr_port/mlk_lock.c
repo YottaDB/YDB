@@ -56,6 +56,7 @@ GBLREF	uint4		dollar_tlevel, process_id;
 #ifdef	DEBUG
 GBLREF	unsigned int	t_tries;
 #endif
+GBLREF uint4		pstarttime;
 
 error_def(ERR_LOCKSPACEFULL);
 error_def(ERR_LOCKSPACEINFO);
@@ -143,7 +144,7 @@ gtm_uint64_t mlk_lock(mlk_pvtblk *p, UINTPTR_T auxown, boolean_t new)
 					 *   if we attempt to get a new prcblk and fail, we should update the transaction number
 					 *   but take no further action */
 					if (new)
-						added = mlk_prcblk_add(p->pvtctl.region, ctl, our, process_id);
+						added = mlk_prcblk_add(p->pvtctl.region, ctl, our, process_id, pstarttime);
 					if (added)
 					{
 						p->nodptr = our;
@@ -157,7 +158,7 @@ gtm_uint64_t mlk_lock(mlk_pvtblk *p, UINTPTR_T auxown, boolean_t new)
 				{	/* We can't have it right now because of child or parent locks */
 					added = TRUE;
 					if (new)
-						added = mlk_prcblk_add(p->pvtctl.region, ctl, our, process_id);
+						added = mlk_prcblk_add(p->pvtctl.region, ctl, our, process_id, pstarttime);
 					if (added)
 					{
 						p->nodptr = our;
@@ -169,6 +170,7 @@ gtm_uint64_t mlk_lock(mlk_pvtblk *p, UINTPTR_T auxown, boolean_t new)
 					if (!new)
 						mlk_prcblk_delete(&p->pvtctl, our, process_id);
 					our->owner = process_id;
+					our->pstart = pstarttime;
 					our->auxowner = auxown;
 					if (auxown && IS_GTCM_GNP_SERVER_IMAGE)
 					{	/* called from gtcml_lock_internal() */

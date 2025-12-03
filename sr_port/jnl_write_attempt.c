@@ -173,7 +173,7 @@ static uint4 jnl_sub_write_attempt(jnl_private_control *jpc, unsigned int *lcnt,
 			if (!was_crit)
 				grab_crit_immediate(jpc->region, TRUE, NOT_APPLICABLE);
 			/* If no one home, try to clear the latch. */
-			if (((FALSE == is_proc_alive(writer, jb->image_count))
+			if (((FALSE == is_proc_alive(writer, 0))
 				DEBUG_ONLY(&& !(WBTEST_ENABLED(WBTEST_JNLPROCSTUCK_FORCE))))
 				&& COMPSWAP_UNLOCK(&jb->io_in_prog_latch, writer, jb->image_count, LOCK_AVAILABLE, 0))
 			{	/* We cleared the latch, so report it and restart the loop. */
@@ -356,7 +356,7 @@ uint4 jnl_write_attempt(jnl_private_control *jpc, uint4 threshold)
 			 */
 			if ((holder_pid = jb->phase2_commit_latch.u.parts.latch_pid) && (holder_pid != process_id))
 			{
-				if (!is_proc_alive(holder_pid, 1))
+				if (!is_proc_alive(holder_pid, 0))
 				{
 					COMPSWAP_UNLOCK(&jb->phase2_commit_latch, holder_pid, NULL, 0, NULL);
 				}
@@ -386,7 +386,10 @@ uint4 jnl_write_attempt(jnl_private_control *jpc, uint4 threshold)
 			 * better turn off journaling and proceed with database update to avoid a database hang.
 			 */
 			if (was_crit)
+			{
 				jb->blocked = 0;
+				jb->blocked_pstarttime = 0;
+			}
 			else
 			{
 				assertpro(0 == have_crit(CRIT_HAVE_ANY_REG));

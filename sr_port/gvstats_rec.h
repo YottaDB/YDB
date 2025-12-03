@@ -20,6 +20,8 @@
  * get updated and are peridically copied back to the fileheader and during fileheader
  * flushes to keep them up to date.
  */
+#define ATOMIC_STAT_TYPE gtm_atomic_uint_least64_t
+#define NON_ATOMIC_STAT_TYPE uint_least64_t
 
 #define	TAB_GVSTATS_REC(A,B,C)	A,
 enum gvstats_rec_type
@@ -31,14 +33,14 @@ n_gvstats_rec_types
 
 typedef struct gvstats_rec_struct
 {
-#define	TAB_GVSTATS_REC(A,B,C)	gtm_atomic_uint_least64_t	A;
+#define	TAB_GVSTATS_REC(A,B,C)	ATOMIC_STAT_TYPE	A;
 #include "tab_gvstats_rec.h"
 } gvstats_rec_t;
 #undef TAB_GVSTATS_REC
 
 typedef struct gvstats_rec_csd_struct
 {
-#define	TAB_GVSTATS_REC(A,B,C)	gtm_atomic_uint_least64_t	A;
+#define	TAB_GVSTATS_REC(A,B,C)	ATOMIC_STAT_TYPE	A;
 #include "tab_gvstats_rec.h"
 } gvstats_rec_csd_t;
 #undef TAB_GVSTATS_REC

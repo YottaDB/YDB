@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -45,6 +45,7 @@ void mlk_nocrit_unlock(mlk_pvtblk *p)
 	{
 		d->sequence = csa->hdr->trans_hist.lock_sequence++;	/* bump sequence so waiters realize this lock is released */
 		d->owner = 0;	/* Setting this marks the lock as available */
+		d->pstart = 0;
 		/* Note: The key unlock operation is setting d->owner to 0. The shared sequence increment can happen
 		 * before or after that. It is only a fast way to signal lock waiters of this unlock. Even if the sequence
 		 * increment actually happens way after the d->owner=0 (due to out-of-order executions), the worst is the

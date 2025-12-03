@@ -32,6 +32,7 @@
 #include "gtm_stdio.h"
 #include "gtm_unistd.h"
 #include "gtm_stdlib.h"
+#include "is_proc_alive.h"
 
 #include "gtm_pipe.h"
 #include "eintr_wrappers.h"
@@ -39,6 +40,7 @@
 #include "fork_init.h"
 
 GBLDEF	uint4	pipe_child;
+GBLDEF	uint4	pipe_child_pstarttime;
 
 int gtm_pipe(char *command, pipe_type pt)
 {
@@ -72,6 +74,7 @@ int gtm_pipe(char *command, pipe_type pt)
 	} else
 	{	/* parent process */
 		pipe_child = child_pid;
+		pipe_child_pstarttime = getpstart(child_pid);
 		CLOSEFILE_RESET(pfd[child], rc);	/* resets "pfd[child]" to FD_INVALID */
    		return pfd[parent];
 	}

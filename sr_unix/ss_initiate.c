@@ -68,6 +68,7 @@
 GBLREF	boolean_t		muint_fast, ointeg_this_reg, online_specified;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	uint4			process_id;
+GBLREF	uint4			pstarttime;
 GBLREF 	void			(*call_on_signal)();
 #ifdef DEBUG_ONLY
 GBLREF	int			process_exiting;
@@ -106,6 +107,7 @@ ZOS_ONLY(error_def(ERR_TEXT);)
 {												\
 	MEMCPY_LIT(ss_filhdr_ptr->label, SNAPSHOT_HDR_LABEL);					\
 	ss_filhdr_ptr->ss_info.ss_pid = ss_shm_ptr->ss_info.ss_pid;				\
+	ss_filhdr_ptr->ss_info.ss_pid_pstarttime = ss_shm_ptr->ss_info.ss_pid_pstarttime;	\
 	ss_filhdr_ptr->ss_info.snapshot_tn = ss_shm_ptr->ss_info.snapshot_tn;			\
 	ss_filhdr_ptr->ss_info.db_blk_size = ss_shm_ptr->ss_info.db_blk_size;			\
 	ss_filhdr_ptr->ss_info.free_blks = ss_shm_ptr->ss_info.free_blks;			\
@@ -258,7 +260,7 @@ boolean_t	ss_initiate(gd_region *reg,			/* Region in which snapshot has to be st
 		 */
 		assert(1 == MAX_SNAPSHOTS);
 		/* Check if the existing snapshot is still alive. If not, go ahead and cleanup that for us to continue  */
-		if ((0 != ss_shm_ptr->ss_info.ss_pid) && !is_proc_alive(ss_shm_ptr->ss_info.ss_pid, 0))
+		if ((0 != ss_shm_ptr->ss_info.ss_pid) && !is_proc_alive(ss_shm_ptr->ss_info.ss_pid, ss_shm_ptr->ss_info.ss_pid_pstarttime))
 			ss_release(NULL);
 		else
 		{
@@ -269,6 +271,7 @@ boolean_t	ss_initiate(gd_region *reg,			/* Region in which snapshot has to be st
 		}
 	}
 	ss_shm_ptr->ss_info.ss_pid = process_id;
+	ss_shm_ptr->ss_info.ss_pid_pstarttime = pstarttime;
 	cnl->num_snapshots_in_effect++;
 	assert(ss_lock_held_by_us(reg));
 	ss_release_lock(reg);

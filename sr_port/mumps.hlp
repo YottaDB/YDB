@@ -5354,8 +5354,8 @@
    limited to between 32 and one less than half the buffer pool inclusive;
    with the exception of zero (0) or 100 per cent, which turn off the
    limitation; specifications exceeding those limits provide the value of the
-   nearer limit. If the argument specifies "*" for the region, the command
-   applies to all regions. $VIEW("POOLLIMIT",<region>) returns the current
+   nearer limit. The region may be an asterisk (*) for all or a comma
+   delimited list of regions. $VIEW("POOLLIMIT",<region>) returns the current
    value for the region as an ordinal number - zero (0) when there is no
    limit in place. This facility is designed for use by a relatively small
    subset of processes. Note that the poollimit mechanism does not completely
@@ -6835,6 +6835,7 @@
    CFT : Critical section Failed (blocked) acquisition Total
    CQS* : Critical section acquisition Queued sleeps sum of Squares
    CQT* : Critical section acquisition Queued sleeps Total
+   CRD : # of cache reads
    CTN : Current Transaction Number of the database for the last committed read-write transaction (TP and non-TP)
    CYS* : Critical section acquisition processor Yields sum of Squares
    CYT* : Critical section acquisition processor Yields Total
@@ -6845,17 +6846,18 @@
    DRD : # of Disk ReaDs from the database file (TP and non-TP, committed and rolled-back).This does not include reads that are satisfied by buffered globals for databases that use the BG (Buffered Global) access method.
    DTA : # of DaTA operations (TP and non-TP)
    DWT : # of Disk WriTes to the database file (TP and non-TP, committed and rolled-back). This does not include writes that are satisfied by buffered globals for databases that use the BG (Buffered Global) access method. GT.M always reports 0 for databases that use the MM (memory-mapped) access method as this has no real meaning in that mode.
+   GCS : ms of sleep time for csh_getn in crit
    GET : # of GET operations (TP and non-TP)
    GLB : # of waits for bg access critical section
-   IDXH: # of index block cache hits
-   IDXM: # of index block cache misses
    INC : # of $INCREMENT operations. The $INCREMENT function also increases the SET counter.
    JBB : # of Journal Buffer Bytes updated in shared memory
+   JCS : ms of sleep time for jnl write in crit
    JEX : # of Journal file EXtentions
    JFB : # of Journal File Bytes written to the journal file on disk. For performance reasons, GT.M always aligns the beginning of these writes to file system block size boundaries. JFB counts all bytes including those needed for alignment in order to reflect the actual IO load on the journal file. Since the bytes required to achieve alignment may have already been counted as part of the previous JFB, processes may write the same bytes more than once, causing the JFB counter to typically be higher than JBB.
    JFL : # of Journal FLushes of all dirty journal buffers in shared memory to disk. For example: when switching journal files etc.
    JFS : # of Journal FSync operations on the journal file. For example: when writing an epoch record, switching a journal file etc.
    JFW : # of Journal File Write system calls
+   JNS : ms of sleep time for jnl write no crit
    JNL : # of waits for journal access critical section
    JOPA: # of waits for journal open critical section
    JRE : # of Journal Regular Epoch records written to the journal file (only seen in a -detail journal extract); these are written every time an epoch-interval boundary is crossed while processing updates
@@ -6881,6 +6883,7 @@
    PRC : # of waits on exit
    PRG : # of pre-read globals that were performed by the reader helper
    QRY : # of $QueRY() operations (TP and non-TP)
+   RCS : ms of sleep time for read-in-progress in crit
    SET : # of SET operations (TP and non-TP)
    STG : # of invoked SET triggers
    TBR : # of Tp transaction induced Block Reads on this database
@@ -6900,9 +6903,11 @@
    TRX : # of waits for transaction in progress
    TTR : # of Tp committed Transactions that were Read-only on this database
    TTW : # of Tp committed Transactions that were read-Write on this database
+   WFCS: ms of sleep time for wcs_flu in crit
    WFL : # of database flushes that were performed by the writer helpers
    WFR : # of times a process slept while waiting for another process to read in a database block
    WHE : # of writer helper epochs
+   WPCS: ms of sleep time for write-in-progress in crit
    WRL : # of times a process consistently slept(longer than WFR) while waiting for another process to read in a database block
    ZAD : # of waits for region freeze off
    ZPR : # of $order(,-1) or $ZPRevious() (reverse order) operations (TP and non-TP). The count of $Order(,1) operations are reported under ORD.
@@ -12633,21 +12638,18 @@
    $ZMAXTPTIme
 
    $ZMAXTPTI[ME] contains a value in seconds with millisecond precision
-   establishing the time duration GT.M should wait for the completion of all
+   specifying the time duration GT.M should wait for the completion of all
    activities fenced by the current transaction's outermost TSTART/TCOMMIT
-   pair. Because some operations present to GT.M with indeterminate time,
-   GT.M may extend the established value up up to five (5) times. A SET to a
-   value outside the accepted range of .001 and 60 leaves the current value
-   unchanged.
+   pair. A SET to a value outside the accepted range of .005 and 300 leaves
+   the current value unchanged.
 
    $ZMAXTPTIME can be SET but cannot be NEWed.
 
    $ZMAXTPTIME takes its value from the environment variable gtm_zmaxtptime.
    If gtm_zmaxtptime is not defined or outside the supported range, the
-   initial value of $ZMAXTPTIME is six (6) seconds which establishes a
-   timeout of 30 seconds. The value of $ZMAXTPTIME when a transaction's
-   outermost TSTART operation executes determines the timeout setting for
-   that transaction.
+   initial value of $ZMAXTPTIME is 30 seconds. The value of $ZMAXTPTIME when
+   a transaction's outermost TSTART operation executes determines the timeout
+   setting for that transaction.
 
    When a $ZMAXTPTIME expires, GT.M executes the $ETRAP/$ZTRAP exception
    handler currently in effect.
@@ -12662,9 +12664,12 @@
    transaction has any effect on the duration established by the value
    $ZMAXTPTIME at the time of the initial TSTART.
 
-   Interactions among the timer servers and the application code make the
-   times used by the $ZMAXTPTIME facility approximate, which serve adequately
-   in typical cases but may require thoughtful attention in unusual cases.
+   Times such as those associated with $ZMAXTPTIME are not precise, but
+   rather subject to interactions among the application, deployed
+   environment, and processing load, which can cause actual times to vary
+   slightly, but possibly materially relative to a given use case, especially
+   for very small settings. Such variations may require thoughtful attention
+   in unusual cases.
 
    Certain actions such as Instance freeze, Online Rollback, and Direct Mode
    (which does not work appropriately within a TP transaction) do not count
@@ -12704,17 +12709,17 @@
 
    Results:
 
-   Start with $ZMAXTPTIME=1.2:
+   Start with $ZMAXTPTIME=6:
    ^X=1,will set ^Y to 3 in 3 seconds...^Y=3...committed.
    (^X,^Y)=(1,3)
    ^X=2,will set ^Y to 5 in 5 seconds...^Y=5...committed.
    (^X,^Y)=(2,5)
    ^X=3,will set ^Y to 7 in 7 seconds...
-   In $ETRAP handler. Error was: 150377322,longtran+5^tptimeout,%GTM-E-TPTIMEOUT, Transaction timeout after 0 restart(s) and 5 grace period(s)
+   In $ETRAP handler. Error was: 150377322,longtran+5^tptimeout,%GTM-E-TPTIMEOUT, Transaction timeout after 0 restart(s) and 5 grace period(s) from longtran+5^tptimeout routine_path
    Rolled back transaction.
    (^X,^Y)=(2,5)
    ^X=3,will set ^Y to 9 in 9 seconds...
-   In $ETRAP handler. Error was: 150377322,longtran+5^tptimeout,%GTM-E-TPTIMEOUT, Transaction timeout after 0 restart(s) and 5 grace period(s)
+   In $ETRAP handler. Error was: 150377322,longtran+5^tptimeout,%GTM-E-TPTIMEOUT, Transaction timeout after 0 restart(s) and 5 grace period(s) from longtran+5^tptimeout routine_path
    Rolled back transaction.
    (^X,^Y)=(2,5)
    Done TP Timeout test - tptimeout

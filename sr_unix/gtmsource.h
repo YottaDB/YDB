@@ -163,6 +163,9 @@ n_jpl_trc_rec_types
 typedef struct jnlpool_ctl_struct_struct
 { 	/* IMPORTANT : all fields that are used by the source server reading from pool logic must be defined VOLATILE to avoid
 	 * compiler optimization, forcing fresh load on every access.
+	 *
+	 * It also seems worthwhile to note that code, including an assert in jnlpool_init.c expects this structure to be
+	 * a multiple of 16 bytes, so watch the padding. 
 	 */
 	replpool_identifier	jnlpool_id;
 	gtm_uint64_t		contig_addr;		/* Virtual address after which all subsequent records are known to be
@@ -237,6 +240,7 @@ typedef struct jnlpool_ctl_struct_struct
 							 * Anyone who does a "jnlpool_init" before this will issue a error.
 							 */
 	uint4			jnlpool_creator_pid;	/* DEBUG-ONLY field used for fake ENOSPC testing */
+	uint4			jnlpool_creator_pstarttime;	/* As above but start time for the creator_pid */
 	volatile uint4		onln_rlbk_pid;		/* process ID of currently running ONLINE ROLLBACK. 0 if none. */
 	volatile uint4		onln_rlbk_cycle;	/* incremented everytime an ONLINE ROLLBACK ends */
 	boolean_t		freeze;			/* Freeze all regions in this instance. */
@@ -252,6 +256,7 @@ typedef struct jnlpool_ctl_struct_struct
 							 * but frequently read. For this reason they should be in separate
 							 * cachelines. Only ever read/written in instance crit.
 							 */
+	char			jnlpool_ctl_pad01[8];	/* This structure must be a multiple of 16 */
 	/************* JPL_TRC_REC RELATED FIELDS -- begin -- ***********/
 #	define TAB_JPL_TRC_REC(A,B)	jpl_trc_rec_t	B;
 #	include "tab_jpl_trc_rec.h"
@@ -262,6 +267,7 @@ typedef struct jnlpool_ctl_struct_struct
 	CACHELINE_PAD(SIZEOF(global_latch_t), 0)	/* start next latch at a different cacheline than previous fields */
 	global_latch_t		phase2_commit_latch;	/* Used by "repl_phase2_complete" to update "phase2_commit_index1" */
 } jnlpool_ctl_struct;
+_Static_assert((SIZEOF(jnlpool_ctl_struct) % 16) == 0, "jnlpool_ctl_struct must be a multiple of 16");
 
 #if defined(__osf__) && defined(__alpha)
 # pragma pointer_size(save)
@@ -445,6 +451,7 @@ typedef struct
 {
 	unsigned char		secondary_instname[MAX_INSTNAME_LEN];/* Name of the secondary instance that is connected */
 	uint4			gtmsource_pid;	/* Process identification of source server */
+	uint4			gtmsource_pstarttime;	/* Start time of source server process */
 	int4			mode; 		/* Active, or Passive */
 	gtmsource_state_t	gtmsource_state;/* Current state of the source server. This shared memory flag is maintained in
 						 * sync with the source server specific private global variable "gtmsource_state" */
@@ -510,8 +517,8 @@ typedef struct
 	uint4			next_renegotiate_time;	/* Time (in future) at which the next SSL/TLS renegotiation happens. */
 	int4			num_renegotiations;	/* Number of SSL/TLS renegotiations that happened so far. */
 #	endif
-	int4			filler_8byte_align;	/* Keep size % 8 == 0 */
 } gtmsource_local_struct;
+_Static_assert((SIZEOF(gtmsource_local_struct) % 8) == 0, "gtmsource_local_struct must be a multiple of 8");
 
 #if defined(__osf__) && defined(__alpha)
 # pragma pointer_size(save)

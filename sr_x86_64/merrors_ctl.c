@@ -1040,7 +1040,7 @@ LITDEF	err_msg merrors[] = {
 	{ "MUPIPSIG", "!AD (signal !UL) issued from process !UL [0x!XL] to process !UL [0x!XL]", 7, 0 },
 	{ "HTSHRINKFAIL", "Hash table compaction failed to allocate new smaller table due to lack of memory", 0, 0 },
 	{ "STPEXPFAIL", "Stringpool expansion failed. It could not expand to !UL bytes.", 1, 0 },
-	{ "DBBTUWRNG", "The blocks-to-upgrade file-header field is incorrect. Expected 0x!16@XQ, found 0x!16@XQ", 2, 5 },
+	{ "DBBTUWRNG", "The blocks-to-upgrade file-header field is incorrect. Counted: 0x!16@XQ, but Header: 0x!16@XQ", 2, 5 },
 	{ "DBBTUFIXED", "The blocks-to-upgrade file-header field has been changed to the correct value", 0, 0 },
 	{ "DBMAXREC2BIG", "Maximum record size (!UL) is too large for this block size (!UL) - Maximum is !UL", 3, 0 },
 	{ "SOCKHANGUP", "Socket has disconnected", 0, 0 },

@@ -227,6 +227,7 @@ void mu_extract(void)
 	int				use_null_iv;
 	tp_region			*rptr;
 	uint4				pid;
+	uint4				pid_pstarttime;
 
 	freeze = override = FALSE;
 	any_file_encrypted = FALSE;
@@ -371,7 +372,8 @@ void mu_extract(void)
 				cnl = csa->nl;
 				grab_crit(reg, WS_86);
 				pid = cnl->reorg_encrypt_pid;
-				if (pid && is_proc_alive(pid, 0))
+				pid_pstarttime = cnl->reorg_encrypt_pid_pstarttime;
+				if (pid && is_proc_alive(pid, pid_pstarttime))
 				{
 					RTS_ERROR_CSA_ABT(REG2CSA(reg), VARLSTCNT(8) ERR_ENCRYPTCONFLT, 6,
 						RTS_ERROR_LITERAL("MUPIP EXTRACT -FORMAT=BIN"), REG_LEN_STR(reg), DB_LEN_STR(reg));

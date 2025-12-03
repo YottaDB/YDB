@@ -104,6 +104,7 @@ STATICDEF	int		wcs_wtstart_count;
 #endif
 
 GBLREF	uint4			process_id;
+GBLREF	uint4			pstarttime;
 GBLREF	sm_uc_ptr_t		reformat_buffer;
 GBLREF	int			reformat_buffer_len;
 GBLREF	gd_region		*gv_cur_region;
@@ -505,6 +506,7 @@ int4	wcs_wtstart(gd_region *region, int4 writes, wtstart_cr_list_t *cr_list_ptr,
 			save_errno = 0;
 			assert(FALSE == cr->data_invalid);	/* check that buffer has valid data */
 			cr->epid = process_id;
+			cr->epid_pstarttime = pstarttime;
 			CR_BUFFER_CHECK1(region, csa, csd, cr, cr_lo, cr_hi);
 			bp = (blk_hdr_ptr_t)(GDS_ANY_REL2ABS(csa, cr->buffaddr));
 			VALIDATE_BM_BLK(cr->blk, bp, csa, region, bmp_status);	/* bmp_status holds bmp buffer's validity */
@@ -708,6 +710,7 @@ int4	wcs_wtstart(gd_region *region, int4 writes, wtstart_cr_list_t *cr_list_ptr,
 					skip_in_trans, save_errno);
 				assert((ERR_ENOSPCQIODEFER != save_errno) || !was_crit || skip_in_trans);
 				cr->epid = 0; /* before releasing update lock, clear epid */
+				cr->epid_pstarttime = 0;
 				CLEAR_BUFF_UPDATE_LOCK(cr, &cnl->db_latch);
 				REINSERT_CR_AT_TAIL(csr, ahead, n, csa, csd, wcb_wtstart_lckfail4);
 				if (INTERLOCK_FAIL == n)
@@ -733,6 +736,7 @@ int4	wcs_wtstart(gd_region *region, int4 writes, wtstart_cr_list_t *cr_list_ptr,
 				{
 					assert(FALSE);
 					cr->epid = 0;
+					cr->epid_pstarttime = 0;
 					SET_TRACEABLE_VAR(cnl->wc_blocked, WC_BLOCK_RECOVER);
 					BG_TRACE_PRO_ANY(csa, wcb_wtstart_lckfail4);
 					err_status = ERR_DBCCERR;
@@ -756,6 +760,7 @@ int4	wcs_wtstart(gd_region *region, int4 writes, wtstart_cr_list_t *cr_list_ptr,
 			{
 				cr->flushed_dirty_tn = cr->dirty;
 				cr->epid = 0;
+				cr->epid_pstarttime = 0;
 				ADD_ENT_TO_FREE_QUE_CNT(cnl);
 				cr->dirty = 0;
 				/* Even though asyncio is ON we may have done a synchronous I/O to get it done, e.g.,

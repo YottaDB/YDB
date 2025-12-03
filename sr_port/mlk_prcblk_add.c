@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -30,7 +30,7 @@ GBLREF	uint4		process_id;
 error_def(ERR_LOCKSPACEFULL);
 error_def(ERR_LOCKSPACEINFO);
 
-boolean_t mlk_prcblk_add(gd_region *reg, mlk_ctldata_ptr_t ctl, mlk_shrblk_ptr_t d, uint4 pid)
+boolean_t mlk_prcblk_add(gd_region *reg, mlk_ctldata_ptr_t ctl, mlk_shrblk_ptr_t d, uint4 pid, uint4 pstarttime)
 {
 	mlk_prcblk_ptr_t	pr;
 	ptroff_t		*prpt;
@@ -75,6 +75,7 @@ boolean_t mlk_prcblk_add(gd_region *reg, mlk_ctldata_ptr_t ctl, mlk_shrblk_ptr_t
 		A2R(ctl->prcfree, R2A(pr->next));
 	A2R(*prpt, pr);
 	pr->process_id = pid;
+	pr->process_start = pstarttime;
 	pr->ref_cnt = 1;
 	pr->next = 0;
 	return TRUE;

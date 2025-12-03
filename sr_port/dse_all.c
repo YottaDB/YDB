@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -224,7 +224,14 @@ void dse_all(void)
 			if (ref)
 				cs_addrs->nl->ref_cnt = 1;
 			if (clear_corrupt)
+			{
+				if (!was_crit)	/* No point seizing crit if WE already have it held */
+					grab_crit_encr_cycle_sync(gv_cur_region, WS_56);
 				csd->file_corrupt = FALSE;
+				fileheader_sync(gv_cur_region);
+				if (!was_crit && (!seize || release))
+					rel_crit(gv_cur_region);
+			}
 		}
 	}
 	cs_addrs = old_addrs;

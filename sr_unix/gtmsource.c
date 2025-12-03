@@ -84,6 +84,7 @@ GBLREF	boolean_t		is_src_server;
 GBLREF	boolean_t		first_syslog;
 GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	uint4			process_id;
+GBLREF	uint4			pstarttime;
 GBLREF	int			gtmsource_sock_fd;
 GBLREF	int			gtmsource_log_fd;
 GBLREF	FILE			*gtmsource_log_fp;
@@ -392,6 +393,7 @@ int gtmsource()
 	TREF(enable_autodelete) = TRUE; /* Autodelete autodeletable files on exit if the last one out */
 	OPERATOR_LOG_MSG;
 	process_id = getpid();
+	pstarttime = getpstart(process_id);
 	/* Initialize mutex socket, memory semaphore etc. before any "grab_lock" is done by this process on the journal pool.
 	 * Note that the initialization would already have been done by the parent receiver startup command but we need to
 	 * redo the initialization with the child process id.
@@ -470,11 +472,13 @@ int gtmsource()
 	}
 	/* Initialize source server alive/dead state related fields in "gtmsource_local" before the ftok semaphore is released */
 	gtmsource_local->gtmsource_pid = process_id;
+	gtmsource_local->gtmsource_pstarttime = pstarttime;
 	gtmsource_local->gtmsource_state = GTMSOURCE_START;
 	if (is_jnlpool_creator)
 	{
 		assert(jnlpool && jnlpool->jnlpool_ctl);
 		DEBUG_ONLY(jnlpool->jnlpool_ctl->jnlpool_creator_pid = process_id);
+		DEBUG_ONLY(jnlpool->jnlpool_ctl->jnlpool_creator_pstarttime = getpstart(process_id));
 		gtmsource_seqno_init(this_side_std_null_coll);
 		if (ROOTPRIMARY_SPECIFIED == gtmsource_options.rootprimary)
 		{	/* Created the journal pool as a root primary. Append a history record to the replication instance file.

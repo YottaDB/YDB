@@ -130,12 +130,12 @@ boolean_t dse_b_dmp(void)
 	bplmap = cs_addrs->hdr->bplmap;
 	is_mm = (dba_mm == cs_addrs->hdr->acc_meth);
 	mapsize = BM_SIZE(bplmap);
-	patch_rec_counter = 1;
 	was_crit = cs_addrs->now_crit;
 	nocrit_present = (CLI_NEGATED == cli_present("CRIT"));
 	DSE_GRAB_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit, nocrit_present, cs_addrs, gv_cur_region);
 	for ( ; ; )
 	{
+		patch_rec_counter = 1;
 		if (!use_image && !(bp = t_qread(blk, &dummy_int, &cr)))
 		{
 			DSE_REL_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit, nocrit_present, cs_addrs, gv_cur_region);

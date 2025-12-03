@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2004-2023 Fidelity National Information	*
+ * Copyright (c) 2004-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -18,6 +18,7 @@
 #include "fileinfo.h"
 #include "gdsbt.h"
 #include "gdsfhead.h"
+#include "gvt_inline.h"
 #include "filestruct.h"
 #include "t_abort.h"		/* for prototype of "t_abort" */
 #include "process_reorg_encrypt_restart.h"
@@ -57,6 +58,7 @@ void t_abort(gd_region *reg, sgmnt_addrs *csa)
 			assert(!dollar_tlevel);
 		}
 	}
+	ACCUMULATE_LCL_GVSTATS_COUNTER(csa, csa->nl, n_cache_reads);
 	t_abort_cleanup();
 	/* Do not release crit in case of
 	 * 	a) MUPIP RECOVER ONLINE  OR

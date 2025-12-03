@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2004-2019 Fidelity National Information	*
+ * Copyright (c) 2004-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -59,6 +59,8 @@ void	t_abort_cleanup(void)
 	TREF(expand_prev_key) = FALSE;	/* reset global (in case it is TRUE) so it does not get carried over to future operations */
 	if (!dollar_tlevel)
 	{
+		if (gv_target && gv_target->gd_csa)
+			ACCUMULATE_LCL_GVSTATS_COUNTER(gv_target->gd_csa, gv_target->gd_csa->nl, n_cache_reads);
 		/* "secshr_db_clnup/t_commit_cleanup" assume an active non-TP transaction if cw_set_depth is non-zero or if
 		 * update_trans has the UPDTRNS_TCOMMIT_STARTED_MASK bit set. Now that the transaction is aborted, reset them.
 		 */

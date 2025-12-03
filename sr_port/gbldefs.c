@@ -845,6 +845,7 @@ GBLDEF	boolean_t		dse_all_dump;		/* TRUE if DSE ALL -DUMP is specified */
 GBLDEF	int			socketus_interruptus;	/* How many times socket reads have been interrutped */
 GBLDEF	int4			pending_errtriplecode;	/* if non-zero contains the error code to invoke ins_errtriple with */
 GBLDEF	uint4	process_id;
+GBLDEF	uint4	pstarttime;
 GBLDEF	uid_t	user_id = INVALID_UID, effective_user_id = INVALID_UID;
 GBLDEF	gid_t	group_id = INVALID_GID, effective_group_id = INVALID_GID;
 GBLDEF	struct	passwd getpwuid_struct = {NULL, NULL, INVALID_UID, INVALID_GID, NULL, NULL, NULL};

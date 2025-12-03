@@ -1701,7 +1701,8 @@ enum cdb_sc upgrade_dir_tree(block_id curr_blk, block_id offset, gd_region *reg,
 			util_out_print("Region !AD : Failed to free block 0x!@XQ;", FALSE, REG_LEN_STR(reg), &curr_blk);
 			util_out_print(" likely to leave an incorrectly maked busy.", TRUE);
 		}
-		DECR_BLKS_TO_UPGRD(csa, csd, 1);
+		if (0 == csd->blks_to_upgrd_subzero_error)
+			DECR_BLKS_TO_UPGRD(csa, csd, 1);
 		mu_reorg_process = FALSE;
 		t_abort(gv_cur_region, csa);							/* do crit and other cleanup */
 		if (DIR_ROOT == curr_blk)

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -158,6 +158,7 @@ bool	lke_showlock(mlk_pvtctl_ptr_t	pctl,
 	if (node->owner || (node->pending && wait))
 	{
 		pblk.process_id = node->owner;
+		pblk.process_start = node->pstart;
 		pblk.next = (wait && node->pending) ?
 			(ptroff_t)((uchar_ptr_t)&node->pending - (uchar_ptr_t)&pblk.next + node->pending)
 						       : 0;
@@ -170,7 +171,7 @@ bool	lke_showlock(mlk_pvtctl_ptr_t	pctl,
 			if ((0 == pid) || (pid == our->process_id))
 			{
 				f[2] = our->process_id;
-				if (is_proc_alive((int4)our->process_id, 0))
+				if (is_proc_alive((int4)our->process_id, (int4)our->process_start))
 				{
 					f[3] = STR_LIT_LEN(existpr);
 					f[4] = (INTPTR_T)existpr;

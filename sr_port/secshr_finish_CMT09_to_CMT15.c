@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2017-2024 Fidelity National Information	*
+ * Copyright (c) 2017-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -69,6 +69,7 @@ GBLREF	sgmnt_addrs 		*kip_csa;
 GBLREF	sgmnt_data		*cs_data;
 GBLREF	uint4			mu_upgrade_in_prog;		/* non-zero if MUPIP REORG UPGRADE/DOWNGRADE is in progress */
 GBLREF	uint4			process_id;
+GBLREF	uint4			pstarttime;
 GBLREF	uint4			update_trans;
 GBLREF	unsigned char		cw_set_depth;
 GBLREF	unsigned int		cr_array_index;
@@ -405,6 +406,7 @@ void	secshr_finish_CMT09_to_CMT15(sgmnt_addrs *csa, jnlpool_addrs_ptr_t update_j
 								BML_RSRV_IF_EXP(cs->cr, CR_BLKEMPTY, process_id, 0);
 							cr->backup_cr_is_twin = FALSE;
 							cr->in_tend = process_id;
+							cr->in_tend_pstarttime = pstarttime;
 							cr->cycle++;	/* increment cycle for blk number changes (for tp_hist) */
 							assert(cs->blk < csd->trans_hist.total_blks);
 							cr->blk = cs->blk;
@@ -433,7 +435,7 @@ void	secshr_finish_CMT09_to_CMT15(sgmnt_addrs *csa, jnlpool_addrs_ptr_t update_j
 									}
 								}
 							}
-							if (!cs_data->fully_upgraded)
+							if ((!cs_data->fully_upgraded) && (0 == csd->blks_to_upgrd_subzero_error))
 							{	/* Transitional DB format */
 								assert(GDSV6 < cs_data->desired_db_format);
 								if (GDSV7m != cs->ondsk_blkver)
@@ -476,6 +478,13 @@ void	secshr_finish_CMT09_to_CMT15(sgmnt_addrs *csa, jnlpool_addrs_ptr_t update_j
 #endif
 								}
 							}
+#ifdef							DEBUG_BLKS_TO_UPGRD
+							else if (!cs_data->fully_upgraded)
+								util_out_print("!UL - !AD:0x!@XQ:!UL:!UL:!UL:!UL (CMT08)",
+									TRUE, cs_data->blks_to_upgrd, REG_LEN_STR(gv_cur_region),
+									&cs->blk, cs->ondsk_blkver, cs->level,
+									cs_data->blks_to_upgrd), cs->mode;
+#endif
 							/* The cse owns ondsk_blkver's setting, force it in the cacherec */
 							cr->ondsk_blkver = cs->ondsk_blkver;
 							cs->old_mode = -old_mode;	/* signal phase1 is complete */

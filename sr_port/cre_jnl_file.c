@@ -336,8 +336,8 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 	epoch_record->blks_to_upgrd = info->blks_to_upgrd;
 	epoch_record->free_blocks = info->free_blocks;
 	epoch_record->total_blks = info->total_blks;
+	epoch_record->offset = info->offset;
 	epoch_record->fully_upgraded = info->csd->fully_upgraded;
-	epoch_record->filler0 = 0;
 	epoch_record->suffix.suffix_code = JNL_REC_SUFFIX_CODE;
 	epoch_record->jnl_seqno = info->reg_seqno;
 	for (idx = 0; idx < MAX_SUPPL_STRMS; idx++)
@@ -346,7 +346,6 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 	{	/* If MUPIP JOURNAL -ROLLBACK, might need some adjustment. See macro definition for comments */
 		MUR_ADJUST_STRM_REG_SEQNO_IF_NEEDED(info->csd, epoch_record->strm_seqno);
 	}
-	epoch_record->filler1 = 0;
 	epoch_record->prefix.checksum = INIT_CHECKSUM_SEED;
 	temp_checksum = compute_checksum(INIT_CHECKSUM_SEED, (unsigned char *)epoch_record, SIZEOF(struct_jrec_epoch));
 	temp_offset = JNL_HDR_LEN + PINI_RECLEN;

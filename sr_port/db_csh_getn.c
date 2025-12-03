@@ -51,6 +51,7 @@
 GBLREF sgmnt_addrs		*cs_addrs;
 GBLREF gd_region		*gv_cur_region;
 GBLREF uint4			process_id;
+GBLREF uint4			pstarttime;
 GBLREF unsigned int		t_tries;
 GBLREF uint4			dollar_tlevel;
 GBLREF sgm_info			*sgm_info_ptr;
@@ -60,14 +61,15 @@ GBLREF uint4 			update_trans;
 GBLREF jnlpool_addrs_ptr_t	jnlpool;
 #endif
 
-#define	TRACE_AND_SLEEP(ocnt)				\
-{							\
-	if (1 == ocnt)					\
-	{						\
-		BG_TRACE_PRO(db_csh_getn_rip_wait);	\
-		first_r_epid = latest_r_epid;		\
-	}						\
-	wcs_sleep(ocnt);				\
+#define	TRACE_AND_SLEEP(ocnt)						\
+{									\
+	if (1 == ocnt)							\
+	{								\
+		BG_TRACE_PRO(db_csh_getn_rip_wait);			\
+		first_r_epid = latest_r_epid;				\
+		first_r_epid_pstarttime = latest_r_epid_pstarttime;	\
+	}								\
+	wcs_sleep(ocnt);						\
 }
 
 error_def(ERR_BUFRDTIMEOUT);
@@ -88,7 +90,7 @@ cache_rec_ptr_t	db_csh_getn(block_id block)
 	unsigned int		lcnt, ocnt;
 	int			max_ent, iter0, iter0cnt, iter1, iter2, iter3, rip;
 	int4			flsh_trigger;
-	uint4			first_r_epid = 0, latest_r_epid;
+	uint4			first_r_epid = 0, first_r_epid_pstarttime, latest_r_epid, latest_r_epid_pstarttime;
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
 	srch_blk_status		*tp_srch_status;
@@ -374,16 +376,18 @@ cache_rec_ptr_t	db_csh_getn(block_id block)
 				 * particularly before calling is_proc_alive as we don't want to call it with a 0 r_epid.
 				 */
 				latest_r_epid = cr->r_epid;
+				latest_r_epid_pstarttime = cr->r_epid_pstarttime;
 				if (cr->read_in_progress < -1)
 				{
 					BG_TRACE_PRO(db_csh_getn_out_of_design);  /* outside of design; clear to known state */
 					send_msg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_INVALIDRIP, 2, DB_LEN_STR(reg));
 					assert(cr->r_epid == 0);
 					cr->r_epid = 0;
+					cr->r_epid_pstarttime = 0;
 					INTERLOCK_INIT(cr);
 				} else  if (0 != latest_r_epid)
 				{
-					if (is_proc_alive(latest_r_epid, 0))
+					if (is_proc_alive(latest_r_epid, latest_r_epid_pstarttime))
 					{
 #						ifdef DEBUG
 						if ((BUF_OWNER_STUCK / 2) == ocnt)
@@ -393,6 +397,7 @@ cache_rec_ptr_t	db_csh_getn(block_id block)
 					} else
 					{
 						cr->r_epid = 0;
+						cr->r_epid_pstarttime = 0;
 						INTERLOCK_INIT(cr);	/* Process gone, release that process's lock */
 					}
 				} else
@@ -415,6 +420,7 @@ cache_rec_ptr_t	db_csh_getn(block_id block)
 					continue;
 				}
 				cr->r_epid = 0;
+				cr->r_epid_pstarttime = 0;
 				INTERLOCK_INIT(cr);
 				LOCK_BUFF_FOR_READ(cr, rip);
 				assert(0 == rip); 	/* Since holding crit, we expect to get lock */
@@ -436,6 +442,7 @@ cache_rec_ptr_t	db_csh_getn(block_id block)
 		assert(NULL == TREF(block_now_locked));
 		TREF(block_now_locked) = cr;
 		cr->r_epid = process_id;	/* establish ownership */
+		cr->r_epid_pstarttime = pstarttime;
 		cr->blk = block;
 		BML_RSRV_RESET(cr);
 		/* We want cr->read_in_progress to be locked BEFORE cr->cycle is incremented. t_qread relies on this order.

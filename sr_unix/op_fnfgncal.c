@@ -800,9 +800,12 @@ STATICFNDEF void op_fgnjavacal(mval *dst, mval *package, mval *extref, uint4 mas
 	assert((char *)free_space_pointer <= free_string_pointer_start);
 	va_end(var_copy);
 	param_list->n = argcnt + 3;		/* Take care of the three implicit parameters. */
+	DBGEXCAL((stderr, "Entry: %s, Calls: %s, Safe: %d, ACIDTP: %d\n", entry_ptr->entry_name.addr, entry_ptr->call_name.addr,
+		entry_ptr->ext_call_behaviors[0], entry_ptr->ext_call_behaviors[1]));	/* WARNING: sloppy string termination */
 	safe = 0 != entry_ptr->ext_call_behaviors[SIGSAFE];
 	VERIFY_STORAGE_CHAINS;
-	TPNOTACID_CHECK(EXCALLSTR);
+	if (!entry_ptr->ext_call_behaviors[ACIDTP])
+		TPNOTACID_CHECK(EXCALLSTR);
 	save_mumps_status = mumps_status; 	/* Save mumps_status as a callin from external call may change it. */
 	if (dollar_tlevel)
 		sys_get_curr_time(&b_time);				/* time starting the external call */
@@ -1207,9 +1210,12 @@ void op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 ma
 	assert((char *)free_space_pointer <= free_string_pointer_start);
 	va_end(var);
 	param_list->n = argcnt;
+	DBGEXCAL((stderr, "Entry: %s, Calls: %s, Safe: %d, ACIDTP: %d\n", entry_ptr->entry_name.addr, entry_ptr->call_name.addr,
+		entry_ptr->ext_call_behaviors[0], entry_ptr->ext_call_behaviors[1]));	/* WARNING: sloppy string termination */
 	safe = 0 != entry_ptr->ext_call_behaviors[SIGSAFE];
 	VERIFY_STORAGE_CHAINS;
-	TPNOTACID_CHECK(EXCALLSTR);
+	if (!entry_ptr->ext_call_behaviors[ACIDTP])
+		TPNOTACID_CHECK(EXCALLSTR);
 	save_mumps_status = mumps_status; /* Save mumps_status as a callin from external call may change it */
 	if (dollar_tlevel)
 		sys_get_curr_time(&b_time);				/* time starting the external call */

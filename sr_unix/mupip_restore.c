@@ -74,6 +74,7 @@
 
 GBLDEF	inc_list_struct		in_files;
 GBLREF	uint4			pipe_child;
+GBLREF	uint4			pipe_child_pstarttime;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	uint4			restore_read_errno;
 
@@ -273,6 +274,7 @@ void mupip_restore(void)
 				break;
 			case backup_to_exec:
 				pipe_child = 0;
+				pipe_child_pstarttime = 0;
 				common_read = exec_read;
 				in = (BFILE *)malloc(SIZEOF(BFILE));
 				if (0 > (in->fd = gtm_pipe(ptr->input_file.addr, input_from_comm)))
@@ -703,7 +705,7 @@ void mupip_restore(void)
 				break;
 			case backup_to_exec:
 				CLOSEFILE_RESET(in->fd, rc);	/* resets "in->fd" to FD_INVALID */
-				if ((pipe_child > 0) && (FALSE != is_proc_alive(pipe_child, 0)))
+				if ((pipe_child > 0) && (FALSE != is_proc_alive(pipe_child, pipe_child_pstarttime)))
 					WAITPID(pipe_child, (int *)&status, 0, waitpid_res);
 				break;
 			case backup_to_tcp:
@@ -745,7 +747,7 @@ STATICFNDEF void exec_read(BFILE *bf, char *buf, int nbytes)
 		else if ((EINTR != errno) && (EAGAIN != errno))
 		{
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) errno);
-			if ((pipe_child > 0) && (FALSE != is_proc_alive(pipe_child, 0)))
+			if ((pipe_child > 0) && (FALSE != is_proc_alive(pipe_child, pipe_child_pstarttime)))
 				WAITPID(pipe_child, (int *)&status, 0, waitpid_res);
 			CLOSEFILE_RESET(bf->fd, rc);	/* resets "bf->fd" to FD_INVALID */
 			restore_read_errno = errno;

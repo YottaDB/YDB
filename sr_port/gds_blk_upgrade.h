@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2005-2023 Fidelity National Information	*
+ * Copyright (c) 2005-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -23,7 +23,7 @@ int4 gds_blk_upgrade(sm_uc_ptr_t gds_blk_src, sm_uc_ptr_t gds_blk_trg, int4 bsiz
 GBLREF	uint4		gtm_blkupgrade_flag;	/* control whether dynamic upgrade is attempted or not */
 GBLREF	boolean_t	dse_running;
 
-/* The following macro was gutted in V7+ as dsk_read uses the inline fuction above to adjust block_ids, but does not actually
+/* The following macro was gutted in V7+ as dsk_read uses the inline function above to adjust block_ids, but does not actually
  * upgrade block_id fileds from 4 to 8 bytes, as managing that as part of the read was deemed to complex and not necessary
  * The macro remains in mur_blocks_free.c as a marker for possible future conversions and the text below retained for guidance
  *

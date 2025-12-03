@@ -14,6 +14,7 @@
 #define GDSBT_H
 /* this requires gdsroot.h */
 
+#include "gtm_common_defs.h"
 #include <sys/types.h>
 #ifdef MUTEX_MSEM_WAKE
 #ifdef POSIX_MSEM
@@ -688,6 +689,7 @@ typedef struct node_local_struct
 	uint4		ss_shmcycle;	 	/* incremented everytime a new snapshot creates a new shared memory identifier */
 	uint4		wbox_test_seq_num;	/* used to coordinate with sequential testing steps */
 	gvstats_rec_t	gvstats_rec;
+	char		filler_1[48];
 	trans_num	last_wcsflu_tn;			/* curr_tn when last wcs_flu was done on this database */
 	trans_num	last_wcs_recover_tn;		/* csa->ti->curr_tn of most recent "wcs_recover" */
 	sm_off_t	encrypt_glo_buff_off;	/* offset from unencrypted global buffer to its encrypted counterpart */
@@ -704,7 +706,8 @@ typedef struct node_local_struct
 	int4		jnlpool_shmid;	/* copy of jnlpool->repl_inst_filehdr->jnlpool_shmid to prevent mixing of multiple
 					 * journal pools within the same database.
 					 */
-	uint4		trunc_pid;			/* Operating truncate. */
+	uint4		trunc_pid;	/* Operating truncate. */
+	uint4		trunc_pstart;	/* Truncate process start time. */
 	boolean_t	fastinteg_in_prog;	/* Tells GT.M if fast integrity is in progress */
 	gtm_uint64_t	sec_size;	/* Upon going to larger shared memory sizes, we realized that this does not	*/
 					/* need	to be in the file header but the node local since it can be calculated	*/
@@ -716,6 +719,7 @@ typedef struct node_local_struct
 	volatile uint4	onln_rlbk_cycle;	/* incremented everytime an online rollback ends */
 	volatile uint4	db_onln_rlbkd_cycle;	/* incremented everytime an online rollback takes the database back in time */
 	volatile uint4	onln_rlbk_pid;		/* process ID of currently running online rollback. */
+	volatile uint4	onln_rlbk_pstarttime;	/* Start time of process ID of currently running online rollback. */
 	uint4		dbrndwn_ftok_skip;	/* # of processes that skipped FTOK semaphore in gds_rundown due to too many MUMPS
 						 * processes
 						 */
@@ -738,6 +742,7 @@ typedef struct node_local_struct
 								 */
 	uint4		reorg_upgrade_pid;	/* indicates whether a MUPIP REORG -UPGRADE is in progress */
 	uint4		reorg_encrypt_pid;	/* indicates whether a MUPIP REORG -ENCRYPT is in progress */
+	uint4		reorg_encrypt_pid_pstarttime;	/* Start time for the reorg_encrypt_pid */
 	uint4		reorg_encrypt_cycle;	/* reflects the cycle of database encryption status in a series of
 						 * MUPIP REORG -ENCRYPTs
 						 */
@@ -778,6 +783,8 @@ typedef struct node_local_struct
 	global_latch_t		statsdb_field_latch;
 	uint4			statsdb_init_cycle;
 } node_local;
+
+static_assert(((OFFSETOF(node_local, last_wcsflu_tn) % 64) == 0), "last_wcsflu_tn is not in solo cacheline, check filler array");
 
 #define	COPY_STATSDB_FNAME_INTO_STATSREG(statsDBreg, statsDBfname, statsDBfname_len)				\
 MBSTART {													\

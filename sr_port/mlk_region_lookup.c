@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -27,6 +27,7 @@
 #include "gv_trigger_common.h"	/* for *HASHT* macros used inside GVNH_REG_INIT macro */
 #include "filestruct.h"		/* needed for "jnl.h" used by next line */
 #include "jnl.h"		/* needed for "jgbl" used inside GVNH_REG_INIT macro */
+#include "stringpool.h"
 
 #define DIR_ROOT 1
 
@@ -34,6 +35,7 @@ gd_region *mlk_region_lookup(mval *ptr, gd_addr *addr)
 {
 	ht_ent_mname		*tabent;
 	mname_entry		 gvent;
+	char			mname_buf[MAX_MIDENT_LEN + 1];
 	gd_binding		*map;
 	gv_namehead		*targ;
 	gd_region		*reg;
@@ -52,8 +54,10 @@ gd_region *mlk_region_lookup(mval *ptr, gd_addr *addr)
 	{
 		p++;
 		plen--;
-		gvent.var_name.addr = p;
 		gvent.var_name.len = MIN(plen, MAX_MIDENT_LEN);
+		gvent.var_name.addr = mname_buf;
+		memcpy(mname_buf, p, gvent.var_name.len);
+		mname_buf[gvent.var_name.len] = '\0';
 		COMPUTE_HASH_MNAME(&gvent);
 		if (NULL != (tabent = lookup_hashtab_mname(addr->tab_ptr, &gvent)))
 		{
@@ -72,6 +76,14 @@ gd_region *mlk_region_lookup(mval *ptr, gd_addr *addr)
 			reg = map->reg.addr;
 			if (!reg->open)
 				gv_init_reg(reg, NULL);
+#ifdef			DEBUG
+			if (WBTEST_ENABLED(WBTEST_GCOL) && (3 == gtm_white_box_test_case_count) && !gtm_wbox_input_test_case_count)
+			{
+				gtm_wbox_input_test_case_count++;
+				/* Force a stringpool expansion */
+				INVOKE_STP_GCOL(stringpool.top - stringpool.base + 1);
+			}
+#endif
 			targ = (gv_namehead *)targ_alloc(reg->max_key_size, &gvent, reg);
 			GVNH_REG_INIT(addr, addr->tab_ptr, map, targ, reg, gvnh_reg, tabent);
 		}

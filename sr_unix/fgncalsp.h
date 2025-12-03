@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -12,6 +12,17 @@
 
 #ifndef FGNCALSP_H_INCLUDED
 #define FGNCALSP_H_INCLUDED
+
+
+#ifdef DEBUG
+/* Uncomment below to enable tracing of deferred events */
+/* #define DEBUG_EXCAL_EVENT */
+#endif
+#ifdef DEBUG_EXCAL_EVENT
+#define DBGEXCAL(x)	DBGFPF(x)
+#else
+#define DBGEXCAL(x)
+#endif
 
 /* fgncalsp.h - UNIX foreign calls (d &package.label) */
 
@@ -90,7 +101,7 @@ enum gtm_types
 	gtm_jbig_decimal
 };
 
-typedef enum {SIGSAFE, XCBEHAVIORTAILENTRY} gtm_ext_call_behavior;
+typedef enum {SIGSAFE, ACIDTP, XCBEHAVIORTAILENTRY} gtm_ext_call_behavior;
 
 enum callintogtm_fncs
 {

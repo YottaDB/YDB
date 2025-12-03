@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -124,10 +124,10 @@ char	*jnl2ext(char *jnl_buff, char *ext_buff, char *ext_bufftop)
 		return ext_buff;
 	}
 	curr = ext_buff;
-	/* The following assumes the journal extract format is "GDSJEX07". Whenever that changes (in mur_jnl_ext.c),
+	/* The following assumes the journal extract format is "GDSJEX08". Whenever that changes (in mur_jnl_ext.c),
 	 * the below code as well as ext2jnl.c will need to change. Add an assert to let us know of that event.
 	 */
-	assert(!MEMCMP_LIT(JNL_EXTR_LABEL,"GDSJEX07"));
+	assert(!MEMCMP_LIT(JNL_EXTR_LABEL,"GDSJEX08"));
 	if (IS_TUPD(rectype))
 	{
 		if (FALSE == first_tstart)

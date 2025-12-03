@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -106,8 +106,11 @@ trans_num gvcst_bmp_mark_free(kill_set *ks)
 	assert(!dollar_tlevel); 			/* Should NOT be in TP now */
 	blk = &ks->blk[0];
 	blk_top = &ks->blk[ks->used];
-	if (0 != cs_data->fully_upgraded)
-	{	/* Database has been completely upgraded. Free all blocks in one bitmap as part of one transaction. */
+	if ((0 != cs_data->fully_upgraded) || (GDSV7m == cs_data->desired_db_format))
+	{	/* Database has been completely upgraded. Free all blocks in one bitmap as part of one transaction, or
+		 * working with V7m format where it's OK to defer upgrade of recycled blocks until they are reused
+		 * rather than causing python effect on a process performing kill clean up and on journal files with before_image
+		 */
 		inctn_detail.blknum_struct.blknum = 0; /* to indicate no adjustment to "blks_to_upgrd" necessary */
 		/* If any of the mini transaction below restarts because of an online rollback, we don't want the application
 		 * refresh to happen (like $ZONLNRLBK++ or rts error(DBROLLEDBACK). This is because, although we are currently in

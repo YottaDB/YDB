@@ -45,7 +45,7 @@ boolean_t	wcs_read_in_progress_wait(cache_rec_ptr_t cr, wbtest_code_t wbox_test_
 	 * (probably too many buffers to reasonably maintain a mutex for each); it should notice if r_epid or cr->cycle
 	 * are changing and in, at least, that case keep waiting; alert messages might be nice
 	 */
-	uint4	lcnt, r_epid;
+	uint4	lcnt, r_epid, r_epid_pstarttime;
 	int4	n;
 
 	for (lcnt = 1; -1 != cr->read_in_progress; lcnt++)
@@ -54,6 +54,7 @@ boolean_t	wcs_read_in_progress_wait(cache_rec_ptr_t cr, wbtest_code_t wbox_test_
 		{	/* outside of design; clear to known state */
 			assert(0 == cr->r_epid);
 			cr->r_epid = 0;
+			cr->r_epid_pstarttime = 0;
 			INTERLOCK_INIT(cr);
 			break;
 		}
@@ -70,11 +71,13 @@ boolean_t	wcs_read_in_progress_wait(cache_rec_ptr_t cr, wbtest_code_t wbox_test_
 			 * particularly before calling is_proc_alive as we don't want to call it with a 0 r_epid.
 			 */
 			r_epid = cr->r_epid;
+			r_epid_pstarttime = cr->r_epid_pstarttime;
 			if (0 != r_epid)
 			{
-				if (FALSE == is_proc_alive(r_epid, 0))
+				if (FALSE == is_proc_alive(r_epid, r_epid_pstarttime))
 				{	/* process gone; release its lock */
 					cr->r_epid = 0;
+					cr->r_epid_pstarttime = 0;
 					RELEASE_BUFF_READ_LOCK(cr);
 				} else
 				{

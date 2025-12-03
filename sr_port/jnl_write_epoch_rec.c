@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -67,6 +67,7 @@ void	jnl_write_epoch_rec(sgmnt_addrs *csa)
 	epoch_record.prefix.jrec_type = JRT_EPOCH;
 	epoch_record.prefix.forwptr = epoch_record.suffix.backptr = EPOCH_RECLEN;
 	epoch_record.blks_to_upgrd = csd->blks_to_upgrd;
+	epoch_record.offset = csd->offset;
 	epoch_record.total_blks    = csd->trans_hist.total_blks;
 	epoch_record.free_blocks   = csd->trans_hist.free_blocks;
 	epoch_record.fully_upgraded = csd->fully_upgraded;
@@ -152,8 +153,6 @@ void	jnl_write_epoch_rec(sgmnt_addrs *csa)
 		for (idx = 0; idx < MAX_SUPPL_STRMS; idx++)
 			jb->strm_end_seqno[idx] = csd->strm_reg_seqno[idx];
 	}
-	epoch_record.filler0 = 0;
-	epoch_record.filler1 = 0;
 	epoch_record.prefix.checksum = compute_checksum(INIT_CHECKSUM_SEED,
 								(unsigned char *)&epoch_record, SIZEOF(struct_jrec_epoch));
 	jnl_write(jpc, JRT_EPOCH, (jnl_record *)&epoch_record, NULL);

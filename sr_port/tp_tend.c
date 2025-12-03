@@ -116,6 +116,7 @@ GBLREF	boolean_t		gvdupsetnoop; /* if TRUE, duplicate SETs update journal but no
 GBLREF	gv_namehead		*gv_target;
 GBLREF	trans_num		local_tn;	/* transaction number for THIS PROCESS */
 GBLREF	uint4			process_id;
+GBLREF	uint4			pstarttime;
 GBLREF	sgmnt_addrs		*reorg_encrypt_restart_csa;
 GBLREF unsigned char		rdfail_detail;
 GBLREF	recvpool_addrs		recvpool;

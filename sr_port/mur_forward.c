@@ -80,6 +80,7 @@ GBLREF	int			mur_forw_mp_hash_buckets;	/* # of buckets in "mur_shm_hdr->hash_buc
 GBLREF	mur_shm_hdr_t		*mur_shm_hdr;	/* Pointer to mur_forward-specific header in shared memory */
 GBLREF	boolean_t		mur_forward_multi_proc_done;
 GBLREF	uint4			process_id;
+GBLREF	uint4			pstarttime;
 
 error_def(ERR_BLKCNTEDITFAIL);
 error_def(ERR_FILENAMETOOLONG);
@@ -286,6 +287,7 @@ int	mur_forward_multi_proc(reg_ctl_list *rctl)
 					csa->nl->in_crit = process_id;
 					assert(csa->nl->onln_rlbk_pid == mp_hdr->parent_pid);
 					csa->nl->onln_rlbk_pid = process_id;
+					csa->nl->onln_rlbk_pstarttime = pstarttime;
 				}
 				if (NULL == first_shm_rctl)
 					first_shm_rctl = shm_rctl;
@@ -877,6 +879,7 @@ int	mur_forward_multi_proc_finish(reg_ctl_list *rctl)
 				csa->nl->in_crit = process_id;	/* reset pid back to parent process now that owning child is done */
 				assert(csa->nl->onln_rlbk_pid == shm_rctl->owning_pid);
 				csa->nl->onln_rlbk_pid = process_id;
+				csa->nl->onln_rlbk_pstarttime = pstarttime;
 			}
 		}
 	}

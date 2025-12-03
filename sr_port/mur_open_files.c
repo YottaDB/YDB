@@ -144,6 +144,7 @@ GBLREF	int4			strm_index;
 GBLREF	jnl_gbls_t		jgbl;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	uint4			process_id;
+GBLREF	uint4			pstarttime;
 #ifdef DEBUG
 GBLREF	bool			only_usr_jnlpool_flush;
 #endif
@@ -801,6 +802,7 @@ int4 mur_open_files(boolean_t retry)
 			assert((FILE_INFO(reg))->grabbed_access_sem);
 			assert((0 == cs_addrs->nl->onln_rlbk_pid) || !is_proc_alive(cs_addrs->nl->onln_rlbk_pid, 0));
 			cs_addrs->nl->onln_rlbk_pid = process_id;
+			cs_addrs->nl->onln_rlbk_pstarttime = pstarttime;
 #			ifdef DEBUG
 			/* ensure that we don't have any pending journal writes or flushes */
 			assert(!JNL_ALLOWED(cs_data) || ((NULL != cs_addrs->jnl) && (NULL != cs_addrs->jnl->jnl_buff)));

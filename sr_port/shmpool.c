@@ -280,7 +280,7 @@ void shmpool_abandoned_blk_chk(gd_region *reg, boolean_t force)
 		*/
 		if ((SHMBLK_FREE == sblkh_p->blktype)
 		    || (0 == sblkh_p->holder_pid)
-		    || ((FALSE == sblkh_p->valid_data) && (!is_proc_alive(sblkh_p->holder_pid, sblkh_p->image_count))))
+		    || ((FALSE == sblkh_p->valid_data) && (!is_proc_alive(sblkh_p->holder_pid, 0))))
 		{	/* Make sure block is clean (orphaned blocks might not be) and queue on free. */
 			sblkh_p->holder_pid = 0;
 			sblkh_p->valid_data = FALSE;

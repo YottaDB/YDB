@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -131,10 +131,12 @@ block_id bm_getfree(block_id hint_arg, boolean_t *blk_used, unsigned int cw_work
 					 * this should be sufficient.
 					 */
 #				ifdef DEBUG
-					if ((WBTEST_ENABLED(WBTEST_MM_CONCURRENT_FILE_EXTEND) && dollar_tlevel
-							&& !MEMCMP_LIT(gv_cur_region->rname, "DEFAULT"))
-						|| (WBTEST_ENABLED(WBTEST_WSSTATS_PAUSE) && (10 == gtm_white_box_test_case_count)
-							&& !MEMCMP_LIT(gv_cur_region->rname, "DEFAULT")))
+					if ((WBTEST_ENABLED(WBTEST_MM_CONCURRENT_FILE_EXTEND)
+								&& dollar_tlevel
+								&& !MEMCMP_LIT(gv_cur_region->rname, "DEFAULT"))
+							|| (WBTEST_ENABLED(WBTEST_WSSTATS_PAUSE)
+								&& (10 == gtm_white_box_test_case_count)
+								&& !MEMCMP_LIT(gv_cur_region->rname, "DEFAULT")))
 					{	/* Sync with copy in gdsfilext()
 						 * Unset the env shouldn't affect the parent, it reads env only at proc startup.
 						 */
@@ -171,9 +173,9 @@ block_id bm_getfree(block_id hint_arg, boolean_t *blk_used, unsigned int cw_work
 					if (!was_crit)
 						rel_crit(gv_cur_region);
 					return (dba_mm == cs_data->acc_meth)
-							? FILE_EXTENDED
-							: bm_getfree(hint_arg, blk_used, cw_work, cs, cw_depth_ptr,
-									last_lmap_cse);
+						? FILE_EXTENDED
+						: bm_getfree(hint_arg, blk_used, cw_work, cs, cw_depth_ptr,
+								last_lmap_cse);
 				}
 				if (IS_STATSDB_CSA(cs_addrs))
 				{	/* Double the allocation size for statsdb regions to reduce tp_restart calls */
@@ -189,7 +191,11 @@ block_id bm_getfree(block_id hint_arg, boolean_t *blk_used, unsigned int cw_work
 					if (!was_crit)
 						rel_crit(gv_cur_region);
 					if (EXTEND_SUSPECT == status)
+					{
+						lcnt++;
+						assert(FALSE); /* We do not know of a way to get EXTEND_SUSPECT here */
 						continue;
+					}
 					return status;
 				}
 				if (IS_STATSDB_CSA(cs_addrs))
@@ -214,6 +220,7 @@ block_id bm_getfree(block_id hint_arg, boolean_t *blk_used, unsigned int cw_work
 				n_decrements++;	/* used only for debugging purposes */
 				continue;
 			}
+			/* AFTER THIS POINT bml is a blocknum, not bmlnum */
 			bml *= BLKS_PER_LMAP;	/* Overflow not possible with MASTER_MAP_BLOCKS_V7 */
 			if (ROUND_DOWN2(hint, BLKS_PER_LMAP) != bml)
 			{	/* not within requested map */
@@ -274,9 +281,10 @@ block_id bm_getfree(block_id hint_arg, boolean_t *blk_used, unsigned int cw_work
 					if (cdb_sc_tqreadnowait != rdfail_detail)
 						return MAP_RD_FAIL;
 					/* else bml is already held; advance to next bml */
+					/* If pid not alive, reset the reservation */
 					if (blkhist.cr && (0 < (lcl_bml_pin = blkhist.cr->bml_pin))
 							&& !is_proc_alive(lcl_bml_pin, 0))
-						BML_RSRV_RESET(blkhist.cr); /* PID not alive, reset the reservation */
+						BML_RSRV_IF_EXP(blkhist.cr, bml, lcl_bml_pin, 0);
 					hint = bml + BLKS_PER_LMAP + 1;
 					lcnt++; /* Repeat iteration because of the synthetic unavailable bitmap */
 					n_nowaits++;	/* used only for debugging purposes */
@@ -335,8 +343,17 @@ block_id bm_getfree(block_id hint_arg, boolean_t *blk_used, unsigned int cw_work
 			free_bit = NO_FREE_SPACE;
 		if (NO_FREE_SPACE != free_bit)
 			break;			/* Found free block */
-		else if (NULL != last_lmap_cse)
+		if ((NULL != last_lmap_cse) && (NULL != *last_lmap_cse))
+		{
+			/* Fast path failed, so start over exactly as if the fast path did not exist */
+			if (blkhist.cr)	/* Going to the next bml, release this one */
+				BML_RSRV_IF_EXP(blkhist.cr, bml, process_id, 0);
 			*last_lmap_cse = NULL;	/* There is no free space, reset last lmap reference */
+			lcnt++;
+			/* In the first loop */
+			assert(hint == (((ublock_id)hint_arg >= total_blks) ? 1 : hint_arg));
+			continue;
+		}
 		if ((ublock_id)(hint = (bml + BLKS_PER_LMAP)) >= total_blks)	/* if map is full, start at 1st blk in next map */
 		{	/* Wrap needed, next loop should force an extension */
 			hint = 1;
@@ -352,6 +369,7 @@ block_id bm_getfree(block_id hint_arg, boolean_t *blk_used, unsigned int cw_work
 		if (blkhist.cr)	/* Going to the next bml, release this one */
 			BML_RSRV_IF_EXP(blkhist.cr, bml, process_id, 0);
 	}
+	assert(NO_FREE_SPACE != free_bit);
 	/* If not in the final retry, it is possible that free_bit is >= map_size, e.g., if the buffer holding the bitmap block
 	 * gets recycled with a non-bitmap block in which case the bit that bm_find_blk returns could be greater than map_size.
 	 * But, this should never happen in final retry.

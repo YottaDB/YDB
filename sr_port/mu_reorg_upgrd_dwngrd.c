@@ -247,7 +247,8 @@ void	mu_reorg_upgrd_dwngrd(void)
 					csa->nl->onln_rlbk_pid);
 			mupip_exit(ERR_MUNOFINISH);
 		}
-		while ((0 != csa->nl->trunc_pid) && (is_proc_alive(csa->nl->trunc_pid, 0)))
+interact1:
+		while ((0 != csa->nl->trunc_pid) && (is_proc_alive(csa->nl->trunc_pid, csa->nl->trunc_pstart)))
 		{	/* Wait for a concurrent REORG -TRUNCATE to exit */
 			if (SLEEP_ONE_MIN == sleepcnt)
 				util_out_print("!/Region !AD : MUPIP REORG -TRUNCATE of !AD in progress, waiting for completion",
@@ -446,6 +447,8 @@ void	mu_reorg_upgrd_dwngrd(void)
 		status = SS_NORMAL;
 	mupip_exit(status);
 	return;
+	assertpro(FALSE);	/* ensure we never reach the goto below */
+	goto interact1;		/* This suppresses the compiler warning about an used label. */
 }
 
 /******************************************************************************************

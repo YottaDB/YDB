@@ -379,6 +379,7 @@ boolean_t updproc_preread(void)
 							assert(!csa->now_crit);
 							INCR_GVSTATS_COUNTER(csa, csa->nl, n_pre_read_globals, 1);
 							status = gvcst_search(gv_currkey, NULL);
+							ACCUMULATE_LCL_GVSTATS_COUNTER(csa, csa->nl, n_cache_reads);
 							assert(!csa->now_crit);
 							TREF(tqread_nowait) = FALSE;	/* reset as soon as possible */
 							if (cdb_sc_normal != status)

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -152,6 +152,8 @@ void gvcst_blk_build(cw_set_element *cse, sm_uc_ptr_t base_addr, trans_num ctn)
 	 */
 	assert(((ctn < cs_addrs->ti->early_tn) || (reset_ctn && (saw_rollback || (cs_addrs->nl->onln_rlbk_pid)))) ||
 		write_after_image AIX_ONLY(|| (cs_data->acc_meth == dba_mm)));
+	// We'd better not be writing out any outdated-format index blocks if we are fully upgraded.
+	assert(!cs_data->fully_upgraded || ((cse->ondsk_blkver == cs_data->desired_db_format) || !cse->level));
 	((blk_hdr_ptr_t)base_addr)->bver = cse->ondsk_blkver;
 	((blk_hdr_ptr_t)base_addr)->tn = ctn;
 	((blk_hdr_ptr_t)base_addr)->bsiz = UINTCAST(array->len);

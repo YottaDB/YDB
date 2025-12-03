@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2024 Fidelity National Information	*
+ * Copyright (c) 2006-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -497,11 +497,11 @@ STATICFNDEF int repl_tr_endian_convert(unsigned char remote_jnl_ver, uchar_ptr_t
 				rec->jrec_null.strm_seqno = GTM_BYTESWAP_64(rec->jrec_null.strm_seqno);
 			}
 			if (IS_SET_KILL_ZKILL_ZTWORM_LGTRIG_ZTRIG(rectype))
-			{	/* This code will need changes in case the jnl-ver changes from V28 to V29 so add an assert to
-				 * alert to that possibility. Once the code is fixed for the new jnl format, change the assert
-				 * to reflect the new latest jnl-ver.
+			{	/* This code will need changes in case the jnl-ver changes from V29 to V30 (if that code alters the
+				 * format of set/kill records); add an assert to alert to that possibility. Once the code is fixed
+				 * for the new jnl format, change the assert to reflect the new latest jnl-ver.
 				 */
-				assert(JNL_VER_THIS == V28_JNL_VER);
+				assert(JNL_VER_THIS == V29_JNL_VER);
 				/* To better understand the logic below (particularly the use of hardcoded offsets), see comment
 				 * in repl_filter.c (search for "struct_jrec_upd layout" for the various jnl versions we support).
 				 */

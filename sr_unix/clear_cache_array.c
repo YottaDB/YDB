@@ -102,6 +102,7 @@ void clear_cache_array(sgmnt_addrs *csa, sgmnt_data_ptr_t csd, gd_region* reg, b
 			cr->data_invalid = 0;	/* process_id */
 			cr->flushed_dirty_tn = 0; /* value of dirty at the time of flush */
 			cr->in_tend = 0;
+			cr->in_tend_pstarttime = 0;
 			/* release of a shmpool reformat block if the current cache record is pointing to it */
 			SHMPOOL_FREE_CR_RFMT_BLOCK(reg, csa, cr);
 			WRITE_LATCH_VAL(cr) = LATCH_CLEAR;

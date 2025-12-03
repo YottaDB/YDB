@@ -48,6 +48,7 @@
 #endif
 
 GBLREF	uint4			process_id;
+GBLREF	uint4			pstarttime;
 GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	boolean_t		is_src_server;
 GBLREF	boolean_t		in_jnl_file_autoswitch;
@@ -249,8 +250,9 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 	SET_JREC_CHECKSUM(jnl_rec, rectype, checksum);
 	if (!in_phase2)
 	{
-		assert((!jb->blocked) || (FALSE == is_proc_alive(jb->blocked, 0)));
+		assert((!jb->blocked) || (FALSE == is_proc_alive(jb->blocked, jb->blocked_pstarttime)));
 		jb->blocked = process_id;
+		jb->blocked_pstarttime = pstarttime;
 	}
 	jnl_fs_block_size = jb->fs_block_size;
 	min_dskaddr = (gtm_int64_t)new_freeaddr - lcl_size + jnl_fs_block_size;	/* gtm_int64_t used as result can be negative */
@@ -322,6 +324,7 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 	if (!in_phase2)
 	{
 		jb->blocked = 0;
+		jb->blocked_pstarttime = 0;
 		if (0 != jnl_write_extend_if_needed(rlen, jb, lcl_freeaddr, csa, rectype, blk_ptr, jfb, reg, jpc, jnl_rec))
 		{
 			DEBUG_ONLY(jnl_write_recursion_depth--);

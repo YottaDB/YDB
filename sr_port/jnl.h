@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -63,8 +63,8 @@ error_def(ERR_JNLENDIANLITTLE);
  * 		which needs to change to say IF_curTO17 if the earliest supported version changes to V17 or so).
  *
  */
-#define JNL_LABEL_TEXT		"GDSJNL28"	/* see above comment paragraph for todos whenever this is changed */
-#define JNL_VER_THIS		28
+#define JNL_LABEL_TEXT		"GDSJNL29"	/* see above comment paragraph for todos whenever this is changed */
+#define JNL_VER_THIS		29
 #define JNL_VER_EARLIEST_REPL	17		/* Replication filter support starts here GDSJNL17 = GT.M V5.1-000.
 						 * (even though it should be V5.0-000, since that is pre-multisite,
 						 * the replication connection with V55000 will error out at handshake
@@ -422,6 +422,7 @@ typedef struct
 	seq_num		jnl_seqno;
 	seq_num		strm_seqno;
 	uint4		process_id;
+	uint4		pstarttime;
 	uint4		start_freeaddr;		/* jb->rsrv_freeaddr at start of this commit */
 	uint4		tot_jrec_len;		/* total length of jnl records in jnl buffer corresponding to this tn */
 	uint4		pini_addr;		/* jpc->pini_addr when this phase2 commit entry was allocated */
@@ -439,7 +440,7 @@ typedef struct
 						 * to be written.
 						 */
 	bool		write_complete;		/* TRUE if this pid is done writing jnl records to jnlbuff */
-	bool		filler_8byte_align[1];
+	bool		filler_8byte_align[5];
 } jbuf_phase2_in_prog_t;
 
 typedef struct
@@ -472,7 +473,8 @@ typedef struct
 	uint4			phase2_commit_index1;
 	uint4			phase2_commit_index2;
 	jbuf_phase2_in_prog_t	phase2_commit_array[JNL_PHASE2_COMMIT_ARRAY_SIZE];
-	volatile int4		blocked;
+	volatile int4		blocked;	/* Process ID blocking write */
+	volatile int4		blocked_pstarttime;	/* Start time for blocking process */
 	volatile uint4		fsync_dskaddr;	/* dskaddr upto which fsync is done */
 	volatile int4		dsk;		/* relative index of 1st byte to write to disk;
 						 * if free == dsk, buffer is empty */
@@ -827,6 +829,7 @@ typedef struct
 	block_id		blks_to_upgrd;		/* Blocks not at current block version level */
 	block_id		free_blocks;		/* free  blocks counter at time of epoch */
 	block_id		total_blks;		/* total blocks counter at time of epoch */
+	block_id		offset;			/* V6->V6p conversion info at time of epoch */
 	uint4			checksum;
 	int4			is_encrypted;
 	char			encryption_hash[GTMCRYPT_RESERVED_HASH_LEN];
@@ -1094,12 +1097,11 @@ typedef struct	/* fixed length */
 	block_id		blks_to_upgrd;		/* blocks-to-upgrade counter at time of epoch */
 	block_id		free_blocks;		/* free blocks counter at time of epoch */
 	block_id		total_blks;		/* total blocks counter at time of epoch */
-	boolean_t		fully_upgraded;		/* cs_data->fully_upgraded at the time of epoch */
-	uint4			filler0;		/* so as to make 8-byte alignment explicit */
+	block_id		offset;			/* V6->V6p conversion info */
 	seq_num			strm_seqno[MAX_SUPPL_STRMS];	/* seqno of each possible supplementary stream at epoch time.
 								 * used by rollback to restore seqnos on the database.
 								 */
-	uint4			filler1;		/* so as to make the EPOCH record aligned to 8 byte boundary */
+	boolean_t		fully_upgraded;		/* cs_data->fully_upgraded at the time of epoch */
 	jrec_suffix		suffix;
 } struct_jrec_epoch;
 
@@ -1366,6 +1368,7 @@ MBSTART {														\
 	jbuf_phase2_in_prog_t	*phs2cmt;										\
 															\
 	GBLREF	uint4		process_id;										\
+	GBLREF	uint4		pstarttime;										\
 	GBLREF	uint4		dollar_tlevel;										\
 															\
 	assert(CSA->now_crit);												\
@@ -1398,6 +1401,7 @@ MBSTART {														\
 	ASSERT_JNL_PHASE2_COMMIT_INDEX_IS_VALID(endIndex, JNL_PHASE2_COMMIT_ARRAY_SIZE);				\
 	phs2cmt = &JBP->phase2_commit_array[endIndex];									\
 	phs2cmt->process_id = process_id;										\
+	phs2cmt->pstarttime = pstarttime;										\
 	assert(JPC->curr_tn == CSA->ti->curr_tn);									\
 	phs2cmt->curr_tn = JPC->curr_tn;										\
 	assert(!REPLICATION || JNL_SEQNO);										\

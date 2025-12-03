@@ -29,6 +29,7 @@
 #include "gdsbgtr.h"
 
 GBLREF	uint4		process_id;
+GBLREF	uint4		pstarttime;
 
 /* Reissues a pending qio from the WIP queue. In case of EAGAIN and holding crit, it issues a SYNCIO instead.
  * And if the SYNCIO succeeds, a special value of SYNCIO_MORPH_SUCCESS is returned so caller can handle this
@@ -56,7 +57,10 @@ int	wcs_wt_restart(unix_db_info *udi, cache_rec_ptr_t cr)
 	DB_LSEEKWRITEASYNCRESTART(csa, udi, udi->fn, udi->fd, save_bp, cr, save_errno);
 	assert(0 == save_errno IF_LIBAIO(|| EAGAIN  == save_errno));
 	if (0 == save_errno)
+	{
 		cr->epid = process_id;
+		cr->epid_pstarttime = pstarttime;
+	}
 	else if (EAGAIN == save_errno)
 	{	/* ASYNC IO could not be started */
 		BG_TRACE_PRO_ANY(csa, wcs_wt_restart_eagain);
@@ -77,6 +81,7 @@ int	wcs_wt_restart(unix_db_info *udi, cache_rec_ptr_t cr)
 			 */
 			BG_TRACE_PRO_ANY(csa, wcs_wt_restart_reinsert);
 			cr->epid = 0;
+			cr->epid_pstarttime = 0;
 			save_errno = 0;
 		}
 	}

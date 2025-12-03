@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -120,7 +120,7 @@ GBLDEF global_list		*trees;
 GBLDEF sgmnt_data		mu_int_data;
 GBLDEF unsigned char		*mu_int_master;
 GBLDEF trans_num		largest_tn;
-GBLDEF block_id			mu_int_blks_to_upgrd;
+GBLDEF block_id			mu_int_blks_to_upgrd;	/* in GDSV7m this is actually only used to count index blocks */
 GBLDEF span_node_integ		*sndata;
 GBLDEF boolean_t		null_coll_type_err = FALSE;
 GBLDEF boolean_t		null_coll_type;
@@ -173,6 +173,7 @@ error_def(ERR_MUNOACTION);
 error_def(ERR_MUNOFINISH);
 error_def(ERR_MUNOTALLINTEG);
 error_def(ERR_MUPCLIERR);
+error_def(ERR_MUUPGRDNRDY);
 error_def(ERR_REGFILENOTFOUND);
 
 void mupip_integ(void)
@@ -743,14 +744,17 @@ void mupip_integ(void)
 				} else
 					blocks_free = (gtm_uint64_t)MAXUINT8;
 			}
-			if (!muint_fast && (mu_int_blks_to_upgrd != csd->blks_to_upgrd))
+			if (mu_int_blks_to_upgrd != csd->blks_to_upgrd)
 			{
-				gtm_putmsg_csa(CSA_ARG(csa)
-					VARLSTCNT(4) ERR_DBBTUWRNG, 2, &mu_int_blks_to_upgrd, &(csd->blks_to_upgrd));
-				if (gv_cur_region->read_only || mu_int_errknt)
-					mu_int_errknt++;
-				else if (!ointeg_this_reg)
-					gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(1) ERR_DBBTUFIXED);
+				if ((GDSV7m == mu_int_data.desired_db_format) && (mu_int_blks_to_upgrd > csd->blks_to_upgrd))
+				{	/* for GDSV7m only count index blocks; fully_upgraded may be set by DSE so skip */
+					gtm_putmsg_csa(CSA_ARG(csa)
+						VARLSTCNT(4) ERR_DBBTUWRNG, 2, &mu_int_blks_to_upgrd, &(csd->blks_to_upgrd));
+					if (gv_cur_region->read_only || mu_int_errknt)
+						mu_int_errknt++;
+					else if (!ointeg_this_reg)
+						gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(1) ERR_DBBTUFIXED);
+				}
 			}
 			if (((0 != mu_int_data.kill_in_prog) || (0 != mu_int_data.abandoned_kills)) && (!mu_map_errs) && !region
 				&& !gv_cur_region->read_only)
@@ -854,10 +858,11 @@ void mupip_integ(void)
 			{
 				if (MAXUINT8 != blocks_free)
 					csd->trans_hist.free_blocks = blocks_free;
-				if ((!mu_int_errknt && muint_all_index_blocks && !muint_fast)
-						&& (mu_int_blks_to_upgrd != csd->blks_to_upgrd))
+				if (!mu_int_errknt && muint_all_index_blocks && (GDSV7m == csd->desired_db_format)
+					&& (mu_int_blks_to_upgrd != csd->blks_to_upgrd))
 				{
 					csd->blks_to_upgrd = mu_int_blks_to_upgrd;
+					csd->fully_upgraded = !mu_int_blks_to_upgrd;
 					gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(1) ERR_DBBTUFIXED);
 				}
 				csd->span_node_absent = (sndata->sn_cnt) ? FALSE : TRUE;
@@ -900,11 +905,12 @@ void mupip_integ(void)
 					mu_int_data.trans_hist.free_blocks = blocks_free;
 					update_filehdr = TRUE;
 				}
-				if (!mu_int_errknt && !muint_fast)
+				if (!mu_int_errknt && (GDSV7m == csd->desired_db_format))
 				{
 					if (mu_int_blks_to_upgrd != mu_int_data.blks_to_upgrd)
 					{
 						mu_int_data.blks_to_upgrd = mu_int_blks_to_upgrd;
+						mu_int_data.fully_upgraded = !mu_int_blks_to_upgrd;
 						update_filehdr = TRUE;
 					}
 				}

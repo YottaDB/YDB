@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -41,7 +41,7 @@ boolean_t	mlk_find_blocking_child_lock(mlk_pvtblk *p, mlk_shrblk_ptr_t child, UI
 		 */
 		if (d->owner && (d->owner != process_id || d->auxowner != auxown))
 		{	/* If owned and not owned by us check if owner is alive */
-			if (is_proc_alive(d->owner, IMAGECNT(d->image_count)))
+			if (is_proc_alive(d->owner, d->pstart))
 			{	/* Signal that this lock request is blocked by this node */
 				p->blocked = d;
 				p->blk_sequence = d->sequence;
@@ -49,6 +49,7 @@ boolean_t	mlk_find_blocking_child_lock(mlk_pvtblk *p, mlk_shrblk_ptr_t child, UI
 			} else
 			{	/* Owner is dead so release this node */
 				d->owner = 0;
+				d->pstart = 0;
 				d->auxowner = 0;
 			}
 		}
@@ -121,7 +122,7 @@ boolean_t	mlk_shrblk_find(mlk_pvtblk *p, mlk_shrblk_ptr_t *ret, UINTPTR_T auxown
 				{
 					if (d->owner != process_id || d->auxowner != auxown)
 					{	/* If owned and not owned by us check if owner is alive */
-						if (is_proc_alive(d->owner, IMAGECNT(d->image_count)))
+						if (is_proc_alive(d->owner, d->pstart))
 						{	/* Signal that this lock request is blocked by this node */
 							p->blocked = d;
 							p->blk_sequence = d->sequence;
@@ -130,6 +131,7 @@ boolean_t	mlk_shrblk_find(mlk_pvtblk *p, mlk_shrblk_ptr_t *ret, UINTPTR_T auxown
 						} else
 						{	/* Owner is dead so release this node */
 							d->owner = 0;
+							d->pstart = 0;
 							d->auxowner = 0;
 						}
 					}

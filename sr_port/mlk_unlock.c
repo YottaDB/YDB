@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -74,6 +74,7 @@ void mlk_unlock(mlk_pvtblk *p)
 		if (d->owner == process_id && p->sequence == d->sequence)
 		{
 			d->owner = 0;
+			d->pstart = 0;
 			d->sequence = csa->hdr->trans_hist.lock_sequence++;
 			assert(!d->owner || d->owner == process_id);
 			/* do not call mlk_tree_wake_children/mlk_wake_pending on "d" if d->owner is non-zero.

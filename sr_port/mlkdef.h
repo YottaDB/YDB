@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -33,6 +33,7 @@ typedef struct				/* One of these nodes is required for each process which is bl
 	ptroff_t	next;		/* relative pointer to the next mlk_prcblk.  If the entry is in the free
 					 * list, then this is a relative pointer to the next free entry. */
 	uint4		process_id;	/* the pid of the blocked process */
+	uint4		process_start;	/* the start time of the blocked process */
 	short		ref_cnt;	/* number of times process references prcblk */
 	short		filler_4byte;
 } mlk_prcblk;
@@ -68,6 +69,7 @@ typedef struct				/* lock node.  The member descriptions below are correct if th
 					 * must, by defintion, be either a non-zero 'pending' entry, or a
 					 * non-zero 'children' entry and in the latter case, at least one
 					 * child must have a 'pending' entry */
+	uint4		pstart;		/* process start time of owner */
 	uint4		sequence;	/* The sequence number at the time that this node was created.  If
 					 * during a direct re-access via pointer from a mlk_pvtblk, the
 					 * sequence numbers do not match, then we must assume that the

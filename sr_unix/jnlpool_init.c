@@ -202,7 +202,7 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 	gd_addr			*repl_gld, *local_gdptr;
 	gtmsrc_lcl_ptr_t	gtmsrclcl_ptr;
 	gtmsource_local_ptr_t	gtmsourcelocal_ptr, reuse_slot_ptr, tmp_gtmsourcelocal_ptr;
-	uint4			gtmsource_pid, gtmrecv_pid;
+	uint4			gtmsource_pid, gtmrecv_pid, gtmsource_pstarttime;
 	gtmsource_state_t	gtmsource_state;
 	seq_num			reuse_slot_seqnum, instfilehdr_seqno;
 	repl_histinfo		last_histinfo;
@@ -808,8 +808,9 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 			{	/* Found matching slot */
 				gtmsource_state = gtmsourcelocal_ptr->gtmsource_state;
 				gtmsource_pid = gtmsourcelocal_ptr->gtmsource_pid;
+				gtmsource_pstarttime = gtmsourcelocal_ptr->gtmsource_pstarttime;
 				/* Check if source server is already running for this secondary instance */
-				if ((0 != gtmsource_pid) && is_proc_alive(gtmsource_pid, 0))
+				if ((0 != gtmsource_pid) && is_proc_alive(gtmsource_pid, gtmsource_pstarttime))
 				{	/* Source server is already up and running for this secondary instance */
 					if (gtmsource_options.start)
 					{
@@ -884,7 +885,8 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 					{
 						gtmsource_state = gtmsourcelocal_ptr->gtmsource_state;
 						gtmsource_pid = gtmsourcelocal_ptr->gtmsource_pid;
-						if ((0 == gtmsource_pid) || !is_proc_alive(gtmsource_pid, 0))
+						gtmsource_pstarttime = gtmsourcelocal_ptr->gtmsource_pstarttime;
+						if ((0 == gtmsource_pid) || !is_proc_alive(gtmsource_pid, gtmsource_pstarttime))
 						{	/* Slot can be reused */
 							/* This cleanup should only affect kill -9 situations, so try not to write
 							 * indiscriminately. The test-and-set is not atomic, but it isn't writing to
@@ -1193,6 +1195,7 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 		assert(!skip_locks);
 		assert(GTMRELAXED != pool_user);
 		gtmsourcelocal_ptr->gtmsource_pid = 0;
+		gtmsourcelocal_ptr->gtmsource_pstarttime = 0;
 		gtmsourcelocal_ptr->gtmsource_state = GTMSOURCE_DUMMY_STATE;
 		if (gtmsource_options.start)
 		{	/* Source server startup needs to initialize source server specific fields in the journal pool */

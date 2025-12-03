@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -27,8 +27,7 @@ static inline void incr_blks_to_upgrd(sgmnt_addrs *csa, sgmnt_data *csd, int del
 	static int	corecount = 0;
 #endif
 
-	if (0 != csd->blks_to_upgrd_subzero_error)	/* Gone negative, give up counting */
-		return;
+	assert(0 == csd->blks_to_upgrd_subzero_error);		/* callers should ensure count has not gone negative */
 	assert(CREATE_IN_PROGRESS(csd) || csa->now_crit);
 	assert(csa->hdr == csd);
 	cur_delta = delta;

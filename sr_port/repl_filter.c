@@ -413,8 +413,9 @@ GBLDEF	intlfltr_t repl_filter_cur2old[JNL_VER_THIS - JNL_VER_EARLIEST_REPL + 1] 
 	IF_24TO24,	/* Convert from filter format V24 to V24 (i.e., from jnl ver V27 to V24) */
 	IF_24TO24,	/* Convert from filter format V24 to V24 (i.e., from jnl ver V27 to V25) */
 	IF_24TO24,	/* Convert from filter format V24 to V24 (i.e., from jnl ver V27 to V26) */
-	IF_24TO24,	/* Convert from filter format V24 to V24 (i.e., from jnl ver V27 to V28) */
-	IF_24TO24	/* Convert from filter format V24 to V24 (i.e., from jnl ver V28 to V28) */
+	IF_24TO24,	/* Convert from filter format V24 to V24 (i.e., from jnl ver V28 to V27) */
+	IF_24TO24,	/* Convert from filter format V24 to V24 (i.e., from jnl ver V29 to V28) */
+	IF_24TO24	/* Convert from filter format V24 to V24 (i.e., from jnl ver V29 to V29) */
 };
 
 GBLDEF	intlfltr_t repl_filter_old2cur[JNL_VER_THIS - JNL_VER_EARLIEST_REPL + 1] =
@@ -430,7 +431,8 @@ GBLDEF	intlfltr_t repl_filter_old2cur[JNL_VER_THIS - JNL_VER_EARLIEST_REPL + 1] 
 	IF_24TO24,	/* Convert from filter format V24 to V24 (i.e., from jnl ver V25 to V27) */
 	IF_24TO24,	/* Convert from filter format V24 to V24 (i.e., from jnl ver V26 to V27) */
 	IF_24TO24,	/* Convert from filter format V24 to V24 (i.e., from jnl ver V27 to V28) */
-	IF_24TO24	/* Convert from filter format V24 to V24 (i.e., from jnl ver V28 to V28) */
+	IF_24TO24,	/* Convert from filter format V24 to V24 (i.e., from jnl ver V28 to V29) */
+	IF_24TO24	/* Convert from filter format V24 to V24 (i.e., from jnl ver V29 to V29) */
 };
 
 GBLREF	unsigned int		jnl_source_datalen, jnl_dest_maxdatalen;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -213,6 +213,7 @@ void	tp_clean_up(tp_cleanup_state clnup_state)
 		for (si = first_sgm_info;  si != NULL;  si = next_si)
 		{
 			TP_TEND_CHANGE_REG(si);
+			ACCUMULATE_LCL_GVSTATS_COUNTER(cs_addrs, cs_addrs->nl, n_cache_reads);
 			upd_trans = si->update_trans;	/* copy in local for debugging purposes in case later asserts fail */
 			if (upd_trans)
 			{

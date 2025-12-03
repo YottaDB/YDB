@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -85,6 +85,7 @@ bool	lke_clearlock(
 		{
 			csa = pctl->csa;
 			node->owner = 0;
+			node->pstart = 0;
 			node->sequence = csa->hdr->trans_hist.lock_sequence++;
 			len = name->len - 1;
 			if (name->addr[len] != '(')

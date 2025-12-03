@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -55,6 +55,7 @@ sm_uc_ptr_t mm_read(block_id blk, boolean_t blk_free)
 	/* --- extended or dse (dse is able to edit any header fields freely) --- */
 	csd = cs_data;
 	csa = cs_addrs;
+	assert(REG2CSA(gv_cur_region) == csa);
 	assert((csa->total_blks <= csa->ti->total_blks) || !IS_MCODE_RUNNING);
 	assert(blk >= 0);
 	/* Note: Even in snapshots, only INTEG requires mm_read to read FREE blocks. The assert below should be modified
@@ -64,7 +65,7 @@ sm_uc_ptr_t mm_read(block_id blk, boolean_t blk_free)
 	tmp_ondskblkver = (enum db_ver)csd->desired_db_format;
 	fully_upgraded = csd->fully_upgraded;
 	buff = (MM_BASE_ADDR(csa) + ((off_t)csa->hdr->blk_size * blk));
-	read_only = csd->read_only;
+	read_only = gv_cur_region->read_only;
 	INCR_GVSTATS_COUNTER(csa, csa->nl, n_dsk_read, 1);
 	if (blk < csa->total_blks)		/* test against process private copy of total_blks */
 	{	/* see if block needs to be converted to current version. This code block should be maintained in parallel
@@ -105,7 +106,7 @@ sm_uc_ptr_t mm_read(block_id blk, boolean_t blk_free)
 		{	/* pre-V7 index block needing its offset adjusted */
 			assert(MEMCMP_LIT(csd->label, GDS_LABEL) || (!fully_upgraded && (GDSV6p < csd->desired_db_format)));
 			if (read_only)
-				rts_error_csa(CSA_ARG(csa) VARLSTCNT(10) ERR_DBFILERDONLY, 3, DB_LEN_STR(gv_cur_region), 0,
+				rts_error_csa(CSA_ARG(csa) VARLSTCNT(9) ERR_DBFILERDONLY, 3, DB_LEN_STR(gv_cur_region), 0,
 					ERR_TEXT, 2, LEN_AND_LIT("read-only region needs to be read write and upgraded"));
 			/* Deviation from the way dsk_read operates because dsk_read has the benefit of using
 			 * its owned BG buffer. MM works directly on the file system copy. Grab crit to ensure
@@ -137,7 +138,7 @@ sm_uc_ptr_t mm_read(block_id blk, boolean_t blk_free)
 		if (buff_is_modified_after_read)
 		{
 			if (read_only)
-				rts_error_csa(CSA_ARG(csa) VARLSTCNT(10) ERR_DBFILERDONLY, 3, DB_LEN_STR(gv_cur_region), 0,
+				rts_error_csa(CSA_ARG(csa) VARLSTCNT(9) ERR_DBFILERDONLY, 3, DB_LEN_STR(gv_cur_region), 0,
 					ERR_TEXT, 2, LEN_AND_LIT("read-only region needs to be read write and upgraded"));
 			/* MUPIP UPDATE: Increment block TN because block version changed */
 			if ((MUPIP_UPGRADE_IN_PROGRESS == mu_upgrade_in_prog) && !read_only)

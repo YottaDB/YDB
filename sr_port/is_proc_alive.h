@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001, 2015 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -13,12 +13,7 @@
 #ifndef IS_PROC_ALIVE_INCLUDED
 #define IS_PROC_ALIVE_INCLUDED
 
-#define	IMAGECNT(imagecnt)	VMS_ONLY(imagecnt) UNIX_ONLY(0)
-
-#ifdef VMS
-bool is_proc_alive(uint4 pid, uint4 imagecnt);
-#elif defined(UNIX)
-bool is_proc_alive(int4 pid, int4 imagecnt);
-#endif
+uint4 getpstart(int4 pid);
+bool is_proc_alive(int4 pid, uint4 pstarttime);
 
 #endif /* IS_PROC_ALIVE_INCLUDED */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -64,6 +64,7 @@ void tp_set_sgm(void)
 		RTS_ERROR_CSA_ABT(csa, VARLSTCNT(6) ERR_MMREGNOACCESS, 4, REG_LEN_STR(csa->region), DB_LEN_STR(csa->region));
 	if (!si->tp_set_sgm_done)
 	{
+		assert(!csa->n_cache_reads);
 		si->next_sgm_info = first_sgm_info;
 		first_sgm_info = si;
 		UPDATE_CRASH_COUNT(csa, si->crash_count);

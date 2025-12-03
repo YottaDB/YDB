@@ -234,7 +234,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 	/* cycle is used in t_end to detect if the buffer has been refreshed since the t_qread */
 {
 	int4			status;
-	uint4			blocking_pid;
+	uint4			blocking_pid, blocking_pid_pstarttime;
 	cache_rec_ptr_t		cr;
 	bt_rec_ptr_t		bt;
 	boolean_t		clustered, hold_onto_crit, was_crit, wrong_keys = FALSE, sync_needed;
@@ -630,6 +630,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 					cr->cycle++;	/* increment cycle for blk number changes (for tp_hist and others) */
 					cr->blk = CR_BLKEMPTY;
 					cr->r_epid = 0;
+					cr->r_epid_pstarttime = 0;
 					BML_RSRV_RESET(cr);
 					RELEASE_BUFF_READ_LOCK(cr);
 					TREF(block_now_locked) = NULL;
@@ -670,6 +671,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 				/* Only set in cache if read was success */
 				cr->ondsk_blkver = ondsk_blkver;
 				cr->r_epid = 0;
+				cr->r_epid_pstarttime = 0;
 				if ((IS_BITMAP_BLK(blk)) && lcl_tqread_grab_bml)
 				{	/* Grab BML block's CR which this process owns */
 					assert(IS_BITMAP_BLK(blk));
@@ -887,6 +889,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 				if ((0 < tmp_levl) && (255 != tmp_levl))
 					INCR_DB_CSH_COUNTER(csa, n_idxblk_csh_hit, 1);
 #endif
+				INCR_LCL_GVSTATS_COUNTER(csa, n_cache_reads, 1);
 				return (sm_uc_ptr_t)GDS_ANY_REL2ABS(csa, cr->buffaddr);
 			}
 			if (blk != cr->blk)
@@ -910,14 +913,16 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 					BG_TRACE_PRO(t_qread_out_of_design);
 					assert(0 == cr->r_epid);
 					cr->r_epid = 0;
+					cr->r_epid_pstarttime = 0;
 					INTERLOCK_INIT(cr);
 				} else if (cr->read_in_progress >= 0)
 				{
 					BG_TRACE_PRO(t_qread_buf_owner_stuck);
 					blocking_pid = cr->r_epid;
+					blocking_pid_pstarttime = cr->r_epid_pstarttime;
 					if ((0 != blocking_pid) && (process_id != blocking_pid))
 					{
-						if (FALSE == is_proc_alive(blocking_pid, 0))
+						if (FALSE == is_proc_alive(blocking_pid, blocking_pid_pstarttime))
 						{	/* process gone: release that process's lock */
 							assert(0 == cr->bt_index);
 							if (cr->bt_index)
@@ -931,6 +936,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 							cr->blk = CR_BLKEMPTY;
 							BML_RSRV_RESET(cr);
 							cr->r_epid = 0;
+							cr->r_epid_pstarttime = 0;
 							RELEASE_BUFF_READ_LOCK(cr);
 						} else
 						{
@@ -973,6 +979,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 						cr->cycle++;	/* increment cycle for blk number changes (for tp_hist) */
 						cr->blk = CR_BLKEMPTY;
 						cr->r_epid = 0; /* If the process itself is lock holder, r_epid is non-zero */
+						cr->r_epid_pstarttime = 0;
 						BML_RSRV_RESET(cr);
 						RELEASE_BUFF_READ_LOCK(cr);
 						if (cr->read_in_progress < -1)	/* race: process released since if r_epid */
