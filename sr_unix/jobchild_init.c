@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -73,7 +73,7 @@ void jobchild_init(void)
 	unsigned char	*transfer_addr;		/* Transfer data */
 	rhdtyp		*base_addr;
 	unsigned short	i, arg_len;
-	char		run_file_name[FILE_NAME_SIZE + 2], *c;
+	char		run_file_name[FILE_NAME_SIZE + 2], *ydb_j0_env;
 	gcall_args	job_arglist;
 	mval		job_args[MAX_ACTUALS];
 	mstr		routine, label;
@@ -87,7 +87,7 @@ void jobchild_init(void)
 	/* Check if environment variable ppid - job parent pid exists. If it does not, we are a regular
 	 * gtm process; else, we are a child process of a job command.
 	 */
-	if ((c = getenv(CHILD_FLAG_ENV)) && strlen(c))
+	if (IS_JOBBED_PROCESS(ydb_j0_env))
 	{	/* We are a Jobbed process Get Job parameters and set up environment to run the Job command. */
 		/* read parameters into parameter structure  - references CHILD_FLAG_ENV */
 		ojchildparms(&jparms, &job_arglist, job_args);

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -38,6 +38,11 @@
 #define IS_JOB_SOCKET(ADDR, LEN)	((LEN >= SIZEOF(JOB_SOCKET_PREFIX)) && (0 == STRNCMP_LIT(ADDR, JOB_SOCKET_PREFIX)))
 #define JOB_SOCKET_HANDLE(ADDR)		(((char *)(ADDR)) + SIZEOF(JOB_SOCKET_PREFIX) - 1)
 #define JOB_SOCKET_HANDLE_LEN(LEN)	(LEN - SIZEOF(JOB_SOCKET_PREFIX) + 1)
+/* TRUE if this process is a grandchild created because its grandparent ran the JOB command
+ * (grandchild process in ojstartchild()).
+ * @param char *PTR used to save a value internally. will be set to getenv("ydb_j0")
+ */
+#define IS_JOBBED_PROCESS(PTR) (((NULL != (PTR = getenv(CHILD_FLAG_ENV))) && ('\0' != PTR[0])))
 
 GBLREF int job_errno;
 

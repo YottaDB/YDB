@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -213,7 +213,7 @@ int gtm_main(int argc, char **argv, char **envp)
 	if (cli_present("DIRECT_MODE"))
 	{
 		shebang_invocation = FALSE;
-		if (!((ptr = getenv(CHILD_FLAG_ENV)) && strlen(ptr)) && (RESTRICTED(dmode))) /* note assignment */
+		if (!(IS_JOBBED_PROCESS(ptr)) && (RESTRICTED(dmode)))
 		{	/* first tell them it's a no-no without engaging the condition handling so we keep control */
 			dec_err(VARLSTCNT(3) MAKE_MSG_SEVERE(ERR_RESTRICTEDOP), 1, "mumps -direct");
 			stop_image_no_core();		/* then kill them off without further delay */

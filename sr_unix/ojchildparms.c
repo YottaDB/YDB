@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -88,8 +88,15 @@ void ojchildparms(job_params_type *jparms, gcall_args *g_args, mval *arglst)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	if ((NULL == sp) && (!((sp = getenv(CHILD_FLAG_ENV)) && sp[0]))) /* note assignment */
-		return;
+	if (NULL == sp)
+	{
+		/* IS_JOBBED_PROCESS sets sp equal to getenv("ydb_j0"), an environment variable
+		 * telling us if we are in a JOBed process. That is the desired value for sp in this case.
+		 * The macro will return TRUE if we are in a JOBed process.
+		 */
+		if (!IS_JOBBED_PROCESS(sp))
+			return;
+	}
 	setup_fd = (int)ATOL(sp);
 	if (NULL != g_args)
 		g_args->callargs = 0;

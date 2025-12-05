@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -27,6 +27,7 @@
 #include "cli_disallow.h"
 #include "gtmio.h"
 #include "op.h"
+#include "jobsp.h"
 
 #define	NO_STRING	"NO"
 
@@ -272,7 +273,7 @@ CLI_ENTRY *find_cmd_param(char *str, CLI_ENTRY *pparm, int follow)
 int 	parse_arg(CLI_ENTRY *pcmd_parms, int *eof)
 {
 	CLI_ENTRY 	*pparm;
-	char 		*opt_str, *val_str;
+	char 		*opt_str, *val_str, *ydb_j0_env;
 	int 		neg_flg;
 	DCL_THREADGBL_ACCESS;
 
@@ -378,7 +379,12 @@ int 	parse_arg(CLI_ENTRY *pcmd_parms, int *eof)
 	 * -------------------------
 	 */
 	if (-1 == (neg_flg = cli_check_negated(&opt_str, pcmd_parms, &pparm)))
-		return (-1);
+	{
+		if (IS_JOBBED_PROCESS(ydb_j0_env)) /* TRUE if invoked with a JOB command. */
+			return (1); /* If invoked with a JOB command, an unrecognized command line input is fine. */
+		else
+			return (-1);/* Otherwise an unrecognized input is an error. */
+	}
 	/* -------------------------------------------------------------
 	 * If value is disallowed for this qualifier, and an assignment
 	 * token is encounter, report error, values not allowed for
@@ -566,7 +572,7 @@ int cli_check_negated(char **opt_str_ptr, CLI_ENTRY *pcmd_parm_ptr, CLI_ENTRY **
 {
 	int 		neg_flg;
 	CLI_ENTRY	*pcmd_parms;
-	char		*opt_str_tmp;
+	char		*opt_str_tmp, *ydb_j0_env;
 
 	pcmd_parms = pcmd_parm_ptr;
 	opt_str_tmp = *opt_str_ptr;
@@ -589,7 +595,12 @@ int cli_check_negated(char **opt_str_ptr, CLI_ENTRY *pcmd_parm_ptr, CLI_ENTRY **
 			{
 				*opt_str_ptr -= STR_LIT_LEN(NO_STRING);
 			}
-			SNPRINTF(cli_err_str, MAX_CLI_ERR_STR, "Unrecognized option : %s", *opt_str_ptr);
+			/* A JOBed process can have any command line and that command line is only
+			 * used to set the value of $zcmdline. Consequently, if this is a JOBed process,
+			 * we do not want to issue the "Unrecognized option" error.
+			 */
+			if (!IS_JOBBED_PROCESS(ydb_j0_env))
+				SNPRINTF(cli_err_str, MAX_CLI_ERR_STR, "Unrecognized option : %s", *opt_str_ptr);
 			cli_lex_in_ptr->tp = 0;
 			return (-1);
 		} else
