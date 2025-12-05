@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -28,18 +28,18 @@
  * so just defer interrupts to be safe. UNIX is a GT.M-specific compiler switch, which we expect to be undefined for any non-GT.M
  * compilation that might include this file.
  */
-#define PUTENV(VAR, ARG)							\
+#define SETENV(VAR, ENV, VAL)							\
 {										\
 	intrpt_state_t		prev_intrpt_state;				\
 										\
 	DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);	\
-	VAR = putenv(ARG);							\
+	VAR = setenv(ENV, VAL, 1);						\
 	ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);	\
 }
 #else
-#  define PUTENV(VAR, ARG)				\
+#  define SETENV(VAR, ENV, VAL)				\
 {							\
-	VAR = putenv(ARG);				\
+	VAR = setenv(ENV, VAL, 1);			\
 }
 #endif
 #define STRTOL		strtol

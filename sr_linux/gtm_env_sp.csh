@@ -301,12 +301,17 @@ if ( $?gtm_version_change == "1" ) then
 	setenv 	gt_ld_options_all_exe	"-rdynamic -Wl,-u,gtm_filename_to_id -Wl,-u,gtm_zstatus"
 	setenv	gt_ld_options_all_exe	"$gt_ld_options_all_exe -Wl,--version-script,ydbexe_symbols.export"
 
-  	# optimize for all 64bit platforms
- 	#
- 	# -lrt doesn't work to pull in semaphores with GCC 4.6, so use -lpthread.
- 	# Add -lc in front of -lpthread to avoid linking in thread-safe versions
- 	# of libc routines from libpthread.
-        setenv	gt_ld_syslibs		" -lelf -lncurses -lm -ldl -lc -lpthread -lrt"
+	# optimize for all 64bit platforms
+	#
+	# -lrt doesn't work to pull in semaphores with GCC 4.6, so use -lpthread.
+	# Add -lc in front of -lpthread to avoid linking in thread-safe versions
+	# of libc routines from libpthread.
+	#
+	# --coverage is needed for errors/test_fao, and v62001/hash when the
+	# debug build is compiled with coverage (default in YDBDevOps)
+	# These flags are also used for pro build. Adding an extra unused flag
+	# for linking has no effect on pro build.
+	setenv	gt_ld_syslibs		" -lelf -lncurses -lm -ldl -lc -lpthread -lrt --coverage"
 	if ( ( 32 == $gt_build_type ) && ( "armv6l" != $mach_type ) && ( "armv7l" != $mach_type ) ) then
 		# 32bit x86_64 and ia32 - decided at the beginning of the file
 		setenv  gt_ld_syslibs           " -lncurses -lm -ldl -lc -lpthread -lrt"

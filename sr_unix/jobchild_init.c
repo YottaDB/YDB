@@ -92,7 +92,7 @@ void jobchild_init(void)
 		/* read parameters into parameter structure  - references CHILD_FLAG_ENV */
 		ojchildparms(&jparms, &job_arglist, job_args);
 		/* Clear the environment variable so that subsequent child mumps processes can start normal initialization. */
-		PUTENV(status, CLEAR_CHILD_FLAG_ENV);
+		SETENV(status, CHILD_FLAG_ENV, "")
 		if (status)
 		{
 			util_out_print("Unable to clear gtmj0 process !UL exiting.", TRUE, process_id);

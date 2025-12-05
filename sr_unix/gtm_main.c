@@ -74,8 +74,8 @@ GBLREF	char 				**gtmenvp;
 GBLREF	boolean_t			shebang_invocation;	/* TRUE if yottadb is invoked through the "ydbsh" soft link */
 
 #define GTMCRYPT_ERRLIT			"during GT.M startup"
-#define YDBXC_gblstat			"ydb_xc_gblstat=%s/gtmgblstat.xc"
-#define YDBXC_gtmtlsfuncs		"ydb_xc_gtmtlsfuncs=%s/plugin/gtmtlsfuncs.tab"
+#define YDBXC_gblstat			"%s/gtmgblstat.xc"
+#define YDBXC_gtmtlsfuncs		"%s/plugin/gtmtlsfuncs.tab"
 #define	MUMPS				"MUMPS "
 
 error_def(ERR_CRYPTDLNOOPEN);
@@ -218,10 +218,10 @@ int gtm_main(int argc, char **argv, char **envp)
 	/* this should be after cli_lex_setup() due to S390 A/E conversion in cli_lex_setup   */
 	init_gtm();
 	SNPRINTF(gtmlibxc, YDB_PATH_MAX, YDBXC_gblstat, ydb_dist);
-	PUTENV(status, gtmlibxc);
+	SETENV(status, "ydb_xc_gblstat", gtmlibxc);
 #	ifdef GTM_TLS
 	SNPRINTF(gtmtlsfuncs, YDB_PATH_MAX, YDBXC_gtmtlsfuncs, ydb_dist);
-	PUTENV(status, gtmtlsfuncs);
+	SETENV(status, "ydb_xc_gtmtlsfuncs", gtmtlsfuncs);
 	if (MUMPS_COMPILE != invocation_mode)
 	{
 		if ((NULL != (ptr = ydb_getenv(YDBENVINDX_PASSWD, NULL_SUFFIX, NULL_IS_YDB_ENV_MATCH)))

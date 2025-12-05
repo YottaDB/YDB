@@ -32,7 +32,6 @@
 #define TIMEOUT_ERROR		(MAX_SYSERR + 1)	/* a special value to differentiate it from the rest of errno's */
 
 #define CHILD_FLAG_ENV		"ydb_j0"
-#define CLEAR_CHILD_FLAG_ENV  	"ydb_j0="""
 #define GBLDIR_ENV		(ydbenvname[YDBENVINDX_GBLDIR] + 1)	/* + 1 to skip leading $ in env var name */
 
 #define JOB_SOCKET_PREFIX		"SOCKET:"

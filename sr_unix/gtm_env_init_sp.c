@@ -458,7 +458,7 @@ void	gtm_env_init_sp(void)
 				 */
 				int status;
 
-				putenv("LC_ALL");			/* Clear LC_ALL before LC_CTYPE can take effect */
+				unsetenv("LC_ALL");			/* Clear LC_ALL before LC_CTYPE can take effect */
 				buf[trans.len] = '\0';
 				status = setenv("LC_CTYPE", buf, TRUE);
 				if (0 != status)
