@@ -53,6 +53,7 @@ boolean_t gvname2naked_optimize(triple *chainstart)
 	COMPDBG(printf("\n\n\n**************************** Begin gvname2naked_optimize rewrite ***********************\n"););
 	/* Iterate over all triples in the translation unit */
 	dqloop(chainstart, exorder, curtrip) {
+		assert(FALSE == curtrip->gv_dataflow_invoked);
 		gv_dataflow(curtrip, DEBUG_ONLY_COMMA(oc_seen) &dollar_reference);
 #		ifdef DEBUG
 		/* 1) Previously, we used to invoke "gv_dataflow()" on all triple parameters too. But this was considered
@@ -64,15 +65,32 @@ boolean_t gvname2naked_optimize(triple *chainstart)
 		 *
 		 * Therefore the triple parameter invocation logic was removed. But to be safe, we now have logic that
 		 * verifies that all triple parameters would have been already found in the execution chain in a prior
-		 * iteration.
-		 *
-		 * We verify that by going through the "->exorder.fl" links starting from the parameter triple and expect to
-		 * eventually land on the current triple "curtrip".
-		 *
-		 * But just in case the parameter triple does not lead to the current triple, we do not want to loop
-		 * indefinitely and so use a "tortoise and hare" algorithm to stop if ever an infinite loop is detected
-		 * and assert fail below. "triptmp" is the tortoise pointer and "triptmp2" is the hare pointer below.
+		 * iteration. The "gv_dataflow_invoked" field helps with this.
 		 */
+		curtrip->gv_dataflow_invoked = TRUE;
+		switch(curtrip->opcode) {
+		case OC_PARAMETER:		/* Skip OC_PARAMETER base triple. We will later process it if it
+						 * is seen as an operand of some other base triple.
+						 */
+		case OC_BOOLEXPRSTART:		/* This has a operand[0] in some cases that is used by "alloc_reg()"
+						 * for OC_NOOP replacement and otherwise serves no purpose. So skip
+						 * this triple from the parameter check.
+						 */
+		case OC_BOOLEXPRFINISH:		/* This has operand[0] pointing to the OC_BOOLEXPRSTART triple and
+						 * otherwise serves no purpose. So skip this triple from the check.
+						 */
+		case OC_NOOP:			/* This could have been some other opcode before being replaced with
+						 * OC_NOOP so ignore any operands this had in its previous incarnation.
+						 */
+		case OC_PASSTHRU:		/* This will be later replaced by OC_NOOP and the operand[0] parameter
+						 * is used by "alloc_reg()" and otherwise has no purpose. So skip this
+						 * opcode as well from the triple parameter check.
+						 */
+			continue;
+			break;
+		default:
+			break;
+		}
 		oprtype		*j, *k;
 		triple		*nested_trip, *tripref, *triptmp, *triptmp2;
 		struct ctvar	save_dollar_reference;
@@ -100,16 +118,14 @@ boolean_t gvname2naked_optimize(triple *chainstart)
 					 * and so should not affect the "gv_dataflow()" call. So skip these while checking that
 					 * all triple parameters eventually lead to the current triple in the execution chain.
 					 */
+				case OC_LITC:
+					/* In case of "-dynamic_literals", OC_LIT is replaced with OC_LITC so treat it just
+					 * like OC_LIT is (i.e. skip it like OC_LIT).
+					 */
 					break;
 				default:
-					triptmp = triptmp2 = tripref;
-					while (triptmp != curtrip)
-					{
-						triptmp = triptmp->exorder.fl;
-						triptmp2 = triptmp2->exorder.fl;
-						triptmp2 = triptmp2->exorder.fl;
-						assert(triptmp != triptmp2);	/* == implies an infinite loop situation */
-					}
+					assert(tripref->gv_dataflow_invoked);
+					break;
 				}
 			}
 			j++;

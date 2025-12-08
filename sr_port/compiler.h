@@ -161,6 +161,9 @@ typedef struct	tripletype
 						 *	 operand[1] corresponds to val.2 in ttt.txt
 						 */
 				destination;	/* Note: corresponds to val.0 in ttt.txt */
+#	ifdef DEBUG
+	boolean_t		gv_dataflow_invoked;	/* TRUE if "gv_dataflow()" has been invoked on this triple */
+#	endif
 } triple;
 
 /* Values for octype */
