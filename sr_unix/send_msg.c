@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -39,6 +39,8 @@
 #include "get_syslog_flags.h"
 #include "libyottadb_int.h"
 #include "have_crit.h"
+#include <execinfo.h>
+#include <dlfcn.h>
 
 GBLREF	VSIG_ATOMIC_T		forced_exit;
 GBLREF	boolean_t		caller_id_flag;
@@ -53,8 +55,20 @@ static	uint4		nesting_level = 0;
 GBLREF	boolean_t	in_fake_enospc;	/* used by an assert in "send_msg.c" */
 #endif
 
-/* Skip frame for send_msg/send_msg_csa */
-#define PRINT_CALLERID util_out_print(" -- generated from 0x!XJ.", NOFLUSH_OUT, caller_id(1))
+/* In send_msg_va, we want to print what function called send_msg_va in the backtrace.
+ * TRACE_DEPTH is the number of functions that we look at in the backtrace,
+ * the last of which should be printed, counting send_msg_va. However,
+ * send_msg_va is only called by one of the 2 wrapper functions in this file, send_msg/send_msg_csa,
+ * so setting TRACE_DEPTH to 2 and looking at the function that called send_msg_va
+ * directly does not give the information that we want.
+ * Instead, in order to get an actually informative part of the backtrace,
+ * we want to look 1 step back, so TRACE_DEPTH must be 3.
+ */
+#define TRACE_DEPTH 3
+/* caller_id adds 3 to the trace depth it returns and it is one level deeper than send_msg_va,
+ * so we want to call it with TRACE_DEPTH-2 to correct for that and skip send_msg/send_msg_csa.
+ */
+#define PRINT_CALLERID util_out_print(" -- generated from 0x!XJ ", NOFLUSH_OUT, caller_id(TRACE_DEPTH - 2))
 
 void send_msg_va(void *csa, int arg_count, va_list var);
 
@@ -68,14 +82,14 @@ void send_msg_va(void *csa, int arg_count, va_list var);
 /* #GTM_THREAD_SAFE : The below function (send_msg) is thread-safe */
 void send_msg(int arg_count, ...)
 {
-        va_list		var;
+	va_list		var;
 	sgmnt_addrs	*csa;
 	jnlpool_addrs_ptr_t	local_jnlpool;	/* used by PTHREAD_CSA_FROM_GV_CUR_REGION */
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	PTHREAD_CSA_FROM_GV_CUR_REGION(csa, local_jnlpool);
-        VAR_START(var, arg_count);
+	VAR_START(var, arg_count);
 	send_msg_va(csa, arg_count, var);
 	va_end(var);
 }
@@ -85,7 +99,7 @@ void send_msg_csa(void *csa, int arg_count, ...)
 {
 	va_list		var;
 
-        VAR_START(var, arg_count);
+	VAR_START(var, arg_count);
 	send_msg_va(csa, arg_count, var);
 	va_end(var);
 }
@@ -93,14 +107,20 @@ void send_msg_csa(void *csa, int arg_count, ...)
 /* #GTM_THREAD_SAFE : The below function (send_msg_va) is thread-safe */
 void send_msg_va(void *csa, int arg_count, va_list var)
 {
-        int		dummy, fao_count, i, msg_id, freeze_msg_id;
-        char    	msg_buffer[PUT_BUFF_SIZE];
-        mstr    	msg_string;
+	int		dummy, fao_count, i, msg_id, freeze_msg_id, trace_size, trace_start, status;
+	long		offset;
+	char		msg_buffer[PUT_BUFF_SIZE];
+	/* Some systems include the backtrace function in the backtrace results but TRACE_DEPTH is defined with the current
+	 * function as its base, so in those cases we need TRACE_DEPTH + 1 space for the extra function.
+	 */
+	void		*backtrace_pointers[TRACE_DEPTH + 1], *last_backtrace;
+	mstr		msg_string;
 	char		*save_util_outptr;
 	va_list		save_last_va_list_ptr;
 	boolean_t	util_copy_saved = FALSE;
 	boolean_t	freeze_needed = FALSE, was_holder;
 	jnlpool_addrs_ptr_t	local_jnlpool;	/* used by CHECK_IF_FREEZE_ON_ERROR_NEEDED and FREEZE_INSTANCE_IF_NEEDED */
+	Dl_info		backtrace_ptr_info;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -154,51 +174,100 @@ void send_msg_va(void *csa, int arg_count, va_list var)
 	assert((0 == nesting_level) || ((2 > nesting_level) && timer_in_handler)
 		|| (EXIT_IMMED == exit_state) || (2 == forced_exit));
 	DEBUG_ONLY(nesting_level++;)
-        assert(arg_count > 0);
+	assert(arg_count > 0);
 	ASSERT_SAFE_TO_UPDATE_THREAD_GBLS;
 	if ((NULL != TREF(util_outptr)) && (TREF(util_outptr) != TREF(util_outbuff_ptr)))
 	{
 		SAVE_UTIL_OUT_BUFFER(save_util_outptr, save_last_va_list_ptr, util_copy_saved);
 	}
-        util_out_print(NULL, RESET);
-        for (;;)
-        {
-                msg_id = (int) va_arg(var, VA_ARG_TYPE);
+	util_out_print(NULL, RESET);
+	for (;;)
+	{
+		msg_id = (int) va_arg(var, VA_ARG_TYPE);
 		CHECK_IF_FREEZE_ON_ERROR_NEEDED(csa, msg_id, freeze_needed, freeze_msg_id, local_jnlpool);
-                --arg_count;
-                msg_string.addr = msg_buffer;
-                msg_string.len = SIZEOF(msg_buffer);
-                gtm_getmsg(msg_id, &msg_string);
-                if (0 < arg_count)
-                {
-                        fao_count = (int) va_arg(var, VA_ARG_TYPE);
-                        --arg_count;
-                        if (fao_count > MAX_FAO_PARMS)
+		--arg_count;
+		msg_string.addr = msg_buffer;
+		msg_string.len = SIZEOF(msg_buffer);
+		gtm_getmsg(msg_id, &msg_string);
+		if (0 < arg_count)
+		{
+			fao_count = (int) va_arg(var, VA_ARG_TYPE);
+			--arg_count;
+			if (fao_count > MAX_FAO_PARMS)
 			{
 				assert(FALSE);
 				fao_count = MAX_FAO_PARMS;
 			}
-                } else
-                        fao_count = 0;
-                util_out_print_vaparm(msg_string.addr, NOFLUSH_OUT, var, fao_count);
+		} else
+			fao_count = 0;
+		util_out_print_vaparm(msg_string.addr, NOFLUSH_OUT, var, fao_count);
 		va_end(var);	/* need this before used as dest in copy */
 		VAR_COPY(var, TREF(last_va_list_ptr));
 		va_end(TREF(last_va_list_ptr));
 		arg_count -= fao_count;
 
-                if (0 >= arg_count)
-                {
-                        if (caller_id_flag)
-                                PRINT_CALLERID;
-                        break;
-                }
-                util_out_print("!/", NOFLUSH_OUT);
-        }
-        util_out_print(NULL, OPER);
+		if (0 >= arg_count)
+		{
+			if (caller_id_flag)
+			{
+				PRINT_CALLERID;
+				#ifdef __GLIBC__
+				/* This section prints the backtrace address in library_base+offset format or,
+				 * in the rare case where the information is available at runtime, in symbolic_name+offset format.
+				 * The library base is the base of the library where the function that called this code is.
+				 * The offset is the distance from the start of the library
+				 * to the location in memory where the function was called from.
+				 * This code looks at the last TRACE_DEPTH functions including this one.
+				 * Currently, TRACE_DEPTH is 3 as if it only looked 2 functions back,
+				 * it would see one of the 2 wrapper functions in this file that invoked send_msg_va,
+				 * but to give useful information we want the function 1 step before that
+				 * in order to know what function called send_msg[_csa].
+				 */
+
+				 /* On some systems the backtrace itself might be returned by backtrace.
+				 * To correct for this, we first check if the first element
+				 * is in libyottadb.so, ignoring it if it is.
+				 */
+				trace_size = backtrace(backtrace_pointers, TRACE_DEPTH + 1);
+				if (0 >= trace_size)
+					status = 0;
+				else
+					status = dladdr(backtrace_pointers[0], &backtrace_ptr_info);
+				if (status)
+				{
+					trace_start = (NULL == strstr(backtrace_ptr_info.dli_fname, "libyottadb.so"));
+					if ((trace_start + TRACE_DEPTH) <= trace_size)
+					{
+						last_backtrace = backtrace_pointers[trace_start + TRACE_DEPTH - 1];
+						status = dladdr(last_backtrace, &backtrace_ptr_info);
+					} else
+						status = 0;
+					if (status)
+					{
+						if (NULL != backtrace_ptr_info.dli_sname)
+						{/* If the symbolic name of the function is available, use it. */
+							offset = last_backtrace - backtrace_ptr_info.dli_saddr;
+							util_out_print("(!AZ+0x!XJ).", 0, backtrace_ptr_info.dli_sname, offset);
+						} else
+						{/* If the symbolic name is not available (likely) use the library_address+offset */
+							assert(NULL != backtrace_ptr_info.dli_fbase);
+							assert(NULL != backtrace_ptr_info.dli_fname);
+							offset = last_backtrace - backtrace_ptr_info.dli_fbase;
+							util_out_print("(0x!XJ+0x!XJ).", 0, backtrace_ptr_info.dli_fbase, offset);
+						}
+					}
+				}
+				#endif
+			}
+			break;
+		}
+		util_out_print("!/", NOFLUSH_OUT);
+	}
+	util_out_print(NULL, OPER);
 	RESTORE_UTIL_OUT_BUFFER(save_util_outptr, save_last_va_list_ptr, util_copy_saved);
-        /* it has been suggested that this would be a place to check a view_debugN
-         * and conditionally enter a "forever" loop on wcs_sleep for unix debugging
-         */
+	/* it has been suggested that this would be a place to check a view_debugN
+	 * and conditionally enter a "forever" loop on wcs_sleep for unix debugging
+	 */
 	DEBUG_ONLY(nesting_level--);
 	FREEZE_INSTANCE_IF_NEEDED(csa, freeze_needed, freeze_msg_id, local_jnlpool);
 	--(TREF(rts_error_depth));			/* All done, remove our bump. But do it before releasing the thread lock */
