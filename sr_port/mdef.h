@@ -2090,4 +2090,11 @@ enum
  * This block of comment is here as a marker so all such non-intuitive include usages reference this.
  */
 
+/* The STR_HELPER and STR macros are needed to convert the JNL_VER_THIS number to a string
+ * See https://stackoverflow.com/a/5459929 for details.
+ * In YottaDB r2.04, they are also used with outputting `-version` information
+ */
+#define	STR_HELPER(NUM)		#NUM
+#define STR(NUM)		STR_HELPER(NUM)
+
 #endif /* MDEF_included */

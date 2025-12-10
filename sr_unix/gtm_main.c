@@ -201,6 +201,13 @@ int gtm_main(int argc, char **argv, char **envp)
 		// dates have the format YYYYMMDD
 		printf("Build date/time:         %.4s-%.2s-%.2s %s\n", date, date + 4, date + 6, time);
 		printf("Build commit SHA:        %s\n", commit);
+		puts("Compiler:                " YDB_COMPILER);
+		puts("Compiler Version:        " YDB_COMPILER_VERSION);
+		puts("Build Type:              " YDB_BUILD_TYPE);
+#		ifdef YDB_ASAN
+		puts("ASAN:                    " YDB_ASAN);
+#		endif
+
 		EXIT(0);
 	}
 	if (cli_present("DIRECT_MODE"))

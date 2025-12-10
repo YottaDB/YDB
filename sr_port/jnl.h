@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -65,11 +65,6 @@ error_def(ERR_JNLENDIANLITTLE);
  */
 #define	JNL_LABEL_PREFIX	"YDBJNL"
 #define JNL_VER_THIS		45
-/* The STR_HELPER and STR macros are needed to get convert the JNL_VER_THIS number to a string
- * See https://stackoverflow.com/a/5459929 for details.
- */
-#define	STR_HELPER(NUM)		#NUM
-#define STR(NUM)		STR_HELPER(NUM)
 #define JNL_LABEL_TEXT		JNL_LABEL_PREFIX STR(JNL_VER_THIS) /* see above comment block for todos whenever this is changed */
 
 /* Since V24 filter format was first released in 09/2014 (see comment block in "repl_filter.h"), which is only 4 years

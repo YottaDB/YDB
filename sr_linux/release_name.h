@@ -46,4 +46,27 @@
 #define GTM_PRODUCT 		"GT.M"
 #define YDB_PRODUCT		"YottaDB"
 
+#if defined(__clang__)
+# define YDB_COMPILER "Clang"
+# define YDB_COMPILER_VERSION STR(__clang_major__) "." STR(__clang_minor__) "." STR(__clang_patchlevel__)
+# if __has_feature(address_sanitizer) // Clang ASAN
+#  define YDB_ASAN "ASAN Enabled"
+# endif
+#elif defined(__GNUC__)
+# define YDB_COMPILER "GCC"
+# define YDB_COMPILER_VERSION STR(__GNUC__) "." STR(__GNUC_MINOR__) "." STR(__GNUC_PATCHLEVEL__)
+# if defined(__SANITIZE_ADDRESS__) // GCC ASAN
+#  define YDB_ASAN "ASAN Enabled"
+# endif
+#else
+# define YDB_COMPILER "Unknown"
+# define YDB_COMPILER_VERSION "Unknown"
+#endif
+
+#ifdef DEBUG
+# define YDB_BUILD_TYPE "Debug"
+#else
+# define YDB_BUILD_TYPE "Production"
+#endif
+
 #endif
