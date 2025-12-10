@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -406,7 +406,7 @@ caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, ssize_t size, in
 					{
 						assert(0 <= chlen);
 						ch = *c;
-						isprintable = ((' ' <= ch) || ('~' >= ch)); /* Ignored in M mode for FAO !AD */
+						isprintable = ((' ' <= ch) && ('~' >= ch)); /* Ignored in M mode for FAO !AD */
 					} else
 					{
 						chlen = (caddr_t)UTF8_MBTOWC(c, ctop, ch) - c;
