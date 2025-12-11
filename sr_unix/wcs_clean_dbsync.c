@@ -146,8 +146,9 @@ void	wcs_clean_dbsync(TID tid, int4 hd_len, sgmnt_addrs **csaptr)
 			&& (0 == fast_lock_count)
 			&& (!db_fsync_in_prog)
 			&& (!jpc || (LOCK_AVAILABLE == jbp->fsync_in_prog_latch.u.parts.latch_pid))
-			&& ((NULL == check_csaddrs) || (!T_IN_COMMIT_OR_WRITE(check_csaddrs) && !check_csaddrs->now_crit))
-			&& (!T_IN_COMMIT_OR_WRITE(csa) && !csa->now_crit)
+			&& (0 == have_crit(CRIT_HAVE_ANY_REG))
+			&& ((NULL == check_csaddrs) || !T_IN_COMMIT_OR_WRITE(check_csaddrs))
+			&& !T_IN_COMMIT_OR_WRITE(csa)
 			&& (FALSE != grab_crit_immediate(reg, OK_FOR_WCS_RECOVER_FALSE, NOT_APPLICABLE)))
 		{ 	/* Note that if we are here, we have obtained crit using grab_crit_immediate. */
 			assert(csa->ti->early_tn == csa->ti->curr_tn);
