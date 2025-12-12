@@ -47,7 +47,7 @@ check_if_hdrs_exist()
 	for hdr in $hdrlist ; do
 		printf "%s\n" '#include <stddef.h>' '#include <stdarg.h>' '#include <stdio.h>' \
 			'#include <setjmp.h>' '#ifndef _FILE_OFFSET_BITS' '#define _FILE_OFFSET_BITS 64' '#endif' '#include <'$hdr'>' "int main() {}" >$tmpprog
-		if ! gcc -H --syntax-only $tmpprog 1>/dev/null 2>&1 ; then
+		if ! $ydb_compiler -H -fsyntax-only $tmpprog 1>/dev/null 2>&1 ; then
 			hdrnotfound="$hdrnotfound $hdr" ; unset hdrflag
 		fi
 	done
@@ -117,6 +117,7 @@ dump_info()
 	if [ -n "$ydb_aim" ] ; then echo ydb_aim " : " $ydb_aim ; fi
 	if [ -n "$ydb_branch" ] ; then echo ydb_branch " : " $ydb_branch ; fi
 	if [ -n "$ydb_change_removeipc" ] ; then echo ydb_change_removeipc " : " $ydb_change_removeipc ; fi
+	if [ -n "$ydb_compiler" ] ; then echo ydb_compiler " : " $ydb_compiler ; fi
 	if [ -n "$ydb_curl" ] ; then echo ydb_curl " : " $ydb_curl ; fi
 	if [ -n "$ydb_debug" ] ; then echo ydb_debug " : " $ydb_debug ; fi
 	if [ -n "$ydb_deprecated" ] ; then echo ydb_deprecated " : " $ydb_deprecated ; fi
@@ -178,66 +179,67 @@ err_exit()
 help_exit()
 {
 	set +x
-	echo "ydbinstall [option] ... [version]"
-	echo "Options are:"
-	echo "--aim				-> installs AIM plugin"
-	echo "--allplugins                      -> installs all plugins"
-	echo "--branch branchname		-> builds YottaDB from a specific git branch; use with --from-source"
-	echo "--build-type buildtype		-> type of YottaDB build, default is pro"
-	echo "--copyenv [dirname]		-> copy ydb_env_set, ydb_env_unset, and gtmprofile files to dirname, default /usr/local/etc; incompatible with linkenv"
-	echo "--copyexec [dirname]		-> copy ydb & gtm scripts to dirname, default /usr/local/bin; incompatible with linkexec"
-	echo "--curl                            -> download and install the libcurl plugin"
-	echo "--debug				-> turn on debugging with set -x"
-	echo "--distrib dirname or URL		-> source directory for YottaDB/GT.M distribution tarball, local or remote"
-	echo "--dry-run				-> do everything short of installing YottaDB, including downloading the distribution"
-	echo "--encplugin			-> compile and install the encryption plugin"
-	echo "--filename filename		-> name of YottaDB distribution tarball"
-	echo "--force-install			-> install even if the current platform is not Supported"
-	echo "--from-source repo		-> builds and installs YottaDB from a git repo; defaults to building the latest master from gitlab if not specified; check README for list of prerequisites to build from source"
-	echo "--group group			-> group that should own the YottaDB installation"
-	echo "--group-restriction		-> limit execution to a group; defaults to unlimited if not specified"
-	echo "--gtm				-> install GT.M instead of YottaDB"
-	echo "--gui				-> download and install the YottaDB GUI"
-	echo "--help				-> print this usage information"
-	echo "--installdir dirname		-> directory where YottaDB is to be installed; defaults to /usr/local/lib/yottadb/version"
-	echo "--keep-obj			-> keep .o files of M routines (normally deleted on platforms with YottaDB support for routines in shared libraries)"
-	echo "--linkenv [dirname]		-> create link in dirname to ydb_env_set, ydb_env_unset & gtmprofile files, default /usr/local/etc; incompatible with copyenv"
-	echo "--linkexec [dirname]		-> create link in dirname to ydb & gtm scripts, default /usr/local/bin; incompatible with copyexec"
-	echo "--nocopyenv			-> do not copy ydb_env_set, ydb_env_unset, and gtmprofile to another directory"
-	echo "--nocopyexec			-> do not copy ydb & gtm scripts to another directory"
-	echo "--nodeprecated			-> do not install deprecated components, specifically %DSEWRAP"
-	echo "--nolinkenv			-> do not create link to ydb_env_set, ydb_env_unset, and gtmprofile from another directory"
-	echo "--nolinkexec			-> do not create link to ydb & gtm scripts from another directory"
-	echo "--nopkg-config			-> do not copy yottadb.pc from installdir to /usr/share/pkgconfig/yottadb.pc"
-	echo "--octo parameters			-> download and install Octo; also installs required POSIX and AIM plugins. Specify optional cmake parameters for Octo as necessary"
-	echo "--overwrite-existing		-> install into an existing directory, overwriting contents; defaults to requiring new directory"
-	echo "--plugins-only			-> just install plugins for an existing YottaDB installation, not YottaDB"
-	echo "--posix				-> download and install the POSIX plugin"
-	echo "--preserveRemoveIPC		-> do not allow changes to RemoveIPC in /etc/systemd/login.conf if needed; defaults to allow changes"
-	echo "--prompt-for-group		-> YottaDB installation script will prompt for group; default is yes for production releases V5.4-002 or later, no for all others"
-	echo "--sodium				-> download and install the libsodium plugin"
+        echo "ydbinstall [option] ... [version]"
+        echo "Options are:"
+        echo "--aim                             -> installs AIM plugin"
+        echo "--allplugins                      -> installs all plugins"
+        echo "--branch branchname               -> builds YottaDB from a specific git branch; use with --from-source"
+        echo "--build-type buildtype            -> type of YottaDB build, default is pro"
+        echo "--compiler                        -> compiler to use with --from-source (default gcc on x86_64, clang on AARCH64)"
+        echo "--copyenv [dirname]               -> copy ydb_env_set, ydb_env_unset, and gtmprofile files to dirname, default /usr/local/etc; incompatible with linkenv"
+        echo "--copyexec [dirname]              -> copy ydb & gtm scripts to dirname, default /usr/local/bin; incompatible with linkexec"
+        echo "--curl                            -> download and install the libcurl plugin"
+        echo "--debug                           -> turn on debugging with set -x"
+        echo "--distrib dirname or URL          -> source directory for YottaDB/GT.M distribution tarball, local or remote"
+        echo "--dry-run                         -> do everything short of installing YottaDB, including downloading the distribution"
+        echo "--encplugin                       -> compile and install the encryption plugin"
+        echo "--filename filename               -> name of YottaDB distribution tarball"
+        echo "--force-install                   -> install even if the current platform is not Supported"
+        echo "--from-source repo                -> builds and installs YottaDB from a git repo; defaults to building the latest master from gitlab if not specified; check README for list of prerequisites to build from source"
+        echo "--group group                     -> group that should own the YottaDB installation"
+        echo "--group-restriction               -> limit execution to a group; defaults to unlimited if not specified"
+        echo "--gtm                             -> install GT.M instead of YottaDB"
+        echo "--gui                             -> download and install the YottaDB GUI"
+        echo "--help                            -> print this usage information"
+        echo "--installdir dirname              -> directory where YottaDB is to be installed; defaults to /usr/local/lib/yottadb/version"
+        echo "--keep-obj                        -> keep .o files of M routines (normally deleted on platforms with YottaDB support for routines in shared libraries)"
+        echo "--linkenv [dirname]               -> create link in dirname to ydb_env_set, ydb_env_unset & gtmprofile files, default /usr/local/etc; incompatible with copyenv"
+        echo "--linkexec [dirname]              -> create link in dirname to ydb & gtm scripts, default /usr/local/bin; incompatible with copyexec"
+        echo "--nocopyenv                       -> do not copy ydb_env_set, ydb_env_unset, and gtmprofile to another directory"
+        echo "--nocopyexec                      -> do not copy ydb & gtm scripts to another directory"
+        echo "--nodeprecated                    -> do not install deprecated components, specifically %DSEWRAP"
+        echo "--nolinkenv                       -> do not create link to ydb_env_set, ydb_env_unset, and gtmprofile from another directory"
+        echo "--nolinkexec                      -> do not create link to ydb & gtm scripts from another directory"
+        echo "--nopkg-config                    -> do not copy yottadb.pc from installdir to /usr/share/pkgconfig/yottadb.pc"
+        echo "--octo parameters                 -> download and install Octo; also installs required POSIX and AIM plugins. Specify optional cmake parameters for Octo as necessary"
+        echo "--overwrite-existing              -> install into an existing directory, overwriting contents; defaults to requiring new directory"
+        echo "--plugins-only                    -> just install plugins for an existing YottaDB installation, not YottaDB"
+        echo "--posix                           -> download and install the POSIX plugin"
+        echo "--preserveRemoveIPC               -> do not allow changes to RemoveIPC in /etc/systemd/login.conf if needed; defaults to allow changes"
+        echo "--prompt-for-group                -> YottaDB installation script will prompt for group; default is yes for production releases V5.4-002 or later, no for all others"
+        echo "--sodium                          -> download and install the libsodium plugin"
 	echo "--source-build-dir		-> compiles YottaDB in a specific directory, not /tmp; use with --from-source"
-	echo "--support                         -> download and install the YDBSupport script"
-	echo "--syslog				-> download and install the YDBSyslog plugin"
-	echo "--ucaseonly-utils			-> install only upper case utility program names; defaults to both if not specified"
-	echo "--user username			-> user who should own YottaDB installation; default is root"
-	echo "--utf8				-> install UTF-8 support"
-	echo "--verbose				-> output diagnostic information as the script executes; default is to run quietly"
-	echo "--webserver			-> download and install the YottaDB Web Server plugin"
-	echo "--zlib				-> download and install the zlib plugin"
-	echo "Options that take a value (e.g, --group) can be specified as either --option=value or --option value."
-	echo "Options marked with \"*\" are likely to be of interest primarily to YottaDB developers."
-	echo "Version is defaulted from yottadb file if one exists in the same directory as the installer."
-	echo "This version must run as root."
-	echo ""
-	echo "Example usages are (assumes latest YottaDB release is r2.02 and latest GT.M version is V7.1-006)"
-	echo "	$0				# installs latest YottaDB release (r2.02) at /usr/local/lib/yottadb/r202"
-	echo "	$0 --utf8			# installs YottaDB release r2.02 with added support for UTF-8"
-	echo "	$0 --installdir /r202 r2.02	# installs YottaDB r2.02 at /r202"
-	echo "	$0 --gtm			# installs latest GT.M version (V7.1-006) at /usr/local/lib/fis-gtm/V7.1-006_x86_64"
-	echo "	$0 --from-source --branch r2.02	# builds YottaDB r2.02 and installs it at /usr/local/lib/yottadb/r202"
-	echo ""
-	echo "As options are processed left to right, later options can override earlier options."
+        echo "--support                         -> download and install the YDBSupport script"
+        echo "--syslog                          -> download and install the YDBSyslog plugin"
+        echo "--ucaseonly-utils                 -> install only upper case utility program names; defaults to both if not specified"
+        echo "--user username                   -> user who should own YottaDB installation; default is root"
+        echo "--utf8                            -> install UTF-8 support"
+        echo "--verbose                         -> output diagnostic information as the script executes; default is to run quietly"
+        echo "--webserver                       -> download and install the YottaDB Web Server plugin"
+        echo "--zlib                            -> download and install the zlib plugin"
+        echo "Options that take a value (e.g, --group) can be specified as either --option=value or --option value."
+        echo "Options marked with \"*\" are likely to be of interest primarily to YottaDB developers."
+        echo "Version is defaulted from yottadb file if one exists in the same directory as the installer."
+        echo "This version must run as root."
+        echo ""
+        echo "Example usages are (assumes latest YottaDB release is r2.02 and latest GT.M version is V7.1-006)"
+        echo "  $0                              # installs latest YottaDB release (r2.02) at /usr/local/lib/yottadb/r202"
+        echo "  $0 --utf8                       # installs YottaDB release r2.02 with added support for UTF-8"
+        echo "  $0 --installdir /r202 r2.02     # installs YottaDB r2.02 at /r202"
+        echo "  $0 --gtm                        # installs latest GT.M version (V7.1-006) at /usr/local/lib/fis-gtm/V7.1-006_x86_64"
+        echo "  $0 --from-source --branch r2.02 # builds YottaDB r2.02 and installs it at /usr/local/lib/yottadb/r202"
+        echo ""
+        echo "As options are processed left to right, later options can override earlier options."
 	echo ""
 	exit
 }
@@ -361,8 +363,8 @@ install_plugins()
 		cd zlib_tmp
 		if git clone --depth 1 https://gitlab.com/YottaDB/Util/YDBZlib.git YDBZlib-master 2>YDBZlib.err 1>YDBZLib.out ; then
 			cd YDBZlib-master
-			if gcc -c -fPIC -I${ydb_installdir} gtmzlib.c && gcc -o libgtmzlib.so -shared gtmzlib.o 1>>../zlib.log 2>&1; then
-				# Save the build directory if either of the gcc commands return a non-zero exit code. Otherwise, remove it.
+			if $ydb_compiler -c -fPIC -I${ydb_installdir} gtmzlib.c && $ydb_compiler -o libgtmzlib.so -shared gtmzlib.o 1>>../zlib.log 2>&1; then
+				# Save the build directory if either of the $ydb_compiler commands return a non-zero exit code. Otherwise, remove it.
 				if [ "Y" = "$gtm_verbose" ] ; then cat ../zlib.log ; fi
 				cp gtmzlib.xc libgtmzlib.so ${ydb_installdir}/plugin
 				cp _ZLIB.m ${ydb_installdir}/plugin/r
@@ -465,11 +467,12 @@ timestamp=`date +%Y%m%d%H%M%S`_$$
 if [ -z "$USER" ] ; then USER=`id -un` ; fi
 
 
-# Defaults that can be over-ridden by command line options to follow
+# Defaults and environment variables that can be over-ridden by command line options
 # YottaDB prefixed versions:
 if [ -z "$ydb_aim" ] ; then ydb_aim="N" ; fi
 if [ -n "$ydb_buildtype" ] ; then gtm_buildtype="$ydb_buildtype" ; fi
 if [ -z "$ydb_change_removeipc" ] ; then ydb_change_removeipc="yes" ; fi
+# No default for ydb_compiler; needs a value only if --from-source is set
 if [ -z "$ydb_curl" ] ; then ydb_curl="N" ; fi
 if [ -z "$ydb_deprecated" ] ; then ydb_deprecated="Y" ; fi
 if [ -n "$ydb_dryrun" ] ; then gtm_dryrun="$ydb_dryrun" ; fi
@@ -525,7 +528,7 @@ while [ $# -gt 0 ] ; do
 		--branch*) tmp=`echo $1 | cut -s -d = -f 2-`
 			if [ -n "$tmp" ] ; then ydb_branch=$tmp
 			else retval=`isvaluevalid $# $2` ; if [ "$retval" -eq 0 ] ; then ydb_branch=$2 ; shift
-			else echo "--branch needs a value" ; err_exit
+				else echo "--branch needs a value" ; err_exit
 				fi
 			fi
 			shift ;;
@@ -535,6 +538,13 @@ while [ $# -gt 0 ] ; do
 				else echo "--build-type needs a value" ; err_exit
 				fi
 			fi ;;
+		--compiler*) tmp=`echo $1 | cut -s -d = -f 2-`
+			if [ -n "$tmp" ] ; then ydb_compiler=$tmp
+			else retval=`isvaluevalid $# $2`; if [ "$retval" -eq 0 ] ; then ydb_compiler=$2 ; shift
+				else echo "--compiler needs a value" ; err_exit
+				fi
+			fi
+			shift ;;
 		--copyenv*) tmp=`echo $1 | cut -s -d = -f 2-`
 			if [ -n "$tmp" ] ; then gtm_copyenv=$tmp
 			else retval=`isvaluevalid $# $2` ; if [ "$retval" -eq 0 ] ; then gtm_copyenv=$2 ; shift
@@ -717,35 +727,103 @@ fi
 check_if_utils_exist "Program(s) required by YottaDB not found:"
 
 ldconfig=$(command -v ldconfig || command -v /sbin/ldconfig)
-# Check for libraries required by YottaDB
-shliblist="libelf.so"
-if [ "Y" = "$ydb_utf8" ] ; then append_to_str shliblist "libicuio.so" ; fi
-check_if_shlibs_exist "Shared library/libraries required by YottaDB not found:"
+# If only installing plugins, find the compiler used to build YottaDB
+if [ "Y" = "$ydb_plugins_only" ] ; then
+	if [ -z "$ydb_installdir" ] ; then
+		# If --installdir was not specified, we first look to $ydb_dist for
+		# the YottaDB version. Otherwise, we check pkg-config.
+		if [ -d "$ydb_dist" ] ; then
+			ydb_installdir=$ydb_dist
+		else
+			ydb_installdir=$(pkg-config --variable=prefix yottadb)
+			ydb_dist=$ydb_installdir
+		fi
+	else
+		ydb_dist=$ydb_installdir
+	fi
+	# Check that YottaDB is actually installed by looking for the presence of a yottadb executable
+	if [ ! -e $ydb_installdir/yottadb ] ; then
+		echo "YottaDB not found at $ydb_installdir. Exiting" ; err_exit
+	fi
+	# If $ydb_compiler is not defined, set it to the compiler used to compile YottaDB
+	if [ -z "$ydb_compiler" ] ; then
+		ydb_compiler=$($ydb_dist/yottadb -version | awk '/^Compiler:/ {print tolower($2)}')
+		if [ -z "$ydb_compiler" ] ; then
+			if [ `readelf -p .comment $ydb_dist/libyottadb.so | grep -wi clang` ] ; then
+				 ydb_compiler=clang
+			else ydb_compiler=gcc
+			fi
+		fi
+	fi
+	CC=$(command -v $ydb_compiler) ; export CC
+# Check for dependencies if building YottaDB from source
+elif [ -n "$ydb_from_source" ] ; then
+	hdrlist="jansson.h libelf.h"
+	if [ "Y" = "$ydb_utf8" ] ; then
+		append_to_str shliblist "libicuio.so"
+		append_to_str hdrlist "unicode/uchar.h"
+	fi
+	# If $ydb_compiler is not defined, set it to a platform-specific default,
+	# gcc on x86_64 and clang on AARCH64 because of the gcc bug
+	# https://gcc.gnu.org/bugzilla/show_bug.cgi?id=119610
+	# Once it is fixed, evaluate whether or not to switch to gcc for AARCH64.
+	if [ -z "$ydb_compiler" ] ; then
+		if [ "aarch64" = $(uname -m) ] ; then
+			ydb_compiler=clang
+		else ydb_compiler=gcc
+		fi
+	fi
+	CC=$(command -v $ydb_compiler) ; export CC
+	check_if_shlibs_exist "Shared library/libraries required by YottaDB not found:"
+	check_if_hdrs_exist "Header files required by YottaDB nof found:"
 
-# Check for additional dependencies beyond those for YottaDB.
-unset hdrlist shliblist utillist
+	unset hdrlist shliblist utillist
+# Check for dependencies if installing a prebuilt YottaDB
+else
+	shliblist="libelf.so"
+	if [ "Y" = "$ydb_utf8" ] ; then
+		append_to_str shliblist "libicuio.so"
+	fi
+	# If $ydb_compiler is not defined, a compiler may be needed for plugins.
+	# Check whether ydbinstall is part of a YottaDB distribution, and if so
+	# use the compiler from the distribution, otherwise use a platform-specific
+	# default. Also see comment above on compiler selection.
+	if [ -z "$ydb_compiler" ] ; then
+		if [ -e libyottadb.so ] ; then
+			if [ `readelf -p .comment libyottadb.so | grep -wi clang` ] ; then
+				 ydb_compiler=clang
+			else ydb_compiler=gcc
+			fi
+		else
+			if [ "aarch64" = $(uname -m) ] ; then
+				ydb_compiler=clang
+			else ydb_compiler=gcc
+			fi
+		fi
+	fi
+	CC=$(command -v $ydb_compiler) ; export CC
+	check_if_shlibs_exist "Shared library/libraries required by YottaDB not found:"
+	check_if_hdrs_exist "Header files required by YottaDB nof found:"
 
-# Build from source
-if [ -n "$ydb_from_source" ] ; then
-	append_to_str utillist "gawk"
-	append_to_str hdrlist "jansson.h"
+	# Check for additional dependencies beyond those for YottaDB.
+	unset hdrlist shliblist utillist
 fi
 
 # YDBAIM
 if [ "Y" = $ydb_aim ] ; then
-	append_to_str utillist "git cmake ld make pkg-config"
+	append_to_str utillist "cmake git ld make pkg-config"
 fi
 
 # libcurl plugin
 if [ "Y" = "$ydb_curl" ] ; then
-	append_to_str utillist "cmake gcc git make ld"
+	append_to_str utillist "cmake git ld make readelf $ydb_compiler"
 	append_to_str shliblist "libcurl.so"
 	append_to_str hdrlist "curl/curl.h"
 fi
 
 # Encryption plugin
 if [ "Y" = "$ydb_encplugin" ] ; then
-	append_to_str utillist "gcc make tcsh"
+	append_to_str utillist "make readelf tcsh $ydb_compiler"
 	append_to_str shliblist "libconfig.so libssl.so"
 	append_to_str hdrlist "gcrypt.h gpg-error.h gpgme.h libconfig.h \
 		openssl/bio.h openssl/err.h openssl/evp.h openssl/ssl.h"
@@ -758,7 +836,7 @@ fi
 
 # Octo
 if [ "Y" = "$ydb_octo" ] ; then
-	append_to_str utillist "bison cmake flex gcc git gzip make ld pkg-config"
+	append_to_str utillist "bison cmake flex git gzip make ld pkg-config readelf $ydb_compiler"
 	append_to_str shliblist "libconfig.so libreadline.so"
 	append_to_str hdrlist "endian.h getopt.h libconfig.h \
 		openssl/conf.h openssl/err.h openssl/evp.h openssl/md5.h openssl/ssl.h \
@@ -767,12 +845,12 @@ fi
 
 # POSIX plugin; note that all required headers are part of the POSIX standard
 if [ "Y" = "$ydb_posix" ] ; then
-	append_to_str utillist "cmake gcc git make ld pkg-config"
+	append_to_str utillist "cmake git ld make pkg-config readelf $ydb_compiler"
 fi
 
 # libsodium plugin
 if [ "Y" = "$ydb_sodium" ] ; then
-	append_to_str utillist "cmake gcc git make ld"
+	append_to_str utillist "cmake git ld make readelf $ydb_compiler"
 	append_to_str shliblist "libsodium.so"
 	append_to_str hdrlist "sodium.h"
 fi
@@ -784,17 +862,17 @@ fi
 
 # YDBSyslog plugin
 if [ "Y" = $ydb_syslog ] ; then
-	append_to_str utillist "git cmake make ld pkg-config"
+	append_to_str utillist "cmake git ld make pkg-config"
 fi
 
 # YDB Web Server plugin
 if [ "Y" = $ydb_ws ] ; then
-	append_to_str utillist "git date cmake make ld pkg-config"
+	append_to_str utillist "cmake date git make ld pkg-config"
 fi
 
 # Zlib plugin; note that all required headers are part of the POSIX standard
 if [ "Y" = "$ydb_zlib" ] ; then
-	append_to_str utillist "locale gcc grep head"
+	append_to_str utillist "head locale grep readelf $ydb_compiler"
 	append_to_str shliblist "libz.so"
 	append_to_str hdrlist "zlib.h"
 fi
@@ -850,6 +928,7 @@ if [ "Y" = "$ydb_utf8" ] ; then
 fi
 
 if [ -n "$ydb_from_source" ] ; then
+	if [ "Y" = "$ydb_plugins_only" ] ; then echo "--plugins-only" and "--from-source" are incompatible ; err_exit ; fi
 	# If --from-source is selected, clone the git repo, build and invoke the build's ydbinstall
 	if [ -n "$ydb_branch" ] ; then
 		echo "Building branch $ydb_branch from repo $ydb_from_source"
@@ -988,22 +1067,6 @@ case ${gtm_hostos}_${gtm_arch} in
 esac
 
 if [ "Y" = "$ydb_plugins_only" ]; then
-	if [ -z "$ydb_installdir" ] ; then
-		# If --installdir was not specified, we first look to $ydb_dist for
-		# the YottaDB version. Otherwise, we check pkg-config.
-		if [ -d "$ydb_dist" ] ; then
-			ydb_installdir=$ydb_dist
-		else
-			ydb_installdir=$(pkg-config --variable=prefix yottadb)
-			ydb_dist=$ydb_installdir
-		fi
-	else
-		ydb_dist=$ydb_installdir
-	fi
-	# Check that YottaDB is actually installed by looking for the presence of a yottadb executable
-	if [ ! -e $ydb_installdir/yottadb ] ; then
-		echo "YottaDB not found at $ydb_installdir. Exiting" ; err_exit
-	fi
 	# If YottaDB is installed with UTF-8, we need that to install plugins
 	if [ -d "$ydb_installdir/utf8" ] ; then
 		ydb_utf8="Y"
