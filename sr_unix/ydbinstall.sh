@@ -1111,6 +1111,13 @@ if [ "N" = "$ydb_force_install" ]; then
 			osallowmajorver="11"
 			osallowminorver="0"
 		fi
+		if [ -z "$ydb_version" ] || [ 1 = `expr "r2.02" "<" "${ydb_version}"` ] ; then
+			if [ "ubuntu" = "${osid}" ] ; then
+				# Ubuntu 24.04 onwards is considered supported on AARCH64 starting with r2.04
+				osallowmajorver="24"
+				osallowminorver="04"
+			fi
+		fi
 	else
 		if [ "armv6l" = "${ydb_flavor}" ] ; then
 			if [ "debian" = ${osid} ] ; then
