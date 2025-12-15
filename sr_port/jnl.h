@@ -1885,12 +1885,18 @@ MBSTART {								\
  * Note that we can do the db fsync only if we already have the journal file open. If we do not, we will end
  * up doing this later after grabbing crit. This just minimizes the # of times db fsync happens while inside crit.
  */
-#define	DO_JNL_FSYNC_OUT_OF_CRIT_IF_NEEDED(REG, CSA, JPC, JBP)					\
-MBSTART {											\
-	assert(!CSA->now_crit);									\
-	assert(0 == have_crit(CRIT_HAVE_ANY_REG)); /* caller should have ensured this */	\
-	if ((NULL != JPC) && JBP->need_db_fsync)						\
-		jnl_wait(REG);	/* Try to do db fsync outside crit */				\
+#define	DO_JNL_FSYNC_OUT_OF_CRIT_IF_NEEDED(REG, CSA, JPC, JBP)						\
+MBSTART {												\
+	assert(!CSA->now_crit);										\
+	/* All callers of this macro ensure that they invoke it when they don't hold crit		\
+	 * on the current region as well as any other region. The only exception is			\
+	 * "mupip_set_journal()" which releases crit on all regions at a later point.			\
+	 * Take that into account in the below assert.							\
+	 */												\
+	assert(((&gds_rundown_ch == active_ch->ch) && (&mupip_set_jnl_ch == (active_ch - 1)->ch))	\
+		|| (0 == have_crit(CRIT_HAVE_ANY_REG)));						\
+	if ((NULL != JPC) && JBP->need_db_fsync)							\
+		jnl_wait(REG);	/* Try to do db fsync outside crit */					\
 } MBEND
 
 /* The below macro is currently used by the source server but is placed here in case others want to avail it later.
