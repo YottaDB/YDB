@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2025 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -30,6 +33,7 @@
 #include "jnl.h"
 #include "io.h"
 #include "gvt_inline.h"
+#include "op.h"
 
 GBLREF gv_namehead	*gv_target;
 GBLREF gv_namehead	*reset_gv_target;
@@ -58,6 +62,14 @@ void	gvzwrite_clnup(void)
 		gvzwrite_block->subsc_count = 0;
 		TREF(gv_last_subsc_null) = gvzwrite_block->gv_last_subsc_null;
 		TREF(gv_some_subsc_null) = gvzwrite_block->gv_some_subsc_null;
+		/* This is a case of ZWRITE ^GBL. In this case, we are about to restore the runtime $REFERENCE to
+		 * what it was BEFORE the ZWRITE command. But the compile time $REFERENCE would be pointing to ^GBL
+		 * and so any OC_GVNAMENAKED opcodes after the ZWRITE were generated assuming ^GBL as the runtime
+		 * $REFERENCE. Given the runtime and compile time $REFERENCE are different, disable the optimization
+		 * until the first global reference after the ZWRITE by setting the below global.
+		 * See https://gitlab.com/YottaDB/DB/YDB/-/issues/1177#note_2964158415 for more details and test case.
+		 */
+		gv_namenaked_state = NAMENAKED_UNKNOWNREFERENCE;
 	}
 	RESET_GV_TARGET(DO_GVT_GVKEY_CHECK);
 }
