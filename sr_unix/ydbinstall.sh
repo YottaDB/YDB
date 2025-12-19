@@ -134,6 +134,7 @@ dump_info()
 	if [ -n "$ydb_posix" ] ; then echo ydb_posix " : " $ydb_posix ; fi
 	if [ -n "$ydb_routines" ] ; then echo ydb_routines " : " $ydb_routines ; fi
 	if [ -n "$ydb_sodium" ] ; then echo ydb_sodium " : " $ydb_sodium ; fi
+	if [ -n "$ydb_source_build_dir" ] ; then echo ydb_source_build_dir " : " $ydb_source_build_dir ; fi
 	if [ -n "$ydb_support" ] ; then echo ydb_support " : " $ydb_support ; fi
 	if [ -n "$ydb_syslog" ] ; then echo ydb_syslog " : " $ydb_syslog ; fi
 	if [ -n "$ydb_utf8" ] ; then echo ydb_utf8 " : " $ydb_utf8 ; fi
@@ -215,6 +216,7 @@ help_exit()
 	echo "--preserveRemoveIPC		-> do not allow changes to RemoveIPC in /etc/systemd/login.conf if needed; defaults to allow changes"
 	echo "--prompt-for-group		-> YottaDB installation script will prompt for group; default is yes for production releases V5.4-002 or later, no for all others"
 	echo "--sodium				-> download and install the libsodium plugin"
+	echo "--source-build-dir		-> compiles YottaDB in a specific directory, not /tmp; use with --from-source"
 	echo "--support                         -> download and install the YDBSupport script"
 	echo "--syslog				-> download and install the YDBSyslog plugin"
 	echo "--ucaseonly-utils			-> install only upper case utility program names; defaults to both if not specified"
@@ -639,6 +641,13 @@ while [ $# -gt 0 ] ; do
 		--preserveRemoveIPC) ydb_change_removeipc="no" ; shift ;; # must come before group*
 		--prompt-for-group) gtm_prompt_for_group="Y" ; shift ;;
 		--sodium) ydb_sodium="Y" ; shift ;;
+		--source-build-dir*) tmp=`echo $1 | cut -s -d = -f 2-`
+			if [ -n "$tmp" ] ; then ydb_source_build_dir=$tmp
+			else retval=`isvaluevalid $# $2` ; if [ "$retval" -eq 0 ] ; then ydb_source_build_dir=$2 ; shift
+				else echo "--source-build-dir needs a value" ; err_exit
+				fi
+			fi
+			shift ;;
 		--support) ydb_support="Y" ; shift ;;
 		--syslog) ydb_syslog="Y" ; shift ;;
 		--ucaseonly-utils) gtm_lcase_utils="N" ; shift ;;
@@ -847,7 +856,11 @@ if [ -n "$ydb_from_source" ] ; then
 	else
 		echo "Building branch master from repo $ydb_from_source"
 	fi
-	ydbinstall_tmp=`mktemp -d`
+	if [ -n "$ydb_source_build_dir" ]; then
+		ydbinstall_tmp=`mktemp -p $ydb_source_build_dir -d`
+	else
+		ydbinstall_tmp=`mktemp -d`
+	fi
 	cd $ydbinstall_tmp
 	#mkdir from_source && cd from_source
 	if git clone $ydb_from_source ; then
