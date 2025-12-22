@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -89,6 +89,9 @@ void iott_flush(io_desc *io_ptr)
 
 	SETUP_THREADGBL_ACCESS;
 	ESTABLISH_GTMIO_CH(&io_ptr->pair, ch_set);
+	assert(tt == io_ptr->type);
+	if (tt != io_ptr->type) /* If not a terminal, flushing ip_ptr will be invalid as iott_flush only work on a terminal. */
+		return;         /* https://gitlab.com/YottaDB/DB/YDB/-/merge_requests/1803#note_3006440440 */
 	tt_ptr = io_ptr->dev_sp;
 	if (tt_ptr->timer_set)
 	{

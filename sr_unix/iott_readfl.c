@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -238,7 +238,13 @@ int	iott_readfl(mval *v, int4 length, uint8 nsec_timeout)	/* timeout in millisec
 	tt_ptr = (d_tt_struct *)(io_ptr->dev_sp);
 	SETTERM_IF_NEEDED(io_ptr, tt_ptr);
 	assert(dev_open == io_ptr->state);
-	iott_flush(io_curr_device.out);
+	/* Even though being in iott_readfl means that stdin is a terminal, it is possible that stdout is not a terminal.
+	 * If stdout is not a terminal, we do not want to call iott_flush.
+	 * More information about this can be found on the gitlab discussion
+	 * https://gitlab.com/YottaDB/DB/YDB/-/merge_requests/1803#note_3006440446
+	 */
+	if (tt == io_curr_device.out)
+		iott_flush(io_curr_device.out);
 	insert_mode = !(TT_NOINSERT & tt_ptr->ext_cap);	/* get initial mode */
 	empterm	= (TT_EMPTERM & tt_ptr->ext_cap);
 	ioptr_width = io_ptr->width;

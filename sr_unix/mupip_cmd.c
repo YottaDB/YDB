@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -130,7 +130,7 @@ static CLI_ENTRY mup_downgrade_dbver_qual[] = {		/* DOWNGRADE -DBVER */
 };
 
 static	CLI_PARM mup_dumpfhead_parm[] = {
-{ "WHAT", "File or Region: ", PARM_REQ},
+{ "WHAT", "File: ", PARM_REQ},
 { "", "",           		PARM_REQ}
 };
 
@@ -346,7 +346,7 @@ static	CLI_ENTRY	mup_ftok_qual[] = {		/* FTOK */
 };
 
 static	CLI_PARM	mup_integ_parm[] = {
-{ "WHAT", "File or Region: ", PARM_REQ},
+{ "WHAT", "File: ", PARM_REQ},
 { "", "",                     PARM_REQ}
 };
 
@@ -715,7 +715,7 @@ static	CLI_ENTRY	mup_restore_qual[] = {	/* RESTORE */
 };
 
 static	CLI_PARM	mup_rundown_parm[] = {
-{ "WHAT", "File or Region: ", PARM_REQ},
+{ "WHAT", "File: ", PARM_REQ},
 { "", "", PARM_REQ}
 };
 
@@ -738,7 +738,7 @@ static	CLI_PARM	mup_sems_parm[] = {
 };
 
 static	CLI_PARM	mup_set_parm[] = {
-{ "WHAT", "File or Region: ", PARM_REQ},
+{ "WHAT", "File: ", PARM_REQ},
 { "", "",                     PARM_REQ}
 };
 
@@ -842,7 +842,7 @@ static	CLI_ENTRY	mup_upgrade_qual[] = {		/* UPGRADE */
 };
 
 static	CLI_PARM	mup_upgrade_parm[] = {
-{"WHAT", "File or Region: ", PARM_REQ},
+{"WHAT", "File: ", PARM_REQ},
 { "",	"",		     PARM_REQ}
 };
 
