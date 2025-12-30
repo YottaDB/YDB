@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -286,6 +286,23 @@ void	op_trestart(int newlevel);
 	op_trollback(RB_LEVELS);/*BYPASSOK*/											\
 	/* Should have been reset by op_trollback at the beginning of the function entry */					\
 	assert(!implicit_trollback);												\
+}
+
+#define	OP_TROLLBACK_IMPLICIT_TP_IF_NEEDED											\
+{																\
+	/* Note: No trollback should occur in case of a simpleAPI started TP (which is also an implicit TP).			\
+	 * It is "ydb_tp_s" that will do the trollback in that case. Hence the "!tp_pointer->ydb_tp_s_tstart" check below.	\
+	 */															\
+	if ((0 == gtm_trigger_depth) && tp_pointer && tp_pointer->implicit_tstart && !tp_pointer->ydb_tp_s_tstart)		\
+	{															\
+		assert(1 == dollar_tlevel);	/* or else we would have been already inside a TP transaction and so we would	\
+						 * not have started an implicit TP (i.e. "tp_pointer->implicit_tstart" would	\
+						 * be FALSE in that case and so the enclosing "if" would evaluate to FALSE.	\
+						 */										\
+		DEBUG_ONLY(donot_INVOKE_MUMTSTART = FALSE);									\
+		OP_TROLLBACK(-1);	/* Unroll implicit TP frame */								\
+		assert(0 == dollar_tlevel);											\
+	}															\
 }
 
 void	op_trollback(int rb_levels);/*BYPASSOK*/

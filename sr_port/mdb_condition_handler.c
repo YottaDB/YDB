@@ -177,17 +177,8 @@ boolean_t clean_mum_tstart(void);
  * errors, perhaps interminably. In both the trigger and spanning-node cases, the MUM_TSTART we are about to execute unrolls
  * the C stack preventing any return to the C frame that did the implicit tstart and prevents it from being committed so
  * it must be rolled back.
- * Note: But no trollback should occur in case of a simpleAPI started TP (which is also an implicit TP). It is "ydb_tp_s"
- * that will do the trollback in that case. Hence the "!tp_pointer->ydb_tp_s_tstart" check below.
  */
-#define MUM_TSTART_FRAME_CHECK												\
-{															\
-	if ((0 == gtm_trigger_depth) && tp_pointer && tp_pointer->implicit_tstart && !tp_pointer->ydb_tp_s_tstart)	\
-	{														\
-		DEBUG_ONLY(donot_INVOKE_MUMTSTART = FALSE);								\
-		OP_TROLLBACK(-1);	/* Unroll implicit TP frame */							\
-	}														\
-}
+#define MUM_TSTART_FRAME_CHECK	OP_TROLLBACK_IMPLICIT_TP_IF_NEEDED
 
 /* Since a call to SET_ZSTATUS may cause the stringpool expansion, record whether we are using an indirection pool or not
  * in a local variable rather than recompare the stringpool bases.

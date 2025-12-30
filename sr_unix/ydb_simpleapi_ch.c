@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -58,6 +58,7 @@
 #include "trace_table.h"
 #include "gvt_inline.h"
 #include "deferred_events_queue.h"
+#include "op.h"
 
 GBLREF	stack_frame		*frame_pointer;
 GBLREF	boolean_t		created_core;
@@ -356,5 +357,10 @@ CONDITION_HANDLER(ydb_simpleapi_ch)
 	if (((SUCCESS == SEVERITY) || (INFO == SEVERITY)) && !zydecode_args && !zyencode_args)
 		CONTINUE;
 	LIBYOTTADB_DONE;
+	/* If an implicit TP transaction was started by say the "ydb_set_st()" call, then rollback that transaction
+	 * before unwinding to the caller which has no clue about the implicit TP. Not doing so will cause an assert to
+	 * fail in the UNWIND macro which checks "(active_ch + 1)->dollar_tlevel" against the global variable "dollar_tlevel".
+	 */
+	OP_TROLLBACK_IMPLICIT_TP_IF_NEEDED;
 	UNWIND(NULL, NULL); 		/* Return back to ESTABLISH_NORET() in caller */
 }
