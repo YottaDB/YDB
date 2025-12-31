@@ -2,7 +2,7 @@
 
 #################################################################
 #								#
-# Copyright (c) 2020-2023 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2020-2026 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
@@ -69,7 +69,7 @@ set +e
 # Since we're only looking for warnings, we don't actually need to do a full build.
 # Only generate .c and .h files that clang-tidy will need.
 # NOTE: `clang-tidy` will give all the same warnings `clang` would have, so we're not ignoring anything.
-make -j $(nproc) gen_export check_git_repository 2>warnings/make_warnings.txt
+make -j $(nproc) gen_export check_git 2>warnings/make_warnings.txt
 status=$?
 set -e
 cd warnings || exit

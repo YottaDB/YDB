@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.2
 #################################################################
 #                                                               #
-# Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.  #
+# Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.  #
 # All rights reserved.                                          #
 #                                                               #
 #       This source code contains the intellectual property     #
@@ -85,7 +85,6 @@ ADD sr_x86_64 /tmp/yottadb-src/sr_x86_64
 ADD sr_x86_regs /tmp/yottadb-src/sr_x86_regs
 ADD .git /tmp/yottadb-src/.git
 
-ENV GIT_DIR=/tmp/yottadb-src/.git
 RUN mkdir -p /tmp/yottadb-build \
  && cd /tmp/yottadb-build \
  && test -f /tmp/yottadb-src/.yottadb.vsn || \

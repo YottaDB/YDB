@@ -3,7 +3,7 @@
 # Copyright (c) 2012-2023 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
-# Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 # Copyright (c) 2017 Stephen L Johnson. All rights reserved.	#
@@ -454,13 +454,14 @@ if(gen_xfer_desc)
   add_dependencies(libmumps gen_xfer_desc)
 endif()
 
-function(add_executable target)
-  _add_executable(${target} ${ARGN})
+function(ydb_add_executable target)
+  add_executable(${target} ${ARGN})
   if (ENABLE_ASAN)
   	set_target_properties(${target} PROPERTIES LINK_FLAGS "-Wl,-Map=${target}.map -fsanitize=address")
   else()
   	set_target_properties(${target} PROPERTIES LINK_FLAGS "-Wl,-Map=${target}.map")
   endif()
+
   # Since all utilities now dlopen() libyottadb.so at startup, add a dependency to not build the utilities
   # until libyottadb.so was built. And that in turn relies on threadgbl_deftypes being built so add that too.
   add_dependencies(${target} libyottadb gen_gtm_threadgbl_deftypes)
@@ -468,16 +469,16 @@ function(add_executable target)
   target_link_libraries(${target} ${libsyslibs})
 endfunction()
 
-add_executable(yottadb ${yottadb_SOURCES})
+ydb_add_executable(yottadb ${yottadb_SOURCES})
 
-add_executable(dse ${dse_SOURCES})
+ydb_add_executable(dse ${dse_SOURCES})
 list(APPEND with_export dse)
 
-add_executable(gtmsecshr ${gtmsecshr_SOURCES})
+ydb_add_executable(gtmsecshr ${gtmsecshr_SOURCES})
 target_link_libraries(gtmsecshr libmumps) # needed for static linking since this is a setuid executable
                                           # and does not do a dlopen of libyottadb.so
 
-add_executable(gtmsecshr_real ${gtmsecshr_real_SOURCES})
+ydb_add_executable(gtmsecshr_real ${gtmsecshr_real_SOURCES})
 set_target_properties(gtmsecshr_real PROPERTIES
   OUTPUT_NAME gtmsecshr
   RUNTIME_OUTPUT_DIRECTORY ${YDB_BINARY_DIR}/gtmsecshrdir
@@ -485,24 +486,24 @@ set_target_properties(gtmsecshr_real PROPERTIES
 target_link_libraries(gtmsecshr_real libmumps) # needed for static linking since this is a setuid executable
                                                # and does not do a dlopen of libyottadb.so
 
-add_executable(mupip ${mupip_SOURCES})
+ydb_add_executable(mupip ${mupip_SOURCES})
 list(APPEND with_export mupip)
 
-add_executable(lke ${lke_SOURCES})
+ydb_add_executable(lke ${lke_SOURCES})
 list(APPEND with_export lke)
 
-add_executable(gtcm_server ${gtcm_server_SOURCES})
+ydb_add_executable(gtcm_server ${gtcm_server_SOURCES})
 list(APPEND with_export gtcm_server)
 
-add_executable(gtcm_gnp_server ${gtcm_gnp_server_SOURCES})
+ydb_add_executable(gtcm_gnp_server ${gtcm_gnp_server_SOURCES})
 list(APPEND with_export gtcm_gnp_server)
 
-add_executable(gtcm_play ${gtcm_play_SOURCES})
+ydb_add_executable(gtcm_play ${gtcm_play_SOURCES})
 list(APPEND with_export gtcm_play)
 
-add_executable(gtcm_pkdisp ${gtcm_pkdisp_SOURCES})
+ydb_add_executable(gtcm_pkdisp ${gtcm_pkdisp_SOURCES})
 
-add_executable(gtcm_shmclean ${gtcm_shmclean_SOURCES})
+ydb_add_executable(gtcm_shmclean ${gtcm_shmclean_SOURCES})
 
 add_library(libyottadb MODULE ${libyottadb_SOURCES})
 set_property(TARGET libyottadb PROPERTY OUTPUT_NAME yottadb)
@@ -940,5 +941,5 @@ set(PRE_CONFIGURE_FILE "${PROJECT_SOURCE_DIR}/sr_linux/release_commit.h.in")
 set(POST_CONFIGURE_FILE "${PROJECT_BINARY_DIR}/release_commit.h")
 include(${PROJECT_SOURCE_DIR}/cmake/git-watcher.cmake)
 set_property(DIRECTORY PROPERTY ADDITIONAL_MAKE_CLEAN_FILES "${PROJECT_BINARY_DIR}/git-state")
-add_dependencies(libmumps check_git_repository)
-add_dependencies(libyottadb check_git_repository)
+add_dependencies(libmumps check_git)
+add_dependencies(libyottadb check_git)
