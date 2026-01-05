@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #################################################################
 #								#
-# Copyright (c) 2020-2025 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2020-2026 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
@@ -225,7 +225,7 @@ if [ -n "$commit_list" ]; then
 			num_copyright_additions=$(git diff upstream_repo/$target_branch..HEAD "$file" | sed -n '/^@@ /,$p' | grep --no-group-separator -C 3 'Copyright (c)' | grep -c -e '^+' || true)
 			num_copyright_deletions=$(git diff upstream_repo/$target_branch..HEAD "$file" | sed -n '/^@@ /,$p' |  grep --no-group-separator -C 3 'Copyright (c)' | grep -c -e '^-' || true)
 			if [[ (( $deletions == $num_copyright_deletions )) && (( $additions == $num_copyright_additions )) ]]; then
-				if [[ "ci/commit_verify.sh" != $file ]]; then
+				if [[ (( "ci/commit_verify.sh" != $file )) && (( "sr_port/copyright.txt" != $file )) ]]; then
 					# Avoid copyright-only check on this framework script
 					copyright_only="$copyright_only $file"
 				fi
