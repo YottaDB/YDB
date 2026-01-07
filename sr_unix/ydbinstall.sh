@@ -3,7 +3,7 @@
 # Copyright (c) 2014-2021 Fidelity National Information         #
 # Services, Inc. and/or its subsidiaries. All rights reserved.  #
 #								#
-# Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 # Copyright (c) 2018 Stephen L Johnson.				#
@@ -749,7 +749,7 @@ if [ "Y" = "$ydb_plugins_only" ] ; then
 	if [ -z "$ydb_compiler" ] ; then
 		ydb_compiler=$($ydb_dist/yottadb -version | awk '/^Compiler:/ {print tolower($2)}')
 		if [ -z "$ydb_compiler" ] ; then
-			if [ `readelf -p .comment $ydb_dist/libyottadb.so | grep -wi clang` ] ; then
+			if readelf -p .comment $ydb_dist/libyottadb.so | grep -wiq clang ; then
 				 ydb_compiler=clang
 			else ydb_compiler=gcc
 			fi
@@ -790,7 +790,7 @@ else
 	# default. Also see comment above on compiler selection.
 	if [ -z "$ydb_compiler" ] ; then
 		if [ -e libyottadb.so ] ; then
-			if [ `readelf -p .comment libyottadb.so | grep -wi clang` ] ; then
+			if readelf -p .comment libyottadb.so | grep -wiq clang ; then
 				 ydb_compiler=clang
 			else ydb_compiler=gcc
 			fi
@@ -1516,7 +1516,7 @@ if [ -z "$ydb_installdir" ] ; then
 fi
 # if install directory is relative then need to make it absolute before passing it to configure
 # (or else configure will create a subdirectory under $tmpdir (/tmp/.*) and install YottaDB there which is not what we want)
-if [ `echo $ydb_installdir | grep -c '^/'` -eq 0 ] ; then
+if ! echo $ydb_installdir | grep -q '^/' ; then
 	ydb_installdir=`pwd`/$ydb_installdir
 fi
 if [ -d "$ydb_installdir" ] && [ "Y" != "$gtm_overwrite_existing" ] ; then
