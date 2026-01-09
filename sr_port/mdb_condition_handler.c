@@ -126,6 +126,7 @@ GBLREF	tp_region		*tp_reg_list;		/* Chained list of regions in this transaction 
 GBLREF	uint4			ydbDebugLevel;		/* Debug level */
 GBLREF	uint4			process_id;
 GBLREF	unsigned char		*msp, *restart_ctxt, *restart_pc, *stacktop, *stackwarn, *tp_sp, *tpstacktop, *tpstackwarn;
+GBLREF	char			**zro_char_buff;
 GBLREF	unsigned short		proc_act_type;
 GBLREF	volatile bool		neterr_pending, std_dev_outbnd;
 GBLREF	volatile boolean_t	dollar_zininterrupt;
@@ -276,6 +277,11 @@ CONDITION_HANDLER(mdb_condition_handler)
 		CLEAR_ALIAS_RETARG;
 	bool_zysqlnull_finish_error_if_needed();	/* Clean up any in-progress boolean expression evaluation */
 	duplicatenew_cleanup();
+	if (NULL != zro_char_buff)
+	{	/* Clean up memory allocated for in-progress zro_load (sr_unix/zro_load.c). */
+		free(*zro_char_buff);
+		zro_char_buff = NULL;
+	}
 	if ((int)ERR_UNSOLCNTERR == SIGNAL)
 	{
 		/* This is here for linking purposes.  We want to delay the receipt of

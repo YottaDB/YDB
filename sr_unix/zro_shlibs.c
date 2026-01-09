@@ -3,7 +3,7 @@
  * Copyright (c) 2011-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -30,8 +30,11 @@ error_def(ERR_TEXT);
 
 /* Routine to lookup given shlib_name to see if we already have it open. If yes, just
  * return its handle. Else, dlopen the shared library and return its handle.
+ * @param fail_type message severity of the errors reported if any
+ * 	ERROR will exit with an error if error encountered
+ * 	SUCCESS will not exit if error encountered
  */
-void *zro_shlibs_find(char *shlib_name)
+void *zro_shlibs_find(char *shlib_name, int fail_type)
 {
 	open_shlib	*oshlb;
 	void		*handle;
@@ -49,7 +52,12 @@ void *zro_shlibs_find(char *shlib_name)
 		}
 	}
 	/* Library was not found. Open it and create a new entry */
-	handle = fgn_getpak(shlib_name, ERROR);
+	handle = fgn_getpak(shlib_name, fail_type);
+	if (NULL == handle)
+	{	/* If fail_type != SUCCESS, and handle==NULL, should have caused an error. */
+		assert(SUCCESS == fail_type);
+		return handle;
+	}
 	oshlb = malloc(SIZEOF(open_shlib));
 	oshlb->shlib_handle = handle;
 	strcpy(oshlb->shlib_name, shlib_name);

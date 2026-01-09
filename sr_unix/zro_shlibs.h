@@ -3,6 +3,9 @@
  * Copyright (c) 2011-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2026 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -21,7 +24,7 @@ typedef struct open_shlib_struct
 } open_shlib;
 
 
-void *zro_shlibs_find(char *shlib_name);
+void *zro_shlibs_find(char *shlib_name, int fail_type);
 void zro_shlibs_unlink_all(void);
 
 #endif
