@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -159,7 +159,8 @@ MBSTART	{													\
  * denotes a simpleAPI routine is active and no other simpleAPI routine can be started - i.e. calls cannot be
  * nested with the exception of ydb_tp_s() which clears this indicator just before it engages the call-back
  * routine which has a high probability of calling more simpleAPI routines, and ydb_encode_s()/ydb_decode_s(),
- * which rely upon ydb_data_s(), ydb_get_s(), ydb_node_next_s(), and ydb_set_s() to do some of their work.
+ * which rely upon ydb_data_s(), ydb_get_s(), ydb_subscript_next_s(), ydb_node_next_s(), and ydb_set_s() to do
+ * some of their work.
  *
  * We need two flavors - one for use in routines with a return value and one without.
  */

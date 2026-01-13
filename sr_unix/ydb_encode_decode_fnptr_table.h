@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2025-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -21,6 +21,7 @@ YDB_ENCODE_DECODE_FNPTR (yed_get_string_value,	"json_string_value")
 YDB_ENCODE_DECODE_FNPTR (yed_get_int_value,	"json_integer_value")
 YDB_ENCODE_DECODE_FNPTR (yed_get_real_value,	"json_real_value")
 YDB_ENCODE_DECODE_FNPTR (yed_new_object,	"json_object")
+YDB_ENCODE_DECODE_FNPTR (yed_new_array,		"json_array")
 YDB_ENCODE_DECODE_FNPTR (yed_output_json,	"json_dumpb")
 YDB_ENCODE_DECODE_FNPTR (yed_dump_json,		"json_dumps")
 YDB_ENCODE_DECODE_FNPTR (yed_new_string,	"json_stringn")
@@ -30,4 +31,5 @@ YDB_ENCODE_DECODE_FNPTR (yed_new_false,		"json_false")
 YDB_ENCODE_DECODE_FNPTR (yed_new_true,		"json_true")
 YDB_ENCODE_DECODE_FNPTR (yed_new_null,		"json_null")
 YDB_ENCODE_DECODE_FNPTR (yed_set_object,	"json_object_set_new")
+YDB_ENCODE_DECODE_FNPTR (yed_set_array,		"json_array_append_new")
 YDB_ENCODE_DECODE_FNPTR (yed_object_delete,	"json_delete")

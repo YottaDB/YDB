@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2019-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -26,17 +26,29 @@ GBLREF	int			zydecode_args;
 GBLREF	zydecode_glvn_ptr	dglvnp;
 
 /* Jansson function pointers */
-GBLDEF	json_t		*(*yed_decode_json)(const char *, size_t, json_error_t *), *(*yed_obj_next_value)(void *),
-			*(*yed_get_value)(const json_t *, size_t), *(*yed_new_object)(void),
-			*(*yed_new_string)(const char *, size_t), *(*yed_new_integer)(long long), *(*yed_new_real)(double),
-			*(*yed_new_false)(void), *(*yed_new_true)(void), *(*yed_new_null)(void);
-GBLDEF	void		*(*yed_get_obj_iter)(json_t *), *(*yed_obj_iter_next)(json_t *, void *), (*yed_object_delete)(json_t *);
-GBLDEF	const char	*(*yed_obj_next_key)(void *), *(*yed_get_string_value)(const json_t *);
-GBLDEF	size_t		(*yed_get_size)(const json_t *), (*yed_output_json)(const json_t *, char *, size_t, size_t);
+GBLDEF	json_t		*(*yed_decode_json)(const char *, size_t, json_error_t *),
+			*(*yed_obj_next_value)(void *),
+			*(*yed_get_value)(const json_t *, size_t),
+			*(*yed_new_object)(void),
+			*(*yed_new_array)(void),
+			*(*yed_new_string)(const char *, size_t),
+			*(*yed_new_integer)(long long),
+			*(*yed_new_real)(double),
+			*(*yed_new_true)(void),
+			*(*yed_new_false)(void),
+			*(*yed_new_null)(void);
+GBLDEF	void		*(*yed_get_obj_iter)(json_t *),
+			*(*yed_obj_iter_next)(json_t *, void *),
+			(*yed_object_delete)(json_t *);
+GBLDEF	const char	*(*yed_obj_next_key)(void *),
+			*(*yed_get_string_value)(const json_t *);
+GBLDEF	size_t		(*yed_get_size)(const json_t *),
+			(*yed_output_json)(const json_t *, char *, size_t, size_t);
 GBLDEF	char		*(*yed_dump_json)(const json_t *, size_t);
 GBLDEF	long long	(*yed_get_int_value)(const json_t *);
 GBLDEF	double		(*yed_get_real_value)(const json_t *);
-GBLDEF	int		(*yed_set_object)(json_t *, const char *, json_t *);
+GBLDEF	int		(*yed_set_object)(json_t *, const char *, json_t *),
+			(*yed_set_array)(json_t *, json_t *);
 
 STATICDEF	ydb_var_types	decode_type;
 
@@ -55,7 +67,7 @@ int ydb_decode_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t 
 	boolean_t	error_encountered;
 	json_t		*jansson_object = NULL;
 	json_error_t	jansson_error;
-	int		decode_svn_index, json_type, i, string_size, status;
+	int		decode_svn_index, json_type, i, key_size, status;
 	char		*curpool = NULL;
 	DCL_THREADGBL_ACCESS;
 
@@ -74,7 +86,7 @@ int ydb_decode_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t 
 	if (error_encountered)
 	{
 		system_free(curpool);
-		YED_OBJECT_DELETE(jansson_object);
+		yed_object_decref(jansson_object);
 		yed_lydb_rtn = FALSE;
 		REVERT;
 		return ((ERR_TPRETRY == SIGNAL) ? YDB_TP_RESTART : -(TREF(ydb_error_code)));
@@ -106,16 +118,16 @@ int ydb_decode_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t 
 			LEN_AND_STR(jansson_error.text), LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_DECODE)));
 	if (LYDB_VARREF_GLOBAL == decode_type)
 		if (zydecode_args)	/* zydecode_args is > 0 if called by op_zydecode() */
-			string_size = dglvnp->gblp[0]->s_gv_cur_region->max_key_size;
+			key_size = dglvnp->gblp[0]->s_gv_cur_region->max_key_size;
 		else
-			string_size = MAX_KEY_SZ;
+			key_size = MAX_KEY_SZ;
 	else
-		string_size = YDB_MAX_STR;
-	curpool = system_malloc(YDB_MAX_SUBS * string_size);
+		key_size = YDB_MAX_STR;
+	curpool = system_malloc(YDB_MAX_SUBS * key_size);
 	for (i = 0; YDB_MAX_SUBS > i; i++)
 	{
-		cur_subsarray[i].len_alloc = string_size;
-		cur_subsarray[i].buf_addr = &curpool[string_size * i];
+		cur_subsarray[i].len_alloc = key_size;
+		cur_subsarray[i].buf_addr = &curpool[key_size * i];
 		if (i < subs_used)
 		{
 			cur_subsarray[i].len_used = subsarray[i].len_used;
@@ -133,7 +145,7 @@ int ydb_decode_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t 
 			LEN_AND_LIT("Invalid JSON"), LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_DECODE)));
 	}
 	system_free(curpool);
-	YED_OBJECT_DELETE(jansson_object);
+	yed_object_decref(jansson_object);
 	yed_lydb_rtn = FALSE;
 	LIBYOTTADB_DONE;
 	REVERT;
@@ -210,17 +222,13 @@ int yed_decode_object(const ydb_buffer_t *varname, int subs_used, ydb_buffer_t *
 
 int yed_decode_array(const ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, json_t *jansson_object)
 {
-	json_t		*value;
-	int		cur_subs_used, status;
-	size_t		array_size;
+	json_t	*value;
+	int	cur_subs_used, status;
+	size_t	array_size;
 
-	array_size = yed_get_size(jansson_object);
-	if (YDB_MAX_SUBS < array_size)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,
-			LEN_AND_LIT("Length of at least 1 array is > YDB_MAX_SUBS in JSON input"),
-			LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_DECODE)));
 	if (YDB_MAX_SUBS == subs_used)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXNRSUBSCRIPTS);
+	array_size = yed_get_size(jansson_object);
 	for (int i = 0; i < array_size; i++)
 	{
 		cur_subs_used = subs_used;
@@ -269,16 +277,16 @@ int yed_decode_string(const ydb_buffer_t *varname, int subs_used, ydb_buffer_t *
 	const char	*value;
 	ydb_buffer_t	value_buffer = {0};
 	char		done;
-	int		status, string_size;
+	int		status, record_size;
 
 	value = yed_get_string_value(jansson_object);
 	assert(NULL != value);	/* This function should only be called if jansson_object was previously confirmed to be a string */
 	value_buffer.len_used = value_buffer.len_alloc = strlen(value);
 	if ((LYDB_VARREF_GLOBAL == decode_type) && zydecode_args)	/* zydecode_args is > 0 if called by op_zydecode() */
-		string_size = dglvnp->gblp[0]->s_gv_cur_region->max_rec_size;
+		record_size = dglvnp->gblp[0]->s_gv_cur_region->max_rec_size;
 	else
-		string_size = YDB_MAX_STR;
-	if (string_size < value_buffer.len_alloc++)	/* add 1 post-conditionally for the NUL */
+		record_size = YDB_MAX_STR;
+	if (record_size < value_buffer.len_alloc++)	/* add 1 post-conditionally for the NUL */
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,
 			LEN_AND_LIT("Size for string value is > max string size in JSON input"),
 			LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_DECODE)));
@@ -308,7 +316,7 @@ int yed_decode_real(const ydb_buffer_t *varname, int subs_used, ydb_buffer_t *su
 	value = yed_get_real_value(jansson_object);
 	value_buffer.len_alloc = YED_REAL_MAX_LEN;	/* Jansson uses double to store reals with a default precision of 17 */
 	value_buffer.buf_addr = (char *)&buffer[0];
-	value_buffer.len_used = snprintf(value_buffer.buf_addr, value_buffer.len_alloc, "%g", value);
+	value_buffer.len_used = snprintf(value_buffer.buf_addr, value_buffer.len_alloc, "%g", value);	/* precision of 6 */
 	return ydb_set_s(varname, subs_used, subsarray, &value_buffer);
 }
 
@@ -351,6 +359,22 @@ int yed_decode_bool(const ydb_buffer_t *varname, int subs_used, ydb_buffer_t *su
 			break;
 	}
 	return ydb_set_s(varname, subs_used, subsarray, &value_buffer);
+}
+
+ /*
+ * This function code is from json_decref() in jansson.h. We can't call it directly, because it is a static inline
+ * function defined in jansson.h, and it calls the json_delete() symbol, which is a regular visible symbol defined
+ * in the library. Since we only load the Jansson library when ydb_encode_s() or ydb_decode_s() are invoked, it is
+ * loaded at run-time, using the dlsym(3) API. Thus it requires use of function pointers to call through to the
+ * symbols that are lazily loaded. The json_delete() function is pointed to by the yed_object_delete() pointer, so
+ * when json_decref() calls json_delete(), it is undefined, and we cannot redefine symbols. So instead we duplicate
+ * the code from json_decref() in jansson.h here as yed_object_decref(), which hasn't changed in a long time.
+ */
+void yed_object_decref(json_t *json)
+{
+	if (json && json->refcount != (size_t)-1 && JSON_INTERNAL_DECREF(json) == 0)
+		yed_object_delete(json);
+	return;
 }
 
 /* Load the Jansson library */

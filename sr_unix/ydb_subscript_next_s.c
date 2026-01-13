@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -31,6 +31,7 @@
 #include "deferred_events_queue.h"
 
 GBLREF	volatile int4	outofband;
+GBLREF	boolean_t	yed_lydb_rtn;
 
 LITREF	mval	literal_null;
 
@@ -59,12 +60,18 @@ int ydb_subscript_next_s(const ydb_buffer_t *varname, int subs_used, const ydb_b
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	VERIFY_NON_THREADED_API;	/* clears a global variable "caller_func_is_stapi" set by SimpleThreadAPI caller
-					 * so needs to be first invocation after SETUP_THREADGBL_ACCESS to avoid any error
-					 * scenarios from not resetting this global variable even though this function returns.
-					 */
-	/* Verify entry conditions, make sure YDB CI environment is up etc. */
-	LIBYOTTADB_INIT(LYDB_RTN_SUBSCRIPT_NEXT, (int));/* Note: macro could "return" from this function in case of errors */
+	if (!yed_lydb_rtn)	/* yed_lydb_rtn is TRUE if called by ydb_encode_s() */
+	{
+		VERIFY_NON_THREADED_API;	/* clears a global variable "caller_func_is_stapi" set by SimpleThreadAPI caller
+						 * so needs to be first invocation after SETUP_THREADGBL_ACCESS to avoid any error
+						 * scenarios from not resetting this global variable even though this function
+						 * returns.
+						 */
+		/* Verify entry conditions, make sure YDB CI environment is up etc. */
+		LIBYOTTADB_INIT(LYDB_RTN_SUBSCRIPT_NEXT, (int));	/* Note: macro could "return" from this function in case
+									 * of errors
+									 */
+	}
 	assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* previously unused entries should have been cleared by that
 							 * corresponding ydb_*_s() call.
 							 */
@@ -171,7 +178,8 @@ int ydb_subscript_next_s(const ydb_buffer_t *varname, int subs_used, const ydb_b
 	} else
 		status = YDB_ERR_NODEEND; /* About to return the empty string. Signal end of list. Leave "ret_value" untouched */
 	assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* the counter should have never become non-zero in this function */
-	LIBYOTTADB_DONE;
+	if (!yed_lydb_rtn)	/* yed_lydb_rtn is TRUE if called by ydb_encode_s() */
+		LIBYOTTADB_DONE;
 	REVERT;
 	return status;
 }
