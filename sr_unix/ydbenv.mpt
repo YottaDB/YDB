@@ -783,6 +783,10 @@ mkdir:(dir,umask)
 	new $test,mask
 	set umask=$get(umask),mask=$select($zlength(umask):"umask "_umask_";",1:"")
 	do:'$zlength($zsearch(dir,-1))
+	. ; If "dir" is a relative path, make it an absolute path as it is used in the "U237" error message
+	. ; and having an absolute path will be more helpful to the user than a relative path.
+	. set:$zextract(dir,1)'="/" dir=$zsearch(".",-1)_"/"_dir
+	. ;
 	. open "create":(shell="/bin/sh":command=mask_"mkdir -p "_dir:writeonly:readonly:stderr="stderr")::"pipe"
 	. use "create"
 	. close "create"
