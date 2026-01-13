@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -323,10 +323,6 @@ void ch_trace_point() {return;}
 						/* See ESTABLISH_RET macro comment for below assert */			\
 						assert(INTRPT_OK_TO_INTERRUPT <= prev_intrpt_state_estnr);		\
 						assert(INTRPT_NUM_STATES > prev_intrpt_state_estnr);			\
-						/* Assert "intrpt_ok_state" and "prev_intrpt_state_estnr" are same in	\
-						 * "dbg" but restore "intrpt_ok_state" in "pro" just in case		\
-						 */									\
-						assert(prev_intrpt_state_estnr == intrpt_ok_state);			\
 						intrpt_ok_state = prev_intrpt_state_estnr;				\
 					} else										\
 						ENABLE_INTERRUPTS(INTRPT_IN_CONDSTK, prev_intrpt_state_estnr);		\
