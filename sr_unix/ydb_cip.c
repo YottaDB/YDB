@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -16,6 +16,7 @@
 
 #include "libyottadb_int.h"
 #include "gtmci.h"
+#include "error_trap.h"
 
 /* Fast path YottaDB wrapper to do a call-in.
  * Adds a struct parm that contains name resolution info after first call to speed up dispatching.
@@ -40,8 +41,13 @@ int ydb_cip(ci_name_descriptor* ci_info, ...)
 	 * ESTABLISH_RET of ydb_simpleapi_ch here like is done for other SimpleAPI function calls.
 	 */
 	VAR_START(var, ci_info);
+	/* We want to start and end ydb_cip in a clean, non-error state.
+	 * To get that, we clear dollar_ecode BEFORE and AFTER the ydb_ci_exec() function call.
+	 */
+	NULLIFY_DOLLAR_ECODE;
 	/* Note: "va_end(var)" done inside "ydb_ci_exec" */
 	retval = ydb_ci_exec(ci_info->rtn_name.address, ci_info, var, FALSE);
+	NULLIFY_DOLLAR_ECODE;
 	CONVERT_YDB_CI_EXEC_TO_SIMPLEAPI_RETVAL(retval);
 	return retval;
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -17,6 +17,7 @@
 #include "gtmxc_types.h"
 #include "libyottadb_int.h"
 #include "gtmci.h"
+#include "error_trap.h"
 
 #undef gtm_ci		/* Undo the transformation of gtm_ci -> ydb_ci created by gtmxc_types.h */
 
@@ -42,7 +43,12 @@ int gtm_ci(const char *c_rtn_name, ...)
 	 * ESTABLISH_RET of ydb_simpleapi_ch here like is done for other SimpleAPI function calls.
 	 */
 	VAR_START(var, c_rtn_name);
+	/* We want to start and end gtm_ci in a clean, non-error state.
+	 * To get that, we clear dollar_ecode BEFORE and AFTER the ydb_ci_exec() function call.
+	 */
+	NULLIFY_DOLLAR_ECODE;
 	/* Note: "va_end(var)" done inside "ydb_ci_exec" */
 	retval = ydb_ci_exec(c_rtn_name, NULL, var, FALSE);
+	NULLIFY_DOLLAR_ECODE;
 	return retval;
 }
