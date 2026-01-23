@@ -10,7 +10,7 @@
  *								*
  ****************************************************************/
 
-YDB_ENCODE_DECODE_FNPTR (yed_decode_json,	"json_loads")
+YDB_ENCODE_DECODE_FNPTR (yed_decode_json,	"json_loadb")
 YDB_ENCODE_DECODE_FNPTR (yed_obj_iter_next,	"json_object_iter_next")
 YDB_ENCODE_DECODE_FNPTR (yed_obj_next_key,	"json_object_iter_key")
 YDB_ENCODE_DECODE_FNPTR (yed_obj_next_value,	"json_object_iter_value")

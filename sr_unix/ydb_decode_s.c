@@ -26,7 +26,7 @@ GBLREF	int			zydecode_args;
 GBLREF	zydecode_glvn_ptr	dglvnp;
 
 /* Jansson function pointers */
-GBLDEF	json_t		*(*yed_decode_json)(const char *, size_t, json_error_t *),
+GBLDEF	json_t		*(*yed_decode_json)(const char *, size_t, size_t, json_error_t *),
 			*(*yed_obj_next_value)(void *),
 			*(*yed_get_value)(const json_t *, size_t),
 			*(*yed_new_object)(void),
@@ -61,7 +61,8 @@ STATICDEF	ydb_var_types	decode_type;
  *   format	- Format of string to be decoded (currently always "JSON" and ignored - for future use)
  *   value	- Value to be decoded and set into local/global
  */
-int ydb_decode_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *subsarray, const char *format, const char *value)
+int ydb_decode_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *subsarray,
+			const char *format, const ydb_buffer_t *value)
 {
 	ydb_buffer_t	cur_subsarray[YDB_MAX_SUBS] = {0};
 	boolean_t	error_encountered;
@@ -98,6 +99,12 @@ int ydb_decode_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t 
 	/* Do some validation */
 	VALIDATE_VARNAME(varname, subs_used, FALSE, LYDB_RTN_DECODE, -1, decode_type, decode_svn_index);
 	if (NULL == value)
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,
+			LEN_AND_LIT("NULL value"), LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_DECODE)));
+	if ((NULL == value->buf_addr) && ((0 < value->len_alloc) || (0 < value->len_used)))
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,
+			LEN_AND_LIT("NULL value->buf_addr"), LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_DECODE)));
+	if ((NULL == value->buf_addr) || (0 == value->len_used))
 		return YDB_OK;
 	for (i = 0; i < subs_used; i++)
 	{
@@ -112,7 +119,7 @@ int ydb_decode_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t 
 	}
 	if (!yed_dl_complete)
 		yed_dl_load((char *)LYDBRTNNAME(LYDB_RTN_DECODE));
-	jansson_object = yed_decode_json(value, 0, &jansson_error);
+	jansson_object = yed_decode_json(value->buf_addr, value->len_used, 0, &jansson_error);
 	if (NULL == jansson_object)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_JANSSONINVALIDJSON, 4,
 			LEN_AND_STR(jansson_error.text), LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_DECODE)));
