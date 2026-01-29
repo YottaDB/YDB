@@ -405,11 +405,11 @@ int	ydb_timer_start_t(uint64_t tptoken, ydb_buffer_t *errstr, intptr_t timer_id,
 /* Simple API routine declarations */
 int	ydb_data_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *subsarray, unsigned int *ret_value);
 int	ydb_decode_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *subsarray, const char *format,
-			const ydb_buffer_t *value);
+			const ydb_string_t *value);
 int	ydb_delete_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *subsarray, int deltype);
 int	ydb_delete_excl_s(int namecount, const ydb_buffer_t *varnames);
 int	ydb_encode_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *subsarray, const char *format,
-			ydb_buffer_t *ret_value);
+			ydb_string_t *ret_value);
 int	ydb_get_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *subsarray, ydb_buffer_t *ret_value);
 int	ydb_incr_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *subsarray, const ydb_buffer_t *increment,
 			ydb_buffer_t *ret_value);
@@ -434,12 +434,12 @@ int	ydb_zwr2str_s(const ydb_buffer_t *zwr, ydb_buffer_t *str);
 int	ydb_data_st(uint64_t tptoken, ydb_buffer_t *errstr, const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *subsarray,
 			unsigned int *ret_value);
 int	ydb_decode_st(uint64_t tptoken, ydb_buffer_t *errstr, const ydb_buffer_t *varname, int subs_used,
-			const ydb_buffer_t *subsarray, const char *format, const ydb_buffer_t *value);
+			const ydb_buffer_t *subsarray, const char *format, const ydb_string_t *value);
 int	ydb_delete_st(uint64_t tptoken, ydb_buffer_t *errstr, const ydb_buffer_t *varname, int subs_used,
 			const ydb_buffer_t *subsarray, int deltype);
 int	ydb_delete_excl_st(uint64_t tptoken, ydb_buffer_t *errstr, int namecount, const ydb_buffer_t *varnames);
 int	ydb_encode_st(uint64_t tptoken, ydb_buffer_t *errstr, const ydb_buffer_t *varname, int subs_used,
-			const ydb_buffer_t *subsarray, const char *format, ydb_buffer_t *ret_value);
+			const ydb_buffer_t *subsarray, const char *format, ydb_string_t *ret_value);
 int	ydb_get_st(uint64_t tptoken, ydb_buffer_t *errstr, const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *subsarray,
 			ydb_buffer_t *ret_value);
 int	ydb_incr_st(uint64_t tptoken, ydb_buffer_t *errstr, const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *subsarray,

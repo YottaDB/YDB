@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2025-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -72,8 +72,7 @@
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERRCODE, 0, -STATUS, 2, LEN_AND_STR(zs1));			\
 			break;													\
 		case YDB_ERR_INVSTRLEN:												\
-		case YDB_ERR_JANSSONINVSTRLEN:											\
-			/* NOTE: This might need to change if the ERR_*INVSTRLEN format changes */				\
+			/* NOTE: This might need to change if the ERR_INVSTRLEN format changes */				\
 			/* we need to get at the dynamic data represented by !UL to stack the errors correctly */		\
 			zs1 = strstr(zstatus, "length ");									\
 			if (NULL == zs1)											\

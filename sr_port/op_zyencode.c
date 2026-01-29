@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2025-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -49,7 +49,7 @@ GBLREF gv_namehead		*gv_target;
 GBLREF int			zyencode_args;
 GBLREF zyencode_glvn_ptr	eglvnp;
 GBLREF mv_stent			*mv_chain;
-GBLREF ydb_buffer_t		zyencode_ret;
+GBLREF ydb_string_t		zyencode_ret;
 GBLREF volatile int4		outofband;
 #ifdef DEBUG
 GBLREF lv_val			*active_lv;
@@ -60,7 +60,7 @@ void op_zyencode(void)
 	boolean_t		is_base_var;
 	gvname_info		*gblp1, *gblp2;
 	int			key_end, dollardata_src, status, cnt_fmt = 0, cnt = 0, cnt_save, size = MAX_ZWR_KEY_SZ, rec_size;
-	unsigned int		len_used;
+	unsigned long		length;
 	unsigned long long	len;
 	lv_val			*dst_lv, *lv, *base_lv, *orig_lv, *src_lv;
 	lvTree			*lvt;
@@ -69,7 +69,7 @@ void op_zyencode(void)
 	mval			*value, *subsc, tmp_mval, temp_mv;
 				/* Add 1 to name_buff for the '^' for globals */
 	unsigned char		buff[MAX_ZWR_KEY_SZ], gv_buff[YDB_MAX_IDENT + 1], *ptr, *ptr2, *ptr_top, *end_buff;
-	char			*format = "JSON", *buf_addr;
+	char			*format = "JSON", *address;
 	ydb_buffer_t		variable, subscripts[YDB_MAX_SUBS];
 #	ifdef DEBUG
 	lv_val			*orig_active_lv;
@@ -140,9 +140,6 @@ void op_zyencode(void)
 				async_action(FALSE);
 			if (YDB_OK != status)
 			{
-				system_free(zyencode_ret.buf_addr);	/* Created by Jansson in ydb_encode_s() */
-				zyencode_ret.buf_addr = NULL;
-				zyencode_ret.len_alloc = zyencode_ret.len_used = 0;
 				for (int i = 0; i < cnt_save; i++)
 					YDB_FREE_BUFFER(&subscripts[i]);
 				POP_MV_STENT();	/* value */
@@ -150,33 +147,36 @@ void op_zyencode(void)
 				ENCODE_DECODE_NESTED_RTS_ERROR(status, ERR_ZYENCODEINCOMPL);
 			}
 			key_end = gv_currkey->end;
-			buf_addr = zyencode_ret.buf_addr;
-			len_used = zyencode_ret.len_used;
+			address = zyencode_ret.address;
+			length = zyencode_ret.length;
 			rec_size = gblp1->s_gv_cur_region->max_rec_size;
 			cnt = 1;
-			for (long long remain = len_used; 0 < remain; remain -= value->str.len, cnt++)
+			for (unsigned long remain = length; 0 != remain; remain -= value->str.len, cnt++)
 			{
 				tmp_mval.mvtype = MV_STR;
 				tmp_mval.str.addr = (char *)buff;
 				tmp_mval.str.len = SNPRINTF(tmp_mval.str.addr, MAX_NUM_SIZE, "%d", cnt);
 				mval2subsc(&tmp_mval, gv_currkey, gv_cur_region->std_null_coll);
 				value->mvtype = MV_STR;
-				value->str.len = (rec_size < len_used) ? rec_size : len_used;
-				value->str.addr = buf_addr;
+				value->str.len = (rec_size < length) ? rec_size : length;
+				value->str.addr = address;
 				op_gvput(value);
 				gv_currkey->end = key_end;
-				len_used -= value->str.len;
-				buf_addr += value->str.len;
+				length -= value->str.len;
+				address += value->str.len;
 			}
 			gv_currkey->base[key_end] = KEY_DELIMITER;
 			value->str.addr = (char *)buff;
 			value->str.len = SNPRINTF(value->str.addr, MAX_NUM_SIZE, "%d", --cnt);
 			op_gvput(value);
 			gvname_env_restore(gblp1);	/* naked indicator is restored into gv_currkey */
-			/* zyencode_ret.buf_addr was returned by Jansson in ydb_encode_s(), which used the system malloc() */
-			system_free(zyencode_ret.buf_addr);	/* free after we store the chunk number in op_gvput */
-			zyencode_ret.buf_addr = NULL;
-			zyencode_ret.len_alloc = zyencode_ret.len_used = 0;
+			/* zyencode_ret.address was returned by Jansson in ydb_encode_s(), which used the system malloc() */
+			system_free(zyencode_ret.address);	/* free after we store the chunk number in op_gvput */
+			zyencode_ret.address = NULL;	/* Need to set NULL because this handler can be called deep in the stack,
+							 * and there  is no other way to ensure no double free() can happen,
+							 * other than always setting it NULL after it is free()'d.
+							 */
+			zyencode_ret.length = 0;
 			for (int i = 0; i < cnt_save; i++)
 				YDB_FREE_BUFFER(&subscripts[i]);
 		} else
@@ -219,9 +219,6 @@ void op_zyencode(void)
 				async_action(FALSE);
 			if (YDB_OK != status)
 			{
-				system_free(zyencode_ret.buf_addr);	/* Created by Jansson in ydb_encode_s() */
-				zyencode_ret.buf_addr = NULL;
-				zyencode_ret.len_alloc = zyencode_ret.len_used = 0;
 				for (int i = 0; i < cnt_save; i++)
 					YDB_FREE_BUFFER(&subscripts[i]);
 				UNDO_ACTIVE_LV(actlv_op_zyencode2); /* kill "dst" and parents as applicable if $data(dst)=0 */
@@ -235,10 +232,10 @@ void op_zyencode(void)
 			orig_lv = dst_lv;
 			is_base_var = LV_IS_BASE_VAR(dst_lv);
 			base_lv = !is_base_var ? LV_GET_BASE_VAR(dst_lv) : dst_lv;
-			buf_addr = zyencode_ret.buf_addr;
-			len_used = zyencode_ret.len_used;
+			address = zyencode_ret.address;
+			length = zyencode_ret.length;
 			cnt = 1;
-			for (long long remain = len_used; 0 < remain; remain -= value->str.len, cnt++)
+			for (unsigned long remain = length; 0 != remain; remain -= value->str.len, cnt++)
 			{
 				subsc->mvtype = MV_STR;
 				subsc->str.addr = (char *)buff;
@@ -246,17 +243,20 @@ void op_zyencode(void)
 				s2pool(&subsc->str);
 				dst_lv = op_putindx(VARLSTCNT(2) orig_lv, subsc);
 				value->mvtype = MV_STR;
-				value->str.len = (YDB_MAX_STR < len_used) ? YDB_MAX_STR : len_used;
-				value->str.addr = buf_addr;
+				value->str.len = (YDB_MAX_STR < length) ? YDB_MAX_STR : length;
+				value->str.addr = address;
 				dst_lv->v = *value;
 				s2pool(&dst_lv->v.str);
-				len_used -= value->str.len;
-				buf_addr += value->str.len;
+				length -= value->str.len;
+				address += value->str.len;
 			}
-			/* zyencode_ret.buf_addr was returned by Jansson in ydb_encode_s(), which used the system malloc() */
-			system_free(zyencode_ret.buf_addr);
-			zyencode_ret.buf_addr = NULL;
-			zyencode_ret.len_alloc = zyencode_ret.len_used = 0;
+			/* zyencode_ret.address was returned by Jansson in ydb_encode_s(), which used the system malloc() */
+			system_free(zyencode_ret.address);
+			zyencode_ret.address = NULL;	/* Need to set NULL because this handler can be called deep in the stack,
+							 * and there  is no other way to ensure no double free() can happen,
+							 * other than always setting it NULL after it is free()'d.
+							 */
+			zyencode_ret.length = 0;
 			for (int i = 0; i < cnt_save; i++)
 				YDB_FREE_BUFFER(&subscripts[i]);
 			ENSURE_STP_FREE_SPACE(MAX_NUM_SIZE);
@@ -326,9 +326,6 @@ void op_zyencode(void)
 				async_action(FALSE);
 			if (YDB_OK != status)
 			{
-				system_free(zyencode_ret.buf_addr);	/* Created by Jansson in ydb_encode_s() */
-				zyencode_ret.buf_addr = NULL;
-				zyencode_ret.len_alloc = zyencode_ret.len_used = 0;
 				for (int i = 0; i < cnt_save; i++)
 					YDB_FREE_BUFFER(&subscripts[i]);
 				UNDO_ACTIVE_LV(actlv_op_zyencode2); /* kill "dst" and parents as applicable if $data(dst)=0 */
@@ -342,10 +339,10 @@ void op_zyencode(void)
 			orig_lv = dst_lv;
 			is_base_var = LV_IS_BASE_VAR(dst_lv);
 			base_lv = !is_base_var ? LV_GET_BASE_VAR(dst_lv) : dst_lv;
-			buf_addr = zyencode_ret.buf_addr;
-			len_used = zyencode_ret.len_used;
+			address = zyencode_ret.address;
+			length = zyencode_ret.length;
 			cnt = 1;
-			for (long long remain = len_used; 0 < remain; remain -= value->str.len, cnt++)
+			for (unsigned long remain = length; 0 != remain; remain -= value->str.len, cnt++)
 			{
 				subsc->mvtype = MV_STR;
 				subsc->str.addr = (char *)buff;
@@ -353,17 +350,20 @@ void op_zyencode(void)
 				s2pool(&subsc->str);
 				dst_lv = op_putindx(VARLSTCNT(2) orig_lv, subsc);
 				value->mvtype = MV_STR;
-				value->str.len = (YDB_MAX_STR < len_used) ? YDB_MAX_STR : len_used;
-				value->str.addr = buf_addr;
+				value->str.len = (YDB_MAX_STR < length) ? YDB_MAX_STR : length;
+				value->str.addr = address;
 				dst_lv->v = *value;
 				s2pool(&dst_lv->v.str);
-				len_used -= value->str.len;
-				buf_addr += value->str.len;
+				length -= value->str.len;
+				address += value->str.len;
 			}
-			/* zyencode_ret.buf_addr was returned by Jansson in ydb_encode_s(), which used the system malloc() */
-			system_free(zyencode_ret.buf_addr);
-			zyencode_ret.buf_addr = NULL;
-			zyencode_ret.len_alloc = zyencode_ret.len_used = 0;
+			/* zyencode_ret.address was returned by Jansson in ydb_encode_s(), which used the system malloc() */
+			system_free(zyencode_ret.address);
+			zyencode_ret.address = NULL;	/* Need to set NULL because this handler can be called deep in the stack,
+							 * and there  is no other way to ensure no double free() can happen,
+							 * other than always setting it NULL after it is free()'d.
+							 */
+			zyencode_ret.length = 0;
 			for (int i = 0; i < cnt_save; i++)
 				YDB_FREE_BUFFER(&subscripts[i]);
 			ENSURE_STP_FREE_SPACE(MAX_NUM_SIZE);
@@ -416,9 +416,6 @@ void op_zyencode(void)
 				async_action(FALSE);
 			if (YDB_OK != status)
 			{
-				system_free(zyencode_ret.buf_addr);	/* Created by Jansson in ydb_encode_s() */
-				zyencode_ret.buf_addr = NULL;
-				zyencode_ret.len_alloc = zyencode_ret.len_used = 0;
 				for (int i = 0; i < cnt_save; i++)
 					YDB_FREE_BUFFER(&subscripts[i]);
 				POP_MV_STENT();	/* value */
@@ -426,33 +423,36 @@ void op_zyencode(void)
 				ENCODE_DECODE_NESTED_RTS_ERROR(status, ERR_ZYENCODEINCOMPL);
 			}
 			key_end = gv_currkey->end;
-			buf_addr = zyencode_ret.buf_addr;
-			len_used = zyencode_ret.len_used;
+			address = zyencode_ret.address;
+			length = zyencode_ret.length;
 			rec_size = gblp1->s_gv_cur_region->max_rec_size;
 			cnt = 1;
-			for (long long remain = len_used; 0 < remain; remain -= value->str.len, cnt++)
+			for (unsigned long remain = length; 0 != remain; remain -= value->str.len, cnt++)
 			{
 				tmp_mval.mvtype = MV_STR;
 				tmp_mval.str.addr = (char *)buff;
 				tmp_mval.str.len = SNPRINTF(tmp_mval.str.addr, MAX_NUM_SIZE, "%d", cnt);
 				mval2subsc(&tmp_mval, gv_currkey, gv_cur_region->std_null_coll);
 				value->mvtype = MV_STR;
-				value->str.len = (rec_size < len_used) ? rec_size : len_used;
-				value->str.addr = buf_addr;
+				value->str.len = (rec_size < length) ? rec_size : length;
+				value->str.addr = address;
 				op_gvput(value);
 				gv_currkey->end = key_end;
-				len_used -= value->str.len;
-				buf_addr += value->str.len;
+				length -= value->str.len;
+				address += value->str.len;
 			}
 			gv_currkey->base[key_end] = KEY_DELIMITER;
 			value->str.addr = (char *)buff;
 			value->str.len = SNPRINTF(value->str.addr, MAX_NUM_SIZE, "%d", --cnt);
 			op_gvput(value);
 			gvname_env_restore(gblp1);	/* store destination as naked indicator in gv_currkey */
-			/* zyencode_ret.buf_addr was returned by Jansson in ydb_encode_s(), which used the system malloc() */
-			system_free(zyencode_ret.buf_addr);	/* free after we store the chunk number in op_gvput */
-			zyencode_ret.buf_addr = NULL;
-			zyencode_ret.len_alloc = zyencode_ret.len_used = 0;
+			/* zyencode_ret.address was returned by Jansson in ydb_encode_s(), which used the system malloc() */
+			system_free(zyencode_ret.address);	/* free after we store the chunk number in op_gvput */
+			zyencode_ret.address = NULL;	/* Need to set NULL because this handler can be called deep in the stack,
+							 * and there  is no other way to ensure no double free() can happen,
+							 * other than always setting it NULL after it is free()'d.
+							 */
+			zyencode_ret.length = 0;
 			for (int i = 0; i < cnt_save; i++)
 				YDB_FREE_BUFFER(&subscripts[i]);
 		}

@@ -71,8 +71,7 @@ GBLREF	json_t	*(*yed_new_object)(void),
 		*(*yed_new_false)(void),
 		*(*yed_new_null)(void);
 GBLREF	void	(*yed_object_delete)(json_t *);
-GBLREF	size_t	(*yed_output_json)(const json_t *, char *, size_t, size_t);
-GBLREF	char	*(*yed_dump_json)(const json_t *, size_t);
+GBLREF	char	*(*yed_encode_json)(const json_t *, size_t);
 GBLREF	int	(*yed_set_object)(json_t *, const char *, json_t *),
 		(*yed_set_array)(json_t *, json_t *);
 

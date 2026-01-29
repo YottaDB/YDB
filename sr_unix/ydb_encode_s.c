@@ -36,9 +36,16 @@ STATICDEF	int		key_size;
  *   subsarray  - an array of subscripts used to process source array, already containing "subs_used" subscripts
  *   format	- Format of string to be encoded (currently always "JSON" and ignored - for future use)
  *   ret_value	- Value fetched from local/global variable encoded in to a formatted string stored/returned here
+ *
+ *  NOTE: Caller of ydb_encode_s() must supply a pointer to an empty ydb_string_t struct for the ret_value argument
+ *	  ret_value->address must be NULL and ret_value->length must be set to 0
+ *	  When ydb_encode_s() returns, without an error, ret_value will contain a pointer to a callee-allocated
+ *	  buffer containing the JSON-formatted string in ret_value->address, and ret_value->length will be
+ *	  set to the length of the string (not including the trailing NUL byte)
+ *	  Caller will be required to free the memory at ret_value->address, as it will be allocated on the heap
  */
 int	ydb_encode_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *subsarray,
-			const char *format, ydb_buffer_t *ret_value)
+			const char *format, ydb_string_t *ret_value)
 {
 	ydb_buffer_t	next_subsarray[YDB_MAX_SUBS] = {0};
 	boolean_t	error_encountered;
@@ -80,10 +87,6 @@ int	ydb_encode_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t 
 	if (NULL == ret_value)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,
 			LEN_AND_LIT("NULL ret_value"), LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_ENCODE)));
-	/* If ret_value is empty, that signals that Jansson should return a buffer, which we will later have to free */
-	if ((NULL == ret_value->buf_addr) && ((0 < ret_value->len_alloc) || (0 < ret_value->len_used)))
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,
-			LEN_AND_LIT("NULL ret_value->buf_addr"), LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_ENCODE)));
 	for (i = 0; i < subs_used; i++)
 	{
 		if (subsarray[i].len_alloc < subsarray[i].len_used)
@@ -172,29 +175,12 @@ int	ydb_encode_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t 
 		}
 		return status;
 	}
-	if ((0 == ret_value->len_alloc) && (0 == ret_value->len_used) && (NULL == ret_value->buf_addr))
-	{	/* If ret_value is empty, that signals that Jansson should return a buffer, which we will later have to free */
-		ret_value->buf_addr = yed_dump_json(jansson_object, 0);
-		if (NULL == ret_value->buf_addr)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_JANSSONINVALIDJSON, 4,
-				LEN_AND_LIT("Empty JSON returned"), LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_ENCODE)));
-		size = strlen(ret_value->buf_addr);
-		if (UINT_MAX < (size + 1))	/* add 1 for the NUL */
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_JANSSONINVSTRLEN, 2, size + 1, UINT_MAX);
-		ret_value->len_alloc = ret_value->len_used = size;
-		ret_value->len_alloc++;	/* add 1 for the NUL */
-	}
-	else
-	{	/* Otherwise, caller has passed in their own buffer */
-		size = yed_output_json(jansson_object, ret_value->buf_addr, ret_value->len_alloc, 0);
-		if (0 == size)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_JANSSONINVALIDJSON, 4,
-				LEN_AND_LIT("Empty JSON returned"), LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_ENCODE)));
-		if (ret_value->len_alloc < size + 1)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_JANSSONINVSTRLEN, 2, size + 1, ret_value->len_alloc);
-		ret_value->len_used = size;
-		ret_value->buf_addr[ret_value->len_used] = '\0';
-	}
+	/* Jansson will return a buffer, which we will later have to free */
+	ret_value->address = yed_encode_json(jansson_object, 0);
+	if (NULL == ret_value->address)
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_JANSSONINVALIDJSON, 4,
+			LEN_AND_LIT("Empty JSON returned"), LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_ENCODE)));
+	ret_value->length = strlen(ret_value->address);
 	yed_object_decref(jansson_object);
 	yed_lydb_rtn = FALSE;
 	LIBYOTTADB_DONE;

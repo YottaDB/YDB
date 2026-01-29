@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -429,7 +429,7 @@ GBLDEF	int			zydecode_args;
 GBLDEF	zydecode_glvn_ptr	dglvnp;
 GBLDEF	int			zyencode_args;
 GBLDEF	zyencode_glvn_ptr	eglvnp;
-GBLDEF	ydb_buffer_t		zyencode_ret;
+GBLDEF	ydb_string_t		zyencode_ret;
 GBLDEF	boolean_t		ztrap_new;
 GBLDEF	int4			wtfini_in_prog;
 #ifdef DEBUG

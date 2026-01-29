@@ -42,9 +42,8 @@ GBLDEF	void		*(*yed_get_obj_iter)(json_t *),
 			(*yed_object_delete)(json_t *);
 GBLDEF	const char	*(*yed_obj_next_key)(void *),
 			*(*yed_get_string_value)(const json_t *);
-GBLDEF	size_t		(*yed_get_size)(const json_t *),
-			(*yed_output_json)(const json_t *, char *, size_t, size_t);
-GBLDEF	char		*(*yed_dump_json)(const json_t *, size_t);
+GBLDEF	size_t		(*yed_get_size)(const json_t *);
+GBLDEF	char		*(*yed_encode_json)(const json_t *, size_t);
 GBLDEF	long long	(*yed_get_int_value)(const json_t *);
 GBLDEF	double		(*yed_get_real_value)(const json_t *);
 GBLDEF	int		(*yed_set_object)(json_t *, const char *, json_t *),
@@ -60,9 +59,14 @@ STATICDEF	ydb_var_types	decode_type;
  *   subsarray	- an array of "subs_used" subscripts
  *   format	- Format of string to be decoded (currently always "JSON" and ignored - for future use)
  *   value	- Value to be decoded and set into local/global
+ *
+ *  NOTE: Caller of ydb_decode_s() must supply a pointer to a non-empty ydb_string_t struct for the value argument
+ *	  value->address must not be NULL, it must be a pointer to a valid JSON string
+ *	  value->length must not be 0, it must be set to the length of the JSON string (not including the trailing NUL byte)
+ *	  The caller is responsible for freeing the memory at value->address if it had allocated such on the heap
  */
 int ydb_decode_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *subsarray,
-			const char *format, const ydb_buffer_t *value)
+			const char *format, const ydb_string_t *value)
 {
 	ydb_buffer_t	cur_subsarray[YDB_MAX_SUBS] = {0};
 	boolean_t	error_encountered;
@@ -101,11 +105,12 @@ int ydb_decode_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t 
 	if (NULL == value)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,
 			LEN_AND_LIT("NULL value"), LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_DECODE)));
-	if ((NULL == value->buf_addr) && ((0 < value->len_alloc) || (0 < value->len_used)))
+	if (NULL == value->address)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,
-			LEN_AND_LIT("NULL value->buf_addr"), LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_DECODE)));
-	if ((NULL == value->buf_addr) || (0 == value->len_used))
-		return YDB_OK;
+			LEN_AND_LIT("NULL value->address"), LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_DECODE)));
+	if (0 == value->length)
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,
+			LEN_AND_LIT("value->length is 0"), LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_DECODE)));
 	for (i = 0; i < subs_used; i++)
 	{
 		if (subsarray[i].len_alloc < subsarray[i].len_used)
@@ -119,7 +124,7 @@ int ydb_decode_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t 
 	}
 	if (!yed_dl_complete)
 		yed_dl_load((char *)LYDBRTNNAME(LYDB_RTN_DECODE));
-	jansson_object = yed_decode_json(value->buf_addr, value->len_used, 0, &jansson_error);
+	jansson_object = yed_decode_json(value->address, value->length, 0, &jansson_error);
 	if (NULL == jansson_object)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_JANSSONINVALIDJSON, 4,
 			LEN_AND_STR(jansson_error.text), LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_DECODE)));
