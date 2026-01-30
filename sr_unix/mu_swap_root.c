@@ -3,7 +3,7 @@
  * Copyright (c) 2012-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2020-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2020-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -384,7 +384,7 @@ block_id swap_root_or_directory_block(int parent_blk_lvl, int child_blk_lvl, src
 		t_retry((enum cdb_sc)rdfail_detail);
 		return RETRY_SWAP;
 	}
-	hint_bit = (0 != upg_mv_block) ? ((upg_mv_block % BLKS_PER_LMAP) - 1) : 0;
+	hint_bit = (0 != upg_mv_block) ? ((upg_mv_block % BLKS_PER_LMAP)) : 0;
 	/* (total_blks - bmlhist.blk_num) can be cast because it should never be larger then BLKS_PER_LMAP */
 	assert(((master_bit + 1) < num_local_maps) || (BLKS_PER_LMAP >= (total_blks - bmlhist.blk_num)));
 	maxbitsthismap = (master_bit != (num_local_maps - 1)) ? BLKS_PER_LMAP : (int4)(total_blks - bmlhist.blk_num);
