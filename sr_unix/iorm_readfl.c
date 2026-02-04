@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -426,8 +426,9 @@ int	iorm_readfl (mval *v, int4 width, uint8 nsec_timeout) /* timeout in nanoseco
 		PIPE_DEBUG(PRINTF("piperfl: .. buffer address: 0x%08lx  stringpool: 0x%08lx\n",
 				  buffer_start, stringpool.free); DEBUGPIPEFLUSH);
 		PIPE_DEBUG(PRINTF("buffer_start =%s\n", buffer_start); DEBUGPIPEFLUSH);
-		/* If it is fixed and utf mode then we are not doing any mods affecting stringpool during the read and
-		   don't use temp, so skip the following stringpool checks */
+		/* If it is fixed and utf mode then we are not doing any mods affecting stringpool during the read,
+		 * so skip the following stringpool checks.
+		 */
 		if (!utf_active || !rm_ptr->fixed)
 		{
 			if (!IS_AT_END_OF_STRINGPOOL(buffer_start, bytes_read))
@@ -466,7 +467,8 @@ int	iorm_readfl (mval *v, int4 width, uint8 nsec_timeout) /* timeout in nanoseco
 			tot_bytes_read = bytes_count = bytes_read;
 			if (!(rm_ptr->fixed && rm_ptr->follow))
 				width -= bytes_read;
-		}
+		} else
+			temp = NULL;
 	}
 	if (utf_active || !rm_ptr->fixed)
 		bytes_read = 0;
@@ -1155,13 +1157,13 @@ int	iorm_readfl (mval *v, int4 width, uint8 nsec_timeout) /* timeout in nanoseco
 				{
 					if (CHSET_UTF8 == chset)
 					{
-						if (!IS_AT_END_OF_STRINGPOOL(temp, 0))
+						if ((NULL == temp) || (!IS_AT_END_OF_STRINGPOOL(temp, 0)))
 						{	/* make sure enough space to store buffer */
 							ENSURE_STP_FREE_SPACE(GTM_MB_LEN_MAX * width);
 						}
+						assert((stringpool.free + v->str.len) <= stringpool.top);
 						memcpy(stringpool.free, rm_ptr->inbuf_off, v->str.len);
-					}
-					else
+					} else
 					{
 						v->str.addr = (char *)rm_ptr->inbuf_off;
 						v->str.len = gtm_conv(chset_desc[chset], chset_desc[CHSET_UTF8],
