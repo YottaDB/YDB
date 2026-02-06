@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -47,9 +47,13 @@ void sig_init(void (*signal_handler)(), void (*ctrlc_handler)(), void (*suspsig_
 {
 	struct sigaction 	ignore, null_action, def_action, susp_action, gen_action, ctrlc_action, cont_action;
 	int			sig, rc;
-        DCL_THREADGBL_ACCESS;
+	sigset_t		all_signals;
+	DCL_THREADGBL_ACCESS;
 
-        SETUP_THREADGBL_ACCESS;
+	SETUP_THREADGBL_ACCESS;
+	sigfillset(&all_signals);
+	/* Unblock all signals in case we inherit blocked signals from a parent process (YDB#1205) */
+	SIGPROCMASK(SIG_UNBLOCK, &all_signals, NULL, rc);
 	memset(&ignore, 0, SIZEOF(ignore));
 	sigemptyset(&ignore.sa_mask);
 	/* Initialize handler definitions we deal with. All signals except those setup for SIG_DFL/SIG_IGN are setup

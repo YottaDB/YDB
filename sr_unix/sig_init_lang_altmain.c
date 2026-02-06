@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2020-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -46,10 +46,14 @@ void sig_init_lang_altmain()
 	int			rc, i;
 	struct sigaction	sigchk_action;
 	pthread_mutexattr_t	sigPendingAttr;		/* Mutex attribute we use for the signal pending queue */
+	sigset_t                all_signals;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	DBGSIGHND((stderr, "sig_init_lang_altmain: Initializing alternate signal processing\n"));
+	sigfillset(&all_signals);
+	/* Unblock all signals in case we inherit blocked signals from a parent process (YDB#1205) */
+	SIGPROCMASK(SIG_UNBLOCK, &all_signals, NULL, rc);
 	/* Define the handlers for use with simple (threaded) API. Note we do not define handlers here for SIGALRM and SIGUSR1
 	 * as those handlers are initialized when needed.
 	 *
