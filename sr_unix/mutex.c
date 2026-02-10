@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -771,10 +771,27 @@ enum cdb_sc gtm_mutex_lock(sgmnt_addrs *csa, mutex_lock_t mutex_lock_type, wait_
 							}
 							if (INTERLOCK_ADD(&addr->stuck_cycle, 1) == (local_stuck_cycle + 1))
 							{
-								GET_C_STACK_FROM_SCRIPT("MUTEXLCKALERT", process_id, cnl->in_crit,
-									addr->crit_cycle);
-								send_msg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_MUTEXLCKALERT, 4,
-									DB_LEN_STR(csa->region), cnl->in_crit, addr->crit_cycle);
+								uint4	in_crit_pid;
+
+								/* Take a copy of "cnl->in_crit" in a local variable as it
+								 * can concurrently change and we do not want to invoke the
+								 * C stack function if the pid turns out to be 0 (i.e. the
+								 * mutex is not held just at the moment we note it down).
+								 * Not noting it down in a local variable could have a race
+								 * condition where we find "cnl->in_crit" non-zero and pass
+								 * it to the GET_C_STACK_FROM_SCRIPT call but before that it
+								 * did become zero.
+								 */
+								in_crit_pid = cnl->in_crit;
+								if (0 != in_crit_pid)
+								{
+									GET_C_STACK_FROM_SCRIPT("MUTEXLCKALERT",
+										process_id, in_crit_pid, addr->crit_cycle);
+									send_msg_csa(CSA_ARG(csa) VARLSTCNT(6)
+										ERR_MUTEXLCKALERT, 4,
+										DB_LEN_STR(csa->region), in_crit_pid,
+										addr->crit_cycle);
+								}
 							}
 						}
 						if ((addr->crit_cycle == local_crit_cycle) && !TREF(disable_sigcont))
@@ -783,8 +800,12 @@ enum cdb_sc gtm_mutex_lock(sgmnt_addrs *csa, mutex_lock_t mutex_lock_type, wait_
 							 * this call in case of SENDTO_EPERM white-box test, because we do not
 							 * want the intentionally stuck process to be awakened prematurely.
 							 */
-							if (DEBUG_ONLY(!WBTEST_ENABLED(WBTEST_SENDTO_EPERM) &&) TRUE)
-								continue_proc(cnl->in_crit);
+							/* For the same reasons as few lines above, note "cnl->in_crit" in local */
+							uint4	in_crit_pid;
+
+							in_crit_pid = cnl->in_crit;
+							if (DEBUG_ONLY(!WBTEST_ENABLED(WBTEST_SENDTO_EPERM) &&) (0 != in_crit_pid))
+								continue_proc(in_crit_pid);
 						}
 						break;
 					default:
