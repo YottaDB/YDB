@@ -243,7 +243,7 @@ int	iott_readfl(mval *v, int4 length, uint8 nsec_timeout)	/* timeout in millisec
 	 * More information about this can be found on the gitlab discussion
 	 * https://gitlab.com/YottaDB/DB/YDB/-/merge_requests/1803#note_3006440446
 	 */
-	if (tt == io_curr_device.out)
+	if (tt == io_curr_device.out->type)
 		iott_flush(io_curr_device.out);
 	insert_mode = !(TT_NOINSERT & tt_ptr->ext_cap);	/* get initial mode */
 	empterm	= (TT_EMPTERM & tt_ptr->ext_cap);
