@@ -51,7 +51,8 @@ GBLDEF	int		(*yed_set_object)(json_t *, const char *, json_t *),
 
 STATICDEF	ydb_var_types	decode_type;
 
-/* Routine to decode a formatted string in to a local or global
+/*
+ * Routine to decode a formatted string in to a local or global
  *
  * Parameters:
  *   varname    - Gives name of local or global variable
@@ -77,13 +78,13 @@ int ydb_decode_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t 
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	VERIFY_NON_THREADED_API;	/* clears a global variable "caller_func_is_stapi" set by SimpleThreadAPI caller
+	VERIFY_NON_THREADED_API;	/* Clears a global variable "caller_func_is_stapi" set by SimpleThreadAPI caller
 					 * so needs to be first invocation after SETUP_THREADGBL_ACCESS to avoid any error
 					 * scenarios from not resetting this global variable even though this function returns.
 					 */
 	assert(!yed_lydb_rtn);	/* ydb_encode_s() and ydb_decode_s() set to TRUE, and they should never be nested */
 	if (zydecode_args)     /* zydecode_args is > 0 if called by op_zydecode() */
-		TREF(libyottadb_active_rtn) = LYDB_RTN_DECODE;	/* set active routine when called by op_zydecode() */
+		TREF(libyottadb_active_rtn) = LYDB_RTN_DECODE;	/* Set active routine when called by op_zydecode() */
 	else
 		/* Verify entry conditions, make sure YDB CI environment is up etc. */
 		LIBYOTTADB_INIT(LYDB_RTN_DECODE, (int));        /* Note: macro could return from this function in case of errors */
@@ -110,7 +111,7 @@ int ydb_decode_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t 
 			LEN_AND_LIT("NULL value->address"), LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_DECODE)));
 	if (0 == value->length)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,
-			LEN_AND_LIT("value->length is 0"), LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_DECODE)));
+			LEN_AND_LIT("0 value->length"), LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_DECODE)));
 	for (i = 0; i < subs_used; i++)
 	{
 		if (subsarray[i].len_alloc < subsarray[i].len_used)
@@ -147,15 +148,11 @@ int ydb_decode_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t 
 		}
 	}
 	json_type = jansson_object->type;
-	if (JSON_OBJECT == json_type)		/* object */
-		status = yed_decode_object(varname, subs_used, cur_subsarray, jansson_object);
-	else if (JSON_ARRAY == json_type)	/* array */
+	/* Jansson only allows an object or an array as the enclosing data type by default */
+	if (JSON_ARRAY == json_type)	/* array */
 		status = yed_decode_array(varname, subs_used, cur_subsarray, jansson_object);
-	else
-	{
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_JANSSONINVALIDJSON, 4,
-			LEN_AND_LIT("Invalid JSON"), LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_DECODE)));
-	}
+	else	/* object */
+		status = yed_decode_object(varname, subs_used, cur_subsarray, jansson_object);
 	system_free(curpool);
 	yed_object_decref(jansson_object);
 	yed_lydb_rtn = FALSE;
@@ -168,7 +165,7 @@ int yed_decode_object(const ydb_buffer_t *varname, int subs_used, ydb_buffer_t *
 {
 	void		*iterator;
 	json_t		*value;
-	int		cur_subs_used, str_size, status;
+	int		cur_subs_used, str_size, status = YDB_OK;
 	const char	*root, *key;
 
 	root = "";	/* Used as a special JSON key to hold values at M array nodes that also have children at higher levels.
@@ -226,16 +223,16 @@ int yed_decode_object(const ydb_buffer_t *varname, int subs_used, ydb_buffer_t *
 				status = yed_decode_bool(varname, cur_subs_used, subsarray, 2);
 		}
 		if (YDB_OK != status)
-			return status;
+			break;
 		iterator = yed_obj_iter_next(jansson_object, iterator);
 	}
-	return YDB_OK;
+	return status;
 }
 
 int yed_decode_array(const ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, json_t *jansson_object)
 {
 	json_t	*value;
-	int	cur_subs_used, status;
+	int	cur_subs_used, status = YDB_OK;
 	size_t	array_size;
 
 	if (YDB_MAX_SUBS == subs_used)
@@ -245,10 +242,31 @@ int yed_decode_array(const ydb_buffer_t *varname, int subs_used, ydb_buffer_t *s
 	{
 		cur_subs_used = subs_used;
 		subsarray[cur_subs_used].len_used = snprintf(NULL, 0, "%d", i);
-		if (subsarray[cur_subs_used].len_used + 1 > subsarray[cur_subs_used].len_alloc)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,
-				LEN_AND_LIT("buf_addr is too small for at least 1 key in JSON input"),
-				LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_DECODE)));
+		/*
+		 * In yed_decode_object() there is error handling to prevent a JSON key coming from the
+		 * decoder, that is longer than the allocation for a subscript in the subsarray, from being
+		 * copied in to it. Here, that is not necessary because instead of an arbitrary key, the
+		 * subscript that is stored in the subsarray is an integer representing the position in the
+		 * array.
+		 *
+		 * The allocation size is either the actual max_key_size for the region if it's a global
+		 * and coming from op_zydecode(), the MAX_KEY_SZ for any region if it's a global and not
+		 * coming from op_zydecode(), or YDB_MAX_STR if it's a local.
+		 *
+		 * In the case of a global, the allocation, being the key size, will always be larger than a
+		 * single subscript stored in subsarray, and will return a GVSUBOFLOW error well before it
+		 * would get to a string representing a position in the JSON array being decoded, because the
+		 * key includes extra bytes for the key encoding. The key size includes the global name, and
+		 * all of the subscripts, but even if there is just one subscript that is really long, it
+		 * still will hit the GVSUBOFLOW error elsewhere before overflowing the allocation in subsarray.
+		 *
+		 * In the case of a local, the allocation is 1 MiB, and that can store a JSON array position that
+		 * is so ridiculously large that it is literally impossible. The JSON array would have to contain
+		 * more than 10^1048576 items!
+		 *
+		 * So we use an assert to capture the invariant instead.
+		 */
+		assert(subsarray[cur_subs_used].len_used < subsarray[cur_subs_used].len_alloc);
 		snprintf(subsarray[cur_subs_used].buf_addr, subsarray[cur_subs_used].len_used + 1, "%d", i);
 		cur_subs_used++;
 		value = yed_get_value(jansson_object, (size_t)i);
@@ -279,9 +297,9 @@ int yed_decode_array(const ydb_buffer_t *varname, int subs_used, ydb_buffer_t *s
 				status = yed_decode_bool(varname, cur_subs_used, subsarray, 2);
 		}
 		if (YDB_OK != status)
-			return status;
+			break;
 	}
-	return YDB_OK;
+	return status;
 }
 
 int yed_decode_string(const ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, json_t *jansson_object)
@@ -290,20 +308,40 @@ int yed_decode_string(const ydb_buffer_t *varname, int subs_used, ydb_buffer_t *
 	ydb_buffer_t	value_buffer = {0};
 	char		done;
 	int		status, record_size;
+	long long	value_ll;
+	double		value_d;
+	size_t		value_len;
 
 	value = yed_get_string_value(jansson_object);
 	assert(NULL != value);	/* This function should only be called if jansson_object was previously confirmed to be a string */
-	value_buffer.len_used = value_buffer.len_alloc = strlen(value);
+	value_buffer.len_used = value_buffer.len_alloc = value_len = strlen(value);
+	value_buffer.len_alloc++;	/* Add 1 for the NUL */
+	value_buffer.buf_addr = (char *)value;
+	if (yed_is_integer(value_buffer, &value_ll) || yed_is_real(value_buffer, &value_d))
+	{
+		value_buffer.len_alloc++;	/* Add 1 for the NUL character that will be prepended */
+		value_buffer.len_used++;	/* Add 1 for the NUL character that will be prepended */
+		value_buffer.buf_addr = system_malloc(value_buffer.len_alloc);
+		value_buffer.buf_addr[0] = YED_NUL;	/* Prepend a NUL to encode JSON strings that match canonical numbers */
+		memcpy(&value_buffer.buf_addr[1], (char *)value, value_buffer.len_used);	/* len_used is length of value */
+	}
 	if ((LYDB_VARREF_GLOBAL == decode_type) && zydecode_args)	/* zydecode_args is > 0 if called by op_zydecode() */
 		record_size = dglvnp->gblp[0]->s_gv_cur_region->max_rec_size;
 	else
 		record_size = YDB_MAX_STR;
-	if (record_size < value_buffer.len_alloc++)	/* add 1 post-conditionally for the NUL */
+	if (record_size < value_buffer.len_used)
+	{
+		/* This indicates that a NUL was prepended to encode this, so we need to free it */
+		if (value_len < value_buffer.len_used)
+			system_free(value_buffer.buf_addr);
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,
 			LEN_AND_LIT("Size for string value is > max string size in JSON input"),
 			LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_DECODE)));
-	value_buffer.buf_addr = (char *)value;
-	return ydb_set_s(varname, subs_used, subsarray, &value_buffer);
+	}
+	status = ydb_set_s(varname, subs_used, subsarray, &value_buffer);
+	if (value_len < value_buffer.len_used)	/* This indicates that a NUL was prepended to encode this, so we need to free it */
+		system_free(value_buffer.buf_addr);
+	return status;
 }
 
 int yed_decode_integer(const ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, json_t *jansson_object)
@@ -316,6 +354,11 @@ int yed_decode_integer(const ydb_buffer_t *varname, int subs_used, ydb_buffer_t 
 	value_buffer.len_alloc = YED_INTEGER_MAX_LEN;	/* Jansson uses long long to store integers */
 	value_buffer.buf_addr = (char *)&buffer[0];
 	value_buffer.len_used = snprintf(value_buffer.buf_addr, value_buffer.len_alloc, "%lld", value);
+	/* Match the precision in the encoder - extra for minus sign, et al. */
+	if (('-' == value_buffer.buf_addr[0]) && ((YED_PRECISION + 2) < value_buffer.len_used))
+		value_buffer.len_used = YED_PRECISION + 2;
+	else if ((YED_PRECISION + 1) < value_buffer.len_used)
+		value_buffer.len_used = YED_PRECISION + 1;
 	return ydb_set_s(varname, subs_used, subsarray, &value_buffer);
 }
 
@@ -326,22 +369,30 @@ int yed_decode_real(const ydb_buffer_t *varname, int subs_used, ydb_buffer_t *su
 	char		buffer[YED_REAL_MAX_LEN];
 
 	value = yed_get_real_value(jansson_object);
-	value_buffer.len_alloc = YED_REAL_MAX_LEN;	/* Jansson uses double to store reals with a default precision of 17 */
+	value_buffer.len_alloc = YED_REAL_MAX_LEN;	/* Jansson uses double to store reals */
 	value_buffer.buf_addr = (char *)&buffer[0];
-	value_buffer.len_used = snprintf(value_buffer.buf_addr, value_buffer.len_alloc, "%g", value);	/* precision of 6 */
+	/* The call to snprintf() matches the precision in the encoder */
+	value_buffer.len_used = snprintf(value_buffer.buf_addr, value_buffer.len_alloc, "%.*g", YED_PRECISION, value);
+	/* Remove leading 0 which is not allowed in M */
+	if (('0' == value_buffer.buf_addr[0]) && ('.' == value_buffer.buf_addr[1]))
+		memmove(value_buffer.buf_addr, value_buffer.buf_addr + 1, --value_buffer.len_used);
+	/* Remove leading 0 after minus sign which is not allowed in M */
+	else if (('-' == value_buffer.buf_addr[0]) && ('0' == value_buffer.buf_addr[1]) && ('.' == value_buffer.buf_addr[2]))
+		memmove(value_buffer.buf_addr + 1, value_buffer.buf_addr + 2, --value_buffer.len_used);
 	return ydb_set_s(varname, subs_used, subsarray, &value_buffer);
 }
 
-/* This function handles the JSON value types of false, true, and null (not strings).
- * M does not support the false, true, and null JSON data types, so we have to
- * distinguish between false and "false", true and "true", null and "null" while
- * stored in M. So these values are stored as $char(0)_"true", $char(0)_"false",
- * and $char(0)_"null" in M arrays. A $char(0) character is supported as data in
- * M arrays, but is not supported as a value in Jansson by default. Thus a value such
- * as "\0_true" cannot be stored as a JSON value in Jansson, and this encoding is
- * therefore unambiguous. Storing the null byte at the beginning instead of the end
- * of the string makes it less likely that it will be confused for a normal C string
- * terminator.
+/*
+ * This function handles the JSON value types of false, true, and null (not
+ * strings). M does not support the false, true, and null JSON data types, so
+ * we have to distinguish between false and "false", true and "true", null and
+ * "null" while stored in M. So these values are stored as $char(0)_"true",
+ * $char(0)_"false", and $char(0)_"null" in M arrays. A $char(0) character is
+ * supported as data in M arrays, but is not supported as a value when decoding
+ * in Jansson by default. Thus a value such as "\0_true" cannot be decoded when
+ * used as a JSON value in Jansson, and this encoding is therefore unambiguous.
+ * Storing the NUL byte at the beginning instead of the end of the string makes
+ * it less likely that it will be confused for a normal C string terminator.
  *
  *	bool_type is one of:
  *		0 for false
@@ -355,25 +406,25 @@ int yed_decode_bool(const ydb_buffer_t *varname, int subs_used, ydb_buffer_t *su
 	switch (bool_type)
 	{
 		case 0:
-			value_buffer.len_alloc = SIZEOF(YED_FALSE);
-			value_buffer.len_used = STR_LIT_LEN(YED_FALSE);
-			value_buffer.buf_addr = YED_FALSE;
+			value_buffer.len_alloc = SIZEOF(YED_JSON_FALSE);
+			value_buffer.len_used = STR_LIT_LEN(YED_JSON_FALSE);
+			value_buffer.buf_addr = YED_JSON_FALSE;
 			break;
 		case 1:
-			value_buffer.len_alloc = SIZEOF(YED_TRUE);
-			value_buffer.len_used = STR_LIT_LEN(YED_TRUE);
-			value_buffer.buf_addr = YED_TRUE;
+			value_buffer.len_alloc = SIZEOF(YED_JSON_TRUE);
+			value_buffer.len_used = STR_LIT_LEN(YED_JSON_TRUE);
+			value_buffer.buf_addr = YED_JSON_TRUE;
 			break;
 		default:
-			value_buffer.len_alloc = SIZEOF(YED_NULL);
-			value_buffer.len_used = STR_LIT_LEN(YED_NULL);
-			value_buffer.buf_addr = YED_NULL;
+			value_buffer.len_alloc = SIZEOF(YED_JSON_NULL);
+			value_buffer.len_used = STR_LIT_LEN(YED_JSON_NULL);
+			value_buffer.buf_addr = YED_JSON_NULL;
 			break;
 	}
 	return ydb_set_s(varname, subs_used, subsarray, &value_buffer);
 }
 
- /*
+/*
  * This function code is from json_decref() in jansson.h. We can't call it directly, because it is a static inline
  * function defined in jansson.h, and it calls the json_delete() symbol, which is a regular visible symbol defined
  * in the library. Since we only load the Jansson library when ydb_encode_s() or ydb_decode_s() are invoked, it is
