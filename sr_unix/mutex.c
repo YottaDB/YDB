@@ -715,6 +715,7 @@ enum cdb_sc gtm_mutex_lock(sgmnt_addrs *csa, mutex_lock_t mutex_lock_type, wait_
 										SHM_WRITE_MEMORY_BARRIER;
 										addr->curr_mutex_type = mutex_type_adaptive_ydb;
 										pthread_mutex_unlock(&addr->mutex);
+										mutex_switched = TRUE;
 										break;
 									}
 								} else
