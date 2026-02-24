@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -69,7 +69,8 @@ void op_wttab(mint col)
 	if (gtmsocket == iod->type)
 	{
 		dsocketptr = (d_socket_struct *)iod->dev_sp;
-		if (dsocketptr->n_socket > dsocketptr->current_socket)
+		// Take care of case when socket device has no sockets (dsocketptr->current_socket == -1)
+		if ((0 <= dsocketptr->current_socket) && (dsocketptr->n_socket > dsocketptr->current_socket))
 		{
 			socketptr = dsocketptr->socket[dsocketptr->current_socket];
 			nonblocking_socket = socketptr->nonblocked_output;
