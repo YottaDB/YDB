@@ -3,7 +3,7 @@
  * Copyright (c) 2006-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -2601,18 +2601,15 @@ STATICFNDEF boolean_t gtmrecv_exchange_tls_info(void)
 	/* At this point, the both sides are ready for a TLS/SSL handshake. Create a TLS/SSL aware socket. */
 	if (NULL == (repl_tls.sock = gtm_tls_socket(tls_ctx, repl_tls.sock, gtmrecv_sock_fd, repl_tls.id,
 					GTMTLS_OP_VERIFY_PEER | GTMTLS_OP_RENEGOTIATE_REQUESTED)))
-	{
-		if (PLAINTEXT_FALLBACK)
-			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) MAKE_MSG_WARNING(ERR_TLSCONVSOCK), 0,
+	{	/* A NULL return from "gtm_tls_socket()" indicates TLS misconfiguration on the receiver side.
+		 * Therefore, do not accept any new connections as that is going to run into this same code path
+		 * in a loop. Therefore, issue a TLSCONVSOCK error and terminate in case -PLAINTEXTFALLBACK was not
+		 * specified. See https://gitlab.com/YottaDB/DB/YDBTest/-/issues/687#note_3109611733 for more details.
+		 */
+		if (!PLAINTEXT_FALLBACK)
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_TLSCONVSOCK, 0, ERR_TEXT, 2, LEN_AND_STR(gtm_tls_get_error(NULL)));
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) MAKE_MSG_WARNING(ERR_TLSCONVSOCK), 0,
 					ERR_TEXT, 2, LEN_AND_STR(gtm_tls_get_error(NULL)));
-		else
-		{	/* Close the connection and issue an error message */
-			repl_close(&gtmrecv_sock_fd);
-			repl_connection_reset = TRUE;
-			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TLSCONVSOCK, 0,
-					ERR_TEXT, 2, LEN_AND_STR(gtm_tls_get_error(NULL)));
-			return FALSE;
-		}
 	} else
 	{
 		/* Do the actual handshake. */
