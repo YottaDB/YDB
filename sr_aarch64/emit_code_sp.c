@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  * Copyright (c) 2018 Stephen L Johnson. All rights reserved.	*
@@ -48,16 +48,16 @@ void	emit_base_offset_addr(int base, int offset)
 			abs_offst = abs(offset);
 			if (0 <= offset)
 			{
-				code_buf[code_idx++] = CODE_BUF_GEN_D_IMM16(AARCH64_INS_MOV_IMM, GTM_REG_CODEGEN_TEMP_1,
-									    offset & 0xffff);
+				code_buf[code_idx++] = CODE_BUF_GEN_D_IMM16(AARCH64_INS_MOV_IMM,
+									GTM_REG_CODEGEN_TEMP_1, LOW_ORDER_16BIT(offset));
 			} else
 			{
-				code_buf[code_idx++] = CODE_BUF_GEN_D_IMM16(AARCH64_INS_MOV_INV, GTM_REG_CODEGEN_TEMP_1,
-									    (abs_offst - 1) & 0xffff);
+				code_buf[code_idx++] = CODE_BUF_GEN_D_IMM16(AARCH64_INS_MOV_INV,
+									GTM_REG_CODEGEN_TEMP_1, LOW_ORDER_16BIT(abs_offst - 1));
 			}
 			if (MAX_16BIT < abs_offst)
-				code_buf[code_idx++] = CODE_BUF_GEN_D_IMM16_SHIFT(AARCH64_INS_MOVK, GTM_REG_CODEGEN_TEMP_1,
-								(offset & 0xffff0000) >> 16, 0x1);
+				code_buf[code_idx++] = CODE_BUF_GEN_D_IMM16_SHIFT(AARCH64_INS_MOVK,
+									GTM_REG_CODEGEN_TEMP_1, HIGH_ORDER_16BIT(offset), 1);
 			code_buf[code_idx] = CODE_BUF_GEN_DNM(0, 0, base, GTM_REG_CODEGEN_TEMP_1);
 			break;
 		default:
@@ -82,10 +82,11 @@ void	emit_base_offset_load(int base, int offset)
 				code_buf[code_idx] = CODE_BUF_GEN_TN0_IMM12(0, 0, base, offset);
 			} else
 			{
-				code_buf[code_idx++] = CODE_BUF_GEN_D_IMM16(AARCH64_INS_MOV_IMM, GTM_REG_CODEGEN_TEMP_1, offset);
+				code_buf[code_idx++] = CODE_BUF_GEN_D_IMM16(AARCH64_INS_MOV_IMM,
+									GTM_REG_CODEGEN_TEMP_1, LOW_ORDER_16BIT(offset));
 				if (MAX_16BIT < abs_offst)
 					code_buf[code_idx++] = CODE_BUF_GEN_D_IMM16_SHIFT(AARCH64_INS_MOVK, GTM_REG_CODEGEN_TEMP_1,
-								(offset & 0xffff0000) >> 16, 0x1);
+										HIGH_ORDER_16BIT(offset), 1);
 				code_buf[code_idx++] = (((0 <= offset) ? AARCH64_INS_ADD_REG : AARCH64_INS_SUB_REG)
 								| (GTM_REG_CODEGEN_TEMP_1 << AARCH64_SHIFT_RM)
 								| (GTM_REG_CODEGEN_TEMP_1 << AARCH64_SHIFT_RD)

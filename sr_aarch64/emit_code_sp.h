@@ -2,7 +2,7 @@
  *								*
  * Copyright 2003, 2009 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  * Copyright (c) 2018 Stephen L Johnson. All rights reserved.	*
@@ -58,6 +58,10 @@ void	tab_to_column(int col);
 
 #define MAX_12BIT			0xfff
 #define MAX_16BIT			0xffff
+
+#define	LOW_ORDER_16BIT(X)		((X) & MAX_16BIT)
+#define	HIGH_ORDER_16BIT(X)		(((X) >> 16) & MAX_16BIT)
+
 #define STACK_ARG_OFFSET(indx)		(8 * (indx))
 #define MACHINE_FIRST_ARG_REG		AARCH64_REG_X0
 
@@ -169,11 +173,10 @@ void	tab_to_column(int col);
 		}														\
 	} else															\
 	{															\
-		code_buf[code_idx++] = CODE_BUF_GEN_D_IMM16(AARCH64_INS_MOV_IMM, GTM_REG_CODEGEN_TEMP, disp);			\
+		code_buf[code_idx++] = CODE_BUF_GEN_D_IMM16(AARCH64_INS_MOV_IMM, GTM_REG_CODEGEN_TEMP, LOW_ORDER_16BIT(disp));	\
 		if ((MAX_16BIT < disp) || (-MAX_16BIT > disp)) 									\
-		{														\
-			code_buf[code_idx++] = CODE_BUF_GEN_D_IMM16_SHIFT(AARCH64_INS_MOVK, GTM_REG_CODEGEN_TEMP, (disp & 0xfff000) >> 16, 1); \
-		}														\
+			code_buf[code_idx++] = CODE_BUF_GEN_D_IMM16_SHIFT(AARCH64_INS_MOVK, GTM_REG_CODEGEN_TEMP,		\
+												HIGH_ORDER_16BIT(disp), 1);	\
 		code_buf[code_idx++] = CODE_BUF_GEN_DNM(AARCH64_INS_ADD_REG, areg, breg, GTM_REG_CODEGEN_TEMP);			\
 	}															\
 }
@@ -191,11 +194,10 @@ void	tab_to_column(int col);
 		code_buf[code_idx++] = CODE_BUF_GEN_DN_IMM12(AARCH64_INS_LDR_W, areg, tmp_reg, disp);				\
 	} else															\
 	{															\
-		code_buf[code_idx++] = CODE_BUF_GEN_D_IMM16(AARCH64_INS_MOV_IMM, GTM_REG_CODEGEN_TEMP_1, disp);			\
+		code_buf[code_idx++] = CODE_BUF_GEN_D_IMM16(AARCH64_INS_MOV_IMM, GTM_REG_CODEGEN_TEMP_1, LOW_ORDER_16BIT(disp));\
 		if ((MAX_16BIT < disp) || (-MAX_16BIT > disp)) 									\
-		{														\
-			code_buf[code_idx++] = CODE_BUF_GEN_D_IMM16_SHIFT(AARCH64_INS_MOVK, GTM_REG_CODEGEN_TEMP_1, (disp & 0xffff0000) >> 16, 0x1); \
-		}														\
+			code_buf[code_idx++] = CODE_BUF_GEN_D_IMM16_SHIFT(AARCH64_INS_MOVK, GTM_REG_CODEGEN_TEMP_1,		\
+												HIGH_ORDER_16BIT(disp), 1);	\
 		code_buf[code_idx++] = CODE_BUF_GEN_DNM(AARCH64_INS_ADD_REG, tmp_reg, tmp_reg, GTM_REG_CODEGEN_TEMP_1);		\
 		code_buf[code_idx++] = CODE_BUF_GEN_DN_IMM12(AARCH64_INS_LDR_W, areg, tmp_reg, 0);				\
 	}															\
@@ -209,11 +211,10 @@ void	tab_to_column(int col);
 		code_buf[code_idx++] = CODE_BUF_GEN_DN_IMM12(AARCH64_INS_LDR_X, areg, breg, disp);				\
 	} else															\
 	{															\
-		code_buf[code_idx++] = CODE_BUF_GEN_D_IMM16(AARCH64_INS_MOV_IMM, GTM_REG_CODEGEN_TEMP, disp);			\
+		code_buf[code_idx++] = CODE_BUF_GEN_D_IMM16(AARCH64_INS_MOV_IMM, GTM_REG_CODEGEN_TEMP, LOW_ORDER_16BIT(disp));	\
 		if ((MAX_16BIT < disp) || (-MAX_16BIT > disp)) 									\
-		{														\
-			code_buf[code_idx++] = CODE_BUF_GEN_D_IMM16_SHIFT(AARCH64_INS_MOVK, GTM_REG_CODEGEN_TEMP, (disp &0xffff0000) >> 16, 1); \
-		}														\
+			code_buf[code_idx++] = CODE_BUF_GEN_D_IMM16_SHIFT(AARCH64_INS_MOVK, GTM_REG_CODEGEN_TEMP,		\
+												HIGH_ORDER_16BIT(disp), 1);	\
 		code_buf[code_idx++] = CODE_BUF_GEN_DNM(AARCH64_INS_ADD_REG, breg, breg, GTM_REG_CODEGEN_TEMP);			\
 		code_buf[code_idx++] = CODE_BUF_GEN_DN_IMM12(AARCH64_INS_LDR_X, areg, breg, 0);					\
 	}															\
@@ -227,11 +228,10 @@ void	tab_to_column(int col);
 		code_buf[code_idx++] = CODE_BUF_GEN_DN_IMM12(AARCH64_INS_STR_W, areg, breg, disp);				\
 	} else															\
 	{															\
-		code_buf[code_idx++] = CODE_BUF_GEN_D_IMM16(AARCH64_INS_MOV_IMM, GTM_REG_CODEGEN_TEMP, disp);			\
+		code_buf[code_idx++] = CODE_BUF_GEN_D_IMM16(AARCH64_INS_MOV_IMM, GTM_REG_CODEGEN_TEMP, LOW_ORDER_16BIT(disp));	\
 		if ((MAX_16BIT < disp) || (-4096 >= disp))									\
-		{														\
-			code_buf[code_idx++] = CODE_BUF_GEN_D_IMM16_SHIFT(AARCH64_INS_MOVK, GTM_REG_CODEGEN_TEMP, (disp & 0xffff0000) >> 16, 1); \
-		}														\
+			code_buf[code_idx++] = CODE_BUF_GEN_D_IMM16_SHIFT(AARCH64_INS_MOVK, GTM_REG_CODEGEN_TEMP,		\
+												HIGH_ORDER_16BIT(disp), 1);	\
 		code_buf[code_idx++] = CODE_BUF_GEN_DNM(AARCH64_INS_ADD_REG, breg, breg, GTM_REG_CODEGEN_TEMP);			\
 		code_buf[code_idx++] = CODE_BUF_GEN_DN_IMM12(AARCH64_INS_STR_W, areg, breg, 0);					\
 	}															\
@@ -242,17 +242,19 @@ void	tab_to_column(int col);
 	assert((2 == SIZEOF(imval)) || (4 == SIZEOF(imval)));									\
 	if (0 <= imval)														\
 	{															\
-		code_buf[code_idx++] = CODE_BUF_GEN_D_IMM16(AARCH64_INS_MOV_IMM, reg, imval & 0xffff);				\
+		code_buf[code_idx++] = CODE_BUF_GEN_D_IMM16(AARCH64_INS_MOV_IMM, reg, LOW_ORDER_16BIT(imval));			\
 		if ((2 < SIZEOF(imval)) && (MAX_16BIT < imval))									\
-			code_buf[code_idx++] = CODE_BUF_GEN_D_IMM16_SHIFT(AARCH64_INS_MOVK, reg, (imval & 0xffff0000) >> 16, 1);\
+			code_buf[code_idx++] = CODE_BUF_GEN_D_IMM16_SHIFT(AARCH64_INS_MOVK, reg, HIGH_ORDER_16BIT(imval), 1);	\
 	} else															\
 	{															\
 		if ((2 >= SIZEOF(imval)) || (-MAX_16BIT < imval))								\
 			code_buf[code_idx++] = CODE_BUF_GEN_D_IMM16(AARCH64_INS_MOV_INV, reg, (-1 * imval) - 1); 		\
 		else														\
 		{														\
-			code_buf[code_idx++] = CODE_BUF_GEN_D_IMM16(AARCH64_INS_MOV_INV, reg, ((-1 * imval) - 1) & 0xffff);	\
-			code_buf[code_idx++] = CODE_BUF_GEN_D_IMM16_SHIFT(AARCH64_INS_MOVK, reg, (imval & 0xffff0000) >> 16, 1);\
+			code_buf[code_idx++] = CODE_BUF_GEN_D_IMM16(AARCH64_INS_MOV_INV, reg,					\
+										LOW_ORDER_16BIT((-1 * imval) - 1));		\
+			code_buf[code_idx++] = CODE_BUF_GEN_D_IMM16_SHIFT(AARCH64_INS_MOVK, reg,				\
+										HIGH_ORDER_16BIT(imval), 1);			\
 		}														\
 	}															\
 }
@@ -272,11 +274,11 @@ void	tab_to_column(int col);
 			code_buf[code_idx++] = CODE_BUF_GEN_DN_IMM12(AARCH64_INS_ADD_IMM, reg, reg, imval);			\
 		} else														\
 		{														\
-			code_buf[code_idx++] = CODE_BUF_GEN_D_IMM16(AARCH64_INS_MOV_IMM, GTM_REG_CODEGEN_TEMP, imval);		\
+			code_buf[code_idx++] = CODE_BUF_GEN_D_IMM16(AARCH64_INS_MOV_IMM, GTM_REG_CODEGEN_TEMP,			\
+												LOW_ORDER_16BIT(imval));	\
 			if (MAX_16BIT < imval)											\
-			{													\
-			  code_buf[code_idx++] = CODE_BUF_GEN_D_IMM16_SHIFT(AARCH64_INS_MOVK, GTM_REG_CODEGEN_TEMP, (imval & 0xffff0000) >> 16, 1); \
-			}													\
+				code_buf[code_idx++] = CODE_BUF_GEN_D_IMM16_SHIFT(AARCH64_INS_MOVK, GTM_REG_CODEGEN_TEMP,	\
+												HIGH_ORDER_16BIT(imval), 1);	\
 			code_buf[code_idx++] = CODE_BUF_GEN_DNM(AARCH64_INS_ADD_REG, reg, reg, GTM_REG_CODEGEN_TEMP);		\
 		}														\
 	} else if (0 > imval)													\
@@ -286,18 +288,17 @@ void	tab_to_column(int col);
 			code_buf[code_idx++] = CODE_BUF_GEN_DN_IMM12(AARCH64_INS_SUB_IMM, reg, reg, (-1 * imval));		\
 		} else														\
 		{														\
-			code_buf[code_idx++] = CODE_BUF_GEN_D_IMM16(AARCH64_INS_MOV_IMM, GTM_REG_CODEGEN_TEMP, (-1 * imval));	\
+			code_buf[code_idx++] = CODE_BUF_GEN_D_IMM16(AARCH64_INS_MOV_IMM, GTM_REG_CODEGEN_TEMP,			\
+												LOW_ORDER_16BIT(-1 * imval));	\
 			if (MAX_16BIT < (-1 * imval))										\
-			{													\
-				code_buf[code_idx++] = CODE_BUF_GEN_D_IMM16_SHIFT(AARCH64_INS_MOVK, GTM_REG_CODEGEN_TEMP, ((-1 * imval) * 0xffff0000) >> 16, 1); \
-			}													\
+				code_buf[code_idx++] = CODE_BUF_GEN_D_IMM16_SHIFT(AARCH64_INS_MOVK, GTM_REG_CODEGEN_TEMP,	\
+											HIGH_ORDER_16BIT(-1 * imval), 1);	\
 			code_buf[code_idx++] = CODE_BUF_GEN_DNM(AARCH64_INS_SUB_REG, reg, reg, GTM_REG_CODEGEN_TEMP);		\
 		}														\
 	}															\
 }
 
-#define GEN_JUMP_REG(reg)													\
-	code_buf[code_idx++] = (AARCH64_INS_BR | (reg << AARCH64_SHIFT_RN))
+#define GEN_JUMP_REG(reg)	code_buf[code_idx++] = (AARCH64_INS_BR | (reg << AARCH64_SHIFT_RN))
 
 #define GEN_STORE_ARG(reg, offset)												\
 {																\
@@ -305,12 +306,10 @@ void	tab_to_column(int col);
 	    || ((CGP_ASSEMBLY == cg_phase || CGP_MACHINE == cg_phase) && (0 == vax_pushes_seen)))				\
 	{															\
 		code_buf[code_idx++] = CODE_BUF_GEN_DN_IMM12(AARCH64_INS_ADD_IMM, AARCH64_REG_FP, AARCH64_REG_SP, 0);		\
-		code_buf[code_idx++] = CODE_BUF_GEN_D_IMM16(AARCH64_INS_MOV_IMM, GTM_REG_CODEGEN_TEMP, offset);			\
+		code_buf[code_idx++] = CODE_BUF_GEN_D_IMM16(AARCH64_INS_MOV_IMM, GTM_REG_CODEGEN_TEMP, LOW_ORDER_16BIT(offset));\
 		if (MAX_16BIT < offset)												\
-		{														\
 			code_buf[code_idx++] = CODE_BUF_GEN_D_IMM16_SHIFT(AARCH64_INS_MOVK, GTM_REG_CODEGEN_TEMP,		\
-									  (offset & 0xffff0000) >> 16, 1);			\
-		}														\
+									  		HIGH_ORDER_16BIT(offset), 1);		\
 		/* Divide offset by 16, add 1, and multiply it by 16 -- multiply is done within the subtract */			\
 		/* The ((offset / 16) + 1) * 16 is to ensure 16 byte stack alignment */						\
 		code_buf[code_idx++] = CODE_BUF_GEN_DN_IMMR(AARCH64_INS_LSR, GTM_REG_CODEGEN_TEMP, GTM_REG_CODEGEN_TEMP, 4);	\
@@ -386,11 +385,11 @@ void	tab_to_column(int col);
 			code_buf[code_idx++] = CODE_BUF_GEN_TN1_IMM12(AARCH64_INS_CMN_IMM, reg, reg, -1 * imm);			\
 		} else														\
 		{														\
-			code_buf[code_idx++] = CODE_BUF_GEN_D_IMM16(AARCH64_INS_MOV_IMM, GTM_REG_CODEGEN_TEMP, -1 * imm);	\
+			code_buf[code_idx++] = CODE_BUF_GEN_D_IMM16(AARCH64_INS_MOV_IMM, GTM_REG_CODEGEN_TEMP,			\
+											LOW_ORDER_16BIT(-1 * imm));		\
 			if (MAX_16BIT < (-1 * imm))										\
-			{													\
-				code_buf[code_idx++] = CODE_BUF_GEN_D_IMM16_SHIFT(AARCH64_INS_MOVK, GTM_REG_CODEGEN_TEMP, ((-1 * imm) & 0xffff0000) >> 16, 1); \
-			}													\
+				code_buf[code_idx++] = CODE_BUF_GEN_D_IMM16_SHIFT(AARCH64_INS_MOVK, GTM_REG_CODEGEN_TEMP,	\
+											HIGH_ORDER_16BIT(-1 * imm), 1);		\
 			code_buf[code_idx++] = CODE_BUF_GEN_NM(AARCH64_INS_CMN_REG, reg, GTM_REG_CODEGEN_TEMP);			\
 		}														\
 	} else															\
@@ -400,11 +399,11 @@ void	tab_to_column(int col);
 			code_buf[code_idx++] = CODE_BUF_GEN_TN1_IMM12(AARCH64_INS_CMP_IMM, reg, reg, imm);			\
 		} else														\
 		{														\
-			code_buf[code_idx++] = CODE_BUF_GEN_D_IMM16(AARCH64_INS_MOV_IMM, GTM_REG_CODEGEN_TEMP, imm);		\
+			code_buf[code_idx++] = CODE_BUF_GEN_D_IMM16(AARCH64_INS_MOV_IMM, GTM_REG_CODEGEN_TEMP,			\
+												LOW_ORDER_16BIT(imm));		\
 			if (MAX_16BIT < imm)											\
-			{													\
-				code_buf[code_idx++] = CODE_BUF_GEN_D_IMM16_SHIFT(AARCH64_INS_MOVK, GTM_REG_CODEGEN_TEMP, (imm & 0xffff0000) >> 16, 1); \
-			}													\
+				code_buf[code_idx++] = CODE_BUF_GEN_D_IMM16_SHIFT(AARCH64_INS_MOVK, GTM_REG_CODEGEN_TEMP,	\
+												HIGH_ORDER_16BIT(imm), 1);	\
 			code_buf[code_idx++] = CODE_BUF_GEN_NM(AARCH64_INS_CMP_REG, reg,GTM_REG_CODEGEN_TEMP);			\
 		}														\
 	}															\
