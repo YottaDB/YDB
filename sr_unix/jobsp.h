@@ -122,6 +122,7 @@ typedef enum
 	job_set_parm_list,		/* followed by a job_arg_count_msg and "arg_count" job_arg_msg messages */
 	job_set_input_buffer,		/* followed by a job_buffer_size_msg and a data message of "buffer_size" */
 	job_set_locals,			/* followed by local_variable */
+	job_set_zyparent,		/* followed by the value of the ISV $ZYJOBPARENT. */
 	local_trans_done		/* Indicates all of the locals have been sent to the grandchild */
 } job_setup_op;
 

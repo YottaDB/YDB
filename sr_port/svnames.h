@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -101,8 +101,9 @@ enum isvopcode
 	SV_ZMALLOCLIM,		/* 80 */
 	SV_ZICUVER,		/* 81 */
 	SV_ZYINTRSIG,		/* 82 */
-	SV_ZYRELEASE,		/* 83 */
-	SV_ZYSQLNULL,		/* 84 */
+	SV_ZYJOBPARENT,		/* 83 */
+	SV_ZYRELEASE,		/* 84 */
+	SV_ZYSQLNULL,		/* 85 */
 	SV_NUM_SV,		/* count - should be next to last SV entry just prior to dummy entry below */
 	SV_DUMMY_TO_FORCE_INT = 0x0FFFFFFF	/* to ensure an int on S390 */
 };

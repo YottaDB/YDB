@@ -241,6 +241,7 @@ GBLDEF	mval		dollar_zgbldir,
 			dollar_ztexit = DEFINE_MVAL_STRING(MV_STR, 0, 0, 0, NULL, 0, 0),
 			dollar_testmv = DEFINE_MVAL_STRING(MV_NM | MV_INT, 0, 0, 0, 0, 0, 0); /* mval copy of dollar_truth */
 GBLDEF  uint4		dollar_zjob;
+GBLDEF	uint4		dollar_zyjobparent = 0; /* PID of process that JOBed current invocation or 0 if not JOBed. */
 GBLDEF	mstr		dollar_zicuver;
 GBLDEF	mval		dollar_zinterrupt;
 GBLDEF	volatile boolean_t	dollar_zininterrupt;

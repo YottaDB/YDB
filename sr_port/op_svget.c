@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -75,7 +75,7 @@ GBLREF mval			dollar_zcmdline;
 GBLREF size_t			totalAlloc, totalAllocGta, totalRmalloc, totalRallocGta, totalUsed, totalUsedGta, zmalloclim;
 GBLREF spdesc			stringpool;
 GBLREF stack_frame		*frame_pointer;
-GBLREF uint4			dollar_tlevel, dollar_trestart, dollar_zjob;
+GBLREF uint4			dollar_tlevel, dollar_trestart, dollar_zjob, dollar_zyjobparent;
 GBLREF volatile boolean_t	dollar_zininterrupt;
 
 #ifdef GTM_TRIGGER
@@ -638,6 +638,9 @@ void op_svget(int varnum, mval *v)
 			break;
 		case SV_ZMLKHASH:
 			i2usmval(v, mlk_last_hash);
+			break;
+		case SV_ZYJOBPARENT:
+			MV_FORCE_UMVAL(v, dollar_zyjobparent);
 			break;
 		default:
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_INVSVN);

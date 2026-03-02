@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -144,6 +144,7 @@ static readonly char zreldate_text[] = "$ZRELDATE";
 static readonly char zicuver_text[] = "$ZICUVER";
 static readonly char zyerror_text[] = "$ZYERROR";
 static readonly char zyintrsig_text[] = "$ZYINTRSIG";
+static readonly char zyjobparent_text[] = "$ZYJOBPARENT";
 static readonly char zyrelease_text[] = "$ZYRELEASE";
 static readonly char zysqlnull_text[] = "$ZYSQLNULL";
 static readonly char zonlnrlbk_text[] = "$ZONLNRLBK";
@@ -164,7 +165,7 @@ GBLREF mval			dollar_zcmdline;
 GBLREF size_t			totalAlloc, totalRmalloc, totalUsed, zmalloclim;
 GBLREF stack_frame		*frame_pointer;
 GBLREF spdesc			stringpool;
-GBLREF uint4			dollar_tlevel, dollar_trestart, dollar_zjob;
+GBLREF uint4			dollar_tlevel, dollar_trestart, dollar_zjob, dollar_zyjobparent;
 GBLREF volatile boolean_t	dollar_zininterrupt;
 #ifdef GTM_TRIGGER
 GBLREF int4			gtm_trigger_depth;
@@ -936,6 +937,13 @@ void zshow_svn(zshow_out *output, int one_sv)
 				var = literal_null;
 			}
 			ZS_VAR_EQU(&x, zyintrsig_text);
+			mval_write(output, &var, TRUE);
+			if (SV_ALL != one_sv)
+				break;
+		/* CAUTION: fall through */
+		case SV_ZYJOBPARENT:
+			MV_FORCE_UMVAL(&var, dollar_zyjobparent);
+			ZS_VAR_EQU(&x, zyjobparent_text);
 			mval_write(output, &var, TRUE);
 			if (SV_ALL != one_sv)
 				break;

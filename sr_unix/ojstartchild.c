@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -384,6 +384,7 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 	char			*pgbldir_str, *exe_str;
 	char			*transfer_addr;
 	int4			index, environ_count, string_len, temp;
+	uint4			parent_pid;
 	int			wait_status, save_errno, kill_ret;
 	int			rc, dup_ret, in_fd;
 	int			status;
@@ -736,6 +737,17 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 					SETUP_DATA_FAIL();
 				/* input_prebuffer leaks, but the middle process is about to exit, so don't worry about it */
 			}
+			/* Send the ISV $ZYJOBPARENT that contains the PID
+			 * of the process that invoked the job command.
+			 */
+			setup_op = job_set_zyparent;
+			SEND(setup_fds[0], &setup_op, SIZEOF(setup_op), 0, rc);
+			if (rc < 0)
+				SETUP_OP_FAIL();
+			parent_pid = (uint4)getppid();
+			SEND(setup_fds[0], &parent_pid, SIZEOF(parent_pid), 0, rc);
+			if (rc < 0)
+				SETUP_DATA_FAIL();
 			setup_op = job_done;
 			SEND(setup_fds[0], &setup_op, SIZEOF(setup_op), 0, rc);
 			if (rc < 0)

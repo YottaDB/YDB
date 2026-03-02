@@ -46,6 +46,7 @@ GBLREF io_log_name		*dollar_principal;
 GBLREF io_pair			io_std_device;
 GBLREF stack_frame		*frame_pointer;
 GBLREF hash_table_objcode	cache_table;
+GBLREF uint4			dollar_zyjobparent;
 #ifdef DEBUG
 GBLREF unsigned char		*msp;
 static unsigned char		*save_msp;
@@ -73,6 +74,7 @@ void ojchildparms(job_params_type *jparms, gcall_args *g_args, mval *arglst)
 {
 	char			parm_string[8];
 	int4			argcnt, i;
+	uint4			parent_pid;
 	job_setup_op		setup_op;
 	boolean_t		setup_done = FALSE;
 	job_params_msg		params;
@@ -208,6 +210,12 @@ void ojchildparms(job_params_type *jparms, gcall_args *g_args, mval *arglst)
 			s2pool(&command_str->str);
 			op_commarg(command_str, indir_set);
 			dm_start();
+			break;
+		case job_set_zyparent:
+			DOREADRC(setup_fd, &parent_pid, SIZEOF(parent_pid), rc);
+			if (rc < 0)
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_JOBSETUP, 2, LEN_AND_LIT("parent pid"), errno, 0);
+			dollar_zyjobparent = parent_pid;
 			break;
 		default:
 			assertpro(FALSE && setup_op);
