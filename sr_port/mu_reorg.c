@@ -1,9 +1,9 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -210,7 +210,7 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 				int index_fill_factor, int data_fill_factor, int reorg_op, const int min_level)
 {
 	boolean_t		end_of_tree = FALSE, detailed_log;
-	int			rec_size, pending_levels;
+	int			rec_size, pending_levels, prev_pending_levels;
 	/*
 	 *
 	 * "level" is the level of the working block.
@@ -371,6 +371,12 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 					t_retry(status);
 					continue;
 				}
+				assert(merge_split_level >= level);
+				if (gv_target->hist.depth < merge_split_level)
+				{
+					pending_levels = 0;
+					merge_split_level = level;
+				}
 				if (gv_target->hist.depth < level)
 				{
 					/* Will come here
@@ -476,7 +482,7 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 				if (cur_blk_size < max_fill - toler && 0 == (reorg_op & NOCOALESCE))
 				{
 					/* histories are sent in &gv_target->hist and gv_target->alt_hist */
-
+					prev_pending_levels = pending_levels;
 					status = mu_clsce(merge_split_level, i_max_fill, d_max_fill, &kill_set_list,
 							&pending_levels);
 					if (cdb_sc_normal == status)
@@ -506,6 +512,7 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 								for (count = 0; count < MAX_BT_DEPTH; count++)
 									rtsib_hist->h[count].level = count;
 							}
+							pending_levels = prev_pending_levels;
 							continue;
 						}
 						if (merge_split_level)
@@ -533,11 +540,13 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 						break;
 					} else if (cdb_sc_oprnotneeded == status)
 					{	/* undo any update_array/cw_set changes and DROP THRU to t_end */
+						pending_levels = prev_pending_levels;
 						cw_set_depth = 0;
 						CHECK_AND_RESET_UPDATE_ARRAY;	/* reset update_array_ptr to update_array */
 						assert(0 == cw_map_depth); /* mu_swap_blk (that changes cw_map_depth) comes later */
 					} else
 					{
+						pending_levels = prev_pending_levels;
 						t_retry(status);
 						continue;
 					}
