@@ -108,6 +108,32 @@ void op_zyencode(void)
 		if (ARG1_IS_GBL(zyencode_args))
 		{	/*==================== ZYENCODE ^gvn1=^gvn2 =====================*/
 			zyencode_zydecode_desc_check(ERR_ZYENCODEDESC); /* will not proceed if one is descendant of another */
+			/* Need to make sure the destination global reference is 30 subscripts or less, as this code
+			 * adds a subscript level to the destination in order to support JSON string chunking.
+			 */
+			gvname_env_restore(gblp1);	/* change to IND1 for max subscript test */
+			cnt = 0;
+			ptr = (unsigned char *)&gv_currkey->base[gv_target->gvname.var_name.len + 1];
+			ptr_top = (unsigned char *)gv_currkey->base + gv_currkey->end;
+			for ( ; ptr < ptr_top; )
+			{
+				opstr.addr = (char *)buff;
+				opstr.len = MAX_ZWR_KEY_SZ;
+				ptr2 = gvsub2str(ptr, &opstr, FALSE);
+				while (*ptr++)
+					;	/* skip to start of next subscript */
+				cnt++;
+			}
+			gvname_env_restore(gblp2);	/* change back to IND2 after max subscript test */
+			if ((YDB_MAX_SUBS - 1) < cnt)
+			{
+				/* zyencode with too many subscripts in the destination global variable
+				 * a subscript level is added to support JSON strings larger than 1 MiB
+				 */
+				POP_MV_STENT();	/* value */
+				zyencode_args = 0;	/* Must reset to zero to reuse zyencode */
+				ENCODE_DECODE_NESTED_RTS_ERROR(YDB_ERR_MAXNRSUBSCRIPTS, ERR_ZYENCODEINCOMPL);
+			}
 			variable.buf_addr = (char *)gv_buff;
 			variable.len_alloc = YDB_MAX_IDENT + 1;	/* 1 for the ^ */
 			variable.buf_addr[0] = '^';	/* make sure ydb_encode_s() knows it's a global */
@@ -182,6 +208,35 @@ void op_zyencode(void)
 		} else
 		{	/*==================== ZYENCODE lvn1=^gvn2 =====================*/
 			assert(ARG1_IS_LCL(zyencode_args));
+			/* Need to make sure the destination local reference is 30 subscripts or less, as this code
+			 * adds a subscript level to the destination in order to support JSON string chunking.
+			 */
+			assert(eglvnp->lclp[IND1]);
+			if (!LV_IS_BASE_VAR(eglvnp->lclp[IND1]))
+			{
+				unsigned int	count = 0;
+
+				lv = eglvnp->lclp[IND1];
+				base_lv = LV_GET_BASE_VAR(lv);
+				while (lv != base_lv)
+				{
+					lvt = LV_GET_PARENT_TREE(lv);
+					lv = (lv_val *)LVT_PARENT(lvt);
+					count++;
+				}
+				if ((YDB_MAX_SUBS - 1) < count)
+				{
+					/* zyencode with too many subscripts in the destination global variable
+					 * a subscript level is added to support JSON strings larger than 1 MiB
+					 */
+					assert(orig_active_lv == active_lv);
+					/* kill "dst" and parents as applicable if $data(dst)=0 */
+					UNDO_ACTIVE_LV(actlv_op_zyencode1);
+					POP_MV_STENT();	/* value */
+					zyencode_args = 0;	/* Must reset to zero to reuse zyencode */
+					ENCODE_DECODE_NESTED_RTS_ERROR(YDB_ERR_MAXNRSUBSCRIPTS, ERR_ZYENCODEINCOMPL);
+				}
+			}
 			/* At this time gv_currkey already points to gblp2 */
 			/* Need to protect subsc created from global variable subscripts from stpgcol */
 			PUSH_MV_STENT(MVST_MVAL);
@@ -286,6 +341,35 @@ void op_zyencode(void)
 		if (ARG1_IS_LCL(zyencode_args))
 		{	/*==================== ZYENCODE lvn1=lvn2 =====================*/
 			zyencode_zydecode_desc_check(ERR_ZYENCODEDESC); /* will not proceed if one is descendant of another */
+			/* Need to make sure the destination local reference is 30 subscripts or less, as this code
+			 * adds a subscript level to the destination in order to support JSON string chunking.
+			 */
+			assert(eglvnp->lclp[IND1]);
+			if (!LV_IS_BASE_VAR(eglvnp->lclp[IND1]))
+			{
+				unsigned int	count = 0;
+
+				lv = eglvnp->lclp[IND1];
+				base_lv = LV_GET_BASE_VAR(lv);
+				while (lv != base_lv)
+				{
+					lvt = LV_GET_PARENT_TREE(lv);
+					lv = (lv_val *)LVT_PARENT(lvt);
+					count++;
+				}
+				if ((YDB_MAX_SUBS - 1) < count)
+				{
+					/* zyencode with too many subscripts in the destination global variable
+					 * a subscript level is added to support JSON strings larger than 1 MiB
+					 */
+					assert(orig_active_lv == active_lv);
+					/* kill "dst" and parents as applicable if $data(dst)=0 */
+					UNDO_ACTIVE_LV(actlv_op_zyencode1);
+					POP_MV_STENT();	/* value */
+					zyencode_args = 0;	/* Must reset to zero to reuse zyencode */
+					ENCODE_DECODE_NESTED_RTS_ERROR(YDB_ERR_MAXNRSUBSCRIPTS, ERR_ZYENCODEINCOMPL);
+				}
+			}
 			PUSH_MV_STENT(MVST_MVAL);
 			subsc = &mv_chain->mv_st_cont.mvs_mval;
 			subsc->mvtype = 0; /* initialize mval in the M-stack in case stp_gcol gets called before it is set below */
@@ -334,7 +418,6 @@ void op_zyencode(void)
 				zyencode_args = 0;	/* Must reset to zero to reuse zyencode */
 				ENCODE_DECODE_NESTED_RTS_ERROR(status, ERR_ZYENCODEINCOMPL);
 			}
-			assert(eglvnp->lclp[IND1]);
 			dst_lv = eglvnp->lclp[IND1];
 			orig_lv = dst_lv;
 			is_base_var = LV_IS_BASE_VAR(dst_lv);
@@ -378,6 +461,31 @@ void op_zyencode(void)
 		} else
 		{	/*==================== ZYENCODE ^gvn1=lvn2 =====================*/
 			assert(ARG1_IS_GBL(zyencode_args) && ARG2_IS_LCL(zyencode_args));
+			/* Need to make sure the destination global reference is 30 subscripts or less, as this code
+			 * adds a subscript level to the destination in order to support JSON string chunking.
+			 */
+			gvname_env_restore(gblp1);
+			cnt = 0;
+			ptr = (unsigned char *)&gv_currkey->base[gv_target->gvname.var_name.len + 1];
+			ptr_top = (unsigned char *)gv_currkey->base + gv_currkey->end;
+			for ( ; ptr < ptr_top; )
+			{
+				opstr.addr = (char *)buff;
+				opstr.len = MAX_ZWR_KEY_SZ;
+				ptr2 = gvsub2str(ptr, &opstr, FALSE);
+				while (*ptr++)
+					;	/* skip to start of next subscript */
+				cnt++;
+			}
+			if ((YDB_MAX_SUBS - 1) < cnt)
+			{
+				/* zyencode with too many subscripts in the destination global variable
+				 * a subscript level is added to support JSON strings larger than 1 MiB
+				 */
+				POP_MV_STENT();	/* value */
+				zyencode_args = 0;	/* Must reset to zero to reuse zyencode */
+				ENCODE_DECODE_NESTED_RTS_ERROR(YDB_ERR_MAXNRSUBSCRIPTS, ERR_ZYENCODEINCOMPL);
+			}
 			assert(eglvnp->lclp[IND2]);
 			lv = eglvnp->lclp[IND2];
 			is_base_var = LV_IS_BASE_VAR(lv);
@@ -411,7 +519,6 @@ void op_zyencode(void)
 			}
 			cnt_save = cnt_fmt;
 			status = ydb_encode_s(&variable, cnt_fmt, subscripts, format, &zyencode_ret);
-			gvname_env_restore(gblp1);
 			if (outofband)
 				async_action(FALSE);
 			if (YDB_OK != status)
