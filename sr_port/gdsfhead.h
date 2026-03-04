@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -2653,7 +2653,10 @@ typedef struct	gd_region_struct
 	int4			jnl_buffer_size;
 	bool			jnl_before_image;
 	bool			opening;
-	bool			read_only;
+	bool			read_only;		/* 1 if the database file is set to read_only mode
+							 * or we do not have OS write permisions on it.
+							 * 0 otherwise.
+							 */
 	bool			was_open;
 	unsigned char		cmx_regnum;
 	unsigned char		def_coll;

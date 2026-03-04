@@ -52,6 +52,7 @@ GBLREF io_pair			io_std_device;
 
 error_def(ERR_BUFFLUFAILED);
 error_def(ERR_DBNOREGION);
+error_def(ERR_DBRDONLY);
 error_def(ERR_YDBDISTUNVERIF);
 error_def(ERR_MUNOFINISH);
 error_def(ERR_MUPCLIERR);
@@ -96,7 +97,16 @@ void mupip_dump_fhead(void)
 				gv_init_reg(rptr->reg);
 				gv_cur_region = rptr->reg; /* required for wcs_flu */
 				cs_addrs = &FILE_INFO(gv_cur_region)->s_addrs;
-				if (TRUE == grab_crit_immediate(gv_cur_region, TRUE, NOT_APPLICABLE))
+				if (gv_cur_region->read_only)
+				{	/* If we do not have write access to any requested file
+					 * we issue a BUFFLUFAILED/DBRDONLY error. This is based on
+					 * https://gitlab.com/YottaDB/DB/YDB/-/work_items/1052#note_3184880073
+					 */
+					gtm_putmsg_csa(CSA_ARG(REG2CSA(gv_cur_region))
+							VARLSTCNT(10) MAKE_MSG_WARNING(ERR_BUFFLUFAILED), 4,
+							LEN_AND_LIT("MUPIP DUMPFHEAD -FLUSH while checking for write permission."),
+							DB_LEN_STR(gv_cur_region), ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
+				} else if (TRUE == grab_crit_immediate(gv_cur_region, TRUE, NOT_APPLICABLE))
 				{
 					if (!wcs_flu(WCSFLU_FLUSH_HDR))
 					{
