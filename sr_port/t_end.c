@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -1702,6 +1702,13 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 	if (is_mm)
 		MM_WRITE_MEMORY_BARRIER;
 #	endif
+	/* gvcst_blk_build.c has an "assert(ctn < cs_addrs->ti->early_tn)" where ctn is "cs_addrs->ti->curr_tn-1".
+	 * That relies on the fact that the early_tn++ (Step CMT04) done above in this function happens BEFORE the
+	 * INCREMENT_CURR_TN done in the following line. This is guaranteed in the strong memory model
+	 * x86_64 where stores are not reordered with other stores but not guaranteed in the weaker
+	 * memory model aarch64. Therefore, use a debug-only memory barrier to ensure this.
+	 */
+	DEBUG_ONLY(SHM_WRITE_MEMORY_BARRIER);	/* needed for "assert(ctn < cs_addrs->ti->early_tn)" in gvcst_blk_build.c */
 	INCREMENT_CURR_TN(csd); /* Step CMT12 */
 	csa->t_commit_crit = T_COMMIT_CRIT_PHASE2;	/* phase2 : update database buffers. Step CMT13.
 							 * Set this BEFORE releasing crit but AFTER incrementing curr_tn.

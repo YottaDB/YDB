@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -123,6 +123,13 @@ void gvcst_blk_build(cw_set_element *cse, sm_uc_ptr_t base_addr, trans_num ctn)
 		 */
 		ctn = cs_addrs->ti->curr_tn - 1;
 	}
+	DEBUG_ONLY(SHM_READ_MEMORY_BARRIER);	/* Make sure cs_addrs->ti->early_tn (referenced a few lines later) is not
+						 * evaluated BEFORE cs_addrs->ti->curr_tn is (possible on the weaker
+						 * memory model aarch64 where multiple loads can be reordered but not
+						 * possible on the strong memory model x86_64 where loads are not reordered
+						 * with other loads) as otherwise it can cause the below assert to fail.
+						 * Hence the need/use of a read memory barrier.
+						 */
 	/* Assert that the block's transaction number is LESS than the transaction number corresponding to the blk build.
 	 * i.e. no one else should have touched the block contents in shared memory from the time we locked this in phase1
 	 * to the time we build it in phase2.
@@ -161,7 +168,7 @@ void gvcst_blk_build(cw_set_element *cse, sm_uc_ptr_t base_addr, trans_num ctn)
 	 * going to modify the block contents. It is possible a concurrent process is in "t_end.c" validating a read transaction
 	 * using the fast path. In that case, it would not get crit but instead invoke the "TP_IS_CDB_SC_BLKMOD" macro to check
 	 * if a block that it had in its read-set had changed state. On architectures where memory accesses can be reordered at
-	 * runtime (e.g. ARMV7L etc.) it is possible that the concurrent process sees the changes to the block contents BEFORE
+	 * runtime (e.g. AARCH64) it is possible that the concurrent process sees the changes to the block contents BEFORE
 	 * it sees changes to the block header. This means that the validation logic would incorrectly conclude that it saw a
 	 * consistent copy of the block. To avoid this issue, insert a write memory barrier here. This is necessary for MM.
 	 * For BG though, "cr->in_tend" is checked inside the "TP_IS_CDB_SC_BLKMOD" macro and is set only after pinning the
@@ -172,7 +179,7 @@ void gvcst_blk_build(cw_set_element *cse, sm_uc_ptr_t base_addr, trans_num ctn)
 	if (is_mm)
 		MM_WRITE_MEMORY_BARRIER;
 #	else
-	UNUSED(is_mm);
+		UNUSED(is_mm);
 #	endif
 	if (cse->forward_process)
 	{
