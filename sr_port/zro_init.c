@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -33,19 +33,36 @@ error_def(ERR_LOGTOOLONG);
  * process startup OR by "dlopen_libyottadb" through a "setenv" at image startup. Therefore it is okay to use
  * "$ydb_dist" in the literals below. Those will be expanded by "gtm_file_stat" below.
  */
-#define	ZROUTINES_DEFAULT1	"$ydb_dist/libyottadbutil.so"
-#define	ZROUTINES_DEFAULT1UTF8	"$ydb_dist/utf8/libyottadbutil.so"
-#define	ZROUTINES_DEFAULT2	"$ydb_dist"
-#define	ZROUTINES_DEFAULT2UTF8  "$ydb_dist/utf8/"
+#define CHECK_LIBYDBUTIL	"$ydb_dist/libyottadbutil.so"
+#define CHECK_PLUGIN_DIR	"$ydb_dist/plugin/o"
+
+#define UTIL_PLUGIN		"$ydb_dist/plugin/o/*.so $ydb_dist/libyottadbutil.so"
+#define NO_UTIL_PLUGIN		"$ydb_dist/plugin/o/*.so $ydb_dist"
+#define UTIL_NO_PLUGIN		CHECK_LIBYDBUTIL
+#define NO_UTIL_NO_PLUGIN	"$ydb_dist"
+/* And the UTF-8 versions. */
+#define UTF8_CHECK_LIBYDBUTIL	"$ydb_dist/utf8/libyottadbutil.so"
+#define UTF8_CHECK_PLUGIN_DIR	"$ydb_dist/plugin/o/utf8"
+
+#define UTF8_UTIL_PLUGIN	"$ydb_dist/plugin/o/utf8/*.so $ydb_dist/utf8/libyottadbutil.so"
+#define UTF8_NO_UTIL_PLUGIN	"$ydb_dist/plugin/o/utf8/*.so $ydb_dist/utf8/"
+#define UTF8_UTIL_NO_PLUGIN	UTF8_CHECK_LIBYDBUTIL
+#define UTF8_NO_UTIL_NO_PLUGIN	"$ydb_dist/utf8/"
+/* sets the value of an mstr str from a const char *value. */
+#define SET_MSTR_FROM_CONST(string, value)	\
+MBSTART {					\
+	string.len = SIZEOF(value) -1;		\
+	string.addr = value;			\
+} MBEND
 
 void zro_init(void)
 {
 	int4		status;
 	mstr		val, tn;
 	char		buf1[MAX_NUMBER_FILENAMES]; /* buffer to hold translated name */
-	boolean_t	is_ydb_env_match;
+	boolean_t	is_ydb_env_match, plugin_exists, libyottadbutil_exists;
 	uint4		ustatus;
-	mstr		def1, def2;
+	mstr		plugin, libyottadbutil, full_default;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -60,36 +77,64 @@ void zro_init(void)
 		MSTR_CONST(ext1, "");
 		if (!is_ydb_chset_utf8) /* M Mode */
 		{
-			MSTR_CONST(def1, ZROUTINES_DEFAULT1);
-			if (FILE_PRESENT == gtm_file_stat(&def1, &ext1, NULL, FALSE, &ustatus))
-			{	/* "$ydb_dist/libyottadbutil.so" is present. So use it as $zroutines. */
-				tn.len = def1.len;
-				tn.addr = def1.addr;
+			SET_MSTR_FROM_CONST(plugin, CHECK_PLUGIN_DIR);
+			SET_MSTR_FROM_CONST(libyottadbutil, CHECK_LIBYDBUTIL);
+			/* Use "$ydb_dist/plugin/o" in $zroutines if present. */
+			plugin_exists = (FILE_PRESENT == gtm_file_stat(&plugin, &ext1, NULL, FALSE, &ustatus));
+			/* Use "$ydb_dist/libyottadbutil.so" in $zroutines if present or $ydb_dist if not. */
+			libyottadbutil_exists = (FILE_PRESENT == gtm_file_stat(&libyottadbutil, &ext1, NULL, FALSE, &ustatus));
+			if (plugin_exists && libyottadbutil_exists)
+			{
+				SET_MSTR_FROM_CONST(full_default, UTIL_PLUGIN);
+			} else if (plugin_exists)
+			{
+				SET_MSTR_FROM_CONST(full_default, NO_UTIL_PLUGIN);
+			} else if (libyottadbutil_exists)
+			{
+				SET_MSTR_FROM_CONST(full_default, UTIL_NO_PLUGIN);
 			} else
-			{	/* "$ydb_dist/libyottadbutil.so" is NOT present. So use "$ydb_dist" as $zroutines. */
-				MSTR_CONST(def2, ZROUTINES_DEFAULT2);
-				tn.len = def2.len;
-				tn.addr = def2.addr;
+			{	/* "$ydb_dist/libyottadbutil.so" and "$ydb_dist/plugin/o" are NOT present.
+				 * So use "$ydb_dist" as $zroutines.
+				 */
+				SET_MSTR_FROM_CONST(full_default, NO_UTIL_NO_PLUGIN);
 			}
+			tn.len = full_default.len;
+			tn.addr = full_default.addr;
 		} else /* UTF-8 mode */
 		{
-			MSTR_CONST(def1, ZROUTINES_DEFAULT1UTF8);
-			if (FILE_PRESENT == gtm_file_stat(&def1, &ext1, NULL, FALSE, &ustatus))
-			{	/* "$ydb_dist/utf8/libyottadbutil.so" is present. So use it as $zroutines. */
-				tn.len = def1.len;
-				tn.addr = def1.addr;
-			} else
-			{	/* Try "$ydb_dist/utf8/" */
-				MSTR_CONST(def2, ZROUTINES_DEFAULT2UTF8);
-				if (FILE_PRESENT == gtm_file_stat(&def2, &ext1, NULL, FALSE, &ustatus))
-				{	/* "$ydb_dist/utf8/" is present. So use it as $zroutines. */
-					tn.len = def2.len;
-					tn.addr = def2.addr;
-				} else
-				{       /* "$ydb_dist/utf8/" does not exist. Can't use $ydb_dist since it doesn't have UTF-8 objects. */
+			SET_MSTR_FROM_CONST(plugin, UTF8_CHECK_PLUGIN_DIR);
+			SET_MSTR_FROM_CONST(libyottadbutil, UTF8_CHECK_LIBYDBUTIL);
+			/* Use "$ydb_dist/plugin/o/utf8" in $zroutines if present. */
+			plugin_exists = (FILE_PRESENT == gtm_file_stat(&plugin, &ext1, NULL, FALSE, &ustatus));
+			/* Use "$ydb_dist/utf8/libyottadbutil.so" in $zroutines if present or $ydb_dist if not. */
+			libyottadbutil_exists = (FILE_PRESENT == gtm_file_stat(&libyottadbutil, &ext1, NULL, FALSE, &ustatus));
+			if (!libyottadbutil_exists)
+			{
+				SET_MSTR_FROM_CONST(libyottadbutil, UTF8_NO_UTIL_NO_PLUGIN);
+				if (FILE_PRESENT != gtm_file_stat(&libyottadbutil, &ext1, NULL, FALSE, &ustatus))
+				{	/* "$ydb_dist/utf8/" does not exist.
+					 * Can't use $ydb_dist since it doesn't have UTF-8 objects.
+					 */
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_UTF8NOTINSTALLED) ;
 				}
 			}
+			if (plugin_exists && libyottadbutil_exists)
+			{
+				SET_MSTR_FROM_CONST(full_default, UTF8_UTIL_PLUGIN);
+			} else if (plugin_exists)
+			{
+				SET_MSTR_FROM_CONST(full_default, UTF8_NO_UTIL_PLUGIN);
+			} else if (libyottadbutil_exists)
+			{
+				SET_MSTR_FROM_CONST(full_default, UTF8_UTIL_NO_PLUGIN);
+			} else
+			{	/* "$ydb_dist/utf8/libyottadbutil.so" and "$ydb_dist/plugin/o/utf8" are NOT present.
+				 * So use "$ydb_dist/utf8/" as $zroutines.
+				 */
+				SET_MSTR_FROM_CONST(full_default, UTF8_NO_UTIL_NO_PLUGIN);
+			}
+			tn.len = full_default.len;
+			tn.addr = full_default.addr;
 		}
 	}
 	zro_load(&tn);
