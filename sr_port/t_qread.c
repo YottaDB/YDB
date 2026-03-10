@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -338,7 +338,20 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 		return (sm_uc_ptr_t)NULL;
 	}
 	if (is_mm)
-	{
+	{	/* The access method is MM. The most common caller of this function is "gvcst_search()" and it has
+		 * noted down "pCurr->tn = cs_addrs->ti->curr_tn" just before calling us. Once the below "mm_read()"
+		 * call returns the caller will then access the block contents and fill in the search history.
+		 * The commit logic in t_end/tp_tend compares this noted tn against the tn in the block header
+		 * (see "if (t1->tn <= ((blk_hdr_ptr_t)(t1->buffaddr))->tn)" logic) and if not it assumes that there
+		 * have been no concurrent changes to this block and the validation logic assumes this is good to commit.
+		 * But all that assumes that the noting down of "pCurr->tn" happens BEFORE any reads of the block contents
+		 * that happen after "mm_read()" returns. This is not guaranteed on architectures like AARCH64 where
+		 * independent memory load instructions can be reordered by the processor. Prevent that reordering using
+		 * the read memory barrier macro below.
+		 *
+		 * Note that BG access method also requires a similar read memory barrier and we do that later in this function.
+		 */
+		SHM_READ_MEMORY_BARRIER;
 		*cycle = CYCLE_SHRD_COPY;
 		*cr_out = 0;
 		return (sm_uc_ptr_t)(mm_read(blk, lcl_blk_free));

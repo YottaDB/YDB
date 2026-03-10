@@ -71,7 +71,7 @@ sm_uc_ptr_t mm_read(block_id blk, boolean_t blk_free)
 	assert(dba_mm == csa->hdr->acc_meth);
 	if (blk < csa->total_blks)		/* test against process private copy of total_blks */
 	{	/* see if block needs to be converted to current version. This code block should be maintained in parallel
-		 * with a similar section in mm_read */
+		 * with a similar section in dsk_read */
 		if ((GDSV6p == (tmp_ondskblkver = ((blk_hdr_ptr_t)buff)->bver)) && (GDSMV70000 == csd->creation_mdb_ver))
 		{       /* adjust for shift of GDSV7 id from 2 to 4 */
 			tmp_ondskblkver = GDSV7;
