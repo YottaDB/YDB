@@ -99,6 +99,7 @@ GBLREF	sgmnt_addrs		*kip_csa;
 GBLREF	boolean_t		need_kip_incr;
 GBLREF	uint4			update_trans;
 GBLREF	boolean_t		mu_reorg_in_swap_blk;
+GBLREF	uint4			process_id;
 
 error_def(ERR_DBRDONLY);
 error_def(ERR_GBLNOEXIST);
@@ -119,7 +120,19 @@ error_def(ERR_MUREORGFAIL);
 	}															\
 }
 
-#ifdef UNIX
+/* This macro invokes "reorg_finish()" and sets "*RESUME" in case "CALLER_IS_MU_REORG_UPGRD_DWNGRD" is TRUE. */
+#define	REORG_FINISH(DEST_BLK_ID, BLKS_PROCESSED, BLKS_KILLED, BLKS_REUSED, FILE_EXTENDED, LVLS_REDUCED, BLKS_COALESCED,	\
+			BLKS_SPLIT, BLKS_SWAPPED, RESUME, CALLER_IS_MU_REORG_UPGRD_DWNGRD)					\
+{																\
+	reorg_finish(DEST_BLK_ID, BLKS_PROCESSED, BLKS_KILLED, BLKS_REUSED, FILE_EXTENDED, LVLS_REDUCED, BLKS_COALESCED,	\
+			BLKS_SPLIT, BLKS_SWAPPED);										\
+	if (CALLER_IS_MU_REORG_UPGRD_DWNGRD)											\
+	{															\
+		assert(FALSE == *RESUME);											\
+		*RESUME = (0 == BLKS_SPLIT);											\
+	}															\
+}
+
 # define ABORT_TRANS_IF_GBL_EXIST_NOMORE_AND_RETURN(LCL_T_TRIES, GN)								\
 {																\
 	boolean_t		tn_aborted;											\
@@ -128,12 +141,11 @@ error_def(ERR_MUREORGFAIL);
 	if (tn_aborted)														\
 	{															\
 		gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_GBLNOEXIST, 2, GN->len, GN->addr);				\
-		reorg_finish(dest_blk_id, blks_processed, blks_killed, blks_reused, file_extended, lvls_reduced, blks_coalesced,\
-				blks_split, blks_swapped);									\
+		REORG_FINISH(dest_blk_id, blks_processed, blks_killed, blks_reused, file_extended, lvls_reduced, blks_coalesced,\
+				blks_split, blks_swapped, resume, caller_is_mu_reorg_upgrd_dwngrd);				\
 		return TRUE; /* It is not an error if the global (that once existed) doesn't exist anymore (due to ROLLBACK) */	\
 	}															\
 }
-#endif
 
 void log_detailed_log(char *X, srch_hist *Y, srch_hist *Z, int level, kill_set *kill_set_list, trans_num tn);
 void reorg_finish(block_id dest_blk_id, block_id blks_processed, block_id blks_killed,
@@ -203,6 +215,7 @@ Input Parameter:
 	data_fill_factor = data blocks' fill factor
 Input/Output Parameter:
 	resume = resume flag
+	          (Note: this is overloaded in case of a "mupip reorg -upgrade" to store whether at least one block got split)
 	reorg_op = What operations to do (coalesce or, swap or, split) [Default is all]
 			[Only for debugging]
  ****************************************************************/
@@ -211,6 +224,7 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 {
 	boolean_t		end_of_tree = FALSE, detailed_log;
 	int			rec_size, pending_levels, prev_pending_levels;
+	uint4			reorg_upgrade_pid;
 	/*
 	 *
 	 * "level" is the level of the working block.
@@ -240,6 +254,7 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 	trans_num		ret_tn;
 	mstr			*gn;
 	uint4			sleep_nsec;
+	boolean_t		caller_is_mu_reorg_upgrd_dwngrd;
 #	ifdef UNIX
 	DEBUG_ONLY(unsigned int	lcl_t_tries;)
 #	endif
@@ -292,7 +307,13 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 		return TRUE;
 	}
 	long_blk_id = (BLK_ID_32_VER < cs_data->desired_db_format);
-	if ((0 != cs_addrs->nl->reorg_upgrade_pid) && (is_proc_alive(cs_addrs->nl->reorg_upgrade_pid, 0)))
+	/* "mu_reorg()" can be called by "mupip reorg -upgrade" (in function "find_gvt_roots()"). We detect that
+	 * case by checking "process_id" against "cs_addrs->nl->reorg_upgrade_pid".
+	 */
+	reorg_upgrade_pid = cs_addrs->nl->reorg_upgrade_pid;
+	assert(0 != process_id);
+	caller_is_mu_reorg_upgrd_dwngrd = (process_id == reorg_upgrade_pid);
+	if ((0 != reorg_upgrade_pid) && (process_id != reorg_upgrade_pid) && (is_proc_alive(reorg_upgrade_pid, 0)))
 		return FALSE;	/* REORG -UPGRADE cannot run concurrently with TRUNCATE which has higher priority. Stop */
 	memcpy(&gv_currkey_next_reorg->base[0], &gv_currkey->base[0], gv_currkey->end + 1);
 	gv_currkey_next_reorg->end =  gv_currkey->end;
@@ -348,8 +369,10 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 		while(pending_levels)	/* === START WHILE COMPLETE_MERGE === */
 		{
 			assert(pending_levels >= 0);
-			if (mu_ctrlc_occurred || mu_ctrly_occurred || ((0 != cs_addrs->nl->reorg_upgrade_pid)
-						&& (is_proc_alive(cs_addrs->nl->reorg_upgrade_pid, 0))))
+			reorg_upgrade_pid = cs_addrs->nl->reorg_upgrade_pid;
+			if (mu_ctrlc_occurred || mu_ctrly_occurred
+				|| ((0 != reorg_upgrade_pid) && (process_id != reorg_upgrade_pid)
+					&& (is_proc_alive(reorg_upgrade_pid, 0))))
 			{	/* REORG -UPGRADE cannot run concurrently with REORG which has higher priority. Stop */
 				SAVE_REORG_RESTART;
 				return FALSE;
@@ -386,8 +409,9 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 					if (min_level > gv_target->hist.depth)
 					{
 						util_out_print("REORG may be incomplete for this global.", TRUE);
-						reorg_finish(dest_blk_id, blks_processed, blks_killed, blks_reused,
-							file_extended, lvls_reduced, blks_coalesced, blks_split, blks_swapped);
+						REORG_FINISH(dest_blk_id, blks_processed, blks_killed, blks_reused,
+							file_extended, lvls_reduced, blks_coalesced, blks_split, blks_swapped,
+							resume, caller_is_mu_reorg_upgrd_dwngrd);
 						return TRUE;
 
 					}
@@ -420,17 +444,18 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 					{
 						gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(6) ERR_MAXBTLEVEL, 4, gn->len, gn->addr,
 							REG_LEN_STR(gv_cur_region));
-						reorg_finish(dest_blk_id, blks_processed, blks_killed, blks_reused,
-							file_extended, lvls_reduced, blks_coalesced, blks_split, blks_swapped);
+						REORG_FINISH(dest_blk_id, blks_processed, blks_killed, blks_reused,
+							file_extended, lvls_reduced, blks_coalesced, blks_split, blks_swapped,
+							resume, caller_is_mu_reorg_upgrd_dwngrd);
 						return FALSE;
 					} else if (cdb_sc_normal == status)
 					{
-						UNIX_ONLY(DEBUG_ONLY(lcl_t_tries = t_tries));
+						DEBUG_ONLY(lcl_t_tries = t_tries);
 						if ((trans_num)0 == (ret_tn = t_end(&(gv_target->hist), NULL, TN_NOT_SPECIFIED)))
 						{
 							need_kip_incr = FALSE;
 							assert(NULL == kip_csa);
-							UNIX_ONLY(ABORT_TRANS_IF_GBL_EXIST_NOMORE_AND_RETURN(lcl_t_tries, gn));
+							ABORT_TRANS_IF_GBL_EXIST_NOMORE_AND_RETURN(lcl_t_tries, gn);
 							max_rightblk_lvl = min_level;
 							continue;
 						}
@@ -500,13 +525,13 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 							if (!cs_addrs->now_crit)	/* Do not sleep while holding crit */
 								WAIT_ON_INHIBIT_KILLS(cs_addrs->nl, MAXWAIT2KILL);
 						}
-						UNIX_ONLY(DEBUG_ONLY(lcl_t_tries = t_tries));
+						DEBUG_ONLY(lcl_t_tries = t_tries);
 						if ((trans_num)0 == (ret_tn = t_end(&(gv_target->hist), rtsib_hist,
 							TN_NOT_SPECIFIED)))
 						{
 							need_kip_incr = FALSE;
 							assert(NULL == kip_csa);
-							UNIX_ONLY(ABORT_TRANS_IF_GBL_EXIST_NOMORE_AND_RETURN(lcl_t_tries, gn));
+							ABORT_TRANS_IF_GBL_EXIST_NOMORE_AND_RETURN(lcl_t_tries, gn);
 							if (merge_split_level)
 							{	/* reinitialize level member in rtsib_hist srch_blk_status' */
 								for (count = 0; count < MAX_BT_DEPTH; count++)
@@ -607,12 +632,12 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 						inctn_opcode = inctn_invalid_op; /* temporary reset; satisfy an assert in t_end() */
 						assert(UPDTRNS_DB_UPDATED_MASK == update_trans);
 						update_trans = 0; /* tell t_end, this is no longer an update transaction */
-						UNIX_ONLY(DEBUG_ONLY(lcl_t_tries = t_tries));
+						DEBUG_ONLY(lcl_t_tries = t_tries);
 						if ((trans_num)0 == (ret_tn = t_end(rtsib_hist, NULL, TN_NOT_SPECIFIED)))
 						{
 							need_kip_incr = FALSE;
 							assert(NULL == kip_csa);
-							UNIX_ONLY(ABORT_TRANS_IF_GBL_EXIST_NOMORE_AND_RETURN(lcl_t_tries, gn));
+							ABORT_TRANS_IF_GBL_EXIST_NOMORE_AND_RETURN(lcl_t_tries, gn);
 							if (merge_split_level && (rtsib_bstar_rec_sz != rec_size))
 							{	/* reinitialize level member in rtsib_hist srch_blk_status' */
 								for (count = 0; count < MAX_BT_DEPTH; count++)
@@ -649,8 +674,9 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 			}/* === SPLIT-COALESCE LOOP END === */
 			t_abort(gv_cur_region, cs_addrs);	/* do crit and other cleanup */
 		}/* === START WHILE COMPLETE_MERGE === */
-		if (mu_ctrlc_occurred || mu_ctrly_occurred || ((0 != cs_addrs->nl->reorg_upgrade_pid)
-					&& (is_proc_alive(cs_addrs->nl->reorg_upgrade_pid, 0))))
+		reorg_upgrade_pid = cs_addrs->nl->reorg_upgrade_pid;
+		if (mu_ctrlc_occurred || mu_ctrly_occurred
+			|| ((0 != reorg_upgrade_pid) && (process_id != reorg_upgrade_pid) && (is_proc_alive(reorg_upgrade_pid, 0))))
 		{	/* REORG -UPGRADE cannot run concurrently with TRUNCATE which has higher priority. Stop */
 			SAVE_REORG_RESTART;
 			return FALSE;
@@ -683,13 +709,14 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 					if (cs_data->trans_hist.total_blks <= dest_blk_id)
 					{
 						util_out_print("REORG may be incomplete for this global.", TRUE);
-						reorg_finish(dest_blk_id, blks_processed, blks_killed, blks_reused,
-							file_extended, lvls_reduced, blks_coalesced, blks_split, blks_swapped);
+						REORG_FINISH(dest_blk_id, blks_processed, blks_killed, blks_reused,
+							file_extended, lvls_reduced, blks_coalesced, blks_split, blks_swapped,
+							resume, caller_is_mu_reorg_upgrd_dwngrd);
 						return TRUE;
 					}
 				} else if (cdb_sc_normal == status)
 				{
-					UNIX_ONLY(DEBUG_ONLY(lcl_t_tries = t_tries));
+					DEBUG_ONLY(lcl_t_tries = t_tries);
 					MERGE_SUPER_HIST(&super_dest_hist, reorg_gv_target->alt_hist, &(reorg_gv_target->hist));
 					if (0 < kill_set_list.used)
 					{
@@ -702,7 +729,7 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 						{
 							need_kip_incr = FALSE;
 							assert(NULL == kip_csa);
-							UNIX_ONLY(ABORT_TRANS_IF_GBL_EXIST_NOMORE_AND_RETURN(lcl_t_tries, gn));
+							ABORT_TRANS_IF_GBL_EXIST_NOMORE_AND_RETURN(lcl_t_tries, gn);
 							DECR_BLK_NUM(dest_blk_id);
 							continue;
 						}
@@ -727,7 +754,7 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 					{
 						need_kip_incr = FALSE;
 						assert(NULL == kip_csa);
-						UNIX_ONLY(ABORT_TRANS_IF_GBL_EXIST_NOMORE_AND_RETURN(lcl_t_tries, gn));
+						ABORT_TRANS_IF_GBL_EXIST_NOMORE_AND_RETURN(lcl_t_tries, gn);
 						DECR_BLK_NUM(dest_blk_id);
 						continue;
 					}
@@ -747,8 +774,9 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 			}	/* === END OF SWAP LOOP === */
 			t_abort(gv_cur_region, cs_addrs);	/* do crit and other cleanup */
 		}
-		if (mu_ctrlc_occurred || mu_ctrly_occurred || ((0 != cs_addrs->nl->reorg_upgrade_pid)
-					&& (is_proc_alive(cs_addrs->nl->reorg_upgrade_pid, 0))))
+		reorg_upgrade_pid = cs_addrs->nl->reorg_upgrade_pid;
+		if (mu_ctrlc_occurred || mu_ctrly_occurred
+			|| ((0 != reorg_upgrade_pid) && (process_id != reorg_upgrade_pid) && (is_proc_alive(reorg_upgrade_pid, 0))))
 		{	/* REORG -UPGRADE cannot run concurrently with TRUNCATE which has higher priority. Stop */
 			SAVE_REORG_RESTART;
 			return FALSE;
@@ -807,12 +835,12 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 				need_kip_incr = TRUE;
 				if (!cs_addrs->now_crit)	/* Do not sleep while holding crit */
 					WAIT_ON_INHIBIT_KILLS(cs_addrs->nl, MAXWAIT2KILL);
-				UNIX_ONLY(DEBUG_ONLY(lcl_t_tries = t_tries));
+				DEBUG_ONLY(lcl_t_tries = t_tries);
 				if ((trans_num)0 == (ret_tn = t_end(&(gv_target->hist), NULL, TN_NOT_SPECIFIED)))
 				{
 					need_kip_incr = FALSE;
 					assert(NULL == kip_csa);
-					UNIX_ONLY(ABORT_TRANS_IF_GBL_EXIST_NOMORE_AND_RETURN(lcl_t_tries, gn));
+					ABORT_TRANS_IF_GBL_EXIST_NOMORE_AND_RETURN(lcl_t_tries, gn);
 					continue;
 				}
 				if (detailed_log)
@@ -836,8 +864,9 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 			break;
 	}
 	/* =========== END REDUCE LEVEL ===========*/
-	reorg_finish(dest_blk_id, blks_processed, blks_killed, blks_reused,
-			file_extended, lvls_reduced, blks_coalesced, blks_split, blks_swapped);
+	REORG_FINISH(dest_blk_id, blks_processed, blks_killed, blks_reused,
+			file_extended, lvls_reduced, blks_coalesced, blks_split, blks_swapped,
+			resume, caller_is_mu_reorg_upgrd_dwngrd);
 	return TRUE;
 } /* end mu_reorg() */
 

@@ -3,7 +3,7 @@
  * Copyright (c) 2005-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2025-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -468,7 +468,7 @@ enum cdb_sc find_gvt_roots(block_id *curr_blk, gd_region *reg, cache_rec_ptr_t *
 	enum db_ver	blk_ver;
 	gvnh_reg_t	*gvnh_reg;
 	gtm_int8	lcl_gv_trees;
-	int		key_cmpc, key_len, level, new_blk_sz, num_recs, rec_sz, split_blks_added, split_levels_added;
+	int		key_cmpc, key_len, level, split_blk_sz, num_recs, rec_sz, split_blks_added, split_levels_added;
 	int4		lcnt, status;
 	mname_entry	gvname;
 	sgmnt_addrs	*csa;
@@ -510,7 +510,9 @@ enum cdb_sc find_gvt_roots(block_id *curr_blk, gd_region *reg, cache_rec_ptr_t *
 		if (debug_mupip)
 			util_out_print("Region !AD: DT level 0 block 0x!@XQ\tprocessing", TRUE, REG_LEN_STR(reg), curr_blk);
 		for (lcl_gv_trees = 0; recBase < blkEnd; recBase +=rec_sz, lcl_gv_trees++)
-		{	/* iterate through block invoking upgrade_idx block for each gv root */
+		{	/* iterate through block invoking upgrade_idx_block for each gv root */
+			boolean_t	mu_reorg_did_not_split_any_blk;
+
 			status = read_record(&rec_sz, &key_cmpc, &key_len, key_buff, dirHist.level, &dirHist, recBase);
 			if (cdb_sc_normal != status)		/* no *-keys at level 0 in dir tree */
 				return status;
@@ -528,9 +530,10 @@ enum cdb_sc find_gvt_roots(block_id *curr_blk, gd_region *reg, cache_rec_ptr_t *
 						TRUE, REG_LEN_STR(reg), gvname.var_name.addr, &blk_pter);
 			blocks_left = csd->blks_to_upgrd;	/* Remaining blocks to upgrade counter prevents a infinite loop */
 			lcnt = MAX_BLK_TRIES;
+			mu_reorg_did_not_split_any_blk = FALSE;
 			do
 			{	/* Retry GVT root block until it the upgrade completes cleanly (or control-C) */
-				status = upgrade_idx_block(&blk_pter, reg, &gvname, &child_cr);
+				status = upgrade_idx_block(&blk_pter, reg, &gvname, &child_cr, &split_blk_sz);
 				if (is_bg && (NULL != child_cr))
 				{	/* Release the cache record, transitively making the corresponding buffer, that this
 					 * function just modified, available for re-use. Doing so ensures that all the CRs being
@@ -552,7 +555,89 @@ enum cdb_sc find_gvt_roots(block_id *curr_blk, gd_region *reg, cache_rec_ptr_t *
 					blocks_left = csd->blks_to_upgrd;
 					lcnt = MAX_BLK_TRIES;
 				} else if (status == cdb_sc_blksplit)
-				{	/* Block splits do not count as errors, but they do require reprocessing the GVT */
+				{	/* Block splits do not count as errors, but they do require reprocessing the GVT.
+					 *
+					 * But to avoid reprocessing the GVT a lot of times, invoke "mupip reorg" so as
+					 * to achieve block splits of almost all of the index blocks in the GVT in one
+					 * traversal of the GVT. This is what the "mu_reorg()" call below implements.
+					 *
+					 * If a previous "mu_reorg()" call in this do/while loop did not end up splitting
+					 * any index block (which it could for example in the "r204/mureorgupgrade-ydb1027"
+					 * subtest where 512-byte blocks with maximum possible key sizes were used), we do
+					 * not want to do any more calls to "mu_reorg()" again as it is most likely not going
+					 * to do any splits again. Hence the "!mu_reorg_did_not_split_any_blk" check below.
+					 *
+					 * If the GVT is already at the maximum height (possible for example in the
+					 * "v71002/mupipupgrade_maxtreedepth-gtmde556760" subtest), we cannot split the
+					 * root block as it will create a tree height more than the design maximum. So skip
+					 * calling "mu_reorg()" in this case.
+					 */
+					/* gv_target should already be set correctly by a previous call to "gen_hist_for_blk()" */
+					assert(gv_cur_region == reg);
+					assert(!memcmp(gvname.var_name.addr, gv_target->gvname.var_name.addr, gvname.var_name.len));
+					assert(MAX_BT_DEPTH > gv_target->hist.depth);
+					if (!mu_reorg_did_not_split_any_blk && (MAX_BT_DEPTH > (gv_target->hist.depth + 1)))
+					{
+						glist		reorg_upgrade_gl;
+						boolean_t	resume, reorg_ret;
+						int		data_fill_factor, index_fill_factor, min_level, reorg_op;
+
+						reorg_upgrade_gl.next = NULL;
+						reorg_upgrade_gl.reg = reg;
+						reorg_upgrade_gl.gvt = gv_target;
+						reorg_gv_target->gvname.var_name = gv_target->gvname.var_name;
+						/* Determine -index_fill_factor for the mupip reorg based on the index block
+						 * that we saw as too full. We hope other index blocks in the GVT to be in
+						 * a similar situation.
+						 */
+						assert(split_blk_sz > csd->blk_size);
+						assert(split_blk_sz < (2 * csd->blk_size));
+						split_blk_sz -= csd->blk_size;
+						index_fill_factor = MAX_FILLFACTOR
+									- ((split_blk_sz * MAX_FILLFACTOR) / csd->blk_size);
+						/* Cut down -index_fill_factor= a little more (by 15% more) to hopefully
+						 * help minimize the number of later iteration "mu_reorg()" calls. This is
+						 * just a heuristic.
+						 */
+						if (index_fill_factor > 15)
+							index_fill_factor -= 15;
+						data_fill_factor = MAX_FILLFACTOR;
+						/* Do not waste time doing COALESCE or SWAP operations in this reorg as we
+						 * are interested only in SPLIT operations for this one.
+						 */
+						reorg_op = DEFAULT | NOCOALESCE | NOSWAP;
+						/* Only process index blocks in this reorg, not data blocks.
+						 * This will speed up the reorg.
+						 */
+						min_level = 1;
+						/* Reset a few global variables to switch the current process state from being
+						 * a "mupip reorg -upgrade" to a "mupip reorg".
+						 */
+						mu_reorg_process = TRUE;
+						mu_upgrade_in_prog = MUPIP_UPGRADE_OFF;
+						util_out_print(
+							"# [mupip reorg -upgrade] found index block that requires block split",
+							TRUE);
+						util_out_print("# Invoking "
+							"[mupip reorg -select=!AD -min_level=1 -index_fill_factor=!UL -reg !AD]",
+							TRUE, gvname.var_name.len, gvname.var_name.addr,
+							index_fill_factor, REG_LEN_STR(reg));
+						resume = FALSE;
+						reorg_ret = mu_reorg(&reorg_upgrade_gl, NULL, &resume,
+									index_fill_factor, data_fill_factor, reorg_op, min_level);
+						/* Switch process global variables back to "mupip reorg -upgrade" now that
+						 * the "mupip reorg" invocation is done.
+						 */
+						mu_upgrade_in_prog = MUPIP_REORG_UPGRADE_IN_PROGRESS;
+						mu_reorg_process = FALSE;
+						assert(reorg_ret);
+						assert(!mu_reorg_did_not_split_any_blk);
+						/* Note that "resume" will be set to TRUE if "mu_reorg()" did not split any blocks
+						 * and will be set to FALSE if it did split at least one block.
+						 */
+						mu_reorg_did_not_split_any_blk = resume;
+						util_out_print("# Resuming [mupip reorg -upgrade]", TRUE);
+					}
 					lcnt = MAX_BLK_TRIES;
 					continue;
 				} else if ((0 == --lcnt) || (cdb_sc_badlvl == status))
@@ -714,7 +799,7 @@ enum cdb_sc find_gvt_roots(block_id *curr_blk, gd_region *reg, cache_rec_ptr_t *
  * 	*cr points to the cache record that this function was working on for the caller to release
  * 	(enum_cdb_sc) returns cdb_sc_normal which the code expects or a retry code
  ******************************************************************************************/
-enum cdb_sc upgrade_idx_block(block_id *curr_blk, gd_region *reg, mname_entry *gvname, cache_rec_ptr_t *cr)
+enum cdb_sc upgrade_idx_block(block_id *curr_blk, gd_region *reg, mname_entry *gvname, cache_rec_ptr_t *cr, int *split_blk_sz)
 {
 	blk_hdr		blkHdr;
 	blk_segment	*bs1, *bs_ptr;
@@ -894,6 +979,7 @@ enum cdb_sc upgrade_idx_block(block_id *curr_blk, gd_region *reg, mname_entry *g
 			assert((((blk_hdr_ptr_t)blkBase)->bsiz <= blk_size) && split_blks_added);
 			tot_splt_cnt += split_blks_added;
 			tot_levl_cnt += split_levels_added;
+			*split_blk_sz = new_blk_sz;
 			if (debug_mupip)
 				util_out_print("!UL:0x!@XQ\tSPLIT - done (added: !UL, levels: !UL)", TRUE, level,
 							curr_blk, split_blks_added, split_levels_added);
@@ -1058,6 +1144,8 @@ enum cdb_sc upgrade_idx_block(block_id *curr_blk, gd_region *reg, mname_entry *g
 	}
 	if (1 < level)
 	{	/* go after descendent trees below */
+		lcl_tn = ((blk_hdr_ptr_t)blkBase)->tn;
+		lcl_bsiz = ((blk_hdr_ptr_t)blkBase)->bsiz;
 		blkEnd = blkBase + ((blk_hdr_ptr_t)blkBase)->bsiz;
 		for (recBase = blkBase + SIZEOF(blk_hdr); recBase < blkEnd;)
 		{
@@ -1116,7 +1204,7 @@ enum cdb_sc upgrade_idx_block(block_id *curr_blk, gd_region *reg, mname_entry *g
 				return cdb_sc_blknumerr;	/* Block out of range, retry */
 			if (debug_mupip)
 				util_out_print("!UL:0x!@XQ descending to child block 0x!@XQ", TRUE, level, curr_blk, &blk_pter);
-			status = upgrade_idx_block(&blk_pter, reg, &gvt_name, &child_cr);
+			status = upgrade_idx_block(&blk_pter, reg, &gvt_name, &child_cr, split_blk_sz);
 			if (is_bg && (NULL != child_cr))
 			{	/* Release the cache record, transitively making the corresponding buffer, that this function just
 				 * modified, available for re-use. Doing so ensures that all the CRs being touched as part of the
