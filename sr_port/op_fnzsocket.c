@@ -3,7 +3,7 @@
  * Copyright (c) 2014-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -711,7 +711,7 @@ void	op_fnzsocket(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 						if (buf1 < charptr)
 							if ('\0' == *++charptr)
 								break;
-						optionend = strstr((const char *)charptr, OPTIONENDSTR);
+						optionend = strstr(charptr, OPTIONENDSTR);
 						if (NULL == optionend)
 							optionend = charptr + STRLEN(charptr);
 						*optionend = '\0';
