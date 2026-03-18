@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -112,15 +112,15 @@ boolean_t line(uint4 *lnc)
 			{	/* Don't insert an error before the first label of the routine. as no fallthrough possible */
 				if (TREF(block_level))
 				{	/* block_level means leaving embedded subroutine - assure OC_RET before inserted error */
-					if ((OC_RET != first_triple->opcode)
-						&& !(TREF(compile_time) && !(cmd_qlf.qlf & CQ_WARNINGS)))
+					if (!(TREF(compile_time) && !(cmd_qlf.qlf & CQ_WARNINGS)))
 					{	/* warn of added QUIT */
 						show_source_line(TRUE);
 						dec_err(VARLSTCNT(6) MAKE_MSG_WARNING(ERR_FALLINTOFLST), 0,
 							ERR_TEXT, 2, RTS_ERROR_STRING("Adding implicit QUIT above"));
 					}
 					e = maketriple(OC_RET);	/* this needs an entry in line table to serve as jmp target */
-					r = first_triple->exorder.fl;
+					r = first_triple;
+					/* This adds the OC_RET ensuring it will be before OC_RTERROR. */
 					dqins(r, exorder, e);
 					first_triple = r->exorder.fl;
 					added_ret = (mline *)mcalloc(SIZEOF(*added_ret));
