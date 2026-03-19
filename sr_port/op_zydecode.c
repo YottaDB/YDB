@@ -49,6 +49,7 @@ GBLREF gv_namehead		*gv_target;
 GBLREF int			zydecode_args;
 GBLREF zydecode_glvn_ptr	dglvnp;
 GBLREF mv_stent			*mv_chain;
+GBLREF ydb_string_t		zydecode_json;
 GBLREF bool			undef_inhibit;
 GBLREF volatile int4		outofband;
 #ifdef DEBUG
@@ -73,7 +74,6 @@ void op_zydecode(void)
 	char			*format = "JSON", *tjson, error_str[YDB_MAX_ERRORMSG];
 	bool			undef_inhibit_save = false;
 	ydb_buffer_t		variable, subscripts[YDB_MAX_SUBS];
-	ydb_string_t		json = {0};
 #	ifdef DEBUG
 	lv_val			*orig_active_lv;
 #	endif
@@ -144,15 +144,16 @@ void op_zydecode(void)
 					{
 						/* double it to reduce the number of potential allocations */
 						realloc_size = (json_size + value->str.len) * 2;
-						tjson = realloc(json.address, realloc_size);
+						tjson = realloc(zydecode_json.address, realloc_size);
 						if (NULL == tjson)
 						{
 							/* free() is not used because of realloc() use which
 							 * gtm_malloc() does not support
 							 */
-							system_free(json.address);
-							json.address = NULL;
-							json.length = 0;
+							system_free(zydecode_json.address);
+							/* Need to set NULL to ensure no double free() can happen */
+							zydecode_json.address = NULL;
+							zydecode_json.length = 0;
 							err = errno;
 							/* store destination as naked indicator in gv_currkey */
 							gvname_env_restore(gblp1);
@@ -165,9 +166,9 @@ void op_zydecode(void)
 							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_ZYDECODEINCOMPL, 0,
 								ERR_SYSCALL, 5, RTS_ERROR_STRING(error_str), CALLFROM, err);
 						}
-						json.address = tjson;
+						zydecode_json.address = tjson;
 					}
-					memcpy(&json.address[json_size], value->str.addr, value->str.len);
+					memcpy(&zydecode_json.address[json_size], value->str.addr, value->str.len);
 					json_size += value->str.len;
 				} else
 				{
@@ -177,7 +178,7 @@ void op_zydecode(void)
 					sgnl_gvundef();	/* Issue GVUNDEF error */
 				}
 			}
-			json.length = json_size;
+			zydecode_json.length = json_size;
 			gvname_env_restore(gblp1);
 			name_buff[0] = '^';	/* make sure ydb_decode_s() knows it's a global */
 			/* gv_target->gvname.var_name.len should never be bigger than YDB_MAX_IDENT, but we'll be extra safe */
@@ -205,11 +206,11 @@ void op_zydecode(void)
 					;	/* skip to start of next subscript */
 			}
 			assert(ptr == ptr_top);
-			status = ydb_decode_s(&variable, cnt, subscripts, format, &json);
+			status = ydb_decode_s(&variable, cnt, subscripts, format, &zydecode_json);
 			/* free() is not used because of realloc() use which gtm_malloc() does not support */
-			system_free(json.address);
-			json.address = NULL;
-			json.length = 0;
+			system_free(zydecode_json.address);
+			zydecode_json.address = NULL;	/* Need to set NULL to ensure no double free() can happen */
+			zydecode_json.length = 0;
 			for (int i = 0; i < cnt; i++)
 				YDB_FREE_BUFFER(&subscripts[i]);
 			gvname_env_restore(gblp1);	/* naked indicator is restored into gv_currkey */
@@ -284,15 +285,16 @@ void op_zydecode(void)
 					{
 						/* double it to reduce the number of potential allocations */
 						realloc_size = (json_size + value->str.len) * 2;
-						tjson = realloc(json.address, realloc_size);
+						tjson = realloc(zydecode_json.address, realloc_size);
 						if (NULL == tjson)
 						{
 							/* free() is not used because of realloc() use which
 							 * gtm_malloc() does not support
 							 */
-							system_free(json.address);
-							json.address = NULL;
-							json.length = 0;
+							system_free(zydecode_json.address);
+							/* Need to set NULL to ensure no double free() can happen */
+							zydecode_json.address = NULL;
+							zydecode_json.length = 0;
 							err = errno;
 							/* kill "dst" and parents as applicable if $data(dst)=0 */
 							UNDO_ACTIVE_LV(actlv_op_zydecode3);
@@ -307,9 +309,9 @@ void op_zydecode(void)
 							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_ZYDECODEINCOMPL, 0,
 								ERR_SYSCALL, 5, RTS_ERROR_STRING(error_str), CALLFROM, err);
 						}
-						json.address = tjson;
+						zydecode_json.address = tjson;
 					}
-					memcpy(&json.address[json_size], value->str.addr, value->str.len);
+					memcpy(&zydecode_json.address[json_size], value->str.addr, value->str.len);
 					json_size += value->str.len;
 				} else
 				{
@@ -321,12 +323,12 @@ void op_zydecode(void)
 					sgnl_gvundef();	/* Issue GVUNDEF error */
 				}
 			}
-			json.length = json_size;
-			status = ydb_decode_s(&variable, cnt_fmt, subscripts, format, &json);
+			zydecode_json.length = json_size;
+			status = ydb_decode_s(&variable, cnt_fmt, subscripts, format, &zydecode_json);
 			/* free() is not used because of realloc() use which gtm_malloc() does not support */
-			system_free(json.address);
-			json.address = NULL;
-			json.length = 0;
+			system_free(zydecode_json.address);
+			zydecode_json.address = NULL;	/* Need to set NULL to ensure no double free() can happen */
+			zydecode_json.length = 0;
 			for (int i = 0; i < cnt_fmt; i++)
 				YDB_FREE_BUFFER(&subscripts[i]);
 			gvname_env_restore(gblp2);	/* naked indicator is restored into gv_currkey */
@@ -416,15 +418,16 @@ void op_zydecode(void)
 					{
 						/* double it to reduce the number of potential allocations */
 						realloc_size = (json_size + dst_lv->v.str.len) * 2;
-						tjson = realloc(json.address, realloc_size);
+						tjson = realloc(zydecode_json.address, realloc_size);
 						if (NULL == tjson)
 						{
 							/* free() is not used because of realloc() use which
 							 * gtm_malloc() does not support
 							 */
-							system_free(json.address);
-							json.address = NULL;
-							json.length = 0;
+							system_free(zydecode_json.address);
+							/* Need to set NULL to ensure no double free() can happen */
+							zydecode_json.address = NULL;
+							zydecode_json.length = 0;
 							err = errno;
 							/* kill "dst" and parents as applicable if $data(dst)=0 */
 							UNDO_ACTIVE_LV(actlv_op_zydecode3);
@@ -437,9 +440,9 @@ void op_zydecode(void)
 							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_ZYDECODEINCOMPL, 0,
 								ERR_SYSCALL, 5, RTS_ERROR_STRING(error_str), CALLFROM, err);
 						}
-						json.address = tjson;
+						zydecode_json.address = tjson;
 					}
-					memcpy(&json.address[json_size], dst_lv->v.str.addr, dst_lv->v.str.len);
+					memcpy(&zydecode_json.address[json_size], dst_lv->v.str.addr, dst_lv->v.str.len);
 					json_size += dst_lv->v.str.len;
 				} else
 				{
@@ -456,12 +459,12 @@ void op_zydecode(void)
 					RTS_ERROR_CSA_ABT(CSA_ARG(NULL) VARLSTCNT(4) ERR_LVUNDEF, 2, end_buff - err_buff, err_buff);
 				}
 			}
-			json.length = json_size;
-			status = ydb_decode_s(&variable, cnt_fmt, subscripts, format, &json);
+			zydecode_json.length = json_size;
+			status = ydb_decode_s(&variable, cnt_fmt, subscripts, format, &zydecode_json);
 			/* free() is not used because of realloc() use which gtm_malloc() does not support */
-			system_free(json.address);
-			json.address = NULL;
-			json.length = 0;
+			system_free(zydecode_json.address);
+			zydecode_json.address = NULL;	/* Need to set NULL to ensure no double free() can happen */
+			zydecode_json.length = 0;
 			for (int i = 0; i < cnt_fmt; i++)
 				YDB_FREE_BUFFER(&subscripts[i]);
 			if (outofband)
@@ -505,15 +508,16 @@ void op_zydecode(void)
 					{
 						/* double it to reduce the number of potential allocations */
 						realloc_size = (json_size + dst_lv->v.str.len) * 2;
-						tjson = realloc(json.address, realloc_size);
+						tjson = realloc(zydecode_json.address, realloc_size);
 						if (NULL == tjson)
 						{
 							/* free() is not used because of realloc() use which
 							 * gtm_malloc() does not support
 							 */
-							system_free(json.address);
-							json.address = NULL;
-							json.length = 0;
+							system_free(zydecode_json.address);
+							/* Need to set NULL to ensure no double free() can happen */
+							zydecode_json.address = NULL;
+							zydecode_json.length = 0;
 							err = errno;
 							/* store destination as naked indicator in gv_currkey */
 							gvname_env_restore(gblp1);
@@ -523,9 +527,9 @@ void op_zydecode(void)
 							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_ZYDECODEINCOMPL, 0,
 								ERR_SYSCALL, 5, RTS_ERROR_STRING(error_str), CALLFROM, err);
 						}
-						json.address = tjson;
+						zydecode_json.address = tjson;
 					}
-					memcpy(&json.address[json_size], dst_lv->v.str.addr, dst_lv->v.str.len);
+					memcpy(&zydecode_json.address[json_size], dst_lv->v.str.addr, dst_lv->v.str.len);
 					json_size += dst_lv->v.str.len;
 				} else
 				{
@@ -541,7 +545,7 @@ void op_zydecode(void)
 					RTS_ERROR_CSA_ABT(CSA_ARG(NULL) VARLSTCNT(4) ERR_LVUNDEF, 2, end_buff - err_buff, err_buff);
 				}
 			}
-			json.length = json_size;
+			zydecode_json.length = json_size;
 			gvname_env_restore(gblp1);
 			name_buff[0] = '^';	/* make sure ydb_decode_s() knows it's a global */
 			/* gv_target->gvname.var_name.len should never be bigger than YDB_MAX_IDENT, but we'll be extra safe */
@@ -569,11 +573,11 @@ void op_zydecode(void)
 					;	/* skip to start of next subscript */
 			}
 			assert(ptr == ptr_top);
-			status = ydb_decode_s(&variable, cnt, subscripts, format, &json);
+			status = ydb_decode_s(&variable, cnt, subscripts, format, &zydecode_json);
 			/* free() is not used because of realloc() use which gtm_malloc() does not support */
-			system_free(json.address);
-			json.address = NULL;
-			json.length = 0;
+			system_free(zydecode_json.address);
+			zydecode_json.address = NULL;	/* Need to set NULL to ensure no double free() can happen */
+			zydecode_json.length = 0;
 			for (int i = 0; i < cnt; i++)
 				YDB_FREE_BUFFER(&subscripts[i]);
 			gvname_env_restore(gblp1);	/* store destination as naked indicator in gv_currkey */

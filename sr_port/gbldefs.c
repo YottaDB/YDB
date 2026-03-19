@@ -430,7 +430,8 @@ GBLDEF	int			zydecode_args;
 GBLDEF	zydecode_glvn_ptr	dglvnp;
 GBLDEF	int			zyencode_args;
 GBLDEF	zyencode_glvn_ptr	eglvnp;
-GBLDEF	ydb_string_t		zyencode_ret;
+GBLDEF	ydb_string_t		zydecode_json;
+GBLDEF	ydb_string_t		zyencode_json;
 GBLDEF	boolean_t		ztrap_new;
 GBLDEF	int4			wtfini_in_prog;
 #ifdef DEBUG

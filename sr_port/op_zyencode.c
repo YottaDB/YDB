@@ -49,7 +49,7 @@ GBLREF gv_namehead		*gv_target;
 GBLREF int			zyencode_args;
 GBLREF zyencode_glvn_ptr	eglvnp;
 GBLREF mv_stent			*mv_chain;
-GBLREF ydb_string_t		zyencode_ret;
+GBLREF ydb_string_t		zyencode_json;
 GBLREF volatile int4		outofband;
 #ifdef DEBUG
 GBLREF lv_val			*active_lv;
@@ -160,7 +160,7 @@ void op_zyencode(void)
 					;	/* skip to start of next subscript */
 			}
 			cnt_save = cnt;
-			status = ydb_encode_s(&variable, cnt, subscripts, format, &zyencode_ret);
+			status = ydb_encode_s(&variable, cnt, subscripts, format, &zyencode_json);
 			gvname_env_restore(gblp1);
 			if (outofband)
 				async_action(FALSE);
@@ -173,8 +173,8 @@ void op_zyencode(void)
 				ENCODE_DECODE_NESTED_RTS_ERROR(status, ERR_ZYENCODEINCOMPL);
 			}
 			key_end = gv_currkey->end;
-			address = zyencode_ret.address;
-			length = zyencode_ret.length;
+			address = zyencode_json.address;
+			length = zyencode_json.length;
 			rec_size = gblp1->s_gv_cur_region->max_rec_size;
 			cnt = 1;
 			for (unsigned long remain = length; 0 != remain; remain -= value->str.len, cnt++)
@@ -196,13 +196,10 @@ void op_zyencode(void)
 			value->str.len = SNPRINTF(value->str.addr, MAX_NUM_SIZE, "%d", --cnt);
 			op_gvput(value);
 			gvname_env_restore(gblp1);	/* naked indicator is restored into gv_currkey */
-			/* zyencode_ret.address was returned by Jansson in ydb_encode_s(), which used the system malloc() */
-			system_free(zyencode_ret.address);	/* free after we store the chunk number in op_gvput */
-			zyencode_ret.address = NULL;	/* Need to set NULL because this handler can be called deep in the stack,
-							 * and there  is no other way to ensure no double free() can happen,
-							 * other than always setting it NULL after it is free()'d.
-							 */
-			zyencode_ret.length = 0;
+			/* zyencode_json.address was returned by Jansson in ydb_encode_s(), which used the system malloc() */
+			system_free(zyencode_json.address);	/* free after we store the chunk number in op_gvput */
+			zyencode_json.address = NULL;	/* Need to set NULL to ensure no double free() can happen */
+			zyencode_json.length = 0;
 			for (int i = 0; i < cnt_save; i++)
 				YDB_FREE_BUFFER(&subscripts[i]);
 		} else
@@ -268,7 +265,7 @@ void op_zyencode(void)
 					;	/* skip to start of next subscript */
 			}
 			cnt_save = cnt;
-			status = ydb_encode_s(&variable, cnt, subscripts, format, &zyencode_ret);
+			status = ydb_encode_s(&variable, cnt, subscripts, format, &zyencode_json);
 			gvname_env_restore(gblp2);	/* naked indicator is restored into gv_currkey */
 			if (outofband)
 				async_action(FALSE);
@@ -287,8 +284,8 @@ void op_zyencode(void)
 			orig_lv = dst_lv;
 			is_base_var = LV_IS_BASE_VAR(dst_lv);
 			base_lv = !is_base_var ? LV_GET_BASE_VAR(dst_lv) : dst_lv;
-			address = zyencode_ret.address;
-			length = zyencode_ret.length;
+			address = zyencode_json.address;
+			length = zyencode_json.length;
 			cnt = 1;
 			for (unsigned long remain = length; 0 != remain; remain -= value->str.len, cnt++)
 			{
@@ -305,13 +302,10 @@ void op_zyencode(void)
 				length -= value->str.len;
 				address += value->str.len;
 			}
-			/* zyencode_ret.address was returned by Jansson in ydb_encode_s(), which used the system malloc() */
-			system_free(zyencode_ret.address);
-			zyencode_ret.address = NULL;	/* Need to set NULL because this handler can be called deep in the stack,
-							 * and there  is no other way to ensure no double free() can happen,
-							 * other than always setting it NULL after it is free()'d.
-							 */
-			zyencode_ret.length = 0;
+			/* zyencode_json.address was returned by Jansson in ydb_encode_s(), which used the system malloc() */
+			system_free(zyencode_json.address);
+			zyencode_json.address = NULL;	/* Need to set NULL to ensure no double free() can happen */
+			zyencode_json.length = 0;
 			for (int i = 0; i < cnt_save; i++)
 				YDB_FREE_BUFFER(&subscripts[i]);
 			ENSURE_STP_FREE_SPACE(MAX_NUM_SIZE);
@@ -405,7 +399,7 @@ void op_zyencode(void)
 				/* we have now copied the subscript for ydb_encode_s() */
 			}
 			cnt_save = cnt_fmt;
-			status = ydb_encode_s(&variable, cnt_fmt, subscripts, format, &zyencode_ret);
+			status = ydb_encode_s(&variable, cnt_fmt, subscripts, format, &zyencode_json);
 			if (outofband)
 				async_action(FALSE);
 			if (YDB_OK != status)
@@ -422,8 +416,8 @@ void op_zyencode(void)
 			orig_lv = dst_lv;
 			is_base_var = LV_IS_BASE_VAR(dst_lv);
 			base_lv = !is_base_var ? LV_GET_BASE_VAR(dst_lv) : dst_lv;
-			address = zyencode_ret.address;
-			length = zyencode_ret.length;
+			address = zyencode_json.address;
+			length = zyencode_json.length;
 			cnt = 1;
 			for (unsigned long remain = length; 0 != remain; remain -= value->str.len, cnt++)
 			{
@@ -440,13 +434,10 @@ void op_zyencode(void)
 				length -= value->str.len;
 				address += value->str.len;
 			}
-			/* zyencode_ret.address was returned by Jansson in ydb_encode_s(), which used the system malloc() */
-			system_free(zyencode_ret.address);
-			zyencode_ret.address = NULL;	/* Need to set NULL because this handler can be called deep in the stack,
-							 * and there  is no other way to ensure no double free() can happen,
-							 * other than always setting it NULL after it is free()'d.
-							 */
-			zyencode_ret.length = 0;
+			/* zyencode_json.address was returned by Jansson in ydb_encode_s(), which used the system malloc() */
+			system_free(zyencode_json.address);
+			zyencode_json.address = NULL;	/* Need to set NULL to ensure no double free() can happen */
+			zyencode_json.length = 0;
 			for (int i = 0; i < cnt_save; i++)
 				YDB_FREE_BUFFER(&subscripts[i]);
 			ENSURE_STP_FREE_SPACE(MAX_NUM_SIZE);
@@ -518,7 +509,7 @@ void op_zyencode(void)
 				/* we have now copied the subscript for ydb_encode_s() */
 			}
 			cnt_save = cnt_fmt;
-			status = ydb_encode_s(&variable, cnt_fmt, subscripts, format, &zyencode_ret);
+			status = ydb_encode_s(&variable, cnt_fmt, subscripts, format, &zyencode_json);
 			if (outofband)
 				async_action(FALSE);
 			if (YDB_OK != status)
@@ -530,8 +521,8 @@ void op_zyencode(void)
 				ENCODE_DECODE_NESTED_RTS_ERROR(status, ERR_ZYENCODEINCOMPL);
 			}
 			key_end = gv_currkey->end;
-			address = zyencode_ret.address;
-			length = zyencode_ret.length;
+			address = zyencode_json.address;
+			length = zyencode_json.length;
 			rec_size = gblp1->s_gv_cur_region->max_rec_size;
 			cnt = 1;
 			for (unsigned long remain = length; 0 != remain; remain -= value->str.len, cnt++)
@@ -553,13 +544,10 @@ void op_zyencode(void)
 			value->str.len = SNPRINTF(value->str.addr, MAX_NUM_SIZE, "%d", --cnt);
 			op_gvput(value);
 			gvname_env_restore(gblp1);	/* store destination as naked indicator in gv_currkey */
-			/* zyencode_ret.address was returned by Jansson in ydb_encode_s(), which used the system malloc() */
-			system_free(zyencode_ret.address);	/* free after we store the chunk number in op_gvput */
-			zyencode_ret.address = NULL;	/* Need to set NULL because this handler can be called deep in the stack,
-							 * and there  is no other way to ensure no double free() can happen,
-							 * other than always setting it NULL after it is free()'d.
-							 */
-			zyencode_ret.length = 0;
+			/* zyencode_json.address was returned by Jansson in ydb_encode_s(), which used the system malloc() */
+			system_free(zyencode_json.address);	/* free after we store the chunk number in op_gvput */
+			zyencode_json.address = NULL;	/* Need to set NULL to ensure no double free() can happen */
+			zyencode_json.length = 0;
 			for (int i = 0; i < cnt_save; i++)
 				YDB_FREE_BUFFER(&subscripts[i]);
 		}
