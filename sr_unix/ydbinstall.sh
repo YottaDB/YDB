@@ -780,7 +780,7 @@ elif [ -n "$ydb_from_source" ] ; then
 	unset hdrlist shliblist utillist
 # Check for dependencies if installing a prebuilt YottaDB
 else
-	shliblist="libelf.so"
+	shliblist="libelf.so libjansson.so"
 	if [ "Y" = "$ydb_utf8" ] ; then
 		append_to_str shliblist "libicuio.so"
 	fi
