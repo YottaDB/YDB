@@ -875,6 +875,15 @@ enum cdb_sc gtm_mutex_lock(sgmnt_addrs *csa, mutex_lock_t mutex_lock_type, wait_
 				for (sleep_spin_cnt = max_sleep_spin_count; 0 <= sleep_spin_cnt; sleep_spin_cnt--)
 				{	/* fast grab loop for the master lock */
 					hard_spin_cnt = max_hard_spin_count;
+					/* Note: We implement a backoff strategy for SPINLOCK_PAUSE only on AARCH64.
+					 * See https://gitlab.com/YottaDB/DB/YDB/-/merge_requests/1834#note_3178506439.
+					 */
+					#ifdef __aarch64__
+						int	i, numPauses, maxPauses;
+
+						numPauses = 1;
+						maxPauses = 64;
+					#endif
 					for ( ; hard_spin_cnt; --hard_spin_cnt)
 					{	/* hard spin loop for the master lock */
 						if (addr->curr_mutex_type != curr_mutex_type)
@@ -895,7 +904,13 @@ enum cdb_sc gtm_mutex_lock(sgmnt_addrs *csa, mutex_lock_t mutex_lock_type, wait_
 							mutex_salvage(csa);
 							try_recovery = FALSE;
 						}
-						SPINLOCK_PAUSE;
+						#ifdef __aarch64__
+							for (i = 0; i < numPauses; i++)
+								SPINLOCK_PAUSE;
+							numPauses = ((numPauses < maxPauses) ? numPauses * 2 : numPauses);
+						#else
+							SPINLOCK_PAUSE;
+						#endif
 					}
 					if (mutex_switched)
 						break;
