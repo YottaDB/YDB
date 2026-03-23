@@ -21,7 +21,7 @@
 ARG OS_VSN=trixie
 
 # Stage 1: YottaDB build image
-FROM debian:${OS_VSN} as ydb-release-builder
+FROM debian:${OS_VSN} AS ydb-release-builder
 
 ARG CMAKE_BUILD_TYPE=Release
 ARG DEBIAN_FRONTEND=noninteractive
@@ -83,7 +83,7 @@ RUN mkdir -p /tmp/yottadb-build \
  && make install
 
 # Stage 2: YottaDB release image
-FROM debian:${OS_VSN} as ydb-release
+FROM debian:${OS_VSN} AS ydb-release
 
 ARG DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && \
@@ -141,7 +141,7 @@ ENV ydb_dir=/data \
     LANGUAGE=en_US:en \
     LC_ALL=C.UTF-8 \
     ydb_chset=UTF-8 \
-    GOPATH=$HOME/go \
+    GOPATH=/go \
     GOPROXY=https://proxy.golang.org/cached-only \
     ydb_dist=/opt/yottadb/current
 RUN git clone https://github.com/anet-be/lua-yottadb.git && cd lua-yottadb && make install && cd - && rm -rf lua-yottadb
