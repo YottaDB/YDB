@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -52,16 +52,14 @@
 #include "mu_outofband_setup.h"
 #include "wcs_flu.h"
 #include "jnl.h"
-#ifdef __x86_64
-#	include <math.h>
-#	include <dlfcn.h>
-#	define BUF_MAX		100
-#	define MIN_ETA		10
-#	define SHOWPERCENT	24
-#	define ADJUSTED_ETA	5 /4	/* not using 1.25 to avoid [bugprone-integer-division] warning */
-#	define MEGABYTE 	1024 * 1024
-#	define GIGABYTE 	1024 * MEGABYTE
-#endif
+#include <math.h>
+#include <dlfcn.h>
+#define BUF_MAX		100
+#define MIN_ETA		10
+#define SHOWPERCENT	24
+#define ADJUSTED_ETA	5 /4	/* not using 1.25 to avoid [bugprone-integer-division] warning */
+#define MEGABYTE 	1024 * 1024
+#define GIGABYTE 	1024 * MEGABYTE
 
 #define	TMPDIR_ACCESS_MODE	R_OK | W_OK | X_OK
 #define	TMPDIR_CREATE_MODE	S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH
@@ -150,9 +148,8 @@ GBLREF	uint4			process_id;
 GBLREF	boolean_t		debug_mupip;
 GBLREF bool                     mu_ctrlc_occurred;
 
-#ifdef __x86_64
 STATICDEF void		*func_ptr;
-#endif
+
 error_def(ERR_BKUPFILEPERM);
 error_def(ERR_BKUPPROGRESS);
 error_def(ERR_BCKUPBUFLUSH);
@@ -197,7 +194,6 @@ boolean_t	mubfilcpy (backup_reg_list *list, boolean_t showprogress, int attemptc
 	int			ftruncate_res;
 	trans_num		ONE = 0x1;
 	boolean_t		in_kernel, use_cp_or_pax = TRUE;
-#	ifdef __x86_64
 	int 			digicnt = 0, eta = MIN_ETA, infd, outfd, speedcnt = 0, transpadcnt = 0;
 	int 			csdigicnt = 0, cspadcnt = 0, speedigits = 0;
 	double			progper = 0, progfact = SHOWPERCENT;
@@ -211,7 +207,6 @@ boolean_t	mubfilcpy (backup_reg_list *list, boolean_t showprogress, int attemptc
 	char 			transferbuf[BUF_MAX], speedbuf[BUF_MAX], errstrbuff[BUF_MAX + GTM_PATH_MAX];
 	ssize_t			(*copy_file_range_p)(int fd_in, loff_t *off_in, int fd_out, loff_t *off_out,
 						size_t len, unsigned int flags);
-#	endif
 	uint4			pid;
 	DCL_THREADGBL_ACCESS;
 
@@ -352,7 +347,6 @@ boolean_t	mubfilcpy (backup_reg_list *list, boolean_t showprogress, int attemptc
 			CLEANUP_AND_RETURN_FALSE(CANNOT_RETRY);
 	}
 	/* Check for copy_file_range symbol. Use copy_file_range() in the first attempt   */
-#	ifdef __x86_64
 	if (1 == attemptcnt)
 	{
 		use_cp_or_pax = (NULL == (func_ptr = dlsym(RTLD_DEFAULT, "copy_file_range")))
@@ -555,7 +549,6 @@ boolean_t	mubfilcpy (backup_reg_list *list, boolean_t showprogress, int attemptc
 		if ((0 != remaining) || (ret == -1))
 			CLEANUP_AND_RETURN_FALSE(CAN_RETRY); /* Copy failed so no need to retry */
 	}
-#	endif
 	if (TRUE == use_cp_or_pax)
 	{
 		/* Calculate total line length for commands to execute (pushd + cp). *
@@ -980,7 +973,6 @@ boolean_t	mubfilcpy (backup_reg_list *list, boolean_t showprogress, int attemptc
         }
 	return TRUE;
 }
-#ifdef __x86_64
 /* error handler for copy_file_range() */
 inline int handle_err(char errorstr[], int saved_errno)
 {
@@ -1038,4 +1030,3 @@ inline int countdigits(size_t n)
 	} while (n);
 	return digitcnt;
 }
-#endif
