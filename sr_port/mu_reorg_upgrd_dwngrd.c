@@ -512,6 +512,7 @@ enum cdb_sc find_gvt_roots(block_id *curr_blk, gd_region *reg, cache_rec_ptr_t *
 		for (lcl_gv_trees = 0; recBase < blkEnd; recBase +=rec_sz, lcl_gv_trees++)
 		{	/* iterate through block invoking upgrade_idx_block for each gv root */
 			boolean_t	mu_reorg_did_not_split_any_blk;
+			int		max_index_fill_factor;
 
 			status = read_record(&rec_sz, &key_cmpc, &key_len, key_buff, dirHist.level, &dirHist, recBase);
 			if (cdb_sc_normal != status)		/* no *-keys at level 0 in dir tree */
@@ -531,6 +532,7 @@ enum cdb_sc find_gvt_roots(block_id *curr_blk, gd_region *reg, cache_rec_ptr_t *
 			blocks_left = csd->blks_to_upgrd;	/* Remaining blocks to upgrade counter prevents a infinite loop */
 			lcnt = MAX_BLK_TRIES;
 			mu_reorg_did_not_split_any_blk = FALSE;
+			max_index_fill_factor = MAX_FILLFACTOR;
 			do
 			{	/* Retry GVT root block until it the upgrade completes cleanly (or control-C) */
 				status = upgrade_idx_block(&blk_pter, reg, &gvname, &child_cr, &split_blk_sz);
@@ -601,6 +603,15 @@ enum cdb_sc find_gvt_roots(block_id *curr_blk, gd_region *reg, cache_rec_ptr_t *
 						 */
 						if (index_fill_factor > 15)
 							index_fill_factor -= 15;
+						/* Make sure index_fill_factor used is decreasing if we invoke "mupip reorg"
+						 * multiple times on the same global. This avoids 100s or 1000s of invocations
+						 * per global (which can result in a very long runtime). Also reduce the
+						 * fill factor by at least 5% for every invocation per global that way
+						 * we limit the number of "mupip reorg" invocations per global.
+						 */
+						if (index_fill_factor > max_index_fill_factor)
+							index_fill_factor = max_index_fill_factor;
+						max_index_fill_factor = index_fill_factor - 5;
 						data_fill_factor = MAX_FILLFACTOR;
 						/* Do not waste time doing COALESCE or SWAP operations in this reorg as we
 						 * are interested only in SPLIT operations for this one.
