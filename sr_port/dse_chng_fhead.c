@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -548,7 +548,7 @@ void dse_chng_fhead(void)
 	if ((CLI_PRESENT == cli_present("BLKS_TO_UPGRADE")) && (cli_get_hex64("BLKS_TO_UPGRADE", (gtm_uint64_t *)&blkcnt)))
 	{
 		cs_data->blks_to_upgrd = blkcnt;
-		cs_data->fully_upgraded = FALSE;
+		cs_data->fully_upgraded = (0 == cs_data->blks_to_upgrd);
 	}
 	if ((CLI_PRESENT == cli_present("MBM_SIZE")) && (cli_get_int("MBM_SIZE", &x)))
 	{
