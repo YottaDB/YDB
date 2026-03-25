@@ -20,11 +20,11 @@
 #   $ docker run --rm  -p 9080-9081:9080-9081 -v `pwd`/ydb-data:/data -ti yottadb/yottadb-rocky:latest-master
 
 # Stage 1: YottaDB build image
-FROM rockylinux:8.8 as ydb-release-builder
+FROM rockylinux:9 as ydb-release-builder
 
 ARG CMAKE_BUILD_TYPE=Release
 RUN yum update -y || true && \
-    yum install -y \
+    yum install --enablerepo=crb -y \
                     git \
                     gcc \
                     make \
@@ -39,7 +39,6 @@ RUN yum update -y || true && \
                     openssl-devel \
                     libgcrypt-devel \
                     readline-devel \
-                    jansson \
                     jansson-devel
 
 RUN mkdir /tmp/yottadb-src
@@ -78,7 +77,7 @@ RUN mkdir -p /tmp/yottadb-build \
  && make install
 
 # Stage 2: YottaDB GUI install
-FROM rockylinux:8.8 as ydb-gui
+FROM rockylinux:9 as ydb-gui
 
 RUN --mount=type=bind,from=ydb-release-builder,source=/tmp/yottadb-release,target=/tmp/staging \
     # This is a strange step: The mount volume is readonly; and we actually write to it in ydbinstall
@@ -112,7 +111,7 @@ RUN --mount=type=bind,from=ydb-release-builder,source=/tmp/yottadb-release,targe
     /tmp/ydb-release/ydbinstall --utf8 --installdir /opt/yottadb/current --gui
 
 # Stage 3: YottaDB release image
-FROM rockylinux:8.8 as ydb-release
+FROM rockylinux:9 as ydb-release
 
 RUN --mount=type=bind,from=ydb-release-builder,source=/tmp/yottadb-release,target=/tmp/staging \
     --mount=type=bind,from=ydb-gui,source=/opt/yottadb/current/plugin/,target=/tmp/plugin \
