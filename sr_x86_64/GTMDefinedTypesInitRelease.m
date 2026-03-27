@@ -3,7 +3,7 @@
 ; Copyright (c) 2010-2019 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
-; Copyright (c) 2017-2025 YottaDB LLC. and/or its subsidiaries.	;
+; Copyright (c) 2017-2026 YottaDB LLC. and/or its subsidiaries.	;
 ; All rights reserved.						;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -48307,6 +48307,38 @@ Init
 	Set gtmtypes("zwr_zav_blk",4,"type")="addr"
 	Set gtmtypfldindx("zwr_zav_blk","next")=4
 	;
+	Set gtmtypes("zydecode_glvn_struct")="struct"
+	Set gtmtypes("zydecode_glvn_struct",0)=2
+	Set gtmtypes("zydecode_glvn_struct","len")=32
+	Set gtmtypes("zydecode_glvn_struct",1,"name")="zydecode_glvn_struct.gblp"
+	Set gtmtypes("zydecode_glvn_struct",1,"off")=0
+	Set gtmtypes("zydecode_glvn_struct",1,"len")=16
+	Set gtmtypes("zydecode_glvn_struct",1,"type")="addr"
+	Set gtmtypfldindx("zydecode_glvn_struct","gblp")=1
+	Set gtmtypes("zydecode_glvn_struct",1,"dim")=2
+	Set gtmtypes("zydecode_glvn_struct",2,"name")="zydecode_glvn_struct.lclp"
+	Set gtmtypes("zydecode_glvn_struct",2,"off")=16
+	Set gtmtypes("zydecode_glvn_struct",2,"len")=16
+	Set gtmtypes("zydecode_glvn_struct",2,"type")="addr"
+	Set gtmtypfldindx("zydecode_glvn_struct","lclp")=2
+	Set gtmtypes("zydecode_glvn_struct",2,"dim")=2
+	;
+	Set gtmtypes("zyencode_glvn_struct")="struct"
+	Set gtmtypes("zyencode_glvn_struct",0)=2
+	Set gtmtypes("zyencode_glvn_struct","len")=32
+	Set gtmtypes("zyencode_glvn_struct",1,"name")="zyencode_glvn_struct.gblp"
+	Set gtmtypes("zyencode_glvn_struct",1,"off")=0
+	Set gtmtypes("zyencode_glvn_struct",1,"len")=16
+	Set gtmtypes("zyencode_glvn_struct",1,"type")="addr"
+	Set gtmtypfldindx("zyencode_glvn_struct","gblp")=1
+	Set gtmtypes("zyencode_glvn_struct",1,"dim")=2
+	Set gtmtypes("zyencode_glvn_struct",2,"name")="zyencode_glvn_struct.lclp"
+	Set gtmtypes("zyencode_glvn_struct",2,"off")=16
+	Set gtmtypes("zyencode_glvn_struct",2,"len")=16
+	Set gtmtypes("zyencode_glvn_struct",2,"type")="addr"
+	Set gtmtypfldindx("zyencode_glvn_struct","lclp")=2
+	Set gtmtypes("zyencode_glvn_struct",2,"dim")=2
+	;
 	; Structure cross reference (struct topname key to retrieve type
 	;
 	Set gtmstructs("activelv_dbg_struct")="activelv_dbg_t"
@@ -48568,6 +48600,8 @@ Init
 	Set gtmstructs("zwr_hash_table_struct")="zwr_hash_table"
 	Set gtmstructs("zwr_sub_lst_struct")="zwr_sub_lst"
 	Set gtmstructs("zwr_zav_blk_struct")="zwr_zav_blk"
+	Set gtmstructs("zydecode_glvn_struct_type")="zydecode_glvn_struct"
+	Set gtmstructs("zyencode_glvn_struct_type")="zyencode_glvn_struct"
 	;
 	; Union cross reference (union topname key to retrieve type
 	;

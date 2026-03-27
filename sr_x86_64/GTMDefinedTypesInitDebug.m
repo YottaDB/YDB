@@ -3,7 +3,7 @@
 ; Copyright (c) 2010-2019 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
-; Copyright (c) 2017-2025 YottaDB LLC. and/or its subsidiaries.	;
+; Copyright (c) 2017-2026 YottaDB LLC. and/or its subsidiaries.	;
 ; All rights reserved.						;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -20983,8 +20983,8 @@ Init
 	Set gtmtypfldindx("parse_blk","l_ext")=18
 	;
 	Set gtmtypes("parse_save_block")="struct"
-	Set gtmtypes("parse_save_block",0)=30
-	Set gtmtypes("parse_save_block","len")=280
+	Set gtmtypes("parse_save_block",0)=31
+	Set gtmtypes("parse_save_block","len")=288
 	Set gtmtypes("parse_save_block",1,"name")="parse_save_block.source_error_found"
 	Set gtmtypes("parse_save_block",1,"off")=0
 	Set gtmtypes("parse_save_block",1,"len")=4
@@ -21078,7 +21078,7 @@ Init
 	Set gtmtypfldindx("parse_save_block","window_token")=18
 	Set gtmtypes("parse_save_block",19,"name")="parse_save_block.pos_in_chain"
 	Set gtmtypes("parse_save_block",19,"off")=136
-	Set gtmtypes("parse_save_block",19,"len")=136
+	Set gtmtypes("parse_save_block",19,"len")=144
 	Set gtmtypes("parse_save_block",19,"type")="triple"
 	Set gtmtypfldindx("parse_save_block","pos_in_chain")=19
 	Set gtmtypes("parse_save_block",20,"name")="parse_save_block.pos_in_chain.opcode"
@@ -21132,11 +21132,16 @@ Init
 	Set gtmtypes("parse_save_block",29,"len")=16
 	Set gtmtypes("parse_save_block",29,"type")="oprtype"
 	Set gtmtypfldindx("parse_save_block","pos_in_chain.destination")=29
-	Set gtmtypes("parse_save_block",30,"name")="parse_save_block.rts_error_in_parse"
+	Set gtmtypes("parse_save_block",30,"name")="parse_save_block.pos_in_chain.gv_dataflow_invoked"
 	Set gtmtypes("parse_save_block",30,"off")=272
 	Set gtmtypes("parse_save_block",30,"len")=4
 	Set gtmtypes("parse_save_block",30,"type")="boolean_t"
-	Set gtmtypfldindx("parse_save_block","rts_error_in_parse")=30
+	Set gtmtypfldindx("parse_save_block","pos_in_chain.gv_dataflow_invoked")=30
+	Set gtmtypes("parse_save_block",31,"name")="parse_save_block.rts_error_in_parse"
+	Set gtmtypes("parse_save_block",31,"off")=280
+	Set gtmtypes("parse_save_block",31,"len")=4
+	Set gtmtypes("parse_save_block",31,"type")="boolean_t"
+	Set gtmtypfldindx("parse_save_block","rts_error_in_parse")=31
 	;
 	Set gtmtypes("pat_strlit")="struct"
 	Set gtmtypes("pat_strlit",0)=4
@@ -27442,8 +27447,8 @@ Init
 	Set gtmtypfldindx("rtnobjshm_hdr_t","shm_len")=9
 	;
 	Set gtmtypes("save_se")="struct"
-	Set gtmtypes("save_se",0)=15
-	Set gtmtypes("save_se","len")=160
+	Set gtmtypes("save_se",0)=16
+	Set gtmtypes("save_se","len")=168
 	Set gtmtypes("save_se",1,"name")="save_se.expr_start"
 	Set gtmtypes("save_se",1,"off")=0
 	Set gtmtypes("save_se",1,"len")=8
@@ -27466,7 +27471,7 @@ Init
 	Set gtmtypfldindx("save_se","saw_side_effect")=4
 	Set gtmtypes("save_se",5,"name")="save_se.tmpchain"
 	Set gtmtypes("save_se",5,"off")=24
-	Set gtmtypes("save_se",5,"len")=136
+	Set gtmtypes("save_se",5,"len")=144
 	Set gtmtypes("save_se",5,"type")="triple"
 	Set gtmtypfldindx("save_se","tmpchain")=5
 	Set gtmtypes("save_se",6,"name")="save_se.tmpchain.opcode"
@@ -27520,6 +27525,11 @@ Init
 	Set gtmtypes("save_se",15,"len")=16
 	Set gtmtypes("save_se",15,"type")="oprtype"
 	Set gtmtypfldindx("save_se","tmpchain.destination")=15
+	Set gtmtypes("save_se",16,"name")="save_se.tmpchain.gv_dataflow_invoked"
+	Set gtmtypes("save_se",16,"off")=160
+	Set gtmtypes("save_se",16,"len")=4
+	Set gtmtypes("save_se",16,"type")="boolean_t"
+	Set gtmtypfldindx("save_se","tmpchain.gv_dataflow_invoked")=16
 	;
 	Set gtmtypes("save_strct")="struct"
 	Set gtmtypes("save_strct",0)=5
@@ -42682,8 +42692,8 @@ Init
 	Set gtmtypfldindx("treeSrchStatus","lastNodeMax")=3
 	;
 	Set gtmtypes("triple")="struct"
-	Set gtmtypes("triple",0)=50
-	Set gtmtypes("triple","len")=136
+	Set gtmtypes("triple",0)=51
+	Set gtmtypes("triple","len")=144
 	Set gtmtypes("triple",1,"name")="triple.opcode"
 	Set gtmtypes("triple",1,"off")=0
 	Set gtmtypes("triple",1,"len")=4
@@ -42935,6 +42945,11 @@ Init
 	Set gtmtypes("triple",50,"len")=1
 	Set gtmtypes("triple",50,"type")="unsigned-char"
 	Set gtmtypfldindx("triple","destination.oprval.vreg")=50
+	Set gtmtypes("triple",51,"name")="triple.gv_dataflow_invoked"
+	Set gtmtypes("triple",51,"off")=136
+	Set gtmtypes("triple",51,"len")=4
+	Set gtmtypes("triple",51,"type")="boolean_t"
+	Set gtmtypfldindx("triple","gv_dataflow_invoked")=51
 	;
 	Set gtmtypes("tripsize")="struct"
 	Set gtmtypes("tripsize",0)=2
@@ -48631,6 +48646,38 @@ Init
 	Set gtmtypes("zwr_zav_blk",4,"type")="addr"
 	Set gtmtypfldindx("zwr_zav_blk","next")=4
 	;
+	Set gtmtypes("zydecode_glvn_struct")="struct"
+	Set gtmtypes("zydecode_glvn_struct",0)=2
+	Set gtmtypes("zydecode_glvn_struct","len")=32
+	Set gtmtypes("zydecode_glvn_struct",1,"name")="zydecode_glvn_struct.gblp"
+	Set gtmtypes("zydecode_glvn_struct",1,"off")=0
+	Set gtmtypes("zydecode_glvn_struct",1,"len")=16
+	Set gtmtypes("zydecode_glvn_struct",1,"type")="addr"
+	Set gtmtypfldindx("zydecode_glvn_struct","gblp")=1
+	Set gtmtypes("zydecode_glvn_struct",1,"dim")=2
+	Set gtmtypes("zydecode_glvn_struct",2,"name")="zydecode_glvn_struct.lclp"
+	Set gtmtypes("zydecode_glvn_struct",2,"off")=16
+	Set gtmtypes("zydecode_glvn_struct",2,"len")=16
+	Set gtmtypes("zydecode_glvn_struct",2,"type")="addr"
+	Set gtmtypfldindx("zydecode_glvn_struct","lclp")=2
+	Set gtmtypes("zydecode_glvn_struct",2,"dim")=2
+	;
+	Set gtmtypes("zyencode_glvn_struct")="struct"
+	Set gtmtypes("zyencode_glvn_struct",0)=2
+	Set gtmtypes("zyencode_glvn_struct","len")=32
+	Set gtmtypes("zyencode_glvn_struct",1,"name")="zyencode_glvn_struct.gblp"
+	Set gtmtypes("zyencode_glvn_struct",1,"off")=0
+	Set gtmtypes("zyencode_glvn_struct",1,"len")=16
+	Set gtmtypes("zyencode_glvn_struct",1,"type")="addr"
+	Set gtmtypfldindx("zyencode_glvn_struct","gblp")=1
+	Set gtmtypes("zyencode_glvn_struct",1,"dim")=2
+	Set gtmtypes("zyencode_glvn_struct",2,"name")="zyencode_glvn_struct.lclp"
+	Set gtmtypes("zyencode_glvn_struct",2,"off")=16
+	Set gtmtypes("zyencode_glvn_struct",2,"len")=16
+	Set gtmtypes("zyencode_glvn_struct",2,"type")="addr"
+	Set gtmtypfldindx("zyencode_glvn_struct","lclp")=2
+	Set gtmtypes("zyencode_glvn_struct",2,"dim")=2
+	;
 	; Structure cross reference (struct topname key to retrieve type
 	;
 	Set gtmstructs("activelv_dbg_struct")="activelv_dbg_t"
@@ -48893,6 +48940,8 @@ Init
 	Set gtmstructs("zwr_hash_table_struct")="zwr_hash_table"
 	Set gtmstructs("zwr_sub_lst_struct")="zwr_sub_lst"
 	Set gtmstructs("zwr_zav_blk_struct")="zwr_zav_blk"
+	Set gtmstructs("zydecode_glvn_struct_type")="zydecode_glvn_struct"
+	Set gtmstructs("zyencode_glvn_struct_type")="zyencode_glvn_struct"
 	;
 	; Union cross reference (union topname key to retrieve type
 	;
