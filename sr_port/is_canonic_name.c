@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -16,6 +16,7 @@
 #include "mdef.h"
 #include "gtm_ctype.h"
 #include "is_canonic_name.h"
+#include "gv_trigger_common.h"
 
 #ifdef	DEBUG
 #include "subscript.h"
@@ -112,6 +113,7 @@ boolean_t parse_gv_name_and_subscripts(mval *src, int *subscripts, int *start, i
 	int		subs_count;
 	int		utf8_len;
 	int		subs_max;
+	int		is_hasht = 0;	/* handle ^#t internal global used to store triggers - 1 == ^# parsed, 2 == ^#t parsed */
 	boolean_t 	gvn;
 	register char	*cpt;
 	char		*lastcpt;
@@ -159,7 +161,8 @@ boolean_t parse_gv_name_and_subscripts(mval *src, int *subscripts, int *start, i
 				}
 				return FALSE;
 			case CHECK_FOR_ENVIRONMENT:		/* global name */
-				if (('%' == letter) ||ISALPHA_ASCII(letter))	/* found ^ allow environment */
+				/* note assignment */
+				if (('%' == letter) || (is_hasht = (HASHT_GBL_CHAR1 == letter)) || ISALPHA_ASCII(letter))
 				{	/* found ^ allow environment */
 					*start++ = isrc;
 					state = EXPECT_NEXT_LETTER_OF_NAME;	/* rest of name */
@@ -191,7 +194,7 @@ boolean_t parse_gv_name_and_subscripts(mval *src, int *subscripts, int *start, i
 					state = IN_STRING;	/* string */
 					break;
 				}
-				if ('$' ==letter)
+				if ('$' == letter)
 				{
 					state = IN_CHAR_FUNC;	/* $[z]char() */
 					break;
@@ -286,7 +289,8 @@ boolean_t parse_gv_name_and_subscripts(mval *src, int *subscripts, int *start, i
 				previous = letter;
 				break;
 			case EXPECT_FIRST_LETTER_OF_NAME:		/* expect first letter of name */
-				if (('%' == letter) || ISALPHA_ASCII(letter))
+				/* note assignment */
+				if (('%' == letter) || (is_hasht = (HASHT_GBL_CHAR1 == letter)) || ISALPHA_ASCII(letter))
 				{
 					*start++ = isrc;
 					state = EXPECT_NEXT_LETTER_OF_NAME;	/* rest of name */
@@ -294,14 +298,19 @@ boolean_t parse_gv_name_and_subscripts(mval *src, int *subscripts, int *start, i
 				}
 				return FALSE;
 			case EXPECT_NEXT_LETTER_OF_NAME:		/* expect next letter of name */
-				if ('(' == letter)
+				if (1 == is_hasht)	/* ^# has been parsed */
+				{
+					if (HASHT_GBL_CHAR2 != letter)
+						return FALSE;
+					is_hasht++;	/* ^#t has been parsed */
+				} else if ('(' == letter)
 				{
 					term = ')';
 					envpart = 1;
 					subs_count = 0;
 					state = DISPATCH_FOR_STARTING_COMPONENT;	/* done with name */
 					*stop++ = isrc;
-				} else if (!ISALNUM_ASCII(letter))
+				} else if (!ISALNUM_ASCII(letter) || is_hasht)	/* any ^# global that isn't ^#t is illegal */
 					return FALSE;
 				break;
 			case IN_CHAR_FUNC:		/* $[Z]CHAR() */
