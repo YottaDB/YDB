@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -37,6 +37,9 @@
 
 /* Insert a doubly-linked list of elements from "X->N.fl" to "X->N.bl" in between "Q" and "Q->N.fl" */
 #define DQADD(Q, X, N) ((Q)->N.fl->N.bl = (X)->N.bl, (X)->N.bl->N.fl = (Q)->N.fl, (Q)->N.fl = (X)->N.fl, (X)->N.fl->N.bl = (Q))
+
+/* Determine if a list is either NULL or contains no elements */
+#define DQISEMPTY(Q, N) ((NULL == (Q)) || ((Q)->N.fl == (Q)))
 
 /* Define macros actually used which if #define DEBUG_TRIPLES, adds debugging information. Since these macros are
  * used in several different queue types and since these debugging macros only work for the exorder field in triples,

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -167,6 +167,7 @@ int4 gds_rundown(boolean_t cleanup_udi, boolean_t delete_statsdb)
 	sgmnt_addrs		*baseDBcsa;
 	node_local_ptr_t	baseDBnl;
 	sgm_info		*si;
+	int			save_ftok_semid;
 	DEBUG_ONLY(boolean_t	orig_we_are_last_writer = FALSE);
 	DCL_THREADGBL_ACCESS;
 
@@ -234,15 +235,22 @@ int4 gds_rundown(boolean_t cleanup_udi, boolean_t delete_statsdb)
 	if (csd->read_only)
 	{
 		if (INVALID_SEMID != udi->semid)
-			semctl(udi->semid, 0, IPC_RMID);
+		{
+			save_ftok_semid = udi->semid;
+			udi->semid = udi->ftok_semid = INVALID_SEMID;
+			semctl(save_ftok_semid, 0, IPC_RMID);
+		}
 		udi->sem_deleted = TRUE;		/* Note that we deleted the semaphore */
 		udi->grabbed_access_sem = FALSE;
 		udi->counter_acc_incremented = FALSE;
 		assert(FALSE == udi->grabbed_ftok_sem);
 		if (INVALID_SEMID != udi->ftok_semid)
-			semctl(udi->ftok_semid, 0, IPC_RMID);
+		{
+			save_ftok_semid = udi->semid;
+			udi->semid = udi->ftok_semid = INVALID_SEMID;
+			semctl(save_ftok_semid, 0, IPC_RMID);
+		}
 		udi->counter_ftok_incremented = FALSE;
-		udi->semid = udi->ftok_semid = INVALID_SEMID;
 		return EXIT_NRM;
 	}
 	if (mu_upgrade_in_prog)
@@ -318,7 +326,8 @@ int4 gds_rundown(boolean_t cleanup_udi, boolean_t delete_statsdb)
 	 */
 	onln_rlbk_pid = cnl->onln_rlbk_pid;
 	onln_rlbk_pstarttime = cnl->onln_rlbk_pstarttime;
-	assert(!have_standalone_access || mupip_jnl_recover || !onln_rlbk_pid || !is_proc_alive(onln_rlbk_pid, onln_rlbk_pstarttime));
+	assert(!have_standalone_access || mupip_jnl_recover || !onln_rlbk_pid ||
+		!is_proc_alive(onln_rlbk_pid, onln_rlbk_pstarttime));
 	if (!have_standalone_access)
 	{
 		if (-1 == (ftok_semval = semctl(udi->ftok_semid, DB_COUNTER_SEM, GETVAL))) /* Check # of procs counted on FTOK */
@@ -512,6 +521,7 @@ int4 gds_rundown(boolean_t cleanup_udi, boolean_t delete_statsdb)
 		    && (is_cur_process_ss_initiator || !is_proc_alive(ss_pid, ss_pid_pstarttime)))
 		{
 			ss_release(NULL);
+			CLEAR_SNAPSHOTS_IN_PROG(csa);
 			ss_release_lock(reg);
 		}
 	}

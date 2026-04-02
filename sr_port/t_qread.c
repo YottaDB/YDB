@@ -455,7 +455,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 	{
 		*cycle = CYCLE_SHRD_COPY;
 		*cr_out = 0;
-		return (sm_uc_ptr_t)(mm_read(blk, lcl_blk_free));
+		return (sm_uc_ptr_t)(mm_read(blk));
 	}
 	was_crit = csa->now_crit;
 	cnl = csa->nl;

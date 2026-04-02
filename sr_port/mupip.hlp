@@ -3329,6 +3329,7 @@
     -DATA[_RESERVED_BYTES]=integer
     -[NO]DE[FER_TIME][=seconds]
     -[NO]DEFER_ALLOCATE
+    -[NO]EPOCHTAPER
     -[NO]ENCRYPTA[BLE]
     -ENCRYPTI[ONCOMPELTE]
     -EX[TENSION_COUNT]=integer(no of blocks)
@@ -3338,13 +3339,15 @@
     -H[ARD_SPIN_COUNT]=integer
     -INDEX[_RESERVED_BYTES]=integer
     -[NO]INST[_FREEZE_ON_ERROR]
-    -JN[LFILE] journal-file-name journal-file-quals
+    -[NO]J[OURNAL][=journal-option-list]
     -K[EY_SIZE]=bytes
     -[NO]LCK_SHARES_DB_CRIT
     -L[OCK_SPACE]=integer
     -M[UTEX_SLOTS]=integer
     -N[ULL_SUBSCRIPTS]=value
+    -PRO[BLKSPLIT]=integer
     -[NO]Q[DBRUNDOWN]
+    -PA[RTIAL_RECOV_BYPASS]
     -[NO]REA[D_ONLY]
     -REC[ORD_SIZE]=bytes
     -REG[ION] region-list
@@ -3556,7 +3559,6 @@
        systems, this avoids reading in advance of most writes and thus
        reduces file system load and increases response time.
      o When -FULLBLKWRT=0 (the default), a process writes only valid data.
-       FIS advises using the same value of -FULLBLKWRT for all processes.
 
    Note that when the file system block size and the database block size are
    the same there is no difference between the settings of 1 and 2.
@@ -3569,10 +3571,10 @@
 
    -G[LOBAL_BUFFERS]=integer
 
-   MUPIP SET -FILE -GLOBAL_BUFFERS= implicitly adjusts trigger_flush_limit to
-   maintain the same ratio as it had with the previous global buffer
-   settings, unless the same command includes a -TRIGGER_FLUSH_LIMIT
-   specification.
+   MUPIP SET -FILE -GLOBAL_BUFFERS= implicitly adjusts trigger_flush to
+   maintain the same ratio as it had with the previous global buffer settings
+   as long as it falls within the range described for the -TRIGGER_FLUSH
+   qualifier, and otherwise to the nearer limit.
 
    In general, increasing the number of global buffers improves performance
    by smoothing the peaks of I/O load on the system. However, increasing the
@@ -3670,7 +3672,7 @@
    from the global database file. The maximum supported size is 1019 bytes.
    The format of the KEY_SIZE qualifier is:
 
-   -K[EY_SIZE=bytes
+   -K[EY_SIZE]=bytes
 
 3 Lck_shares_db_crit
    Lck_shares_db_crit
@@ -3940,13 +3942,17 @@
    Trigger_flush
 
    Specifies the decimal value, in buffers, for the threshold at which
-   processes start flushing dirty buffers after each update. The format of
-   the TRIGGER_FLUSH qualifier is:
+   processes start flushing dirty buffers after each update. The minimum
+   acceptable value is greater of 1/32, and the minimum of 64 and 1/8 of
+   global buffers, and the maximum is the lesser of 262144 (.25 Mi) and 15/16
+   of global buffers. The format of the TRIGGER_FLUSH qualifier is:
 
    -T[RIGGER_FLUSH]=integer
 
-   MUPIP SET -FILE -GLOBAL_BUFFERS adjusts trigger_flush as long as it within
-   the range of 1/8th to 15/16th of the number of global buffers.
+   Note: MUPIP SET -FILE -GLOBAL_BUFFERS= implicitly adjusts trigger_flush to
+   maintain the same ratio as it had with the previous global buffer settings
+   as long as it falls within the range of minimum and maximum described
+   above, and otherwise to the nearer limit.
 
 3 Version
    Version
@@ -6606,10 +6612,10 @@
 
    The listing below shows an example of a simple journal extract:
 
-   GDSJEX07
-   01\65457,9380\1099511627777\3664\zappa\scheese\\0\\\
-   02\65457,9380\1099511627777\3664\0
-   03\65457,9380\1099511627777\3664\0\1
+   01\67628,22261\3\1474136\gtmhost\gtmuser\0\0\\\
+   05\67628,22261\3\1474136\0\0\0\0\0\0\^global="newvalue"
+   02\67628,22261\4\1474136\0
+   03\67628,22261\4\1474136\0\0
 
    Journal extracts contain NULL records only in a multisite replication
    configuration where triggers or external M-filters are active. Here are
@@ -6653,7 +6659,7 @@
    ULGTRIG  time\tnum\chksum\pid\clntpid\token_seq\strm_num\strm_seq\updnum\trigdefinition
    TCOM     time\tnum\chksum\pid\clntpid\token_seq\strm_num\strm_seq\partners\tid
    INCTN    time\tnum\chksum\pid\clntpid\opcode\incdetail
-   EPOCH    time\tnum\chksum\pid\clntpid\jsnum\blks_to_upgrd\free_blocks\total_blks\fully_upgraded[\strm_num\strm_seq]...
+   EPOCH    time\tnum\chksum\pid\clntpid\jsnum\blks_to_upgrd\free_blocks\total_blks\offset\fully_upgraded[\strm_num\strm_seq]...
    PBLK     time\tnum\chksum\pid\clntpid\blknum\bsiz\blkhdrtn\ondskbver
    AIMG     time\tnum\chksum\pid\clntpid\blknum\bsiz\blkhdrtn\ondskbver
    NULL     time\tnum\chksum\pid\clntpid\jsnum\strm_num\strm_seq
@@ -6818,6 +6824,9 @@
    |----------------+-------------------------------------------------------|
    | clntunam       | If non-empty, clntunam is the name of the GT.CM       |
    |                | client that initiated this update on the server side. |
+   |----------------+-------------------------------------------------------|
+   | offset         | offset correction to convert v6->v6p blocks in        |
+   |                | upgrade interregnum (at time of writing the EPOCH).   |
    +------------------------------------------------------------------------+
 
    After the header(s), each line of a detail journal extract file begins
@@ -6826,11 +6835,12 @@
    square brackets) is the length of that record. The listing below shows an
    example of a detail extract:
 
-   GDSJDX08
-   0x00010000 [0x00d0] :: PINI   \65457,9380\1099511627777\2480956899\3664\zappa\scheese\\0\\\
-   0x000100d0 [0x00b8] :: EPOCH  \65457,9380\1099511627777\973009291\3664\0\1\0\96\101\1
-   0x00010188 [0x0020] :: PFIN   \65457,9380\1099511627777\3421761717\3664\0
-   0x000101a8 [0x0028] :: EOF    \65457,9380\1099511627777\884316091\3664\0\1
+   0x000106b8 [0x00d0] :: PINI   \67628,22261\3\4046488676\1474136\gtmhost\gtmuser\0\0\\\
+   0x00010788 [0x0050] :: PBLK   \67628,22261\3\4259595182\1474136\0\3\33\1\4
+   0x000107d8 [0x0050] :: SET    \67628,22261\3\4138852170\1474136\0\0\0\0\0\0\^global="value"
+   0x00010828 [0x00c8] :: EPOCH  \67628,22261\4\1321506953\1474136\0\0\0\96\101\0\1
+   0x000108f0 [0x0020] :: PFIN   \67628,22261\4\4268027422\1474136\0
+   0x00010910 [0x0028] :: EOF    \67628,22261\4\3238298114\1474136\0\0
 
 1 Replication
    Replication
@@ -9458,7 +9468,7 @@
 1 Copyright
    Copyright
 
-   Copyright 2025
+   Copyright 2026
 
    Fidelity National Information Services, Inc. and/or its subsidiaries. All
    rights reserved.

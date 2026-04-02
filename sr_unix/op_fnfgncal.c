@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -112,7 +112,8 @@ GBLREF uint4		dollar_tlevel, dollar_trestart;
 GBLREF unsigned char   *msp;
 GBLREF volatile int4	gtmMallocDepth;
 #ifdef GTM_PTHREAD
-GBLREF boolean_t	gtm_jvm_process, gtm_main_thread_id, gtm_main_thread_id_set;
+GBLREF boolean_t	gtm_jvm_process, gtm_main_thread_id_set;
+GBLREF pthread_t	gtm_main_thread_id;
 #endif
 
 LITREF mval		literal_null, skiparg;
@@ -147,8 +148,6 @@ STATICDEF int		gtm_jtype_start_idx = gtm_jboolean,	/* Value of first gtm_j... ty
 STATICFNDCL void	extarg2mval(void *src, enum gtm_types typ, mval *dst, boolean_t java, boolean_t starred,
 				int prealloc_size, char *m_label, gparam_list *ext_buff_start, int4 ext_buff_len);
 STATICFNDCL int		extarg_getsize(void *src, enum gtm_types typ, mval *dst, struct extcall_entry_list *entry_ptr);
-STATICFNDCL void	op_fgnjavacal(mval *dst, mval *package, mval *extref, uint4 mask, int4 argcnt, int4 entry_argcnt,
-				struct extcall_package_list *package_ptr, struct extcall_entry_list *entry_ptr, va_list var);
 STATICFNDCL gparam_list	*set_up_buffer(char *p_list, int len);
 STATICFNDCL void	verify_buffer(char *p_list, int len, char *m_label);
 STATICFNDCL void	free_return_type(INTPTR_T ret_val, enum gtm_types typ);
@@ -540,7 +539,7 @@ STATICFNDEF int extarg_getsize(void *src, enum gtm_types typ, mval *dst, struct 
 	return 0; /* This should never get executed, added to make compiler happy */
 }
 
-STATICFNDEF void op_fgnjavacal(mval *dst, mval *package, mval *extref, uint4 mask, int4 argcnt, int4 entry_argcnt,
+void op_fgnjavacal(mval *dst, mval *package, mval *extref, gtm_uint8 mask, int4 argcnt, int4 entry_argcnt,
 	struct extcall_package_list *package_ptr, struct extcall_entry_list *entry_ptr, va_list var)
 {
 	ABS_TIME	b_time;
@@ -551,7 +550,8 @@ STATICFNDEF void op_fgnjavacal(mval *dst, mval *package, mval *extref, uint4 mas
 	gparam_list	*param_list;
 	gtm_long_t	*free_space_pointer;
 	int		grace, i, j, save_mumps_status;
-	int4 		m1, m2, n, space_n, call_buff_size;
+	int4 		n, space_n, call_buff_size;
+	gtm_uint8	m1, m2;
 	INTPTR_T	status;
 	mval		*v;
 	va_list		var_copy;
@@ -562,16 +562,20 @@ STATICFNDEF void op_fgnjavacal(mval *dst, mval *package, mval *extref, uint4 mas
 	gtm_jvm_process = TRUE;
 	if (!gtm_main_thread_id_set)
 	{
+		assert(FALSE);
 		gtm_main_thread_id = pthread_self();
 		gtm_main_thread_id_set = TRUE;
 	}
 #	endif
 	/* This is how many parameters we will use for callg, including the implicit ones described below. So, better make
 	 * sure we are not trying to pass more than callg can handle.
+	 *
+	 * For Java we are currently enforcing a call("class", "method", 1, 2..,32) limit.
 	 */
-	if (MAX_ACTUALS < argcnt + 3)
+	if( (argcnt + 2) > (32 + 2))
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_ZCMAXPARAM);
 	VAR_COPY(var_copy, var);
+
 	/* Compute size of parameter block */
 	n = entry_ptr->parmblk_size + (3 * SIZEOF(void *));	/* This is enough for the parameters and the fixed length entries */
 	mask >>= 2;						/* Bypass the class and method arguments. */
@@ -904,7 +908,7 @@ STATICFNDEF void op_fgnjavacal(mval *dst, mval *package, mval *extref, uint4 mas
 	return;
 }
 
-void op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 mask, int4 argcnt, ...)
+void op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 maskhi, uint4 masklo, int4 argcnt, ...)
 {
 	ABS_TIME	b_time;
 	boolean_t	java = FALSE, safe;
@@ -918,17 +922,18 @@ void op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 ma
 	mval		*v;
 	struct extcall_package_list	*package_ptr;
 	struct extcall_entry_list	*entry_ptr;
-	uint4		m1;
+	gtm_uint8	mask, m1;
 	va_list		var;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	assert(n_mvals == argcnt + 5);
+	assert(n_mvals == argcnt + 6);
 	assert(MV_IS_STRING(package));	/* Package and routine are literal strings */
 	assert(MV_IS_STRING(extref));
 	if (MAX_ACTUALS < argcnt)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZCMAXPARAM);
 	assert(INTRPT_OK_TO_INTERRUPT == intrpt_ok_state); /* Interrupts should be enabled for external calls */
+	mask = (((gtm_uint8) maskhi) << 32) | masklo;
 	/* Find package */
 	for (package_ptr = TREF(extcall_package_root); package_ptr; package_ptr = package_ptr->next_package)
 	{
@@ -968,6 +973,7 @@ void op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 ma
 		java = TRUE;
 		argcnt -= 2;
 	}
+
 	/* It is an error to have more actual parameters than formal parameters */
 	if (argcnt > entry_ptr->argcnt)
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_ZCARGMSMTCH, 2, argcnt, entry_ptr->argcnt);
@@ -1237,7 +1243,7 @@ void op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 ma
 	/* Compute space requirement for return values */
 	n = 0;
 	VAR_START(var, argcnt);
-	for (i = 0, m1 = mask & entry_ptr->output_mask; i < argcnt; i++, m1 = m1 >> 1)
+	for (i = 0, m1 = mask & (entry_ptr->output_mask); i < argcnt; i++, m1 = m1 >> 1)
 	{
 		v = va_arg(var, mval *);
 		if (MASK_BIT_ON(m1))
@@ -1249,7 +1255,7 @@ void op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 ma
 	ENSURE_STP_FREE_SPACE(n);
 	/* Convert return values */
 	VAR_START(var, argcnt);
-	for (i = 0, m1 = mask & entry_ptr->output_mask; i < argcnt; i++, m1 = m1 >> 1)
+	for (i = 0, m1 = mask & (entry_ptr->output_mask); i < argcnt; i++, m1 = m1 >> 1)
 	{
 		v = va_arg(var, mval *);
 		if (MASK_BIT_ON(m1))

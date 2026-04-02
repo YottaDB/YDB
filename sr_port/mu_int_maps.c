@@ -99,7 +99,9 @@ void mu_int_maps(void)
 		RTS_ERROR_CSA_ABT(CSA_ARG(NULL) VARLSTCNT(4) MAKE_MSG_ERROR(ERR_TEXT), 2,
 				RTS_ERROR_TEXT("White Box integ rts_error"));
 #	endif
-	while (((cs_data && cs_data->kill_in_prog) || mu_int_data.kill_in_prog) && (MAX_CRIT_TRY > crit_counter++))
+	/* MAX_CRIT_TRY is 1 minute (as of now).  However given how problematic going into integ with KIP is,
+	 * doubling that seems reasonable. */
+	while (((cs_data && cs_data->kill_in_prog) || mu_int_data.kill_in_prog) && ((2 * MAX_CRIT_TRY) > crit_counter++))
 	{
 		if (cs_addrs)
 			GET_C_STACK_FOR_KIP(cs_addrs->nl->kip_pid_array, crit_counter, MAX_CRIT_TRY, 1, MAX_KIP_PID_SLOTS);
@@ -110,6 +112,9 @@ void mu_int_maps(void)
 		GET_CUR_TIME(time_str);
 		util_out_print("!/MUPIP INFO: mu_int_maps: !AD : Done with kill-in-prog wait.", TRUE,
 			CTIME_BEFORE_NL, time_str);
+		if ((cs_data && cs_data->kill_in_prog) || mu_int_data.kill_in_prog)
+			util_out_print("!/MUPIP INFO: mu_int_maps: !AD : Kill-in-prog wait failed, proceeding anyway.", TRUE,
+				CTIME_BEFORE_NL, time_str);
 	}
 	mu_int_offset[0] = 0;
 	maps = (mu_int_data.trans_hist.total_blks + mu_int_data.bplmap - 1) / mu_int_data.bplmap;

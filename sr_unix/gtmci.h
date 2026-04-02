@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -23,7 +23,7 @@
  * problematic, so we picked an arbitrary limit (10) that seems generous. */
 #define CALLIN_MAX_LEVEL	10
 
-#define CALLIN_HASHTAB_SIZE	32
+#define CALLIN_HASHTAB_SIZE	36
 
 #define SET_CI_ENV(g)								\
 {										\

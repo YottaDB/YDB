@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -85,7 +85,7 @@ void convert_key_to_db(mval *gvn, int start, int stop, gv_key *gvkey, unsigned c
  */
 unsigned char *gvn2gds(mval *gvn, gv_key *gvkey, int act)
 {
-	boolean_t		est_first_pass;
+	boolean_t		est_first_pass, dummy;
 	collseq 		*csp;
 	gd_region		tmpreg;
 	gv_namehead		temp_gv_target;
@@ -96,7 +96,7 @@ unsigned char *gvn2gds(mval *gvn, gv_key *gvkey, int act)
 
 	SETUP_THREADGBL_ACCESS;
 	/* determine which buffer to use */
-	DETERMINE_BUFFER(gvn, start_buff, stop_buff, start, stop);
+	DETERMINE_BUFFER(gvn, start_buff, stop_buff, start, stop, dummy);
 	if (0 != act)
 	{
 		csp = ready_collseq(act);
@@ -111,7 +111,7 @@ unsigned char *gvn2gds(mval *gvn, gv_key *gvkey, int act)
 	gvkey->top = DBKEYSIZE(MAX_KEY_SZ);
 	key_top = key_start + gvkey->top;
 	/* We will parse all of the components up front. */
-	if (!parse_gv_name_and_subscripts(gvn, &subscript, start, stop, &contains_env))
+	if (!parse_glvn_and_subscripts(gvn, &subscript, start, stop, &contains_env, FALSE))
 		NOCANONICNAME_ERROR(gvn);
 	if ((tmp_len = (stop[contains_env] - start[contains_env])) > (max_len = gvkey->top))
 	{

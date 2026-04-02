@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2011-2021 Fidelity National Information	*
+ * Copyright (c) 2011-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -29,6 +29,7 @@
 
 GBLREF	int	process_exiting;
 GBLREF	int4	exi_condition;
+GBLREF	uint4	dollar_tlevel;
 LITREF		gtmImageName	gtmImageNames[];
 
 STATICDEF	ABS_TIME	halt_time;
@@ -52,7 +53,11 @@ void op_zhalt(int4 retcode, boolean_t is_zhalt)
 							 * to the parent process.
 							 */
 	if (IS_GTM_IMAGE && !(is_zhalt ? RESTRICTED(zhalt_op) : RESTRICTED(halt_op)))
+	{
+		if (dollar_tlevel)
+			 OP_TROLLBACK(0);
 		EXIT(is_zhalt ? retcode : 0);
+	}
 	if (is_zhalt ? RESTRICTED(zhalt_op) : retcode ? FALSE : RESTRICTED(halt_op))
 	{	/* if the operation is restricted and not from op_dmode or dm_read proclaim the restriction */
 		sys_get_curr_time(&cur_time);
@@ -94,6 +99,8 @@ void op_zhalt(int4 retcode, boolean_t is_zhalt)
 	if (retcode && !is_zhalt)
 		EXIT(0); 			/* unless this is a op_dmode or dm_read exit */
 	create_fatal_error_zshow_dmp(MAKE_MSG_SEVERE(ERR_RESTRICTEDOP));
+	if (dollar_tlevel)
+		 OP_TROLLBACK(0);
 	exi_condition = SIGQUIT;
 	stop_image_no_core();
 }

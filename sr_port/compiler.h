@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -141,15 +141,15 @@ typedef struct
 typedef struct	tripletype
 {
 	opctype			opcode;
+	int			rtaddr;		/* relative run time address of triple */
 	struct
 	{
 		struct	tripletype	*fl,
 					*bl;
 	}			exorder;
 	tbp			backptr,	/* triples which reference this triple's value */
-				jmplist;	/* triples which jump to this one */
+				*jmplist;	/* triples which jump to this one */
 	source_address		src;
-	int			rtaddr;		/* relative run time address of triple */
 	oprtype			operand[2],
 				destination;
 } triple;
@@ -200,7 +200,6 @@ typedef struct
 typedef struct
 {
 	triple	*curr_fetch_trip;
-	triple	*curr_fetch_opr;
 	int4	curr_fetch_count;
 } fetch_ctrl;
 
@@ -670,7 +669,7 @@ GBLREF unsigned int indir_fntype[];
 #define ASSERT_INDIR_FUNCTION_OPR(ARGCODE) (1)
 #endif
 
-int		actuallist(oprtype *opr);
+int		actuallist(oprtype *opr, boolean_t do_mask64);
 int		bool_expr(boolean_t sense, oprtype *addr);
 void		bx_boollit(triple *t);
 void		bx_boolop(triple *t, boolean_t jmp_type_one, boolean_t jmp_to_next, boolean_t sense, oprtype *addr);

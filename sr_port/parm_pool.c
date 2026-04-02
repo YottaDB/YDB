@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2025 Fidelity National Information	*
+ * Copyright (c) 2012-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -110,6 +110,10 @@ STATICFNDEF void parm_pool_init(unsigned int init_capacity)
 	(TREF(parm_pool_ptr))->capacity = capacity;
 	(TREF(parm_pool_ptr))->start_idx = 0;
 	(*(TREF(parm_pool_ptr))->parms).mask_and_cnt.actualcnt = SAFE_TO_OVWRT;
+
+	/* set up parm_mask_hi with the same number of slots as parm_pool */
+	assert(!TREF(parm_mask_hi));
+	TREF(parm_mask_hi) = (uint4 *)malloc(SIZEOF(uint4) * capacity);
 }
 
 /**
@@ -129,13 +133,16 @@ void push_parm(UNIX_ONLY_COMMA(unsigned int totalcnt) int truth_value, ...)
 {
 	va_list			var;
 	mval			*ret_value, *actpmv;
-	int			mask, i, slots_needed;
+	int			i, slots_needed;
+	gtm_uint8		mask;
 	VMS_ONLY(unsigned int	totalcnt;)
 	unsigned int		actualcnt, prev_count;
 	lv_val			*actp;
 	lv_val			**act_list_ptr;
 	stack_frame		*save_frame;
 	parm_slot		*curr_slot;
+	uint4			sidx;
+	uint4			*pmh;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -143,7 +150,7 @@ void push_parm(UNIX_ONLY_COMMA(unsigned int totalcnt) int truth_value, ...)
 	VMS_ONLY(va_count(totalcnt));
 	assert(PUSH_PARM_OVERHEAD <= totalcnt);
 	ret_value = va_arg(var, mval *);
-	mask = va_arg(var, int);
+	mask = (gtm_uint8) va_arg(var, int);
 	actualcnt = va_arg(var, unsigned int);
 	assert(PUSH_PARM_OVERHEAD + actualcnt == totalcnt);
 	assert(MAX_ACTUALS >= actualcnt);
@@ -175,7 +182,7 @@ void push_parm(UNIX_ONLY_COMMA(unsigned int totalcnt) int truth_value, ...)
 	for (i = 0; i < actualcnt; i++, act_list_ptr++)				/* Save parameters in the following empty slots. */
 	{
 		actp = va_arg(var, lv_val *);
-		if (!(mask & 1 << i))
+		if (!(mask & (1ul << i)))
 		{	/* Not a dotted pass-by-reference parm. */
 			actpmv = &actp->v;
 			MV_FORCE_DEFINED_UNLESS_SKIPARG(actpmv);
@@ -200,7 +207,10 @@ void push_parm(UNIX_ONLY_COMMA(unsigned int totalcnt) int truth_value, ...)
 		frame_pointer->dollar_test = truth_value;
 	(TREF(parm_pool_ptr))->start_idx += SLOTS_NEEDED_FOR_SET(actualcnt);	/* Update start_idx for the future parameter set. */
 	curr_slot = PARM_CURR_SLOT;
-	(*(curr_slot - 1)).mask_and_cnt.mask = mask;				/* Save parameter mask. */
+	sidx = (TREF(parm_pool_ptr))->start_idx;
+	pmh = TREF(parm_mask_hi);
+	pmh[sidx - 1] = (uint4) (mask >> 32);			/* Update our high 32 bits in tandem with mask_and_cnt */
+	(*(curr_slot - 1)).mask_and_cnt.mask = (uint4) (mask & 0xffffffff);	/* Save parameter mask. */
 	(*(curr_slot - 1)).mask_and_cnt.actualcnt = actualcnt;			/* Save parameter count. */
 	PARM_ACT_FRAME(curr_slot, actualcnt) = frame_pointer;			/* Save frame pointer. */
 	assert(frame_pointer && (frame_pointer->type & SFT_COUNT));		/* Ensure we are dealing with a counted frame. */
@@ -211,13 +221,15 @@ STATICFNDEF void parm_pool_expand(int slots_needed, int slots_copied)
 {
 	parm_pool	*pool_ptr;
 	uint4		pool_capacity;
+	uint4		parm_mask_hi_curr_slots;
+	uint4		*new_parm_mask_hi;
 	DCL_THREADGBL_ACCESS;
 	size_t		sizt_len;	/* For SCI */
 
 	SETUP_THREADGBL_ACCESS;
 	assert(TREF(parm_pool_ptr));
 	assert((slots_copied < slots_needed) && (0 < slots_needed));
-	pool_capacity = (TREF(parm_pool_ptr))->capacity;
+	parm_mask_hi_curr_slots = pool_capacity = (TREF(parm_pool_ptr))->capacity;
 	CAPACITY_ROUND_UP2(pool_capacity, slots_needed);			/* Calculate the new capacity. */
 	assert(MAX_TOTAL_SLOTS > pool_capacity);				/* In debug, ensure we are not growing endlessly. */
 	sizt_len = sizeof(parm_pool) + sizeof(lv_val *) * (pool_capacity) * LV_VALS_PER_SLOT;
@@ -233,4 +245,10 @@ STATICFNDEF void parm_pool_expand(int slots_needed, int slots_copied)
 	free(TREF(parm_pool_ptr));
 	TREF(parm_pool_ptr) = pool_ptr;						/* Update the global reference. */
 	assert(MAX_TOTAL_SLOTS > (*((TREF(parm_pool_ptr))->parms + (TREF(parm_pool_ptr))->start_idx - 1)).mask_and_cnt.actualcnt);
+
+	/* Allocate & populate a new parm_mask_hi array based on the increase in parm_pool */
+	new_parm_mask_hi = (uint4 *)malloc(pool_capacity * sizeof(uint4));
+	memcpy((void *)new_parm_mask_hi, (void *)(TREF(parm_mask_hi)), parm_mask_hi_curr_slots * sizeof(uint4));
+	free(TREF(parm_mask_hi));
+	TREF(parm_mask_hi) = new_parm_mask_hi;
 }

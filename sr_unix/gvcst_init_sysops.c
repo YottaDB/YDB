@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -117,6 +117,7 @@ MBSTART {														\
 	lcl_cnl->ss_shmid = INVALID_SHMID;										\
 	lcl_cnl->ss_shmcycle = 0;											\
 	CLEAR_SNAPSHOTS_IN_PROG(lcl_cnl);										\
+	CLEAR_SNAPSHOTS_IN_PROG(CSA);											\
 	lcl_cnl->num_snapshots_in_effect = 0;										\
 	SET_LATCH_GLOBAL(&lcl_cnl->snapshot_crit_latch, LOCK_AVAILABLE);						\
 	assert(1 == MAX_SNAPSHOTS); /* To ensure that we revisit this whenever multiple snapshots is implemented */	\
@@ -760,10 +761,6 @@ gd_region *dbfilopn(gd_region *reg)
 		/* Try again as a readonly database, only if
 		 * 	- Not actually trying again, but trying for the first time OR
 		 *	- udi->fd still invalid
-		 *	AND
-		 *		- Not a statsdb (only worth opening as read-write).
-		 *		- Either not an autodb or the autodb error was explicitly on the open (and not with more complex
-		 *		logic in cre/init file)
 		 */
 		if ((open_read_only || (FD_INVALID == udi->fd)))
 		{
@@ -796,6 +793,28 @@ gd_region *dbfilopn(gd_region *reg)
 				DBGRDB((stderr, "%s:%d:%s: process id %d succeeded in opening read-only file %s for region %s\n",
 							__FILE__, __LINE__, __func__, process_id, reg->dyn.addr->fname,
 							reg->rname));
+				if (IS_AUTODB_REG(reg) && !open_read_only && !did_one_loop)
+				{
+					/* Handle a potential race condition where
+					 * 	- Process A has uid 'A'
+					 * 	- Process B has uid 'B'
+					 * 	- Process A creates the file 0600 perms
+					 * 	- Process B fails the initial OPENFILE RW
+					 * 	- Process A chmods the db file to its eventual perms
+					 * 	- Process B succeeds on the OPENFILE Readonly
+					 * We do not want to ever grab ftok without having the right to move the state
+					 * machine of file initialization forward for fear of livelock. So handle this potential
+					 * case by an ordering logic that means we repeat the attempt to RW-open any AUTODB file
+					 * whose first RW-open attempt fails but subsequent Readonly-attempt succeeds.
+					 */
+					CLOSEFILE_RESET(udi->fd, rc);
+					udi->fd_opened_with_o_direct = FALSE;
+					assert(!TREF(mu_cre_file_openrc));
+					TREF(mu_cre_file_openrc) = 0;
+					did_one_loop = TRUE;
+					continue;
+
+				}
 				reg->read_only = TRUE;		/* maintain csa->read_write simultaneously */
 				csa->read_write = FALSE;	/* maintain reg->read_only simultaneously */
 				csa->orig_read_write = FALSE;
@@ -864,9 +883,9 @@ gd_region *dbfilopn(gd_region *reg)
 		switch (autodb_rcerr)
 		{
 			case AUTODB_OPNERR:
-				assert(TREF(mu_cre_file_openrc));
+				assert(save_errno);
 				RTS_ERROR_CSA_ABT(csa, VARLSTCNT(5) ERR_DBOPNERR, 2,
-						DB_LEN_STR(reg), TREF(mu_cre_file_openrc));
+						DB_LEN_STR(reg), save_errno);
 				break;			/* For the compiler */
 			case AUTODB_INITERR:
 			case AUTODB_CREERR:
@@ -1290,7 +1309,25 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass, boolean_t return_file_errs)
 			error_on_db_invalidity(csa, reg, tsd, db_invalid, save_errno);
 			assert(FALSE);
 		}
-		/* TODO - incorporate BADDBVER_CHK into read_db_file_header */
+		/* At this point we are sure that the database file has been initialized - either by us or by a competitor process.
+		 * Recalculate gtm_permissions to account for any CHMOD as part of that process if this is an autodb.
+		 */
+		if (IS_AUTODB_REG(reg))
+		{
+			FSTAT_FILE(udi->fd, &stat_buf, stat_res); /* get the stats for the file, which may have changed */
+			if (-1 == stat_res)
+				RTS_ERROR(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), errno);
+			/* Setup new group and permissions if indicated by the security rules. */
+			if (!gtm_permissions(&stat_buf, &user_id, &group_id, &perm, PERM_IPC, &pdd))
+			{
+				SEND_MSG(VARLSTCNT(6 + PERMGENDIAG_ARG_COUNT)
+						ERR_PERMGENFAIL, 4, RTS_ERROR_STRING("ipc resources"), RTS_ERROR_STRING(udi->fn),
+						PERMGENDIAG_ARGS(pdd));
+				RTS_ERROR(VARLSTCNT(6 + PERMGENDIAG_ARG_COUNT)
+						ERR_PERMGENFAIL, 4, RTS_ERROR_STRING("ipc resources"), RTS_ERROR_STRING(udi->fn),
+						PERMGENDIAG_ARGS(pdd));
+			}
+		}
 		DO_BADDBVER_CHK(reg, tsd, TRUE); /* need to do BADDBVER check before de-referencing shmid and semid from file header
 					    * as they could be at different offsets if the database is V4-format */
 		db_do_crypt_init = (USES_ENCRYPTION(tsd->is_encrypted) && !IS_LKE_IMAGE);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -25,47 +25,44 @@ GBLREF mvax	*mvaxtab;
  */
 void start_for_fetches(void)
 {
-	triple	*fetch_trip, *ref1, *ref2;
-	int	fetch_count, idiff, index;
-	mvax	*idx;
+	triple		*fetch_trip, *ref;
+	int		fetch_count, index, opri;
+	mvax		*idx;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	fetch_trip = (TREF(fetch_control)).curr_fetch_trip;
 	fetch_count = (TREF(fetch_control)).curr_fetch_count;
 	START_FETCHES(OC_FETCH);
-	ref1 = fetch_trip;
-	ref2 = (TREF(fetch_control)).curr_fetch_trip;
+	(TREF(fetch_control)).curr_fetch_trip->operand[1] = fetch_trip->operand[1];
 	idx = mvaxtab;
-	while (ref1->operand[1].oprclass)
+	for (ref = fetch_trip, opri = 1; (opri < 2) && (TRIP_REF == ref->operand[opri].oprclass); )
 	{
-		assert(ref1->operand[1].oprclass == TRIP_REF);
-		ref1 = ref1->operand[1].oprval.tref;
-		assert(ref1->opcode == OC_PARAMETER);
-		ref2->operand[1] = put_tref (newtriple (OC_PARAMETER));
-		ref2 = ref2->operand[1].oprval.tref;
-		ref2->operand[0] = ref1->operand[0];
-		assert(ref2->operand[0].oprclass == TRIP_REF &&
-			ref2->operand[0].oprval.tref->opcode == OC_ILIT);
-		index = ref2->operand[0].oprval.tref->operand[0].oprval.ilit;
-		idiff = index - idx->mvidx;
-		while (idx->mvidx != index)
+		if (OC_PARAMETER == ref->operand[opri].oprval.tref->opcode)
 		{
-			if (idiff < 0)
+			ref = ref->operand[opri].oprval.tref;
+			opri = 0;
+		} else
+		{
+			assert(OC_ILIT == ref->operand[opri].oprval.tref->opcode);
+			index = ref->operand[opri].oprval.tref->operand[0].oprval.ilit;
+
+			while (idx->mvidx != index)
 			{
-				assert(idx->last);
-				idx = idx->last;
-				idiff++;
-			} else
-			{
-				assert(idx->next);
-				idx = idx->next;
-				idiff--;
+				if (index < idx->mvidx)
+				{
+					assert(idx->last);
+					idx = idx->last;
+				} else
+				{
+					assert(idx->next);
+					idx = idx->next;
+				}
 			}
+			idx->var->last_fetch = (TREF(fetch_control)).curr_fetch_trip;
+
+			opri++;
 		}
-		assert(idx->mvidx == index);
-		idx->var->last_fetch = (TREF(fetch_control)).curr_fetch_trip;
 	}
 	(TREF(fetch_control)).curr_fetch_count = fetch_count;
-	(TREF(fetch_control)).curr_fetch_opr = ref2;
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -34,6 +34,7 @@
 #include "mv_stent.h"		/* for COPY_SUBS_TO_GVCURRKEY macro */
 #include "gvcst_protos.h"	/* for gvcst_root_search in GV_BIND_NAME_AND_ROOT_SEARCH macro */
 #include "gvt_inline.h"
+#include "min_max.h"
 
 /*the header files below are for environment translation*/
 #ifdef UNIX
@@ -79,6 +80,7 @@ void op_gvextnam_fast(UNIX_ONLY_COMMA(int count_arg) int hash_code, mval *val1, 
 	va_end(var);
 }
 
+/* op_gvextnam_runtime should generally be maintained in parallel */
 STATICFNDEF void op_gvextnam_common(int count, int hash_code, mval *val1, va_list var)
 {
 	boolean_t	is_null, was_null;
@@ -153,4 +155,78 @@ STATICFNDEF void op_gvextnam_common(int count, int hash_code, mval *val1, va_lis
 	if (was_null && (NEVER == reg->null_subs))
 		sgnl_gvnulsubsc(NULL);
 	return;
+}
+
+/* op_gvextnam_common should generally be maintained in parallel */
+boolean_t op_gvextnam_runtime(mval *src, int subscripts, int *start, int *stop)
+{
+	boolean_t	is_null, was_null;
+	mstr		*gld_mstr_ptr;
+	mval		*val, *dst, gld_mval;
+	mname_entry	gvname;
+	uint4		max_key;
+	gd_addr		*tmpgd;
+	gvnh_reg_t	*gvnh_reg;
+	gd_region	*reg;
+	size_t		st_len;
+	int		i, tmp_len;
+	char		gblname[MAX_MIDENT_LEN + 1];
+	DCL_THREADGBL_ACCESS;
+
+	SETUP_THREADGBL_ACCESS;
+	dst = &gld_mval;
+	val = src;
+	op_fnqsubscript_fast(val, -1, dst, subscripts, *start++, *stop++);	/* -1 : for environment */
+	if (dst->str.len)
+	{
+		gld_mstr_ptr = &dst->str;
+		tmpgd = zgbldir(dst);
+	} else
+	{
+		if (!gd_header)
+			gvinit();
+		gld_mstr_ptr = &dollar_zgbldir.str;
+		tmpgd = gd_header;
+	}
+	extnam_str.len = gld_mstr_ptr->len;
+	if (extnam_str.len > TREF(gv_extname_size))
+	{
+		if (NULL != extnam_str.addr)
+			free(extnam_str.addr);
+		TREF(gv_extname_size) = extnam_str.len;
+		st_len = extnam_str.len;
+		extnam_str.addr = (char *)malloc(st_len);
+	}
+	st_len = gld_mstr_ptr->len;
+	memcpy(extnam_str.addr, gld_mstr_ptr->addr, st_len);
+	val = src;
+	op_fnqsubscript_fast(val, 0, dst, subscripts, *start++, *stop++);	/* 0 : for the unsubscripted name */
+	assert(MV_IS_STRING(dst));
+	dst->str.addr++;							/* remove '^' */
+	dst->str.len--;
+	dst->str.len = MIN(dst->str.len, MAX_MIDENT_LEN);
+	memcpy(gblname, dst->str.addr, dst->str.len);
+	gvname.var_name.addr = gblname;
+	gvname.var_name.len = dst->str.len;
+	COMPUTE_HASH_MSTR(gvname.var_name, gvname.hash_code);
+	TREF(gd_targ_addr) = tmpgd;
+	GV_BIND_NAME_AND_ROOT_SEARCH(tmpgd, &gvname, gvnh_reg);
+	DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC((NULL == gvnh_reg->gvspan) ? CHECK_CSA_TRUE : CHECK_CSA_FALSE);
+	was_null = is_null = FALSE;
+	reg = gvnh_reg->gd_reg;
+	for (i = 1; i <= subscripts; i++)
+	{	/* Get the sub mvals with op_fnqsubscript_fast since there is no compilation involved */
+		val = src;
+		op_fnqsubscript_fast(val, i, dst, subscripts, *start++, *stop++);
+		COPY_SUBS_TO_GVCURRKEY(dst, reg, gv_currkey, was_null, is_null);
+	}
+	GV_BIND_SUBSNAME_IF_GVSPAN(gvnh_reg, tmpgd, gv_currkey, reg);
+	max_key = gv_cur_region->max_key_size;
+	if ((tmp_len = gv_currkey->end) >= max_key)
+		ISSUE_GVSUBOFLOW_ERROR(gv_currkey, KEY_COMPLETE_TRUE, (tmp_len+1), max_key, gv_cur_region);
+	TREF(gv_some_subsc_null) = was_null;
+	TREF(gv_last_subsc_null) = is_null;
+	if (was_null && (NEVER == reg->null_subs))
+		sgnl_gvnulsubsc(NULL);
+	return TRUE;
 }

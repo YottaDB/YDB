@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -17,11 +17,12 @@
 #include "compiler.h"
 #include "opcode.h"
 #include "mmemory.h"
+#include "stringpool.h"
 
+GBLREF hash_table_str	*complits_hashtab;
 GBLREF int		mlitmax;
 GBLREF mliteral 	literal_chain;
-GBLREF hash_table_str	*complits_hashtab;
-
+GBLREF spdesc		stringpool;
 oprtype put_lit(mval *x)
 {
 	return put_lit_s(x, NULL);
@@ -29,16 +30,30 @@ oprtype put_lit(mval *x)
 
 oprtype put_lit_s(mval *x, triple *dst_triple)
 {
-	mliteral	*a;
-	triple		*ref;
 	boolean_t	usehtab, added;
-	stringkey	litkey;
 	ht_ent_str	*litent;
+	mliteral	*a;
+	mstr		*mstr_ptr;
+	mval		mval_lcl, *x1;
+	stringkey	litkey;
+	triple		*ref;
 
 	assert(MV_DEFINED(x));
 	MV_FORCE_STR(x);
 	if (MV_IS_CANONICAL(x))
 		MV_FORCE_NUM(x);
+	x1 = x;									/* local copy in case of below modification */
+	if (x->str.len && (x->mvtype & MV_STR))
+	{
+		if (((mstr_ptr = &(x->str))->addr < (char *)stringpool.base)	/* BYPASSOK */
+			|| (mstr_ptr->addr >= (char *)stringpool.free))		/* BYPASSOK */
+		{	/* ensure any string is in heap, not e.g. in mtable localpool - repoint x1 to local copy for modification */
+			assert(NULL != x->str.addr);
+			x1 = &mval_lcl;
+			*x1 = *x;
+			s2pool(&x1->str);
+		}
+	}
 	DEBUG_ONLY(litent = NULL);
 	if (dst_triple == NULL)
 		ref = newtriple(OC_LIT);
@@ -52,9 +67,9 @@ oprtype put_lit_s(mval *x, triple *dst_triple)
 	 */
 	usehtab = (LIT_HASH_CUTOVER < mlitmax) || (complits_hashtab && complits_hashtab->base);
 	if (!usehtab)
-	{	/* Brute force scan under cutover .. should include all intrinsics */
+	{	/* Brute force scan up to cutover to hash .. should include all intrinsics */
 		dqloop(&literal_chain, que, a)
-			if (is_equ(x, &(a->v)))
+			if (is_equ(x1, &(a->v)))
 			{
 				a->rt_addr--;
 				ref->operand[0].oprval.mlit = a;
@@ -83,7 +98,7 @@ oprtype put_lit_s(mval *x, triple *dst_triple)
 			}
 		}
 		/* Set the hash value in this element */
-		litkey.str = x->str;
+		litkey.str = x1->str;
 		COMPUTE_HASH_STR(&litkey);
 		added = add_hashtab_str(complits_hashtab, &litkey, NULL, &litent);
 		if (!added)
@@ -91,7 +106,7 @@ oprtype put_lit_s(mval *x, triple *dst_triple)
 			a = (mliteral *)litent->value;
 			assert(a);
 			assert(MV_DEFINED(&(a->v)));
-			assert(is_equ(x, &(a->v)));
+			assert(is_equ(x1, &(a->v)));
 			assert(a->reference_count);
 			a->rt_addr--;
 			ref->operand[0].oprval.mlit = a;
@@ -103,7 +118,7 @@ oprtype put_lit_s(mval *x, triple *dst_triple)
 	a->reference_count = 1;
 	dqins(&literal_chain, que, a);
 	a->rt_addr = -1;
-	a->v = *x;
+	a->v = *x1;
 	if (usehtab)
 	{	/* Now that new mlit is created, place it in created hashtab entry */
 		assert(litent);

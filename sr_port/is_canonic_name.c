@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -43,11 +43,12 @@ boolean_t is_canonic_name(mval *src, int *subscripts, int *start_off, int *stop_
 	gv_name_and_subscripts 	start_buff, stop_buff;
 	int			seq, contains_env, i;
 	int 			*start, *stop;
+	boolean_t		dummy;
 
 	/* determine which buffer to use */
-	DETERMINE_BUFFER(src, start_buff, stop_buff, start, stop);
+	DETERMINE_BUFFER(src, start_buff, stop_buff, start, stop, dummy);
 	seq = *subscripts;
-	if (parse_gv_name_and_subscripts(src, subscripts, start, stop, &contains_env))
+	if (parse_glvn_and_subscripts(src, subscripts, start, stop, &contains_env, FALSE))
 	{
 #		ifdef DEBUG
 		/* Check that the sequence of start[i] and stop[i] is
@@ -70,10 +71,6 @@ boolean_t is_canonic_name(mval *src, int *subscripts, int *start_off, int *stop_
 			*start_off = start[contains_env + seq];
 			*stop_off = stop[contains_env + seq];
 		}
-		if ('"' == src->str.addr[*start_off])
-			start_off++;
-		if ((0 < *stop_off) && ('"' == src->str.addr[*stop_off - 1]))
-			stop_off--;
 		return TRUE;
 	}
 	return FALSE;
@@ -81,8 +78,8 @@ boolean_t is_canonic_name(mval *src, int *subscripts, int *start_off, int *stop_
 
 /*
  * -----------------------------------------------
- * parse_gv_name_and_subscripts()
- * Validates a global variable name and returns all the corresponding subscripts (unsubscripted or subscripted).
+ * parse_glvn_and_subscripts()
+ * Validates a global or local variable name and returns all the corresponding subscripts (unsubscripted or subscripted).
  *
  * Arguments:
  *	src	     - Pointer to Source Name string mval.
@@ -96,11 +93,13 @@ boolean_t is_canonic_name(mval *src, int *subscripts, int *start_off, int *stop_
  *	contains_env - Pointer returns whether there was an environment or not. This is an integer
  *		       for ease of indexing into the start and stop arrays, i.e. start[contains_env]
  *		       will always return the start of the name.
+ *	no_mult_env  - if this flag is set, return that the name is defective when two environment variable
+ *		       names appear in the extended global.
  * Return:
  *	boolean_t    - TRUE indicates good name; FALSE indicates defective
  * -----------------------------------------------
  */
-boolean_t parse_gv_name_and_subscripts(mval *src, int *subscripts, int *start, int *stop, int *contains_env)
+boolean_t parse_glvn_and_subscripts(mval *src, int *subscripts, int *start, int *stop, int *contains_env, boolean_t no_mult_env)
 {
 	char		term;
 	int		envpart;
@@ -114,7 +113,6 @@ boolean_t parse_gv_name_and_subscripts(mval *src, int *subscripts, int *start, i
 	int		subs_count;
 	int		utf8_len;
 	int		subs_max;
-	boolean_t 	gvn;
 	register char	*cpt;
 	char		*lastcpt;
 	enum
@@ -130,7 +128,6 @@ boolean_t parse_gv_name_and_subscripts(mval *src, int *subscripts, int *start, i
 		END_OF_PROCESSING
 	};
 
-	gvn = ((0 < src->str.len) && ('^' == src->str.addr[0]));
 	MV_FORCE_STR(src);
 	seq = *subscripts;
 	state = BEFORE_NAME;
@@ -140,7 +137,7 @@ boolean_t parse_gv_name_and_subscripts(mval *src, int *subscripts, int *start, i
 	previous = 0;
 	subs_count = -1;
 	*contains_env = 0;
-	subs_max = gvn ? MAX_GVSUBSCRIPTS : MAX_LVSUBSCRIPTS;
+	subs_max = ((0 < src->str.len) && ('^' == src->str.addr[0])) ? MAX_GVSUBSCRIPTS : MAX_LVSUBSCRIPTS;
 	isrc = 0;
 	lastcpt = src->str.addr + src->str.len;
 	for (cpt = src->str.addr; (cpt < lastcpt) && (subs_count < subs_max);)
@@ -184,8 +181,8 @@ boolean_t parse_gv_name_and_subscripts(mval *src, int *subscripts, int *start, i
 					return FALSE;	/* too many environment components */
 				if (')' == term)
 					subs_count++;	/* new subscript */
-				else
-					envpart++;	/* next environment component */
+				else if ((1 < ++envpart) && no_mult_env)	/* next environment component */
+						return FALSE;
 				if ((0 < subs_count) || (1 == envpart))
 					*start++ = isrc;
 				if ('"' == letter)

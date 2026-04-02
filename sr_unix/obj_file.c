@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -463,7 +463,11 @@ void emit_literals(void)
 		assert(p->rt_addr == offset);
 		MV_FORCE_NUMD(&p->v);
 		if (p->v.str.len)
+		{
+			assert(((char *)stringpool.base <= p->v.str.addr)
+				&& ((p->v.str.addr + p->v.str.len) <= (char *)stringpool.free));
 			p->v.str.addr = (char *)(p->v.str.addr - (char *)stringpool.base); /* Initial offset */
+		}
 		else
 			p->v.str.addr = NULL;
 		p->v.fnpc_indx = (unsigned char)-1;

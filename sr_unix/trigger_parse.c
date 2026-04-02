@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2023 Fidelity National Information	*
+ * Copyright (c) 2010-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -560,7 +560,7 @@ boolean_t check_trigger_name(char *name_str, uint4 *name_len)
 STATICFNDEF boolean_t process_options(char *option_str, uint4 option_len, boolean_t *isolation, boolean_t *noisolation,
 			       boolean_t *consistency, boolean_t *noconsistency)
 {
-	char		local_options[MAX_OPTIONS_LEN];
+	char		local_options[MAX_OPTIONS_LEN + 1];
 	char		*ptr, *strtokptr;
 
 	if (MAX_OPTIONS_LEN < option_len)
@@ -569,6 +569,7 @@ STATICFNDEF boolean_t process_options(char *option_str, uint4 option_len, boolea
 		return FALSE;
 	}
 	memcpy((void *)local_options, option_str, option_len);
+	local_options[option_len] = '\0';
 	*isolation = *noisolation = *consistency = *noconsistency = FALSE;
 	ptr = local_options;
 	for ( ; 0 < option_len; ptr++, option_len--)

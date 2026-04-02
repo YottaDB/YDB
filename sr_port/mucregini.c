@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -271,7 +271,7 @@ void mucregini(gd_region *reg, sgmnt_data_ptr_t csd, enum db_ver desired_db_ver)
 	csd->bt_buckets = getprime(csd->n_bts);
 
 	csd->n_wrt_per_flu = 7;
-	csd->flush_trigger = csd->flush_trigger_top = FLUSH_FACTOR(csd->n_bts);
+	csd->flush_trigger = csd->flush_trigger_top = MAX_FLUSH_TRIGGER(csd->n_bts);
 
 	csd->max_update_array_size = csd->max_non_bm_update_array_size
 					= (int4)ROUND_UP2(MAX_NON_BITMAP_UPDATE_ARRAY_SIZE(csd), UPDATE_ARRAY_ALIGN_SIZE);

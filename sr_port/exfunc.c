@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -26,6 +26,7 @@ int exfunc(oprtype *a, boolean_t alias_target)
 {
 	triple		*calltrip, *calltrip_opr1_tref, *counttrip, *funret, *labelref, *masktrip;
 	triple		*oldchain, *ref0, *routineref, tmpchain, *triptr;
+
 #	if defined(USHBIN_SUPPORTED) || defined(VMS)
 	triple		*tripsize = NULL;
 #	endif
@@ -111,7 +112,7 @@ int exfunc(oprtype *a, boolean_t alias_target)
 		masktrip->operand[1] = put_tref(counttrip);
 		ref0->operand[1] = put_tref(masktrip);
 	} else
-		if (!actuallist(&ref0->operand[1]))
+		if (!actuallist(&ref0->operand[1], false))
 			return FALSE;
 	triptr = oldchain->exorder.bl;
 	dqadd(triptr, &tmpchain, exorder);		/*this is a violation of info hiding*/

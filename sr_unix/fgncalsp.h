@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -120,8 +120,8 @@ struct extcall_entry_list
 	struct extcall_entry_list	*next_entry;
 	enum gtm_types			return_type;	/* function return value */
 	int				ret_pre_alloc_val; /* amount of space to be pre-allocated for the return type */
-	uint4				input_mask;	/* is it an input parameter lsb = 1st parm */
-	uint4				output_mask;	/* is it an output parameter lsb = 1st parm */
+	gtm_uint8			input_mask;	/* is it an input parameter lsb = 1st parm */
+	gtm_uint8			output_mask;	/* is it an output parameter lsb = 1st parm */
 	int				parmblk_size;	/* size in bytes of parameter block to be allocated for call*/
 	int				argcnt;		/* number of arguments */
 	enum gtm_types			*parms;		/* pointer to parameter array */
@@ -138,8 +138,8 @@ typedef struct callin_entry_list
 {
 	mstr			label_ref;	/* labelref name of M routine */
 	mstr			call_name;	/* corresponding name of C function */
-	uint4			input_mask;	/* input parameter? LSB = 1st parm */
-	uint4			output_mask;	/* output parameter? LSB = 1st parm */
+	gtm_uint8		input_mask;	/* input parameter? LSB = 1st parm */
+	gtm_uint8		output_mask;	/* output parameter? LSB = 1st parm */
 	unsigned short		argcnt;		/* number of arguments */
 	enum gtm_types		return_type;
 	enum gtm_types		*parms;		/* parameter types */

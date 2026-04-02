@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -22,22 +22,27 @@
 #include <rtnhdr.h>
 #include "valid_mname.h"
 #include "stack_frame.h"
+#include "is_canonic_name.h"
 
-GBLREF	symval			*curr_symval;
-GBLREF stack_frame	*frame_pointer;
+GBLREF	symval		*curr_symval;
+GBLREF	stack_frame	*frame_pointer;
 
 error_def(ERR_VAREXPECTED);
 
 void	op_indset(mval *target, mval *value)
 {
-	char 		new;
-	ht_ent_mname 	*tabent;
-	icode_str	indir_src;
-	int		rval;
-	mstr		*obj, object;
-	oprtype		v;
-	triple		*s, *src;
-	var_tabent	targ_key;
+	char 			new;
+	ht_ent_mname 		*tabent;
+	icode_str		indir_src;
+	int			rval;
+	mstr			*obj, object;
+	oprtype			v;
+	triple			*s, *src;
+	var_tabent		targ_key;
+	lv_gv_name		glvname;
+	int			subs, *start, *stop;
+	gv_name_and_subscripts	start_buff, stop_buff;
+	lv_val			*ret_lv, tmp_lv;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -56,6 +61,19 @@ void	op_indset(mval *target, mval *value)
 				lv_newname(tabent, curr_symval);
 			((lv_val *)tabent->value)->v = *value;
 			return;
+		} else
+		{
+			DO_OP_GVNAME_IF_NEEDED(target, subs, start_buff, stop_buff, start, stop, glvname);
+			if (GV_NAME == glvname)
+			{
+				op_gvput(value);
+				return;
+			} else if ((LV_NAME == glvname)
+					&& (NULL != (ret_lv = op_putindx_runtime(target, subs, start, stop, &tmp_lv))))
+			{
+				ret_lv->v = *value;
+				return;
+			}
 		}
 		obj = &object;
 		comp_init(&target->str, NULL);

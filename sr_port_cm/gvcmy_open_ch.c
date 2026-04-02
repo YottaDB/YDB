@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -44,7 +45,6 @@ CONDITION_HANDLER(gvcmy_open_ch)
 		PRN_ERROR;
 		CONTINUE;
 	}
-	assert(NULL != gd_header);
 	assert(NULL != gv_currkey);
 	assert(NULL != gv_altkey);
 	gv_currkey->base[0] = gv_altkey->base[0] = '\0'; /* error opening remote db should reset gv_currkey and gv_altkey so

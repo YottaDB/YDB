@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -16,11 +16,12 @@
 #define JOBINTR_TP_RETHROW								\
 { /* rethrow job interrupt($ZINT) if $ZTEXIT is true and not already in $ZINTR */	\
 	GBLREF  boolean_t		dollar_ztexit_bool;				\
+	GBLREF  int			process_exiting;				\
 	GBLREF  volatile boolean_t	dollar_zininterrupt;				\
 											\
 	error_def(ERR_JOBINTRRETHROW);				/* BYPASSOK */		\
 											\
-	if (dollar_ztexit_bool && !dollar_zininterrupt)				\
+	if (dollar_ztexit_bool && !dollar_zininterrupt && !process_exiting)		\
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_JOBINTRRETHROW);		\
 }
 void jobinterrupt_event(int sig, siginfo_t *info, void *context);

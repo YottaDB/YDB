@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2023 Fidelity National Information	*
+ * Copyright (c) 2003-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -248,12 +248,15 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 	ADJUST_CHECKSUM(checksum, lcl_freeaddr, checksum);
 	ADJUST_CHECKSUM(checksum, csd->jnl_checksum, checksum);
 	SET_JREC_CHECKSUM(jnl_rec, rectype, checksum);
+interact1:
 	if (!in_phase2)
 	{
-		assert((!jb->blocked) || (FALSE == is_proc_alive(jb->blocked, jb->blocked_pstarttime)));
+		assert(WBTEST_ENABLED(WBTEST_CRASH_SHUTDOWN_EXPECTED) || (!jb->blocked)
+			|| (FALSE == is_proc_alive(jb->blocked, jb->blocked_pstarttime)));
 		jb->blocked = process_id;
 		jb->blocked_pstarttime = pstarttime;
 	}
+interact2:
 	jnl_fs_block_size = jb->fs_block_size;
 	min_dskaddr = (gtm_int64_t)new_freeaddr - lcl_size + jnl_fs_block_size;	/* gtm_int64_t used as result can be negative */
 	/* If jb->dskaddr >= min_dskaddr, we are guaranteed we can write "rlen" bytes at "lcl_freeaddr" without
@@ -479,4 +482,9 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 		jpc->phase2_free = lcl_free;
 	}
 	DEBUG_ONLY(jnl_write_recursion_depth--);
+	return;
+	assertpro(FALSE); /* ensure we never reach the gotos below */
+	/* keep the compiler happy for labels only used by interact */
+	goto interact1;
+	goto interact2;
 }

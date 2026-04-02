@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2009-2015 Fidelity National Information 	*
+ * Copyright (c) 2009-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -41,6 +41,7 @@
    NOTE: Although this module can be used on other platforms it is efficient **ONLY** on Itanium in its present
          form and is not suggested for use on other platforms.
 */
+
 
 INTPTR_T callg(callgfnptr fnptr, gparam_list *paramlist)
 {
@@ -93,7 +94,6 @@ INTPTR_T callg(callgfnptr fnptr, gparam_list *paramlist)
 		case 34:
 		case 35:
 		case 36:
-			assert(fnptr == (callgfnptr)push_parm); /* Only push_parm is aware of this extra space */
 			return (fnptr)(paramlist->n, VAR_ARGS36(paramlist->arg));
 		default:
 			assertpro(paramlist->n <= 36);

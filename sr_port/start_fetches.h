@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -30,7 +30,7 @@ static inline void start_fetches(opctype op)
 		(TREF(fetch_control)).curr_fetch_trip->operand[0] = put_ilit((TREF(fetch_control)).curr_fetch_count);
 		(TREF(fetch_control)).curr_fetch_count = 0;
 	}
-	(TREF(fetch_control)).curr_fetch_opr = (TREF(fetch_control)).curr_fetch_trip = newtriple(op);
+	(TREF(fetch_control)).curr_fetch_trip = newtriple(op);
 	return;
 }
 
@@ -53,4 +53,29 @@ static inline void mid_line_refetch(void)
 		start_for_fetches();
 	return;
 }
+
+static inline void add_fetch(mvar *var)
+{
+	triple	*p, *fetch;
+	DCL_THREADGBL_ACCESS;
+
+	SETUP_THREADGBL_ACCESS;
+	fetch = (TREF(fetch_control)).curr_fetch_trip;
+	if ((var->last_fetch != fetch) && !TREF(discard))
+	{
+		if (NO_REF == fetch->operand[1].oprclass)
+		{
+			fetch->operand[1] = put_ilit(var->mvidx);
+		} else
+		{
+			p = newtriple(OC_PARAMETER);
+			p->operand[0] = put_ilit(var->mvidx);
+			p->operand[1] = fetch->operand[1];
+			fetch->operand[1] = put_tref(p);
+		}
+		var->last_fetch = fetch;
+		(TREF(fetch_control)).curr_fetch_count++;
+	}
+}
+
 #endif

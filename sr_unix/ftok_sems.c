@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -260,6 +260,7 @@ boolean_t ftok_sem_lock(gd_region *reg, boolean_t immediate)
 boolean_t ftok_sem_release(gd_region *reg,  boolean_t decr_cnt, boolean_t immediate)
 {
 	int		ftok_semval, semflag, save_errno;
+	int		save_ftok_semid;
 	unix_db_info 	*udi;
 	DCL_THREADGBL_ACCESS;
 
@@ -294,13 +295,14 @@ boolean_t ftok_sem_release(gd_region *reg,  boolean_t decr_cnt, boolean_t immedi
 			/* Below checks against 0, in case already we decremented semaphore number 1 */
 			if (DB_COUNTER_SEM_INCR >= ftok_semval)
 			{
-				if (0 != sem_rmid(udi->ftok_semid))
+				save_ftok_semid = udi->ftok_semid;
+				udi->ftok_semid = INVALID_SEMID;
+				if (0 != sem_rmid(save_ftok_semid))
 				{
 					save_errno = errno;
 					GTM_SEM_CHECK_EINVAL(TREF(gtm_environment_init), save_errno, udi);
 					ISSUE_CRITSEMFAIL_AND_RETURN(reg, "sem_rmid()", save_errno);
 				}
-				udi->ftok_semid = INVALID_SEMID;
 				ftok_sem_reg = NULL;
 				udi->grabbed_ftok_sem = FALSE;
 				udi->counter_ftok_incremented = FALSE;

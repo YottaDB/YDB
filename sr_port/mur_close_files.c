@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2025 Fidelity National Information	*
+ * Copyright (c) 2003-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -135,7 +135,7 @@ boolean_t mur_close_files(void)
 	uint4			ustatus, ustatus2;
 	int4			status;
 	int4			rundown_status = EXIT_NRM;		/* if "gds_rundown" went smoothly */
-	int			idx, finish_err_code, save_errno;
+	int			idx, save_errno;
 	const char		*fini_str = NULL;
 	const char		*termntd_str;
 	unsigned char		ipcs_buff[MAX_IPCS_ID_BUF], *ipcs_ptr;
@@ -980,17 +980,15 @@ boolean_t mur_close_files(void)
 	in_rlbk = RLBKNOTACTIVE;
 	if (FD_INVALID != repl_inst_rlbk_fd) /* No need to check status below as we are exiting */
 		CLOSEFILE_RESET(repl_inst_rlbk_fd, status);    /* resets "fd" to FD_INVALID */
-	if (jgbl.onlnrlbk)
+	if (jgbl.onlnrlbk && (NULL != jnlpool))
 	{	/* Signal completion */
-		assert(NULL != jnlpool);
-		assert(((NULL != inst_hdr) && (udi == FILE_INFO(jnlpool->jnlpool_dummy_reg))) || !murgbl.clean_exit);
-		finish_err_code = murgbl.clean_exit ? ERR_ORLBKCMPLT : ERR_ORLBKTERMNTD;
+		assert(((NULL != inst_hdr) && (udi == FILE_INFO(jnlpool->jnlpool_dummy_reg))));
 		assert(!murgbl.repl_standalone || ((NULL != inst_hdr) && (NULL != udi)));
 		if (murgbl.repl_standalone)
 		{
-			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) finish_err_code, 4,
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) murgbl.clean_exit ? ERR_ORLBKCMPLT : ERR_ORLBKTERMNTD, 4,
 					LEN_AND_STR(inst_hdr->inst_info.this_instname), LEN_AND_STR(udi->fn));
-			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(6) finish_err_code, 4,
+			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(6) murgbl.clean_exit ? ERR_ORLBKCMPLT : ERR_ORLBKTERMNTD, 4,
 					LEN_AND_STR(inst_hdr->inst_info.this_instname), LEN_AND_STR(udi->fn));
 		}
 	}
@@ -1005,10 +1003,7 @@ boolean_t mur_close_files(void)
 		 * external signal that in turn took us to exit handling. In that case forced_exit_err would be set so assert that.
 		 */
 		assert(!murgbl.clean_exit || forced_exit_err);
-		if (murgbl.wrn_count)
-			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT (1) ERR_JNLACTINCMPLT);
-		else
-			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT (1) ERR_MUNOACTION);
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT (1) murgbl.wrn_count ? ERR_JNLACTINCMPLT : ERR_MUNOACTION);
 	} else if (murgbl.clean_exit && !murgbl.wrn_count)
 		JNL_SUCCESS_MSG(mur_options);
  	JNL_PUT_MSG_PROGRESS("End processing");

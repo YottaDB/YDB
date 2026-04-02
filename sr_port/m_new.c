@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -50,15 +50,7 @@ int m_new(void)
 	{
 	case TK_IDENT:
 		var = get_mvaddr(&(TREF(window_ident)));
-		if ((var->last_fetch != (TREF(fetch_control)).curr_fetch_trip) && !TREF(discard))
-		{	/* This block is identical to one in put_mvar */
-			fetch = newtriple(OC_PARAMETER);
-			(TREF(fetch_control)).curr_fetch_opr->operand[1] = put_tref(fetch);
-			fetch->operand[0] = put_ilit(var->mvidx);
-			((TREF(fetch_control)).curr_fetch_count)++;
-			(TREF(fetch_control)).curr_fetch_opr = fetch;
-			var->last_fetch = (TREF(fetch_control)).curr_fetch_trip;
-		}
+		add_fetch(var);
 		tmp = maketriple(OC_NEWVAR);
 		tmp->operand[0] = put_ilit(var->mvidx);
 		ins_triple(tmp);

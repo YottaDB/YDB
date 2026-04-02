@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -22,6 +22,7 @@
 #include "op.h"
 #include <rtnhdr.h>
 #include "valid_mname.h"
+#include "is_canonic_name.h"
 
 GBLREF	bool			undef_inhibit;
 GBLREF	symval			*curr_symval;
@@ -29,14 +30,18 @@ LITREF	mval			literal_null;
 
 error_def(ERR_UNDEF);
 
-void	op_indglvn(mval *v,mval *dst)
+void	op_indglvn(mval *v, mval *dst)
 {
-	ht_ent_mname	*tabent;
-	icode_str	indir_src;
-	int		rval;
-	mstr		*obj, object;
-	oprtype		x, getdst;
-	var_tabent	targ_key;
+	ht_ent_mname		*tabent;
+	icode_str		indir_src;
+	int			rval;
+	mstr			*obj, object;
+	oprtype			x, getdst;
+	var_tabent		targ_key;
+	lv_gv_name		glvname;
+	int			subs, *start, *stop;
+	gv_name_and_subscripts	start_buff, stop_buff;
+	lv_val			*ret_lv, tmp_lv;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -58,11 +63,24 @@ void	op_indglvn(mval *v,mval *dst)
 					*dst = literal_null;
 					return;
 				} else
-					RTS_ERROR_ABT(VARLSTCNT(4) ERR_UNDEF, 2, v->str.len, v->str.addr);
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_UNDEF, 2, v->str.len, v->str.addr);
 			}
 			*dst = ((lv_val *)tabent->value)->v;
 			dst->mvtype &= ~MV_ALIASCONT;	/* Make sure alias container property does not pass */
 			return;
+		} else
+		{
+			DO_OP_GVNAME_IF_NEEDED(v, subs, start_buff, stop_buff, start, stop, glvname);
+			if (GV_NAME == glvname)
+			{
+				op_gvget(dst);
+				return;
+			} else if ((LV_NAME == glvname) && (NULL != (ret_lv = op_getindx_runtime(v, subs, start, stop, &tmp_lv))))
+			{
+				*dst = ret_lv->v;
+				dst->mvtype &= ~MV_ALIASCONT;
+				return;
+			}
 		}
 		obj = &object;
 		comp_init(&v->str, &getdst);

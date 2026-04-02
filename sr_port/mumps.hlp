@@ -120,7 +120,7 @@
 2 Copyright
    Copyright
 
-   Copyright 2025
+   Copyright 2026
 
    Fidelity National Information Services, Inc. and/or its subsidiaries. All
    rights reserved.
@@ -12732,8 +12732,8 @@
 
    The mode can be:
 
-     * INTERACTIVE
-     * OTHER
+     * INTERACTIVE - process not started by a JOB command
+     * OTHER - process started by a JOB command
 
    M routines cannot modify $ZMODE.
 
@@ -12742,7 +12742,21 @@
    GTM>WRITE $ZMODE
    INTERACTIVE
 
-   This displays the process mode.
+   Example:
+
+   > cat mode.m
+   mode;
+           write $zmode,!
+           quit
+   > mumps -run mode
+   INTERACTIVE
+
+   Example:
+
+   GTM>job ^mode
+
+   > cat mode.mjo
+   OTHER
 
 2 $ZONLNrlbk
    $ZONLNrlbk

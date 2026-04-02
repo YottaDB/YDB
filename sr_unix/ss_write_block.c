@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2009-2020 Fidelity National Information	*
+ * Copyright (c) 2009-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -73,7 +73,7 @@ boolean_t ss_write_block(sgmnt_addrs *csa,
 	assert((is_bg && (NULL != cr) && (NULL == mm_blk_ptr)) || (!is_bg && (NULL == cr) && (NULL != mm_blk_ptr)));
 	ss_shm_ptr = lcl_ss_ctx->ss_shm_ptr;
 	DBG_ENSURE_PTR_WITHIN_SS_BOUNDS(csa, (sm_uc_ptr_t)ss_shm_ptr);
-	if (ss_shm_ptr->failure_errno)
+	if (ss_shm_ptr->failure_errno || (INVALID_SHMID == cnl->ss_shmid) || (INVALID_SHMID == ss_shm_ptr->ss_info.ss_shmid))
 	{
 		/* A prior GT.M process has encountered an error and hence the snapshot is invalid and hence there is
 		 * no use in continuing with the before image writes. So, do early return.
@@ -162,6 +162,7 @@ boolean_t ss_write_block(sgmnt_addrs *csa,
 		return FALSE;
 	}
 	/* Mark the block as before imaged in the bitmap */
-	ss_set_shdw_bitmap(csa, lcl_ss_ctx, blk);
+	if (INVALID_SHMID != (lcl_ss_ctx->ss_shm_ptr->ss_info.ss_shmid))
+		ss_set_shdw_bitmap(csa, lcl_ss_ctx, blk);
 	return TRUE;
 }

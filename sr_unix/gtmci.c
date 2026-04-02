@@ -1,7 +1,7 @@
 
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -223,7 +223,7 @@ int gtm_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 	mstr			label, routine;
 	int			has_return, i, len;
 	rhdtyp          	*base_addr;
-	uint4			inp_mask, out_mask, mask;
+	gtm_uint8		inp_mask, out_mask, mask;
 	mval			arg_mval, *arg_ptr;
 	enum gtm_types		arg_type;
 	gtm_string_t		*mstr_parm;
@@ -533,7 +533,7 @@ int gtm_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 	mstr			label, routine;
 	int			has_return, i;
 	rhdtyp          	*base_addr;
-	uint4			inp_mask, out_mask, mask;
+	gtm_uint8		inp_mask, out_mask, mask;
 	mval			arg_mval, *arg_ptr;
 	enum gtm_types		arg_type;
 	gtm_string_t		*mstr_parm;

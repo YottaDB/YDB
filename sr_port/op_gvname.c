@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -80,6 +80,7 @@ void op_gvname_fast(UNIX_ONLY_COMMA(int count_arg) int hash_code, mval *val_arg,
 	va_end(var);
 }
 
+/* op_gvname_runtime should generally be maintained in parallel */
 STATICFNDEF void op_gvname_common(int count, int hash_code, mval *val_arg, va_list var)
 {
 	boolean_t	is_null, was_null;
@@ -108,7 +109,7 @@ STATICFNDEF void op_gvname_common(int count, int hash_code, mval *val_arg, va_li
 	 * and point to it instead of val->str.addr.
 	 */
 	gvname.var_name.len = val->str.len;
-	memcpy((void *)varstr, val->str.addr, gvname.var_name.len);
+	memcpy(varstr, val->str.addr, gvname.var_name.len);
 	gvname.var_name.addr = varstr;
 	TREF(gd_targ_addr) = gd_header;		/* needed by name-level $order/$zprevious and various other functions */
 	/* Bind the unsubscripted global name to corresponding region in the global directory map */
@@ -145,4 +146,55 @@ STATICFNDEF void op_gvname_common(int count, int hash_code, mval *val_arg, va_li
 		sgnl_gvnulsubsc(NULL);
 	TREF(prev_gv_target) = gv_target;	/* note down gv_target in another global for debugging purposes (C9I09-003039) */
 	return;
+}
+
+/* op_gvname_common should generally be maintained in parallel */
+boolean_t op_gvname_runtime(mval *src, int subscripts, int *start, int *stop)
+{
+	boolean_t	is_null, was_null;
+	mname_entry	gvname;
+	int		max_key, tmp_len, i;
+	gvnh_reg_t	*gvnh_reg;
+	gd_region	*reg;
+	mval		*dst, *val, gblname_mval;
+	char		gblname[MAX_MIDENT_LEN + 1];
+	DCL_THREADGBL_ACCESS;
+
+	SETUP_THREADGBL_ACCESS;
+	DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC(CHECK_CSA_TRUE);
+	extnam_str.len = 0;
+	if (!gd_header)
+		gvinit();
+	dst = &gblname_mval;
+	val = src;
+	op_fnqsubscript_fast(val, 0, dst, subscripts, start[0], stop[0]);	/* 0 : for the unsubscripted name */
+	dst->str.addr++;							/* remove '^' */
+	dst->str.len--;
+	dst->str.len = MIN(dst->str.len, MAX_MIDENT_LEN);
+	memcpy(gblname, dst->str.addr, dst->str.len);
+	gvname.var_name.addr = gblname;
+	gvname.var_name.len = dst->str.len;
+	COMPUTE_HASH_MSTR(gvname.var_name, gvname.hash_code);
+	TREF(gd_targ_addr) = gd_header;
+	GV_BIND_NAME_AND_ROOT_SEARCH(gd_header, &gvname, gvnh_reg);
+	reg = gvnh_reg->gd_reg;
+	DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC((NULL == gvnh_reg->gvspan) ? CHECK_CSA_TRUE : CHECK_CSA_FALSE);
+	was_null = is_null = FALSE;
+	for (i = 1; i <= subscripts; i++)
+	{	/* Get the sub mvals with op_fnqsubscript_fast since there is no compilation involved */
+		val = src;
+		op_fnqsubscript_fast(val, i, dst, subscripts, start[i], stop[i]);
+		COPY_SUBS_TO_GVCURRKEY(dst, reg, gv_currkey, was_null, is_null);
+	}
+	GV_BIND_SUBSNAME_IF_GVSPAN(gvnh_reg, gd_header, gv_currkey, reg);
+	max_key = gv_cur_region->max_key_size;
+	if ((tmp_len = gv_currkey->end) >= max_key)
+		ISSUE_GVSUBOFLOW_ERROR(gv_currkey, KEY_COMPLETE_TRUE, (tmp_len+1), max_key, gv_cur_region);
+	assert(!dollar_tlevel || (sgm_info_ptr && (sgm_info_ptr->tp_csa == cs_addrs)));
+	TREF(gv_some_subsc_null) = was_null;
+	TREF(gv_last_subsc_null) = is_null;
+	if (was_null && (NEVER == reg->null_subs))
+		sgnl_gvnulsubsc(NULL);
+	TREF(prev_gv_target) = gv_target;
+	return TRUE;
 }

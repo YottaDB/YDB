@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -134,7 +134,7 @@ void dse_dmp_fhead (void)
 		util_out_print("                                                   ", FALSE);
 		util_out_print("  Block size (in bytes)         !12UL", TRUE, csd->blk_size);
 		util_out_print("  Maximum record size           !19UL", FALSE, csd->max_rec_size);
-		util_out_print("  Starting VBN                  !12UL", TRUE, csd->start_vbn);
+		util_out_print("  Starting VBN            0x!16@XQ", TRUE, &csd->start_vbn);
 		util_out_print("  Maximum key size              !19UL", FALSE, csd->max_key_size);
 		util_out_print("  Total blocks            0x!16@XQ", TRUE, &(csa->ti->total_blks));
 		util_out_print("  Null subscripts                      !AD", FALSE, 12,

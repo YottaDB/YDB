@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2009-2020 Fidelity National Information	*
+ * Copyright (c) 2009-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -84,33 +84,67 @@ error_def(ERR_SSSHMCLNUPFAIL);
 {														\
 	int		save_errno;										\
 	struct shmid_ds ss_shmstat;										\
+	int res; \
 														\
 	if ((INVALID_SHMID != ss_shmid) && (0 == shmctl((int)ss_shmid, IPC_STAT, &ss_shmstat)))			\
 	{													\
-		if (0 != shmctl((int)ss_shmid, IPC_RMID, &ss_shmstat))						\
+		res = shmctl((int)ss_shmid, IPC_RMID, &ss_shmstat);	\
+		if (0 != res)					\
 		{												\
 			save_errno = errno;									\
 			if (IS_MUMPS_IMAGE)									\
 				send_msg_csa(CSA_ARG(csa) VARLSTCNT(6)						\
 					ERR_SSSHMCLNUPFAIL, 3, LEN_AND_LIT("shmctl"), ss_shmid, save_errno);	\
 			else											\
+			{											\
 				gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(6)					\
 					ERR_SSSHMCLNUPFAIL, 3, LEN_AND_LIT("shmctl"), ss_shmid, save_errno);	\
+			}											\
+		}												\
+		else												\
+		{												\
+			/* Technically might not be removed yet, but nobody should use it */			\
+			ss_shmid = INVALID_SHMID;								\
 		}												\
 	}													\
 }														\
 
-#define ADJUST_SHARED_MEMORY_FIELDS(cnl, ss_shm_ptr)				\
-{										\
-	if (0 < cnl->num_snapshots_in_effect)					\
-		cnl->num_snapshots_in_effect--;					\
-	if (0 == cnl->num_snapshots_in_effect)					\
-	{									\
-		CLEAR_SNAPSHOTS_IN_PROG(cnl);					\
-		cnl->ss_shmid = INVALID_SHMID;					\
-	}									\
-	SS_DEFAULT_INIT_POOL(ss_shm_ptr);					\
-	cnl->ss_shmcycle++;							\
+#define ADJUST_SHARED_MEMORY_FIELDS(cnl, ss_shm_ptr)									\
+{															\
+	int res;													\
+	int save_errno;													\
+	struct shmid_ds asmf_shmstat;											\
+	assert(csa->now_crit);												\
+	if (0 < cnl->num_snapshots_in_effect)										\
+		cnl->num_snapshots_in_effect--;										\
+	if (0 == cnl->num_snapshots_in_effect)										\
+	{														\
+		CLEAR_SNAPSHOTS_IN_PROG(cnl);										\
+		CLEAR_SNAPSHOTS_IN_PROG(csa);										\
+		if ((INVALID_SHMID != cnl->ss_shmid) && (0 == shmctl(cnl->ss_shmid, IPC_STAT, &asmf_shmstat)))		\
+		{													\
+			res = shmctl(cnl->ss_shmid, IPC_RMID, &asmf_shmstat);						\
+			/* We checked but could be somebody else cleaned up in between there & here */			\
+			if ((0 != res) && (EINVAL != errno))								\
+			{												\
+				save_errno = errno;									\
+				/* since we checked above must have been another process doing RMID too */		\
+				if (IS_MUMPS_IMAGE)									\
+					send_msg_csa(CSA_ARG(csa) VARLSTCNT(6)						\
+						ERR_SSSHMCLNUPFAIL, 3, LEN_AND_LIT("shmctl2"), cnl->ss_shmid,		\
+						save_errno);								\
+				else											\
+				{											\
+					gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(6)					\
+						ERR_SSSHMCLNUPFAIL, 3, LEN_AND_LIT("shmctl2"), cnl->ss_shmid, 		\
+							save_errno);							\
+				}											\
+			}												\
+			cnl->ss_shmid = INVALID_SHMID;									\
+		}													\
+	}														\
+	SS_DEFAULT_INIT_POOL(ss_shm_ptr);										\
+	cnl->ss_shmcycle++;												\
 }
 
 void		ss_release(snapshot_context_ptr_t *ss_ctx)
@@ -139,12 +173,36 @@ void		ss_release(snapshot_context_ptr_t *ss_ctx)
 	if (NULL == ss_ctx) /* orphaned cleanup */
 	{
 		assert(ss_lock_held_by_us(gv_cur_region));
+		if (!was_crit)
+			grab_crit(gv_cur_region, WS_99);
 		ss_shm_ptr = (shm_snapshot_ptr_t)(SS_GETSTARTPTR(csa));
 		DBG_ENSURE_PTR_WITHIN_SS_BOUNDS(csa, (sm_uc_ptr_t)ss_shm_ptr);
 		ss_shmid = ss_shm_ptr->ss_info.ss_shmid;
 		CLEANUP_SHADOW_FILE(FALSE, ss_shm_ptr->ss_info.shadow_file, csa);
-		CLEANUP_SHARED_MEMORY(ss_shmid, csa);
+		CLEANUP_SHARED_MEMORY(ss_shm_ptr->ss_info.ss_shmid, csa);
+		/* Previously orphaned cleanup didn't do the wait for phase 2 commit as the mainline code below, but
+		   it probably should */
+		assert(cs_data == cs_addrs->hdr);
+		if (dba_bg == cs_data->acc_meth)
+		{
+			/* Now that we have crit, wait for any pending phase2 updates to finish. Since phase2 updates happen
+			 * outside of crit, we dont want them to keep writing to the snapshot file even after the snapshot
+			 * is complete. This is needed as otherwise a GT.M process might see the value of csa->snapshot_in_prog
+			 * as TRUE and before it can proceed any further(starvation, maybe), we went ahead and removed the
+			 * snapshot file(below). Now, if the GT.M process resumes execution, it might end up writing
+			 * the before image to a temporary file which is no longer available.
+			 */
+			if (cnl->wcs_phase2_commit_pidcnt && !wcs_phase2_commit_wait(csa, NULL))
+			{
+				assert(FALSE);
+				gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(7) ERR_COMMITWAITSTUCK, 5, process_id, 1,
+						cnl->wcs_phase2_commit_pidcnt, DB_LEN_STR(gv_cur_region));
+			}
+		}
 		ADJUST_SHARED_MEMORY_FIELDS(cnl, ss_shm_ptr);
+		if (!was_crit)
+			rel_crit(gv_cur_region);
+		ss_shm_ptr->ss_info.ss_pid = 0;
 		return;
 	}
 	assert(NULL != *ss_ctx);
@@ -201,6 +259,12 @@ void		ss_release(snapshot_context_ptr_t *ss_ctx)
 	}
 	STRCPY(shadow_file, lcl_ss_ctx->shadow_file);
 	ss_shmid = lcl_ss_ctx->attach_shmid;
+	if (0 < cnl->num_snapshots_in_effect)
+	{
+		--(cnl->num_snapshots_in_effect);
+		CLEAR_SNAPSHOTS_IN_PROG(cnl);
+		CLEAR_SNAPSHOTS_IN_PROG(csa);
+	}
 	ss_destroy_context(lcl_ss_ctx);
 	/* Do cleanup depending on what state of the snapshot init we are in */
 	switch(cur_state)
@@ -212,7 +276,7 @@ void		ss_release(snapshot_context_ptr_t *ss_ctx)
 			 * delted by the OS until number of processes attached to this shared segment becomes zero. GT.M
 			 * at the end of each transaction, will try to detach itself from this shared memory segment and will
 			 * eventually lead to number of attached processes becoming zero.*/
-			CLEANUP_SHARED_MEMORY(ss_shmid, csa);
+			CLEANUP_SHARED_MEMORY(lcl_ss_ctx->attach_shmid, csa);
 		/* intentional fall through */
 		case AFTER_SHADOW_FIL_CREAT:
 			CLEANUP_SHADOW_FILE(preserve_snapshot, shadow_file, csa);

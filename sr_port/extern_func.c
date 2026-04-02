@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2011-2023 Fidelity National Information	*
+ * Copyright (c) 2011-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -15,6 +15,7 @@
 #include "opcode.h"
 #include "toktyp.h"
 #include "advancewindow.h"
+#include "gtm_stdio.h"
 
 error_def(ERR_RTNNAME);
 
@@ -84,11 +85,18 @@ int extern_func(oprtype *a)
 	cnt++;
 	if (TK_LPAREN != TREF(window_token))
 	{
-		ref = newtriple(OC_PARAMETER);
+		ref = newtriple(OC_PARAMETER);	/* maskhi */
 		ref->operand[0] = put_ilit(0);
 		*nxtopr = put_tref(ref);
 		nxtopr = &ref->operand[1];
 		cnt++;
+
+		ref = newtriple(OC_PARAMETER);	/* masklo */
+		ref->operand[0] = put_ilit(0);
+		*nxtopr = put_tref(ref);
+		nxtopr = &ref->operand[1];
+		cnt++;
+
 		ref = newtriple(OC_PARAMETER);
 		ref->operand[0] = put_ilit(0);
 		*nxtopr = put_tref(ref);
@@ -96,7 +104,7 @@ int extern_func(oprtype *a)
 		cnt++;
 	} else
 	{
-		if (!(actcnt = actuallist(nxtopr)))
+		if (!(actcnt = actuallist(nxtopr, true)))
 			return FALSE;
 		cnt += actcnt;
 	}

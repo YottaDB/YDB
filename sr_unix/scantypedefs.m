@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-; Copyright (c) 2010-2024 Fidelity National Information		;
+; Copyright (c) 2010-2026 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ; 								;
 ; 	This source code contains the intellectual property	;
@@ -23,9 +23,7 @@
 ; unusability.
 ;
 	Set TRUE=1,FALSE=0
-	Set debug=FALSE
-	Set debugtoken=FALSE
-	Set KeepFiles=FALSE
+	Set (debug,debugtoken,keepfiles)=FALSE				; could separated
 	Set gtmsdver="1.2.0"	; Set version id
 	Set $ETrap="Goto ErrorTrap^scantypedefs"
 	Set TAB=$ZChar(9)
@@ -625,7 +623,7 @@
 	. Use $P
 	. Do DoWrite("Error messages from pre-processor compile: "_cmdToPipe)
 	. For i=1:1:results(0) Write results(i),!
-	. Do Error("BADPREPCOMP","E","Pre-process compile failed - aborting")
+	. Do Error("BADPREPCOMP","F","Pre-process compile failed - aborting")
 	;
 	; Run the preprocessor output through the stripmine scrubber. This performs the following:
 	;
@@ -643,7 +641,7 @@
 	;
 	; Remove tmpCFile.*
 	;
-	Do:'KeepFiles
+	Do:'keepfiles
 	. Open cfile:Write
 	. Close cfile:Delete
 	. Open cfile_"exp":Write
@@ -824,7 +822,7 @@
 	. . . Merge types(typdf("newtype"))=typdf	; Add to sum of knowledge for this type
 	. Do:(TKSEMI'=token) Error("ASSERTFAIL","F","Expecting end of statement TKSEMI token")
 	. Do GetToken(TRUE)
-	Do:'KeepFiles
+	Do:'keepfiles
 	. Close infile
 	. Open infile:Write
 	. Close infile:Delete
@@ -1003,7 +1001,7 @@
 	Set pipeopen=TRUE
 	For  Quit:$ZEof  Do
 	. Read line
-	. Quit:$ZEof
+	. Quit:$ZEof							;!(""=line) should empty lines be a problem
 	. Set lincnt=lincnt+1
 	. Set type=$ZPiece(line," ",1)
 	. Set input=$ZPiece(line," ",2,999)
@@ -1016,7 +1014,10 @@
 	. . Set fldoff=$ZPiece(input,"|",6)
 	. . Set fldlen=$ZPiece(input,"|",7)
 	. . Set flddim=$ZPiece(input,"|",8)
-	. . Do:(fldname'[types(type,"isuidx",isuidx,fldidx,"newtype")) Error("MISMATCH","F","Field names do not match")
+	. . Do:(fldname'[types(type,"isuidx",isuidx,fldidx,"newtype"))
+	. . . Use $Principal
+	. . . ZWrite lincnt,line
+	. . . Do Error("MISMATCH","F","Field names do not match")
 	. . Set fullidx=$Increment(types(type,"fullexp",0))
 	. . Set types(type,"fullexp",fullidx,"fldname")=fldname
 	. . Set:(1<flddim) types(type,"fullexp",fullidx,"flddim")=flddim
@@ -1032,7 +1033,10 @@
 	. . Set type=$ZPiece(input,"|",1)
 	. . Set typlen=$ZPiece(input,"|",2)
 	. . Set types(type,"typlen")=typlen
-	. Else  Do Error("BADINPUT","F","Line from running routine does not start with a known record type token (field or typsz)")
+	. Else  Do
+	. . Use $Principal
+	. . ZWrite lincnt,line
+	. . Do Error("BADINPUT","F","Line from running routine does not start with a known record type token (field or type)")
 	Close pipe
 	Set pipeopen=FALSE
 	If $Data(padding) Do
@@ -1052,7 +1056,7 @@
 	Set endline=" Finished running and reading results of C offset/size routine ("_lincnt_" lines read)"
 	Do DoWrite($ZDate($Horolog,"24:60:SS")_endline)
 	;
-	Do:'KeepFiles
+	Do:'keepfiles
 	. Open cfile:Write
 	. Close cfile:Delete
 	. Set cfile=$ZPiece(cfile,".",1)	; Isolate filename
@@ -1548,7 +1552,7 @@ CommandToPipe(cmd,results)
 	Open pipe:(Shell="/usr/local/bin/tcsh":Command=cmd)::"PIPE"
 	Use pipe
 	Set pipecnt=1
-	For  Read results(pipecnt) Quit:$ZEof  Set pipecnt=pipecnt+1
+	For  Read results(pipecnt) Quit:$ZEof  if ""'=results(pipecnt),$increment(pipecnt)
 	Close pipe
 	Set results(0)=pipecnt-1
 	Kill results(pipecnt)

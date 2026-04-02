@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -13,6 +13,6 @@
 #ifndef MM_READ_INCLUDED
 #define MM_READ_INCLUDED
 
-sm_uc_ptr_t mm_read(block_id blk, boolean_t blk_free);
+sm_uc_ptr_t mm_read(block_id blk);
 
 #endif /* MM_READ_INCLUDED */

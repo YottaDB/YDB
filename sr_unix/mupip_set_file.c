@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -682,8 +682,8 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 					new_flush_trigger = (BT_FACTOR(new_cache_size) == pvt_csd->n_bts) ?
 						pvt_csd->flush_trigger_top : (int4) round(((double) pvt_csd->flush_trigger_top /
 						(double) pvt_csd->n_bts) * BT_FACTOR(new_cache_size));
-					if (new_flush_trigger > FLUSH_FACTOR(BT_FACTOR(new_cache_size)))
-						pvt_csd->flush_trigger_top = FLUSH_FACTOR(BT_FACTOR(new_cache_size));
+					if (new_flush_trigger > MAX_FLUSH_TRIGGER(BT_FACTOR(new_cache_size)))
+						pvt_csd->flush_trigger_top = MAX_FLUSH_TRIGGER(BT_FACTOR(new_cache_size));
 					else if (new_flush_trigger < MIN_FLUSH_TRIGGER(BT_FACTOR(new_cache_size)))
 						pvt_csd->flush_trigger_top = MIN_FLUSH_TRIGGER(BT_FACTOR(new_cache_size));
 					else
@@ -891,12 +891,12 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 						LEN_AND_LIT("TRIGGER_FLUSH_LIMIT"), glbl_buff_status
 						? MIN_FLUSH_TRIGGER(BT_FACTOR(new_cache_size)) : MIN_FLUSH_TRIGGER(cs_data->n_bts));
 					reg_exit_stat |= EXIT_ERR;
-				} else if (glbl_buff_status ? (FLUSH_FACTOR(BT_FACTOR(new_cache_size)) < new_flush_trigger)
-					: (FLUSH_FACTOR(cs_data->n_bts) < new_flush_trigger))
+				} else if (glbl_buff_status ? (MAX_FLUSH_TRIGGER(BT_FACTOR(new_cache_size)) < new_flush_trigger)
+					: (MAX_FLUSH_TRIGGER(cs_data->n_bts) < new_flush_trigger))
 				{
 					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUPIPSET2BIG, 4, new_flush_trigger,
-						       LEN_AND_LIT("TRIGGER_FLUSH_LIMIT"), glbl_buff_status
-						       ? FLUSH_FACTOR(BT_FACTOR(new_cache_size)) : FLUSH_FACTOR(cs_data->n_bts));
+						LEN_AND_LIT("TRIGGER_FLUSH_LIMIT"), glbl_buff_status
+						? MAX_FLUSH_TRIGGER(BT_FACTOR(new_cache_size)) : MAX_FLUSH_TRIGGER(cs_data->n_bts));
 					reg_exit_stat |= EXIT_ERR;
 				}
 			} else

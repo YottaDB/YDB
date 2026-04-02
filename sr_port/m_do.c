@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -12,6 +12,7 @@
 
 #include "mdef.h"
 #include "gtm_string.h"
+#include "gtm_stdio.h"
 #include "mdq.h"
 #include "compiler.h"
 #include "opcode.h"
@@ -154,7 +155,7 @@ int m_do(void)
 			ref0->operand[0] = calltrip->operand[1];
 			calltrip->operand[1] = put_tref(ref0);
 		}
-		if (!actuallist(&ref0->operand[1]))
+		if (!actuallist(&ref0->operand[1], false))
 			return FALSE;
 	} else if (OC_CALL == calltrip->opcode)
 	{

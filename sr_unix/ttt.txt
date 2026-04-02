@@ -129,8 +129,9 @@ OC_EXP:		pushab	val.0
 		calls	#3,xfer.xf_exp
 OC_FETCH:	irepl	val.2
 		calls	val.1,xfer.xf_fetch
-OC_FGNCAL:	irepab	val.6
-		pushl	val.5
+OC_FGNCAL:	irepab	val.7
+		pushl	val.6	; masklo
+		pushl	val.5	; maskhi
 		pushl	val.4
 		pushab	val.3
 		pushab	val.2
@@ -151,8 +152,9 @@ OC_FNEXTRACT:	pushab	val.0
 		pushl	val.2
 		pushl	val.3
 		calls	#4,xfer.xf_fnextract
-OC_FNFGNCAL:	irepab	val.6
-		pushl	val.5
+OC_FNFGNCAL:	irepab	val.7
+		pushl	val.6	; masklo
+		pushl	val.5	; maskhi
 		pushl	val.4
 		pushab	val.3
 		pushab	val.2

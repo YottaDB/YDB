@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -934,10 +934,11 @@ void emit_jmp(uint4 branchop, short **instp, int reg)
 					}
 					RISC_ONLY(
 						skip_idx = code_idx++; /* Save index of branch inst. Set target offset later */
-						code_buf[skip_idx] = IGEN_COND_BRANCH_REG_OFFSET(branchop_opposite, reg, 0);
+						code_buf[skip_idx] = IGEN_COND_BRANCH_OP_OFFSET(branchop_opposite, 0);
 						branch_offset--;
 					)
 					NON_RISC_ONLY(
+						assert(FALSE);
 						skip_idx = code_idx; /* Save index of branch inst. Set target offset later */
 						IGEN_COND_BRANCH_REG_OFFSET(branchop_opposite, reg, 0)
 						branch_offset -= NUM_INST_IGEN_COND_BRANCH_REG_OFFSET;
@@ -954,9 +955,12 @@ void emit_jmp(uint4 branchop, short **instp, int reg)
 					 * jumps (Examples: AIX and HP-UX)
 					 */
 					assert(!(EMIT_JMP_OPPOSITE_BR_CHECK));
-					NON_RISC_ONLY(IGEN_UCOND_BRANCH_REG_OFFSET(branchop, branch_offset))
+					NON_RISC_ONLY(
+						assert(FALSE);
+						IGEN_UCOND_BRANCH_REG_OFFSET(branchop, branch_offset);
+						)
 					RISC_ONLY(
-					code_buf[code_idx++] = IGEN_UCOND_BRANCH_REG_OFFSET(branchop, 0, branch_offset);
+						code_buf[code_idx++] = IGEN_UCOND_BRANCH_OP_OFFSET(branchop, branch_offset);
 					)
 #					ifdef DELAYED_BRANCH
 					code_buf[code_idx++] = GENERIC_OPCODE_NOP;

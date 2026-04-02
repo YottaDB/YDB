@@ -376,16 +376,9 @@ done
 # Install the normal binaries
 for i in $binaries
 do
-	if [ $arch = "linux" ]; then
-		install -g $bingroup -o $owner -m 644 $i $gtmdist
-	elif [ $arch = "ibm" ]; then
-		/usr/bin/install -f $gtmdist -M 644 -O $owner -G $bingroup $i
-	elif [ -x /usr/sbin/install ]; then
-		/usr/sbin/install -f $gtmdist -m 644 -u $owner -g $bingroup $i $gtmdist
-	else
-		install -f $gtmdist -m 644 -u $owner -g $bingroup $i $gtmdist
-	fi
-#		strip $gtmdist/$i >/dev/null 2>&1
+	cp -p $i $gtmdist
+	chmod 0644 $gtmdist/$i
+	chown $owner:$bingroup $gtmdist/$i
 done
 
 # Install other individual files
@@ -656,27 +649,17 @@ else
 	chgrp -R $bingroup $gtmdist
 fi
 
-# Install real gtmsecshr with special permissions in $gtmdist/gtmsecshrdir
+# Install gtmsecshr wrapper and real gtmsecshr (in $gtmdist/gtmsecshrdir) with special permissions
 tgtmsecshrdir=$gtmdist/gtmsecshrdir
 mkdir -p $tgtmsecshrdir
 chmod 700 $tgtmsecshrdir
 chgrp $bingroup $tgtmsecshrdir
 
-# Install gtmsecshr and the wrapper with special permissions
-if [ $arch = "linux" ]; then
-	install -m 4555 -o root -g $bingroup gtmsecshr $gtmdist
-	install -m 4500 -o root -g $bingroup gtmsecshrdir/gtmsecshr $tgtmsecshrdir/gtmsecshr
-elif [ $arch = "ibm" ]; then
-	/usr/bin/install -f $gtmdist -M 4555 -O root -G $bingroup gtmsecshr
-	/usr/bin/install -f $tgtmsecshrdir -M 4500 -O root -G $bingroup gtmsecshrdir/gtmsecshr
-elif [ -x /usr/sbin/install ]; then
-	/usr/sbin/install -f $gtmdist -m 4555 -u root -g $bingroup gtmsecshr $gtmdist
-	/usr/sbin/install -f $tgtmsecshrdir -m 4500 -u root -g $bingroup gtmsecshrdir/gtmsecshr $tgtmsecshrdir
-else
-	install -f $gtmdist -m 4555 -u root -g $bingroup gtmsecshr $gtmdist
-	install -f $tgtmsecshrdir -m 4500 -u root -g $bingroup gtmsecshrdir/gtmsecshr $tgtmsecshrdir
-fi
-
+cp gtmsecshr $gtmdist/gtmsecshr
+cp gtmsecshrdir/gtmsecshr $tgtmsecshrdir/gtmsecshr
+chown root:$bingroup $gtmdist/gtmsecshr $tgtmsecshrdir/gtmsecshr
+chmod 4555 $gtmdist/gtmsecshr
+chmod 4500 $tgtmsecshrdir/gtmsecshr
 strip $gtmdist/gtmsecshr > /dev/null 2>&1
 strip $tgtmsecshrdir/gtmsecshr > /dev/null 2>&1
 

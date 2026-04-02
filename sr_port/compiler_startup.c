@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -140,7 +140,7 @@ boolean_t compiler_startup(void)
 	null_lab = get_mladdr(&null_mident);
 	null_lab->ml = &mline_root;
 	mlmax++;
-	(TREF(fetch_control)).curr_fetch_trip = (TREF(fetch_control)).curr_fetch_opr = newtriple(OC_LINEFETCH);
+	(TREF(fetch_control)).curr_fetch_trip = newtriple(OC_LINEFETCH);
 	(TREF(fetch_control)).curr_fetch_count = 0;
 	TREF(code_generated) = FALSE;
 	line_count = 1;

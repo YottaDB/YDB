@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -13,6 +13,7 @@
 #ifndef IS_PROC_ALIVE_INCLUDED
 #define IS_PROC_ALIVE_INCLUDED
 
+unsigned int parse_starttime(char *buf);
 uint4 getpstart(int4 pid);
 bool is_proc_alive(int4 pid, uint4 pstarttime);
 

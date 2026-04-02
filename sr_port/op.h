@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -16,6 +16,8 @@
 #include <rtnhdr.h>	/* Avoid changing a few hundred op_* and other modules to put this first */
 #include "hashtab_int4.h"
 #include "hashtab.h"
+#include "lv_val.h"
+#include "fgncalsp.h"
 
 #ifdef VMS
 /* Define a TWO-argument VMS_ONLY macro (first argument is empty string but is needed because of the VMS-only , that follows) */
@@ -34,6 +36,31 @@ typedef enum
 	RIGHT_DIR,
 	BOTH_DIR
 } translate_direction;
+
+typedef enum
+{
+	NONE,
+	LV_NAME,
+	GV_NAME
+} lv_gv_name;
+
+#define DO_OP_GVNAME_IF_NEEDED(SRC, SUBS, START_BUFF, STOP_BUFF, START_PTR, STOP_PTR, RET)		\
+MBSTART {												\
+	int			contain_env;								\
+	boolean_t		lv_or_gv;								\
+													\
+	RET = NONE;											\
+	DETERMINE_BUFFER(SRC, START_BUFF, STOP_BUFF, START_PTR, STOP_PTR, lv_or_gv);			\
+	if (parse_glvn_and_subscripts(SRC, &(SUBS), START_PTR, STOP_PTR, &contain_env, TRUE))		\
+	{												\
+		if (lv_or_gv)										\
+			RET = LV_NAME;									\
+		else if (contain_env)									\
+			RET = (op_gvextnam_runtime(SRC, SUBS, START_PTR, STOP_PTR)) ? GV_NAME : NONE;	\
+		else											\
+			RET = (op_gvname_runtime(SRC, SUBS, START_PTR, STOP_PTR)) ? GV_NAME : NONE;	\
+	}												\
+} MBEND
 
 void	op_add(mval *u, mval *v, mval *s);
 void	add_mvals(mval *u, mval *v, int subtraction, mval *result);	/* function defined in op_add.c */
@@ -61,7 +88,9 @@ void	op_fgnlookup(void);
 void	op_fnascii(int4 num, mval *in, mval *out);
 void	op_fnchar(UNIX_ONLY_COMMA(int cnt) mval *dst, ...);
 void	op_fnextract(int last, int first, mval *src, mval *dest);
-void	op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 mask, int4 argcnt, ...);
+void	op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 maskhi, uint4 masklo, int4 argcnt, ...);
+void	op_fgnjavacal(mval *dst, mval *package, mval *extref, gtm_uint8 mask, int4 argcnt, int4 entry_argcnt,
+		struct extcall_package_list *package_ptr, struct extcall_entry_list *entry_ptr, va_list var);
 int4	op_fnfind(mval *src, mval *del, mint first, mval *dst);
 void	op_fnfnumber(mval *src, mval *fmt, boolean_t use_fract, int fract, mval *dst);
 void	op_fnget1(mval *src, mval *dst);
@@ -84,7 +113,9 @@ void	op_fnpiece(mval *src, mval *del, int first, int last, UNIX1_VMS2(mval *dst,
 void	op_fnpopulation(mval *arg1, mval *arg2, mval *dst);
 void	op_fnqlength(mval *name, mval *subscripts);
 void	op_fnqsubscript(mval *name, int seq, mval *subscript);
+void	op_fnqsubscript_fast(mval *src, int seq, mval *dst, int subs_count, int isrc, int stop);
 void	op_fnquery(UNIX_ONLY_COMMA(int sbscnt) mval *dst, ...);
+boolean_t op_fnquery_runtime(mval *src, int sbscnt, int *start, int *stop, mval *dst);
 void	op_fnrandom(int4 interval, mval *ret);
 void	op_fnreplace(mval *src, mval *substr, mval *rplc, mval *dst);
 void	op_fnreverse(mval *src, mval *dst);
@@ -159,12 +190,14 @@ int	op_forloop();
 void	op_gvdata(mval *v);
 void	op_gvextnam(UNIX_ONLY_COMMA(int4 count) mval *val1, ...);
 void	op_gvextnam_fast(UNIX_ONLY_COMMA(int4 count) int hash_code, mval *val1, ...);
+boolean_t op_gvextnam_runtime(mval *src, int subscripts, int *start, int *stop);
 boolean_t op_gvget(mval *v);
 void	op_gvincr(mval *increment, mval *result);
 void	op_gvkill(void);
 void	op_gvnaked(UNIX_ONLY_COMMA(int count_arg) mval *val_arg, ...);
 void	op_gvnaked_fast(UNIX_ONLY_COMMA(int count_arg) int hash_code, mval *val_arg, ...);
 void	op_gvname(UNIX_ONLY_COMMA(int count_arg) mval *val_arg, ...);
+boolean_t op_gvname_runtime(mval *src, int subscripts, int *start, int *stop);
 void	op_gvname_fast(UNIX_ONLY_COMMA(int count_arg) int hash_code, mval *val_arg, ...);
 void	op_gvnext(mval *v);
 void	op_gvo2(mval *dst, mval *direct);

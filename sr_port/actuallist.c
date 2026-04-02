@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -26,21 +26,40 @@ error_def(ERR_MAXACTARG);
 error_def(ERR_NAMEEXPECTED);
 error_def(ERR_SIDEEFFECTEVAL);
 
-	int actuallist (oprtype *opr)
+/*
+ * Process parameters.  If we have a consumer for a 64 bit parameter
+ * mask, provide it as two triples, one with the low 32 bits, one with the
+ * high 32 bits.
+ *
+ * If we do not have such a consumer, provide the historical 32 bit mask triple
+ */
+int actuallist (oprtype *opr, boolean_t do_mask64)
 {
 	boolean_t	se_warn;
-	int		i, j, mask, parmcount;
+	int		i, j;
+	gtm_uint8	parmcount, mask;
+	uint4		masklo, maskhi;
 	oprtype		ot;
-	triple		*counttrip, *masktrip, *ref0, *ref1, *ref2;
+	triple		*counttrip, *ref0, *ref1, *ref2;
+	triple		*maskhitrip, *masklotrip;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	assert(TK_LPAREN == TREF(window_token));
 	advancewindow();
-	masktrip = newtriple(OC_PARAMETER);
-	mask = 0;
+
 	counttrip = newtriple(OC_PARAMETER);
-	masktrip->operand[1] = put_tref(counttrip);
+	masklotrip = newtriple(OC_PARAMETER);
+	maskhitrip = NULL;
+	mask = 0;
+
+	if (do_mask64)
+	{
+		maskhitrip = newtriple(OC_PARAMETER);
+		maskhitrip->operand[1] = put_tref(masklotrip);
+	}
+	masklotrip->operand[1] = put_tref(counttrip);
+
 	ref0 = counttrip;
 	if (TK_RPAREN == TREF(window_token))
 		parmcount = 0;
@@ -59,7 +78,7 @@ error_def(ERR_SIDEEFFECTEVAL);
 				if (TK_IDENT == TREF(window_token))
 				{
 					ot = put_mvar(&(TREF(window_ident)));
-					mask |= (1 << (parmcount - 1));
+					mask |= (1ul << (parmcount - 1));
 					advancewindow();
 				} else if (TK_ATSIGN == TREF(window_token))
 				{
@@ -68,7 +87,7 @@ error_def(ERR_SIDEEFFECTEVAL);
 					ref2 = newtriple(OC_INDLVNAMADR);
 					ref2->operand[0] = ot;
 					ot = put_tref(ref2);
-					mask |= (1 << (parmcount - 1));
+					mask |= (1ul << (parmcount - 1));
 				} else
 				{
 					stx_error(ERR_NAMEEXPECTED);
@@ -129,9 +148,26 @@ error_def(ERR_SIDEEFFECTEVAL);
 		}
 	}
 	advancewindow();
-	masktrip->operand[0] = put_ilit(mask);
+
+	maskhi = (uint4) (mask >> 32);
+	masklo = (uint4) (mask & 0x00000000ffffffff);
+
+	if (do_mask64)
+	{
+		maskhitrip->operand[0] = put_ilit((uint4) maskhi);
+	}
+	masklotrip->operand[0] = put_ilit((uint4) masklo);
+
 	counttrip->operand[0] = put_ilit(parmcount);
-	parmcount += 2;
-	*opr = put_tref(masktrip);
+	if (do_mask64)
+	{
+		parmcount += 3;
+		*opr = put_tref(maskhitrip);
+	}
+	else
+	{
+		parmcount += 2;
+		*opr = put_tref(masklotrip);
+	}
 	return parmcount;
 }

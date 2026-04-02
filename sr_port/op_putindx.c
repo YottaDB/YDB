@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -35,6 +35,8 @@
 #include "toktyp.h"
 #include "valid_mname.h"
 #include "stack_frame.h"
+#include "op.h"
+#include "min_max.h"
 #ifdef DEBUG
 #include "gtm_ctype.h"
 #include "trans_numeric.h"
@@ -93,6 +95,7 @@ void	set_active_lv(lv_val *newlv, boolean_t do_assert, int type)
 }
 #endif
 
+/* op_putindx_runtime should generally be maintained in parallel */
 lv_val	*op_putindx(int argcnt, lv_val *start, ...)
 {
 	boolean_t 		is_canonical, is_base_var;
@@ -237,6 +240,130 @@ lv_val	*op_putindx(int argcnt, lv_val *start, ...)
 		}
 		assert(NULL != lv);
 		SET_ACTIVE_LV(lv, (orig_subs_level == (subs_level + 1)) ? TRUE : FALSE, actlv_op_putindx2);
+	}
+	return lv;
+}
+
+/* op_putindx should generally be maintained in parallel */
+lv_val  *op_putindx_runtime(mval *src, int subscripts, int *start, int *stop, lv_val *ve)
+{
+	boolean_t 		is_canonical, is_base_var;
+	int			i, length, n_length, subs_level;
+	int4			t_length;
+	lv_val			*base_lv, *lv;
+	lvTree			*lvt;
+	lvTreeNode		*parent;
+	mident_fixed		name;
+	mval			*key, tmp_sbs;
+	var_tabent              targ_key;
+	mval                    *val, *varname, lvname_mval, subs_mval;
+	ht_ent_mname            *tabent;
+	DCL_THREADGBL_ACCESS;
+
+	SETUP_THREADGBL_ACCESS;
+	assert(0 <= subscripts);
+	varname = &lvname_mval;
+	val = src;
+	op_fnqsubscript_fast(val, 0, varname, subscripts, start[0], stop[0]);       /* 0 : for the unsubscripted name */
+	targ_key.var_name.len = MIN(varname->str.len, MAX_MIDENT_LEN);
+	targ_key.var_name.addr = varname->str.addr;
+	COMPUTE_HASH_MNAME(&targ_key);
+	targ_key.marked = NOT_MARKED;
+	if (add_hashtab_mname_symval(&curr_symval->h_symtab, &targ_key, NULL, &tabent, FALSE))
+		lv_newname(tabent, curr_symval);
+	ve = (lv_val *)tabent->value;
+	assert(ve);
+	is_base_var = LV_IS_BASE_VAR(ve);
+	if (is_base_var)
+	{
+		base_lv = ve;
+		if ((NULL != ve->tp_var) && !ve->tp_var->var_cloned)
+			TP_VAR_CLONE(ve);
+	} else
+	{
+		base_lv = LV_GET_BASE_VAR(ve);
+		assert((NULL == base_lv->tp_var) || base_lv->tp_var->var_cloned);
+	}
+	t_length = SIZEOF(name) + 1;	/* assume maximum length name and include 1 for open paren */
+	n_length = 0;			/* actually unknown, but avoid unecessary lookup and only determine later if needed */
+	lv = ve;
+	assert(NULL != lv);
+	LV_SBS_DEPTH(ve, is_base_var, subs_level);
+	for (i = 1, subs_level++; i <= subscripts; i++, subs_level++)
+	{
+                key = &subs_mval;       /* reinitialize each iteration to avoid tmp_sbs corruption */
+                op_fnqsubscript_fast(val, i, key, subscripts, start[i], stop[i]);
+		MV_FORCE_DEFINED(key);	/* Subscripts for set shouldn't be undefined - check here enables lvnullsubs to work */
+		if (!(is_canonical = MV_IS_CANONICAL(key)))
+		{
+			assert(MV_IS_STRING(key));
+			assert(!TREE_KEY_SUBSCR_IS_CANONICAL(key->mvtype));
+			if (!key->str.len)
+			{
+				if (LVNULLSUBS_OK != TREF(lv_null_subs))	/* Error for both LVNULLSUBS_{NO,NEVER} */
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_LVNULLSUBS);
+			}
+			if (TREF(local_collseq))
+			{	/* Do collation transformations */
+				ALLOC_XFORM_BUFF(key->str.len);
+				tmp_sbs.mvtype = MV_STR;
+				tmp_sbs.str.len = TREF(max_lcl_coll_xform_bufsiz);
+				assert(NULL != TREF(lcl_coll_xform_buff));
+				tmp_sbs.str.addr = TREF(lcl_coll_xform_buff);
+				do_xform(TREF(local_collseq), XFORM, &key->str, &tmp_sbs.str, &length);
+				tmp_sbs.str.len = length;
+				s2pool(&(tmp_sbs.str));
+				key = &tmp_sbs;
+			}
+			if ((lvt = LV_GET_CHILD(lv)))	/* caution: assignment */
+				assert(MV_LV_TREE == lvt->ident);
+			else	/* No children exist at this level - create a child */
+				LV_TREE_CREATE(lvt, (lvTreeNode *)lv, subs_level, base_lv);
+			lv = (lv_val *)lvAvlTreeLookupStr(lvt, key, &parent);
+		} else
+		{
+			tmp_sbs = *key;
+			key = &tmp_sbs;
+			MV_FORCE_NUM(key);
+			TREE_KEY_SUBSCR_SET_MV_CANONICAL_BIT(key);	/* used by the lvAvlTreeLookup* functions below */
+			tmp_sbs.mvtype &= (MV_STR_OFF & MV_UTF_LEN_OFF);
+			if ((lvt = LV_GET_CHILD(lv)))	/* caution: assignment */
+				assert(MV_LV_TREE == lvt->ident);
+			else	/* No children exist at this level - create a child */
+				LV_TREE_CREATE(lvt, (lvTreeNode *)lv, subs_level, base_lv);
+			if (MVTYPE_IS_INT(tmp_sbs.mvtype))
+				lv = (lv_val *)lvAvlTreeLookupInt(lvt, key, &parent);
+			else
+				lv = (lv_val *)lvAvlTreeLookupNum(lvt, key, &parent);
+		}
+		if (NULL == lv)
+		{
+			lv = (lv_val *)lvAvlTreeNodeInsert(lvt, key, parent);
+			lv->v.mvtype = 0;	/* initialize mval to undefined value at this point */
+		}
+		if (!(MV_CANONICAL & key->mvtype))
+			t_length += 2;					/* + 2 for the quotes if it's not canonical lvn */
+		else if (!(MV_STR & key->mvtype))
+			MV_FORCE_STR(key);				/* to ensure a length for the number */
+		if (MAX_STRLEN < (t_length += (key->str.len + 1)))	/* WARNING assignment */
+		{	/* + 1 above for the comma or close parenthesis */
+			if ((0 == n_length) && !((MAX_STRLEN + SIZEOF(name)) < t_length))
+			{	/* near max, so name length matters - adjust for it by replacing overestimate with actual length */
+				n_length = (char *)format_lvname((lv_val *)ve, (uchar_ptr_t)name.c, SIZEOF(name)) - name.c;
+				t_length -= (SIZEOF(name) - n_length);
+			}
+			if (MAX_STRLEN < t_length)
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_MAXSTRLEN);
+		}
+	}
+	if (base_lv != lv)
+	{
+		if (LV_IS_VAL_DEFINED(lv))
+		{
+			DECR_AC_REF(lv, TRUE);
+			lv->v.mvtype &= ~MV_ALIASCONT;	/* Value being replaced is now no longer a container var */
+		}
+		assert(NULL != lv);
 	}
 	return lv;
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2004-2023 Fidelity National Information	*
+ * Copyright (c) 2004-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -22,16 +22,22 @@
 #include "op.h"
 #include "mvalconv.h"	/* for i2mval prototype for the MV_FORCE_MVAL macro */
 #include "fullbool.h"
+#include "is_canonic_name.h"
+#include "lv_val.h"
 
 error_def(ERR_VAREXPECTED);
 
 void	op_indincr(mval *dst, mval *increment, mval *target)
 {
-	icode_str	indir_src;
-	int		rval;
-	mstr		*obj, object;
-	oprtype		v, getdst;
-	triple		*s = NULL, *src, *oldchain, tmpchain, *triptr;
+	icode_str		indir_src;
+	int			rval;
+	mstr			*obj, object;
+	oprtype			v, getdst;
+	triple			*s = NULL, *src, *oldchain, tmpchain, *triptr;
+	lv_gv_name		glvname;
+	int			subs, *start, *stop;
+	gv_name_and_subscripts	start_buff, stop_buff;
+	lv_val			*ret_lv, tmp_lv;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -40,6 +46,16 @@ void	op_indincr(mval *dst, mval *increment, mval *target)
 	indir_src.code = indir_increment;
 	if (NULL == (obj = cache_get(&indir_src)))
 	{
+		DO_OP_GVNAME_IF_NEEDED(target, subs, start_buff, stop_buff, start, stop, glvname);
+		if (GV_NAME == glvname)
+		{
+			op_gvincr(increment, dst);
+			return;
+		} else if ((LV_NAME == glvname) && (NULL != (ret_lv = op_srchindx_runtime(target, subs, start, stop, &tmp_lv))))
+		{
+			op_fnincr(ret_lv, increment, dst);
+			return;
+		}
 		obj = &object;
 		comp_init(&target->str, &getdst);
 		src = newtriple(OC_IGETSRC);

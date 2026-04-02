@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -27,10 +27,12 @@
 #include "op.h"
 #include "gtm_common_defs.h"
 #include "min_max.h"
+#include "is_canonic_name.h"
+#include "lv_val.h"
 
 #define INDIR(a, b, c) b
 GBLDEF int (*indir_fcn[])() = {
-#include "indir.h"
+#include "indir.h"	/* BYPASSOK */
 };
 
 #ifdef DO_INDIR_FUNCTION_CHECK
@@ -41,7 +43,7 @@ int indir_dummy_fn_opr(oprtype *, opctype);
 #define INDIR(a, b, c) ((!!__builtin_types_compatible_p(__typeof__(indir_dummy_fn_void), __typeof__(b)))		\
 			| ((!!__builtin_types_compatible_p(__typeof__(indir_dummy_fn_opr), __typeof__(b))) << 1))
 GBLDEF unsigned int indir_fntype[] = {
-#include "indir.h"
+#include "indir.h"	/* BYPASSOK */
 };
 #endif
 
@@ -57,10 +59,14 @@ error_def	(ERR_VAREXPECTED);
 
 void	op_commarg(mval *v, unsigned char argcode)
 {
-	int		comp_res, rval;
-	icode_str	indir_src;
-	mstr		*obj, object, src_buff_temp;
-
+	int			comp_res, rval;
+	icode_str		indir_src;
+	mstr			*obj, object, src_buff_temp;
+	lv_gv_name		glvname;
+	int			subs, *start, *stop;
+	gv_name_and_subscripts	start_buff, stop_buff;
+	lv_val			*ret_lv, tmp_lv;
+	mval			dst;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -82,6 +88,19 @@ void	op_commarg(mval *v, unsigned char argcode)
 				return;		/* fast path for indirect of a label */
 			break;
 		case indir_kill:	/* These 4 can be argumentless so prevent indirection from turning into that form */
+			if (0 == v->str.len)
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_VAREXPECTED);
+			DO_OP_GVNAME_IF_NEEDED(v, subs, start_buff, stop_buff, start, stop, glvname);
+			if (GV_NAME == glvname)
+			{
+				op_gvkill();
+				return;
+			} else if ((LV_NAME == glvname) && (NULL != (ret_lv = op_srchindx_runtime(v, subs, start, stop, &tmp_lv))))
+			{
+				op_kill(ret_lv);
+				return;
+			}
+			break;
 		case indir_new:
 			if (0 == v->str.len)
 				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_VAREXPECTED);
@@ -107,9 +126,37 @@ void	op_commarg(mval *v, unsigned char argcode)
 				(TREF(source_buffer)).addr = malloc((TREF(source_buffer)).len);
 			}
 			break;
-		case indir_hang:	/* Hang +"" is close enough to no Hang */
-		case indir_if:		/* treat as argumentless */
 		case indir_write:	/* WRITE "" does nothing */
+			if (0 == v->str.len)
+				return;
+			DO_OP_GVNAME_IF_NEEDED(v, subs, start_buff, stop_buff, start, stop, glvname);
+			if (GV_NAME == glvname)
+			{
+				op_gvget(&dst);
+				op_write(&dst);
+				return;
+			} else if ((LV_NAME == glvname) && (NULL != (ret_lv = op_getindx_runtime(v, subs, start, stop, &tmp_lv))))
+			{
+				op_write(&(ret_lv->v));
+				return;
+			}
+			break;
+		case indir_hang:	/* Hang +"" is close enough to no Hang */
+			if (0 == v->str.len)
+				return;
+			DO_OP_GVNAME_IF_NEEDED(v, subs, start_buff, stop_buff, start, stop, glvname);
+			if (GV_NAME == glvname)
+			{
+				op_gvget(&dst);
+				op_hang(&dst);
+				return;
+			} else if ((LV_NAME == glvname) && (NULL != (ret_lv = op_getindx_runtime(v, subs, start, stop, &tmp_lv))))
+			{
+				op_hang(&(ret_lv->v));
+				return;
+			}
+			break;
+		case indir_if:		/* treat as argumentless */
 		case indir_xecute:	/* XECUTE "" does nothing */
 		case indir_zshow:	/* ZSHOW "" does nothing */
 			if (0 == v->str.len)

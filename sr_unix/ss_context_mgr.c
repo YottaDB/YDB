@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2009-2021 Fidelity National Information	*
+ * Copyright (c) 2009-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -158,8 +158,12 @@ boolean_t	ss_create_context(snapshot_context_ptr_t lcl_ss_ctx, int ss_shmcycle)
 boolean_t	ss_destroy_context(snapshot_context_ptr_t lcl_ss_ctx)
 {
 	int				status;
+	intrpt_state_t  prev_intrpt_state;
 
 	assert(NULL != lcl_ss_ctx);
+	/* Need to protect against being called from timer_handler ==> jnl_file_close_timer if we are already doing this */
+	DEFER_INTERRUPTS(INTRPT_NO_TIMER_EVENTS, prev_intrpt_state);
+
 	if (FD_INVALID != lcl_ss_ctx->shdw_fd)
 	{
 		CLOSEFILE_RESET(lcl_ss_ctx->shdw_fd, status);
@@ -176,5 +180,6 @@ boolean_t	ss_destroy_context(snapshot_context_ptr_t lcl_ss_ctx)
 		SHMDT((void *)(lcl_ss_ctx->start_shmaddr));	/* no check for errors that 'cause gone is the goal */
 	/* Invalidate the context */
 	DEFAULT_INIT_SS_CTX(lcl_ss_ctx);
+	ENABLE_INTERRUPTS(INTRPT_NO_TIMER_EVENTS, prev_intrpt_state);
 	return TRUE;
 }

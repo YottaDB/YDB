@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2025 Fidelity National Information	*
+ * Copyright (c) 2010-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -42,6 +42,8 @@ THREADGBLDEF(boolchain,				triple)				/* anchor for chain used by bx_boolop  */
 THREADGBLDEF(boolchain_ptr,			triple *)			/* pointer to anchor for chain used by bx_boolop  */
 THREADGBLDEF(bool_targ_anchor,			tbp)				/* anchor of targ chain for bool relocation */
 THREADGBLDEF(bool_targ_ptr,			tbp *)				/* ptr->anchor of targ chain for bool relocation */
+THREADGBLDEF(cat_array_base,			mval **)			/* for op_cat highwater array */
+THREADGBLDEF(cat_array_size,			int4)				/* for op_cat highwater array management */
 THREADGBLDEF(code_generated,			boolean_t)			/* flag that the compiler generated an object */
 THREADGBLDEF(codegen_padlen,			int4)				/* used to pad code to section alignment */
 THREADGBLDEF(compile_time,			boolean_t)			/* flag that the compiler's at work */
@@ -333,6 +335,9 @@ THREADGBLDEF(gtm_autorelink_keeprtn,		boolean_t)			/* do not let go of objects i
 #endif
 THREADGBLDEF(open_shlib_root,			open_shlib *)			/* Anchor for open shared library list */
 THREADGBLDEF(parm_pool_ptr,			parm_pool *)			/* Pointer to the parameter pool */
+THREADGBLDEF(parm_mask_hi, 			uint4 *)			/* high 32 bits of 64 bit parameter masks,
+										 * maintained in tandem with low 32 bits in
+										 * parm_pool */
 THREADGBLDEF(parms_cnt,                         unsigned int)                   /* Parameters count */
 THREADGBLAR1DEF(zpeek_regname,			char,		NAME_ENTRY_SZ)	/* Last $ZPEEK() region specified */
 THREADGBLDEF(zpeek_regname_len,			int)				/* Length of zpeekop_regname */

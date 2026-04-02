@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -249,12 +249,21 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 				 * Just do a gds_rundown and continue. Only change the exit status if ALL of the regions
 				 * were AUTODBs, we targeted one specific autodb region, or it's a set -file.
 				 */
+				assert(region);
 				gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(8) MAKE_MSG_INFO(ERR_JNLNOTALLOWED), 6,
 						LEN_AND_LIT("AUTODB"), REG_LEN_STR(gv_cur_region), DB_LEN_STR(gv_cur_region));
 			} else
 			{
-				gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(8) ERR_JNLNOTALLOWED, 6, LEN_AND_LIT("AUTODB"),
-						REG_LEN_STR(gv_cur_region),DB_LEN_STR(gv_cur_region));
+				/* If this is a mupip set -file, we use a "DEFAULT" dummy region to access the file. Report
+				 * UNKNOWN region rather than mislabeling the region as DEFAULT.
+				 */
+				if (!region)
+					gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(8) ERR_JNLNOTALLOWED, 6, LEN_AND_LIT("AUTODB"),
+							LEN_AND_LIT("UNKNOWN"), DB_LEN_STR(gv_cur_region));
+
+				else
+					gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(8) ERR_JNLNOTALLOWED, 6, LEN_AND_LIT("AUTODB"),
+							REG_LEN_STR(gv_cur_region), DB_LEN_STR(gv_cur_region));
 				exit_status |= EXIT_WRN;
 			}
 			gds_rundown_status = gds_rundown(CLEANUP_UDI_TRUE, FALSE);

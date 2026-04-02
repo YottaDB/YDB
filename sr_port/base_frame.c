@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -28,7 +28,9 @@ void base_frame(rhdtyp *base_address)
 {
 	unsigned char	*msp_save;
 	stack_frame	*fp;
+	intrpt_state_t  prev_intrpt_state;
 
+	DEFER_INTERRUPTS(INTRPT_IN_FRAMES, prev_intrpt_state);
 	if ((INTPTR_T)msp & 1)	/* synchronize mumps stack on even boundary */
 		msp--;
 	if ((INTPTR_T)msp & 2)
@@ -41,13 +43,9 @@ void base_frame(rhdtyp *base_address)
 	msp -= SIZEOF(stack_frame) + SIZEOF(stack_frame *);
 	if (msp <= stackwarn)
 	{
-		if (msp <= stacktop)
-		{
-			msp = msp_save;
-			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_STACKOFLOW);
-		}
-		else
-			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_STACKCRIT);
+		msp = msp_save;
+		ENABLE_INTERRUPTS(INTRPT_IN_FRAMES, prev_intrpt_state);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1)  (msp <= stacktop) ? ERR_STACKOFLOW : ERR_STACKCRIT);
 	}
 	*(stack_frame **)((stack_frame *)msp + 1) = frame_pointer;
 	frame_pointer = fp = (stack_frame *)msp;
@@ -63,5 +61,6 @@ void base_frame(rhdtyp *base_address)
 	fp->dollar_test = -1;
 	fp->restart_pc = fp->mpc;
 	fp->restart_ctxt = fp->ctxt;
+	ENABLE_INTERRUPTS(INTRPT_IN_FRAMES, prev_intrpt_state);
 	DBGEHND((stderr, "base_frame: New base frame allocated at 0x"lvaddr"\n", fp));
 }

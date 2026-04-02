@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -175,7 +175,12 @@ int resolve_ref(int errknt)
 				case TJMP_REF:
 					tripbp = (tbp *)mcalloc(SIZEOF(tbp));
 					tripbp->bpt = curtrip;
-					dqins(&opnd->oprval.tref->jmplist, que, tripbp);
+					if (NULL == opnd->oprval.tref->jmplist)
+					{
+						opnd->oprval.tref->jmplist = (tbp *)mcalloc(SIZEOF(tbp));
+						dqinit(opnd->oprval.tref->jmplist, que);
+					}
+					dqins(opnd->oprval.tref->jmplist, que, tripbp);
 					continue;
 				case MNXL_REF:	/* external reference to the routine (not within the routine) */
 					mxl = opnd->oprval.mlin->child;

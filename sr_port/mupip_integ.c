@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -68,6 +68,7 @@
 #define TEXT2 "!/Largest transaction number found in database was "
 #define TEXT3 "Current transaction number is                    "
 #define MSG1  "!/!/WARNING: Transaction number reset complete on all active blocks. Please do a DATABASE BACKUP before proceeding"
+#define MSG2  "!/!/WARNING: Transaction number already 1; skipping tnreset"
 /* The QWPERCENTCALC calculates the percent used in two scaled parts*/
 
 #define QWPERCENTCALC(lpt, rpt, sizes, int_blks, blk_size) 									\
@@ -532,6 +533,11 @@ void mupip_integ(void)
 		trees_tail->act = 0;
 		trees_tail->ver = 0;
 		tn_reset_this_reg = update_header_tn = FALSE;
+		if (1 == mu_int_data.trans_hist.curr_tn && tn_reset_specified)
+		{
+			tn_reset_specified = FALSE;
+			util_out_print(MSG2, TRUE);
+		}
 		if (tn_reset_specified)
 		{
 			if (gv_cur_region->read_only || (USES_NEW_KEY(csd)))
@@ -752,8 +758,6 @@ void mupip_integ(void)
 						VARLSTCNT(4) ERR_DBBTUWRNG, 2, &mu_int_blks_to_upgrd, &(csd->blks_to_upgrd));
 					if (gv_cur_region->read_only || mu_int_errknt)
 						mu_int_errknt++;
-					else if (!ointeg_this_reg)
-						gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(1) ERR_DBBTUFIXED);
 				}
 			}
 			if (((0 != mu_int_data.kill_in_prog) || (0 != mu_int_data.abandoned_kills)) && (!mu_map_errs) && !region
@@ -912,6 +916,7 @@ void mupip_integ(void)
 						mu_int_data.blks_to_upgrd = mu_int_blks_to_upgrd;
 						mu_int_data.fully_upgraded = !mu_int_blks_to_upgrd;
 						update_filehdr = TRUE;
+						gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(1) ERR_DBBTUFIXED);
 					}
 				}
 			}

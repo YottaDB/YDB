@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -9,18 +9,17 @@
  *	the license, please stop and do not read further.	*
  *								*
  ****************************************************************/
-
 #include "mdef.h"
 
 #include <errno.h>
-#include <unistd.h>
 #ifdef __MVS__
 #include <sys/resource.h>
 #endif
-
+#include "gtm_unistd.h"
 #include "gtm_signal.h"
 #include "gtm_stdio.h"
 #include "gtm_fcntl.h"
+#include "gtm_string.h"
 #ifdef _AIX
 #include <sys/procfs.h>
 #endif
@@ -30,6 +29,45 @@
 #ifdef DEBUG
 GBLREF	uint4			process_id;
 #endif
+
+/* ----------------------------------------------
+ * Parser to replaced sscanf() GTM-11523
+ *
+ * Arguments:
+ *	procpidstat - the content of /proc/<pid>/stat
+ *
+ * Return:
+ *	The 22nd argument from the /proc/<pid>/stat buffer (32-bit number)
+ * ----------------------------------------------
+ */
+unsigned int parse_starttime(char *procpidstat)
+{
+	char			*ptr_ch;
+	int			i;
+	unsigned long long	pstart = 0;
+
+	ptr_ch = strrchr(procpidstat, ')');	/* Find the last ')' — end of command field */
+	if (!ptr_ch)
+		return 0;
+	ptr_ch++;				/* Move past ") " */
+	if (' ' == *ptr_ch)
+		ptr_ch++;
+	for (i = 0; i < 19; i++)
+	{
+		while (*ptr_ch && (' ' != *ptr_ch))
+			ptr_ch++;
+		while (' ' == *ptr_ch)
+			ptr_ch++;
+	}
+	if (!*ptr_ch)
+		return 0;
+	while (('0' <= *ptr_ch) && ('9' >= *ptr_ch))
+	{
+		pstart = pstart * 10 + (*ptr_ch - '0');
+		ptr_ch++;
+	}
+	return (unsigned int)(pstart & 0xffffffff);
+}
 
 /* Get process' start time if available
  * On Linux the process start time is in clock ticks (typically 100 per second)
@@ -41,17 +79,13 @@ GBLREF	uint4			process_id;
  */
 uint4 getpstart(int4 pid)
 {
+	int		fd;
+	int		res;
+	unsigned int	starttime = 0;	/* assume we don't get it */
+	char		pidfile[80];
 
-	char buf[8192];
-	int fd;
-	int res;
-	unsigned long long pstart;
-	unsigned int starttime;
-	time_t starttime_sec;
-	char pid_statfile[80];
-
-	starttime = 0; /* assume we don't get it */
 #ifdef __linux__
+	char		buf[8192];
 
 	/*
 	 * If we can't open /proc/PID/stat,  we can assume the specified PID does not exist
@@ -61,38 +95,27 @@ uint4 getpstart(int4 pid)
 	 * bytes which would be fairly logical, but errors out with errno set to
 	 * ESRCH (which is not, in fact, a documented errno for read()).
 	 */
-	snprintf(pid_statfile, sizeof(pid_statfile), "/proc/%d/stat", pid);
-	fd = open(pid_statfile, O_RDONLY);
-	if (fd > 0)
-	{
-		/*
-		* We are not going to insist on errno == ESRCH in pro, just say
-		* that read error, or reading no data returns an invalid gtm_pid
-		*/
-		res = read(fd, buf, sizeof(buf) -1);
+	SNPRINTF(pidfile, sizeof(pidfile), "/proc/%d/stat", pid);
+	fd = open(pidfile, O_RDONLY);
+	if (fd >= 0)
+	{	/* We are not going to insist on errno == ESRCH in pro, just say
+		 * that read error, or reading no data returns an invalid gtm_pid
+		 */
+		res = read(fd, buf, sizeof(buf) - 1);
 		(void) close(fd);
 		assert((res >=0) || ((res < 0) && (errno == ESRCH)));
 		if (res > 0)
 		{
 			buf[res] = '\0';			/* terminate string */
-
-			/* Consult the man proc_pid_stat(5) page for this format string.  We suppress all assignments we don't care about */
-			res = sscanf(buf, "%*d %*s %*c %*d %*d %*d %*d %*d %*u %*u %*u %*u %*u %*u %*u %*d %*d %*d %*d %*d %*d %llu", &pstart);
-			if (res == 1)
-			{
-				/* to convert to seconds pstart = pstart / sysconf(_SC_CLK_TCK); */
-				starttime = (0xffffffff & pstart);
-			}
+			starttime = parse_starttime(buf);
 		}
 	}
 #else
-
-	/* see https://www.ibm.com/docs/en/aix/7.3.0?topic=files-proc-file */
-	char psinfo_file[80];
 	struct psinfo psinfo;
 
-	snprintf(psinfo_file, sizeof(psinfo_file), "/proc/%ld/psinfo",pid);
-	fd = open(psinfo_file, O_RDONLY);
+	/* see https://www.ibm.com/docs/en/aix/7.3.0?topic=files-proc-file */
+	SNPRINTF(pidfile, sizeof(pidfile), "/proc/%d/psinfo", pid);
+	fd = open(pidfile, O_RDONLY);
 	if (fd > 0)
 	{
 		res = read(fd, &psinfo, sizeof(psinfo));
@@ -100,12 +123,11 @@ uint4 getpstart(int4 pid)
 		assert(res == sizeof(psinfo));
 		if (res == sizeof(psinfo))
 		{
-			starttime_sec = psinfo.pr_start.tv_sec;
-			starttime =  (0xffffffff & starttime_sec);
+			starttime =  (0xffffffff & psinfo.pr_start.tv_sec);
 		}
 	}
 #endif
-	return(starttime);
+	return starttime;
 }
 
 /* ----------------------------------------------
@@ -113,14 +135,13 @@ uint4 getpstart(int4 pid)
  *
  * Arguments:
  *	pid		- process ID
- *      pstarttime	- process start time ; used to distinguish different process with the same pid
+ *	pstarttime	- process start time ; used to distinguish different process with the same pid
  *
  * Return:
  *	TRUE	- Process still alive
  *	FALSE	- Process is gone
  * ----------------------------------------------
  */
-
 bool is_proc_alive(int4 pid, uint4 pstarttime)
 {
 	int		status;
@@ -130,7 +151,7 @@ bool is_proc_alive(int4 pid, uint4 pstarttime)
 	if (0 == pid)
 		return FALSE;
 #	ifdef __MVS__
-	errno = 0;	/* it is possible getpriority returns -1 even in case of success */
+	errno = 0;			/* it is possible getpriority returns -1 even in case of success */
 	status = getpriority(PRIO_PROCESS, (id_t)pid);
 	if ((-1 == status) && (0 == errno))
 		status = 0;

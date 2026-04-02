@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -64,7 +64,7 @@ STATICFNDCL enum gtm_types scan_keyword(char **c);
 STATICFNDCL int scan_array_bound(char **b,int curr_type);
 STATICFNDCL char *read_table(char *b, int l, FILE *f);
 STATICFNDCL void put_mstr(mstr *src, mstr *dst);
-STATICFNDCL uint4 array_to_mask(boolean_t ar[MAX_ACTUALS], int n);
+STATICFNDCL gtm_uint8 array_to_mask(boolean_t ar[MAX_ACTUALS], int n);
 STATICFNDCL void ext_stx_error(int in_error, ...);
 
 const int parm_space_needed[] =
@@ -467,9 +467,9 @@ STATICFNDEF void put_mstr(mstr *src, mstr *dst)
 }
 
 /* Utility to convert an array of bool's to a bit mask */
-STATICFNDEF uint4 array_to_mask(boolean_t ar[MAX_ACTUALS], int n)
+STATICFNDEF gtm_uint8 array_to_mask(boolean_t ar[MAX_ACTUALS], int n)
 {
-	uint4	mask = 0;
+	gtm_uint8	mask = 0;
 	int	i;
 
 	for (i = n - 1; 0 <= i; i--)
@@ -768,7 +768,7 @@ struct extcall_package_list *exttab_parse(mval *package)
 callin_entry_list* citab_parse (boolean_t internal_use)
 {
 	int			parameter_count, i, fclose_res;
-	uint4			inp_mask, out_mask, mask;
+	gtm_uint8		inp_mask, out_mask, mask;
 	mstr			labref, callnam;
 	enum gtm_types		ret_tok, parameter_types[MAX_ACTUALS], pr;
 	char			str_buffer[MAX_TABLINE_LEN], *tbp, *end, rcfpath[GTM_PATH_MAX];
@@ -846,7 +846,7 @@ callin_entry_list* citab_parse (boolean_t internal_use)
 			if ((0 == parameter_count) && (*tbp == ')')) /* special case () */
 				break;
 			/* looking for an I, a O or an IO */
-			mask = (1 << parameter_count);
+			mask = (1ul << parameter_count);
 			inp_mask |= ('I' == *tbp) ? (tbp++, mask) : 0;
 			out_mask |= ('O' == *tbp) ? (tbp++, mask) : 0;
 			if ((!(inp_mask & mask) && !(out_mask & mask)) || (':' != *tbp++))

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -549,8 +549,11 @@ void	op_setfnretin2alsct(mval *srcmv, lv_val *dstlv);
 void	op_zshow(mval *func, int type, lv_val *lvn);
 
 lv_val   *op_getindx(UNIX_ONLY_COMMA(int argcnt) lv_val *start, ...);
+lv_val   *op_getindx_runtime(mval *src, int subscripts, int *start, int *stop, lv_val *ve);
 lv_val   *op_putindx(UNIX_ONLY_COMMA(int argcnt) lv_val *start, ...);
+lv_val   *op_putindx_runtime(mval *src, int subscripts, int *start, int *stop, lv_val *ve);
 lv_val   *op_srchindx(UNIX_ONLY_COMMA(int argcnt_arg) lv_val *lv, ...);
+lv_val   *op_srchindx_runtime(mval *src, int subscripts, int *start, int *stop, lv_val *lv);
 lv_val   *op_m_srchindx(UNIX_ONLY_COMMA(int4 count) lv_val *lvarg, ...);
 
 /* Function Prototypes for local variables functions of merge */

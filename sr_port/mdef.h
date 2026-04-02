@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -1829,8 +1829,9 @@ enum
 					 * (repeated twice), return value, and the truth value. As of this writing ojchildparms.c is
 					 * the only module that relies on the extra space.
 					 */
-#define	MAX_ACTUALS		32	/* Maximum number of arguments allowed in an actuallist. This value also determines
-					 * how many parameters are allowed to be passed between M and C.
+#define	MAX_ACTUALS		36	/* Maximum number of arguments allowed in an actuallist. This value also determines
+					 * how many parameters are allowed to be passed between M and C.  36 accomodates
+					 * 33 "real" parameters in calls out to Java, but we limit ourselves to round number 32.
 					 */
 #if defined(DEBUG) && defined(UNIX)
 #define OPERATOR_LOG_MSG												\

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -64,7 +64,6 @@
 #define MAX_WT_PID_SLOTS 	4
 
 #define BT_FACTOR(X) (X)
-#define FLUSH_FACTOR(X) ((X)-(X)/16)
 #define BT_QUEHEAD (-2)
 #define BT_NOTVALID (-1)
 #define BT_MAXRETRY 3

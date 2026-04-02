@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -36,6 +36,7 @@
 #include "proc_wait_stat.h"
 #include "region_freeze_multiproc.h"
 #include "gtm_atomic.h"
+#include "min_max.h"
 
 #define CACHE_STATE_OFF SIZEOF(que_ent)
 
@@ -1600,7 +1601,8 @@ MBSTART {											\
 #define START_VBN_CURRENT	START_VBN_V7
 
 #define	STEP_FACTOR			64			/* the factor by which flush_trigger is incremented/decremented */
-#define	MIN_FLUSH_TRIGGER(n_bts)	((n_bts) / 8)		/* the minimum flush_trigger as a function of n_bts */
+#define	MIN_FLUSH_TRIGGER(n_bts)	MAX((n_bts) / 32, MIN(n_bts / 8, STEP_FACTOR))	/* min is function of n_bts with floor */
+#define	MAX_FLUSH_TRIGGER(X) MIN((X)-(X)/16, 0x040000)		/* max is function of n_bts with cap of 262144 == 0x040000 */
 #define	MAX_WRT_PER_FLU			64			/* arbitrary, but probably sensible limit */
 
 #define MIN_FILLFACTOR 30
@@ -4412,13 +4414,15 @@ MBSTART {														\
 MBSTART {										\
 	shm_snapshot_ptr_t		ss_shm_ptr;					\
 											\
-	assert(SNAPSHOTS_IN_PROG(CNL));							\
+	/* We used to assert the if below, but it can change by the time we get here */	\
+	if (!SNAPSHOTS_IN_PROG(CNL))							\
+		break;									\
 	assert(NULL != LCL_SS_CTX);							\
 	ss_shm_ptr = LCL_SS_CTX->ss_shm_ptr;						\
 	assert(NULL != ss_shm_ptr);							\
 	assert(SNAPSHOT_INIT_DONE == LCL_SS_CTX->cur_state);				\
 	assert(0 == LCL_SS_CTX->failure_errno);						\
-	assert((-1 != CNL->ss_shmid) &&						\
+	assert((-1 != CNL->ss_shmid) &&							\
 		(LCL_SS_CTX->attach_shmid == CNL->ss_shmid));				\
 	assert(NULL != LCL_SS_CTX->start_shmaddr);					\
 	assert(0 == STRCMP(LCL_SS_CTX->shadow_file, ss_shm_ptr->ss_info.shadow_file));	\
@@ -4485,7 +4489,7 @@ MBSTART {															\
 		assert(lcl_ss_ctx->ss_shmcycle <= CNL->ss_shmcycle);								\
 		if (!cnl_snapshot_in_prog || ss_shm_ptr->failure_errno)								\
 		{	/* No on going snapshots or on going snapshot is invalid. Even if we encountered error during snapshot	\
-			 * context creation outside crit, we ignore it as the snapshot is no more active/valid.		\
+			 * context creation outside crit, we ignore it as the snapshot is no more active/valid.			\
 			 */													\
 			CLEAR_SNAPSHOTS_IN_PROG(CSA);										\
 		} else if (lcl_ss_ctx->ss_shmcycle == CNL->ss_shmcycle)								\
@@ -4552,9 +4556,12 @@ MBSTART {										\
 	 * which INTEG will later query and report accordingly. So, just continue	\
 	 * as if nothing happened.							\
 	 */										\
-	if (!ss_chk_shdw_bitmap(csa, lcl_ss_ctx, blkid))				\
-		if (!ss_write_block(csa, blkid, cr, mm_blk_ptr, lcl_ss_ctx))		\
-			assert(FALSE);							\
+	if ((INVALID_SHMID != lcl_ss_ctx->ss_shm_ptr->ss_info.ss_shmid))		\
+	{										\
+		if (!ss_chk_shdw_bitmap(csa, lcl_ss_ctx, blkid))			\
+			if (!ss_write_block(csa, blkid, cr, mm_blk_ptr, lcl_ss_ctx))	\
+				assert(FALSE);						\
+	}										\
 } MBEND
 
 /* Determine if the state of 'backup in progress' has changed since we grabbed crit in t_end.c/tp_tend.c */

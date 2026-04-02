@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2009-2024 Fidelity National Information	*
+ * Copyright (c) 2009-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -170,18 +170,6 @@ ZOS_ONLY(error_def(ERR_TEXT);)
 	}												\
 }
 
-/* In case of an error, un-freeze the region before returning if we had done the region_freeze
- * in mu_int_reg for a read_only process
- */
-#define UNFREEZE_REGION_IF_NEEDED(CSD, REG)					\
-{										\
-	if (process_id == (CSD)->image_count)					\
-	{									\
-		assert((REG)->read_only);					\
-		region_freeze((REG), FALSE, FALSE, FALSE, FALSE, FALSE);	\
-	}									\
-}
-
 /* The below function is modelled around mupip_backup_call_on_signal. This is invoked for doing snapshot clean up if ss_initiate
  * gets interrupted by a MUPIP STOP or other interruptible signals. In such cases, information would not have been transferred to
  * database shared memory and hence gds_rundown cannot do the cleanup.
@@ -260,7 +248,8 @@ boolean_t	ss_initiate(gd_region *reg,			/* Region in which snapshot has to be st
 		 */
 		assert(1 == MAX_SNAPSHOTS);
 		/* Check if the existing snapshot is still alive. If not, go ahead and cleanup that for us to continue  */
-		if ((0 != ss_shm_ptr->ss_info.ss_pid) && !is_proc_alive(ss_shm_ptr->ss_info.ss_pid, ss_shm_ptr->ss_info.ss_pid_pstarttime))
+		if ((0 != ss_shm_ptr->ss_info.ss_pid) &&
+			!is_proc_alive(ss_shm_ptr->ss_info.ss_pid, ss_shm_ptr->ss_info.ss_pid_pstarttime))
 			ss_release(NULL);
 		else
 		{

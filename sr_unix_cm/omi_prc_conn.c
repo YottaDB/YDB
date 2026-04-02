@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -25,9 +25,6 @@ static char rcsid[] = "$Header:$";
 
 #include "gtm_string.h"
 #include "gtm_stdio.h"
-#ifndef __MVS__
-#include <crypt.h> /* for crypt(), actually it is in unistd.h */
-#endif
 #include "gtm_unistd.h" /* for crypt() */
 
 #include "gtcm.h"

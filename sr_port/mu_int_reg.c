@@ -36,6 +36,9 @@
 #include "gt_timer.h"
 #include "mupint.h"
 #include "wbox_test_init.h"
+#include "ss_lock_facility.h"
+#include "shmpool.h"
+#include "is_proc_alive.h"
 #include "inline_atomic_pid.h" /* for DEFINE_ATOMIC_OP(gtm_atomic_uint, ATOMIC_LOAD, memory_order_acquire) */
 #include "inline_not_frozen.h" /* for not_frozen_hard */
 
@@ -50,15 +53,14 @@ GBLREF enc_handles		mu_int_encr_handles;
 GBLREF sgmnt_addrs		*cs_addrs;
 GBLREF boolean_t		jnlpool_init_needed, online_specified, preserve_snapshot;
 GBLREF util_snapshot_ptr_t	util_ss_ptr;
-#ifdef DEBUG
 GBLREF uint4			process_id;
-#endif
 
 LITREF	char			*gtm_dbversion_table[];
 
 error_def(ERR_BUFFLUFAILED);
 error_def(ERR_DBUPGRDREQ);
 error_def(ERR_SSMMNOALLOW);
+error_def(ERR_MAXSSREACHED);
 
 void mu_int_reg(gd_region *reg, boolean_t *return_value, boolean_t return_after_open)
 {
@@ -75,6 +77,8 @@ void mu_int_reg(gd_region *reg, boolean_t *return_value, boolean_t return_after_
 	int			trynum;
 	uint4			curr_wbox_seq_num;
 #	endif
+	boolean_t		region_already_in_progress = FALSE;
+	shm_snapshot_ptr_t      ss_shm_ptr;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -186,11 +190,38 @@ void mu_int_reg(gd_region *reg, boolean_t *return_value, boolean_t return_after_
 		csd_copy_ptr = &mu_int_data;
 	} else
 	{
-		if (!ss_initiate(gv_cur_region, util_ss_ptr, &csa->ss_ctx, preserve_snapshot, MUPIP_INTEG))
+
+		/* If there is a concurrent snapshot, there is no point in going into ss_initiate()
+		 *(MAX_SNAPSHOTS is currently 1).  This code below is modeled on that in ss_initiate() itself */
+		assert(!csa->now_crit);	/* Right now mu_int_reg (which does not hold crit) is the only one that calls ss_initiate */
+		assert(!csa->hold_onto_crit);	/* this ensures we can safely do unconditional grab_crit and rel_crit */
+		ss_get_lock(reg);	/* Grab hold of the snapshot crit lock (low level latch) */
+		ss_shm_ptr = (shm_snapshot_ptr_t)SS_GETSTARTPTR(csa);
+		if (MAX_SNAPSHOTS == cnl->num_snapshots_in_effect)
+		{
+			/* SS_MULTI: If multiple snapshots are supported, then we should run through each of the "possibly" running
+			 * snapshots
+			 */
+			assert(1 == MAX_SNAPSHOTS);
+			/* Check if the existing snapshot is still alive. If not, go ahead and cleanup that for us to continue  */
+			if ((0 != ss_shm_ptr->ss_info.ss_pid) && !is_proc_alive(ss_shm_ptr->ss_info.ss_pid, 0))
+				ss_release(NULL);
+			else
+			{
+				region_already_in_progress = TRUE;
+				UNFREEZE_REGION_IF_NEEDED(csd, reg);
+				gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_MAXSSREACHED, 3, MAX_SNAPSHOTS, REG_LEN_STR(reg));
+			}
+		}
+		assert(ss_lock_held_by_us(reg));
+		ss_release_lock(reg);
+		if (region_already_in_progress ||
+			(!ss_initiate(gv_cur_region, util_ss_ptr, &csa->ss_ctx, preserve_snapshot, MUPIP_INTEG)))
 		{
 			mu_int_skipreg_cnt++;
 			assert(NULL != csa->ss_ctx);
-			ss_release(&csa->ss_ctx);
+			if (!region_already_in_progress)
+				ss_release(&csa->ss_ctx);
 			ointeg_this_reg = FALSE; /* Turn off ONLINE INTEG for this region */
 			assert(process_id != cnl->in_crit); /* Ensure ss_initiate released the crit before returning */
 			assert(not_frozen_hard(csa)); /* Ensure region is unfrozen before returning from ss_initiate */

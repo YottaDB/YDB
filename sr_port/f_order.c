@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -108,8 +108,10 @@ int f_order(oprtype *a, opctype op)
 		return FALSE;
 	}
 	if (TK_COMMA != TREF(window_token))
+	{
 		direction = FORWARD;	/* default direction */
-	else
+		ins_triple(r);
+	} else
 	{	/* two argument form: ugly logic for direction */
 		advancewindow();
 		column = source_column;
@@ -124,10 +126,8 @@ int f_order(oprtype *a, opctype op)
 			return FALSE;
 		}
 		assert(TRIP_REF == dir_oprptr->oprclass);
+		direction = TBD;
 		triptr = dir_oprptr->oprval.tref;
-		sav_dirref = newtriple(OC_GVSAVTARG); /* for explicit direction, $R at this point set by lit: 1st or var: 2nd arg */
-		triptr = newtriple(OC_GVRECTARG);
-		triptr->operand[0] = put_tref(sav_ref);
 		if (OC_LIT == triptr->opcode)
 		{	/* if direction is a literal - pick it up and stop flailing about */
 			if (MV_IS_TRUEINT(&triptr->operand[0].oprval.mlit->v, &intval) && (1 == intval || -1 == intval))
@@ -139,85 +139,84 @@ int f_order(oprtype *a, opctype op)
 				stx_error(ERR_ORDER2);
 				return FALSE;
 			}
-		} else
+		}
+		sav_dirref = newtriple(OC_GVSAVTARG); /* for explicit direction, $R at this point set by lit: 1st or var: 2nd arg */
+		triptr = newtriple(OC_GVRECTARG);
+		triptr->operand[0] = put_tref(sav_ref);
+		switch (object)
 		{
-			direction = TBD;
-			switch (object)
+		case GLOBAL:		/* The direction may have had a side effect, so take copies of subscripts */
+			*next_oprptr = *dir_oprptr;
+			assert(sav_gvn);
+			assert(sav_gv1);
+			assert(sav_gvn != sav_gv1);
+			do
+			{	/* hunt down the gv opcode */
+				gv_oc = sav_gvn->opcode;
+				if ((OC_GVNAME == gv_oc) || (OC_GVNAKED == gv_oc) || (OC_GVEXTNAM == gv_oc))
+					break;
+			} while ((sav_gvn = sav_gvn->exorder.bl) != sav_gv1);	/* Note assignment */
+			assert((OC_GVNAME == gv_oc) || (OC_GVNAKED == gv_oc) || (OC_GVEXTNAM == gv_oc));
+			TREF(temp_subs) = TRUE;
+			create_temporaries(sav_gvn, gv_oc);
+			break;
+		case LOCAL:		/* Additionally need to move srchindx triple to after potential side effect */
+			triptr = newtriple(OC_PARAMETER);
+			triptr->operand[0] = *next_oprptr;
+			triptr->operand[1] = *(&dir_opr);
+			*next_oprptr = put_tref(triptr);
+			sav_lvn = r->operand[0].oprval.tref;
+			assert((OC_SRCHINDX == sav_lvn->opcode) || (OC_VAR == sav_lvn->opcode));
+			if (OC_SRCHINDX == sav_lvn->opcode)
 			{
-			case GLOBAL:		/* The direction may have had a side effect, so take copies of subscripts */
-				*next_oprptr = *dir_oprptr;
-				assert(sav_gvn);
-				assert(sav_gv1);
-				assert(sav_gvn != sav_gv1);
-				do
-				{	/* hunt down the gv opcode */
-					gv_oc = sav_gvn->opcode;
-					if ((OC_GVNAME == gv_oc) || (OC_GVNAKED == gv_oc) || (OC_GVEXTNAM == gv_oc))
-						break;
-				} while ((sav_gvn = sav_gvn->exorder.bl) != sav_gv1);	/* Note assignment */
-				assert((OC_GVNAME == gv_oc) || (OC_GVNAKED == gv_oc) || (OC_GVEXTNAM == gv_oc));
+				dqdel(sav_lvn, exorder);
+				ins_triple(sav_lvn);
 				TREF(temp_subs) = TRUE;
-				create_temporaries(sav_gvn, gv_oc);
-				break;
-			case LOCAL:		/* Additionally need to move srchindx triple to after potential side effect */
-				triptr = newtriple(OC_PARAMETER);
-				triptr->operand[0] = *next_oprptr;
-				triptr->operand[1] = *(&dir_opr);
-				*next_oprptr = put_tref(triptr);
-				sav_lvn = r->operand[0].oprval.tref;
-				assert((OC_SRCHINDX == sav_lvn->opcode) || (OC_VAR == sav_lvn->opcode));
-				if (OC_SRCHINDX == sav_lvn->opcode)
-				{
-					dqdel(sav_lvn, exorder);
-					ins_triple(sav_lvn);
-					TREF(temp_subs) = TRUE;
-					create_temporaries(sav_lvn, OC_SRCHINDX);
-				}
-				assert(&r->operand[1] == next_oprptr);
-				assert(TRIP_REF == next_oprptr->oprclass);
-				assert(OC_PARAMETER == next_oprptr->oprval.tref->opcode);
-				assert(TRIP_REF == next_oprptr->oprval.tref->operand[0].oprclass);
-				sav_lvn = next_oprptr->oprval.tref->operand[0].oprval.tref;
-				if ((OC_VAR == sav_lvn->opcode) || (OC_GETINDX == sav_lvn->opcode))
-				{	/* lvn excludes the last subscript from srchindx and attaches it to the "parent"
-					 * now we find it is an lvn and needs protection too
-					 */
-					triptr = maketriple(OC_STOTEMP);
-					triptr->operand[0] = put_tref(sav_lvn);
-					dqins(sav_lvn, exorder, triptr);		/* NOTE: violation of info hiding */
-					next_oprptr->oprval.tref->operand[0].oprval.tref = triptr;
-				}
-				break;
-			case INDIRECT:		/* Save and restore the variable lookup for true left-to-right evaluation */
-				*next_oprptr = *dir_oprptr;
-				used_glvn_slot = TRUE;
-				exorder_init(&tmpchain2);
-				chain2 = setcurtchain(&tmpchain2);
-				INSERT_INDSAVGLVN(control_slot, r->operand[0], ANY_SLOT, 1);
-				setcurtchain(chain2);
-				obp = sav_ref->exorder.bl;	/* insert before second arg */
-				dqadd(obp, &tmpchain2, exorder);
-				r->operand[0] = control_slot;
-				break;
-			case LOCAL_NAME:	/* left argument is a string - side effect can't screw it up */
-				*next_oprptr = *dir_oprptr;
-				break;
-			default:
-				assert(FALSE);
+				create_temporaries(sav_lvn, OC_SRCHINDX);
 			}
-			ins_triple(r);
-			if (used_glvn_slot)
-			{
-				triptr = newtriple(OC_GLVNPOP);
-				triptr->operand[0] = control_slot;
+			assert(&r->operand[1] == next_oprptr);
+			assert(TRIP_REF == next_oprptr->oprclass);
+			assert(OC_PARAMETER == next_oprptr->oprval.tref->opcode);
+			assert(TRIP_REF == next_oprptr->oprval.tref->operand[0].oprclass);
+			sav_lvn = next_oprptr->oprval.tref->operand[0].oprval.tref;
+			if ((OC_VAR == sav_lvn->opcode) || (OC_GETINDX == sav_lvn->opcode))
+			{	/* lvn excludes the last subscript from srchindx and attaches it to the "parent"
+				 * now we find it is an lvn and needs protection too
+				 */
+				triptr = maketriple(OC_STOTEMP);
+				triptr->operand[0] = put_tref(sav_lvn);
+				dqins(sav_lvn, exorder, triptr);		/* NOTE: violation of info hiding */
+				next_oprptr->oprval.tref->operand[0].oprval.tref = triptr;
 			}
-			if (SE_WARN_ON && (TREF(side_effect_base))[TREF(expr_depth)])
+			break;
+		case INDIRECT:		/* Save and restore the variable lookup for true left-to-right evaluation */
+			*next_oprptr = *dir_oprptr;
+			used_glvn_slot = TRUE;
+			exorder_init(&tmpchain2);
+			chain2 = setcurtchain(&tmpchain2);
+			INSERT_INDSAVGLVN(control_slot, r->operand[0], ANY_SLOT, 1);
+			setcurtchain(chain2);
+			obp = sav_ref->exorder.bl;				/* insert before second arg */
+			dqadd(obp, &tmpchain2, exorder);
+			r->operand[0] = control_slot;
+			direction = TBD;					/* indirection must defer direction */
+			break;
+		case LOCAL_NAME:	/* left argument is a string - side effect can't screw it up */
+			*next_oprptr = *dir_oprptr;
+			break;
+		default:
+			assert(FALSE);
+		}
+		ins_triple(r);
+		if (used_glvn_slot)
+		{
+			triptr = newtriple(OC_GLVNPOP);
+			triptr->operand[0] = control_slot;
+		}
+		if (SE_WARN_ON && (TREF(side_effect_base))[TREF(expr_depth)])
 				ISSUE_SIDEEFFECTEVAL_WARNING(column - 1);
 			DISABLE_SIDE_EFFECT_AT_DEPTH;		/* usual side effect processing doesn't work for $ORDER() */
-		}
 	}
-	if (TBD != direction)
-		ins_triple(r);
 	if (NULL != sav_dirref)
 	{
 		triptr = newtriple(OC_GVRECTARG);

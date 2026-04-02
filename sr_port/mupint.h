@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -26,6 +26,18 @@
 	if (mu_int_adj_prev[LVL] <= BLK + muint_adj && mu_int_adj_prev[LVL] >= BLK - muint_adj)	\
 		CNTR += 1;									\
 	mu_int_adj_prev[LVL] = BLK;									\
+}
+
+/* In case of an error, un-freeze the region before returning if we had done the region_freeze
+ * in mu_int_reg for a read_only process.  (Moved from mu_int_reg.c as ss_initiate.c now also uses it)
+ */
+#define UNFREEZE_REGION_IF_NEEDED(CSD, REG)					\
+{										\
+	if (process_id == (CSD)->image_count)					\
+	{									\
+		assert((REG)->read_only);					\
+		region_freeze((REG), FALSE, FALSE, FALSE, FALSE, FALSE);	\
+	}									\
 }
 
 typedef	struct global_list_struct

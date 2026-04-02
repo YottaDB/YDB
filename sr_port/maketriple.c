@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -29,6 +29,6 @@ triple *maketriple(opctype op)
 	x->src.line = TREF(source_line);
 	x->src.column = source_column;
 	dqinit(&(x->backptr), que);
-	dqinit(&(x->jmplist), que);
+	assert(NULL == x->jmplist);
 	return x;
 }

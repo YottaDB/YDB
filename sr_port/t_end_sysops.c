@@ -112,7 +112,7 @@ error_def(ERR_WCBLOCKED);
 	assert((CSE_LEVEL_DRT_LVL0_FREE != cs->level) || (gds_t_writemap == cs->mode));						\
 	assert(blkid < lcl_ss_ctx->total_blks);											\
 	blk_hdr_ptr = (blk_hdr_ptr_t)old_block;											\
-	if (WAS_FREE(cs->blk_prior_state))											\
+	if (WAS_FREE(cs->blk_prior_state) || (INVALID_SHMID == (lcl_ss_ctx->ss_shm_ptr->ss_info.ss_shmid)))			\
 		write_to_snapshot_file = FALSE;											\
 	else if (WAS_RECYCLED(cs->blk_prior_state))										\
 		write_to_snapshot_file = (blk_hdr_ptr->levl > 0);								\
@@ -1150,7 +1150,9 @@ enum cdb_sc bg_update_phase2(cw_set_element *cs, trans_num ctn, trans_num effect
 				WRITE_SNAPSHOT_BLOCK(csa, cr, NULL, blkid, lcl_ss_ctx);
 			assert(!FASTINTEG_IN_PROG(lcl_ss_ctx) || !write_to_snapshot_file
 					|| ss_chk_shdw_bitmap(csa, lcl_ss_ctx, blkid));
-			assert(FASTINTEG_IN_PROG(lcl_ss_ctx) || ss_chk_shdw_bitmap(csa, lcl_ss_ctx, blkid)
+			assert(FASTINTEG_IN_PROG(lcl_ss_ctx) ||
+					((INVALID_SHMID == lcl_ss_ctx->ss_shm_ptr->ss_info.ss_shmid)
+					|| ss_chk_shdw_bitmap(csa, lcl_ss_ctx, blkid))
 					|| ((blk_hdr_ptr_t)(blk_ptr))->tn >= lcl_ss_ctx->ss_shm_ptr->ss_info.snapshot_tn);
 		}
 	}

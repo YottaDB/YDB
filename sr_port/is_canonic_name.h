@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -16,19 +16,21 @@
 typedef union
 {
 	int lv[MAX_LVSUBSCRIPTS + 1 + 2]; /* 1 for the name, 2 for the environment components */
-	int gv[MAX_LVSUBSCRIPTS + 1 + 2];
+	int gv[MAX_GVSUBSCRIPTS + 1 + 2];
 } gv_name_and_subscripts;
 
-#define DETERMINE_BUFFER(src, start_buff, stop_buff, start, stop)	\
+#define DETERMINE_BUFFER(SRC, START_BUFF, STOP_BUFF, START, STOP, RET)	\
 MBSTART {								\
-	if ((0 < src->str.len) && ('^' == src->str.addr[0]))		\
+	if ((0 < (SRC)->str.len) && ('^' == (SRC)->str.addr[0]))	\
 	{								\
-		start = start_buff.gv;					\
-		stop = stop_buff.gv;					\
+		RET = FALSE;						\
+		START = (START_BUFF).gv;				\
+		STOP = (STOP_BUFF).gv;					\
 	} else								\
 	{								\
-		start = start_buff.lv;					\
-		stop = stop_buff.lv;					\
+		RET = TRUE;						\
+		START = (START_BUFF).lv;				\
+		STOP = (STOP_BUFF).lv;					\
 	}								\
 } MBEND
 
@@ -50,4 +52,4 @@ MBSTART {									\
 } MBEND
 
 boolean_t is_canonic_name(mval *src, int *subscripts, int *start_off, int *stop_off);
-boolean_t parse_gv_name_and_subscripts(mval *src, int *subscripts, int *start, int *stop, int *contains_env);
+boolean_t parse_glvn_and_subscripts(mval *src, int *subscripts, int *start, int *stop, int *contains_env, boolean_t no_mult_env);

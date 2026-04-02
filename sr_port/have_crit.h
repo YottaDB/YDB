@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2025 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -92,6 +92,7 @@ typedef enum
 	INTRPT_IN_JNL_CLEANUP,		/* Deferring interrupts while holding the phase2 latch */
 	INTRPT_IN_MLK_SHM_MODIFY,	/* Deferring interrupts while grabbing a LOCK and initializing a node */
 	INTRPT_HAVE_STATSDB_LATCH,	/* Deferring interrupts while posessing a latch on statsdb fields in basedb */
+	INTRPT_IN_FRAMES,		/* Deferring interrupts while creating base frames and new stack frames */
 	INTRPT_NUM_STATES		/* Should be the *last* one in the enum. */
 } intrpt_state_t;
 

@@ -129,7 +129,7 @@ error_def(ERR_TEXT);
 int4	mu_upgrade_bmm(gd_region *reg, size_t blocks_needed)
 {
 	boolean_t		adjust_for_first_blk, dt, is_bg, is_mm, mv_blk_err;
-	block_id		blks_in_way, curbml, new_blk_num, offset, old_blk_num, t_blk_num, old_vbn;
+	block_id		blks_in_way, curbml, new_blk_num, offset, old_blk_num, t_blk_num, old_vbn, total_blks;
 	block_id_32		lost;
 	blk_hdr			blkHdr;
 	bt_rec_ptr_t		bt;
@@ -656,6 +656,50 @@ int4	mu_upgrade_bmm(gd_region *reg, size_t blocks_needed)
 	util_out_print("Region !AD : Master map required 0x!@XQ blocks;", FALSE, REG_LEN_STR(reg), &blks_in_way);
 	util_out_print(" Size is now at 0x!@XQ blocks after any extension.", TRUE, &csd->trans_hist.total_blks);
 	tot_dt = tot_kill_byte_cnt = tot_levl_cnt = tot_splt_cnt = 0;
+	if (is_mm)
+	{
+		/* Read every busy block in the database so runtime upgrades are not necessary */
+		total_blks = csa->ti->total_blks;
+		for (curbml = 0; curbml < total_blks; curbml += BLKS_PER_LMAP)
+		{	/* check which blocks need reading */
+			bml_buff = t_qread(curbml, (sm_int_ptr_t)&cycle, &cr);
+			if (NULL == bml_buff)
+			{	/* read failed */
+				assert(cdb_sc_normal == (enum cdb_sc)rdfail_detail);
+				assert(FALSE);
+				util_out_print("Region !AD : Read of Bit map @x!@XQ failed.", TRUE, REG_LEN_STR(reg), &curbml);
+				util_out_print("Region !AD : Cannot complete block upgrades.",
+						TRUE, REG_LEN_STR(reg));
+				return ERR_MUNOFINISH;
+			}
+			blks_in_bml = (total_blks >= (curbml + BLKS_PER_LMAP)) ? BLKS_PER_LMAP : total_blks % BLKS_PER_LMAP;
+			for (bml_index = 0; bml_index < blks_in_bml; bml_index++)
+			{	/* process the local bit map for BUSY blocks */
+				new_blk_num = curbml + bml_index;
+				GET_BM_STATUS(bml_buff, bml_index, bml_status);
+				assert(BLK_MAPINVALID != bml_status);
+				if (BLK_BUSY != bml_status)
+					continue;
+				/* else (BLK_BUSY == bml_status), this block is BUSY so read it */
+				status = upgrade_mm_block(new_blk_num, GDSV7m);
+				if (status)
+				{	/* upgrade failed */
+					assert(blkBase);
+					assert(cdb_sc_normal == (enum cdb_sc)rdfail_detail);
+					assert(FALSE);
+					util_out_print("Region !AD : upgrade-on-read of block @x!@XQ failed (!UL).", TRUE,
+							REG_LEN_STR(reg), &new_blk_num, status);
+					util_out_print("Region !AD : Cannot complete block upgrades.",
+							TRUE, REG_LEN_STR(reg));
+					return ERR_MUNOFINISH;
+				}
+			}	/* end of loop over a local bit map */
+		}	/* end identification of blocks to read */
+		csd->offset = 0;
+		status = cdb_sc_normal;
+		cs_data->trans_hist.early_tn = cs_data->trans_hist.curr_tn + 1;
+		INCREMENT_CURR_TN(cs_data);
+	}
 	for (i = 1; i >= 0; i--)
 	{	/* Upgrade_dir_tree does both the offest adjustment and the pointer enlargement. It is possible
 		 * for DIR_ROOT to split, so loop once more to account for it.
@@ -722,6 +766,7 @@ int4	mu_upgrade_bmm(gd_region *reg, size_t blocks_needed)
 	csd->desired_db_format_tn = csd->trans_hist.curr_tn;	/* Phase 1 complete, set the format change TN */
 	csd->trans_hist.early_tn = csd->trans_hist.curr_tn + 1;
 	INCREMENT_CURR_TN(csd);
+
 	send_msg_csa(CSA_ARG(NULL) VARLSTCNT(11) ERR_DBDSRDFMTCHNG, 9, DB_LEN_STR(reg),
 		LEN_AND_STR(gtm_dbversion_table[GDSV7m]), LEN_AND_LIT("MUPIP UPGRADE"),
 		process_id, process_id, &csd->desired_db_format_tn);

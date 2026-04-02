@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -213,7 +213,7 @@ int cmd(void)
 	int		rval, x;
 	int4		fetch_cnt;
 	oprtype		*cr;
-	triple		*fetch0, *fetch1, *oldchain, *ref0, *ref1, *temp_expr_start = NULL, tmpchain, *triptr;
+	triple		*fetch, *oldchain, *ref0, *ref1, *temp_expr_start = NULL, tmpchain, *triptr;
 	mval		*v;
 	DCL_THREADGBL_ACCESS;
 
@@ -253,8 +253,7 @@ int cmd(void)
 	}
 	oldchain = NULL;
 	advancewindow();
-	fetch0 = (TREF(fetch_control)).curr_fetch_trip;
-	fetch1 = (TREF(fetch_control)).curr_fetch_opr;
+	fetch = (TREF(fetch_control)).curr_fetch_trip;
 	if ((TK_COLON != TREF(window_token)) || !cmd_data[x].pcnd_ok)
 	{
 		assert(m_zinvcmd != cmd_data[x].fcn);
@@ -327,8 +326,7 @@ int cmd(void)
 	if (NULL != oldchain)
 	{	/* for a literal 0 postconditional, we just throw the command & args away and return happiness */
 		assert(0 <= fetch_cnt);
-		(TREF(fetch_control)).curr_fetch_trip = fetch0;
-		(TREF(fetch_control)).curr_fetch_opr = fetch1;
+		(TREF(fetch_control)).curr_fetch_trip = fetch;
 		(TREF(fetch_control)).curr_fetch_count = fetch_cnt;
 		setcurtchain(oldchain);
 		TREF(discard) = FALSE;
@@ -336,7 +334,7 @@ int cmd(void)
 	}
 	if ((EXPR_FAIL != rval) && cr)
 	{
-		if (fetch0 != (TREF(fetch_control)).curr_fetch_trip)
+		if (fetch != (TREF(fetch_control)).curr_fetch_trip)
 		{
 			assert(OC_FETCH == (TREF(fetch_control)).curr_fetch_trip->opcode);
 			*cr = put_tjmp((TREF(fetch_control)).curr_fetch_trip);

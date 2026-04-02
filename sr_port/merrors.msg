@@ -1,6 +1,6 @@
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !								!
-! Copyright (c) 2001-2025 Fidelity National Information		!
+! Copyright (c) 2001-2026 Fidelity National Information		!
 ! Services, Inc. and/or its subsidiaries. All rights reserved.	!
 !								!
 !	This source code contains the intellectual property	!
@@ -1165,7 +1165,7 @@ INVZROENT	<!AD is neither a directory nor an object library(DLL)>/error/fao=2!/a
 DDPLOGERR	<!AD: !AD>/error/fao=4!/ansi=0
 GETSOCKNAMERR	<Getting the socket name failed from getsockname(): (errno==!UL) !AD>/error/fao=3!/ansi=0
 INVGTMEXIT	<Inappropriate invocation of gtm_exit. gtm_exit cannot be invoked from external calls.>/error/fao=0!/ansi=0
-CIMAXPARAM	<Exceeded maximum number of parameters in the call-in table entry. An M routine cannot accept more than 32 parameters.>/error/fao=0!/ansi=0
+CIMAXPARAM	<Exceeded maximum number of parameters in the call-in table entry. An M routine cannot accept more than 36 parameters.>/error/fao=0!/ansi=0
 CITPNESTED	<Call-ins can not be used inside a TP transaction>/error/fao=0!/ansi=0
 CIMAXLEVELS	<Too many nested Call-ins. Nested resources exhausted at level !UL.>/error/fao=1!/ansi=0
 JOBINTRRETHROW	<Job interrupt redelivered>/error/fao=0!/ansi=0

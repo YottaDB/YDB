@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -43,7 +43,7 @@ error_def(ERR_STACKOFLOW);
 void op_bindparm(UNIX_ONLY_COMMA(int frmc) int frmp_arg, ...)
 {
 	va_list		var;
-	uint4		mask;
+	gtm_uint8	mask;
 	register lv_val *a;
 	var_tabent	*parm_name;
 	int		i;
@@ -57,6 +57,8 @@ void op_bindparm(UNIX_ONLY_COMMA(int frmc) int frmp_arg, ...)
 	mvs_ntab_struct	*ntab;
 	ht_ent_mname	*tabent, **htepp;
 	parm_slot	*curr_slot;
+	uint4		sidx;
+	uint4		*pmh;
 	DBGRFCT_ONLY(mident_fixed vname;)
 	DCL_THREADGBL_ACCESS;
 
@@ -86,6 +88,9 @@ void op_bindparm(UNIX_ONLY_COMMA(int frmc) int frmp_arg, ...)
 		{	/* Acquire mask, actual count, and pointer to actual list from the parameter pool. */
 			assert(1 <= (TREF(parm_pool_ptr))->start_idx);
 			mask = (*(curr_slot - 1)).mask_and_cnt.mask;
+			sidx = (TREF(parm_pool_ptr))->start_idx;
+			pmh = TREF(parm_mask_hi);
+			mask |= ((gtm_uint8) (pmh[sidx - 1])) << 32;
 			actc = prev_count;
 			actp = &((*(curr_slot - SLOTS_NEEDED_FOR_SET(actc))).actuallist);
 		}
@@ -110,7 +115,7 @@ void op_bindparm(UNIX_ONLY_COMMA(int frmc) int frmp_arg, ...)
 			LVVAL_INIT(new_var, curr_symval);
 			ntab = &mv_chain->mv_st_cont.mvs_pval.mvs_ptab;
 			ntab->hte_addr = NULL;		/* In case table gets expanded before we set it below */
-		} else if (!(mask & 1 << i))
+		} else if (!(mask & (1ul << i)))
 		{	/* Actual list parm - already has PVAL built by push_parm() */
 			ntab = &((mvs_pval_struct *)*actp)->mvs_ptab;
 			new_var = ((mvs_pval_struct *)*actp)->mvs_val;

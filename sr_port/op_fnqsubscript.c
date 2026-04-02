@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -62,22 +62,9 @@ error_def(ERR_NOSUBSCRIPT);
  */
 void op_fnqsubscript(mval *src, int seq, mval *dst)
 {
-#ifdef UTF8_SUPPORTED
-	int		char_len = 0;
-#endif
-	int		ch_int;
-	unsigned char	*cp;
-	unsigned char	*end;
-	boolean_t	instring;
-	int		isrc;
-	unsigned char	letter;
-	int		odst;
-	mval		srcmval;
-	int		stop;
-	int		subs_count;
-	unsigned char	*temp_cp;
+	int		isrc, stop, subs_count;
 
-	if (seq < -1)	/* error "Cannot return subscript number ###" */
+	if (-1 > seq)	/* The subscript has not found */
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_NOSUBSCRIPT, 1, seq);
 	subs_count = seq;
 	if (!is_canonic_name(src, &subs_count, &isrc, &stop))
@@ -85,6 +72,24 @@ void op_fnqsubscript(mval *src, int seq, mval *dst)
 	/*  is_canonic_name has to parse it all anyway so it returns a start and stop for the compenent we want
 	    because is_canonic_name has established src is of good form, we don't have to be paranoid in parsing
 	*/
+	op_fnqsubscript_fast(src, seq, dst, subs_count, isrc, stop);
+	return;
+}
+
+void op_fnqsubscript_fast(mval *src, int seq, mval *dst, int subs_count, int isrc, int stop)
+{
+#ifdef UTF8_SUPPORTED
+	int		char_len = 0;
+#endif
+	int		ch_int;
+	unsigned char	*cp;
+	unsigned char	*end;
+	boolean_t	instring;
+	unsigned char	letter;
+	int		odst;
+	mval		srcmval;
+	unsigned char	*temp_cp;
+
 	assert((isrc >= 0) && (stop <= src->str.len) && (isrc <= stop));
 	ENSURE_STP_FREE_SPACE(stop - isrc + 1);		/* Before we reference stingpool.free; + 1 for possible ^ */
 	srcmval = *src;		/* Copy of source mval in case same as dst mval */

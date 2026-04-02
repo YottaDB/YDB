@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -15,7 +15,7 @@
 typedef struct gparam_list_struct
 {
 	intszofptr_t	n;
-	void    	*arg[MAX_ACTUALS + PUSH_PARM_OVERHEAD];
+	void    	*arg[MAX_ACTUALS -4 + PUSH_PARM_OVERHEAD];  /* -3 to make assert in callg.c happy */
 } gparam_list;
 
 typedef	INTPTR_T (*callgfnptr)(intszofptr_t cnt, ...);

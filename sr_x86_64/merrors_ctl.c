@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information 	*
+ * Copyright (c) 2001-2026 Fidelity National Information 	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -999,7 +999,7 @@ LITDEF	err_msg merrors[] = {
 	{ "DDPLOGERR", "!AD: !AD", 4, 0 },
 	{ "GETSOCKNAMERR", "Getting the socket name failed from getsockname(): (errno==!UL) !AD", 3, 0 },
 	{ "INVGTMEXIT", "Inappropriate invocation of gtm_exit. gtm_exit cannot be invoked from external calls.", 0, 0 },
-	{ "CIMAXPARAM", "Exceeded maximum number of parameters in the call-in table entry. An M routine cannot accept more than 32 parameters.", 0, 0 },
+	{ "CIMAXPARAM", "Exceeded maximum number of parameters in the call-in table entry. An M routine cannot accept more than 36 parameters.", 0, 0 },
 	{ "CITPNESTED", "Call-ins can not be used inside a TP transaction", 0, 0 },
 	{ "CIMAXLEVELS", "Too many nested Call-ins. Nested resources exhausted at level !UL.", 1, 0 },
 	{ "JOBINTRRETHROW", "Job interrupt redelivered", 0, 0 },

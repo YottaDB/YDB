@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -347,7 +347,7 @@ void v6_db_auto_upgrade(gd_region *reg)
 				csd->read_only = 0;
 			case GDSMV63003:
 				/*  GT.M v63007 added stable user control of flush_trigger using flush_trigger_top */
-				csd->flush_trigger_top = FLUSH_FACTOR(csd->n_bts);	/* more predictable than flush_trigger */
+				csd->flush_trigger_top = MAX_FLUSH_TRIGGER(csd->n_bts);	/* more predictable than flush_trigger */
 			case GDSMV63007:
 				/* GT.M V63012 added fullblkwrt option */
 				csd->write_fullblk = 0;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -201,7 +201,7 @@ void cdbg_dump_operand(int indent, oprtype *opr, int opnum)
 		case TJMP_REF:
 			if (opr->oprval.tref)
 				PRINTF("%s tjmp-ref jump list ptr: 0x%08lx\n", cdbg_indent(indent),
-					(unsigned long)&opr->oprval.tref->jmplist);
+					(unsigned long)opr->oprval.tref->jmplist);
 			else
 				PRINTF("%s ** Warning ** oprval.tref is NULL\n", cdbg_indent(indent));
 			break;
