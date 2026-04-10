@@ -751,6 +751,8 @@ inline boolean_t yed_is_integer(ydb_buffer_t buff, long long *value)
 {
         char    *str, *endptr, ptr;
 
+        if (0 == buff.len_used)
+		return FALSE;
 	if (NULL != memchr(buff.buf_addr, '.', (buff.len_used < (YED_PRECISION + 3)) ? buff.len_used : YED_PRECISION + 3))
 		return FALSE;
 	if (('-' != buff.buf_addr[0]) && ((YED_PRECISION + 1) < buff.len_used))
@@ -781,6 +783,8 @@ inline boolean_t yed_is_real(ydb_buffer_t buff, double *value)
 	char		*str, *endptr, ptr;
 	boolean_t	dpnt = FALSE;
 
+        if (0 == buff.len_used)
+		return FALSE;
 	if (('-' != buff.buf_addr[0]) && ((YED_PRECISION + 2) < buff.len_used))
 		return FALSE;
 	if (('-' == buff.buf_addr[0]) && ((YED_PRECISION + 3) < buff.len_used))
