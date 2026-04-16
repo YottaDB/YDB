@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -87,14 +87,7 @@ int gtmrecv_comm_init(in_port_t port)
 	/* Make it known to the world that you are ready for a Source Server */
 	SERVER_HINTS(hints, af);
 	SNPRINTF(port_buffer, NI_MAXSERV, "%hu", port);
-<<<<<<< HEAD
 	if (0 != (errcode = dogetaddrinfo(NULL, port_buffer, &hints, &ai_ptr)))
-||||||| parent of 19e495f7cb (GT.M V7.1-003)
-	if (0 != (errcode = getaddrinfo(NULL, port_buffer, &hints, &ai_ptr)))
-=======
-	DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
-	if (0 != (errcode = getaddrinfo(NULL, port_buffer, &hints, &ai_ptr)))
->>>>>>> 19e495f7cb (GT.M V7.1-003)
 	{
 		ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 		CLOSEFILE(temp_sock_fd, rc);
@@ -107,32 +100,16 @@ int gtmrecv_comm_init(in_port_t port)
 	gtmrecv_listen_sock_fd = temp_sock_fd;
 	if (0 > setsockopt(gtmrecv_listen_sock_fd, SOL_SOCKET, SO_LINGER, (const void *)&disable_linger, SIZEOF(disable_linger)))
 	{
-<<<<<<< HEAD
 		save_errno = ERRNO;
 		FREEADDRINFO(ai_ptr);
-||||||| parent of 19e495f7cb (GT.M V7.1-003)
-=======
-		ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
->>>>>>> 19e495f7cb (GT.M V7.1-003)
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
-<<<<<<< HEAD
 				RTS_ERROR_LITERAL("Error with receiver server listen socket disable linger"), save_errno);
-||||||| parent of 19e495f7cb (GT.M V7.1-003)
-			RTS_ERROR_LITERAL("Error with receiver server listen socket disable linger"), ERRNO);
-=======
-			RTS_ERROR_LITERAL("Error with receiver server listen socket disable linger"), ERRNO);
->>>>>>> 19e495f7cb (GT.M V7.1-003)
 	}
 	if (0 > setsockopt(gtmrecv_listen_sock_fd, SOL_SOCKET, SO_REUSEADDR, (const void *)&enable_reuseaddr,
 			SIZEOF(enable_reuseaddr)))
 	{
-<<<<<<< HEAD
 		save_errno = ERRNO;
 		FREEADDRINFO(ai_ptr);
-||||||| parent of 19e495f7cb (GT.M V7.1-003)
-=======
-		ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
->>>>>>> 19e495f7cb (GT.M V7.1-003)
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
 				RTS_ERROR_LITERAL("Error with receiver server listen socket enable reuseaddr"), save_errno);
 	}
@@ -185,14 +162,7 @@ int gtmrecv_comm_init(in_port_t port)
 		GTM_WHITE_BOX_TEST(WBTEST_REPL_INIT_ERR, errno, 98);
 		SNPRINTF(err_buffer, 512, "Could not bind local address. Local Port : %hu", port);
 		SEND_SYSMSG_REPLCOMM(LEN_AND_STR(err_buffer));
-<<<<<<< HEAD
 		FREEADDRINFO(ai_ptr);
-||||||| parent of 19e495f7cb (GT.M V7.1-003)
-		freeaddrinfo(ai_ptr);
-=======
-		freeaddrinfo(ai_ptr);
-		ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
->>>>>>> 19e495f7cb (GT.M V7.1-003)
 		CLOSEFILE_RESET(gtmrecv_listen_sock_fd, rc);	/* resets "gtmrecv_listen_sock_fd" to FD_INVALID */
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
 				 RTS_ERROR_STRING(err_buffer), save_errno);
@@ -208,26 +178,12 @@ int gtmrecv_comm_init(in_port_t port)
 			SNPRINTF(err_buffer, 512, "Could not listen. Local port : *UNKNOWN* : %s\n", strerror(errno));
 		GTM_WHITE_BOX_TEST(WBTEST_REPL_INIT_ERR2, save_errno, 98);
 		SEND_SYSMSG_REPLCOMM(LEN_AND_STR(err_buffer));
-<<<<<<< HEAD
 		FREEADDRINFO(ai_ptr);
-||||||| parent of 19e495f7cb (GT.M V7.1-003)
-		freeaddrinfo(ai_ptr);
-=======
-		freeaddrinfo(ai_ptr);
-		ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
->>>>>>> 19e495f7cb (GT.M V7.1-003)
 		CLOSEFILE_RESET(gtmrecv_listen_sock_fd, rc);	/* resets "gtmrecv_listen_sock_fd" to FD_INVALID */
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
 				 RTS_ERROR_STRING(err_buffer), save_errno);
 		return (-1);
 	}
-<<<<<<< HEAD
 	FREEADDRINFO(ai_ptr);
-||||||| parent of 19e495f7cb (GT.M V7.1-003)
-	freeaddrinfo(ai_ptr);
-=======
-	freeaddrinfo(ai_ptr);
-	ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
->>>>>>> 19e495f7cb (GT.M V7.1-003)
 	return (0);
 }

@@ -3,7 +3,7 @@
  * Copyright (c) 2003-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -706,11 +706,12 @@ boolean_t mur_close_files(void)
 						 * pool fields to reflect the new state.
 						 */
 						assert(csa->now_crit && csa->hold_onto_crit);
-<<<<<<< HEAD
 						jpl->last_histinfo_seqno = last_histinfo_seqno;
 						jpl->jnl_seqno = murgbl.consist_jnl_seqno;
 						jpl->start_jnl_seqno = murgbl.consist_jnl_seqno;
 						jpl->rsrv_write_addr = jpl->write_addr = 0;
+						jpl->contig_addr = 0;
+						rollback_mutex_cln_ctl(murgbl.consist_jnl_seqno);
 						jpl->lastwrite_len = 0;
 						jpl->max_zqgblmod_seqno = max_zqgblmod_seqno;
 						assert(jpl->phase2_commit_index1 == jpl->phase2_commit_index2);
@@ -725,28 +726,6 @@ boolean_t mur_close_files(void)
 						lastJplCmt->jnl_seqno = 0;
 						lastJplCmt->start_write_addr = 0;
 						lastJplCmt->tot_jrec_len = 0;
-||||||| parent of 19e495f7cb (GT.M V7.1-003)
-						jnlpool->jnlpool_ctl->last_histinfo_seqno = last_histinfo_seqno;
-						jnlpool->jnlpool_ctl->jnl_seqno = murgbl.consist_jnl_seqno;
-						jnlpool->jnlpool_ctl->start_jnl_seqno = murgbl.consist_jnl_seqno;
-						jnlpool->jnlpool_ctl->rsrv_write_addr = jnlpool->jnlpool_ctl->write_addr = 0;
-						jnlpool->jnlpool_ctl->rsrv_write_addr = 0;
-						assert(jnlpool->jnlpool_ctl->phase2_commit_index1
-							== jnlpool->jnlpool_ctl->phase2_commit_index2);
-						jnlpool->jnlpool_ctl->lastwrite_len = 0;
-						jnlpool->jnlpool_ctl->max_zqgblmod_seqno = max_zqgblmod_seqno;
-=======
-						jnlpool->jnlpool_ctl->last_histinfo_seqno = last_histinfo_seqno;
-						jnlpool->jnlpool_ctl->jnl_seqno = murgbl.consist_jnl_seqno;
-						jnlpool->jnlpool_ctl->start_jnl_seqno = murgbl.consist_jnl_seqno;
-						jnlpool->jnlpool_ctl->rsrv_write_addr = jnlpool->jnlpool_ctl->write_addr = 0;
-						jnlpool->jnlpool_ctl->contig_addr = 0;
-						rollback_mutex_cln_ctl(murgbl.consist_jnl_seqno);
-						assert(jnlpool->jnlpool_ctl->phase2_commit_index1
-							== jnlpool->jnlpool_ctl->phase2_commit_index2);
-						jnlpool->jnlpool_ctl->lastwrite_len = 0;
-						jnlpool->jnlpool_ctl->max_zqgblmod_seqno = max_zqgblmod_seqno;
->>>>>>> 19e495f7cb (GT.M V7.1-003)
 						/* Keep strm_seqno in journal pool in sync with the one in instance file header */
 						assert(SIZEOF(jpl->strm_seqno) == SIZEOF(inst_hdr->strm_seqno));
 						memcpy(jpl->strm_seqno, inst_hdr->strm_seqno,

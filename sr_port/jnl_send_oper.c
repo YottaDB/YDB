@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2021-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.                                     *
  *								*
  *	This source code contains the intellectual property	*
@@ -94,23 +94,13 @@ void jnl_send_oper(jnl_private_control *jpc, uint4 status)
 	fsync_pid     = jb->fsync_in_prog_latch.u.parts.latch_pid;
 	if (ok_to_log)
 	{
-		send_msg_csa(CSA_ARG(csa) VARLSTCNT(23) ERR_JNLBUFINFO, 21, process_id,
+		send_msg_csa(CSA_ARG(csa) VARLSTCNT(24) ERR_JNLBUFINFO, 22, process_id,
 			jb->dsk, jb->free, jb->bytcnt, io_in_prog, fsync_in_prog, jb->dskaddr, jb->freeaddr, jb->qiocnt,
 			now_writer, fsync_pid, jb->filesize, jb->cycle, jb->errcnt, jb->wrtsize, jb->fsync_dskaddr,
-<<<<<<< HEAD
 			jb->rsrv_free, jb->rsrv_freeaddr, jb->phase2_commit_index1, jb->phase2_commit_index2,
 			jb->next_align_addr, jb->size);
-		send_msg_csa(CSA_ARG(csa) VARLSTCNT(10) ERR_JNLPVTINFO, 8, process_id, jpc->cycle, jpc->fd_mismatch,
-			jpc->channel, jpc->sync_io, jpc->pini_addr, jpc->qio_active, jpc->old_channel);
-||||||| parent of 19e495f7cb (GT.M V7.1-003)
-			jb->rsrv_free, jb->rsrv_freeaddr, jb->phase2_commit_index1, jb->phase2_commit_index2, jb->next_align_addr);
-		send_msg_csa(CSA_ARG(csa) VARLSTCNT(10) ERR_JNLPVTINFO, 8, process_id, jpc->cycle, jpc->fd_mismatch,
-			jpc->channel, jpc->sync_io, jpc->pini_addr, jpc->qio_active, jpc->old_channel);
-=======
-			jb->rsrv_free, jb->rsrv_freeaddr, jb->phase2_commit_index1, jb->phase2_commit_index2, jb->next_align_addr);
 		send_msg_csa(CSA_ARG(csa) VARLSTCNT(9) ERR_JNLPVTINFO, 7, process_id, jpc->cycle, jpc->fd_mismatch,
 			jpc->channel, jpc->sync_io, jpc->pini_addr, jpc->qio_active);
->>>>>>> 19e495f7cb (GT.M V7.1-003)
 	}
 	caller_id_flag = TRUE;
 }

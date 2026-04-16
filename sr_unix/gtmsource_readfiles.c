@@ -3,7 +3,7 @@
  * Copyright (c) 2006-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -566,15 +566,7 @@ static	int update_eof_addr(repl_ctl_element *ctl, int *eof_change)
 	new_eof_addr = csa->jnl->jnl_buff->dskaddr;
 	if (is_gdid_gdid_identical(&fc->id, JNL_GDID_PTR(csa)))
 	{
-<<<<<<< HEAD
-		REPL_DPRINT3("Update EOF : New EOF addr from SHM for %s is %u\n", ctl->jnl_fn, new_eof_addr);
-||||||| parent of 19e495f7cb (GT.M V7.1-003)
-		new_eof_addr = csa->jnl->jnl_buff->dskaddr;
-		REPL_DPRINT3("Update EOF : New EOF addr from SHM for %s is %u\n", ctl->jnl_fn, new_eof_addr);
-=======
-		new_eof_addr = csa->jnl->jnl_buff->dskaddr;
 		REPL_DPRINT4("Update EOF : New EOF addr from SHM for %s is %u, was %u\n", ctl->jnl_fn, new_eof_addr, prev_eof_addr);
->>>>>>> 19e495f7cb (GT.M V7.1-003)
 	} else
 	{
 		REPL_DPRINT2("Update EOF : New EOF addr will be found from jnl file hdr for %s\n", ctl->jnl_fn);
@@ -1736,15 +1728,9 @@ static	int read_regions(unsigned char **buff, int *buff_avail,
 					{
 						csa = &FILE_INFO(ctl->reg)->s_addrs;
 						freeaddr = csa->jnl->jnl_buff->rsrv_freeaddr;
-<<<<<<< HEAD
 						if (((ctl->repl_buff->fc->eof_addr == freeaddr)
 								&& (ctl->max_seqno_eof_addr == freeaddr))
 							|| (!JNL_ENABLED(csa->hdr)))
-||||||| parent of 19e495f7cb (GT.M V7.1-003)
-						if ((ctl->repl_buff->fc->eof_addr == freeaddr) || (!JNL_ENABLED(csa->hdr)))
-=======
-						if ((ctl->max_seqno_eof_addr == freeaddr) || (!JNL_ENABLED(csa->hdr)))
->>>>>>> 19e495f7cb (GT.M V7.1-003)
 						{	/* No more pending updates in the journal file. Next update to the
 							 * journal file will take the seqno jctl->jnl_seqno which will be
 							 * greater than read_jnl_seqno

@@ -3,7 +3,7 @@
  * Copyright (c) 2017-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -533,32 +533,16 @@ void	secshr_finish_CMT09_to_CMT15(sgmnt_addrs *csa, jnlpool_addrs_ptr_t update_j
 				assert(si);
 				si->update_trans = updTrans | UPDTRNS_TCOMMIT_STARTED_MASK;	/* Step CMT12 for TP */
 			} else
-<<<<<<< HEAD:sr_port/secshr_finish_CMT08_to_CMT14.c
-				update_trans = updTrans | UPDTRNS_TCOMMIT_STARTED_MASK;	/* Step CMT11 for Non-TP */
-			INCREMENT_CURR_TN(csd);	/* roll forward Step (CMT12) */
+				update_trans = updTrans | UPDTRNS_TCOMMIT_STARTED_MASK;	/* Step CMT12 for Non-TP */
+			INCREMENT_CURR_TN(csd);	/* roll forward Step (CMT13) */
 		} else
-		{	/* else : early_tn == curr_tn and so Step CMT12 is done.
+		{	/* else : early_tn == curr_tn and so Step CMT13 is done.
 			 * But ctn corresponds to the post-commit curr_tn value whereas we need it below to
 			 * reflect the pre-commit curr_tn. Therefore go back one tn.
 			 */
 			ctn--;
-||||||| parent of 19e495f7cb (GT.M V7.1-003):sr_port/secshr_finish_CMT08_to_CMT14.c
-				update_trans = updTrans | UPDTRNS_TCOMMIT_STARTED_MASK;	/* Step CMT11 for Non-TP */
-			INCREMENT_CURR_TN(csd);	/* roll forward Step (CMT12) */
-=======
-				update_trans = updTrans | UPDTRNS_TCOMMIT_STARTED_MASK;	/* Step CMT12 for Non-TP */
-			INCREMENT_CURR_TN(csd);	/* roll forward Step (CMT13) */
->>>>>>> 19e495f7cb (GT.M V7.1-003):sr_port/secshr_finish_CMT09_to_CMT15.c
 		}
-<<<<<<< HEAD:sr_port/secshr_finish_CMT08_to_CMT14.c
-		csa->t_commit_crit = T_COMMIT_CRIT_PHASE2;			/* Step CMT13 */
-||||||| parent of 19e495f7cb (GT.M V7.1-003):sr_port/secshr_finish_CMT08_to_CMT14.c
-		/* else : early_tn == curr_tn and so Step CMT12 is done */
-		csa->t_commit_crit = T_COMMIT_CRIT_PHASE2;			/* Step CMT13 */
-=======
-		/* else : early_tn == curr_tn and so Step CMT13 is done */
 		csa->t_commit_crit = T_COMMIT_CRIT_PHASE2;			/* Step CMT14 */
->>>>>>> 19e495f7cb (GT.M V7.1-003):sr_port/secshr_finish_CMT09_to_CMT15.c
 		/* Check if kill_in_prog flag in file header has to be incremented. */
 		if (dollar_tlevel)
 		{

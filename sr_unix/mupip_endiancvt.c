@@ -3,7 +3,7 @@
  * Copyright (c) 2006-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -185,19 +185,12 @@ void mupip_endiancvt(void)
 	sgmnt_data		*old_data, *new_data;
 	trans_num		curr_tn;
 	uint4			swap_uint4;
-	uint4			cli_status;
 	unsigned short		n_len, outdb_len, t_len;
 	ZOS_ONLY(int		realfiletag;)
 	DCL_THREADGBL_ACCESS;
 
-<<<<<<< HEAD
-	if (CLI_PRESENT == cli_present("OUTDB"))
-||||||| parent of 19e495f7cb (GT.M V7.1-003)
-	if (CLI_PRESENT == (cli_status = cli_present("OUTDB")))
-=======
 	SETUP_THREADGBL_ACCESS;
-	if (CLI_PRESENT == (cli_status = cli_present("OUTDB")))
->>>>>>> 19e495f7cb (GT.M V7.1-003)
+	if (CLI_PRESENT == cli_present("OUTDB"))
 	{
 		outdb_specified = TRUE;
 		outdb_len = SIZEOF(outdb) - 1;

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -109,27 +109,13 @@ error_def(ERR_ZTWORMHOLE2BIG);
 
 void op_svput(int varnum, mval *v)
 {
-<<<<<<< HEAD
-	char	*vptr, lcl_str[256], *tmpPtr;
-	int	i, ok, state, tmp;
-	mval	lcl_mval;
-	int4	previous_gtm_strpllim;
-	size_t	rtmp;
-||||||| parent of 19e495f7cb (GT.M V7.1-003)
-	char	*vptr;
-	int	i, ok, state, tmp;
-	int4	previous_gtm_strpllim;
-	size_t	rtmp;
-	mstr	trap_v;
-=======
-	char		*vptr;
+	char		*vptr, lcl_str[256], *tmpPtr;
 	int		i, ok, state, tmp;
+	mval		lcl_mval;
 	int4		previous_gtm_strpllim;
 	size_t		rtmp;
 	sgmnt_addrs	*csa;			/* for ZGBLDIR */
 	gd_region	*reg, *reg_top;
-	mstr		trap_v;
->>>>>>> 19e495f7cb (GT.M V7.1-003)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;

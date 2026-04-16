@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -92,18 +92,12 @@ int	gtmsource_ipc_cleanup(boolean_t auto_shutdown, int *exit_status, int4 *num_s
 	 * In that case, the detach will happen automatically when the process terminates.
 	 */
 	assert(NULL != jnlpool);
-<<<<<<< HEAD
-	if (IS_REPL_INST_FROZEN)
+	if (IS_REPL_INST_FROZEN(RECOGNIZE_FREEZES))
 	{	/* Before returning, give an indication that we are not deleting jnlpool ipcs because of a frozen instance
 		 * in the source server shutdown command logs. This keeps the output consistent ("Not deleting jnlpool ipcs")
 		 * between the frozen and not frozen case.
 		 */
 		repl_log(stderr, TRUE, TRUE, "Not deleting jnlpool ipcs. Instance is frozen\n");
-||||||| parent of 19e495f7cb (GT.M V7.1-003)
-	if (IS_REPL_INST_FROZEN)
-=======
-	if (IS_REPL_INST_FROZEN(RECOGNIZE_FREEZES))
->>>>>>> 19e495f7cb (GT.M V7.1-003)
 		return FALSE;
 	}
 	udi = (unix_db_info *)FILE_INFO(jnlpool->jnlpool_dummy_reg);
@@ -127,20 +121,10 @@ int	gtmsource_ipc_cleanup(boolean_t auto_shutdown, int *exit_status, int4 *num_s
 							(WBTEST_UPD_PROCESS_ERROR == ydb_white_box_test_case_number))))
 				repl_log(stderr, TRUE, TRUE, "Receive pool semaphore IDs were not removed\n");
 			if ((INVALID_SHMID != jnlpool->repl_inst_filehdr->recvpool_shmid) DEBUG_ONLY(&&
-<<<<<<< HEAD
 						!(ydb_white_box_test_case_enabled &&
 							 (WBTEST_UPD_PROCESS_ERROR == ydb_white_box_test_case_number))))
 							 repl_log(stderr, TRUE, TRUE, "Receive pool shared memory not removed\n");
-||||||| parent of 19e495f7cb (GT.M V7.1-003)
-						!(gtm_white_box_test_case_enabled &&
-							 (WBTEST_UPD_PROCESS_ERROR == gtm_white_box_test_case_number))))
-							 repl_log(stderr, TRUE, TRUE, "Receiver pool shared memory not removed\n");
-=======
-						!(gtm_white_box_test_case_enabled &&
-							 (WBTEST_UPD_PROCESS_ERROR == gtm_white_box_test_case_number))))
-							 repl_log(stderr, TRUE, TRUE, "Receiver pool shared memory not removed\n");
 			DEBUG_ONLY(only_usr_jnlpool_flush = true;)
->>>>>>> 19e495f7cb (GT.M V7.1-003)
 			repl_inst_flush_jnlpool(TRUE, TRUE);
 			DEBUG_ONLY(only_usr_jnlpool_flush = false;)
 		}

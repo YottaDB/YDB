@@ -219,17 +219,7 @@ MBSTART {												\
 	/* Note: This code is called from timer_handler and so needs to be async-signal safe.		\
 	 * POSIX defines "clock_gettime" as safe but not "gettimeofday" so dont use the latter.		\
 	 */												\
-<<<<<<< HEAD
 	clock_gettime(CLOCKID, ATP);									\
-||||||| parent of 19e495f7cb (GT.M V7.1-003)
-	clock_gettime(CLOCKID, &ts);									\
-	atp->at_sec = (int4)ts.tv_sec;									\
-	atp->at_usec = (int4)ts.tv_nsec / 1000;								\
-=======
-	clock_gettime(CLOCKID, &ts);									\
-	ATP->at_sec = (int4)ts.tv_sec;									\
-	ATP->at_usec = (int4)ts.tv_nsec / 1000;								\
->>>>>>> 19e495f7cb (GT.M V7.1-003)
 } MBEND
 
 /* Sleep for MS milliseconds of "clockid" time unless interrupted by RESTART processing */

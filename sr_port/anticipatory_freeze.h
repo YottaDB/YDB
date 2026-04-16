@@ -3,7 +3,7 @@
  * Copyright (c) 2012-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -352,7 +352,7 @@ MBSTART {															\
 				lseekwrite_target = LSEEKWRITE_TARGET;								\
 			} else if (gtm_white_box_test_case_enabled && (WBTEST_PHS1_NOSPACE == gtm_white_box_test_case_number))	\
 			{													\
-				if (gtm_wbox_input_test_case_count < gtm_white_box_test_case_count)				\
+				if (gtm_wbox_input_test_case_count < ydb_white_box_test_case_count)				\
 				{												\
 					gtm_wbox_input_test_case_count++;							\
 					LCL_STATUS = ENOSPC;									\
@@ -529,12 +529,8 @@ static inline void wait_for_repl_inst_unfreeze_nocsa_jpl(jnlpool_addrs_ptr_t jpl
 {
 	GBLREF	int4			exit_state;
 	GBLREF	int4			exi_condition;
-<<<<<<< HEAD
 	GBLREF	sig_pending		sigPendingQue;		/* Queue of pending signals handled in alt signal handling mode */
-||||||| parent of 19e495f7cb (GT.M V7.1-003)
-=======
 	DCL_THREADGBL_ACCESS;
->>>>>>> 19e495f7cb (GT.M V7.1-003)
 
 	SETUP_THREADGBL_ACCESS;
 	assert((NULL != jpl) && (NULL != jpl->jnlpool_ctl));

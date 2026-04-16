@@ -3,7 +3,7 @@
  * Copyright (c) 2014-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -60,12 +60,7 @@
 /* Constants defining how many times to retry the loop in relinkctl_open() based on the specific error conditions encountered. */
 #define MAX_RCTL_INIT_WAIT_RETRIES	1000	/* # of sleeps to allow while waiting for the shared memory to be initialized. */
 #define MAX_RCTL_DELETED_RETRIES	16	/* # of times to allow an existing relinkctl file to be deleted before open(). */
-<<<<<<< HEAD
 #define MAX_RCTL_RUNDOWN_RETRIES	128	/* # of times to allow a mapped relinkctl file to get run down before shmat(). */
-||||||| parent of 19e495f7cb (GT.M V7.1-003)
-#define MAX_RCTL_RUNDOWN_RETRIES	16	/* # of times to allow a mapped relinkctl file to get run down before shmat(). */
-=======
->>>>>>> 19e495f7cb (GT.M V7.1-003)
 
 DEBUG_ONLY(GBLDEF int	saved_errno;)
 GBLREF	uint4		process_id;
@@ -78,20 +73,6 @@ STATICFNDCL void relinkctl_map(open_relinkctl_sgm *linkctl);
 STATICFNDCL void relinkctl_unmap(open_relinkctl_sgm *linkctl);
 STATICFNDCL void relinkctl_delete(open_relinkctl_sgm *linkctl);
 
-<<<<<<< HEAD
-error_def(ERR_EXCEEDRCTLRNDWN);
-||||||| parent of 19e495f7cb (GT.M V7.1-003)
-#define SLASH_GTM_RELINKCTL	"/gtm-relinkctl-"
-#define SLASH_GTM_RELINKCTL_LEN	STRLEN(SLASH_GTM_RELINKCTL)
-#define MAX_RCTL_OPEN_RETRIES	16
-
-error_def(ERR_EXCEEDRCTLRNDWN);
-=======
-#define SLASH_GTM_RELINKCTL	"/gtm-relinkctl-"
-#define SLASH_GTM_RELINKCTL_LEN	STRLEN(SLASH_GTM_RELINKCTL)
-#define MAX_RCTL_OPEN_RETRIES	16
-
->>>>>>> 19e495f7cb (GT.M V7.1-003)
 error_def(ERR_FILEPARSE);
 error_def(ERR_RELINKCTLERR);
 error_def(ERR_RELINKCTLFULL);
@@ -314,7 +295,7 @@ int relinkctl_open(open_relinkctl_sgm *linkctl, boolean_t object_dir_missing)
 	relinkctl_data		*hdr;
 	char			errstr[256];
 	int			rctl_deleted_count, rctl_init_wait_count, rctl_do_shmat_count;
-	DEBUG_ONLY(int		rctl_rundown_count);
+	int			rctl_rundown_count;
 	struct shmid_ds		shmstat;
 	DCL_THREADGBL_ACCESS;
 
@@ -325,7 +306,7 @@ int relinkctl_open(open_relinkctl_sgm *linkctl, boolean_t object_dir_missing)
 		linkctl->relinkctl_path, linkctl->zro_entry_name.len, linkctl->zro_entry_name.addr));
 	/* Anybody that has read permissions to the object container should have write permissions to the relinkctl file. */
 	rctl_deleted_count = rctl_init_wait_count = 0;
-	DEBUG_ONLY(rctl_rundown_count = 0);
+	rctl_rundown_count = 0;
 	rctl_do_shmat_count = 0;
 	is_mu_rndwn_rlnkctl = TREF(is_mu_rndwn_rlnkctl);
 	do
@@ -442,26 +423,18 @@ int relinkctl_open(open_relinkctl_sgm *linkctl, boolean_t object_dir_missing)
 			relinkctl_unlock_exclu(linkctl);
 			relinkctl_unmap(linkctl);
 			assert(NULL == linkctl->hdr);
-<<<<<<< HEAD
-			/* We don't expect the below "continue" to execute too many times. But in practice we have seen
-			 * the continue execute as high as 40 on fast systems. This was before the YDB#872 fixes.
-			 * But because we know it is theoretically possible to execute the below as many times as possible
-			 * depending on system load, we don't "assertpro" below. Just an "assert" so Debug builds catch it
-			 * (and we fix the macro to be a high value if needed) but Release builds keep retrying indefinitely.
-			 * We don't expect this to be an infinite loop in practice.
+			/* GT.M replaced the prior ERR_EXCEEDRCTLRNDWN hard error (after 16 retries) with a ERR_RLNKCTLOPENDEL
+			 * warning message logged to syslog on each retry, allowing indefinite retries. YottaDB had replaced
+			 * the hard error with an assert (allowing up to MAX_RCTL_RUNDOWN_RETRIES retries in Debug builds) and
+			 * silent indefinite retry in Release builds. Both approaches are incorporated here: the
+			 * ERR_RLNKCTLOPENDEL warning is logged on each retry for operator visibility in all builds, and the
+			 * assert catches runaway loops in Debug builds. Release builds retry indefinitely with each attempt
+			 * logged. In practice we have seen the continue execute as high as 40 on fast systems (before the
+			 * YDB#872 fixes) and have never seen it reach MAX_RCTL_RUNDOWN_RETRIES in testing.
 			 */
-			assert(MAX_RCTL_RUNDOWN_RETRIES > rctl_rundown_count++);
-			/* Note: GT.M side issues a ERR_EXCEEDRCTLRNDWN error after MAX_RCTL_RUNDOWN_RETRIES == 16 retries,
-			 * but in the YottaDB side this macro is set at 128 and we have never seen it go that far in testing
-			 * so we do not issue such an error.
-			 */
-||||||| parent of 19e495f7cb (GT.M V7.1-003)
-			if (MAX_RCTL_RUNDOWN_RETRIES <= rctl_rundown_count++)
-				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_EXCEEDRCTLRNDWN, 1, MAX_RCTL_RUNDOWN_RETRIES);
-=======
-			send_msg_csa(NULL, VARLSTCNT(6) ERR_RLNKCTLOPENDEL, 4,linkctl->relinkctl_path,
+			send_msg_csa(NULL, VARLSTCNT(6) ERR_RLNKCTLOPENDEL, 4, linkctl->relinkctl_path,
 					RTS_ERROR_MSTR(&linkctl->zro_entry_name), ++rctl_rundown_count);
->>>>>>> 19e495f7cb (GT.M V7.1-003)
+			assert(MAX_RCTL_RUNDOWN_RETRIES > rctl_rundown_count);
 			continue;
 		}
 		if (0 == hdr->relinkctl_max_rtn_entries)

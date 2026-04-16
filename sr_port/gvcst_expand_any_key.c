@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -81,15 +81,7 @@ enum cdb_sc gvcst_expand_any_key(srch_blk_status *blk_stat, sm_uc_ptr_t rec_top,
 
 	blk_base = blk_stat->buffaddr;
 	long_blk_id = IS_64_BLK_ID(blk_base);
-<<<<<<< HEAD
-	cur_level = blk_stat->level;
-||||||| parent of 19e495f7cb (GT.M V7.1-003)
-	blk_id_sz = SIZEOF_BLK_ID(long_blk_id);
-	cur_level = blk_stat->level;
-=======
-	blk_id_sz = SIZEOF_BLK_ID(long_blk_id);
 	*reached_level = cur_level = blk_stat->level;
->>>>>>> 19e495f7cb (GT.M V7.1-003)
 	curptr = blk_base + SIZEOF(blk_hdr);
 	*rec_size = *keycmpc = *keylen = 0;
 	while (curptr < rec_top)
@@ -171,14 +163,10 @@ enum cdb_sc gvcst_expand_any_key(srch_blk_status *blk_stat, sm_uc_ptr_t rec_top,
 		}	/* end else if *-record */
 	}	/* end of "while" loop */
 	if (curptr == rec_top)
-<<<<<<< HEAD
-||||||| parent of 19e495f7cb (GT.M V7.1-003)
-	{
-=======
 	{
 		assert(*reached_level == cur_level);
->>>>>>> 19e495f7cb (GT.M V7.1-003)
 		return cdb_sc_normal;
+	}
 	else
 	{
 		assert(t_tries < CDB_STAGNATE);

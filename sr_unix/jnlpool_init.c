@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -245,25 +245,13 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 	jnlpool_addrs_ptr_t	tmp_jnlpool, save_jnlpool;
 	struct sembuf   	sop[3];
 	uint4           	sopcnt;
-<<<<<<< HEAD
-	DEBUG_ONLY(int4		semval);
-	DEBUG_ONLY(boolean_t	sem_created = FALSE);
-	DEBUG_ONLY(int		i);
-	DEBUG_ONLY(char 	*ptr);
-	boolean_t		new_shmid, new_semid;
-||||||| parent of 19e495f7cb (GT.M V7.1-003)
-	DEBUG_ONLY(int4		semval);
-	DEBUG_ONLY(boolean_t	sem_created = FALSE);
-	DEBUG_ONLY(int		i);
-	DEBUG_ONLY(char 	*ptr);
-=======
 #	ifdef DEBUG
 	int4			semval;
 	boolean_t		sem_created = FALSE;
 	int			i;
 	char			*ptr;
 #	endif
->>>>>>> 19e495f7cb (GT.M V7.1-003)
+	boolean_t		new_shmid, new_semid;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -1144,16 +1132,10 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 				grab_lock(jnlpool->jnlpool_dummy_reg, TRUE, ASSERT_NO_ONLINE_ROLLBACK);
 				repl_inst_flush_jnlpool(TRUE, TRUE); /* to reset "crash" field in instance file header to FALSE */
 				rel_lock(jnlpool->jnlpool_dummy_reg);
-<<<<<<< HEAD
-				DETACH_AND_REMOVE_SHM_AND_SEM(jnlpool, new_semid, new_shmid);/* remove any sem/shm we had created */
-||||||| parent of 19e495f7cb (GT.M V7.1-003)
-				DETACH_AND_REMOVE_SHM_AND_SEM(jnlpool);	/* remove any sem/shm we had created */
-=======
 				tmp_gtmsourcelocal_ptr = &jnlpool->gtmsource_local_array[0];
 				for (index = 0; index < NUM_GTMSRC_LCL; index++, tmp_gtmsourcelocal_ptr++)
 					rel_gtmsource_srv_latch(&tmp_gtmsourcelocal_ptr->gtmsource_srv_latch);
-				DETACH_AND_REMOVE_SHM_AND_SEM(jnlpool);	/* remove any sem/shm we had created */
->>>>>>> 19e495f7cb (GT.M V7.1-003)
+				DETACH_AND_REMOVE_SHM_AND_SEM(jnlpool, new_semid, new_shmid);/* remove any sem/shm we had created */
 				udi->grabbed_access_sem = FALSE;
 				udi->counter_acc_incremented = FALSE;
 				ftok_sem_release(jnlpool->jnlpool_dummy_reg, udi->counter_ftok_incremented, TRUE);
@@ -1172,16 +1154,10 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 				grab_lock(jnlpool->jnlpool_dummy_reg, TRUE, ASSERT_NO_ONLINE_ROLLBACK);
 				repl_inst_flush_jnlpool(TRUE, TRUE); /* to reset "crash" field in instance file header to FALSE */
 				rel_lock(jnlpool->jnlpool_dummy_reg);
-<<<<<<< HEAD
-				DETACH_AND_REMOVE_SHM_AND_SEM(jnlpool, new_semid, new_shmid);/* remove any sem/shm we had created */
-||||||| parent of 19e495f7cb (GT.M V7.1-003)
-				DETACH_AND_REMOVE_SHM_AND_SEM(jnlpool);	/* remove any sem/shm we had created */
-=======
 				tmp_gtmsourcelocal_ptr = &jnlpool->gtmsource_local_array[0];
 				for (index = 0; index < NUM_GTMSRC_LCL; index++, tmp_gtmsourcelocal_ptr++)
 					rel_gtmsource_srv_latch(&tmp_gtmsourcelocal_ptr->gtmsource_srv_latch);
-				DETACH_AND_REMOVE_SHM_AND_SEM(jnlpool);	/* remove any sem/shm we had created */
->>>>>>> 19e495f7cb (GT.M V7.1-003)
+				DETACH_AND_REMOVE_SHM_AND_SEM(jnlpool, new_semid, new_shmid);/* remove any sem/shm we had created */
 				udi->grabbed_access_sem = FALSE;
 				udi->counter_acc_incremented = FALSE;
 				ftok_sem_release(jnlpool->jnlpool_dummy_reg, udi->counter_ftok_incremented, TRUE);

@@ -1,9 +1,9 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries.*
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -948,13 +948,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* JNLALIGNSZCHG */
 	   0,	/* SEFCTNEEDSFULLB */
 	   0,	/* GVFAILCORE */
-<<<<<<< HEAD:sr_port/merrors_ansi.h
-	   0,	/* UNUSEDMSG1117 */
-||||||| parent of 19e495f7cb (GT.M V7.1-003):sr_x86_64/merrors_ansi.h
-	   0,	/* UNUSEDMSG1115 */
-=======
 	   0,	/* RLNKCTLOPENDEL */
->>>>>>> 19e495f7cb (GT.M V7.1-003):sr_x86_64/merrors_ansi.h
 	   0,	/* DBFRZRESETSUC */
 	   0,	/* JNLFILEXTERR */
 	   0,	/* JOBEXAMDONE */
@@ -1051,15 +1045,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* DBBTUWRNG */
 	   0,	/* DBBTUFIXED */
 	   0,	/* DBMAXREC2BIG */
-<<<<<<< HEAD:sr_port/merrors_ansi.h
-||||||| parent of 19e495f7cb (GT.M V7.1-003):sr_x86_64/merrors_ansi.h
-	   0,	/* UNUSEDMSG1212 */
-	   0,	/* UNUSEDMSG1213 */
-=======
 	   0,	/* SOCKHANGUP */
-	   0,	/* UNUSEDMSG1213 */
->>>>>>> 19e495f7cb (GT.M V7.1-003):sr_x86_64/merrors_ansi.h
-	   0,	/* UNUSEDMSG1214 */
 	   0,	/* UNUSEDMSG1215 */
 	   0,	/* UNUSEDMSG1216 */
 	   0,	/* UNUSEDMSG1217 */
@@ -1091,13 +1077,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* BKUPTMPFILWRITE */
 	   0,	/* SHMHUGETLB */
 	   0,	/* SHMLOCK */
-<<<<<<< HEAD:sr_port/merrors_ansi.h
-	   0,	/* UNUSEDMSG1246 */
-||||||| parent of 19e495f7cb (GT.M V7.1-003):sr_x86_64/merrors_ansi.h
-	   0,	/* UNUSEDMSG1244 */
-=======
 	   0,	/* SPCFCBUFDELAY */
->>>>>>> 19e495f7cb (GT.M V7.1-003):sr_x86_64/merrors_ansi.h
 	   0,	/* REPLINSTMISMTCH */
 	   0,	/* REPLINSTREAD */
 	   0,	/* REPLINSTDBMATCH */

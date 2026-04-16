@@ -3,7 +3,7 @@
 ! Copyright (c) 2001-2023 Fidelity National Information		!
 ! Services, Inc. and/or its subsidiaries. All rights reserved.	!
 !								!
-! Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries.	!
+! Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries.	!
 ! All rights reserved.						!
 !								!
 !	This source code contains the intellectual property	!
@@ -1114,13 +1114,7 @@ INVMNEMCSPC	<Unsupported mnemonicspace !AD>/error/fao=2!/ansi=35
 JNLALIGNSZCHG	<Journal ALIGNSIZE is rounded up to !UL blocks (closest next higher power of two)>/info/fao=1!/ansi=0
 SEFCTNEEDSFULLB	<Current side effect setting does not permit full Boolean to be turned off>/error/fao=0!/ansi=0
 GVFAILCORE	<A core file is being created for later analysis if necessary>/error/fao=0!/ansi=0
-<<<<<<< HEAD
-UNUSEDMSG1117	<DBCDBNOCERTIFY removed from code in V7.0-000 Nov 2020>/error/fao=0!/ansi=0
-||||||| parent of 19e495f7cb (GT.M V7.1-003)
-UNUSEDMSG1115	<DBCDBNOCERTIFY removed from code in V7.0-000 Nov 2020>/error/fao=0!/ansi=0
-=======
 RLNKCTLOPENDEL	<The relinkctl file !AZ for $ZROUTINES directory !AD has been deleted by another process, will try to reconnect. (retry = !UL)>/warning/fao=4!/ansi=0
->>>>>>> 19e495f7cb (GT.M V7.1-003)
 DBFRZRESETSUC	<Freeze released successfully on database file !AD>/info/fao=2!/ansi=0
 JNLFILEXTERR	<Error during extension of journal file !AD>/error/fao=2!/ansi=0
 JOBEXAMDONE	<YottaDB process !UL successfully executed $ZJOBEXAM() into !AD>/info/fao=3!/ansi=0
@@ -1217,22 +1211,10 @@ STPEXPFAIL	<Stringpool expansion failed. It could not expand to !UL bytes.>/erro
 DBBTUWRNG	<The blocks-to-upgrade file-header field is incorrect. Expected 0x!16@XQ, found 0x!16@XQ>/warning/fao=2!/ansi=0/T
 DBBTUFIXED	<The blocks-to-upgrade file-header field has been changed to the correct value>/info/fao=0!/ansi=0
 DBMAXREC2BIG	<Maximum record size (!UL) is too large for this block size (!UL) - Maximum is !UL>/error/fao=3!/ansi=0
-<<<<<<< HEAD
-UNUSEDMSG1214	<DBCSCNNOTCMPLT removed from code in V7.0-000 Nov 2020>/error/fao=0!/ansi=0
+SOCKHANGUP	<Socket has disconnected>/error/fao=0!/ansi=0
 UNUSEDMSG1215	<DBCBADFILE removed from code in V7.0-000 Nov 2020>/error/fao=0!/ansi=0
 UNUSEDMSG1216	<DBCNOEXTND removed from code in V7.0-000 Nov 2020>/error/fao=0!/ansi=0
 UNUSEDMSG1217	<DBCINTEGERR removed from code in V7.0-000 Nov 2020>/error/fao=0!/ansi=0
-||||||| parent of 19e495f7cb (GT.M V7.1-003)
-UNUSEDMSG1212	<DBCSCNNOTCMPLT removed from code in V7.0-000 Nov 2020>/error/fao=0!/ansi=0
-UNUSEDMSG1213	<DBCBADFILE removed from code in V7.0-000 Nov 2020>/error/fao=0!/ansi=0
-UNUSEDMSG1214	<DBCNOEXTND removed from code in V7.0-000 Nov 2020>/error/fao=0!/ansi=0
-UNUSEDMSG1215	<DBCINTEGERR removed from code in V7.0-000 Nov 2020>/error/fao=0!/ansi=0
-=======
-SOCKHANGUP	<Socket has disconnected>/error/fao=0!/ansi=0
-UNUSEDMSG1213	<DBCBADFILE removed from code in V7.0-000 Nov 2020>/error/fao=0!/ansi=0
-UNUSEDMSG1214	<DBCNOEXTND removed from code in V7.0-000 Nov 2020>/error/fao=0!/ansi=0
-UNUSEDMSG1215	<DBCINTEGERR removed from code in V7.0-000 Nov 2020>/error/fao=0!/ansi=0
->>>>>>> 19e495f7cb (GT.M V7.1-003)
 DBMINRESBYTES	<Minimum RESERVED BYTES value required for certification/upgrade is !UL - Currently is !UL>/error/fao=2!/ansi=0
 UNUSEDMSG1219	<DBCNOTSAMEDB removed from code in V7.0-000 Nov 2020>/error/fao=0!/ansi=0
 UNUSEDMSG1220	<DBCDBCERTIFIED removed from code in V7.0-000 Nov 2020>/info/fao=0!/ansi=0
@@ -1261,13 +1243,7 @@ BKUPTMPFILOPEN	<Open of backup temporary file !AD failed>/error/fao=2!/ansi=0//1
 BKUPTMPFILWRITE	<Write to backup temporary file !AD failed>/error/fao=2!/ansi=0//1
 SHMHUGETLB	<Could not back shared memory with huge pages, using base pages instead !AD>/warning/fao=2!/ansi=0
 SHMLOCK		<Could not pin shared memory into physical memory>/warning/fao=0!/ansi=0
-<<<<<<< HEAD
-UNUSEDMSG1246	<LOADEDSZ2 last used in V6.3-009>/error/fao=0!/ansi=0
-||||||| parent of 19e495f7cb (GT.M V7.1-003)
-UNUSEDMSG1244	<LOADEDSZ2 last used in V6.3-009>/error/fao=0!/ansi=0
-=======
 SPCFCBUFDELAY	<Request for block 0x!16@XQ in database file !AD delayed by PID !UL>/warning/fao=4!/ansi=0
->>>>>>> 19e495f7cb (GT.M V7.1-003)
 REPLINSTMISMTCH	<Process has replication instance file !AD (jnlpool shmid = !UL) open but database !AD is bound to instance file !AD (jnlpool shmid = !UL)>/error/fao=8!/ansi=0
 REPLINSTREAD	<Error reading [0x!XL] bytes at offset [0x!16@XQ] from replication instance file !AD>/error/fao=4!/ansi=0//1
 REPLINSTDBMATCH	<Replication instance file !AD has seqno [0x!16@XQ] while database has a different seqno [0x!16@XQ]>/error/fao=4!/ansi=0

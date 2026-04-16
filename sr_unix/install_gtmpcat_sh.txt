@@ -4,7 +4,7 @@
 # Copyright (c) 2017 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
-# Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
@@ -29,7 +29,7 @@
 # gtm_icu_version : pkg-config --modversion icu-io (or) icu-config --version (or) pkg-config --modversion icu
 # LC_CTYPE : locale -a | grep -iE 'en_us\.utf.?8$' | head -n1
 #
-# If $gtm_dist points to */utf8 directory but a proper UTF-8 environment is not set, this script tries to set it up.
+# If $ydb_dist points to */utf8 directory but a proper UTF-8 environment is not set, this script tries to set it up.
 #
 uid=`id -u`
 hostos=`uname -s`
@@ -51,21 +51,9 @@ if [ ! -f "${package_dir}/gtmpcat.m" ]; then
 	exit 1
 fi
 
-<<<<<<< HEAD
 # Check valid $ydb_dist
-
 if [ ! -d "$ydb_dist" ]; then
 	echo "ydb_dist ($ydb_dist) is not a valid directory"
-||||||| parent of 19e495f7cb (GT.M V7.1-003)
-# Check valid $gtm_dist
-
-if [ ! -d "$gtm_dist" ]; then
-	echo "gtm_dist ($gtm_dist) is not a valid directory"
-=======
-# Check valid $gtm_dist
-if [ ! -d "$gtm_dist" ]; then
-	echo "gtm_dist ($gtm_dist) is not a valid directory"
->>>>>>> 19e495f7cb (GT.M V7.1-003)
 	exit 1
 fi
 if [ ! -x "$ydb_dist/mumps" ]; then
@@ -76,21 +64,12 @@ fi
 gtmroutines=". $ydb_dist"
 export gtmroutines
 
-<<<<<<< HEAD
-# Note owner and group of mumps executable for later use as the owner and group of the installed files
-
-eval $(/bin/ls -l $ydb_dist/mumps | awk 'NR == 1 { print "owner=" $3, "group=" $4 }')
-||||||| parent of 19e495f7cb (GT.M V7.1-003)
-# Note owner and group of mumps executable for later use as the owner and group of the installed files
-
-eval $(/bin/ls -l $gtm_dist/mumps | awk 'NR == 1 { print "owner=" $3, "group=" $4 }')
-=======
-isutfdir=$(ls -ld $gtm_dist | awk -F/ '{print $NF}')
+isutfdir=$(ls -ld $ydb_dist | awk -F/ '{print $NF}')
 if [ "utf8" == "$isutfdir" ] ; then
-	# If $gtm_dist directory ends with "utf8", let us assume it points to UTF-8 installation path
+	# If $ydb_dist directory ends with "utf8", let us assume it points to UTF-8 installation path
 	if [ "UTF-8" != "$gtm_chset" ] ; then
 		echo ""
-		echo "gtm_dist ($gtm_dist) points to utf8 directory, but gtm_chset is not UTF-8. Setting gtm_chset=UTF-8"
+		echo "ydb_dist ($ydb_dist) points to utf8 directory, but gtm_chset is not UTF-8. Setting gtm_chset=UTF-8"
 		export gtm_chset=UTF-8
 	fi
 	if [ "" == "$gtm_icu_version" ] && [ "Linux" == "$hostos" ] ; then
@@ -128,14 +107,13 @@ if [ "utf8" == "$isutfdir" ] ; then
 		export LC_CTYPE=$utflocale
 		unset LC_ALL
 	fi
-	usemumps=$gtm_dist/../mumps
+	usemumps=$ydb_dist/../mumps
 else
-	usemumps=$gtm_dist/mumps
+	usemumps=$ydb_dist/mumps
 fi
 # Note ownership and permissions of mumps executable, to set ownership and permissions of the installed gtmpcat files
 eval $(/bin/ls -l $usemumps | awk 'NR==1 {for (x=2; x<=8; x=x+3 ) {ar[x]=substr($1,x,3); gsub("-","",ar[x]) } \
 					print "userp="ar[2]" groupp="ar[5]" otherp="ar[8]" owner="$3" group="$4 }')
->>>>>>> 19e495f7cb (GT.M V7.1-003)
 
 # Check matching version
 req_zver="#ZVERSION#"
@@ -158,44 +136,16 @@ if [ "Y" != "$response" -a "YES" != "$response" ] ; then
 fi
 
 # Do the copy
-<<<<<<< HEAD
-
 if [ ! -d "$ydb_dist/tools" ]; then
 	mkdir $ydb_dist/tools
 	chown ${owner}:${group} $ydb_dist/tools
-||||||| parent of 19e495f7cb (GT.M V7.1-003)
-
-if [ ! -d "$gtm_dist/tools" ]; then
-	mkdir $gtm_dist/tools
-	chown ${owner}:${group} $gtm_dist/tools
-=======
-if [ ! -d "$gtm_dist/tools" ]; then
-	mkdir $gtm_dist/tools
-	chown ${owner}:${group} $gtm_dist/tools
->>>>>>> 19e495f7cb (GT.M V7.1-003)
 fi
-<<<<<<< HEAD
 mkdir -p $ydb_dist/tools/gtmpcat
 cp ${package_dir}/gtmpcat.m ${package_dir}/#FLDBLD# $ydb_dist/tools/gtmpcat
 cp ${package_dir}/gtmpcat.sh $ydb_dist/gtmpcat
 (cd $ydb_dist/tools/gtmpcat && gtmroutines="." $ydb_dist/mumps *.m)
 chown -R ${owner}:${group} $ydb_dist/gtmpcat $ydb_dist/tools/gtmpcat
+chmod u=${userp},g=${groupp},o=${otherp} $ydb_dist/gtmpcat $ydb_dist/tools $ydb_dist/tools/gtmpcat $ydb_dist/tools/gtmpcat/*.o
 ls -ald $ydb_dist/gtmpcat $ydb_dist/tools $ydb_dist/tools/gtmpcat $ydb_dist/tools/gtmpcat/*
-||||||| parent of 19e495f7cb (GT.M V7.1-003)
-mkdir -p $gtm_dist/tools/gtmpcat
-cp ${package_dir}/gtmpcat.m ${package_dir}/#FLDBLD# $gtm_dist/tools/gtmpcat
-cp ${package_dir}/gtmpcat.sh $gtm_dist/gtmpcat
-(cd $gtm_dist/tools/gtmpcat && gtmroutines="." $gtm_dist/mumps *.m)
-chown -R ${owner}:${group} $gtm_dist/gtmpcat $gtm_dist/tools/gtmpcat
-ls -ald $gtm_dist/gtmpcat $gtm_dist/tools $gtm_dist/tools/gtmpcat $gtm_dist/tools/gtmpcat/*
-=======
-mkdir -p $gtm_dist/tools/gtmpcat
-cp ${package_dir}/gtmpcat.m ${package_dir}/#FLDBLD# $gtm_dist/tools/gtmpcat
-cp ${package_dir}/gtmpcat.sh $gtm_dist/gtmpcat
-(cd $gtm_dist/tools/gtmpcat && gtmroutines="." $gtm_dist/mumps *.m)
-chown -R ${owner}:${group} $gtm_dist/gtmpcat $gtm_dist/tools/gtmpcat
-chmod u=${userp},g=${groupp},o=${otherp} $gtm_dist/gtmpcat $gtm_dist/tools $gtm_dist/tools/gtmpcat $gtm_dist/tools/gtmpcat/*.o
-ls -ald $gtm_dist/gtmpcat $gtm_dist/tools $gtm_dist/tools/gtmpcat $gtm_dist/tools/gtmpcat/*
->>>>>>> 19e495f7cb (GT.M V7.1-003)
 echo ""
 echo "Done. Please check the permissions on the listed files and directories and change them as appropriate."

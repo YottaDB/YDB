@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2023-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2023-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -351,19 +351,8 @@ void async_action(bool lnfetch_or_start)
 			outofband_action(lnfetch_or_start);	/* which effectively does assertpro(no_event == outofband) */
 			break;
 		case sighup:
-<<<<<<< HEAD
 			TAREF1(save_xfer_root, outofband).event_state = pending;
 			outofband_action(lnfetch_or_start);	/* which effectively does assertpro(no_event == outofband) */
-||||||| parent of 19e495f7cb (GT.M V7.1-003)
-			TAREF1(save_xfer_root, sighup).event_state = pending;
-			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_TERMHANGUP);
-=======
-			TAREF1(save_xfer_root, sighup).event_state = pending;
-			if (tt == io_std_device.in->type)
-				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_TERMHANGUP);
-			else if (gtmsocket == io_std_device.in->type)
-				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_SOCKHANGUP);
->>>>>>> 19e495f7cb (GT.M V7.1-003)
 			break;
 		case neterr_action:	/* netrror_action currently set in assembly routines placed by mdb_condition_handler */
 		case zstep_pending:

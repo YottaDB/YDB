@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -312,13 +312,7 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 		{	/* cur_rec is not first key */
 			if (cdb_sc_normal != gvcst_expand_any_key(old_blk1_hist_ptr,
 				old_blk1_base + old_blk1_hist_ptr->curr_rec.offset,
-<<<<<<< HEAD
-				&curr_prev_key[0], &rec_size, &tkeylen, &tkeycmpc, NULL))
-||||||| parent of 19e495f7cb (GT.M V7.1-003)
-				&curr_prev_key[0], &rec_size, &tkeylen, &tkeycmpc, NULL)))
-=======
-				&curr_prev_key[0], &rec_size, &tkeylen, &tkeycmpc, NULL, &exp_level)))
->>>>>>> 19e495f7cb (GT.M V7.1-003)
+				&curr_prev_key[0], &rec_size, &tkeylen, &tkeycmpc, NULL, &exp_level))
 			{
 				assert(t_tries < CDB_STAGNATE);
 				NONTP_TRACE_HIST_MOD(old_blk1_hist_ptr, t_blkmod_mu_split);
@@ -558,7 +552,11 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 					 */
 					curr_new_blk2_size += EVAL_CMPC((rec_hdr_ptr_t)curr_blk2_frec_base);
 					/* Calculate expansion of first record of block 2 end */
-<<<<<<< HEAD
+				} else
+				{	/* We've overrun the buffer. Instead of segfaulting on the EVAL_CMPC, stop here */
+					assert(t_tries < CDB_STAGNATE);
+					status = cdb_sc_blkmod;
+					break;
 				} /* Finish calculation of new blk1 and blk2 sizes */
 				/* curr_new_blk1_size includes 1 MORE record (the current record) in the block as compared
 				 * to prev_new_blk1_size. So we expect it to be always greater. The only exception is if
@@ -612,17 +610,6 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 						|| (curr_new_blk1_size > max_fill)
 						|| (curr_new_blk1_size > (blk_size - reserve_bytes)))
 					break;
-||||||| parent of 19e495f7cb (GT.M V7.1-003)
-				} /* Finish calculation of new blk1 and blk2 sizes */
-=======
-				} else
-				{	/* We've overrun the buffer. Instead of segfaulting on the EVAL_CMPC, stop here */
-					assert(t_tries < CDB_STAGNATE);
-					status = cdb_sc_blkmod;
-					break;
-				}
-				/* Finish calculation of new blk1 and blk2 sizes */
->>>>>>> 19e495f7cb (GT.M V7.1-003)
 			} /* Finish READ_RECORD for-loop */
 			/* Note that we do not honor the fill factor in case of "mupip reorg -upgrade" hence the
 			 * "(MUPIP_REORG_UPGRADE_IN_PROGRESS != mu_upgrade_in_prog)" check below.

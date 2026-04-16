@@ -2608,9 +2608,7 @@ STATICFNDEF boolean_t gtmrecv_exchange_tls_info(uint4 remote_API_ver, uint4 remo
 	if (repl_connection_reset || gtmrecv_wait_for_jnl_seqno)
 		return FALSE;
 	/* At this point, the both sides are ready for a TLS/SSL handshake. Create a TLS/SSL aware socket. */
-<<<<<<< HEAD
-	if (NULL == (repl_tls.sock = gtm_tls_socket(tls_ctx, repl_tls.sock, gtmrecv_sock_fd, repl_tls.id,
-					GTMTLS_OP_VERIFY_PEER | GTMTLS_OP_RENEGOTIATE_REQUESTED)))
+	if (NULL == (repl_tls.sock = gtm_tls_socket(tls_ctx, repl_tls.sock, gtmrecv_sock_fd, repl_tls.id, flags)))
 	{	/* A NULL return from "gtm_tls_socket()" indicates TLS misconfiguration on the receiver side.
 		 * Therefore, do not accept any new connections as that is going to run into this same code path
 		 * in a loop. Therefore, issue a TLSCONVSOCK error and terminate in case -PLAINTEXTFALLBACK was not
@@ -2619,18 +2617,6 @@ STATICFNDEF boolean_t gtmrecv_exchange_tls_info(uint4 remote_API_ver, uint4 remo
 		if (!PLAINTEXT_FALLBACK)
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_TLSCONVSOCK, 0, ERR_TEXT, 2, LEN_AND_STR(gtm_tls_get_error(NULL)));
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) MAKE_MSG_WARNING(ERR_TLSCONVSOCK), 0,
-||||||| parent of 19e495f7cb (GT.M V7.1-003)
-	if (NULL == (repl_tls.sock = gtm_tls_socket(tls_ctx, repl_tls.sock, gtmrecv_sock_fd, repl_tls.id,
-					GTMTLS_OP_VERIFY_PEER | GTMTLS_OP_RENEGOTIATE_REQUESTED)))
-	{
-		if (PLAINTEXT_FALLBACK)
-			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) MAKE_MSG_WARNING(ERR_TLSCONVSOCK), 0,
-=======
-	if (NULL == (repl_tls.sock = gtm_tls_socket(tls_ctx, repl_tls.sock, gtmrecv_sock_fd, repl_tls.id, flags)))
-	{
-		if (PLAINTEXT_FALLBACK)
-			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) MAKE_MSG_WARNING(ERR_TLSCONVSOCK), 0,
->>>>>>> 19e495f7cb (GT.M V7.1-003)
 					ERR_TEXT, 2, LEN_AND_STR(gtm_tls_get_error(NULL)));
 	} else
 	{
@@ -2695,13 +2681,7 @@ STATICFNDEF boolean_t gtmrecv_exchange_tls_info(uint4 remote_API_ver, uint4 remo
 STATICFNDEF void do_main_loop(boolean_t crash_restart)
 {
 	/* The work-horse of the Receiver Server */
-<<<<<<< HEAD
-	boolean_t			dont_reply_to_heartbeat = FALSE, is_repl_cmpc, is_wacky_message;
-||||||| parent of 19e495f7cb (GT.M V7.1-003)
-	boolean_t			dont_reply_to_heartbeat = FALSE, is_repl_cmpc;
-=======
-	boolean_t			dont_reply_to_heartbeat = FALSE, is_repl_cmpc, pha_peer_cert_check = FALSE;
->>>>>>> 19e495f7cb (GT.M V7.1-003)
+	boolean_t			dont_reply_to_heartbeat = FALSE, is_repl_cmpc, is_wacky_message, pha_peer_cert_check = FALSE;
 	boolean_t			uncmpfail, send_cross_endian, recvpool_prepared = FALSE, copied_to_recvpool = FALSE;
 	gtmrecv_local_ptr_t		gtmrecv_local;
 	gtm_time4_t			ack_time;

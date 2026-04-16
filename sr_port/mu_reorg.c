@@ -227,14 +227,8 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 				block_id sweep_start_blk)
 {
 	boolean_t		end_of_tree = FALSE, detailed_log;
-<<<<<<< HEAD
-	int			rec_size, pending_levels, prev_pending_levels;
+	int			rec_size, lcl_rec_size = 0, pending_levels, exp_level, prev_pending_levels;
 	uint4			reorg_upgrade_pid;
-||||||| parent of 19e495f7cb (GT.M V7.1-003)
-	int			rec_size, pending_levels;
-=======
-	int			rec_size, lcl_rec_size = 0, pending_levels, exp_level;
->>>>>>> 19e495f7cb (GT.M V7.1-003)
 	/*
 	 *
 	 * "level" is the level of the working block.
@@ -525,12 +519,7 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 				if (cur_blk_size < max_fill - toler && 0 == (reorg_op & NOCOALESCE))
 				{
 					/* histories are sent in &gv_target->hist and gv_target->alt_hist */
-<<<<<<< HEAD
 					prev_pending_levels = pending_levels;
-||||||| parent of 19e495f7cb (GT.M V7.1-003)
-
-=======
->>>>>>> 19e495f7cb (GT.M V7.1-003)
 					status = mu_clsce(merge_split_level, i_max_fill, d_max_fill, &kill_set_list,
 							&pending_levels, min_level);
 					if (cdb_sc_normal == status)
@@ -667,16 +656,8 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 						{
 							need_kip_incr = FALSE;
 							assert(NULL == kip_csa);
-<<<<<<< HEAD
 							ABORT_TRANS_IF_GBL_EXIST_NOMORE_AND_RETURN(lcl_t_tries, gn);
-							if (merge_split_level && (rtsib_bstar_rec_sz != rec_size))
-||||||| parent of 19e495f7cb (GT.M V7.1-003)
-							UNIX_ONLY(ABORT_TRANS_IF_GBL_EXIST_NOMORE_AND_RETURN(lcl_t_tries, gn));
-							if (merge_split_level && (rtsib_bstar_rec_sz != rec_size))
-=======
-							UNIX_ONLY(ABORT_TRANS_IF_GBL_EXIST_NOMORE_AND_RETURN(lcl_t_tries, gn));
 							if (merge_split_level && exp_level)
->>>>>>> 19e495f7cb (GT.M V7.1-003)
 							{	/* reinitialize level member in rtsib_hist srch_blk_status' */
 								for (count = 0; count < MAX_BT_DEPTH; count++)
 									rtsib_hist->h[count].level = count;

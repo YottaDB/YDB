@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -139,16 +139,7 @@ MBSTART {														\
 				part of the exit handling process, the control once agin comes to wcs_flu		\
 				and at that time we do not want the WBTEST_BUFOWNERSTUCK_STACK white box		\
 				mechanism to kick in.*/									\
-<<<<<<< HEAD
 				GTM_WHITE_BOX_TEST(WBTEST_BUFOWNERSTUCK_STACK, ydb_white_box_test_case_enabled, FALSE);	\
-				send_msg_csa(CSA_ARG(CSA) VARLSTCNT(5) ERR_WRITERSTUCK, 3, CNL->in_wtstart,		\
-						DB_LEN_STR(REG));							\
-||||||| parent of 19e495f7cb (GT.M V7.1-003)
-				GTM_WHITE_BOX_TEST(WBTEST_BUFOWNERSTUCK_STACK, gtm_white_box_test_case_enabled, FALSE);	\
-				send_msg_csa(CSA_ARG(CSA) VARLSTCNT(5) ERR_WRITERSTUCK, 3, CNL->in_wtstart,		\
-						DB_LEN_STR(REG));							\
-=======
-				GTM_WHITE_BOX_TEST(WBTEST_BUFOWNERSTUCK_STACK, gtm_white_box_test_case_enabled, FALSE);	\
 				for (msgcnt = i = 0; (MAX_WTSTART_PID_SLOTS > i) && (CNL->in_wtstart >= msgcnt); i++)	\
 				{											\
 					if (0 == (pid = CNL->wtstart_pid[i]))						\
@@ -157,7 +148,6 @@ MBSTART {														\
 							CNL->in_wtstart, DB_LEN_STR(REG));				\
 					msgcnt++;									\
 				}											\
->>>>>>> 19e495f7cb (GT.M V7.1-003)
 				return FALSE;										\
 			}												\
 			if (-1 == shmctl(udi->shmid, IPC_STAT, &shm_buf))						\

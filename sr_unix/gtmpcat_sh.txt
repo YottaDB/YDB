@@ -4,7 +4,7 @@
 # Copyright (c) 2017 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
-# Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
@@ -13,13 +13,5 @@
 #	the license, please stop and do not read further.	#
 #								#
 #################################################################
-<<<<<<< HEAD
-gtm_chset=M gtm_boolean=0 gtm_side_effects=0 gtm_max_indrcache_count=2048 gtm_max_indrcache_memory=8192 \
-	gtmroutines="$ydb_dist/tools/gtmpcat $gtmroutines" $ydb_dist/mumps -r gtmpcat "$@"
-||||||| parent of 19e495f7cb (GT.M V7.1-003)
-gtm_chset=M gtm_boolean=0 gtm_side_effects=0 gtm_max_indrcache_count=2048 gtm_max_indrcache_memory=8192 \
-	gtmroutines="$gtm_dist/tools/gtmpcat $gtmroutines" $gtm_dist/mumps -r gtmpcat "$@"
-=======
 gtm_boolean=0 gtm_side_effects=0 gtm_max_indrcache_count=2048 gtm_max_indrcache_memory=8192 \
-	gtmroutines="$gtm_dist/tools/gtmpcat $gtmroutines" $gtm_dist/mumps -r gtmpcat "$@"
->>>>>>> 19e495f7cb (GT.M V7.1-003)
+	gtmroutines="$ydb_dist/tools/gtmpcat $gtmroutines" $ydb_dist/mumps -r gtmpcat "$@"

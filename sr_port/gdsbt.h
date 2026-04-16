@@ -671,19 +671,9 @@ typedef struct node_local_struct
 	volatile CNTR4DCL(wcs_timers, 1);			/* number of write cache timers in use - 1 */
 	CACHELINE_PAD(4, 3);
 	volatile CNTR4DCL(wcs_active_lvl, 2);			/* number of entries in active queue */
-<<<<<<< HEAD
 	CACHELINE_PAD(4, 4);
-	volatile CNTR4DCL(wcs_staleness, 3);
-	CACHELINE_PAD(4, 5);
-||||||| parent of 19e495f7cb (GT.M V7.1-003)
-	CACHELINE_PAD(4, 4)
-	volatile CNTR4DCL(wcs_staleness, 3);
-	CACHELINE_PAD(4, 5)
-=======
-	CACHELINE_PAD(4, 4)
 	volatile CNTR4DCL(wcs_staleness, 3);			/* currently unused */
-	CACHELINE_PAD(4, 5)
->>>>>>> 19e495f7cb (GT.M V7.1-003)
+	CACHELINE_PAD(4, 5);
 	volatile CNTR4DCL(ref_cnt, 4);				/* reference count. How many people are using the database */
 	CACHELINE_PAD(4, 6);
 	volatile CNTR4DCL(intent_wtstart, 5);			/* Count of processes that INTEND to enter wcs_wtstart code */

@@ -3,7 +3,7 @@
  * Copyright (c) 2006-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -631,22 +631,10 @@ void gtmsource_recv_ctl(void)
 					heartbeat_stalled = FALSE;
 				/* else, heartbeat_stalled will be set back to FALSE when REPL_XON is received. */
 				DEBUG_ONLY(renegotiation_pending = FALSE);
-<<<<<<< HEAD
 				REPLTLS_SET_NEXT_RENEGOTIATE_HRTBT(repl_tls, next_renegotiate_hrtbt,	\
 								renegotiate_factor, hrtbt_cnt, gtmsource_local);
-				repl_log_tls_info(gtmsource_log_fp, repl_tls.sock);
-||||||| parent of 19e495f7cb (GT.M V7.1-003)
-				repl_tls.renegotiate_state = REPLTLS_RENEG_STATE_NONE;
-				next_renegotiate_hrtbt = FALSE;
-				hrtbt_cnt = 0;
-				repl_log_tls_info(gtmsource_log_fp, repl_tls.sock);
-=======
-				repl_tls.renegotiate_state = REPLTLS_RENEG_STATE_NONE;
-				next_renegotiate_hrtbt = FALSE;
-				hrtbt_cnt = 0;
 				if (gtm_tls_does_renegotiate(repl_tls.sock))	/* Announce results only if renegotiated */
 					repl_log_tls_info(gtmsource_log_fp, repl_tls.sock);
->>>>>>> 19e495f7cb (GT.M V7.1-003)
 				break;
 #			endif
 			default:

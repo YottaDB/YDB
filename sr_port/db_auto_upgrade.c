@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -164,7 +164,10 @@ void db_auto_upgrade(gd_region *reg)
 				/* GT.M V7.1-002 implemented index reserved bytes and changed default to zero */
 				csd->i_reserved_bytes = 0;
 			case GDSMV71002:
-<<<<<<< HEAD
+				/* GT.M V7.1-003 changed freeze on fail default for statsDBs to FALSE */
+				if (IS_STATSDB_REGNAME(reg))
+					csd->freeze_on_fail = FALSE;
+			case GDSMV71003:
 				if (GDSMR200_V70000 != csd->minor_dbver)
 				{
 					/* Do YottaDB r2.00 related auto upgrade operations.
@@ -209,13 +212,17 @@ void db_auto_upgrade(gd_region *reg)
 				/* GT.M V7.1-002 implemented index reserved bytes and changed default to zero */
 				csd->i_reserved_bytes = 0;
 			case GDSMR204_V71002:
+				/* GT.M V7.1-003 changed freeze on fail default for statsDBs to FALSE */
+				if (IS_STATSDB_REGNAME(reg))
+					csd->freeze_on_fail = FALSE;
 				/* YottaDB r2.04 added new "mutex_type" field */
 				assert(!IS_STATSDB_REG(reg));	/* statsdb should never come through auto upgrade logic.
 								 * but just to be safe handle it below as it is easy to do so.
 								 */
 				csd->mutex_type = IS_STATSDB_REG(reg) ? mutex_type_ydb : mutex_type_adaptive_ydb;
+			case GDSMR206_V71003:
 				break;		/* so a new "case" needs to be added BEFORE the assert. */
-			case GDSMR204:
+			case GDSMR206:
 				/* When adding a new minor version, the following template should be maintained
 				 * 1) Remove the penultimate 'break' (i.e. "break" in the PREVIOUS "case" block.
 				 * 2) If there are any file header fields added in the new minor version, initialize the fields
@@ -233,7 +240,6 @@ void db_auto_upgrade(gd_region *reg)
 				assert(FALSE);		/* When this assert fails, it means a new GDSMV* was created, */
 				break;			/* 	so a new "case" needs to be added BEFORE the assert. */
 			/* Remove the below cases one by one as later GT.M versions use up these minor db version enum values. */
-			case GDSMVFILLER30:
 			case GDSMVFILLER31:
 			case GDSMVFILLER32:
 			case GDSMVFILLER33:
@@ -452,18 +458,6 @@ void db_auto_upgrade(gd_region *reg)
 			case GDSMVFILLER253:
 			case GDSMVFILLER254:
 			case GDSMVFILLER255:
-||||||| parent of 19e495f7cb (GT.M V7.1-003)
-				assert(FALSE);
-				break;
-=======
-				/* GT.M V7.1-003 changed freeze on fail default for statsDBs to FALSE */
-				if (IS_STATSDB_REGNAME(reg))
-					csd->freeze_on_fail = FALSE;
-				break;
-			case GDSMV71003:
-				assert(FALSE);
-				break;
->>>>>>> 19e495f7cb (GT.M V7.1-003)
 			default:
 				/* Unrecognized version in the header */
 				assertpro(FALSE && csd->minor_dbver);
@@ -731,7 +725,6 @@ void v6_db_auto_upgrade(gd_region *reg)
 				csd->max_update_array_size = csd->max_non_bm_update_array_size
 					= (int4)(ROUND_UP2(MAX_NON_BITMAP_UPDATE_ARRAY_SIZE(csd), UPDATE_ARRAY_ALIGN_SIZE));
 				csd->max_update_array_size
-<<<<<<< HEAD
 					+= (int4)(ROUND_UP2(MAX_BITMAP_UPDATE_ARRAY_SIZE(csd), UPDATE_ARRAY_ALIGN_SIZE));
 				/* GT.M V70002 added proactive block split option.
 				 * GT.M V71001 changed proactive block split default.
@@ -739,28 +732,14 @@ void v6_db_auto_upgrade(gd_region *reg)
 				csd->problksplit = DEFAULT_PROBLKSPLIT;
 				/* GT.M V7.1-002 implemented index reserved bytes and changed default to zero */
 				csd->i_reserved_bytes = 0;
+				/* GT.M V7.1-003 changed freeze on fail default for statsDBs to FALSE */
+				if (IS_STATSDB_REGNAME(reg))
+					csd->freeze_on_fail = FALSE;
 				/* YottaDB r2.04 added new "mutex_type" field */
 				assert(!IS_STATSDB_REG(reg));	/* statsdb should never come through auto upgrade logic.
 								 * but just to be safe handle it below as it is easy to do so.
 								 */
 				csd->mutex_type = IS_STATSDB_REG(reg) ? mutex_type_ydb : mutex_type_adaptive_ydb;
-||||||| parent of 19e495f7cb (GT.M V7.1-003)
-				+= (int4)(ROUND_UP2(MAX_BITMAP_UPDATE_ARRAY_SIZE(csd), UPDATE_ARRAY_ALIGN_SIZE));
-				/* GT.M V70002 added proactive block split option */
-				if (csd->last_mdb_ver < GDSMV71001)
-					csd->problksplit = DEFAULT_PROBLKSPLIT;
-				if (csd->last_mdb_ver < GDSMV71002)
-					csd->i_reserved_bytes = 0;
-=======
-				+= (int4)(ROUND_UP2(MAX_BITMAP_UPDATE_ARRAY_SIZE(csd), UPDATE_ARRAY_ALIGN_SIZE));
-				/* GT.M V70002 added proactive block split option */
-				if (csd->last_mdb_ver < GDSMV71001)
-					csd->problksplit = DEFAULT_PROBLKSPLIT;
-				if (csd->last_mdb_ver < GDSMV71002)
-					csd->i_reserved_bytes = 0;
-				if ((csd->last_mdb_ver < GDSMV71003) && IS_STATSDB_REGNAME(reg))
-					csd->freeze_on_fail = FALSE;
->>>>>>> 19e495f7cb (GT.M V7.1-003)
 				break;
 			case GDSMV63015:
 				assert(FALSE);	/* if this should come to pass, add appropriate code above the assert */

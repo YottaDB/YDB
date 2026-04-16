@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2021-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2021-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -134,15 +134,7 @@ MBSTART {															\
 					&& (lastJbufCmt->curr_tn == csa->ti->curr_tn)						\
 					&& (!lastJbufCmt->write_complete))							\
 			{	/* CMT06 finished. So undo it as a whole */							\
-<<<<<<< HEAD
-				assert(lastJbufCmt->curr_tn == csd->trans_hist.curr_tn);					\
 				/* TODO : Invoke same cleanup code as in mutex.c to reset jb->freeaddr back */			\
-||||||| parent of 19e495f7cb (GT.M V7.1-003)
-				assert(lastJbufCmt->curr_tn == csd->trans_hist.curr_tn);					\
-			/* 	NARSTODO : Invoke same cleanup code as in mutex.c to reset jb->freeaddr back */			\
-=======
-			/* 	NARSTODO : Invoke same cleanup code as in mutex.c to reset jb->freeaddr back */			\
->>>>>>> 19e495f7cb (GT.M V7.1-003)
 				SET_JBP_RSRV_FREEADDR(jbp, lastJbufCmt->start_freeaddr);					\
 				SHM_WRITE_MEMORY_BARRIER;/* see corresponding SHM_READ_MEMORY_BARRIER in "jnl_phase2_cleanup" */\
 				jbp->phase2_commit_index2 = index2;	/* remove last commit entry */				\

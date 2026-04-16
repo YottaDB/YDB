@@ -1,16 +1,10 @@
 /****************************************************************
  *								*
-<<<<<<< HEAD
- * Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
-||||||| parent of 19e495f7cb (GT.M V7.1-003)
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
-=======
- * Copyright (c) 2001-2023 Fidelity National Information	*
- * Services, Inc. and/or its subsidiaries. All rights reserved.	*
->>>>>>> 19e495f7cb (GT.M V7.1-003)
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -192,16 +186,8 @@ int omi_prc_conn(omi_conn *cptr, char *xend, char *buff, char *bend)
 #	ifdef SHADOWPW
 	struct spwd *spass, *getspnam();
 	struct stat buf;
-<<<<<<< HEAD
 #	endif
-	struct passwd *pass;
-||||||| parent of 19e495f7cb (GT.M V7.1-003)
-#		endif
-	struct passwd *pass;
-=======
-#		endif
 	struct passwd *uinfo;
->>>>>>> 19e495f7cb (GT.M V7.1-003)
 	char *pw, *syspw;
 
 	/* lowercase agent name */

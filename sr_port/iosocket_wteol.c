@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -54,16 +54,7 @@ void	iosocket_wteol(int4 val, io_desc *iod)
 	boolean_t	ch_set;
 	DCL_THREADGBL_ACCESS;
 
-<<<<<<< HEAD
 	SETUP_THREADGBL_ACCESS;
-	assert(gtmsocket == io_ptr->type);
-	dsocketptr = (d_socket_struct *)io_ptr->dev_sp;
-	ESTABLISH_GTMIO_CH(&io_ptr->pair, ch_set);
-||||||| parent of 19e495f7cb (GT.M V7.1-003)
-	assert(gtmsocket == io_ptr->type);
-	dsocketptr = (d_socket_struct *)io_ptr->dev_sp;
-	ESTABLISH_GTMIO_CH(&io_ptr->pair, ch_set);
-=======
 	assert(gtmsocket == iod->type);
 	if (ERR_SOCKHANGUP == error_condition)
 	{
@@ -72,7 +63,6 @@ void	iosocket_wteol(int4 val, io_desc *iod)
 	}
 	dsocketptr = (d_socket_struct *)iod->dev_sp;
 	ESTABLISH_GTMIO_CH(&iod->pair, ch_set);
->>>>>>> 19e495f7cb (GT.M V7.1-003)
 	if (0 >= dsocketptr->n_socket)
 	{
 #		ifndef VMS

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -96,7 +96,10 @@ void outofband_action(boolean_t lnfetch_or_start)
 				break;
 			case sighup:
 				TAREF1(save_xfer_root, sighup).event_state = pending;
-				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_TERMHANGUP);
+				if (tt == io_std_device.in->type)
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_TERMHANGUP);
+				else if (gtmsocket == io_std_device.in->type)
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_SOCKHANGUP);
 				break;
 			case tptimeout:
 				/* Following is basically an rts_error; function pointer is used for flexibility.

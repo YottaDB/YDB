@@ -3,7 +3,7 @@
  * Copyright (c) 2014-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -512,20 +512,11 @@ void	iosocket_tls(mval *optionmval, uint8 nsec_timeout, mval *tlsid, mval *passw
 			errp = UNREAD_INPUT;
 			SET_DOLLARDEVICE_ONECOMMA_ERRSTR(iod, errp, errlen);
 			if (socketptr->ioerror)
-<<<<<<< HEAD
-				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_TLSRENEGOTIATE, 0,	ERR_TEXT, 2, LEN_AND_STR(errp));
-			if (NO_M_TIMEOUT != nsec_timeout)
-||||||| parent of 19e495f7cb (GT.M V7.1-003)
-				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_TLSRENEGOTIATE, 0,
-					ERR_TEXT, 2, errlen, errp);
-			if (NO_M_TIMEOUT != msec_timeout)
-=======
 				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_TLSRENEGOTIATE, 1,
 					((gtm_tls_does_renegotiate((gtm_tls_socket_t *)socketptr->tlssocket)) ?
-						 "renegotiate" : "update TLS session keys"),
-					ERR_TEXT, 2, errlen, errp);
-			if (NO_M_TIMEOUT != msec_timeout)
->>>>>>> 19e495f7cb (GT.M V7.1-003)
+						"renegotiate" : "update TLS session keys"),
+					ERR_TEXT, 2, LEN_AND_STR(errp));
+			if (NO_M_TIMEOUT != nsec_timeout)
 				dollar_truth = FALSE;
 			REVERT_GTMIO_CH(&iod->pair, ch_set);
 			return;
@@ -542,21 +533,11 @@ void	iosocket_tls(mval *optionmval, uint8 nsec_timeout, mval *tlsid, mval *passw
 					errp2 = (char *)STRERROR(socketptr->obuffer_errno);
 				SET_DOLLARDEVICE_ONECOMMA_ERRSTR1_ERRSTR2(iod, errp, errlen, errp2, errlen2);
 				if (socketptr->ioerror)
-<<<<<<< HEAD
-					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(10) ERR_TLSRENEGOTIATE, 0,
-						      ERR_TEXT, 2, LEN_AND_STR(errp), ERR_TEXT, 2, LEN_AND_STR(errp2));
-				if (NO_M_TIMEOUT != nsec_timeout)
-||||||| parent of 19e495f7cb (GT.M V7.1-003)
-					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(10) ERR_TLSRENEGOTIATE, 0,
-						ERR_TEXT, 2, errlen, errp, ERR_TEXT, 2, errlen2, errp2);
-				if (NO_M_TIMEOUT != msec_timeout)
-=======
 					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(11) ERR_TLSRENEGOTIATE, 1,
 						((gtm_tls_does_renegotiate((gtm_tls_socket_t *)socketptr->tlssocket)) ?
-						 	"renegotiate" : "update TLS session keys"),
-						ERR_TEXT, 2, errlen, errp, ERR_TEXT, 2, errlen2, errp2);
-				if (NO_M_TIMEOUT != msec_timeout)
->>>>>>> 19e495f7cb (GT.M V7.1-003)
+							"renegotiate" : "update TLS session keys"),
+						ERR_TEXT, 2, LEN_AND_STR(errp), ERR_TEXT, 2, LEN_AND_STR(errp2));
+				if (NO_M_TIMEOUT != nsec_timeout)
 					dollar_truth = FALSE;
 				REVERT_GTMIO_CH(&iod->pair, ch_set);
 				return;
@@ -599,21 +580,11 @@ void	iosocket_tls(mval *optionmval, uint8 nsec_timeout, mval *tlsid, mval *passw
 				errp = STRERROR(tls_errno);
 			SET_DOLLARDEVICE_ONECOMMA_ERRSTR(iod, errp, errlen);
 			if (socketptr->ioerror)
-<<<<<<< HEAD
-				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_TLSRENEGOTIATE, 0,
-					      ERR_TEXT, 2, LEN_AND_STR(errp));
-			if (NO_M_TIMEOUT != nsec_timeout)
-||||||| parent of 19e495f7cb (GT.M V7.1-003)
-				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_TLSRENEGOTIATE, 0,
-					ERR_TEXT, 2, errlen, errp);
-			if (NO_M_TIMEOUT != msec_timeout)
-=======
 				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_TLSRENEGOTIATE, 1,
 					((gtm_tls_does_renegotiate((gtm_tls_socket_t *)socketptr->tlssocket)) ?
-					 	"renegotiate" : "update TLS session keys"),
-					ERR_TEXT, 2, errlen, errp);
-			if (NO_M_TIMEOUT != msec_timeout)
->>>>>>> 19e495f7cb (GT.M V7.1-003)
+						"renegotiate" : "update TLS session keys"),
+					ERR_TEXT, 2, LEN_AND_STR(errp));
+			if (NO_M_TIMEOUT != nsec_timeout)
 				dollar_truth = FALSE;
 			REVERT_GTMIO_CH(&iod->pair, ch_set);
 			return;

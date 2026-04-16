@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -27,15 +27,9 @@
 #include "do_xform.h"
 #include "format_targ_key.h"
 
-<<<<<<< HEAD
 GBLREF gv_namehead	*gv_target;
+GBLREF gd_region	*gv_cur_region;
 GBLREF boolean_t	tref_transform;
-||||||| parent of 19e495f7cb (GT.M V7.1-003)
-GBLREF	gv_namehead	*gv_target;
-=======
-GBLREF	gv_namehead	*gv_target;
-GBLREF	gd_region	*gv_cur_region;
->>>>>>> 19e495f7cb (GT.M V7.1-003)
 
 static readonly unsigned int pos_code[100] =
 {
@@ -75,16 +69,10 @@ unsigned char *mval2subsc(mval *in_val, gv_key *out_key, boolean_t std_null_coll
 	int4		mt, mw, mx;
 	uint4		mvt;	/* Local copy of mvtype, bit ands use a int4, so do conversion once */
 	unsigned int	digs, exp_val;
-<<<<<<< HEAD
-	int		tmp_len, avail_bytes;
+	int		avail_bytes, length_exceed, max_len, tmp_len;
 #	ifdef DEBUG
 	unsigned char	*tm_end;
 #	endif
-||||||| parent of 19e495f7cb (GT.M V7.1-003)
-	int		tmp_len, avail_bytes;
-=======
-	int		avail_bytes, length_exceed, max_len, tmp_len;
->>>>>>> 19e495f7cb (GT.M V7.1-003)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;

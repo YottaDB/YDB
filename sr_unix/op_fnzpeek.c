@@ -3,7 +3,7 @@
  * Copyright (c) 2013-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -472,13 +472,7 @@ void	op_fnzpeek(mval *structid, int offset, int len, mval *format, mval *ret)
 	unsigned int		full_len;
 	unsigned char		argument_uc_buf[ARGUMENT_MAX_LEN];
 	sgmnt_addrs		*csa;
-<<<<<<< HEAD
-	int			pass, maxlen;
-||||||| parent of 19e495f7cb (GT.M V7.1-003)
-	int			pass;
-=======
-	int			iter;
->>>>>>> 19e495f7cb (GT.M V7.1-003)
+	int			iter, maxlen;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;

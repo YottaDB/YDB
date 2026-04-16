@@ -1,9 +1,9 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries.*
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -729,7 +729,7 @@
 #define ERR_GTMSECSHRSSIDF 150378064
 #define ERR_GTMSECSHRFORKF 150378076
 #define ERR_DBFSYNCERR 150378082
-#define ERR_EXCEEDRCTLRNDWN 150378090
+#define ERR_UNUSEDMSG898 150378090
 #define ERR_SCNDDBNOUPD 150378098
 #define ERR_MUINFOUINT4 150378107
 #define ERR_NLMISMATCHCALC 150378114
@@ -946,7 +946,7 @@
 #define ERR_JNLALIGNSZCHG 150379803
 #define ERR_SEFCTNEEDSFULLB 150379810
 #define ERR_GVFAILCORE 150379818
-#define ERR_UNUSEDMSG1117 150379826
+#define ERR_RLNKCTLOPENDEL 150379824
 #define ERR_DBFRZRESETSUC 150379835
 #define ERR_JNLFILEXTERR 150379842
 #define ERR_JOBEXAMDONE 150379851
@@ -1043,7 +1043,7 @@
 #define ERR_DBBTUWRNG 150380576
 #define ERR_DBBTUFIXED 150380587
 #define ERR_DBMAXREC2BIG 150380594
-#define ERR_UNUSEDMSG1214 150380602
+#define ERR_SOCKHANGUP 150380602
 #define ERR_UNUSEDMSG1215 150380610
 #define ERR_UNUSEDMSG1216 150380618
 #define ERR_UNUSEDMSG1217 150380626
@@ -1075,7 +1075,7 @@
 #define ERR_BKUPTMPFILWRITE 418816290
 #define ERR_SHMHUGETLB 150380840
 #define ERR_SHMLOCK 150380848
-#define ERR_UNUSEDMSG1246 150380858
+#define ERR_SPCFCBUFDELAY 150380856
 #define ERR_REPLINSTMISMTCH 150380866
 #define ERR_REPLINSTREAD 418816330
 #define ERR_REPLINSTDBMATCH 150380882

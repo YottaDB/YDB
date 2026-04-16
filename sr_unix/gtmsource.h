@@ -3,7 +3,7 @@
  * Copyright (c) 2006-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -262,14 +262,8 @@ typedef struct jnlpool_ctl_struct_struct
 #	undef TAB_JPL_TRC_REC
 	/************* JPL_TRC_REC RELATED FIELDS -- end -- ***********/
 	jpl_phase2_in_prog_t	phase2_commit_array[JPL_PHASE2_COMMIT_ARRAY_SIZE];
-<<<<<<< HEAD
-	CACHELINE_PAD(SIZEOF(global_latch_t), 0);	/* start next latch at a different cacheline than previous fields */
-||||||| parent of 19e495f7cb (GT.M V7.1-003)
-	CACHELINE_PAD(SIZEOF(global_latch_t), 0)	/* start next latch at a different cacheline than previous fields */
-=======
 	mutex_cln_ctl_struct	mutex_cln_ctl;
-	CACHELINE_PAD(SIZEOF(global_latch_t), 0)	/* start next latch at a different cacheline than previous fields */
->>>>>>> 19e495f7cb (GT.M V7.1-003)
+	CACHELINE_PAD(SIZEOF(global_latch_t), 0);	/* start next latch at a different cacheline than previous fields */
 	global_latch_t		phase2_commit_latch;	/* Used by "repl_phase2_complete" to update "phase2_commit_index1" */
 } jnlpool_ctl_struct;
 
@@ -460,15 +454,7 @@ typedef struct
 						 * sync with the source server specific private global variable "gtmsource_state" */
 	int4			gtmsrc_lcl_array_index;	/* Index of THIS struct in the array of gtmsource_local_struct in jnlpool */
 	int4			repl_zlib_cmp_level;	/* zlib compression level currently used across the replication pipe */
-<<<<<<< HEAD
-	unsigned char		filler1_align_8[4];
-	int4			read_state;  	/* From where to read - pool or the file(s)? */
-||||||| parent of 19e495f7cb (GT.M V7.1-003)
-	unsigned char		filler1_align_8[3];
-	int4			read_state;  	/* From where to read - pool or the file(s)? */
-=======
 	enum src_read_state	read_state;  	/* From where to read - pool or the file(s)? */
->>>>>>> 19e495f7cb (GT.M V7.1-003)
 	qw_off_t		read; 		/* Offset relative to jnldata_base_off of the next journal record from the pool */
 	repl_conn_info_t	remote_side;	/* Details of the remote side connection */
 	qw_off_t		read_addr; 	/* Virtual address of the next journal record in the merged journal file to read */

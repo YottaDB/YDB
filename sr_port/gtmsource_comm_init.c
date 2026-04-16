@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -63,41 +63,16 @@ error_def(ERR_TEXT);
 int gtmsource_comm_init(boolean_t print_addresolve_error)
 {
 	/* Initialize communication stuff */
-<<<<<<< HEAD
-||||||| parent of 19e495f7cb (GT.M V7.1-003)
-	struct	linger	disable_linger = {0, 0};
-	char	error_string[1024];
-	int	err_status, send_buffsize, recv_buffsize, tcp_s_buffsize;
-	struct addrinfo *ai_ptr = NULL, *ai_head = NULL, hints;
-=======
 	struct linger		disable_linger = {0, 0};
 	char			error_string[1024];
 	int			err_status, send_buffsize, recv_buffsize, tcp_s_buffsize;
->>>>>>> 19e495f7cb (GT.M V7.1-003)
 	struct addrinfo 	*ai_ptr = NULL, *ai_head = NULL, hints;
 	gtmsource_local_ptr_t   gtmsource_local;
-<<<<<<< HEAD
-	intrpt_state_t  	prev_intrpt_state;
-	struct linger		disable_linger = {0, 0};
-	char			error_string[1024];
-	int			err_status, send_buffsize, recv_buffsize, tcp_s_buffsize;
-	char			*host;
-	char			port_buffer[NI_MAXSERV];
-	char			hostinfo[SIZEOF(RESOLUTION_FAILURE_PREFIX) + MAX_HOST_NAME_LEN + NI_MAXSERV];
-	int			port_len;
-	int			errcode;
-||||||| parent of 19e495f7cb (GT.M V7.1-003)
-	char	*host;
-	char	port_buffer[NI_MAXSERV], hostinfo[SIZEOF(RESOLUTION_FAILURE_PREFIX) + MAX_HOST_NAME_LEN + NI_MAXSERV];
-	int	port_len;
-	int	errcode;
-=======
 	char			*host, port_buffer[NI_MAXSERV];
 	char			hostinfo[SIZEOF(RESOLUTION_FAILURE_PREFIX) + MAX_HOST_NAME_LEN + NI_MAXSERV];
 	int			port_len;
 	int			errcode;
 	intrpt_state_t		prev_intrpt_state;
->>>>>>> 19e495f7cb (GT.M V7.1-003)
 
 	if (FD_INVALID != gtmsource_sock_fd) /* Initialization done already */
 		return(0);
@@ -107,14 +82,7 @@ int gtmsource_comm_init(boolean_t print_addresolve_error)
 	port_buffer[port_len] = '\0';
 	host = gtmsource_local->secondary_host;
 	CLIENT_HINTS(hints);
-<<<<<<< HEAD
 	errcode = dogetaddrinfo(host, port_buffer, &hints, &ai_head);
-||||||| parent of 19e495f7cb (GT.M V7.1-003)
-	errcode = getaddrinfo(host, port_buffer, &hints, &ai_head);
-=======
-	DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
-	errcode = getaddrinfo(host, port_buffer, &hints, &ai_head);
->>>>>>> 19e495f7cb (GT.M V7.1-003)
 	if ((0 != errcode) && print_addresolve_error)
 	{
 		SNPRINTF(hostinfo, SIZEOF(hostinfo), "%s%s:%s", RESOLUTION_FAILURE_PREFIX, host, port_buffer);
@@ -135,14 +103,7 @@ int gtmsource_comm_init(boolean_t print_addresolve_error)
 		}
 		if (0 != err_status)
 		{
-<<<<<<< HEAD
 			FREEADDRINFO(ai_head); /* prevent mem-leak */
-||||||| parent of 19e495f7cb (GT.M V7.1-003)
-			freeaddrinfo(ai_head); /* prevent mem-leak */
-=======
-			freeaddrinfo(ai_head); /* prevent mem-leak */
-			ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
->>>>>>> 19e495f7cb (GT.M V7.1-003)
 			SNPRINTF(error_string, SIZEOF(error_string), "Error with source server socket create : %s",
 				 STRERROR(err_status));
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, RTS_ERROR_STRING(error_string));

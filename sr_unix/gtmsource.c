@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -413,29 +413,9 @@ int gtmsource()
 	is_src_server = first_syslog = TRUE;
 	TREF(error_on_jnl_file_lost) = JNL_FILE_LOST_ERRORS; /* source server should never switch journal files even on errors */
 	OPERATOR_LOG_MSG;
-<<<<<<< HEAD
 	SET_PROCESS_ID;
-||||||| parent of 19e495f7cb (GT.M V7.1-003)
-	process_id = getpid();
-	/* Initialize mutex socket, memory semaphore etc. before any "grab_lock" is done by this process on the journal pool.
-	 * Note that the initialization would already have been done by the parent receiver startup command but we need to
-	 * redo the initialization with the child process id.
-	 */
-	assert(mutex_per_process_init_pid && (mutex_per_process_init_pid != process_id));
-	mutex_per_process_init();
-	ppid = getppid();
-=======
-	process_id = getpid();
-	/* Initialize mutex socket, memory semaphore etc. before any "grab_lock" is done by this process on the journal pool.
-	 * Note that the initialization would already have been done by the parent receiver startup command but we need to
-	 * redo the initialization with the child process id.
-	 */
-	assert(mutex_per_process_init_pid && (mutex_per_process_init_pid != process_id));
-	mutex_per_process_init();
-	ppid = getppid();
 	/* Detached from the initiating process, now detach from the starting IO */
 	io_rundown(RUNDOWN_EXCEPT_STD);
->>>>>>> 19e495f7cb (GT.M V7.1-003)
 	log_init_status = repl_log_init(REPL_GENERAL_LOG, &gtmsource_log_fd, gtmsource_options.log_file);
 	assert(SS_NORMAL == log_init_status);
 	PRO_ONLY(UNUSED(log_init_status));
@@ -443,42 +423,6 @@ int gtmsource()
 	if (-1 == setsid())
 		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_JNLPOOLSETUP, 0, ERR_TEXT, 2,
 				RTS_ERROR_LITERAL("Source server error in setsid"), errno);
-<<<<<<< HEAD
-||||||| parent of 19e495f7cb (GT.M V7.1-003)
-	/* Point stdin to /dev/null */
-	OPENFILE(DEVNULL, O_RDONLY, null_fd);
-	if (0 > null_fd)
-		rts_error_csa(CSA_ARG(NULL) ERR_REPLERR, RTS_ERROR_LITERAL("Failed to open /dev/null for read"), errno, 0);
-	assert(null_fd > 2);
-	/* Detached from the initiating process, now detach from the starting IO */
-	io_rundown(NORMAL_RUNDOWN);
-	FSTAT_FILE(gtmsource_log_fd, &stat_buf, log_init_status);
-	assertpro(!log_init_status);	/* io_rundown should not affect the log file */
-	DUP2(null_fd, 0, rc);
-	if (0 > rc)
-		RTS_ERROR_CSA_ABT(NULL, ERR_REPLERR, RTS_ERROR_LITERAL("Failed to set stdin to /dev/null"), errno, 0);
-	/* Re-init IO now that we have opened the log file and set stdin to /dev/null */
-	io_init(IS_MUPIP_IMAGE);
-	CLOSEFILE(null_fd, rc);
-	if (0 > rc)
-		RTS_ERROR_CSA_ABT(NULL, ERR_REPLERR, RTS_ERROR_LITERAL("Failed to close /dev/null"), errno, 0);
-=======
-	/* Point stdin to /dev/null */
-	OPENFILE(DEVNULL, O_RDONLY, null_fd);
-	if (0 > null_fd)
-		rts_error_csa(CSA_ARG(NULL) ERR_REPLERR, RTS_ERROR_LITERAL("Failed to open /dev/null for read"), errno, 0);
-	assert(null_fd > 2);
-	FSTAT_FILE(gtmsource_log_fd, &stat_buf, log_init_status);
-	assertpro(!log_init_status);	/* Log file was just created by repl_log_init()! */
-	DUP2(null_fd, 0, rc);
-	if (0 > rc)
-		RTS_ERROR_CSA_ABT(NULL, ERR_REPLERR, RTS_ERROR_LITERAL("Failed to set stdin to /dev/null"), errno, 0);
-	/* Re-init IO now that we have opened the log file and set stdin to /dev/null */
-	io_init(IS_MUPIP_IMAGE);
-	CLOSEFILE(null_fd, rc);
-	if (0 > rc)
-		RTS_ERROR_CSA_ABT(NULL, ERR_REPLERR, RTS_ERROR_LITERAL("Failed to close /dev/null"), errno, 0);
->>>>>>> 19e495f7cb (GT.M V7.1-003)
 #	endif /* REPL_DEBUG_NOBACKGROUND */
 	if (ZLIB_CMPLVL_NONE != ydb_zlib_cmp_level)
 		gtm_zlib_init();	/* Open zlib shared library for compression/decompression */

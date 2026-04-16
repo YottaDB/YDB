@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -329,21 +329,6 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 						 * 	fixed part from the indefinite part.
 						 */
 						split_atom = TRUE;
-<<<<<<< HEAD
-||||||| parent of 19e495f7cb (GT.M V7.1-003)
-						if ((count >= (MAX_PATTERN_ATOMS - 1)) ||
-								(atom_map >= (MAX_PATTERN_ATOMS -2)))
-							return ERR_PATMAXLEN;
-
-=======
-						if ((count >= (MAX_PATTERN_ATOMS - 1)) ||
-								(atom_map >= (MAX_PATTERN_ATOMS -2)))
-						{
-							free_alts(&init_alt);
-							return ERR_PATMAXLEN;
-						}
-
->>>>>>> 19e495f7cb (GT.M V7.1-003)
 					} else
 					{
 						infinite = TRUE;
@@ -789,7 +774,10 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 				curr_min_dfa = min_dfa;
 				curr_leaf_num = leaf_num;
 				if (atom_map >= MAX_PATTERN_ATOMS)
+				{
+					free_alts(&init_alt);
 					return ERR_PATMAXLEN;
+				}
 				if (pattern_mask & PATM_STRLIT)
 				{
 					memset(&exp_temp[0], 0, SIZEOF(exp_temp));

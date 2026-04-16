@@ -3,6 +3,9 @@
 ; Copyright (c) 2010-2023 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
+; Copyright (c) 2026 YottaDB LLC and/or its subsidiaries.	;
+; All rights reserved.						;
+;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
 ;	under a license.  If you do not know the terms of	;
@@ -447,16 +450,8 @@ gvsuboflowerr
 	set $etrap=savetrap
 	; Do not attempt to print the full "gvn" value as it might exceed the buffer allocated by zmessage.
 	; So print first 100 bytes and last 100 bytes with a "..." in between
-<<<<<<< HEAD
 	d message^GDE(gdeerr("NAMGVSUBOFLOW"),$zwrite($ze(gvn,2,100))_":"_$zwrite($ze(gvn,len-100,len))_":"""_coll_"""")	; 2 (instead of 1) to skip ^ at start of gvn
 	q
-||||||| parent of 19e495f7cb (GT.M V7.1-003)
-	zm gdeerr("NAMGVSUBOFLOW"):$ze(gvn,2,100):$ze(gvn,len-100,len):coll	; 2 (instead of 1) to skip ^ at start of gvn
-	q
-=======
-	zm gdeerr("NAMGVSUBOFLOW"):$ze(gvn,2,100):$ze(gvn,len-100,len):coll	; 2 (instead of 1) to skip ^ at start of gvn
-	quit
->>>>>>> 19e495f7cb (GT.M V7.1-003)
 gvn2gdsnotrailingnulls:(gvn,coll)
 	; return subscript (gds) representation for input "gvn". Removes trailing double null-byte
 	n key
