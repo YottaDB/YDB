@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -176,11 +176,14 @@ int	op_lock2_common(uint8 timeout, unsigned char laflag) /* timeout is in nanose
 	gotit = -1;
 	cm_action = laflag;
 	out_of_time = FALSE;
+	TREF(mlk_yield_pid) = 0;
 	if (NO_M_TIMEOUT != timeout)
 	{
 		if (0 == timeout)
+		{
 			out_of_time = TRUE;
-		else
+			TREF(mlk_yield_pid) = MLK_FAIRNESS_DISABLED;
+		} else
 		{
 			sys_get_curr_time(&cur_time);
 			mv_zintcmd = find_mvstent_cmd(ZINTCMD_LOCK, frame_pointer->restart_pc, frame_pointer->restart_ctxt, FALSE);
@@ -210,7 +213,6 @@ int	op_lock2_common(uint8 timeout, unsigned char laflag) /* timeout is in nanose
 		}
 	}
 	lckclr();
-	TREF(mlk_yield_pid) = 0;
 	already_locked = NULL;
 	for (blocked = FALSE;  !blocked;)
 	{	/* if this is a request for a remote node */
