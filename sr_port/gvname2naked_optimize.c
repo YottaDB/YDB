@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2025-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -378,6 +378,7 @@ static boolean_t gv_dataflow(triple *curtrip, DEBUG_ONLY_COMMA(boolean_t *oc_see
 	/* Opcodes that invoke code we don't know how to analyze (e.g. not in this translation unit), or directly modify $REFERENCE
 	 */
 	case OC_RET:        /* QUIT */
+	case OC_RETARG:     /* QUIT value */
 	/* OC_CALL is unreachable; has type OCT_JUMP */
 	case OC_EXTCALL:    /* do f^module */
 	case OC_FGNCAL:     /* do &x */
