@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -98,7 +98,8 @@ int	iott_rdone (mint *v, uint8 nsec_timeout)	/* timeout in nanoseconds */
 	}
 	ESTABLISH_RET_GTMIO_CH(&io_curr_device, -1, ch_set);
 	assert(io_ptr->state == dev_open);
-	iott_flush(io_curr_device.out);
+	if (io_curr_device.out->type == tt)
+		iott_flush(io_curr_device.out);
 	tt_ptr = (d_tt_struct*) io_ptr->dev_sp;
 	SETTERM_IF_NEEDED(io_ptr, tt_ptr);
 	*v = -1;

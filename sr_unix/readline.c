@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2023-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2023-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -366,7 +366,8 @@ void readline_read_mval(mval *v) {
 	recall_data recall_data;
 
 	/* finish any pending flush timers (or else we would see a newline) */
-	iott_flush(io_curr_device.out);
+	if (io_curr_device.out->type == tt)
+		iott_flush(io_curr_device.out);
 
 	do {
 		/* Signal Handling destination (siglongjmp from signal handling code)
