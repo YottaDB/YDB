@@ -110,7 +110,7 @@ void op_gvnamenaked(int count, int hash_code, int subs_cached, mval *opcodes, mv
 	/* Cross check GVNAKED against GVNAME to make sure they get the same result.
 	 * Start by checking that a GVNAKED is legal at all. */
 	if (IS_ILLEGAL_GVNAKED(gv_currkey))
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_GVDBGNAKEDUNSET, 2, opcodes->str.len, opcodes->str.addr);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_GVDBGNAKEDUNSET, 2, opcodes->str.len, opcodes->str.addr);
 	SAVE_GV_CURRKEY(save_currkey);
 	va_copy(save_var, var);
 #	endif
