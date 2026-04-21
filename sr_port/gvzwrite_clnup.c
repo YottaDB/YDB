@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2025-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -69,7 +69,7 @@ void	gvzwrite_clnup(void)
 		 * until the first global reference after the ZWRITE by setting the below global.
 		 * See https://gitlab.com/YottaDB/DB/YDB/-/issues/1177#note_2964158415 for more details and test case.
 		 */
-		gv_namenaked_state = NAMENAKED_UNKNOWNREFERENCE;
+		SET_GV_NAMENAKED_STATE(NAMENAKED_UNKNOWNREFERENCE);
 	}
 	RESET_GV_TARGET(DO_GVT_GVKEY_CHECK);
 }

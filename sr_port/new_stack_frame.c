@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -93,12 +93,9 @@ void new_stack_frame(rhdtyp *rtn_base, unsigned char *context, unsigned char *tr
 	frame_pointer = sf;
 	assert((frame_pointer < frame_pointer->old_frame_pointer) || (NULL == frame_pointer->old_frame_pointer));
 	/* This is a function call or GOTO. We cannot predict $REFERENCE at compile time so set a runtime flag that way
-	 * we don't misoptimize. Note also that this can happen inside interrupt code in which case we should not touch
-	 * the runtime flag as that needs to stay set to the interrupt state (NAMENAKED_ININTERRUPT) until the outermost
-	 * interrupt frame exits.
+	 * we don't misoptimize.
 	 */
-	if (NAMENAKED_LEGAL == gv_namenaked_state)
-		gv_namenaked_state = NAMENAKED_UNKNOWNREFERENCE;
+	SET_GV_NAMENAKED_STATE(NAMENAKED_UNKNOWNREFERENCE);
 	DBGEHND((stderr, "new_stack_frame: Added stackframe at addr 0x"lvaddr"  old-msp: 0x"lvaddr"  new-msp: 0x"lvaddr
 		 " for routine %.*s (rtnhdr 0x"lvaddr")\n", sf, msp_save, msp, rtn_base->routine_name.len,
 		 rtn_base->routine_name.addr, rtn_base));

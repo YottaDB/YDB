@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -92,10 +92,12 @@ void op_unwind(void)
 			nested_interrupt |= current_frame->type & (SFT_ZSTEP_ACT | SFT_ZBRK_ACT | SFT_ZTRAP | SFT_DEV_ACT);
 		}
 		if (frame_is_interrupt && !nested_interrupt)
-			/* At this point we know at compile time the code that is executing. But we do not know the state of $REFERENCE.
-			* Refrain from optimizing until we see a GVNAME that resets it to a known state.
-			*/
-			gv_namenaked_state = NAMENAKED_UNKNOWNREFERENCE;
+		{	/* At this point we know at compile time the code that is executing.
+			 * But we do not know the state of $REFERENCE.
+			 * Refrain from optimizing until we see a GVNAME that resets it to a known state.
+			 */
+			SET_GV_NAMENAKED_STATE(NAMENAKED_UNKNOWNREFERENCE);
+		}
 	}
 	DBGEHND_ONLY(prevfp = frame_pointer);
 	if (tp_pointer && tp_pointer->fp <= frame_pointer)

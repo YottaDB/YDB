@@ -378,7 +378,16 @@ static boolean_t gv_dataflow(triple *curtrip, DEBUG_ONLY_COMMA(boolean_t *oc_see
 	/* Opcodes that invoke code we don't know how to analyze (e.g. not in this translation unit), or directly modify $REFERENCE
 	 */
 	case OC_RET:        /* QUIT */
-	case OC_RETARG:     /* QUIT value */
+	case OC_RETARG:     /* QUIT value : See https://gitlab.com/YottaDB/DB/YDB/-/work_items/1223#note_3266885297 */
+	case OC_BINDPARM:   /* EXFUN() : See https://gitlab.com/YottaDB/DB/YDB/-/work_items/1223#note_3271149622.
+	                     * Note: The OC_RETARG and OC_BINDPARM cases do not need to disable the naked reference optimization
+			     * at compile time since at runtime "exfun_frame.c" is going to reset "gv_namenaked_state" to
+			     * "NAMENAKED_UNKNOWNREFERENCE" as part of the extrinsic function call thereby ensuring the first
+			     * global reference inside the extrinsic ends up as a non-naked reference. But since this was a
+			     * user-reported issue (YDB#1223), it is considered safer to disable the naked reference
+			     * optimization at compile time as well as runtime (just in case there are other subtle related
+			     * issues that are addressed by the compile time disabling but not by the runtime disabling).
+			     */
 	/* OC_CALL is unreachable; has type OCT_JUMP */
 	case OC_EXTCALL:    /* do f^module */
 	case OC_FGNCAL:     /* do &x */

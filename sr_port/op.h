@@ -35,11 +35,32 @@
 
 /* A state machine that tracks whether a `gvname2naked` optimization is legal at runtime.
  * In particular, a transition from the ININTERRUPT to LEGAL state is always wrong; we have to see at least one GVNAME to get back
- * to a known state before doing an optimization. */
+ * to a known state before doing an optimization (the "SET_GV_NAMENAKED_STATE" macro defined below takes care of this).
+ */
 #define NAMENAKED_LEGAL 0             /* Naked reference optimization OK */
 #define NAMENAKED_ININTERRUPT 1       /* Can't do a naked reference optimization until we leave the interrupt AND see a GVNAME */
 #define NAMENAKED_UNKNOWNREFERENCE 2  /* The next GVNAME will make a naked reference optimization legal */
+
 GBLREF int gv_namenaked_state;
+
+#define	SET_GV_NAMENAKED_STATE(NEWSTATE)								\
+{													\
+	if (NAMENAKED_UNKNOWNREFERENCE == NEWSTATE)							\
+	{	/* Note also that this invocation can happen inside interrupt code in which case	\
+		 * we should not touch the runtime flag as that needs to stay set to the interrupt	\
+		 * state (NAMENAKED_ININTERRUPT) until the outermost interrupt frame exits.		\
+		 */											\
+		if (NAMENAKED_LEGAL == gv_namenaked_state)						\
+			gv_namenaked_state = NAMENAKED_UNKNOWNREFERENCE;				\
+	} else if (NAMENAKED_ININTERRUPT == NEWSTATE)							\
+		gv_namenaked_state = NAMENAKED_ININTERRUPT;						\
+	else												\
+	{												\
+		assert(NEWSTATE == NAMENAKED_LEGAL);							\
+		if (NAMENAKED_UNKNOWNREFERENCE == gv_namenaked_state)					\
+			gv_namenaked_state = NAMENAKED_LEGAL;						\
+	}												\
+}
 
 void	op_add(mval *u, mval *v, mval *s);
 void	add_mvals(mval *u, mval *v, int subtraction, mval *result);	/* function defined in op_add.c */

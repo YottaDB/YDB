@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -214,7 +214,6 @@ STATICFNDEF void op_gvname_common(int count, int hash_code, mval *val_arg, va_li
 	 * interrupt will execute and modify $REFERENCE. If that happens, we disable the optimization until the next GVNAME
 	 * after the interrupt finishes. We have just finished a GVNAME, so we know it is legal to start optimizing again.
 	 */
-	if (NAMENAKED_UNKNOWNREFERENCE == gv_namenaked_state)
-		gv_namenaked_state = NAMENAKED_LEGAL;
+	SET_GV_NAMENAKED_STATE(NAMENAKED_LEGAL);
 	return;
 }

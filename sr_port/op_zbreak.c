@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -46,7 +46,7 @@ int op_zbreak(stack_frame *fp)
 		flush_pio();
 		comp_indr(&z_ptr->action->obj);
 		frame_pointer->type = SFT_ZBRK_ACT;
-		gv_namenaked_state = NAMENAKED_ININTERRUPT; /* ZBREAK interrupt; code executed is not visible at compile time */
+		SET_GV_NAMENAKED_STATE(NAMENAKED_ININTERRUPT); /* ZBREAK interrupt; code executed is not visible at compile time */
 		return (FALSE);
 	}
 }

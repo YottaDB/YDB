@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -74,8 +74,8 @@ void flush_jmp (rhdtyp *rtn_base, unsigned char *context, unsigned char *transfe
 	GTMTRIG_ONLY(DBGTRIGR((stderr, "flush_jmp: Disabling SFF_NORET_VIA_MUMTSTART_OFF in frame 0x"lvaddr"\n", frame_pointer)));
 	USHBIN_ONLY(old_rtnhdr = frame_pointer->rvector);
 	frame_pointer->rvector = rtn_base;
-	if (NAMENAKED_LEGAL == gv_namenaked_state)
-		gv_namenaked_state = NAMENAKED_UNKNOWNREFERENCE; /* ZGOTO; cannot predict the state of $REFERENCE at compile time */
+	/* This is a ZGOTO. We cannot predict $REFERENCE at compile time so set a runtime flag that way we don't misoptimize. */
+	SET_GV_NAMENAKED_STATE(NAMENAKED_UNKNOWNREFERENCE);
 	/* Now that fp->rvector has been overwritten to new routine, check if the older routine had a "rtn_relinked" flag set
 	 * and if so that cleanup can be performed now.
 	 */
