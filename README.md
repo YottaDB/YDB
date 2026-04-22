@@ -140,7 +140,7 @@ sudo apt-get install --no-install-recommends clang llvm lld
 - Installing YottaDB
 
   Now you are ready to install YottaDB. The default installation path for each release includes the release
-  (e.g. for YottaDB r2.04, the default installation path is /usr/local/lib/yottadb/r204),
+  (e.g. for YottaDB r2.06, the default installation path is /usr/local/lib/yottadb/r206),
   but can be controlled using the ```--installdir``` option. Run ```./ydbinstall --help``` for a list of options.
 
   Note that if the ```ydb_icu_version``` env var is set to a value other than what `pkg-config --modversion icu-io`
