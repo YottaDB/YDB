@@ -1668,7 +1668,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 			if (WBTEST_ENABLED(WBTEST_PHS1_NOSPACE))
 			{
 				gtm_wbox_input_test_case_count = 0;
-				gtm_white_box_test_case_count = 10;
+				ydb_white_box_test_case_count = 10;
 			}
 #			endif
 			SET_CUR_CMT_STEP_IF(TRUE, csa->nl->cur_cmt_step, DECL_CMT08);
@@ -1974,7 +1974,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 	 */
 #	ifdef DEBUG
 	if (WBTEST_ENABLED(WBTEST_PHS1_NOSPACE))
-		gtm_white_box_test_case_count = 0;
+		ydb_white_box_test_case_count = 0;
 #	endif
 	END_IGNORE_EXTFREEZES(TREF(defer_instance_freeze));
 	/* If BG, check that we have not pinned any more buffers than we are updating */

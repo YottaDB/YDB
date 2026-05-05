@@ -350,7 +350,7 @@ MBSTART {															\
 			{													\
 				LCL_STATUS = ENOSPC;										\
 				lseekwrite_target = LSEEKWRITE_TARGET;								\
-			} else if (gtm_white_box_test_case_enabled && (WBTEST_PHS1_NOSPACE == gtm_white_box_test_case_number))	\
+			} else if (ydb_white_box_test_case_enabled && (WBTEST_PHS1_NOSPACE == ydb_white_box_test_case_number))	\
 			{													\
 				if (gtm_wbox_input_test_case_count < ydb_white_box_test_case_count)				\
 				{												\

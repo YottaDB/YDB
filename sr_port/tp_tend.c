@@ -1692,7 +1692,7 @@ boolean_t	tp_tend()
 			if (WBTEST_ENABLED(WBTEST_PHS1_NOSPACE))
 			{
 				gtm_wbox_input_test_case_count = 0;
-				gtm_white_box_test_case_count = 10;
+				ydb_white_box_test_case_count = 10;
 			}
 			for (si = first_tp_si_by_ftok; (NULL != si); si = si->next_tp_si_by_ftok)
 			{
@@ -2035,7 +2035,7 @@ boolean_t	tp_tend()
 	} /* for (si ... ) */
 #	ifdef DEBUG
 	if (WBTEST_ENABLED(WBTEST_PHS1_NOSPACE))
-		gtm_white_box_test_case_count = 0;
+		ydb_white_box_test_case_count = 0;
 #	endif
 	END_IGNORE_EXTFREEZES(TREF(defer_instance_freeze));
 	assert(cdb_sc_normal == status);
