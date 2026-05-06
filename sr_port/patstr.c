@@ -937,4 +937,5 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 	}
 	assert(FALSE);
 	free_alts(&init_alt);
+	return 0;
 }
