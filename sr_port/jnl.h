@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -1942,6 +1942,9 @@ MBSTART {											\
 	jnlpool_addrs_ptr_t		local_jnlpool;						\
 												\
 	GBLREF	jnlpool_addrs_ptr_t	jnlpool;						\
+	DCL_THREADGBL_ACCESS;									\
+												\
+	SETUP_THREADGBL_ACCESS;									\
 												\
 	assert(JNL_ENABLED(CSA));								\
 	assert(CSA == &FILE_INFO(REG)->s_addrs);						\
@@ -1953,7 +1956,7 @@ MBSTART {											\
 	if (jbp->dskaddr != jbp->rsrv_freeaddr)							\
 	{											\
 		local_jnlpool = JNLPOOL_FROM(CSA);	/* uses "jnlpool" */			\
-		if (!IS_REPL_INST_FROZEN_JPL(local_jnlpool))					\
+		if (!IS_REPL_INST_FROZEN_JPL(local_jnlpool, TREF(defer_instance_freeze)))	\
 		{										\
 			was_crit = CSA->now_crit;						\
 			if (!was_crit)								\
