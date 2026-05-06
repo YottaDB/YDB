@@ -3,7 +3,7 @@
  * Copyright (c) 2005-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -235,7 +235,7 @@ typedef enum {
 	WBTEST_SEQNO_PREKILL,			/* 182 : Kill right after incrementing the sequence number. */
 	WBTEST_REL_LOCK_PREKILL,		/* 183 : Kill right before releaseing instance crit. */
 	WBTEST_REL_LOCK_POSTKILL,		/* 184 : Kill after releasing instance crit and sleeping for a second. */
-	WBTEST_PHS1_NOSPACE			/* 185 : Set fake enospc right before releasing instance crit. */
+	WBTEST_PHS1_NOSPACE,			/* 185 : Set fake enospc right before releasing instance crit. */
 
 	/* Note 1: when adding new white box test cases, please make use of WBTEST_ENABLED and WBTEST_ASSIGN_ONLY (defined below)
 	 * whenever applicable
