@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -30,12 +30,9 @@
 #define GTCM_MIN_TCP_RCVBUFLEN	(64 * 1024)	/* accommodate the longest message possible with 2-byte message length */
 #endif
 
-GBLREF	uint4	process_id;
-
 cmi_status_t cmj_setupfd(int fd)
 {
 	int rval, buflen, snd_buflen, rcv_buflen;
-	long lpid = (long)process_id;
 	int on = 1;
 	GTM_SOCKLEN_TYPE optlen;
 
@@ -43,14 +40,7 @@ cmi_status_t cmj_setupfd(int fd)
 	FCNTL3(fd, F_SETFL, O_NONBLOCK, rval);
 	if (-1 == rval)
 		return (cmi_status_t)errno;
-	FCNTL3(fd, F_SETOWN, lpid, rval);
-	if (-1 == rval)
-		return (cmi_status_t)errno;
-#ifdef F_SETSIG
-	FCNTL3(fd, F_SETSIG, (long)SIGIO, rval);
-	if (-1 == rval)
-		return (cmi_status_t)errno;
-#endif
+	/* I/O readiness is delivered via epoll, not SIGIO; F_SETOWN / F_SETSIG are unnecessary. */
 	rval = setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE,
 			(const void *)&on, SIZEOF(on));
 	if (rval < 0)

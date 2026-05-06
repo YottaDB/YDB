@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -15,12 +15,72 @@
 
 #include "gtm_string.h"
 #include <errno.h>
+#include <sys/epoll.h>
+#include <unistd.h>
 
 #include "cmidef.h"
 #include "generic_signal_handler.h"
 #include "sig_init.h"
 
 GBLDEF struct NTD *ntd_root;
+
+/* Mirror the desired event mask for "fd" (derived from rs/ws/es) into the NTD's epoll set.
+ * Uses EPOLL_CTL_ADD on first registration and EPOLL_CTL_MOD thereafter; if no events are
+ * desired the fd is removed via EPOLL_CTL_DEL.
+ */
+void cmj_epoll_update(struct NTD *tsk, int fd)
+{
+	struct epoll_event	ev;
+	int			rc;
+
+	ASSERT_IS_LIBCMISOCKETTCP;
+	if (NULL == tsk || 0 > tsk->epoll_fd || 0 > fd)
+		return;
+	ev.events = 0;
+	if (FD_ISSET(fd, &tsk->rs))
+		ev.events |= EPOLLIN;
+	if (FD_ISSET(fd, &tsk->ws))
+		ev.events |= EPOLLOUT;
+	if (FD_ISSET(fd, &tsk->es))
+		ev.events |= EPOLLPRI;
+	ev.data.fd = fd;
+	if (0 == ev.events)
+	{
+		rc = epoll_ctl(tsk->epoll_fd, EPOLL_CTL_DEL, fd, NULL);
+		if ((-1 == rc) && (ENOENT != errno))
+		{
+			CMI_DPRINT(("cmj_epoll_update: EPOLL_CTL_DEL fd=%d errno=%d\n", fd, errno));
+		}
+		return;
+	}
+	rc = epoll_ctl(tsk->epoll_fd, EPOLL_CTL_MOD, fd, &ev);
+	if (-1 == rc && ENOENT == errno)
+	{
+		rc = epoll_ctl(tsk->epoll_fd, EPOLL_CTL_ADD, fd, &ev);
+		if (-1 == rc)
+		{
+			CMI_DPRINT(("cmj_epoll_update: EPOLL_CTL_ADD fd=%d errno=%d\n", fd, errno));
+		}
+	} else if (-1 == rc)
+	{
+		CMI_DPRINT(("cmj_epoll_update: EPOLL_CTL_MOD fd=%d errno=%d\n", fd, errno));
+	}
+}
+
+/* Remove "fd" from the NTD's epoll set unconditionally (used on close/error). */
+void cmj_epoll_remove(struct NTD *tsk, int fd)
+{
+	int rc;
+
+	ASSERT_IS_LIBCMISOCKETTCP;
+	if (NULL == tsk || 0 > tsk->epoll_fd || 0 > fd)
+		return;
+	rc = epoll_ctl(tsk->epoll_fd, EPOLL_CTL_DEL, fd, NULL);
+	if ((-1 == rc) && (ENOENT != errno) && (EBADF != errno))
+	{
+		CMI_DPRINT(("cmj_epoll_remove: EPOLL_CTL_DEL fd=%d errno=%d\n", fd, errno));
+	}
+}
 
 /* CLEAN-UP: 1. replace CMI_CMICHECK with new message
 	2. find correct size and location of MBX_SIZE
@@ -31,8 +91,6 @@ error_def(CMI_CMICHECK);
 cmi_status_t cmj_netinit(void)
 {
 	struct NTD *tsk;
-	struct sigaction sa;
-	int rval;
 
 	ASSERT_IS_LIBCMISOCKETTCP;
 	if (ntd_root)
@@ -44,30 +102,13 @@ cmi_status_t cmj_netinit(void)
 	FD_ZERO(&tsk->rs);
 	FD_ZERO(&tsk->ws);
 	FD_ZERO(&tsk->es);
-	/* To support CMI_MUTEX_ macros */
+	/* I/O readiness is now driven by epoll instead of SIGIO/SIGURG. mutex_set is left empty
+	 * so the existing SIGPROCMASK brackets become cheap (block-empty-set) and other signals
+	 * (SIGTERM/HUP/USR/ALRM) keep their normal delivery. cmj_handler is no longer registered.
+	 */
 	sigemptyset(&tsk->mutex_set);
-	sigaddset(&tsk->mutex_set, SIGIO);
-	sigaddset(&tsk->mutex_set, SIGURG);
-	/* Setup signal handlers */
-	if (!USING_ALTERNATE_SIGHANDLING)
-	{	/* I/O - SIGURG, SIGIO are I/O interrupts - highest priority */
-		sa.sa_flags = SA_SIGINFO;
-		sa.sa_handler = NULL;
-		sa.sa_sigaction = cmj_handler;
-		sigemptyset(&sa.sa_mask);
-		sigaddset(&sa.sa_mask, SIGURG);
-		rval = sigaction(SIGIO, &sa, NULL);
-		if (rval < 0)
-			return errno;
-		sigemptyset(&sa.sa_mask);
-		sigaddset(&sa.sa_mask, SIGIO);
-		rval = sigaction(SIGURG, &sa, NULL);
-		if (rval < 0)
-			return errno;
-	} else
-	{	/* Set the handlers for these signals into the dispatch array for alternate signal handling */
-		SET_ALTERNATE_SIGHANDLER(SIGIO, &ydb_altio_sighandler);
-		SET_ALTERNATE_SIGHANDLER(SIGURG, &ydb_altio_sighandler);
-	}
+	tsk->epoll_fd = epoll_create1(EPOLL_CLOEXEC);
+	if (-1 == tsk->epoll_fd)
+		return errno;
 	return SS_NORMAL;
 }

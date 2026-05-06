@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -131,6 +131,7 @@ cmi_status_t cmi_init(cmi_descriptor *tnd, unsigned char tnr,
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_FDSIZELMT, 1, ntd_root->listen_fd);
 	FD_SET(ntd_root->listen_fd, &ntd_root->rs);
 	FD_SET(ntd_root->listen_fd, &ntd_root->es);
+	cmj_epoll_update(ntd_root, ntd_root->listen_fd);
 	ntd_root->err = err;
 	ntd_root->crq = crq;
 	ntd_root->acc = acc;

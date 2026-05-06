@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001 Sanchez Computer Associates, Inc.		*
  *								*
- * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -25,17 +25,10 @@ cmi_status_t cmj_set_async(int fd)
 {
 	cmi_status_t status = SS_NORMAL;
 	int rval;
-#if defined(FIOASYNC)
-	int val = 1;
+
 	ASSERT_IS_LIBCMISOCKETTCP;
-	rval = ioctl(fd, FIOASYNC, &val);
-#elif defined(O_ASYNC)
-	rval = fcntl(fd, F_SETFL, O_ASYNC|O_NONBLOCK);
-#elif defined(FASYNC)
-	rval = fcntl(fd, F_SETFL, FASYNC|O_NONBLOCK);
-#else
-#error Can not set async state on platform
-#endif
+	/* I/O readiness is delivered via epoll, not SIGIO; only O_NONBLOCK is required here. */
+	rval = fcntl(fd, F_SETFL, O_NONBLOCK);
 	if (rval < 0)
 		status = errno;
 	return status;

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -34,5 +34,6 @@ void cmj_err(struct CLB *lnk, cmi_reason_t reason, cmi_status_t status)
 	FD_CLR(lnk->mun, &tsk->rs);
 	FD_CLR(lnk->mun, &tsk->ws);
 	FD_CLR(lnk->mun, &tsk->es);
+	cmj_epoll_remove(tsk, lnk->mun);
 	lnk->sta = CM_CLB_DISCONNECT;
 }

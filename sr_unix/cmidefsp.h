@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -58,6 +58,7 @@ typedef mstr cmi_descriptor;
 #define CMI_DESC_DEF(DESC,STR,LEN) (DESC)->len = (LEN);(DESC)->addr = (STR)
 
 #include <signal.h>
+#include <sys/epoll.h>
 #include "gtm_unistd.h"
 #include "gtm_netdb.h"
 #include "gtm_socket.h"	/* for sockaddr_storage */
@@ -140,6 +141,7 @@ struct NTD
 	int		listen_fd;		/* Server's listen file descriptor */
 	fd_set		rs,ws,es;		/* select I/O sets */
 	int		max_fd;			/* largest fd - for select processing*/
+	int		epoll_fd;		/* epoll instance for I/O readiness, replaces SIGIO wake mechanism */
 	VSIG_ATOMIC_T	sigio_interrupt;
 	VSIG_ATOMIC_T	sigurg_interrupt;
 	/* for mutex processing - use mutex_set set to block.
@@ -190,6 +192,9 @@ cmi_status_t cmj_set_async(int fd);
 int cmj_reset_async(int fd);
 cmi_status_t cmj_clb_set_async(struct CLB *lnk);
 cmi_status_t cmj_clb_reset_async(struct CLB *lnk);
+/* Mirror an fd's desired-event mask (computed from rs/ws/es) into the NTD's epoll set. */
+void cmj_epoll_update(struct NTD *tsk, int fd);
+void cmj_epoll_remove(struct NTD *tsk, int fd);
 void cmj_err(struct CLB *lnk, cmi_reason_t reason, cmi_status_t status);
 void cmj_exception_interrupt(struct CLB *lnk, int signo);
 void cmj_fini(struct CLB *lnk);

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -33,9 +33,10 @@ cmi_status_t cmi_close(struct CLB *lnk)
 	qp = RELQUE2PTR(lnk->cqe.fl);
 	previous = QUEENT2CLB(qp, cqe);
 	remqt(&previous->cqe);
-	CLOSEFILE(lnk->mun, status);
 	if (FD_SETSIZE <= lnk->mun)
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_FDSIZELMT, 1, lnk->mun);
+	cmj_epoll_remove(tsk, lnk->mun);
+	CLOSEFILE(lnk->mun, status);
 	FD_CLR(lnk->mun, &tsk->rs);
 	FD_CLR(lnk->mun, &tsk->ws);
 	FD_CLR(lnk->mun, &tsk->es);

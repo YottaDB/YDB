@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -145,6 +145,7 @@ cmi_status_t cmi_open(struct CLB *lnk)
 			memcpy(&lnk->peer_ai, ai_ptr, SIZEOF(struct addrinfo));
 			lnk->peer_ai.ai_addr = (struct sockaddr *)(&lnk->peer_sas);
 			FD_SET(new_fd, &ntd_root->es);
+			cmj_epoll_update(ntd_root, new_fd);
 			lnk->sta = CM_CLB_IDLE;
 		} else
 			CLOSEFILE_RESET(new_fd, rc);	/* resets "new_fd" to FD_INVALID */

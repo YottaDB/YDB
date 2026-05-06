@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -42,6 +42,7 @@ cmi_status_t cmj_clb_set_async(struct CLB *lnk)
 	default:
 		assert(FALSE);
 	}
+	cmj_epoll_update(tsk, lnk->mun);
 	return status;
 }
 
@@ -64,5 +65,6 @@ cmi_status_t cmj_clb_reset_async(struct CLB *lnk)
 	default:
 		assert(FALSE);
 	}
+	cmj_epoll_update(tsk, lnk->mun);
 	return status;
 }

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -76,6 +76,7 @@ void cmj_incoming_call(struct NTD *tsk)
 		if (FD_SETSIZE <= rval)
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_FDSIZELMT, 1, rval);
 		FD_SET(rval, &tsk->es);
+		cmj_epoll_update(tsk, rval);
 		/* setup for callback processing */
 		lnk->deferred_event = TRUE;
 		lnk->deferred_reason = CMI_REASON_CONNECT;
