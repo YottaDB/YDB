@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -387,7 +387,7 @@ void zshow_devices(zshow_out *output)
 					}
 					if (tt_ptr->mupintr)
 						ZS_STR_OUT(&v, interrupt_text);
-					temp_ptr = (d_tt_struct *)io_std_device->in->dev_sp;
+					temp_ptr = (d_tt_struct *)io_std_device.in->dev_sp;
 					if (hup_on && (tt_ptr->fildes == temp_ptr->fildes))
 						ZS_STR_OUT(&v, hup_text);
 					if (tt_ptr->ttio_struct->c_iflag & IXON)
@@ -644,7 +644,7 @@ void zshow_devices(zshow_out *output)
 					ZS_ONE_OUT(&v, space_text);
 					if (dsocketptr->mupintr)
 						ZS_STR_OUT(&v, interrupt_text);
-					if (hup_on && (dsocketptr == (d_socket_struct *)io_std_device->in->dev_sp))
+					if (hup_on && (dsocketptr == (d_socket_struct *)io_std_device.in->dev_sp))
 						ZS_STR_OUT(&v, hup_text);
 					output->flush = TRUE;
 					zshow_output(output, 0);
