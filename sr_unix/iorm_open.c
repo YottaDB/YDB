@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -235,11 +235,30 @@ short	iorm_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, uint8 tim
 			 * would be 0. Unfortunately, there is no accurate way to differentiate a 0-byte regular file vs
 			 * a /proc file. Therefore, we check for /proc in the file name and if so we skip setting $ZEOF.
 			 */
-			if ((size == statbuf.st_size)
-				&& (size || (STR_LIT_LEN(PROCPATH_PREFIX) > dev_name->len)
-					|| MEMCMP_LIT(dev_name->dollar_io, PROCPATH_PREFIX)))
+			if (size == statbuf.st_size)
 			{
-				iod->dollar.zeof = TRUE;
+				if (size)
+					iod->dollar.zeof = TRUE;
+				else
+				{
+					char	fullpath[YDB_PATH_MAX], *ret_path;
+
+					/* If it is a soft link, then get the realpath and check if that is a "/proc" file.
+					 * For example, "/etc/mtab" is a soft link to "/proc/self/mounts". If "/etc/mtab"
+					 * is being opened, we want to look at the real path i.e. "/proc/self/mounts" and
+					 * treat this as a "/proc" file for $ZEOF handling. There is no way of knowing
+					 * if it is a soft link from "statbuf.st_mode" since that corresponds to "fd" which
+					 * corresponds to the realpath already. Therefore, we do a "realpath()" call below.
+					 */
+					ret_path = realpath(dev_name->dollar_io, fullpath);
+					/* In case of error from "realpath()", "fullpath" will be NULL. In that case,
+					 * assume as if this file is not a "/proc" file.
+					 */
+					if ((NULL == ret_path)
+							|| (STR_LIT_LEN(PROCPATH_PREFIX) > STRLEN(fullpath))
+							|| MEMCMP_LIT(fullpath, PROCPATH_PREFIX))
+						iod->dollar.zeof = TRUE;
+				}
 			}
 		} else
 		{
