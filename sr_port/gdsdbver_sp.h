@@ -288,6 +288,6 @@ ENUM_ENTRY(GDSMVFILLER254),	/* 254 - Space reserved for GT.M changes to minor db
 ENUM_ENTRY(GDSMVFILLER255),	/* 255 - Space reserved for GT.M changes to minor db format */
 ENUM_ENTRY(GDSMR204_V71001),	/* 256 - YottaDB r2.04 which includes GDSMV71001 */
 ENUM_ENTRY(GDSMR204_V71002),	/* 257 - YottaDB r2.04 which includes GDSMV71002 */
-ENUM_ENTRY(GDSMR206_V71003),	/* 258 - YottaDB r2.06 which includes GDSMV71003 */
-ENUM_ENTRY(GDSMR206),		/* 259 - New field "freeze_on_fail" default changed for statsDB regions */
+ENUM_ENTRY(GDSMR208_V71003),	/* 258 - YottaDB r2.08 which includes GDSMV71003 */
+ENUM_ENTRY(GDSMR208),		/* 259 - New field "freeze_on_fail" default changed for statsDB regions */
 ENUM_ENTRY(GDSMVLAST)

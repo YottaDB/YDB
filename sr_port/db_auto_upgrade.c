@@ -220,9 +220,9 @@ void db_auto_upgrade(gd_region *reg)
 								 * but just to be safe handle it below as it is easy to do so.
 								 */
 				csd->mutex_type = IS_STATSDB_REG(reg) ? mutex_type_ydb : mutex_type_adaptive_ydb;
-			case GDSMR206_V71003:
+			case GDSMR208_V71003:
 				break;		/* so a new "case" needs to be added BEFORE the assert. */
-			case GDSMR206:
+			case GDSMR208:
 				/* When adding a new minor version, the following template should be maintained
 				 * 1) Remove the penultimate 'break' (i.e. "break" in the PREVIOUS "case" block.
 				 * 2) If there are any file header fields added in the new minor version, initialize the fields
