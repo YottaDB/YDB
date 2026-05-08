@@ -46,7 +46,6 @@
 
 GBLDEF	int                	gtmrecv_listen_sock_fd = FD_INVALID;
 GBLREF	gtmrecv_options_t  	gtmrecv_options;
-GBLREF	intrpt_state_t		intrpt_ok_state;
 
 /* Initialize communication stuff */
 int gtmrecv_comm_init(in_port_t port)
@@ -67,7 +66,6 @@ int gtmrecv_comm_init(in_port_t port)
 	char                    local_port_buffer[NI_MAXSERV];
 	unsigned int		save_errno;
 	GTM_SOCKLEN_TYPE        len;
-	intrpt_state_t		prev_intrpt_state;
 
 	if (FD_INVALID != gtmrecv_listen_sock_fd) /* Initialization done already */
 		return (0);
@@ -89,7 +87,6 @@ int gtmrecv_comm_init(in_port_t port)
 	SNPRINTF(port_buffer, NI_MAXSERV, "%hu", port);
 	if (0 != (errcode = dogetaddrinfo(NULL, port_buffer, &hints, &ai_ptr)))
 	{
-		ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 		CLOSEFILE(temp_sock_fd, rc);
 		RTS_ERROR_ADDRINFO_CTX(NULL, ERR_GETADDRINFO, errcode, "FAILED in obtaining IP address on receiver server.");
 		return -1;
@@ -115,7 +112,6 @@ int gtmrecv_comm_init(in_port_t port)
 	}
 	if (0 != (errcode = get_send_sock_buff_size(gtmrecv_listen_sock_fd, &send_buffsize)))
 	{
-		ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 		SNPRINTF(err_buffer, SIZEOF(err_buffer), "Error getting socket send buffsize : %s", STRERROR(errcode));
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, LEN_AND_STR(err_buffer));
 	}
@@ -125,7 +121,6 @@ int gtmrecv_comm_init(in_port_t port)
 		{
 			if (send_buffsize < GTMRECV_MIN_TCP_SEND_BUFSIZE)
 			{
-				ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 				SNPRINTF(err_buffer, SIZEOF(err_buffer), "Could not set TCP send buffer size to %d : %s",
 						GTMRECV_MIN_TCP_SEND_BUFSIZE, STRERROR(errcode));
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) MAKE_MSG_INFO(ERR_REPLCOMM), 0,
@@ -135,7 +130,6 @@ int gtmrecv_comm_init(in_port_t port)
 	}
 	if (0 != (errcode = get_recv_sock_buff_size(gtmrecv_listen_sock_fd, &recv_buffsize)))
 	{
-		ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 		SNPRINTF(err_buffer, SIZEOF(err_buffer), "Error getting socket recv buffsize : %s", STRERROR(errcode));
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, LEN_AND_STR(err_buffer));
 	}
@@ -148,7 +142,6 @@ int gtmrecv_comm_init(in_port_t port)
 			;
 		if (tcp_r_buffsize < GTMRECV_MIN_TCP_RECV_BUFSIZE)
 		{
-			ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 			SNPRINTF(err_buffer, SIZEOF(err_buffer), "Could not set TCP receive buffer size in range [%d, %d], last "
 					"known error : %s", GTMRECV_MIN_TCP_RECV_BUFSIZE, gtmrecv_options.recv_buffsize,
 					STRERROR(errcode));

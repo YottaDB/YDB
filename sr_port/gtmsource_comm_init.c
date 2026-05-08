@@ -54,7 +54,6 @@ GBLDEF	int			gtmsource_sock_fd = FD_INVALID;
 GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF  FILE			*gtmsource_log_fp;
 GBLREF  gtmsource_options_t	gtmsource_options;
-GBLREF	intrpt_state_t		intrpt_ok_state;
 
 error_def(ERR_REPLCOMM);
 error_def(ERR_GETADDRINFO);
@@ -72,7 +71,6 @@ int gtmsource_comm_init(boolean_t print_addresolve_error)
 	char			hostinfo[SIZEOF(RESOLUTION_FAILURE_PREFIX) + MAX_HOST_NAME_LEN + NI_MAXSERV];
 	int			port_len;
 	int			errcode;
-	intrpt_state_t		prev_intrpt_state;
 
 	if (FD_INVALID != gtmsource_sock_fd) /* Initialization done already */
 		return(0);
@@ -119,7 +117,6 @@ int gtmsource_comm_init(boolean_t print_addresolve_error)
 		if (-1 == setsockopt(gtmsource_sock_fd, SOL_SOCKET, SO_LINGER,
 				(const void *)&disable_linger, SIZEOF(disable_linger)))
 		{
-			ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 			err_status = ERRNO;
 			SNPRINTF(error_string, SIZEOF(error_string), "Error with source server socket disable linger : %s",
 					STRERROR(err_status));
@@ -127,7 +124,6 @@ int gtmsource_comm_init(boolean_t print_addresolve_error)
 		}
 		if (0 != (err_status = get_send_sock_buff_size(gtmsource_sock_fd, &send_buffsize)))
 		{
-			ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 			SNPRINTF(error_string, SIZEOF(error_string), "Error getting socket send buffsize : %s",
 					STRERROR(err_status));
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, LEN_AND_STR(error_string));
@@ -141,7 +137,6 @@ int gtmsource_comm_init(boolean_t print_addresolve_error)
 				;
 			if (tcp_s_buffsize < GTMSOURCE_MIN_TCP_SEND_BUFSIZE)
 			{
-				ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 				SNPRINTF(error_string, SIZEOF(error_string), "Could not set TCP send buffer size in range [%d, %d],"
 						"last known error : %s", GTMSOURCE_MIN_TCP_SEND_BUFSIZE,
 						gtmsource_options.send_buffsize, STRERROR(err_status));
@@ -151,7 +146,6 @@ int gtmsource_comm_init(boolean_t print_addresolve_error)
 		}
 		if (0 != (err_status = get_recv_sock_buff_size(gtmsource_sock_fd, &recv_buffsize)))
 		{
-			ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 			SNPRINTF(error_string, SIZEOF(error_string), "Error getting socket recv buffsize : %s",
 					STRERROR(err_status));
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(10) ERR_REPLCOMM, 0, ERR_TEXT, 2,
@@ -164,7 +158,6 @@ int gtmsource_comm_init(boolean_t print_addresolve_error)
 			{
 				if (recv_buffsize < GTMSOURCE_MIN_TCP_RECV_BUFSIZE)
 				{
-					ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 					SNPRINTF(error_string, SIZEOF(error_string), "Could not set TCP recv buffer size to"
 							" %d : %s", GTMSOURCE_MIN_TCP_RECV_BUFSIZE, STRERROR(err_status));
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) MAKE_MSG_INFO(ERR_REPLCOMM), 0, ERR_TEXT, 2,
@@ -173,6 +166,5 @@ int gtmsource_comm_init(boolean_t print_addresolve_error)
 			}
 		}
 	}
-	ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 	return(errcode);
 }
