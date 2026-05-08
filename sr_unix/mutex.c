@@ -277,7 +277,7 @@ void rollback_mutex_cln_ctl(seq_num max_seqno)
 	mutex_cln_ctl_struct	lcl_cln_ctl = { .top = 0, .pids = {0}, .seqnos = {0} };
 
 	assert(jnlpool && jnlpool->jnlpool_ctl);
-	assert(MAX_MUTEX_CLNS && (((MAX_MUTEX_CLNS) & (MAX_MUTEX_CLNS - 1)) == 0));
+	assert((MAX_MUTEX_CLNS != 0) && (((MAX_MUTEX_CLNS) & (MAX_MUTEX_CLNS - 1)) == 0));
 	jpl = jnlpool->jnlpool_ctl;
 	/* If top is zero, then the array is empty. We guarantee this with our overflow handling. Values of top from 0 to
 	 * MAX_MUTEX_CLNS count the number of valid entries starting at index 0; values over MAX_MUTEX_CLNS indicate there are
@@ -321,7 +321,7 @@ static inline enum mutex_cln_status get_mutex_cln_info(sgmnt_addrs *csa, uint4 h
 	enum mutex_cln_status	status;
 
 	assert(csa->hdr);
-	assert(MAX_MUTEX_CLNS && (((MAX_MUTEX_CLNS) & (MAX_MUTEX_CLNS - 1)) == 0));
+	assert((MAX_MUTEX_CLNS != 0) && (((MAX_MUTEX_CLNS) & (MAX_MUTEX_CLNS - 1)) == 0));
 	info->pid = 0;
 	info->seqno = 0;
 	status = mutex_cln_absent;
@@ -388,7 +388,7 @@ static inline void set_mutex_cln_info(sgmnt_addrs *csa, uint4 holder_pid)
 
 	assert(!csa->hdr);
 	assert(jnlpool);
-	assert(MAX_MUTEX_CLNS && (((MAX_MUTEX_CLNS) & (MAX_MUTEX_CLNS - 1)) == 0));
+	assert((MAX_MUTEX_CLNS != 0) && (((MAX_MUTEX_CLNS) & (MAX_MUTEX_CLNS - 1)) == 0));
 	/* Gracefully return even in cases we think are impossible since this is a sensitive location. */
 	if ((!jnlpool) || !(jpl = jnlpool->jnlpool_ctl))
 	{
