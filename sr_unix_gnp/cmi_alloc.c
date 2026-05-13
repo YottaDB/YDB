@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -32,9 +32,7 @@ void cmi_free_clb(struct CLB *lnk)
 	insqt(&lnk->cqe, &tsk->cqh_free);
 	ntd_root->freelist_dirty = TRUE;
 	ntd_root->free_count++;
-	SIGPROCMASK(SIG_BLOCK, &tsk->mutex_set, &oset, rc);
 	cmj_housekeeping();
-	SIGPROCMASK(SIG_SETMASK, &oset, NULL, rc);
 }
 
 struct CLB *cmi_alloc_clb(void)

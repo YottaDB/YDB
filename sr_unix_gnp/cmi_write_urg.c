@@ -29,11 +29,9 @@ cmi_status_t cmi_write_urg(struct CLB *lnk, unsigned char urg)
 
 	ASSERT_IS_LIBCMISOCKETTCP;
 	lnk->urgdata = urg;
-	SIGPROCMASK(SIG_BLOCK, &tsk->mutex_set, &oset, rc);
 	status = cmj_write_urg_start(lnk);
 	if (CMI_ERROR(status))
 	{
-		SIGPROCMASK(SIG_SETMASK, &oset, NULL, rc);
 		return status;
 	}
 	cmj_housekeeping();
@@ -44,6 +42,5 @@ cmi_status_t cmi_write_urg(struct CLB *lnk, unsigned char urg)
 		tsk->sigio_interrupt = TRUE;
 		cmj_housekeeping();
 	}
-	SIGPROCMASK(SIG_SETMASK, &oset, NULL, rc);
 	return status;
 }

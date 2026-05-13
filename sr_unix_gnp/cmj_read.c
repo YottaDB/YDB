@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2015 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -118,7 +118,7 @@ cmi_status_t cmj_read_start(struct CLB *lnk)
 	return status;
 }
 
-void cmj_read_interrupt(struct CLB *lnk, int signo)
+void cmj_read_interrupt(struct CLB *lnk)
 {
 	ssize_t rval;
 	cmi_status_t status = SS_NORMAL;

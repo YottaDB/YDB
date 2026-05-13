@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2015 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -21,7 +21,7 @@
 
 GBLREF struct NTD *ntd_root;
 
-void cmj_select(int signo)
+void cmj_select(void)
 {
 	int count;
 	int rsfd;
@@ -55,7 +55,7 @@ void cmj_select(int signo)
 		{
 			lnk = cmj_unit2clb(ntd_root, esfd);
 			if (lnk)
-				cmj_exception_interrupt(lnk, signo);
+				cmj_exception_interrupt(lnk);
 			esfd = cmj_firstone(&myes, n);
 		}
 
@@ -68,7 +68,7 @@ void cmj_select(int signo)
 			{
 				lnk = cmj_unit2clb(ntd_root, rsfd);
 				if (lnk)
-					cmj_read_interrupt(lnk, signo);
+					cmj_read_interrupt(lnk);
 			}
 			rsfd = cmj_firstone(&myrs, n);
 		}
@@ -78,7 +78,7 @@ void cmj_select(int signo)
 		{
 			lnk = cmj_unit2clb(ntd_root, wsfd);
 			if (lnk)
-				cmj_write_interrupt(lnk, signo);
+				cmj_write_interrupt(lnk);
 			wsfd = cmj_firstone(&myws, n);
 		}
 		myrs = ntd_root->rs;

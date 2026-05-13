@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -57,12 +57,10 @@ void gvcmz_int_lkcancel(void)
 	uint4			status, norm_stat;
 	int			loopcounter = 0;
 	struct CLB		*p;
-	CMI_MUTEX_DECL(cmi_mutex_rc);
 	DEBUG_ONLY(void		(*oldast)();)
 
 	ASSERT_IS_LIBGNPCLIENT;
 	assertpro(ntd_root);
-	CMI_MUTEX_BLOCK(cmi_mutex_rc);
 	action = CMMS_L_LKCANCEL;
 	temp[0] = CMMS_S_INTERRUPT;
 	temp[3] = action;
@@ -99,9 +97,6 @@ void gvcmz_int_lkcancel(void)
 			if (CMI_ERROR(status))
 			{
 				((link_info *)(p->usr))->neterr = TRUE;
-			/* safe to always enable since error ??? smw 96/11 */
-				VMS_ONLY(was_setast = SS$_WASSET;) /* to force ENABLE_AST in CMI_MUTEX_RESTORE */
-				CMI_MUTEX_RESTORE(cmi_mutex_rc);
 				gvcmz_error(action, status);
 				return;
 			}
@@ -112,9 +107,6 @@ void gvcmz_int_lkcancel(void)
 				if (CMI_ERROR(status))
 				{
 					((link_info *)(p->usr))->neterr = TRUE;
-				/* safe to always enable since error ??? smw 96/11 */
-					VMS_ONLY(was_setast = SS$_WASSET;) /* to force ENABLE_AST in CMI_MUTEX_RESTORE */
-					CMI_MUTEX_RESTORE(cmi_mutex_rc);
 					gvcmz_error(action, status);
 					return;
 				}
@@ -126,8 +118,7 @@ void gvcmz_int_lkcancel(void)
 			count++;
 		}
 	}
-	CMI_MUTEX_RESTORE(cmi_mutex_rc);
-/* 97/6/23 smw need to rethink break condition here */
+	/* 97/6/23 smw need to rethink break condition here */
 	while (lkcancel_count < count && !lkerror)
 	{
 		CMI_IDLE(CM_LKCANCEL_WAIT_TIME);

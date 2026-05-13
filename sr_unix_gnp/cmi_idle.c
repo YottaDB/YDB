@@ -38,17 +38,13 @@ void cmi_idle(uint4 hiber)
 	 * to catch potential completion from an
 	 * I/O interrupt.
 	 */
-	SIGPROCMASK(SIG_BLOCK, &ntd_root->mutex_set, &oset, rc);
 	cmj_housekeeping();
 	while ((lnk = cmj_getdeferred(ntd_root)))
 	{
 		lnk->deferred_event = FALSE;
 		posted = TRUE;
-		SIGPROCMASK(SIG_SETMASK, &oset, NULL, rc);
 		cmj_postevent(lnk);
-		SIGPROCMASK(SIG_BLOCK, &ntd_root->mutex_set, &oset, rc);
 	}
-	SIGPROCMASK(SIG_SETMASK, &oset, NULL, rc);
 	if (!posted)
 	{
 		/* Wait for any registered fd to become ready, or for the hiber timeout to expire. We don't need
@@ -60,8 +56,6 @@ void cmi_idle(uint4 hiber)
 		nev = epoll_wait(ntd_root->epoll_fd, evs, CMI_EPOLL_MAX_EVENTS, (int)hiber);
 		if (0 < nev)
 			ntd_root->sigio_interrupt = TRUE;
-		SIGPROCMASK(SIG_BLOCK, &ntd_root->mutex_set, &oset, rc);
 		cmj_housekeeping();
-		SIGPROCMASK(SIG_SETMASK, &oset, NULL, rc);
 	}
 }

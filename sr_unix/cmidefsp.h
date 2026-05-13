@@ -143,12 +143,6 @@ struct NTD
 	int		max_fd;			/* largest fd - for select processing*/
 	int		epoll_fd;		/* epoll instance for I/O readiness, replaces SIGIO wake mechanism */
 	VSIG_ATOMIC_T	sigio_interrupt;
-	VSIG_ATOMIC_T	sigurg_interrupt;
-	/* for mutex processing - use mutex_set set to block.
-	 * mutex_set - used in sigprocmask to block
-	 * used in sigsuspend, sigprocmask to restore to prior
-	 */
-	sigset_t	mutex_set;		/* set of signals to block */
 	size_t		pool_size;		/* cmi_init specified pool size */
 						/* This is zero for clients */
 	size_t		free_count;		/* # of items on free list */
@@ -162,10 +156,6 @@ struct NTD
 #define CMI_CLB_IOSTATUS(c)	((c)->deferred_status)
 #define CMI_CLB_ERROR(c)	(CMI_ERROR(CMI_CLB_IOSTATUS(c)))
 #define CMI_MAKE_STATUS(s)	(s)
-
-#define CMI_MUTEX_DECL(RC)	sigset_t cmi_oset_prev; int RC
-#define CMI_MUTEX_BLOCK(RC)	SIGPROCMASK(SIG_BLOCK, &ntd_root->mutex_set, &cmi_oset_prev, RC)
-#define CMI_MUTEX_RESTORE(RC)	SIGPROCMASK(SIG_SETMASK, &cmi_oset_prev, NULL, RC)
 
 /* All TCP/IP GNP messages have a 2 byte length before the message itself */
 #define CMI_TCP_PREFIX_LEN	2
@@ -196,23 +186,22 @@ cmi_status_t cmj_clb_reset_async(struct CLB *lnk);
 void cmj_epoll_update(struct NTD *tsk, int fd);
 void cmj_epoll_remove(struct NTD *tsk, int fd);
 void cmj_err(struct CLB *lnk, cmi_reason_t reason, cmi_status_t status);
-void cmj_exception_interrupt(struct CLB *lnk, int signo);
+void cmj_exception_interrupt(struct CLB *lnk);
 void cmj_fini(struct CLB *lnk);
 int cmj_firstone(fd_set *s, int n);
 struct CLB *cmj_getdeferred(struct NTD *tsk);
-void cmj_handler(int signo, siginfo_t *info, void *context);
 void cmj_housekeeping(void);
 void cmj_incoming_call(struct NTD *tsk);
 cmi_status_t cmj_netinit(void);
 cmi_status_t cmj_postevent(struct CLB *lnk);
 cmi_status_t cmj_read_start(struct CLB *lnk);
-void cmj_read_interrupt(struct CLB *lnk, int signo);
-void cmj_select(int signo);
+void cmj_read_interrupt(struct CLB *lnk);
+void cmj_select(void);
 cmi_status_t cmj_setupfd(int fd);
 struct CLB *cmj_unit2clb(struct NTD *tsk, cmi_unit_t unit);
 cmi_status_t cmj_write_start(struct CLB *lnk);
 cmi_status_t cmj_write_urg_start(struct CLB *lnk);
-void cmj_write_interrupt(struct CLB *lnk, int signo);
+void cmj_write_interrupt(struct CLB *lnk);
 void cmj_init_clb(struct NTD *tsk, struct CLB *lnk);
 cmi_status_t cmj_getsockaddr(cmi_descriptor *nod, cmi_descriptor *tnd, struct addrinfo **ai_ptr);
 cmi_status_t cmi_write_urg(struct CLB *c, unsigned char data);

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -134,7 +134,7 @@ cmi_status_t cmj_write_urg_start(struct CLB *lnk)
 	return status;
 }
 
-void cmj_write_interrupt(struct CLB *lnk, int signo)
+void cmj_write_interrupt(struct CLB *lnk)
 {
 	int save_errno;
 	ssize_t rval = 0;

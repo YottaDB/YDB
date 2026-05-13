@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -149,7 +149,6 @@ STATICFNDEF void gtcm_gnp_server_actions(void)
 	unsigned short		value;
 	cm_op_t			reply;
 	connection_struct	*prev_curr_entry;
-	CMI_MUTEX_DECL(cmi_mutex_rc);
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -174,20 +173,16 @@ STATICFNDEF void gtcm_gnp_server_actions(void)
 		}
 		if (blkdlist)
 			gtcml_chkreg();
-		CMI_MUTEX_BLOCK(cmi_mutex_rc);
 		gtcm_remove_from_action_queue();
-		CMI_MUTEX_RESTORE(cmi_mutex_rc);
 		if ((connection_struct *)INTERLOCK_FAIL == curr_entry)
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) CMERR_CMINTQUE);
 		if ((connection_struct *)EMPTY_QUEUE != curr_entry)
 		{
 			if (1 == (curr_entry->int_cancel.laflag & 1))
 			{ /* valid interrupt cancel msg, handle in gtcm_urgread_ast */
-				CMI_MUTEX_BLOCK(cmi_mutex_rc);
 				prev_curr_entry = curr_entry;
 				curr_entry = EMPTY_QUEUE;
 				gtcm_int_unpack(prev_curr_entry);
-				CMI_MUTEX_RESTORE(cmi_mutex_rc);
 				continue;
 			}
 			switch (*curr_entry->clb_ptr->mbf)
@@ -302,9 +297,7 @@ STATICFNDEF void gtcm_gnp_server_actions(void)
 					curr_entry = EMPTY_QUEUE;
 					if (1 == (prev_curr_entry->int_cancel.laflag & 1))
 					{  /* valid interrupt cancel msg, handle in gtcm_urgread_ast */
-						CMI_MUTEX_BLOCK(cmi_mutex_rc);
 						gtcm_int_unpack(prev_curr_entry);
-						CMI_MUTEX_RESTORE(cmi_mutex_rc);
 					} else if (CM_READ == reply)
 					{
 						prev_curr_entry->clb_ptr->ast = gtcm_read_ast;

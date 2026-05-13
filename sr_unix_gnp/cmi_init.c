@@ -111,20 +111,17 @@ cmi_status_t cmi_init(cmi_descriptor *tnd, unsigned char tnr,
 		CLOSEFILE_RESET(ntd_root->listen_fd, rc);	/* resets "ntd_root->listen_fd" to FD_INVALID */
 		return status;
 	}
-	SIGPROCMASK(SIG_BLOCK, &ntd_root->mutex_set, &oset, rc);
 	rval = listen(ntd_root->listen_fd, MAX_CONN_IND);
 	if (-1 == rval)
 	{
 		save_errno = errno;
 		CLOSEFILE_RESET(ntd_root->listen_fd, rc);	/* resets "ntd_root->listen_fd" to FD_INVALID */
-		SIGPROCMASK(SIG_SETMASK, &oset, NULL, rc);
 		return save_errno;
 	}
 	status = cmj_set_async(ntd_root->listen_fd);
 	if (CMI_ERROR(status))
 	{
 		CLOSEFILE_RESET(ntd_root->listen_fd, rc);	/* resets "ntd_root->listen_fd" to FD_INVALID */
-		SIGPROCMASK(SIG_SETMASK, &oset, NULL, rc);
 		return status;
 	}
 	if (FD_SETSIZE <= ntd_root->listen_fd)
@@ -139,6 +136,5 @@ cmi_status_t cmi_init(cmi_descriptor *tnd, unsigned char tnr,
 	if (ntd_root->listen_fd > ntd_root->max_fd)
 		ntd_root->max_fd = ntd_root->listen_fd;
 	cmj_housekeeping(); /* will establish listening pools */
-	SIGPROCMASK(SIG_SETMASK, &oset, NULL, rc);
 	return SS_NORMAL;
 }

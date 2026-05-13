@@ -102,11 +102,6 @@ cmi_status_t cmj_netinit(void)
 	FD_ZERO(&tsk->rs);
 	FD_ZERO(&tsk->ws);
 	FD_ZERO(&tsk->es);
-	/* I/O readiness is now driven by epoll instead of SIGIO/SIGURG. mutex_set is left empty
-	 * so the existing SIGPROCMASK brackets become cheap (block-empty-set) and other signals
-	 * (SIGTERM/HUP/USR/ALRM) keep their normal delivery. cmj_handler is no longer registered.
-	 */
-	sigemptyset(&tsk->mutex_set);
 	tsk->epoll_fd = epoll_create1(EPOLL_CLOEXEC);
 	if (-1 == tsk->epoll_fd)
 		return errno;

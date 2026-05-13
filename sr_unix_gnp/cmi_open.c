@@ -128,7 +128,6 @@ cmi_status_t cmi_open(struct CLB *lnk)
 		FREEADDRINFO(ai_head);
 		return save_errno;
 	}
-	SIGPROCMASK(SIG_BLOCK, &ntd_root->mutex_set, &oset, rc);
 	status = cmj_setupfd(new_fd);
 	if (CMI_ERROR(status))
 		CLOSEFILE_RESET(new_fd, rc);	/* resets "new_fd" to FD_INVALID */
@@ -150,7 +149,6 @@ cmi_status_t cmi_open(struct CLB *lnk)
 		} else
 			CLOSEFILE_RESET(new_fd, rc);	/* resets "new_fd" to FD_INVALID */
 	}
-	SIGPROCMASK(SIG_SETMASK, &oset, NULL, rc);
 	FREEADDRINFO(ai_head);			/* prevent mem-leak */
 	return status;
 }

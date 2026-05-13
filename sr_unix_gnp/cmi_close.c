@@ -52,8 +52,6 @@ cmi_status_t cmi_close(struct CLB *lnk)
 	 */
 	cmi_free_clb(lnk);
 #endif
-	SIGPROCMASK(SIG_BLOCK, &tsk->mutex_set, &oset, rc);
 	cmj_housekeeping();
-	SIGPROCMASK(SIG_SETMASK, &oset, NULL, rc);
 	return status;
 }

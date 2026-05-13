@@ -30,11 +30,9 @@ cmi_status_t cmi_write(struct CLB *lnk)
 	ASSERT_IS_LIBCMISOCKETTCP;
 	CMI_DPRINT(("ENTER CMI_WRITE, AST 0x%x\n", lnk->ast));
 
-	SIGPROCMASK(SIG_BLOCK, &tsk->mutex_set, &oset, rc);
 	status = cmj_write_start(lnk);
 	if (CMI_ERROR(status))
 	{
-		SIGPROCMASK(SIG_SETMASK, &oset, NULL, rc);
 		CMI_DPRINT(("EXIT CMI_WRITE ERROR %d\n", status));
 		return status;
 	}
@@ -49,8 +47,6 @@ cmi_status_t cmi_write(struct CLB *lnk)
 		if (lnk->sta != CM_CLB_WRITE)
 			status = CMI_CLB_IOSTATUS(lnk);
 	}
-	SIGPROCMASK(SIG_SETMASK, &oset, NULL, rc);
-
 	CMI_DPRINT(("EXIT CMI_WRITE sta = %d\n", lnk->sta));
 	return status;
 }

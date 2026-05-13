@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2020-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2020-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -87,7 +87,6 @@ GBLREF	GPCallback		go_panic_callback;
 
 int ydb_altalrm_sighandler(int signum);
 int ydb_altcont_sighandler(int signum);
-int ydb_altio_sighandler(int signum);		/* Alternate handler for SIGIO/SIGURG for GT.CM usage */
 int ydb_altmain_sighandler(int signum);
 int ydb_altsusp_sighandler(int signum);		/* Alternate handler for various suspend/resume signal handlers */
 int ydb_altusr1_sighandler(int signum);

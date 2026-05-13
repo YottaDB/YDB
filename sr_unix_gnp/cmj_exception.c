@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -20,29 +20,26 @@
 #include "gtm_socket.h"
 #include "eintr_wrappers.h"
 
-void cmj_exception_interrupt(struct CLB *lnk, int signo)
+void cmj_exception_interrupt(struct CLB *lnk)
 {
 	int rval;
 
 	ASSERT_IS_LIBCMISOCKETTCP;
 	if (lnk->mun == -1)
 		return;
-	if (signo == SIGURG)
+	while ((-1 == (rval = (int)recv(lnk->mun, (void *)&lnk->urgdata, 1, MSG_OOB))) && EINTR == errno)
+		eintr_handling_check();
+	HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
+	/* test to see if there is ANY oob data */
+	if (-1 == rval && (CMI_IO_WOULDBLOCK(errno) || errno == EINVAL))
+		return;
+	if (0 == rval || -1 == rval)
 	{
-		while ((-1 == (rval = (int)recv(lnk->mun, (void *)&lnk->urgdata, 1, MSG_OOB))) && EINTR == errno)
-			eintr_handling_check();
-		HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
-		/* test to see if there is ANY oob data */
-		if (-1 == rval && (CMI_IO_WOULDBLOCK(errno) || errno == EINVAL))
-			return;
-		if (0 == rval || -1 == rval)
-		{
-			cmj_err(lnk, CMI_REASON_STATUS, (0 == rval ? ECONNRESET : errno));
-			return;
-		}
-		/* flag urgent data */
-		lnk->deferred_event = TRUE;
-		lnk->deferred_reason = CMI_REASON_INTMSG;
+		cmj_err(lnk, CMI_REASON_STATUS, (0 == rval ? ECONNRESET : errno));
 		return;
 	}
+	/* flag urgent data */
+	lnk->deferred_event = TRUE;
+	lnk->deferred_reason = CMI_REASON_INTMSG;
+	return;
 }

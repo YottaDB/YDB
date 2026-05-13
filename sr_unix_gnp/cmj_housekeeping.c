@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -32,14 +32,9 @@ void cmj_housekeeping(void)
 	 */
 	DEFERRED_SIGNAL_HANDLING_CHECK;
 	/* handle I/O interrupts */
-	if (ntd_root->sigurg_interrupt)
-	{
-		cmj_select(SIGURG);
-		ntd_root->sigurg_interrupt = FALSE;
-	}
 	if (ntd_root->sigio_interrupt)
 	{
-		cmj_select(SIGIO);
+		cmj_select();
 		ntd_root->sigio_interrupt = FALSE;
 	}
 	/* prune CLB free list if necessary */

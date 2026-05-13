@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -43,10 +43,8 @@ void gtcml_chkprc(cm_lckblklck *lck)
 	cm_lckblkprc	*prc, *prc1;
 	boolean_t	found;
 	long		status;
-	CMI_MUTEX_DECL(cmi_mutex_rc);
 
 	ASSERT_IS_LIBGNPSERVER;
-	CMI_MUTEX_BLOCK(cmi_mutex_rc);
 	found = FALSE;
 	prc = lck->prc;
 	/* it appears that the design assumes that prc should never be null, but we have empirical evidence that it happens.
@@ -94,5 +92,4 @@ void gtcml_chkprc(cm_lckblklck *lck)
 			lck->prc = prc->next;
 		free(prc);
 	}
-	CMI_MUTEX_RESTORE(cmi_mutex_rc);
 }
