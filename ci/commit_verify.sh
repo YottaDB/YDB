@@ -162,7 +162,7 @@ if [ -n "$commit_list" ]; then
 			continue
 		fi
 		# Get number of changes (addition deletion file_name)
-		changes=$(git diff --numstat upstream_repo/$target_branch..HEAD "$file")
+		changes=$(git diff --numstat upstream_repo/$target_branch..HEAD -- "$file")
 		if [[ -n "$changes" ]]; then
 			additions=$(echo $changes | awk '{print $1}')
 			deletions=$(echo $changes | awk '{print $2}')
@@ -222,8 +222,8 @@ if [ -n "$commit_list" ]; then
 			# groups of matches. But that would again be confused as deleted lines in the git diff output so we disable
 			# that by adding a "--no-group-separator" to the "grep -C".
 			#
-			num_copyright_additions=$(git diff upstream_repo/$target_branch..HEAD "$file" | sed -n '/^@@ /,$p' | grep --no-group-separator -C 3 'Copyright (c)' | grep -c -e '^+' || true)
-			num_copyright_deletions=$(git diff upstream_repo/$target_branch..HEAD "$file" | sed -n '/^@@ /,$p' |  grep --no-group-separator -C 3 'Copyright (c)' | grep -c -e '^-' || true)
+			num_copyright_additions=$(git diff upstream_repo/$target_branch..HEAD -- "$file" | sed -n '/^@@ /,$p' | grep --no-group-separator -C 3 'Copyright (c)' | grep -c -e '^+' || true)
+			num_copyright_deletions=$(git diff upstream_repo/$target_branch..HEAD -- "$file" | sed -n '/^@@ /,$p' |  grep --no-group-separator -C 3 'Copyright (c)' | grep -c -e '^-' || true)
 			if [[ (( $deletions == $num_copyright_deletions )) && (( $additions == $num_copyright_additions )) ]]; then
 				if [[ (( "ci/commit_verify.sh" != $file )) && (( "sr_port/copyright.txt" != $file )) ]]; then
 					# Avoid copyright-only check on this framework script
