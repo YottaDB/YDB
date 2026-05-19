@@ -3,7 +3,7 @@
  * Copyright (c) 2012-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -73,6 +73,7 @@ GBLREF	boolean_t		holds_sem[NUM_SEM_SETS][NUM_SRC_SEMS];
 GBLREF	uint4			process_id;
 GBLREF	volatile boolean_t	timer_in_handler;
 GBLREF	boolean_t		multi_thread_in_use;
+GBLREF	boolean_t		exit_handler_active;
 #endif
 
 /* Typically prototypes are included in the header file. But, in this case the static function - get_mnemonic_offset - has the
@@ -438,11 +439,20 @@ void clear_fake_enospc_if_master_dead(void)
 	gd_addr				*addr_ptr;
 	gd_region			*r_top, *r_local;
 	sgmnt_addrs			*csa;
+	boolean_t			master_dead;
 
 	assert(!multi_thread_in_use);	/* fake-enospc would not have been set if in threaded-code */
 	assert(jnlpool && jnlpool->jnlpool_ctl);
-	if((jnlpool->jnlpool_ctl->jnlpool_creator_pid != process_id)
-		&& !is_proc_alive(jnlpool->jnlpool_ctl->jnlpool_creator_pid, 0))
+	/* The journal pool is created by the source server so check if the creator pid is still alive. If yes,
+	 * then master is alive. The only exception is if we are the source server and we are in exit handling mode.
+	 * In that case, we might ourselves be waiting for freeze to clear up and so we need to reset fake enospc
+	 * or else it could cause hard-to-debug rare test hangs.
+	 */
+	if (jnlpool->jnlpool_ctl->jnlpool_creator_pid != process_id)
+		master_dead = !is_proc_alive(jnlpool->jnlpool_ctl->jnlpool_creator_pid, 0);
+	else
+		master_dead = exit_handler_active;
+	if (master_dead)
 	{
 		for (addr_ptr = get_next_gdr(NULL); addr_ptr; addr_ptr = get_next_gdr(addr_ptr))
 		{
