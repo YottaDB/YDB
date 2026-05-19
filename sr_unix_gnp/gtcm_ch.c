@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -105,7 +105,7 @@ CONDITION_HANDLER(gtcm_ch)
 		gtm_putmsg_noflush_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SERVERERR, 2, msglen, sevmsgbuf);
 		msglen = (int)(TREF(util_outptr) - TREF(util_outbuff_ptr));
 	}
-	if (curr_entry)
+	if (curr_entry && (NULL != curr_entry->clb_ptr))
 	{
 		mbfptr = curr_entry->clb_ptr->mbf;
 		endptr = mbfptr + curr_entry->clb_ptr->mbl;

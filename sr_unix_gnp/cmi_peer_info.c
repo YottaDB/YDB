@@ -2,7 +2,7 @@
  *								*
  * Copyright 2002, 2013 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -47,7 +47,6 @@ void cmi_peer_info(struct CLB *lnk, char *buf, size_t sz)
 					 ipname, SA_MAXLEN,
 					 port_str, NI_MAXSERV, NI_NUMERICHOST | NI_NUMERICSERV)))
 	{
-		assert(0);
 		RTS_ERROR_ADDRINFO(NULL, ERR_GETNAMEINFO, errcode);
 		return;
 	}
@@ -55,7 +54,6 @@ void cmi_peer_info(struct CLB *lnk, char *buf, size_t sz)
 					 hostname, SA_MAXLITLEN,
 					 NULL, 0, 0)))
 	{
-		assert(0);
 		RTS_ERROR_ADDRINFO(NULL, ERR_GETNAMEINFO, errcode);
 		return;
 	}

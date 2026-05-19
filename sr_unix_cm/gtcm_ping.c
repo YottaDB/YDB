@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  * Copyright (c) 2017 Stephen L Johnson. All rights reserved.	*
@@ -181,7 +181,6 @@ int icmp_ping(int conn)
 		struct hostent *he;
 		if (0 != (errcode = getnameinfo((struct sockaddr *)&paddr, paddr_len, host, SA_MAXLEN, NULL, 0 0)))
 		{
-			assert(FALSE);
 			RTS_ERROR_ADDRINFO(NULL, ERR_GETNAMEINFO, errcode);
 			return FALSE;
 		}
@@ -236,7 +235,6 @@ int get_ping_rsp(void)
 		struct hostent *he;
 		if (0 != (errcode = getnameinfo((struct sockaddr *)&from, fromlen, host, SA_MAXLEN, NULL, 0 0)))
 		{
-			assert(FALSE);
 			RTS_ERROR_ADDRINFO(NULL, ERR_GETNAMEINFO, errcode);
 			return FALSE;
 		}
