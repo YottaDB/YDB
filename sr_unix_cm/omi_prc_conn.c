@@ -159,11 +159,15 @@ int omi_prc_conn(omi_conn *cptr, char *xend, char *buff, char *bend)
 
 /*  Agent name (in) */
     OMI_SI_READ(&ss_len, cptr->xptr);
+    if (ss_len.value == 0 || ss_len.value >= MAX_USER_NAME)
+    {
+	cptr->state = OMI_ST_CLOS;
+	return -OMI_ER_PR_INVMSGFMT;
+    }
     ag_name = (char *)malloc(ss_len.value + 1);
-    assert(ss_len.value < MAX_USER_NAME && ss_len.value > 0);
     memcpy(ag_name, cptr->xptr, ss_len.value);
     ag_name[ss_len.value] = '\0';
-    strcpy(cptr->ag_name, ag_name);
+    memcpy(cptr->ag_name, ag_name, ss_len.value + 1);
     cptr->xptr += ss_len.value;
 
 /*  Agent password (in) */
