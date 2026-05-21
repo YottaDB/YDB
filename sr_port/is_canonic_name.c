@@ -443,6 +443,12 @@ boolean_t parse_gv_name_and_subscripts(mval *src, int *subscripts, int *start, i
 	assert((0 < subs_count) || ((EXPECT_NEXT_LETTER_OF_NAME == state) && (-1 == subs_count)));
 	if (EXPECT_NEXT_LETTER_OF_NAME == state)
 	{
+		if (1 == is_hasht)
+		{	/* "is_hasht == 1" implies only ^# was parsed. No letter following the #.
+			 * Treat this as an invalid global reference.
+			 */
+			return FALSE;
+		}
 		subs_count = 0;
 		*stop = isrc;
 	}
