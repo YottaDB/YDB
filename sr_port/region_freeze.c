@@ -188,12 +188,12 @@ freeze_status	region_freeze_main(gd_region *region, boolean_t freeze, boolean_t 
 			}
 			do
 			{
-				if (!was_crit)
-					grab_crit(region, WS_80);
+				/* Note: We don't hold crit here so one might wonder if "csd->kill_in_prog" can become
+				 * non-zero after we find it zero below and do a "break". That is not possible because
+				 * we have already inhibited the start of new kills (INCR_INHIBIT_KILLS call above).
+				 */
 				if (!csd->kill_in_prog)
 					break;
-				if (!was_crit)
-					rel_crit(region);
 				wcs_sleep(sleep_counter);
 			} while (MAX_CRIT_TRY > sleep_counter++);
 			if (debug_mupip)
@@ -201,6 +201,14 @@ freeze_status	region_freeze_main(gd_region *region, boolean_t freeze, boolean_t 
 				GET_CUR_TIME(time_str);
 				util_out_print("!/MUPIP INFO: !AD : Done with kill-in-prog wait on region", TRUE,
 					       CTIME_BEFORE_NL, time_str);
+			}
+			if (!was_crit)
+			{
+				grab_crit(region, WS_80);
+				/* Assert that "csd->kill_in_prog" did not change since we found it to be 0 in the
+				 * do/while loop above outside of crit (see INCR_INHIBIT_KILLS comment above for why).
+				 */
+				assert(!csd->kill_in_prog || (MAX_CRIT_TRY <= sleep_counter));
 			}
 		}
 		if (pfrms)

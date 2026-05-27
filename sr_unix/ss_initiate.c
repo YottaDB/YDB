@@ -3,7 +3,7 @@
  * Copyright (c) 2009-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -528,7 +528,7 @@ boolean_t	ss_initiate(gd_region *reg,			/* Region in which snapshot has to be st
 		 * be rare.
 		 */
 		if (wait_for_zero_kip)
-		{	/* after inhibitting kills wait once for up to a minute; if that's insufficient, it's probably abandoned */
+		{	/* after inhibiting kills wait once for up to a minute; if that's insufficient, it's probably abandoned */
 			/* Release crit before going into the wait loop */
 			if (csa->now_crit)	/* In MUPIP INTEG and instance freeze, it is possible we don't have crit */
 				rel_crit(reg);
