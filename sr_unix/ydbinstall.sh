@@ -310,23 +310,7 @@ install_plugins()
 	if [ "Y" = $ydb_curl ] ; then install_std_plugin Util YDBCurl ; fi
 	if [ "Y" = "$ydb_posix" ] ; then install_std_plugin Util YDBPosix ; fi
 	if [ "Y" = "$ydb_sodium" ] ; then install_std_plugin Util YDBSodium ; fi
-	if [ "Y" = "$ydb_support" ] ; then
-		echo "Now installing YDBSupport"
-		cd $tmpdir	# Get back to top level temporary directory as the current directory
-		mkdir ydbsupport_tmp
-		cd ydbsupport_tmp
-		if git clone --depth 1 https://gitlab.com/YottaDB/Util/YDBSupport.git YDBSupport-master 2>YDBSupport.err 1>YDBSupport.out ; then
-			cd YDBSupport-master
-			cp ydb_support.sh ${ydb_installdir}/plugin
-			chmod +x ${ydb_installdir}/plugin/ydb_support.sh
-			git log --max-count=1 --pretty=oneline >${ydb_installdir}/plugin/version/YDBSupport_${timestamp}.log
-			cd ../..
-			\rm -R ydbsupport_tmp
-		else
-			echo "Unable to download YDBSupport.  Your internet connection and/or the gitlab servers may be down. Please try again later."
-			remove_tmpdir=0
-		fi
-	fi
+	if [ "Y" = "$ydb_support" ] ; then install_std_plugin Util YDBSupport ; fi
 	if [ "Y" = "$ydb_syslog" ] ; then install_std_plugin Util YDBSyslog ; fi
 	if [ "Y" = $ydb_encplugin ] ; then
 		echo "Now installing YDBEncrypt"
@@ -368,20 +352,17 @@ install_plugins()
 				if [ "Y" = "$gtm_verbose" ] ; then cat ../zlib.log ; fi
 				cp gtmzlib.xc libgtmzlib.so ${ydb_installdir}/plugin
 				cp _ZLIB.m ${ydb_installdir}/plugin/r
-				if [ "Y" = $ydb_utf8 ] ; then
-					mkdir utf8
-					(
-						cd utf8
-						LC_CTYPE=$(locale -a | grep -a -iE '\.utf.?8$' | head -1) ; export LC_CTYPE
-						export ydb_chset="UTF-8"
-						${ydb_installdir}/mumps ${ydb_installdir}/plugin/r/_ZLIB
-						cp _ZLIB.o ${ydb_installdir}/plugin/o/utf8
-					)
-				fi
-				${ydb_installdir}/mumps ${ydb_installdir}/plugin/r/_ZLIB
-				cp _ZLIB.o ${ydb_installdir}/plugin/o
+				cd ${ydb_installdir}/plugin/o
+				ydb_chset=M ${ydb_installdir}/yottadb ../r/_ZLIB.m
+				ld -o _ydbzlib.so --shared -z noexecstack _ZLIB.o && rm _ZLIB.o
+				cd $tmpdir/zlib_tmp/YDBZlib-master
 				git log --max-count=1 --pretty=oneline >${ydb_installdir}/plugin/version/YDBZlib_${timestamp}.log
-				cd ../..
+				if [ -e ${ydb_installdir}/utf8/libyottadbutil.so ] ; then
+					cd ${ydb_installdir}/plugin/o/utf8
+					ydb_chset=UTF8 ${ydb_installdir}/yottadb ../../r/_ZLIB.m
+					ld -o _ydbzlib.so --shared -z noexecstack _ZLIB.o && rm _ZLIB.o
+				fi
+				cd $tmpdir
 				\rm -R zlib_tmp
 			else
 				echo "YDBZlib build failed. The build directory ($PWD/zlib_tmp) has been saved."
