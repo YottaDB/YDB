@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  * Copyright (c) 2017 Stephen L Johnson. All rights reserved.	*
@@ -103,7 +103,10 @@ GBLREF mval			*alias_retarg;
 GBLREF io_pair			io_std_device;
 GTMTRIG_ONLY(GBLREF mval 	dollar_ztwormhole;)
 GTMTRIG_ONLY(GBLREF mval 	dollar_ztslate;)
-DEBUG_ONLY(GBLREF   boolean_t	ok_to_UNWIND_in_exit_handling;)
+#ifdef DEBUG
+GBLREF boolean_t		ok_to_UNWIND_in_exit_handling;
+GBLREF boolean_t		run_time;
+#endif
 
 OS_PAGE_SIZE_DECLARE
 
@@ -500,8 +503,14 @@ void stp_vfy_mval(void)
 
 boolean_t is_stp_space_available(ssize_t space_needed)
 {
-	/* Asserts added here are tested every time any module in the codebase does stringpool space checks */
-	assert(!stringpool_unusable);
+	/* Asserts added here are tested every time any module in the codebase does stringpool space checks.
+	 * The only exception known currently is if the process is in the middle of compiling an M routine
+	 * and decided to exit in "obj_code()" because of deferred signal. Hence the "||" in the assert below.
+	 */
+	DEBUG_ONLY(DCL_THREADGBL_ACCESS);
+
+	DEBUG_ONLY(SETUP_THREADGBL_ACCESS);
+	assert(!stringpool_unusable || (process_exiting && !run_time && TREF(compile_time)));
 	return IS_STP_SPACE_AVAILABLE_PRO(space_needed);
 }
 
