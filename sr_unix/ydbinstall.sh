@@ -1113,7 +1113,9 @@ if [ "Y" = "$ydb_plugins_only" ]; then
 	fi
 fi
 
-if [ "N" = "$ydb_force_install" ]; then
+# If only plugins are to be installed, YottaDB is already installed and there is
+# no need to check for YottaDB compatibility.
+if [ "N" = "$ydb_plugins_only" ] && [ "N" = "$ydb_force_install" ]; then
 	# At this point, we know the current machine architecture is supported by YottaDB
 	# but not yet sure if the OS and/or version is supported. Since
 	# --force-install is not specified, it is okay to do the os-version check now.
