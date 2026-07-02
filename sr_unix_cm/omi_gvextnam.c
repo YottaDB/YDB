@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -37,6 +37,7 @@ static char rcsid[] = "$Header:$";
 #include "dpgbldir.h"
 #include "gvcst_protos.h"	/* for gvcst_root_search in GV_BIND_NAME_AND_ROOT_SEARCH macro */
 #include "hashtab_mname.h"
+#include "stringpool.h"
 
 GBLREF gv_key		*gv_currkey;
 GBLREF gd_region	*gv_cur_region;
@@ -46,7 +47,7 @@ int	omi_gvextnam (omi_conn *cptr, uns_short len, char *ref)
 {
 	bool		was_null, is_null;
 	mval		v;
-	mname_entry	gvname;
+	unmanaged_mname_entry	gvname;
 	char		*ptr, *end, c[MAX_FN_LEN + 1];
 	omi_li		li;
 	omi_si		si;
@@ -64,6 +65,7 @@ int	omi_gvextnam (omi_conn *cptr, uns_short len, char *ref)
 
 /*	Initialize part of the mval */
 	v.mvtype = MV_STR;
+	v.str.in_array = FALSE;
 
 /*	Refine the gd_addr given this environment */
 	OMI_LI_READ(&li, ptr);
@@ -77,7 +79,7 @@ int	omi_gvextnam (omi_conn *cptr, uns_short len, char *ref)
 	pblk.buff_size = MAX_FN_LEN;
 	pblk.def1_buf = DEF_GDR_EXT;
 	pblk.def1_size = SIZEOF(DEF_GDR_EXT) - 1;
-	status = parse_file(&v.str, &pblk);
+	status = parse_file(&v.str.umstr, &pblk);
 
 	/* for all segments insert the full path in the segment fname */
 	cur_seg = cptr->ga->segments;

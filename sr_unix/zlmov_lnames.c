@@ -14,7 +14,7 @@
 
 #include "gtm_string.h"
 
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "arlinkdbg.h"
 
 #ifdef USHBIN_SUPPORTED

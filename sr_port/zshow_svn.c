@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -27,7 +27,7 @@
 #include "gdscc.h"
 #include "io.h"
 #include "jnl.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "stack_frame.h"
 #include "stringpool.h"
 #include "svnames.h"
@@ -100,6 +100,7 @@ static readonly char zerror_text[] = "$ZERROR";
 static readonly char zgbldir_text[] = "$ZGBLDIR";
 static readonly char zininterrupt_text[] = "$ZININTERRUPT";
 static readonly char zinterrupt_text[] = "$ZINTERRUPT";
+static readonly char zinxpel_text[] = "$ZINXPEL";
 static readonly char zio_text[] = "$ZIO";
 static readonly char zjob_text[] = "$ZJOB";
 static readonly char zlevel_text[] = "$ZLEVEL";
@@ -163,7 +164,7 @@ GBLREF uint4			dollar_tlevel, dollar_trestart, dollar_zjob;
 GBLREF volatile boolean_t	dollar_zininterrupt;
 #ifdef GTM_TRIGGER
 GBLREF int4			gtm_trigger_depth;
-GBLREF mstr			*dollar_ztname;
+GBLREF mident			*dollar_ztname;
 GBLREF mstr			dollar_zicuver;
 GBLREF mval			*dollar_ztdata, *dollar_ztdelim, *dollar_ztoldval, *dollar_ztriggerop, dollar_ztslate;
 GBLREF mval			*dollar_ztupdate, *dollar_ztvalue, dollar_ztwormhole;
@@ -180,22 +181,22 @@ LITREF mval		literal_mv_bias, literal_null, literal_zero, literal_one;
 	io_log_name	*tl;								\
 											\
 	tl = dollar_principal ? dollar_principal : io_root_log_name->iod->trans_name;	\
-	MVAL.mvtype = MV_STR;								\
-	MVAL.str.addr = tl->dollar_io;							\
-	MVAL.str.len = tl->len;								\
+	(MVAL)->mvtype = MV_STR;							\
+	(MVAL)->str.addr = tl->dollar_io;						\
+	(MVAL)->str.len = tl->len;							\
 	/*** The following should be in the I/O code ***/				\
-	if (ESC == *MVAL.str.addr)							\
+	if (ESC == *(MVAL)->str.addr)							\
 	{										\
-		if (5 > MVAL.str.len)							\
-			MVAL.str.len = 0;						\
+		if (5 > (MVAL)->str.len)						\
+			(MVAL)->str.len = 0;						\
 		else									\
 		{									\
-			MVAL.str.addr += ESC_OFFSET;					\
-			MVAL.str.len -= ESC_OFFSET;					\
+			(MVAL)->str.addr += ESC_OFFSET;					\
+			(MVAL)->str.len -= ESC_OFFSET;					\
 		}									\
 	}										\
 	ZS_VAR_EQU(&X, TEXT);								\
-	mval_write(OUTPUT, &MVAL, TRUE);						\
+	mval_write(OUTPUT, MVAL, TRUE);							\
 }
 
 #define ZWRITE_SPLIT_DOLLAR_P(MVAL, BUFFER, BUFF_LEN, X, DOLLARZ, TEXT, OUTPUT)		\
@@ -205,18 +206,18 @@ LITREF mval		literal_mv_bias, literal_null, literal_zero, literal_one;
 											\
 	tl = dollar_principal ? dollar_principal : io_root_log_name->iod->trans_name;	\
 	assert(BUFF_LEN > (tl->len + DOLLARZ.len));					\
-	MVAL.mvtype = MV_STR;								\
-	MVAL.str.addr = BUFFER;								\
-	ptr = MVAL.str.addr;								\
+	(MVAL)->mvtype = MV_STR;							\
+	(MVAL)->str.addr = BUFFER;							\
+	ptr = (MVAL)->str.addr;								\
 	/* Transfer $p to mval */							\
 	memcpy(ptr, (char *)tl->dollar_io, tl->len);					\
 	ptr += tl->len;									\
-	MVAL.str.len = tl->len;								\
+	(MVAL)->str.len = tl->len;							\
 	/* then transfer "< /" */							\
 	memcpy(ptr, DOLLARZ.addr, DOLLARZ.len);						\
-	MVAL.str.len += DOLLARZ.len;							\
+	(MVAL)->str.len += DOLLARZ.len;							\
 	ZS_VAR_EQU(&X, TEXT);								\
-	mval_write(OUTPUT, &MVAL, TRUE);						\
+	mval_write(OUTPUT, (MVAL), TRUE);						\
 }
 
 error_def(ERR_ZDIROUTOFSYNC);
@@ -224,9 +225,8 @@ error_def(ERR_INVSVN);
 
 void zshow_svn(zshow_out *output, int one_sv)
 {
-	mstr		x;
-	mval		var, zdir;
-       	stack_frame	*fp;
+	unmanaged_mstr	x;
+	mval		*var, lcl_mval = {{0}};
 	int 		count, save_dollar_zlevel;
 	char		*c1, *c2;
 	char		zdir_error[ZDIR_ERR_LEN];
@@ -234,64 +234,73 @@ void zshow_svn(zshow_out *output, int one_sv)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	if (!process_exiting)
+	{
+		PUSH_MV_STENT(MVST_MVAL);
+		var = &mv_chain->mv_st_cont.mvs_mval;
+	} else
+	{
+		var = &lcl_mval;
+		/* For now, no protection */
+	}
 	switch(one_sv)
 	{
 		case SV_ALL:
 		case SV_DEVICE:
-			get_dlr_device(&var);
+			get_dlr_device(var);
 			ZS_VAR_EQU(&x, device_text);
-			mval_write(output, &var, TRUE);
+			mval_write(output, var, TRUE);
 			if (SV_ALL != one_sv)
 				break;
 		/* CAUTION: fall through */
 		case SV_ECODE:
-			ecode_get(-1, &var);
+			ecode_get(-1, var);
 			ZS_VAR_EQU(&x, ecode_text);
-			mval_write(output, &var, TRUE);
+			mval_write(output, var, TRUE);
 			if (SV_ALL != one_sv)
 				break;
 		/* CAUTION: fall through */
 		case SV_ESTACK:
 			save_dollar_zlevel = dollar_zlevel();
 			count = (save_dollar_zlevel - 1) - dollar_estack_delta.m[0];
-			MV_FORCE_MVAL(&var, count);
+			MV_FORCE_MVAL(var, count);
 			ZS_VAR_EQU(&x, estack_text);
-			mval_write(output, &var, TRUE);
+			mval_write(output, var, TRUE);
 			if (SV_ALL != one_sv)
 				break;
 		/* CAUTION: fall through */
 		case SV_ETRAP:
-			var.mvtype = MV_STR;
-			var.str = (TREF(dollar_etrap)).str;
+			var->mvtype = MV_STR;
+			var->str.umstr = (TREF(dollar_etrap)).str.umstr;
 			ZS_VAR_EQU(&x, etrap_text);
-			mval_write(output, &var, TRUE);
+			mval_write(output, var, TRUE);
 			if (SV_ALL != one_sv)
 				break;
 		/* CAUTION: fall through */
 		case SV_HOROLOG:
-			op_zhorolog(&var, FALSE);
+			op_zhorolog(var, FALSE);
 			ZS_VAR_EQU(&x, horolog_text);
-			mval_write(output, &var, TRUE);
+			mval_write(output, var, TRUE);
 			if (SV_ALL != one_sv)
 				break;
 		/* CAUTION: fall through */
 		case SV_IO:
-			var.str.addr = io_curr_device.in->name->dollar_io;
-			var.str.len = io_curr_device.in->name->len;
+			var->str.addr = io_curr_device.in->name->dollar_io;
+			var->str.len = io_curr_device.in->name->len;
 			/*** The following should be in the I/O code ***/
-			if (ESC == *var.str.addr)
+			if (ESC == *var->str.addr)
 			{
-				if (5 > var.str.len)
-					var.str.len = 0;
+				if (5 > var->str.len)
+					var->str.len = 0;
 				else
 				{
-					var.str.addr += ESC_OFFSET;
-					var.str.len -= ESC_OFFSET;
+					var->str.addr += ESC_OFFSET;
+					var->str.len -= ESC_OFFSET;
 				}
 			}
-			var.mvtype = MV_STR;
+			var->mvtype = MV_STR;
 			ZS_VAR_EQU(&x, io_text);
-			mval_write(output, &var, TRUE);
+			mval_write(output, var, TRUE);
 			if (SV_ALL != one_sv)
 				break;
 		/* CAUTION: fall through */
@@ -302,9 +311,9 @@ void zshow_svn(zshow_out *output, int one_sv)
 				break;
 		/* CAUTION: fall through */
 		case SV_KEY:
-			get_dlr_key(&var);
+			get_dlr_key(var);
 			ZS_VAR_EQU(&x, key_text);
-			mval_write(output, &var, TRUE);
+			mval_write(output, var, TRUE);
 			if (SV_ALL != one_sv)
 				break;
 		/* CAUTION: fall through */
@@ -315,25 +324,25 @@ void zshow_svn(zshow_out *output, int one_sv)
 		/* CAUTION: fall through */
 		case SV_QUIT:
 			count = dollar_quit();
-			MV_FORCE_MVAL(&var, count);
+			MV_FORCE_MVAL(var, count);
 			ZS_VAR_EQU(&x, quit_text);
-			mval_write(output, &var, TRUE);
+			mval_write(output, var, TRUE);
 			if (SV_ALL != one_sv)
 				break;
 		/* CAUTION: fall through */
 		case SV_REFERENCE:
-			get_reference(&var);
+			get_reference(var);
 			ZS_VAR_EQU(&x, reference_text);
-			mval_write(output, &var, TRUE);
+			mval_write(output, var, TRUE);
 			if (SV_ALL != one_sv)
 				break;
 		/* CAUTION: fall through */
 		case SV_STACK:
 			save_dollar_zlevel = dollar_zlevel();
 			count = (save_dollar_zlevel - 1);
-			MV_FORCE_MVAL(&var, count);
+			MV_FORCE_MVAL(var, count);
 			ZS_VAR_EQU(&x, stack_text);
-			mval_write(output, &var, TRUE);
+			mval_write(output, var, TRUE);
 			if (SV_ALL != one_sv)
 				break;
 		/* CAUTION: fall through */
@@ -342,164 +351,164 @@ void zshow_svn(zshow_out *output, int one_sv)
 			count -= (int)totalRmalloc;
 			if (0 > count)
 				count = 0;
-			MV_FORCE_MVAL(&var, count);
+			MV_FORCE_MVAL(var, count);
 			ZS_VAR_EQU(&x, storage_text);
-			mval_write(output, &var, TRUE);
+			mval_write(output, var, TRUE);
 			if (SV_ALL != one_sv)
 				break;
 		/* CAUTION: fall through */
 		case SV_SYSTEM:
-			var.mvtype = MV_STR;
-			var.str = dollar_system.str;
+			var->mvtype = MV_STR;
+			var->str.umstr = dollar_system.str.umstr;
 			ZS_VAR_EQU(&x, system_text);
-			mval_write(output, &var, TRUE);
+			mval_write(output, var, TRUE);
 			if (SV_ALL != one_sv)
 				break;
 		/* CAUTION: fall through */
 		case SV_TEST:
-			i2mval(&var, (int)op_dt_get());
+			i2mval(var, (int)op_dt_get());
 			ZS_VAR_EQU(&x, test_text);
-			mval_write(output, &var, TRUE);
+			mval_write(output, var, TRUE);
 			if (SV_ALL != one_sv)
 				break;
 		/* CAUTION: fall through */
 		case SV_TLEVEL:
 			count = (int)dollar_tlevel;
-			MV_FORCE_MVAL(&var, count);
+			MV_FORCE_MVAL(var, count);
 			ZS_VAR_EQU(&x, tlevel_text);
-			mval_write(output, &var, TRUE);
+			mval_write(output, var, TRUE);
 			if (SV_ALL != one_sv)
 				break;
 		/* CAUTION: fall through */
 		case SV_TRESTART:
-			MV_FORCE_MVAL(&var, (int)((MAX_VISIBLE_TRESTART < dollar_trestart)
+			MV_FORCE_MVAL(var, (int)((MAX_VISIBLE_TRESTART < dollar_trestart)
 				? MAX_VISIBLE_TRESTART : dollar_trestart));
 			ZS_VAR_EQU(&x, trestart_text);
-			mval_write(output, &var, TRUE);
+			mval_write(output, var, TRUE);
 			if (SV_ALL != one_sv)
 				break;
 		/* CAUTION: fall through */
 		case SV_X:
 			count = (int)io_curr_device.out->dollar.x;
-			MV_FORCE_MVAL(&var, count);
+			MV_FORCE_MVAL(var, count);
 			ZS_VAR_EQU(&x, x_text);
-			mval_write(output, &var, TRUE);
+			mval_write(output, var, TRUE);
 			if (SV_ALL != one_sv)
 				break;
 		/* CAUTION: fall through */
 		case SV_Y:
 			count = (int)io_curr_device.out->dollar.y;
-			MV_FORCE_MVAL(&var, count);
+			MV_FORCE_MVAL(var, count);
 			ZS_VAR_EQU(&x, y_text);
-			mval_write(output, &var, TRUE);
+			mval_write(output, var, TRUE);
 			if (SV_ALL != one_sv)
 				break;
 		/* CAUTION: fall through */
 		case SV_ZA:
 			count = (int)io_curr_device.in->dollar.za;
-			MV_FORCE_MVAL(&var, count);
+			MV_FORCE_MVAL(var, count);
 			ZS_VAR_EQU(&x, za_text);
-			mval_write(output, &var, TRUE);
+			mval_write(output, var, TRUE);
 			if (SV_ALL != one_sv)
 				break;
 		/* CAUTION: fall through */
 		case SV_ZALLOCSTOR:
 			count = (int)totalAlloc;	/* WARNING: downcasting possible 64bit value to 32bits */
-			MV_FORCE_UMVAL(&var, (unsigned int)count);
+			MV_FORCE_UMVAL(var, (unsigned int)count);
 			ZS_VAR_EQU(&x, zallocstor_text);
-			mval_write(output, &var, TRUE);
+			mval_write(output, var, TRUE);
 			if (SV_ALL != one_sv)
 				break;
 		/* CAUTION: fall through */
 		case SV_ZAUDIT:
-			MV_FORCE_MVAL(&var, TREF(dollar_zaudit));
+			MV_FORCE_MVAL(var, TREF(dollar_zaudit));
 			ZS_VAR_EQU(&x, zaudit_text);
-			mval_write(output, &var, TRUE);
+			mval_write(output, var, TRUE);
 			if (SV_ALL != one_sv)
 				break;
 		/* CAUTION: fall through */
 		case SV_ZB:
 			c1 = (char *)io_curr_device.in->dollar.zb;
 			c2 = c1 + SIZEOF(io_curr_device.in->dollar.zb);
-			var.mvtype = MV_STR;
-			var.str.addr = (char *)io_curr_device.in->dollar.zb;
+			var->mvtype = MV_STR;
+			var->str.addr = (char *)io_curr_device.in->dollar.zb;
 			while (c1 < c2 && *c1)
 				c1++;
-			var.str.len = INTCAST((char *)c1 - var.str.addr);
+			var->str.len = INTCAST((char *)c1 - var->str.addr);
 			ZS_VAR_EQU(&x, zb_text);
-			mval_write(output, &var, TRUE);
+			mval_write(output, var, TRUE);
 			if (SV_ALL != one_sv)
 				break;
 		/* CAUTION: fall through */
 		case SV_ZCHSET:
-			var.mvtype = MV_STR;
-			var.str = dollar_zchset;
+			var->mvtype = MV_STR;
+			var->str.umstr = dollar_zchset.umstr;
 			ZS_VAR_EQU(&x, zchset_text);
-			mval_write(output, &var, TRUE);
+			mval_write(output, var, TRUE);
 			if (SV_ALL != one_sv)
 				break;
 		/* CAUTION: fall through */
 		case SV_ZCLOSE:
 			count = (int)(TREF(dollar_zclose));
-			MV_FORCE_MVAL(&var, count);
+			MV_FORCE_MVAL(var, count);
 			ZS_VAR_EQU(&x, zclose_text);
-			mval_write(output, &var, TRUE);
+			mval_write(output, var, TRUE);
 			if (SV_ALL != one_sv)
 				break;
 		/* CAUTION: fall through */
 		case SV_ZCMDLINE:
-			get_command_line(&var, TRUE);	/* TRUE indicates $ZCMDLINE (i.e. processed not actual command line) */
+			get_command_line(var, TRUE);	/* TRUE indicates $ZCMDLINE (i.e. processed not actual command line) */
 			ZS_VAR_EQU(&x, zcmdline_text);
-			mval_write(output, &var, TRUE);
+			mval_write(output, var, TRUE);
 			if (SV_ALL != one_sv)
 				break;
 		/* CAUTION: fall through */
 		case SV_ZCOMPILE:
-			var.mvtype = MV_STR;
-			var.str = TREF(dollar_zcompile);
+			var->mvtype = MV_STR;
+			var->str.umstr = (TREF(dollar_zcompile)).umstr;
 			ZS_VAR_EQU(&x, zcompile_text);
-			mval_write(output, &var, TRUE);
+			mval_write(output, var, TRUE);
 			if (SV_ALL != one_sv)
 				break;
 		/* CAUTION: fall through */
 		case SV_ZC:
 		case SV_ZCSTATUS:
-			MV_FORCE_MVAL(&var, !TREF(dollar_zcstatus) ? 1 : TREF(dollar_zcstatus));
+			MV_FORCE_MVAL(var, !TREF(dollar_zcstatus) ? 1 : TREF(dollar_zcstatus));
 			ZS_VAR_EQU(&x, zcstatus_text);
-			mval_write(output, &var, TRUE);
+			mval_write(output, var, TRUE);
 			if (SV_ALL != one_sv)
 				break;
 		/* CAUTION: fall through */
 		case SV_ZDATE_FORM:
-			MV_FORCE_MVAL(&var, TREF(zdate_form));
+			MV_FORCE_MVAL(var, TREF(zdate_form));
 			ZS_VAR_EQU(&x, zdate_form_text);
-			mval_write(output, &var, TRUE);
+			mval_write(output, var, TRUE);
 			if (SV_ALL != one_sv)
 				break;
 		/* CAUTION: fall through */
 		case SV_ZDIR:
 			ZS_VAR_EQU(&x, zdirectory_text);
-			setzdir(NULL, &zdir);
-			if (zdir.str.len != dollar_zdir.str.len || 0 != memcmp(zdir.str.addr, dollar_zdir.str.addr, zdir.str.len))
+			setzdir(NULL, var);
+			if (var->str.len != dollar_zdir.str.len || 0 != memcmp(var->str.addr, dollar_zdir.str.addr, var->str.len))
 			{
-				memcpy((void *)zdir_error, zdir.str.addr, zdir.str.len);
-				memcpy(&zdir_error[zdir.str.len], arrow_text, STR_LIT_LEN(arrow_text));
-				zdir_error_rem_len = ZDIR_ERR_LEN - zdir.str.len - STR_LIT_LEN(arrow_text);
-				sgtm_putmsg(&zdir_error[zdir.str.len + STR_LIT_LEN(arrow_text)], zdir_error_rem_len,
-					VARLSTCNT(6) ERR_ZDIROUTOFSYNC, 4, zdir.str.len, zdir.str.addr,
+				memcpy(zdir_error, var->str.addr, var->str.len);
+				memcpy(&zdir_error[var->str.len], arrow_text, STR_LIT_LEN(arrow_text));
+				zdir_error_rem_len = ZDIR_ERR_LEN - var->str.len - STR_LIT_LEN(arrow_text);
+				sgtm_putmsg(&zdir_error[var->str.len + STR_LIT_LEN(arrow_text)], zdir_error_rem_len,
+					VARLSTCNT(6) ERR_ZDIROUTOFSYNC, 4, var->str.len, var->str.addr,
 					dollar_zdir.str.len, dollar_zdir.str.addr);
-				zdir.str.addr = zdir_error;
-				zdir.str.len = STRLEN(zdir_error) - 1; /* eliminate trailing '\n' */
+				var->str.addr = zdir_error;
+				var->str.len = STRLEN(zdir_error) - 1; /* eliminate trailing '\n' */
 			}
-			SKIP_DEVICE_IF_NOT_NEEDED(&zdir);
-			mval_write(output, &zdir, TRUE);
+			SKIP_DEVICE_IF_NOT_NEEDED(var);
+			mval_write(output, var, TRUE);
 			if (SV_ALL != one_sv)
 				break;
 		/* CAUTION: fall through */
 		case SV_ZEDITOR:
-			MV_FORCE_MVAL(&var, dollar_zeditor);
+			MV_FORCE_MVAL(var, dollar_zeditor);
 			ZS_VAR_EQU(&x, zeditor_text);
-			mval_write(output, &var, TRUE);
+			mval_write(output, var, TRUE);
 			if (SV_ALL != one_sv)
 				break;
 		/* CAUTION: fall through */
@@ -510,10 +519,10 @@ void zshow_svn(zshow_out *output, int one_sv)
 				break;
 		/* CAUTION: fall through */
 		case SV_ZERROR:
-			var.mvtype = MV_STR;
-			var.str = dollar_zerror.str;
+			var->mvtype = MV_STR;
+			var->str.umstr = dollar_zerror.str.umstr;
 			ZS_VAR_EQU(&x, zerror_text);
-			mval_write(output, &var, TRUE);
+			mval_write(output, var, TRUE);
 			if (SV_ALL != one_sv)
 				break;
 		/* CAUTION: fall through */
@@ -524,99 +533,106 @@ void zshow_svn(zshow_out *output, int one_sv)
 				break;
 		/* CAUTION: fall through */
 		case SV_ZHOROLOG:
-			op_zhorolog(&var, TRUE);
+			op_zhorolog(var, TRUE);
 			ZS_VAR_EQU(&x, zhorolog_text);
-			mval_write(output, &var, TRUE);
+			mval_write(output, var, TRUE);
 			if (SV_ALL != one_sv)
 				break;
 		/* CAUTION: fall through */
 		case SV_ZICUVER:
-			var.mvtype = MV_STR;
-			var.str = dollar_zicuver;
+			var->mvtype = MV_STR;
+			var->str.umstr = dollar_zicuver.umstr;
 			ZS_VAR_EQU(&x, zicuver_text);
-			mval_write(output, &var, TRUE);
+			mval_write(output, var, TRUE);
 			if (SV_ALL != one_sv)
 				break;
 		/* CAUTION: fall through */
 		case SV_ZININTERRUPT:
-			MV_FORCE_MVAL(&var, dollar_zininterrupt);
+			MV_FORCE_MVAL(var, dollar_zininterrupt);
 			ZS_VAR_EQU(&x, zininterrupt_text);
-			mval_write(output, &var, TRUE);
+			mval_write(output, var, TRUE);
 			if (SV_ALL != one_sv)
 				break;
 		/* CAUTION: fall through */
 		case SV_ZINTERRUPT:
-			var.mvtype = MV_STR;
-			var.str = dollar_zinterrupt.str;
+			var->mvtype = MV_STR;
+			var->str.umstr = dollar_zinterrupt.str.umstr;
 			ZS_VAR_EQU(&x, zinterrupt_text);
-			mval_write(output, &var, TRUE);
+			mval_write(output, var, TRUE);
+			if (SV_ALL != one_sv)
+				break;
+		/* CAUTION: fall through */
+		case SV_ZINXPEL:
+			MV_FORCE_MVAL(var, TREF(dollar_zinxpel));
+			ZS_VAR_EQU(&x, zinxpel_text);
+			mval_write(output, var, TRUE);
 			if (SV_ALL != one_sv)
 				break;
 		/* CAUTION: fall through */
 		case SV_ZIO:
-			var.mvtype = MV_STR;
+			var->mvtype = MV_STR;
 			/* NOTE:	This is **NOT** equivalent to :
 			 *		io_curr_log_name->dollar_io
 			 */
-			var.str.addr = io_curr_device.in->trans_name->dollar_io;
-			var.str.len = io_curr_device.in->trans_name->len;
-			if (*var.str.addr == ESC)
+			var->str.addr = io_curr_device.in->trans_name->dollar_io;
+			var->str.len = io_curr_device.in->trans_name->len;
+			if (*var->str.addr == ESC)
 			{
-				if (5 > var.str.len)
-					var.str.len = 0;
+				if (5 > var->str.len)
+					var->str.len = 0;
 				else
 				{
-					var.str.addr += ESC_OFFSET;
-					var.str.len -= ESC_OFFSET;
+					var->str.addr += ESC_OFFSET;
+					var->str.len -= ESC_OFFSET;
 				}
 			}
 			ZS_VAR_EQU(&x, zio_text);
-			mval_write(output, &var, TRUE);
+			mval_write(output, var, TRUE);
 			if (SV_ALL != one_sv)
 				break;
 		/* CAUTION: fall through */
 		case SV_ZJOB:
-			MV_FORCE_UMVAL(&var, dollar_zjob);
+			MV_FORCE_UMVAL(var, dollar_zjob);
 			ZS_VAR_EQU(&x, zjob_text);
-			mval_write(output, &var, TRUE);
+			mval_write(output, var, TRUE);
 			if (SV_ALL != one_sv)
 				break;
 		/* CAUTION: fall through */
 		case SV_ZKEY:
-			get_dlr_zkey(&var);
+			get_dlr_zkey(var);
 			ZS_VAR_EQU(&x, zkey_text);
-			mval_write(output, &var, TRUE);
+			mval_write(output, var, TRUE);
 			if (SV_ALL != one_sv)
 				break;
 		/* CAUTION: fall through */
 		case SV_ZLEVEL:
 			save_dollar_zlevel = dollar_zlevel();
-			MV_FORCE_MVAL(&var, save_dollar_zlevel);
+			MV_FORCE_MVAL(var, save_dollar_zlevel);
 			ZS_VAR_EQU(&x, zlevel_text);
-			mval_write(output, &var, TRUE);
+			mval_write(output, var, TRUE);
 			if (SV_ALL != one_sv)
 				break;
 		/* CAUTION: fall through */
 		case SV_ZMALLOCLIM:
 			tmp = zmalloclim;
-			MV_FORCE_UMVAL(&var, (unsigned int)tmp);
+			MV_FORCE_UMVAL(var, (unsigned int)tmp);
 			ZS_VAR_EQU(&x, zmalloclim_text);
-			mval_write(output, &var, TRUE);
+			mval_write(output, var, TRUE);
 			if (SV_ALL != one_sv)
 				break;
 		/* CAUTION: fall through */
 		case SV_ZMAXTPTIME:
-			MV_FORCE_MVAL(&var, TREF(dollar_zmaxtptime));
+			MV_FORCE_MVAL(var, TREF(dollar_zmaxtptime));
 			assert(MV_BIAS == MILLISECS_IN_SEC);				/* check math if this changes */
-			op_div(&var, (mval*)&literal_mv_bias, &var);
+			op_div(var, (mval*)&literal_mv_bias, var);
 			ZS_VAR_EQU(&x, zmaxtptime_text);
-			mval_write(output, &var, TRUE);
+			mval_write(output, var, TRUE);
 			if (SV_ALL != one_sv)
 				break;
 		case SV_ZMLKHASH:
-			i2usmval(&var, mlk_last_hash);
+			i2usmval(var, mlk_last_hash);
 			ZS_VAR_EQU(&x, zmlkhash_text);
-			mval_write(output, &var, TRUE);
+			mval_write(output, var, TRUE);
 			if (SV_ALL != one_sv)
 				break;
 		/* CAUTION: fall through */
@@ -628,17 +644,17 @@ void zshow_svn(zshow_out *output, int one_sv)
 		/* CAUTION: fall through */
 		case SV_ZONLNRLBK:
 			count = (int)(TREF(dollar_zonlnrlbk));
-			MV_FORCE_MVAL(&var, count);
+			MV_FORCE_MVAL(var, count);
 			ZS_VAR_EQU(&x, zonlnrlbk_text);
-			mval_write(output, &var, TRUE);
+			mval_write(output, var, TRUE);
 			if (SV_ALL != one_sv)
 				break;
 		/* CAUTION: fall through */
 		case SV_ZPATNUMERIC:
-			var.mvtype = MV_STR;
-			var.str = dollar_zpatnumeric;
+			var->mvtype = MV_STR;
+			var->str.umstr = dollar_zpatnumeric.umstr;
 			ZS_VAR_EQU(&x, zpatnumeric_text);
-			mval_write(output, &var, TRUE);
+			mval_write(output, var, TRUE);
 			if (SV_ALL != one_sv)
 				break;
 		/* CAUTION: fall through */
@@ -650,14 +666,15 @@ void zshow_svn(zshow_out *output, int one_sv)
 			{	/* Print $principal for a ZWRite request if ZPIN == ZPOUT */
 				ZWRITE_DOLLAR_PRINCIPAL(var, x, principalin_text, output);
 			}
-			var.mvtype = 0;
+			var->mvtype = 0;
+			var->str.len = 0;
 			if (SV_ALL != one_sv)
 				break;
 		/* CAUTION: fall through */
 		case SV_ZPOS:
-			getzposition(&var);
+			getzposition(var);
 			ZS_VAR_EQU(&x, zpos_text);
-			mval_write(output, &var, TRUE);
+			mval_write(output, var, TRUE);
 			if (SV_ALL != one_sv)
 				break;
 		/* CAUTION: fall through */
@@ -669,53 +686,54 @@ void zshow_svn(zshow_out *output, int one_sv)
 			{	/* Print $principal for a ZWRite request if ZPOUT == ZPIN */
 				ZWRITE_DOLLAR_PRINCIPAL(var, x, principalout_text, output);
 			}
-			var.mvtype = 0;
+			var->mvtype = var->str.len = 0;
 			if (SV_ALL != one_sv)
 				break;
 		/* CAUTION: fall through */
 		case SV_PROMPT:
-			var.mvtype = MV_STR;
-			var.str.addr = (TREF(gtmprompt)).addr;
-			var.str.len = (TREF(gtmprompt)).len;
+			var->mvtype = MV_STR;
+			var->str.addr = (TREF(gtmprompt)).addr;
+			var->str.len = (TREF(gtmprompt)).len;
 			ZS_VAR_EQU(&x, zprompt_text);
-			mval_write(output, &var, TRUE);
+			mval_write(output, var, TRUE);
 			if (SV_ALL != one_sv)
 				break;
 		/* CAUTION: fall through */
 		case SV_ZQUIT:
-			MV_FORCE_MVAL(&var, dollar_zquit_anyway);
+			MV_FORCE_MVAL(var, dollar_zquit_anyway);
 			ZS_VAR_EQU(&x, zquit_text);
-			mval_write(output, &var, TRUE);
+			mval_write(output, var, TRUE);
 			if (SV_ALL != one_sv)
 				break;
 		/* CAUTION: fall through */
 		case SV_ZREALSTOR:
 			count = (int)totalRmalloc;	/* WARNING: downcasting possible 64bit value to 32bits */
-			MV_FORCE_UMVAL(&var, (unsigned int)count);
+			MV_FORCE_UMVAL(var, (unsigned int)count);
 			ZS_VAR_EQU(&x, zrealstor_text);
-			mval_write(output, &var, TRUE);
+			mval_write(output, var, TRUE);
 			if (SV_ALL != one_sv)
 				break;
 		case SV_ZRELDATE:
-			var.mvtype = MV_STR;
-			var.str.addr = (char *)gtm_release_stamp;
-			var.str.len = gtm_release_stamp_len;
+			var->mvtype = MV_STR;
+			var->str.addr = (char *)gtm_release_stamp;
+			var->str.len = gtm_release_stamp_len;
 			ZS_VAR_EQU(&x, zreldate_text);
-			mval_write(output, &var, TRUE);
+			mval_write(output, var, TRUE);
 			if (SV_ALL != one_sv)
 				break;
 		/* CAUTION: fall through */
 		case SV_ZROUTINES:
 			if (!TREF(zro_root))
 				zro_init();
-			var.mvtype = MV_STR;
-			var.str = TREF(dollar_zroutines);
+			var->mvtype = MV_STR;
+			var->str.umstr = (TREF(dollar_zroutines)).umstr;
 			ZS_VAR_EQU(&x, zroutines_text);
-			mval_write(output, &var, TRUE);
+			mval_write(output, var, TRUE);
 			if (SV_ALL != one_sv)
 				break;
 		/* CAUTION: fall through */
 		case SV_ZSOURCE:
+			assert(glist_mval_in_sync(&dollar_zsource));
 			ZS_VAR_EQU(&x, zsource_text);
 			mval_write(output, &dollar_zsource, TRUE);
 			if (SV_ALL != one_sv)
@@ -735,64 +753,64 @@ void zshow_svn(zshow_out *output, int one_sv)
 		/* CAUTION: fall through */
 		case SV_ZSTRPLLIM:
 			count = stringpool.strpllim;
-			MV_FORCE_MVAL(&var, count);
+			MV_FORCE_MVAL(var, count);
 			ZS_VAR_EQU(&x, zstrpllim_text);
-			mval_write(output, &var, TRUE);
+			mval_write(output, var, TRUE);
 			if (SV_ALL != one_sv)
 				break;
 		/* CAUTION: fall through */
 		case SV_ZSYSTEM:
-			MV_FORCE_MVAL(&var, dollar_zsystem);
+			MV_FORCE_MVAL(var, dollar_zsystem);
 			ZS_VAR_EQU(&x, zsystem_text);
-			mval_write(output, &var, TRUE);
+			mval_write(output, var, TRUE);
 			if (SV_ALL != one_sv)
 				break;
 		/* CAUTION: fall through */
 		case SV_ZTIMEOUT:
-			get_ztimeout(&var);
+			get_ztimeout(var);
 			ZS_VAR_EQU(&x, ztimeout_text);
-			mval_write(output, &var, TRUE);
+			mval_write(output, var, TRUE);
 			if (SV_ALL != one_sv)
 				break;		/* CAUTION: fall through */
 #		ifdef GTM_TRIGGER
 		case SV_ZTDATA:
 			if (NULL != dollar_ztdata)
 			{
-				var.mvtype = MV_STR;
-				var.str = dollar_ztdata->str;
+				var->mvtype = MV_STR;
+				var->str.umstr = dollar_ztdata->str.umstr;
 			} else
-				memcpy(&var, &literal_zero, SIZEOF(mval));
+				var->umval = literal_zero.umval;
 			ZS_VAR_EQU(&x, ztdata_text);
-			mval_write(output, &var, TRUE);
+			mval_write(output, var, TRUE);
 			if (SV_ALL != one_sv)
 				break;
 		/* CAUTION: fall through */
 		case SV_ZTDELIM:
 			if (NULL != dollar_ztdelim && (0 < dollar_ztdelim->str.len))
 			{
-				var.mvtype = MV_STR;
-				var.str = dollar_ztdelim->str;
+				var->mvtype = MV_STR;
+				var->str.umstr = dollar_ztdelim->str.umstr;
 			} else
-				memcpy(&var, &literal_null, SIZEOF(mval));
+				var->umval = literal_null.umval;
 			ZS_VAR_EQU(&x, ztdelim_text);
-			mval_write(output, &var, TRUE);
+			mval_write(output, var, TRUE);
 			if (SV_ALL != one_sv)
 				break;
 #		endif
 		/* CAUTION: fall through */
 		case SV_ZTEXIT:
-			var.mvtype = MV_STR;
-			var.str = dollar_ztexit.str;
+			var->mvtype = MV_STR;
+			var->str.umstr = dollar_ztexit.str.umstr;
 			ZS_VAR_EQU(&x, ztexit_text);
-			mval_write(output, &var, TRUE);
+			mval_write(output, var, TRUE);
 			if (SV_ALL != one_sv)
 				break;
 		/* CAUTION: fall through */
 #		ifdef GTM_TRIGGER
 		case SV_ZTLEVEL:
-			MV_FORCE_MVAL(&var, gtm_trigger_depth);
+			MV_FORCE_MVAL(var, gtm_trigger_depth);
 			ZS_VAR_EQU(&x, ztlevel_text);
-			mval_write(output, &var, TRUE);
+			mval_write(output, var, TRUE);
 			if (SV_ALL != one_sv)
 				break;
 		/* CAUTION: fall through */
@@ -800,34 +818,34 @@ void zshow_svn(zshow_out *output, int one_sv)
 		case SV_ZTCODE:		/* deprecated */
 			if (NULL != dollar_ztname)
 			{
-				var.mvtype = MV_STR;
-				var.str.addr = dollar_ztname->addr;
-				var.str.len = dollar_ztname->len;
+				var->mvtype = MV_STR;
+				var->str.addr = dollar_ztname->addr;
+				var->str.len = dollar_ztname->len;
 			} else
-				memcpy(&var, &literal_null, SIZEOF(mval));
+				var->umval = literal_null.umval;
 			ZS_VAR_EQU(&x, ztname_text);
-			mval_write(output, &var, TRUE);
+			mval_write(output, var, TRUE);
 			if (SV_ALL != one_sv)
 				break;
 		/* CAUTION: fall through */
 		case SV_ZTOLDVAL:
 			if (NULL != dollar_ztoldval)
 			{
-				var.mvtype = MV_STR;
-				var.str = dollar_ztoldval->str;
+				var->mvtype = MV_STR;
+				var->str.umstr = dollar_ztoldval->str.umstr;
 			} else
-				memcpy(&var, &literal_null, SIZEOF(mval));
+				var->umval = literal_null.umval;
 			ZS_VAR_EQU(&x, ztoldval_text);
-			mval_write(output, &var, TRUE);
+			mval_write(output, var, TRUE);
 			if (SV_ALL != one_sv)
 				break;
 #		endif
 		/* CAUTION: fall through */
 		case SV_ZTRAP:
-			var.mvtype = MV_STR;
-			var.str = (TREF(dollar_ztrap)).str;
+			var->mvtype = MV_STR;
+			var->str.umstr = (TREF(dollar_ztrap)).str.umstr;
 			ZS_VAR_EQU(&x, ztrap_text);
-			mval_write(output, &var, TRUE);
+			mval_write(output, var, TRUE);
 			if (SV_ALL != one_sv)
 				break;
 		/* CAUTION: fall through */
@@ -835,88 +853,91 @@ void zshow_svn(zshow_out *output, int one_sv)
 		case SV_ZTRIGGEROP:
 			if (NULL != dollar_ztriggerop)
 			{
-				var.mvtype = MV_STR;
-				var.str = dollar_ztriggerop->str;
+				var->mvtype = MV_STR;
+				var->str.umstr = dollar_ztriggerop->str.umstr;
 			} else
-				memcpy(&var, &literal_null, SIZEOF(mval));
+				var->umval = literal_null.umval;
 			ZS_VAR_EQU(&x, ztriggerop_text);
-			mval_write(output, &var, TRUE);
+			mval_write(output, var, TRUE);
 			if (SV_ALL != one_sv)
 				break;
 		/* CAUTION: fall through */
 		case SV_ZTSLATE:
-			var.mvtype = MV_STR;
-			var.str = dollar_ztslate.str;
+			var->mvtype = MV_STR;
+			var->str.umstr = dollar_ztslate.str.umstr;
 			ZS_VAR_EQU(&x, ztslate_text);
-			mval_write(output, &var, TRUE);
+			mval_write(output, var, TRUE);
 			if (SV_ALL != one_sv)
 				break;
 		/* CAUTION: fall through */
 		case SV_ZTUPDATE:
 			if (NULL != dollar_ztupdate)
 			{
-				var.mvtype = MV_STR;
-				var.str = dollar_ztupdate->str;
+				var->mvtype = MV_STR;
+				var->str.umstr = dollar_ztupdate->str.umstr;
 			} else
-				memcpy(&var, &literal_null, SIZEOF(mval));
+				var->umval = literal_null.umval;
 			ZS_VAR_EQU(&x, ztupdate_text);
-			mval_write(output, &var, TRUE);
+			mval_write(output, var, TRUE);
 			if (SV_ALL != one_sv)
 				break;
 		/* CAUTION: fall through */
 		case SV_ZTVALUE:
 			if (NULL != dollar_ztvalue)
 			{
-				var.mvtype = MV_STR;
-				var.str = dollar_ztvalue->str;
+				var->mvtype = MV_STR;
+				var->str.umstr = dollar_ztvalue->str.umstr;
 			} else
-				memcpy(&var, &literal_null, SIZEOF(mval));
+				var->umval = literal_null.umval;
 			ZS_VAR_EQU(&x, ztvalue_text);
-			mval_write(output, &var, TRUE);
+			mval_write(output, var, TRUE);
 			if (SV_ALL != one_sv)
 				break;
 		/* CAUTION: fall through */
 		case SV_ZTWORMHOLE:
-			var.mvtype = MV_STR;
-			var.str = dollar_ztwormhole.str;
+			var->mvtype = MV_STR;
+			var->str.umstr = dollar_ztwormhole.str.umstr;
 			ZS_VAR_EQU(&x, ztwormhole_text);
-			mval_write(output, &var, TRUE);
+			mval_write(output, var, TRUE);
 			if (SV_ALL != one_sv)
 				break;
 #		endif
 		/* CAUTION: fall through */
 		case SV_ZUSEDSTOR:
 			count = (int)totalUsed;		/* WARNING: downcasting possible 64bit value to 32bits */
-			MV_FORCE_UMVAL(&var, (unsigned int)count);
+			MV_FORCE_UMVAL(var, (unsigned int)count);
 			ZS_VAR_EQU(&x, zusedstor_text);
-			mval_write(output, &var, TRUE);
+			mval_write(output, var, TRUE);
 			if (SV_ALL != one_sv)
 				break;
 		/* CAUTION: fall through */
 		case SV_ZUT:
-			op_zut(&var);
+			op_zut(var);
 			ZS_VAR_EQU(&x, zut_text);
-			mval_write(output, &var, TRUE);
+			mval_write(output, var, TRUE);
 			if (SV_ALL != one_sv)
 				break;
 		/* CAUTION: fall through */
 		case SV_ZVERSION:
-			var.mvtype = MV_STR;
-			var.str.addr = (char *)gtm_release_name;
-			var.str.len = gtm_release_name_len;
+			var->mvtype = MV_STR;
+			var->str.addr = (char *)gtm_release_name;
+			var->str.len = gtm_release_name_len;
 			ZS_VAR_EQU(&x, zversion_text);
-			mval_write(output, &var, TRUE);
+			mval_write(output, var, TRUE);
 			if (SV_ALL != one_sv)
 				break;
 		/* CAUTION: fall through */
 		case SV_ZYERROR:
-			var.mvtype = MV_STR;
-			var.str = dollar_zyerror.str;
+			var->mvtype = MV_STR;
+			var->str.umstr = dollar_zyerror.str.umstr;
 			ZS_VAR_EQU(&x, zyerror_text);
-			mval_write(output, &var, TRUE);
+			mval_write(output, var, TRUE);
 			break;
 		/* NOTE: fall through ended */
 		default:
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_INVSVN);
 	}
+	assert(process_exiting || var == &mv_chain->mv_st_cont.mvs_mval);
+	if (var == &mv_chain->mv_st_cont.mvs_mval)
+		POP_MV_STENT();
 }

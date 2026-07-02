@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -53,11 +53,12 @@ enum	parse_state
 
 GBLREF mval dollar_zdir;
 
-int4 parse_file(mstr *file, parse_blk *pblk)
+int4 parse_file(const unmanaged_mstr *file, parse_blk *pblk)
 {
 	struct stat		statbuf;
 	struct addrinfo		*ai_ptr, *localhost_ai_ptr, *temp_ai_ptr, hints;
-	mstr			trans, tmp;
+	mstr			trans;
+	unmanaged_mstr		tmp;
 	int			status, diff;
 	uint4			local_node_len, query_node_len, node_name_len;
 	parse_blk		def;
@@ -99,6 +100,7 @@ int4 parse_file(mstr *file, parse_blk *pblk)
 		def.def1_buf = pblk->def2_buf;
 		tmp.len = pblk->def1_size;
 		tmp.addr = pblk->def1_buf;
+		/* TODO: seems unprotected in mainline, but trips assert(!glist_umstr_in_stringpool(&tmp)); */
 		if (ERR_PARNORMAL != (status = parse_file(&tmp, &def)))	/* Note Assignment */
 			return status;
 		assert(!def.b_node);
@@ -372,7 +374,7 @@ int4 parse_file(mstr *file, parse_blk *pblk)
 			diff = (int)((ext - node));
 			if (def.b_ext + diff > pblk->buff_size)
 				return ERR_FILEPATHTOOLONG;
-			memcpy((void *)ext, def.l_ext, def.b_ext);
+			memcpy(ext, def.l_ext, def.b_ext);
 			ptr += def.b_ext;
 		}
 	}
@@ -389,7 +391,7 @@ int4 parse_file(mstr *file, parse_blk *pblk)
 			memmove(name + diff, name, pblk->b_name + pblk->b_ext);	/*return ERR_FILEPATHTOOLONG ensures this is safe*/
 		else if (0 > diff)
 			memcpy(name + diff, name, pblk->b_name + pblk->b_ext);
-		memcpy((void *)base, def.l_dir, def.b_dir);
+		memcpy(base, def.l_dir, def.b_dir);
 		ptr += diff;
 		name += diff;
 	}

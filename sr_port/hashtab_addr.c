@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2009 Fidelity Information Services, Inc	*
+ * Copyright (c) 2009-2026 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,3 +22,4 @@
 #define ADDR_HASH
 /* The below include generates the hash table routines for the "addr" hash type */
 #include "hashtab_implementation.h"
+#undef ADDR_HASH

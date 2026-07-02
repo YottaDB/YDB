@@ -1,7 +1,7 @@
 
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -17,7 +17,7 @@
 #include "opcode.h"
 #include "mdq.h"
 #include "mmemory.h"
-#include <emit_code.h>
+#include "emit_code.h"
 #include "fullbool.h"
 #include "matchc.h"
 #include "numcmp.h"
@@ -44,7 +44,8 @@ void bx_boollit(triple *t)
 {
 	boolean_t	tv[ARRAYSIZE(t->operand)];
 	int		dummy, j, neg, num, tvr;
-	mval		*mv, *v[ARRAYSIZE(t->operand)];
+	mval		*v[ARRAYSIZE(t->operand)];
+	mval		mv;
 	opctype		opercode;
 	oprtype		*opr;
 	triple		*ref0, *optrip[ARRAYSIZE(t->operand)];
@@ -78,34 +79,34 @@ void bx_boollit(triple *t)
 			num = OC_FORCENUM == t->operand[j].oprval.tref->opcode;
 			if (neg || num)
 			{	/* get literal into uniform state */
-				mv = (mval *)mcalloc(SIZEOF(mval));
-				*mv = *v[j];
+				mv.umval = v[j]->umval;
+				mv.str.in_array = FALSE;
 				unuse_literal(v[j]);
 				if (neg)
 				{
-					if (MV_INT & mv->mvtype)
+					if (MV_INT & mv.mvtype)
 					{
-						if (0 != mv->m[1])
-							mv->m[1] = -mv->m[1];
+						if (0 != mv.m[1])
+							mv.m[1] = -mv.m[1];
 						else
-							mv->sgn = 0;
-					} else if (MV_NM & mv->mvtype)
-						mv->sgn = !mv->sgn;
+							mv.sgn = 0;
+					} else if (MV_NM & mv.mvtype)
+						mv.sgn = !mv.sgn;
 				} else
 				{
-					s2n(mv);
-					if (!(MV_NM & mv->mvtype))
+					s2n(&mv);
+					if (!(MV_NM & mv.mvtype))
 					{
 						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NUMOFLOW);
 						assert(TREF(rts_error_in_parse));
 						return;
 					}
 				}
-				n2s(mv);
-				assert((MV_NM & mv->mvtype) && (MV_STR & mv->mvtype));
-				v[j] = mv;
+				n2s(&mv);
+				assert((MV_NM & mv.mvtype) && (MV_STR & mv.mvtype));
 				assert(ref0 == optrip[j]);
-				put_lit_s(v[j], ref0);
+				put_lit_s(&mv, ref0);
+				v[j] = &ref0->operand[0].oprval.mlit->v;
 			}
 			/* In the case of this one optimized but not other, remove all unary's except the first
 			 * If the first is a COMVAL, remove it.

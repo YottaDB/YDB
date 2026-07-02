@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2001-2022 Fidelity National Information		#
+# Copyright (c) 2001-2026 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -45,7 +45,8 @@ mval_m_aliascont	=	0x200
 #
 #	Length of mval in bytes
 #
-mval_byte_len		=	32
+mval_byte_len		=	40
+umval_byte_len		=	32
 #
 #	Offsets of type, exp, strlen, stradd, num in mval structure
 #
@@ -145,6 +146,7 @@ top			=	8
 # ---------------------------------------
 .macro	mv_i2mval	int, mval
 	movw	$mval_m_int,mval_w_mvtype(\mval)
+	movl	$0,mval_l_strlen(\mval)
 	movl	\int,%eax
 	imull	$MV_BIAS,%eax,%eax
 	movl	%eax,mval_l_m1(\mval)

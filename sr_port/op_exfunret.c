@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2021 Fidelity National Information	*
+ * Copyright (c) 2010-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -15,7 +15,7 @@
 #include "gtm_stdio.h"
 
 #include "gtmio.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "stack_frame.h"
 #include "op.h"
 #include "lv_val.h"
@@ -56,7 +56,7 @@ void op_exfunret(mval *retval)
 		 * extrinsic; just make the return value NULL instead
 		 */
 		if (dollar_zquit_anyway)
-			*retval = literal_null;
+			retval->umval = literal_null.umval;
 		else
 		{
 			assert(0 == (MV_ALIASCONT & savtyp));

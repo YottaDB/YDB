@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -116,7 +116,8 @@ struct gd_addr_struct *repl_inst_get_name(char *fn, unsigned int *fn_len, unsign
 						struct gd_addr_struct *gd_ptr)
 {
 	char		temp_inst_fn[MAX_FN_LEN + 1];
-	mstr		log_nam, trans_name;
+	mstr		trans_name;
+	unmanaged_mstr	log_nam;
 	gd_addr		*gd_local;
 	uint4		ustatus;
 	int4		status;

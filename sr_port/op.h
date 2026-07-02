@@ -13,11 +13,13 @@
 #ifndef OP_INCLUDED
 #define OP_INCLUDED
 
-#include <rtnhdr.h>	/* Avoid changing a few hundred op_* and other modules to put this first */
+#include "rtnhdr.h"	/* Avoid changing a few hundred op_* and other modules to put this first */
 #include "hashtab_int4.h"
 #include "hashtab.h"
 #include "lv_val.h"
 #include "fgncalsp.h"
+
+error_def(ERR_INDRMAXLEN);
 
 #ifdef VMS
 /* Define a TWO-argument VMS_ONLY macro (first argument is empty string but is needed because of the VMS-only , that follows) */
@@ -46,19 +48,29 @@ typedef enum
 
 #define DO_OP_GVNAME_IF_NEEDED(SRC, SUBS, START_BUFF, STOP_BUFF, START_PTR, STOP_PTR, RET)		\
 MBSTART {												\
+	GBLREF int4		aligned_source_buffer;							\
 	int			contain_env;								\
 	boolean_t		lv_or_gv;								\
 													\
+	if ((MAX_SRCLINE < (unsigned)(SRC)->str.len)							\
+		&& ((TREF(source_buffer)).addr == (char *)&aligned_source_buffer))			\
+	{	/* see comment in comp_init.c for explanation of error suppression */			\
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_INDRMAXLEN, 1, MAX_SRCLINE);			\
+	}												\
 	RET = NONE;											\
 	DETERMINE_BUFFER(SRC, START_BUFF, STOP_BUFF, START_PTR, STOP_PTR, lv_or_gv);			\
 	if (parse_glvn_and_subscripts(SRC, &(SUBS), START_PTR, STOP_PTR, &contain_env, TRUE))		\
 	{												\
 		if (lv_or_gv)										\
 			RET = LV_NAME;									\
-		else if (contain_env)									\
-			RET = (op_gvextnam_runtime(SRC, SUBS, START_PTR, STOP_PTR)) ? GV_NAME : NONE;	\
 		else											\
-			RET = (op_gvname_runtime(SRC, SUBS, START_PTR, STOP_PTR)) ? GV_NAME : NONE;	\
+		{											\
+			RET = GV_NAME;									\
+			if (contain_env)								\
+				op_gvextnam_runtime(SRC, SUBS, START_PTR, STOP_PTR);			\
+			else										\
+				op_gvname_runtime(SRC, SUBS, START_PTR, STOP_PTR);			\
+		}											\
 	}												\
 } MBEND
 
@@ -115,7 +127,7 @@ void	op_fnqlength(mval *name, mval *subscripts);
 void	op_fnqsubscript(mval *name, int seq, mval *subscript);
 void	op_fnqsubscript_fast(mval *src, int seq, mval *dst, int subs_count, int isrc, int stop);
 void	op_fnquery(UNIX_ONLY_COMMA(int sbscnt) mval *dst, ...);
-boolean_t op_fnquery_runtime(mval *src, int sbscnt, int *start, int *stop, mval *dst);
+void	op_fnquery_runtime(mval *src, int sbscnt, int *start, int *stop, mval *dst);
 void	op_fnrandom(int4 interval, mval *ret);
 void	op_fnreplace(mval *src, mval *substr, mval *rplc, mval *dst);
 void	op_fnreverse(mval *src, mval *dst);
@@ -190,14 +202,14 @@ int	op_forloop();
 void	op_gvdata(mval *v);
 void	op_gvextnam(UNIX_ONLY_COMMA(int4 count) mval *val1, ...);
 void	op_gvextnam_fast(UNIX_ONLY_COMMA(int4 count) int hash_code, mval *val1, ...);
-boolean_t op_gvextnam_runtime(mval *src, int subscripts, int *start, int *stop);
+void	op_gvextnam_runtime(mval *src, int subscripts, int *start, int *stop);
 boolean_t op_gvget(mval *v);
 void	op_gvincr(mval *increment, mval *result);
 void	op_gvkill(void);
 void	op_gvnaked(UNIX_ONLY_COMMA(int count_arg) mval *val_arg, ...);
 void	op_gvnaked_fast(UNIX_ONLY_COMMA(int count_arg) int hash_code, mval *val_arg, ...);
 void	op_gvname(UNIX_ONLY_COMMA(int count_arg) mval *val_arg, ...);
-boolean_t op_gvname_runtime(mval *src, int subscripts, int *start, int *stop);
+void	op_gvname_runtime(mval *src, int subscripts, int *start, int *stop);
 void	op_gvname_fast(UNIX_ONLY_COMMA(int count_arg) int hash_code, mval *val_arg, ...);
 void	op_gvnext(mval *v);
 void	op_gvo2(mval *dst, mval *direct);
@@ -282,7 +294,7 @@ void	op_sub(mval *u, mval *v, mval *s);
 void	op_svget(int varnum, mval *v);
 void	op_svput(int varnum, mval *v);
 /*	op_tcommit : prototype defined separately in op_tcommit.h since it returns "enum cdb_sc" type. */
-void	op_trestart(int newlevel);
+void    op_trestart(mval *rtn_name, mval *lbl_name, int newlevel);
 
 /* Macro to be called by C Runtime code to invoke op_trollback. Sets implicit_trollback to TRUE. Note: The interface of
  * OP_TROLLBACK macro and op_trollback function needs to be maintained in parallel.

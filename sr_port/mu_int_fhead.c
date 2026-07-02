@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -57,7 +57,6 @@ error_def(ERR_DBFSTBC);
 error_def(ERR_DBTOTBLK);
 error_def(ERR_DBMISALIGN);
 error_def(ERR_KILLABANDONED);
-error_def(ERR_MUKILLIP);
 error_def(ERR_MUTNWARN);
 
 #define SET_NATIVE_SIZE(native_size)									\
@@ -148,11 +147,6 @@ boolean_t mu_int_fhead(void)
 	}
 	if (mu_data->trans_hist.curr_tn != mu_data->trans_hist.early_tn)
 		mu_int_err(ERR_DBTNNEQ, 0, 0, 0, 0, 0, 0, 0);
-	if (0 != mu_data->kill_in_prog)
-	{
-		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUKILLIP, 4, DB_LEN_STR(gv_cur_region), LEN_AND_LIT("MUPIP INTEG"));
-		mu_int_errknt++;
-	}
 	if (0 != mu_data->abandoned_kills)
 	{
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_KILLABANDONED, 4, DB_LEN_STR(gv_cur_region),

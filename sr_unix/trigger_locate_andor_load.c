@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2011-2020 Fidelity National Information	*
+ * Copyright (c) 2011-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -18,7 +18,7 @@
 #include "gdsbt.h"			/* for gdsfhead.h */
 #include "gdsfhead.h"
 #include "gvcst_protos.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "gv_trigger.h"
 #include "gtm_trigger.h"
 #include "trigger.h"
@@ -160,7 +160,7 @@ int trigger_locate_andor_load(mstr *trigname, rhdtyp **rtn_vec)
 	{
 		rtn_vector = *rtn_vec;
 		rttabent = rtn_names;
-	} else if (find_rtn_tabent(&rttabent, trigname))
+	} else if (find_rtn_tabent(&rttabent, &trigname->mident))
 		rtn_vector = rttabent->rt_adr;
 	else
 		rtn_vector = NULL;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -33,7 +33,10 @@ GBLREF	volatile boolean_t	in_wcs_recover;
 GBLREF	int			process_exiting;
 GBLREF	char			*repl_state_lit[];
 
+error_def(ERR_JNLACCESS);
 error_def(ERR_JNLCLOSED);
+error_def(ERR_JNLCNTRL);
+error_def(ERR_JNLEXTEND);
 error_def(ERR_REPLSTATE);
 error_def(ERR_TEXT);
 
@@ -78,18 +81,18 @@ uint4 jnl_file_lost(jnl_private_control *jpc, uint4 jnl_stat)
 				jnlpool = save_jnlpool;
 			csa->jnl->error_reported = TRUE;
 			in_wcs_recover = FALSE;	/* in case we're called in wcs_recover() */
+			assert((ERR_JNLACCESS == jnl_stat) || (ERR_JNLCNTRL == jnl_stat)
+				|| (ERR_JNLEXTEND == jnl_stat));
 			if (SS_NORMAL != jpc->status)
 			{
-				send_msg_csa(CSA_ARG(csa) VARLSTCNT(7) jnl_stat, 4, JNL_LEN_STR(csa->hdr),
-					DB_LEN_STR(gv_cur_region), jpc->status);
-				rts_error_csa(CSA_ARG(csa) VARLSTCNT(7) jnl_stat, 4, JNL_LEN_STR(csa->hdr),
-					DB_LEN_STR(gv_cur_region), jpc->status);
+				send_msg_csa(CSA_ARG(csa) VARLSTCNT(5) jnl_stat, 2, JNL_LEN_STR(csa->hdr),
+					jpc->status);
+				rts_error_csa(CSA_ARG(csa) VARLSTCNT(5) jnl_stat, 2, JNL_LEN_STR(csa->hdr),
+					jpc->status);
 			} else
 			{
-				send_msg_csa(CSA_ARG(csa) VARLSTCNT(6) jnl_stat, 4, JNL_LEN_STR(csa->hdr),
-					DB_LEN_STR(gv_cur_region));
-				rts_error_csa(CSA_ARG(csa) VARLSTCNT(6) jnl_stat, 4, JNL_LEN_STR(csa->hdr),
-					DB_LEN_STR(gv_cur_region));
+				send_msg_csa(CSA_ARG(csa) VARLSTCNT(4) jnl_stat, 2, JNL_LEN_STR(csa->hdr));
+				rts_error_csa(CSA_ARG(csa) VARLSTCNT(4) jnl_stat, 2, JNL_LEN_STR(csa->hdr));
 			}
 		}
 		if (save_jnlpool != jnlpool)

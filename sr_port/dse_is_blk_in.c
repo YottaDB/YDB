@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -35,7 +35,7 @@ int dse_is_blk_in(sm_uc_ptr_t rp, sm_uc_ptr_t r_top, short size)
 	sm_uc_ptr_t	key_top;
 
 	assert((0 <= size) && (SIZEOF(targ_key) >= size));
-	memcpy((void *)targ_key, rp + SIZEOF(rec_hdr), size);
+	memcpy(targ_key, rp + SIZEOF(rec_hdr), size);
 	if ((patch_find_blk != patch_path[0])
 		&& !dse_order(patch_path[0], &patch_path[1], patch_offset, targ_key, size, 0))
 			return FALSE;
@@ -52,7 +52,7 @@ int dse_is_blk_in(sm_uc_ptr_t rp, sm_uc_ptr_t r_top, short size)
 			size = 0;
 		else if (SIZEOF(targ_key) < size)
 			size = SIZEOF(targ_key);
-		memcpy((void *)targ_key, rp + SIZEOF(rec_hdr), size);
+		memcpy(targ_key, rp + SIZEOF(rec_hdr), size);
 		patch_path1[0] = patch_path[patch_path_count - 1];
 		patch_path[patch_path_count - 1] = 0;
 		patch_path_count = 1;

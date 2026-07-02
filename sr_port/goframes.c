@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,7 +14,7 @@
 
 #include "gtm_stdio.h"
 
-#include <rtnhdr.h>		/* needed for golevel.h */
+#include "rtnhdr.h"		/* needed for golevel.h */
 #include "error.h"
 #include "op.h"
 #include "stack_frame.h"	/* needed for golevel.h */
@@ -40,6 +41,7 @@ GBLREF	mval		*alias_retarg;
 GBLREF	stack_frame	*frame_pointer;
 GBLREF	boolean_t	skip_error_ret;
 GBLREF	tp_frame	*tp_pointer;
+GBLREF	uint4		dollar_tlevel;
 
 LITREF mval             literal_null;
 
@@ -50,7 +52,9 @@ void	goframes(int4 frames)
 #endif
 {
         mval            *ret_targ;
+        DCL_THREADGBL_ACCESS;
 
+        SETUP_THREADGBL_ACCESS;
 	GTMTRIG_ONLY(goframes_unwound_trigger = FALSE);
         for (ret_targ = NULL; frames--; )
         {
@@ -60,18 +64,25 @@ void	goframes(int4 frames)
 		}
 		if (0 == frames)
 		{
-			ret_targ = (mval *)get_ret_targ(NULL);
+			ret_targ = get_ret_targ(NULL);
 			/* If alias_retarg is non-NULL, *ret_targ would have been already initialized so no need to set it.
 			 * Setting it to literal_null in that case would cause reference counts to not be decremented later
 			 * in op_unwind/mdb_condition_handler so it is actually necessary to skip it in that case.
 			 */
 	       		if ((NULL != ret_targ) && (NULL == alias_retarg))
 	       		{
-	       		        *ret_targ = literal_null;
+	       		        ret_targ->umval = literal_null.umval;
 	       		        ret_targ->mvtype |= MV_RETARG;
 	       		}
 		}
 		skip_error_ret = TRUE;
+		if (TREF(zinxpel_rtn_fp) == frame_pointer)
+		{
+			assert(0 != TREF(dollar_zinxpel));
+			TREF(dollar_zinxpel) = 0;
+			TREF(zinxpel_rtn_fp) = NULL;
+			TREF(zinxpel_no_tp_or_trig) = FALSE;
+		}
 #		ifdef GTM_TRIGGER
 		if (!(SFT_TRIGR & frame_pointer->type))
 		{	/* Normal frame unwind */

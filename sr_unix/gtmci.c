@@ -1,4 +1,3 @@
-
 /****************************************************************
  *								*
  * Copyright (c) 2001-2026 Fidelity National Information	*
@@ -24,7 +23,7 @@
 #include "gtm_limits.h"
 #include "cli.h"
 #include "stringpool.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "stack_frame.h"
 #include "mvalconv.h"
 #include "gtmxc_types.h"
@@ -77,6 +76,10 @@ GBLREF	u_casemap_t 		gtm_strToTitle_ptr;		/* Function pointer for gtm_strToTitle
 #include "tp.h"
 #include "gtm_permissions.h"
 #include "gtm_post_startup_check_init.h"
+#include "iottdef.h"
+#include "gtmio.h"
+#include "iott_setterm.h"
+
 
 #if defined(__x86_64__)
 extern	void	opp_ciret();
@@ -105,6 +108,8 @@ GBLREF	unsigned int		gtm_dist_len;
 GBLREF boolean_t		gtm_dist_ok_to_use;
 GTMTRIG_DBG_ONLY(GBLREF ch_ret_type (*ch_at_trigger_init)();)
 LITREF  gtmImageName            gtmImageNames[];
+GBLREF	io_pair			io_std_device;
+STATICDEF	unsigned int	gtmci_flags;
 
 error_def(ERR_ACTLSTTOOLONG);
 error_def(ERR_CALLINAFTERXIT);
@@ -224,7 +229,7 @@ int gtm_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 	int			has_return, i, len;
 	rhdtyp          	*base_addr;
 	gtm_uint8		inp_mask, out_mask, mask;
-	mval			arg_mval, *arg_ptr;
+	mval			arg_mval = {{0}}, *arg_ptr;
 	enum gtm_types		arg_type;
 	gtm_string_t		*mstr_parm;
 	parmblk_struct 		param_blk;
@@ -308,7 +313,7 @@ int gtm_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 	has_return = (gtm_void != entry->return_type);
 	if (has_return)
 	{	/* Create mval slot for return value */
-		MV_INIT(&arg_mval);
+		UMV_INIT(&arg_mval.umval);
 		param_blk.retaddr = (void *)push_lvval(&arg_mval);
 		arg_blob_ptr = &arg_blob[0] + GTM64_ONLY(1) NON_GTM64_ONLY(2);
 		java_arg_type = arg_types + 1;
@@ -534,7 +539,7 @@ int gtm_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 	int			has_return, i;
 	rhdtyp          	*base_addr;
 	gtm_uint8		inp_mask, out_mask, mask;
-	mval			arg_mval, *arg_ptr;
+	mval			arg_mval = {{0}}, *arg_ptr;
 	enum gtm_types		arg_type;
 	gtm_string_t		*mstr_parm;
 	char			*gtm_char_ptr;
@@ -659,7 +664,7 @@ int gtm_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 	has_return = (gtm_void == entry->return_type) ? 0 : 1;
 	if (has_return)
 	{	/* Create mval slot for return value */
-		MV_INIT(&arg_mval);
+		UMV_INIT(&arg_mval.umval);
 		param_blk.retaddr = (void *)push_lvval(&arg_mval);
 		va_arg(var, void *);	/* advance va_arg */
 	} else
@@ -672,6 +677,7 @@ int gtm_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 		 * inp_mask is inversed to achieve this.
 		 */
 		arg_mval.mvtype = MV_XZERO;
+		arg_mval.str.len = 0;
 		if (MASK_BIT_ON(mask))
 		{ 	/* Output-only(O) params : advance va_arg pointer */
 			switch (entry->parms[i])
@@ -816,6 +822,12 @@ int gtm_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 	 * global param_list to point to local param_blk will do the job.
 	 */
 	param_list = &param_blk;
+	if ((GTMCI_STATE_TERM_ENABLE_AND_RESET == (GTMCI_STATE_TERM_ENABLE_AND_RESET & gtmci_flags))
+		&& (tt == io_std_device.in->type))
+	{	/* terminal reset to normal enabled, is now reset, and stdin is a terminal */
+		iott_setterm(io_std_device.in);		/* how GT.M wants it */
+		gtmci_flags &= ~GTMCI_STATE_TERM_RESET;	/* clear state */
+	}
 	old_intrpt_state = intrpt_ok_state;
 	intrpt_ok_state = INTRPT_OK_TO_INTERRUPT; /* reset interrupt state for the new M session */
 	save_var_on_cstack_ptr = var_on_cstack_ptr;
@@ -835,6 +847,12 @@ int gtm_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 	/*				*/
 	intrpt_ok_state = old_intrpt_state; /* restore the old interrupt state */
 	var_on_cstack_ptr = save_var_on_cstack_ptr; /* restore the old environment's var_on_cstack_ptr */
+	if ((GTMCI_FLAG_TERM_ENABLE_AND_ALWAYS == (GTMCI_FLAG_TERM_ENABLE_AND_ALWAYS & gtmci_flags))
+		&& (tt == io_std_device.in->type))
+	{	/* terminal reset to normal enabled after each call to GT.M and stdin is a terminal */
+		iott_resetterm(io_std_device.in);	/* return to normal */
+		gtmci_flags |= GTMCI_STATE_TERM_RESET;	/* record state */
+	}
 	if (1 != mumps_status)
 	{
 		/* dm_start() initializes mumps_status to 1 before execution. If mumps_status is not 1,
@@ -1011,8 +1029,7 @@ int gtm_ci_filter(const char *c_rtn_name, ...)
 /* Java flavor of gtm_init() */
 gtm_status_t gtm_jinit(void)
 {
-	gtm_jvm_process = TRUE;
-	return gtm_init();
+	return gtm_init_extra(GTMCI_FLAG_GTMJI);
 }
 #endif
 
@@ -1020,7 +1037,13 @@ gtm_status_t gtm_jinit(void)
  * if other GT.M services are to be used prior to a gtm_ci*() call (like timers, gtm_malloc/free, etc), this routine
  * should be called first.
  */
-int gtm_init()
+
+gtm_status_t gtm_init()
+{
+	return gtm_init_extra(0);
+}
+
+gtm_status_t gtm_init_extra(unsigned int flags, ...)
 {
 	rhdtyp          	*base_addr;
 	unsigned char   	*transfer_addr;
@@ -1032,6 +1055,8 @@ int gtm_init()
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	if (GTMCI_FLAG_GTMJI & flags)
+		gtm_jvm_process = TRUE;
 	if (NULL == lcl_gtm_threadgbl)
 	{	/* This will likely need some attention before going to a threaded model */
 		assert(!gtm_startup_active);
@@ -1093,6 +1118,7 @@ int gtm_init()
 	if (!gtm_startup_active)
 	{	/* GT.M is not active yet. Create GT.M startup environment */
 		invocation_mode = MUMPS_CALLIN;
+		gtmci_flags = (GTMCI_STATE_CLEAR & flags);
 		init_gtm();			/* Note - this initializes fgncal_stackbase */
 		gtm_savetraps(); /* nullify default $ZTRAP handling */
 		assert(IS_VALID_IMAGE && (n_image_types > image_type));	/* assert image_type is initialized */
@@ -1143,6 +1169,29 @@ int gtm_init()
 	}
 	REVERT;
 	assert(NULL == TREF(temp_fgncal_stack));
+	if ((GTMCI_FLAG_TERMIO_ENABLE & gtmci_flags)
+		&& (tt == io_std_device.in->type))
+	{	/* terminal reset to normal enabled and stdin is a terminal */
+		iott_resetterm(io_std_device.in);	/* return to normal */
+		gtmci_flags |= GTMCI_STATE_TERM_RESET;	/* record state */
+	}
+	return 0;
+}
+
+/* This routine allows the calling program to reset the terminal state
+ * to normal when needed (before doing terminal input) if
+ * GTMCI_FLAG_TERMIO_ALWAYS is not set which would do it after each call
+ * to GT.M, even if not needed, though at some expense.
+ */
+gtm_status_t gtm_terminal_reset(void)
+{
+	if ((GTMCI_FLAG_TERMIO_ENABLE & gtmci_flags)
+		&& !(GTMCI_STATE_TERM_RESET & gtmci_flags)
+		&& (tt == io_std_device.in->type))
+	{	/* terminal reset to normal enabled and stdin is a terminal */
+		iott_resetterm(io_std_device.in);	/* return to normal */
+		gtmci_flags |= GTMCI_STATE_TERM_RESET;	/* record state */
+	}
 	return 0;
 }
 
@@ -1177,6 +1226,9 @@ int gtm_exit()
 			ci_ret_code_quit();
 		}
 	}
+	/* gtm_exit_handler calls io_rundown which calls iott_resetterm if
+	 * tt == io_std_device.in when GT.M was started by call-in
+	 */
 	gtm_exit_handler(); /* rundown all open database resource */
 	/* If libgtmshr was loaded via (or on account of) dlopen() and is later unloaded via dlclose()
 	 * the exit handler on AIX and HPUX still tries to call the registered atexit() handler causing

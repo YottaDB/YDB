@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -19,7 +19,7 @@
 #include "cmd_qlf.h"
 #include "iosp.h"
 #include "cli.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "stack_frame.h"
 #include "mv_stent.h"
 #include "lv_val.h"
@@ -69,6 +69,8 @@ int	gtm_compile(void)
 	SETUP_THREADGBL_ACCESS;
 	get_page_size();
 	stp_init(STP_INITSIZE);
+	stringpool.sort_array_pp = TADR(rts_sort_array_p);
+	stringpool.protect_array_pp = TADR(rts_protect_array_p);
 	rts_stringpool = stringpool;
 	io_init(TRUE);
 	getjobnum();
@@ -108,6 +110,7 @@ int	gtm_compile(void)
 	len = module_name.len = 0;
 	zl_cmd_qlf(&(TREF(dollar_zcompile)), &cmd_qlf, source_file_string, &len, FALSE);	/* Init with default quals */
 	zl_cmd_qlf(&orig_cmdstr, &cmd_qlf, source_file_string, &len, TRUE);		/* Override with the actual qualifers */
+	SYNC_CMD_QLF_STRINGS(cmd_qlf);
 	free(orig_cmdstr.addr);
 	/* end command qualifier processing stuff */
 	ce_init();	/* initialize compiler escape processing */

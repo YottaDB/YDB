@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -50,11 +50,14 @@ int m_tstart(void)
 	int		count, n;
 	mval		dummyid;
 	oprtype		tmparg;
-	triple		*fetch, *ref, *s, *ser, *tid, *varlst, *varnext, *varp;
+	triple		*fetch, *pre, *ref, *s, *ser, *tid, *varlst, *varnext, *varp;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	count = -1;	/* indicates not restartable */
+	/* Use OC_PRETSTART triple to get the mpc of this TSTART */
+	pre = newtriple(OC_PRETSTART);
+	/* OC_PRETSTART avoids compiler issues, but generates same code as OC_LINESTART */
 	varlst = newtriple(OC_PARAMETER);
 	switch (TREF(window_token))
 	{

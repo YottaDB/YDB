@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -34,6 +34,8 @@ void	flt_mod (mval *u, mval *v, mval *q)
 					   to prevent modifying caller's data */
 	mval	*u_orig;		/* original (caller's) value of u */
 
+	y.str.in_array = FALSE;
+	w.str.in_array = FALSE;
 	MV_FORCE_NUM(u);
 	MV_FORCE_NUM(v);
 	u_orig = u;
@@ -45,20 +47,21 @@ void	flt_mod (mval *u, mval *v, mval *q)
 	{
 		/* Both are INT's; use shortcut.  */
 		q->mvtype = MV_NM | MV_INT;
+		q->str.len = 0;
 		eb_int_mod(u->m[1], v->m[1], q->m);
 		return;
 	}
 	else if ((u->mvtype & MV_INT) != 0)
 	{
 		/* u is INT; promote to extended precision for compatibility with v.  */
-		y = *u;
+		y.umval = u->umval;
 		promote(&y);		/* y will be normalized, but not in canonical form */
 		u = &y;			/* this is why we need u_orig */
 	}
 	else if ((v->mvtype & MV_INT) != 0)
 	{
 		/* v is INT; promote to extended precision for compatibility with u.  */
-		y = *v;
+		y.umval = v->umval;
 		promote(&y);
 		v = &y;
 	}
@@ -84,7 +87,7 @@ void	flt_mod (mval *u, mval *v, mval *q)
 		else
 		{
 			/* Signs same (=> floor(u/v) >= 0) or (w == 0) or (underflow) => floor(u/v) == 0 */
-			*q = *u_orig;	/* u - floor(u/v)*v == u - 0*v == u */
+			q->umval = u_orig->umval;	/* u - floor(u/v)*v == u - 0*v == u */
 			MV_FORCE_CANONICAL(q);
 			return;
 		}

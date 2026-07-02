@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -25,7 +25,7 @@
 #include "opcode.h"
 #include "stringpool.h"
 #include "toktyp.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "mv_stent.h"
 #include "stack_frame.h"
 
@@ -46,16 +46,18 @@ void op_indtext(mval *lab, mint offset, mval *rtn, mval *dst)
 	mval		mv_off;
 	oprtype		opt, getdst;
 	triple		*ref;
-	mval 		m;
+	mval 		m = {{0}};
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	MV_FORCE_STR(lab);
 	if (WANT_CURRENT_RTN(rtn))
 	{
-		m = *rtn;
+		m.umval = rtn->umval;
 		rtn = &m;
-		rtn->str = frame_pointer->rvector->routine_name;
+		rtn->str.mident = frame_pointer->rvector->routine_name;
+		rtn->str.in_array = FALSE;
+		assert(!IS_IN_STRINGPOOL(rtn->str.addr, rtn->str.len));
 	}
 	indir_src.str.len = lab->str.len;
 	indir_src.str.len += SIZEOF("+^") - 1;
@@ -72,6 +74,7 @@ void op_indtext(mval *lab, mint offset, mval *rtn, mval *dst)
 	mv_chain->mv_st_cont.mvs_mval.mvtype = 0;	/* so stp_gcol, which may be invoked below, does not get confused by
 							 * this otherwise incompletely initialized mval in the M-stack
 							 */
+	assert(mv_chain->mv_st_cont.mvs_mval.str.len == 0);
 	mv_chain->mv_st_cont.mvs_mval.str.addr = (char *)stringpool.free;
 	memcpy(stringpool.free, lab->str.addr, lab->str.len);
 	stringpool.free += lab->str.len;
@@ -84,7 +87,8 @@ void op_indtext(mval *lab, mint offset, mval *rtn, mval *dst)
 	mv_chain->mv_st_cont.mvs_mval.str.len = INTCAST(stringpool.free - (unsigned char*)mv_chain->mv_st_cont.mvs_mval.str.addr);
 	mv_chain->mv_st_cont.mvs_mval.mvtype = MV_STR; /* initialize mvtype now that mval has been otherwise completely set up */
 	DBG_MARK_STRINGPOOL_EXPANDABLE;	/* Now that we are done with stringpool.free initializations, mark as free for expansion */
-	indir_src.str = mv_chain->mv_st_cont.mvs_mval.str;
+	indir_src.str.umstr = mv_chain->mv_st_cont.mvs_mval.str.umstr;
+	indir_src.str.in_array = FALSE;
 	indir_src.code = indir_text;
 	if (NULL == (obj = cache_get(&indir_src)))
 	{

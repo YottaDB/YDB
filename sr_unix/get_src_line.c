@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -20,8 +20,8 @@
 #include "gtm_stat.h"
 #include "gtm_stdio.h"
 
-#include <rtnhdr.h>
-#include <auto_zlink.h>
+#include "rtnhdr.h"
+#include "auto_zlink.h"
 #include "zroutines.h"
 #include "compiler.h"
 #include "srcline.h"
@@ -65,14 +65,15 @@ LITREF mval		literal_null;
 error_def(ERR_TXTSRCFMT);
 error_def(ERR_SYSCALL);
 
-int get_src_line(mval *routine, mval *label, int offset, mstr **srcret, rhdtyp **rtn_vec)
+int get_src_line(mval *routine, mval *label, int offset, unmanaged_mstr **srcret, rhdtyp **rtn_vec)
 {
 	int			srcrecs, *lt_ptr, size, line_indx, srcfilnamlen;
 	boolean_t		found, added, eof_seen, srcstat;
-	mstr			src;
+	unmanaged_mstr		src;
 	rhdtyp			*rtn_vector;
 	zro_ent			*srcdir;
-	mstr			*base, *current, *top, tmprtnname;
+	unmanaged_mstr		*base, *current, *top;
+	mstr			tmprtnname;
 	char			buff[MAX_SRCLINE], *cptr, *srcfile_name;
 	char			srcnamebuf[SIZEOF(mident_fixed) + STR_LIT_LEN(DOTM)];
 	routine_source		*src_tbl;
@@ -118,7 +119,8 @@ int get_src_line(mval *routine, mval *label, int offset, mstr **srcret, rhdtyp *
 		 * avoid modification to routine->str as it affects the caller which relies on this variable being
 		 * untouched.
 		 */
-		tmprtnname = routine->str;
+		tmprtnname.umstr = routine->str.umstr;
+		tmprtnname.in_array = FALSE;
 		DBGTRIGR((stderr, "get_src_line: fetch source for %s\n", tmprtnname.addr));
 		rc = trigger_locate_andor_load(&tmprtnname, &rtn_vector);
 		if (0 != rc)
@@ -137,10 +139,10 @@ int get_src_line(mval *routine, mval *label, int offset, mstr **srcret, rhdtyp *
 	} else if (NULL == rtn_vector)
 	{
 		assert(!is_trigger);
-		if (NULL == (rtn_vector = find_rtn_hdr(&routine->str)))		/* Note assignment */
+		if (NULL == (rtn_vector = find_rtn_hdr(&routine->str.mident)))		/* Note assignment */
 		{
 			op_zlink(routine, NULL);
-			rtn_vector = find_rtn_hdr(&routine->str);
+			rtn_vector = find_rtn_hdr(&routine->str.mident);
 			if (NULL == rtn_vector)
 			{
 				if (NULL != rtn_vec)
@@ -234,7 +236,7 @@ STATICFNDEF boolean_t fill_src_tbl(routine_source **src_tbl_result, rhdtyp *rtn_
 STATICFNDEF boolean_t fill_src_tbl_via_litpool(routine_source **src_tbl_result, rhdtyp *rtn_vector)
 {
 	int			srcrecs, size;
-	mstr			*current, *top;
+	unmanaged_mstr		*current, *top;
 	routine_source		*src_tbl;
 	off_t			srcsize;
 	unsigned char		*srcptr, *srcptr_max, *srcstart, *prev_srcptr;
@@ -281,7 +283,7 @@ STATICFNDEF boolean_t fill_src_tbl_via_mfile(routine_source **src_tbl_result, rh
 	gtm_rtn_src_chksum_ctx	checksum_ctx;
 	int			fclose_res, fdd, fsd, line_indx, *lt_ptr, rc, srcfilnamlen, srcrecs;
 	unsigned int		size = 0;
-	mstr			*base, *current, src, *top;
+	unmanaged_mstr		*base, *current, src, *top;
 	off_t			srcsize;
 	routine_source		*src_tbl;
 	struct stat		srcfile_stat;
@@ -303,7 +305,7 @@ STATICFNDEF boolean_t fill_src_tbl_via_mfile(routine_source **src_tbl_result, rh
 		free(srcfile_name);
 		srcfile_name = NULL;
 		srcfilnamlen = (int)rtn_vector->routine_name.len;
-		memcpy((void *)srcnamebuf, rtn_vector->routine_name.addr, srcfilnamlen);
+		memcpy(srcnamebuf, rtn_vector->routine_name.addr, srcfilnamlen);
 		if (srcnamebuf[0] == '%')	/* percents are translated to _ on filenames */
 			srcnamebuf[0] = '_';
 		MEMCPY_LIT(&srcnamebuf[srcfilnamlen], DOTM);
@@ -369,7 +371,7 @@ STATICFNDEF boolean_t fill_src_tbl_via_mfile(routine_source **src_tbl_result, rh
 	 * Note, the size we get from lnrtab_len has an extra [0] origin entry in the total. This
 	 * entry is not used in the source array for direct referencing ease.
 	 */
-	src_tbl = (routine_source *)malloc(SIZEOF(routine_source) + ((srcrecs - 1) * SIZEOF(mstr)));
+	src_tbl = (routine_source *)malloc(SIZEOF(routine_source) + ((srcrecs - 1) * SIZEOF(unmanaged_mstr)));
 	src_tbl->srcbuff = (0 < srcsize) ? malloc(srcsize + 1) : NULL;
 	base = src_tbl->srclines;
 	srcptr = src_tbl->srcbuff;
@@ -411,7 +413,7 @@ STATICFNDEF boolean_t fill_src_tbl_via_mfile(routine_source **src_tbl_result, rh
 					size = 0;
 				} else
 				{	/* Read size fits in the destination buffer */
-					memcpy((void *)prev_srcptr, (void *)buff, (size_t)size);
+					memcpy(prev_srcptr, (void *)buff, (size_t)size);
 					/* Strip trailing '\n' if any (if at least one byte was read in) */
 					if (size && ('\n' == buff[size - 1]))
 						size--;

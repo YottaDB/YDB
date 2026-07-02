@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,11 +11,12 @@
  ****************************************************************/
 
 #include "mdef.h"
-#include "io.h"
+#include "send_msg.h"
+#include "gdsfhead.h"
 
-/* This module determines whether a vms device is NONLOCAL and therefore a network device, generally sys$net.
-In UNIX, it always returns false. */
-bool io_is_sn(mstr *tn)
-{
-	return FALSE;
-}
+#define UMNAME_HASH
+#include "hashtab_umname.h"
+/* The below include generates the hash table routines for the "mname" hash type */
+#include "hashtab_implementation.h"
+
+#undef UMNAME_HASH

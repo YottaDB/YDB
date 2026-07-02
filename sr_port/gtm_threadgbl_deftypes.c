@@ -33,7 +33,7 @@
 #include "hashtab_str.h"
 #include "hashtab_objcode.h"
 #include "error.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "gdsroot.h"
 #include "gdskill.h"
 #include "ccp.h"

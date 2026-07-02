@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2009-2021 Fidelity National Information	*
+ * Copyright (c) 2009-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -24,7 +24,7 @@
 #include "gdsfhead.h"
 #include "alias.h"
 #include "min_max.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "stack_frame.h"
 
 GBLREF symval		*curr_symval;
@@ -52,7 +52,7 @@ void op_setalsct2alsct(lv_val *srclv, lv_val *dstlv)
 		dst_lvbase = LV_GET_BASE_VAR(dstlv);
 		if (dollar_tlevel && (NULL != dst_lvbase->tp_var) && !dst_lvbase->tp_var->var_cloned)
 			TP_VAR_CLONE(dst_lvbase);	/* clone the tree. */
-		dstlv->v = srclv->v;
+		dstlv->v.umval = srclv->v.umval;
 		assert(0 < src_lvref->stats.trefcnt);
 		assert(0 <= src_lvref->stats.crefcnt);
 		INCR_TREFCNT(src_lvref);

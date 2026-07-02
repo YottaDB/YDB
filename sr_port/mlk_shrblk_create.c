@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -22,6 +22,7 @@
 #include "mlk_shrhash_find_bucket.h"
 #include "mlk_garbage_collect.h"
 #include "gdsfhead.h"
+#include "gcol_list.h"
 #include "filestruct.h"
 #include "mlk_ops.h"
 #include "mlk_shrhash_add.h"
@@ -131,6 +132,7 @@ boolean_t mlk_shrhash_add(mlk_pvtctl *pctl, mlk_shrblk_ptr_t shr)
 	{
 		i2mval(&dollar_ztwormhole, bi);
 		MV_FORCE_STRD(&dollar_ztwormhole);
+		glist_sync_mval(&dollar_ztwormhole);
 	}
 #	endif
 	if (0 == bucket->shrblk_idx)

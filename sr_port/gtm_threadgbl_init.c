@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2021 Fidelity National Information	*
+ * Copyright (c) 2010-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -44,7 +44,7 @@
 #include "hashtab_str.h"
 #include "hashtab_objcode.h"
 #include "error.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "gdsroot.h"
 #include "gdskill.h"
 #include "ccp.h"
@@ -219,4 +219,8 @@ void gtm_threadgbl_init(void)
 	(TREF(source_buffer)).addr = (char *)&aligned_source_buffer;
 	(TREF(source_buffer)).len = MAX_SRCLINE;
 	(TREF(dollar_ztimeout)).ztimeout_seconds.m[1] = -1000;
+	(TREF(trestart_xpel_rtn)).mvtype = MV_STR;
+	(TREF(trestart_xpel_rtn)).str.addr = malloc(MAX_MIDENT_LEN);
+	(TREF(trestart_xpel_lab)).mvtype = MV_STR;
+	(TREF(trestart_xpel_lab)).str.addr = malloc(MAX_MIDENT_LEN);
 }

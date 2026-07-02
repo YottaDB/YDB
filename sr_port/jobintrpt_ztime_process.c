@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -16,7 +16,7 @@
 
 #include "error.h"
 #include "indir_enum.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "op.h"
 #include "stack_frame.h"
 #include "error_trap.h"
@@ -65,7 +65,7 @@ void jobintrpt_ztime_process(boolean_t ztime)
 	assert(ztime || dollar_zininterrupt);
 	/* Compile and push new (counted) frame onto the stack to drive the $zinterrupt handler */
 	assert(((ztime ? SFT_ZTIMEOUT : SFT_ZINTR) | SFT_COUNT) == proc_act_type);
-	op_commarg((ztime ? (mval *)&(TREF(dollar_ztimeout)) : (mval *)&dollar_zinterrupt), indir_linetail);
+	op_commarg((ztime ? &((TREF(dollar_ztimeout)).ztimeout_vector) : &dollar_zinterrupt), indir_linetail);
 	frame_pointer->type = proc_act_type;	/* The mark of zorro.. */
 	proc_act_type = 0;
 	/* Now we need to preserve our current environment. This MVST_ZINTR mv_stent type will hold
@@ -77,11 +77,10 @@ void jobintrpt_ztime_process(boolean_t ztime)
 	 */
 	PUSH_MV_STENT(MVST_ZINTR);	/* MVST_ZTIMEOUT is identical to MVST_ZINTR with a flag to differentiate in debugging */
 	mv_st_ent = mv_chain;
-	mv_st_ent->mv_st_cont.mvs_zintr.savtarg.str.len = 0;
-	mv_st_ent->mv_st_cont.mvs_zintr.savextref.len = 0;
 	mv_st_ent->mv_st_cont.mvs_zintr.saved_dollar_truth = dollar_truth;
 	mv_st_ent->mv_st_cont.mvs_zintr.ztimeout = FALSE;
 	op_gvsavtarg(&mv_st_ent->mv_st_cont.mvs_zintr.savtarg);
+	glist_sync_str(&mv_st_ent->mv_st_cont.mvs_zintr.savtarg.str);
 	if (extnam_str.len)
 	{
 		ENSURE_STP_FREE_SPACE(extnam_str.len);
@@ -89,8 +88,10 @@ void jobintrpt_ztime_process(boolean_t ztime)
 		memcpy(mv_st_ent->mv_st_cont.mvs_zintr.savextref.addr, extnam_str.addr, extnam_str.len);
 		stringpool.free += extnam_str.len;
 		assert(stringpool.free <= stringpool.top);
+		mv_st_ent->mv_st_cont.mvs_zintr.savextref.len = extnam_str.len;
+		glist_protect_str(&mv_st_ent->mv_st_cont.mvs_zintr.savextref);
 	}
-	mv_st_ent->mv_st_cont.mvs_zintr.savextref.len = extnam_str.len;
+	assert(glist_str_in_sync(&mv_st_ent->mv_st_cont.mvs_zintr.savextref));
 	/* save/restore $ECODE/$STACK over this invocation */
 	mv_st_ent->mv_st_cont.mvs_zintr.error_frame_save = error_frame;
 	memcpy(&mv_st_ent->mv_st_cont.mvs_zintr.dollar_ecode_save, &dollar_ecode, SIZEOF(dollar_ecode));

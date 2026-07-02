@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2015 Fidelity National Information	*
+ * Copyright (c) 2006-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -32,6 +32,7 @@
 #include "mdef.h"
 
 #include "fnpc.h"
+#include "gcol_list.h"
 #include "min_max.h"
 #include "op.h"
 
@@ -40,7 +41,7 @@ void op_fnzp1(mval *src, int delim, int trgpcidx, mval *dst)
 	unsigned char	*first, *last, *start, *end;
 	unsigned char	dlmc;
 	unsigned int	*pcoff, *pcoffmax, fnpc_indx, slen;
-	int		trgpc, cpcidx, spcidx;
+	int		cpcidx, spcidx;
 	mval		ldst;		/* Local copy since &dst == &src .. move to dst at return */
 	fnpc   		*cfnpc;
 	delimfmt	ldelim;
@@ -62,7 +63,7 @@ void op_fnzp1(mval *src, int delim, int trgpcidx, mval *dst)
 	{
 		ldst.str.addr = (char *)start;
 		ldst.str.len  = 0;
-		*dst = ldst;
+		dst->umval = ldst.umval;
 		return;
 	}
 	/* Test mval for valid cache: index ok, mval addr same, delim same. One additional test
@@ -74,7 +75,7 @@ void op_fnzp1(mval *src, int delim, int trgpcidx, mval *dst)
 	cfnpc = &(TREF(fnpca)).fnpcs[fnpc_indx];
 	if (FNPC_MAX > fnpc_indx && cfnpc->last_str.addr == (char *)first &&
 	    cfnpc->last_str.len == slen && cfnpc->delim == ldelim.unichar_val &&
-	    cfnpc->byte_oriented)
+		(cfnpc->gcols == stringpool.gcols) && cfnpc->byte_oriented)
 	{
 		/* Have valid cache. See if piece we want already in cache */
 		COUNT_EVENT(hit);
@@ -86,7 +87,7 @@ void op_fnzp1(mval *src, int delim, int trgpcidx, mval *dst)
 			ldst.str.addr = (char *)first + cfnpc->pstart[trgpcidx - 1];
 			ldst.str.len = cfnpc->pstart[trgpcidx] - cfnpc->pstart[trgpcidx - 1] - 1;
 			assert(ldst.str.len >= 0 && ldst.str.len <= src->str.len);
-			*dst = ldst;
+			dst->umval = ldst.umval;
 			return;
 		} else
 		{
@@ -108,9 +109,10 @@ void op_fnzp1(mval *src, int delim, int trgpcidx, mval *dst)
 		if ((TREF(fnpca)).fnpcmax < cfnpc)
 			cfnpc = &(TREF(fnpca)).fnpcs[0];
 		(TREF(fnpca)).fnpcsteal = cfnpc + 1;	/* -> next element to steal */
-		cfnpc->last_str = src->str;		/* Save validation info */
+		cfnpc->last_str = src->str.umstr;		/* Save validation info */
 		cfnpc->delim = ldelim.unichar_val;
 		cfnpc->npcs = 0;
+		cfnpc->gcols = stringpool.gcols;
 		cfnpc->byte_oriented = TRUE;
 		src->fnpc_indx = cfnpc->indx + 1;	/* Save where we are putting this element
 							   (1 based index in mval so 0 isn't so common) */
@@ -155,6 +157,6 @@ void op_fnzp1(mval *src, int delim, int trgpcidx, mval *dst)
 		ldst.str.len  = 0;
 	assert(cfnpc->npcs > 0);
 	assert(ldst.str.len >= 0 && ldst.str.len <= src->str.len);
-	*dst = ldst;
+	dst->umval = ldst.umval;
 	return;
 }

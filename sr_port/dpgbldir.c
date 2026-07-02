@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -24,7 +24,7 @@
 #include "gdsbt.h"
 #include "gdsfhead.h"
 #include "gbldirnam.h"
-#include "hashtab_mname.h"
+#include "hashtab_umname.h"
 #include "iosize.h"
 #include "dpgbldir.h"
 #include "filestruct.h"
@@ -74,7 +74,7 @@ gd_addr *zgbldir(mval *v)
 {
 	gd_addr		*gd_ptr;
 	gdr_name	*name;
-	mstr		temp_mstr, *tran_name;
+	unmanaged_mstr		temp_mstr, *tran_name;
 
 	for (name = gdr_name_head;  name;  name = (gdr_name *)name->link)
 		if (v->str.len == name->name.len && !memcmp(v->str.addr, name->name.addr, v->str.len))
@@ -85,7 +85,7 @@ gd_addr *zgbldir(mval *v)
 		temp_mstr.len = SIZEOF(GTM_GBLDIR) - 1;
 		tran_name = get_name(&temp_mstr);
 	} else
-		tran_name = get_name(&v->str);
+		tran_name = get_name(&v->str.umstr);
 	gd_ptr = gd_load(tran_name);
 	name = (gdr_name *)malloc(SIZEOF(gdr_name));
 	if ((name->name.len = v->str.len))	/* Note embedded assignment */
@@ -164,7 +164,7 @@ Notes:          A) While checking may be done earlier for duplicate names,
 		operations useable only after the file is open, so checks
 		must be done within this function for duplicate files.
 -*/
-gd_addr *gd_load(mstr *v)
+gd_addr *gd_load(unmanaged_mstr *v)
 {
 	void			*file_ptr; /* is a temporary structure as the file open and manipulations are currently stubs */
 	header_struct		*header, temp_head, disp_head;
@@ -307,8 +307,8 @@ gd_addr *gd_load(mstr *v)
 	gd_addr_head = table;
 	fill_gd_addr_id(gd_addr_head, file_ptr);
 	close_gd_file(file_ptr);
-	table->tab_ptr = (hash_table_mname *)malloc(SIZEOF(hash_table_mname));
-	init_hashtab_mname(table->tab_ptr, 0, HASHTAB_NO_COMPACT, HASHTAB_NO_SPARE_TABLE);
+	table->tab_ptr = (hash_table_umname *)malloc(SIZEOF(hash_table_umname));
+	init_hashtab_umname(table->tab_ptr, 0, HASHTAB_NO_COMPACT, HASHTAB_NO_SPARE_TABLE);
 	/* For most MUPIP commands (except those that can do logical database updates ("is_replicator" == TRUE)
 	 * or MUPIP RUNDOWN or MUPIP CREATE, hide the statsdb regions so the commands do not even know about them
 	 * let alone operate on them. All of them would have set TREF(ok_to_see_statsdb_regs) appropriately.
@@ -437,7 +437,7 @@ void cm_del_gdr_ptr(gd_region *greg)
 	return;
 }
 
-boolean_t get_first_gdr_name(gd_addr *current_gd_header, mstr *log_nam)
+boolean_t get_first_gdr_name(gd_addr *current_gd_header, unmanaged_mstr *log_nam)
 {
 	gdr_name	*name;
 
@@ -481,9 +481,9 @@ void gd_rundown(void)		/* Wipe out the global directory structures */
 	gdr_name_head = (gdr_name *)NULL;
 }
 
-void gd_ht_kill(hash_table_mname *table, boolean_t contents)	/* wipe out the hash table corresponding to a gld */
+void gd_ht_kill(hash_table_umname *table, boolean_t contents)	/* wipe out the hash table corresponding to a gld */
 {
-	ht_ent_mname	*tabent, *topent;
+	ht_ent_umname	*tabent, *topent;
 	gvnh_reg_t	*gvnh_reg;
 	gv_namehead	*gvt;
 	gvnh_spanreg_t	*gvspan;
@@ -493,7 +493,7 @@ void gd_ht_kill(hash_table_mname *table, boolean_t contents)	/* wipe out the has
 	{
 		for (tabent = table->base, topent = tabent + table->size; tabent < topent; tabent++)
 		{
-			if (HTENT_VALID_MNAME(tabent, gvnh_reg_t, gvnh_reg))
+			if (HTENT_VALID_UMNAME(tabent, gvnh_reg_t, gvnh_reg))
 			{
 				gvspan = gvnh_reg->gvspan;
 				if (NULL == gvspan)
@@ -523,7 +523,7 @@ void gd_ht_kill(hash_table_mname *table, boolean_t contents)	/* wipe out the has
 			}
 		}
 	}
-	free_hashtab_mname(table);
+	free_hashtab_umname(table);
 	/* We don't do a free(table) in this generic routine because it is called both by GT.M and GT.CM
 	 * and GT.CM retains the table for reuse while GT.M doesn't. GT.M fgncal_rundown() takes care of
 	 * this by freeing it up explicitly (after a call to ht_kill) in gd_rundown() [dpgbldir.c]

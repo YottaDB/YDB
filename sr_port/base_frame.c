@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -15,8 +15,9 @@
 #include "gtm_string.h"
 
 #include "error.h"	/* For DBGEHND() */
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "stack_frame.h"
+#include "glvn_pool.h"
 
 GBLREF unsigned char 	*stacktop, *stackwarn, *msp;
 GBLREF stack_frame	*frame_pointer;
@@ -55,12 +56,14 @@ void base_frame(rhdtyp *base_address)
 	fp->rvector = base_address;
 	fp->temps_ptr = (unsigned char *)fp;
 	fp->vartab_len = 0;
-	fp->vartab_ptr = (char *)fp;
-	fp->type = SFT_COUNT;
+	fp->vartab_ptr = (var_tabent *)fp;
+	fp->type = (SFT_COUNT | SFT_BASE);
 	fp->ret_value = NULL;
 	fp->dollar_test = -1;
 	fp->restart_pc = fp->mpc;
 	fp->restart_ctxt = fp->ctxt;
+	SET_GLVN_INDX(fp, GLVN_POOL_UNTOUCHED);
+	SET_PTEMP_CNT(fp, INVALID_PTEMP_CNT);
 	ENABLE_INTERRUPTS(INTRPT_IN_FRAMES, prev_intrpt_state);
 	DBGEHND((stderr, "base_frame: New base frame allocated at 0x"lvaddr"\n", fp));
 }

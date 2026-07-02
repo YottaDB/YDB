@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2012-2026 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,5 +14,6 @@
 #define GTM_MVAE_INCLUDED
 
 void *gtm_memcpy_validate_and_execute(void *target, const void *src, size_t len);
+void *gtm_memmove(void *target, const void *src, size_t len);
 
 #endif

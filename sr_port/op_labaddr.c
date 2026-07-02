@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -18,9 +18,10 @@
 #endif
 
 #include "cmd_qlf.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "zbreak.h"
 #include "linktrc.h"
+#include "xpelerrpre_inline.h"
 
 error_def(ERR_LABELMISSING);
 error_def(ERR_LABELONLY);
@@ -74,7 +75,10 @@ lnr_tabent *op_labaddr(rhdtyp *routine, mval *label, int4 offset)
 			routine_hdr->routine_name.addr);
 	answer = find_line_addr(routine_hdr, &label->str, 0, NULL);
 	if (NULL == answer)
+	{
+		xpelerrorpre();
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_LABELMISSING, 2, label->str.len, label->str.addr);
+	}
 	real_routine = CURRENT_RHEAD_ADR(routine_hdr);
 	first_line = LNRTAB_ADR(real_routine);
 	answer += offset;

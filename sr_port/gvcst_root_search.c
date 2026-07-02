@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -185,7 +185,6 @@ void gvcst_redo_root_search()
 
 	SETUP_THREADGBL_ACCESS;
 	ESTABLISH(gvcst_redo_root_search_ch);
-	ACCUMULATE_LCL_GVSTATS_COUNTER(cs_addrs, cs_addrs->nl, n_cache_reads);
 	assert(!TREF(in_gvcst_redo_root_search)); /* Should never recurse. However, can be called from non-redo gvcst_root_search,
 						   * e.g. from op_gvname. In that case, the results of gvcst_redo_root_search are
 						   * discarded and the outer root search correctly sets gv_target->root.
@@ -232,7 +231,7 @@ enum cdb_sc gvcst_root_search(boolean_t donot_restart)
 	boolean_t	gbl_target_was_set, long_blk_id;
 	int4		blk_id_sz;
 	gv_namehead	*next, *prev, *save_targ;
-	mname_entry	*gvent;
+	unmanaged_mname_entry	*gvent;
 	int		altkeylen;
 	int		tmp_cmpc;
 	block_id	lcl_root;

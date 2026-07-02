@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -54,7 +54,7 @@ short iott_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 	int		status, chset_index, dev_sp_size;
 	int		save_errno;
 	int		p_offset;
-	mstr		chset_mstr;
+	unmanaged_mstr	chset_mstr;
 	gtm_chset_t	temp_chset, old_ichset, old_ochset;
 	boolean_t	empt = FALSE, wrap_specified = FALSE, wrap_parm;
 	boolean_t	ch_set;

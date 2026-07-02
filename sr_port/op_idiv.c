@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -43,11 +43,12 @@ void	op_idiv(mval *u, mval *v, mval *q)
 		if (!promo)
 		{
 			q->mvtype = MV_NM | MV_INT;
+			q->str.len = 0;
 			return;
 		} else
 		{
-			w = *u;
-			y = *v;
+			w.umval = u->umval;
+			y.umval = v->umval;
 			promote(&w);
 			promote(&y);
 			u = &w;
@@ -55,24 +56,24 @@ void	op_idiv(mval *u, mval *v, mval *q)
 		}
 	} else  if (u->mvtype & MV_INT)
 	{
-		w = *u;
+		w.umval = u->umval;
 		promote(&w);
 		u = &w;
 	} else  if (v->mvtype & MV_INT)
 	{
-		w = *v;
+		w.umval = v->umval;
 		promote(&w);
 		v = &w;
 	}
 	exp = u->e - v->e + MV_XBIAS;
 	if (exp < MV_XBIAS)
-		*q = literal_zero;
+		q->umval = literal_zero.umval;
 	else
 	{
 		c = eb_div(v->m, u->m, q->m);
 		exp += c;
 		if (exp <= MV_XBIAS)
-			*q = literal_zero;
+			q->umval = literal_zero.umval;
 		else  if (exp < EXP_IDX_BIAL)
 		{
 			assert(EXP_IDX_BIAL - exp >= 0);
@@ -101,6 +102,7 @@ void	op_idiv(mval *u, mval *v, mval *q)
 			q->e = exp;
 			q->sgn = u->sgn ^ v->sgn;
 			q->mvtype = MV_NM;
+			q->str.len = 0;
 		}
 	}
 	assert(q->m[1] < MANT_HI);

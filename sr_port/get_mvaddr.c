@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,6 +18,7 @@
 #include "mmemory.h"
 #include "min_max.h"
 #include "stringpool.h"
+#include "gcol_list.h"
 
 GBLREF mvar 	*mvartab;
 GBLREF mvax 	*mvaxtab, *mvaxtab_end;
@@ -26,7 +28,6 @@ mvar *get_mvaddr(mident *var_name)
 {
 	mvar 	**p;
 	mvax 	*px;
-	mstr 	vname;
 	int 	x;
 
 	p = &mvartab;
@@ -41,12 +42,11 @@ mvar *get_mvaddr(mident *var_name)
 			return *p;
 	}
 	/* variable doesn't exist - create a new mvar in mvartab */
-	vname.len = var_name->len;
-	vname.addr = var_name->addr;
-	s2pool_align(&vname);
 	*p = (mvar *)mcalloc(SIZEOF(mvar));
-	(*p)->mvname.len = vname.len;
-	(*p)->mvname.addr = vname.addr;
+	glist_first_init_str(&(*p)->mvname);
+	glist_protect_str(&(*p)->mvname);
+	(*p)->mvname.umstr = *var_name;
+	s2pool(&(*p)->mvname);
 	(*p)->mvidx = mvmax++;
 	(*p)->lson = (*p)->rson = NULL;
 	(*p)->last_fetch = NULL;

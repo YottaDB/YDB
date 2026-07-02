@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2013-2023 Fidelity National Information	*
+ * Copyright (c) 2013-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -19,7 +19,7 @@
 #include "gtm_string.h"
 #include "io.h"
 #include "gtmio.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "rtn_src_chksum.h"
 
 error_def(ERR_FILENOTFND);
@@ -187,6 +187,6 @@ int append_checksum(unsigned char *out, rhdtyp *routine)
 #	else
 	len = SNPRINTF(buf, MAX_ROUTINE_CHECKSUM_DIGITS, "%04x", (uint4)get_rtnhdr_checksum(hdr));
 #	endif
-	memcpy((void *)out, (unsigned char *)buf, len);
+	memcpy(out, buf, len);
 	return len;
 }

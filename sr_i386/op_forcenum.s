@@ -1,6 +1,7 @@
 #################################################################
 #								#
-#	Copyright 2001, 2008 Fidelity Information Services, Inc	#
+# Copyright (c) 2001-2026 Fidelity National Information		#
+# Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -42,6 +43,7 @@ ENTRY op_forcenum
 l20:	testw	$mval_m_int_without_nm,mval_w_mvtype(%edx)
 	je	l30
 	movw	$mval_m_int,mval_w_mvtype(%eax)
+	movl	$0,mval_l_strlen(%eax)
 	movl	mval_l_m1(%edx),%edx
 	movl	%edx,mval_l_m1(%eax)
 	ret
@@ -57,6 +59,7 @@ l30:	pushl	%ebx
 	movl	%ebx,mval_l_m0(%eax)
 	movl	mval_l_m1(%edx),%ebx
 	movl	%ebx,mval_l_m1(%eax)
+	movl	$0,mval_l_strlen(%eax)
 	popl	%ebx
 	ret
 
@@ -67,7 +70,7 @@ l40:
 	pushl	%esi
 	movl	%eax,%edi
 	movl	%edx,%esi
-	movl	$mval_byte_len,%ecx
+	movl	$umval_byte_len,%ecx
 	REP
 	movsb
 	popl	%esi

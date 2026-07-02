@@ -17,7 +17,7 @@
 #include "opcode.h"
 #include "mdq.h"
 #include "mmemory.h"
-#include <emit_code.h>
+#include "emit_code.h"
 #include "fullbool.h"
 #include "stringpool.h"
 

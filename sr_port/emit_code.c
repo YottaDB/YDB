@@ -26,11 +26,11 @@
 #include "vxt.h"
 #include "cgp.h"
 #include "obj_gen.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "obj_file.h"
 #include "list_file.h"
 #include "min_max.h"
-#include <emit_code.h>
+#include "emit_code.h"
 #ifdef UNIX
 #include "xfer_enum.h"
 #endif
@@ -49,7 +49,7 @@ DEFINE_XFER_TABLE_DESC;
 GBLDEF int call_4lcldo_variant;	 /* used in emit_jmp for call[sp] and forlcldo */
 #endif /* __x86_64__ || __ia64 */
 
-#define MVAL_INT_SIZE DIVIDE_ROUND_UP(SIZEOF(mval), SIZEOF(UINTPTR_T))
+#define UMVAL_INT_SIZE DIVIDE_ROUND_UP(SIZEOF(unmanaged_mval), SIZEOF(UINTPTR_T))
 
 #ifdef DEBUG
 #  include "vdatsize.h"
@@ -611,29 +611,35 @@ short *emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
 						assertpro(FALSE && *inst);
 					break;
 				case VXI_MOVC3:
-					/* The MOVC3 instruction is only used to copy an mval from one place to another
-					 * so that is the expansion we will generate.
-					 */
 					assert(VXT_LIT == *inst);
-					inst += 2;
+					inst++;
+					save_inst = *inst++;
 					assert(VXT_VAL == *inst);
 					inst++;
 					emit_trip(*(fst_opr + *inst++), TRUE, GENERIC_OPCODE_LDA, MOVC3_SRC_REG);
 					assert(VXT_VAL == *inst);
 					inst++;
 					emit_trip(*(fst_opr + *inst++), TRUE, GENERIC_OPCODE_LDA, MOVC3_TRG_REG);
+					assert(SIZEOF(mval) == (offsetof(mval, str.in_array) + SIZEOF(((mstr *)0)->in_array)));
 #					if defined(__MVS__) || defined(Linux390)
 					/* The MVC instruction on zSeries facilitates memory copy(mval in this case) in a single
 					 * instruction instead of multiple 8/4 byte copies.
 					 */
-					GEN_MVAL_COPY(MOVC3_SRC_REG, MOVC3_TRG_REG, SIZEOF(mval));
-#					elif defined(__linux) && defined(__x86_64__)
+					GEN_COPY(MOVC3_SRC_REG, MOVC3_TRG_REG, offsetof(mval, str.in_array));
+#					else
+#					if defined(__linux) && defined(__x86_64__)
+					/* TODO - THIS COMMENT IS FALSE, USE LOADSTORES or xmms */
 					/* The latest x86-64 processors have optimized REP MOVSQ to be the fastest way to move
 					 * medium/small strings (like mvals which are always at least 8 byte aligned). This also
 					 * significantly reduces the codegen.
 					 */
-					GEN_MVAL_COPY(MOVC3_SRC_REG, MOVC3_TRG_REG, MVAL_QWORD_SIZE);
-#					else
+					if (0 == (offsetof(mval, str.in_array) % SIZEOF(void *)))
+					{
+						GEN_COPY(MOVC3_SRC_REG, MOVC3_TRG_REG,
+							 (OFFSETOF(mval, str.in_array) / SIZEOF(void *)));
+					} else
+					{
+#					endif
 					/* For any non-special-cased platforms, the most efficient expansion is to generate a
 					 * series of load and store instructions. Do the loads first then the stores to keep the
 					 * pipelines flowing and not stall waiting for any given load or store to complete. Because
@@ -642,7 +648,7 @@ short *emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
 					 * we put the whole mval copy code gen thing in a loop so we can do this regardless of how
 					 * big it gets.
 					 */
-					for (words_to_move = MVAL_INT_SIZE, reg_offset = 0; words_to_move;)
+					for (words_to_move = UMVAL_INT_SIZE, reg_offset = 0; words_to_move;)
 					{
 						reg = MACHINE_FIRST_ARG_REG;
 						save_reg_offset = reg_offset;
@@ -664,6 +670,9 @@ short *emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
 							NON_GTM64_ONLY(GEN_STORE_WORD(targ_reg, MOVC3_TRG_REG, save_reg_offset));
 							GTM64_ONLY(GEN_STORE_WORD_8(targ_reg, MOVC3_TRG_REG, save_reg_offset));
 						}
+					}
+#					endif
+#					if !(defined(__MVS__) || defined(Linux390)) && (defined(__linux) && defined(__x86_64__))
 					}
 #					endif
 					break;

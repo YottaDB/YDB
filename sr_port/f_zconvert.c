@@ -1,6 +1,6 @@
 /****************************************************************
  *                                                              *
- * Copyright (c) 2006-2024 Fidelity National Information	*
+ * Copyright (c) 2006-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *                                                              *
  *      This source code contains the intellectual property     *
@@ -37,7 +37,7 @@ error_def(ERR_ENCODING);
 int f_zconvert(oprtype *a, opctype op)
 {
 	triple	*r, *mode, *mode2;
-	mstr	*tmpstr;
+	const unmanaged_mstr	*tmpstr;
 	int	i;
 	DCL_THREADGBL_ACCESS;
 
@@ -60,7 +60,7 @@ int f_zconvert(oprtype *a, opctype op)
 	if (TK_COMMA != TREF(window_token))
 	{	/* 3rd parameter does not exist. Do checks for 2 arument $zconvert */
 		if ((OC_LIT == mode->operand[0].oprval.tref->opcode) &&
-		    (-1 == verify_case((tmpstr = &mode->operand[0].oprval.tref->operand[0].oprval.mlit->v.str))))
+		    (-1 == verify_case((tmpstr = &mode->operand[0].oprval.tref->operand[0].oprval.mlit->v.str.umstr))))
 		{
 			stx_error(ERR_BADCASECODE, 2, tmpstr->len, tmpstr->addr);
 			return FALSE;
@@ -69,7 +69,7 @@ int f_zconvert(oprtype *a, opctype op)
 	{	/* 3rd parameter exists .. reel it in after error checking 2nd parm */
 		r->opcode = OC_FNZCONVERT3;
 		if ((OC_LIT == mode->operand[0].oprval.tref->opcode) &&
-		    (0 >= verify_chset((tmpstr = &mode->operand[0].oprval.tref->operand[0].oprval.mlit->v.str))))
+		    (0 >= verify_chset((tmpstr = &mode->operand[0].oprval.tref->operand[0].oprval.mlit->v.str.umstr))))
 		{	/* Convert extended ascii to a different encoding */
 			if (CHSET_M != check_w1252(tmpstr))
 			{
@@ -85,7 +85,7 @@ int f_zconvert(oprtype *a, opctype op)
 		if (EXPR_FAIL == expr(&(mode2->operand[0]), MUMPS_STR))
 			return FALSE;
 		if ((OC_LIT == mode2->operand[0].oprval.tref->opcode) &&
-		    (0 >= verify_chset((tmpstr = &mode2->operand[0].oprval.tref->operand[0].oprval.mlit->v.str))))
+		    (0 >= verify_chset((tmpstr = &mode2->operand[0].oprval.tref->operand[0].oprval.mlit->v.str.umstr))))
 		{	/* Convert UTF8/UTF16 to an extended ascii encoding */
 			if (CHSET_M != check_w1252(tmpstr))
 			{

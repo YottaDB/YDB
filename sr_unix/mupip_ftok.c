@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -60,7 +60,7 @@ void mupip_ftok(void)
 	int		index, ispool, semid, shmid;
 	int4		id, status;
 	key_t		semkey = (key_t)-1;
-	mstr		file;
+	unmanaged_mstr	file;
 	parse_blk	pblk;
 	repl_inst_hdr	repl_instance;
 	sgmnt_data	header;
@@ -141,25 +141,26 @@ void mupip_ftok(void)
 		{
 			if (showheader)
 			{
-				FPRINTF(stderr, "%20s :: %23s :: %23s :: %23s :: %34s\n", "File", "Semaphore Id",
-					"Shared Memory Id", "FTOK Key", "FileId");
+				FPRINTF(stderr, "%23s :: %23s :: %23s :: %34s :: %20s\n", "Semaphore Id",
+					"Shared Memory Id", "FTOK Key", "FileId", "File");
 				FPRINTF(stderr, "-----------------------------------------------------------------------------");
 				FPRINTF(stderr, "--------------------------------------------------------------\n");
 				showheader = FALSE;
 			}
 			if (!ispool || !index)
 			{	/* it's a file */
-				FPRINTF(stderr, "%20s :: %10d [0x%.8x] :: %10d [0x%.8x] :: %10d [0x%.8x] :: 0x", fn, semid, semid,
+				FPRINTF(stderr, "%10d [0x%.8x] :: %10d [0x%.8x] :: %10d [0x%.8x] :: 0x", semid, semid,
 					shmid, shmid, semkey, semkey);
 				fid_ptr = (sm_uc_ptr_t)&fid;
 				filename_to_id((gd_id_ptr_t)fid_ptr, fn);
 				for (fid_top = fid_ptr + SIZEOF(fid) ; fid_ptr < fid_top; fid_ptr++)
 					FPRINTF(stderr, "%.2x", *(sm_uc_ptr_t)fid_ptr);
+				FPRINTF(stderr, " :: %20s", fn);
 			} else
-				FPRINTF(stderr, "%20s :: %10d [0x%.8x] :: %10d [0x%.8x]", fn, semid, semid, shmid, shmid);
+				FPRINTF(stderr, "%10d [0x%.8x] :: %10d [0x%.8x] :: %85s", semid, semid, shmid, shmid, fn);
 			FPRINTF(stderr, "\n");
 		} else		/* simple legacy format */
-			FPRINTF(stderr, "%20s  ::  %10d  [ 0x%8x ]\n", fn, semkey, semkey);
+			FPRINTF(stderr, "%10d  [ 0x%8x ] :: %20s\n", semkey, semkey, fn);
 	}
 	mupip_exit(SS_NORMAL);
 }

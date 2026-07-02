@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2020 Fidelity National Information	*
+ * Copyright (c) 2010-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -18,7 +18,7 @@
 #include "gdsbt.h"			/* for gdsfhead.h */
 #include "gdsfhead.h"
 #include "gvcst_protos.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "gv_trigger.h"
 #include "trigger.h"
 #include "mv_stent.h"			/* for COPY_SUBS_TO_GVCURRKEY macro */
@@ -139,7 +139,8 @@ STATICFNDEF void trigger_fill_xecute_buffer_read_trigger_source(gv_trigger_t *tr
 {
 	enum cdb_sc		cdb_status;
 	int4			index;
-	mstr			gbl, xecute_buff;
+	mstr			gbl;
+	unmanaged_mstr		xecute_buff;
 	mval			trig_index;
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
@@ -194,7 +195,7 @@ STATICFNDEF void trigger_fill_xecute_buffer_read_trigger_source(gv_trigger_t *tr
 	INITIAL_HASHT_ROOT_SEARCH_IF_NEEDED;
 	assert(0 == trigdsc->xecute_str.str.len);	/* Make sure not replacing/losing a buffer */
 	xecute_buff.addr = trigger_gbl_fill_xecute_buffer(gbl.addr, gbl.len, &trig_index, NULL, (int4 *)&xecute_buff.len);
-	trigdsc->xecute_str.str = xecute_buff;
+	trigdsc->xecute_str.str.umstr = xecute_buff; /* TODO should be umstr? */
 	/* Restore gv_target/gv_currkey which need to be kept in sync */
 	RESTORE_REGION_INFO(save_currkey, save_gv_target, save_gv_cur_region, save_sgm_info_ptr, save_jnlpool);
 	return;

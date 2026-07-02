@@ -773,6 +773,7 @@ OC_OPEN:	jsb 	xfer.xf_restartpc
 OC_PATTERN:	movab	val.1,r0
 		movab	val.2,r1
 		jsb	xfer.xf_pattern
+OC_PRETSTART:	jsb	xfer.xf_pretstart
 OC_PUTINDX:	irepab	val.2
 		calls	val.1,xfer.xf_putindx
 		movl	r0,addr.0
@@ -904,6 +905,8 @@ OC_TCOMMIT:	jsb	xfer.xf_tcommit
 OC_TROLLBACK:	pushl	val.1
 		jsb	xfer.xf_trollback
 OC_TRESTART:	pushl	val.1
+		pushab  val.3
+		pushab  val.2
 		jsb	xfer.xf_trestart
 OC_TSTART:	irepab	val.4
 		pushl	val.3

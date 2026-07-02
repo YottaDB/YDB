@@ -1,5 +1,5 @@
-All software in this package is part of FIS GT.M (http://fis-gtm.com)
-which is Copyright 2026 Fidelity Information Services, Inc., and
+All software in this package is part of FIS GT.M which is 
+Copyright 2026 Fidelity Information Services, Inc., and
 provided to you under the terms of a license. If there is a COPYING
 file included in this package, it contains the terms of the license under
 which the package is provided to you. If there is not a COPYING file in
@@ -24,20 +24,18 @@ To build GT.M for Linux, do the following steps:
    If CMake issues a NOTFOUND error, please see the FAQ below.
 
 2. Unpack the GT.M sources
-   The GT.M source tarball extracts to a directory with the version number in
-   the name, fis-gtm-V7.1-011
-   $ tar xfz fis-gtm-V7.1-011.tar.gz
-   $ cd fis-gtm-V7.1-011
+   The GT.M source tarball extracts to a directory with the version number in the name, gtm_V7.2-000_src
+   $ tar xfz gtm_V7.2-000_src.tar.gz
+   $ cd gtm_V7.2-000_src
 
    You should find this README, LICENSE, COPYING and CMakeLists.txt file and
    sr_* source directories.
 
 3. Building GT.M -
-   <fis-gtm-build> can be a sub directory of the source directory,
-   fis-gtm-V7.1-011, or any other valid path.
+   <gtm_build> can be a sub directory of the source directory, or any other valid path.
 
-   $ mkdir <fis-gtm-build>
-   $ cd <fis-gtm-build>
+   $ mkdir <gtm_build>
+   $ cd <gtm_build>
 
    # [optional] If you installed GT.M, provide the directory path to cmake
    #   -D GTM_DIST:PATH=$gtm_dist
@@ -53,16 +51,17 @@ To build GT.M for Linux, do the following steps:
    #
    #     -D CMAKE_INSTALL_PREFIX:PATH=${PWD}/package
    #
-   $ cmake -D CMAKE_INSTALL_PREFIX:PATH=${PWD}/package <path to>/fis-gtm-V7.1-011
+
+   $ cmake -D CMAKE_INSTALL_PREFIX:PATH=${PWD}/package <path to>/gtm_V7.2-000_src
 
    $ make
 
    $ make install
 
-   $ cd package/lib/fis-gtm/V7.1-011_x86_64
+   $ cd package/lib/fis-gtm/V7.2-000_x86_64
 
    # Now you are ready to install GT.M. Answer a few questions and install it.
-   # The recommended installation path is /opt/fis-gtm/V7.1-011_x86_64
+   # The recommended installation path is /opt/fis-gtm/V7.2-000_x86_64
 
    $ sudo ./configure
 
@@ -77,4 +76,3 @@ FAQ:
 	Please set them or make sure they are set and tested correctly in the CMake files:
   This indicates that required libraries are not found. Please consult the list
   of libraries and check your distributions package manager.
-

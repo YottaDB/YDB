@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -128,7 +128,7 @@ void	op_fnzparse (mval *file, mval *field, mval *def1, mval *def2, mval *type, m
 	pblk.def2_size = def2->str.len;
 	pblk.def2_buf = def2->str.addr;
 
-	if ((parse_file(&file->str, &pblk) & 1) == 0)
+	if ((parse_file(&file->str.umstr, &pblk) & 1) == 0)
 	{
 		ret->mvtype = MV_STR;
 		ret->str.len = 0;

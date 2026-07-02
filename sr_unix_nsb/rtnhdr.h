@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -79,7 +79,7 @@ typedef struct
 typedef struct	rhead_struct
 {
 	char		jsb[RHEAD_JSB_SIZE];
-	mstr		src_full_name;		/* (updated) full source name of current module version */
+	unmanaged_mstr	src_full_name;		/* (updated) full source name of current module version */
 	mident		routine_name;
 	int4		vartab_off;		/* (updated) offset to variable table of current module version */
 	int4		vartab_len;		/* (updated) length of variable table of current module version */
@@ -146,7 +146,7 @@ typedef struct
 #define VERIFY		TRUE
 #define NOVERIFY	FALSE
 
-int get_src_line(mval *routine, mval *label, int offset, mstr **srcret, rhdtyp **rtn_vec);
+int get_src_line(mval *routine, mval *label, int offset, unmanaged_mstr **srcret, rhdtyp **rtn_vec);
 void free_src_tbl(rhdtyp *rtn_vector);
 unsigned char *find_line_start(unsigned char *in_addr, rhdtyp *routine);
 int4 *find_line_addr(rhdtyp *routine, mstr *label, int4 offset, mident **lent_name);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -15,7 +15,7 @@
 #include "gtm_stdio.h"
 
 #include "gtmio.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "stack_frame.h"
 #include "mv_stent.h"
 #include "tp_frame.h"
@@ -73,15 +73,17 @@ int unw_retarg(mval *src, boolean_t alias_return)
 	rhdtyp		*rtnhdr;
 	stack_frame	*prevfp;
 	symval		*symlv, *symlvc;
+	mval		*m, *mtop;
+	unsigned int ptemp_cnt;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	assert((frame_pointer < frame_pointer->old_frame_pointer) || (NULL == frame_pointer->old_frame_pointer));
-	assert(NULL == alias_retarg);
-	alias_retarg = NULL;
 	DBGEHND_ONLY(prevfp = frame_pointer);
 	if (tp_pointer && tp_pointer->fp <= frame_pointer)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_TPQUIT);
+	assert(NULL == alias_retarg);
+	alias_retarg = NULL;
 	assert(msp <= stackbase && msp > stacktop);
 	assert(mv_chain <= (mv_stent *)stackbase && mv_chain > (mv_stent *)stacktop);
 	assert(frame_pointer <= (stack_frame *)stackbase && frame_pointer > (stack_frame *)stacktop);
@@ -93,7 +95,7 @@ int unw_retarg(mval *src, boolean_t alias_return)
 	if (!alias_return)
 	{	/* Return of "regular" value - Verify it exists */
 		MV_FORCE_DEFINED(src);
-		ret_value = *src;
+		ret_value.umval = src->umval;
 		ret_value.mvtype &= ~MV_ALIASCONT;	/* Make sure alias container of regular return does not propagate */
 	} else
 	{	/* QUIT *var or *var(indx..) syntax was used.
@@ -111,7 +113,7 @@ int unw_retarg(mval *src, boolean_t alias_return)
 			{	/* Have a potential container var - verify */
 				if (!(MV_ALIASCONT & srclv->v.mvtype))
 					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_ALIASEXPECTED);
-				ret_value = *src;
+				ret_value.umval = src->umval;
 				srclvc = (lv_val *)srclv->v.str.addr;
 				assert(LV_IS_BASE_VAR(srclvc));	/* Verify base var */
 				assert(srclvc->stats.trefcnt >= srclvc->stats.crefcnt);
@@ -125,7 +127,7 @@ int unw_retarg(mval *src, boolean_t alias_return)
 					 src, srclvc));
 			} else
 			{	/* Creating a new alias - create a container to pass back */
-				memcpy(&ret_value, &literal_null, SIZEOF(mval));
+				ret_value.umval = literal_null.umval;
 				ret_value.mvtype |= MV_ALIASCONT;
 				ret_value.str.addr = (char *)srclv;
 				srclvc = srclv;
@@ -134,47 +136,66 @@ int unw_retarg(mval *src, boolean_t alias_return)
 			}
 			INCR_TREFCNT(srclvc);
 			INCR_CREFCNT(srclvc);	/* This increment will be reversed if this container gets put into an alias */
-			*trg = ret_value;
+			trg->umval = ret_value.umval;
 			alias_retarg = trg;
 			got_ret_target = TRUE;
-		} /* else fall into below which will raise the NOTEXTRINSIC error */
+		}	/* else fall into below which can raise the NOTEXTRINSIC error */
 	}
 	/* Note: we are unwinding uncounted (indirect) frames here to allow the QUIT command to have indirect arguments
 	 * and thus be executed by commarg in an indirect frame. By unrolling the indirect frames here we get back to
 	 * the point where we can find where to put the quit value.
 	 */
 	unwind_nocounts();
+	if ((trg = frame_pointer->ret_value) && !alias_return)	/* CAUTION: Assignment */
+	{	/* If this is an alias_return arg, bypass the arg set logic done above. */
+		assert(!got_ret_target);
+		got_ret_target = TRUE;
+		trg->umval = ret_value.umval;	/* If this is an alias_return arg, bypass the arg set logic which was done above. */
+	}
+	/* this routine is called to return a value, if the caller does not expect a return value, throw an error */
+	if (!got_ret_target && !dollar_zquit_anyway)
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_NOTEXTRINSIC);		/* invoking routine not expecting return value */
 	while (mv_chain < (mv_stent *)frame_pointer)
 	{
 		msp = (unsigned char *)mv_chain;
 		unw_mv_ent(mv_chain, UNWIND_NEWVARS);
 		POP_MV_STENT();
 	}
-	if (0 <= frame_pointer->dollar_test)
-		dollar_truth = (boolean_t)frame_pointer->dollar_test;
 	/* Now that we have unwound the uncounted frames, we should be left with a counted frame that
 	 * contains some ret_value, NULL or not. If the value is non-NULL, let us restore the $TEST
 	 * value from that frame as well as update *trg for non-alias returns.
 	 */
-	if ((trg = frame_pointer->ret_value) && !alias_return)	/* CAUTION: Assignment */
-	{	/* If this is an alias_return arg, bypass the arg set logic which was done above. */
-		assert(!got_ret_target);
-		got_ret_target = TRUE;
-		*trg = ret_value;
-	}
-	/* do not throw an error if return value is expected from a non-extrinsic, but dollar_zquit_anyway is true */
-	if (!dollar_zquit_anyway && !got_ret_target)
-		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_NOTEXTRINSIC);	/* Routine not invoked as an extrinsic function */
-	/* Note that error_ret() should be invoked only after the rts_error() of TPQUIT and NOTEXTRINSIC.
-	 * This is so the TPQUIT/NOTEXTRINSIC error gets noted down in $ECODE (which wont happen if error_ret() is called before).
+	if (0 <= frame_pointer->dollar_test)
+		dollar_truth = (boolean_t)frame_pointer->dollar_test;
+	/* Note that error_ret() should be invoked only after any rts_error() of TPQUIT or NOTEXTRINSIC.
+	 * This is so rts_error records any TPQUIT/NOTEXTRINSIC errors in $ECODE which would be prempted by error_ret().
 	 */
 	INVOKE_ERROR_RET_IF_NEEDED;
 	if (is_tracing_on)
 		(*unw_prof_frame_ptr)();
-	msp = (unsigned char *)frame_pointer + SIZEOF(stack_frame);
 	DRAIN_GLVN_POOL_IF_NEEDED;
 	PARM_ACT_UNSTACK_IF_NEEDED;
 	USHBIN_ONLY(rtnhdr = frame_pointer->rvector);	/* Save rtnhdr for cleanup call below */
+	m = (mval *)frame_pointer->temps_ptr;
+	ptemp_cnt = PTEMP_CNT(frame_pointer);
+	if (ptemp_cnt != INVALID_PTEMP_CNT)
+	{
+		for (mtop = m + frame_pointer->temp_mvals; ptemp_cnt && m < mtop; m++)
+		{
+			ptemp_cnt -= !!m->str.in_array;
+			glist_unprotect_str(&m->str);
+		}
+
+		assert(0 == ptemp_cnt || PTEMP_CNT(frame_pointer) == ptemp_cnt);
+	}
+	while (mv_chain < (mv_stent *)frame_pointer)
+	{
+		msp = (unsigned char *)mv_chain;
+		unw_mv_ent(mv_chain, UNWIND_NEWVARS);
+		unprotect_mv_ent(mv_chain);
+		POP_MV_STENT();
+	}
+	msp = (unsigned char *)frame_pointer + SIZEOF(stack_frame);
 	frame_pointer = frame_pointer->old_frame_pointer;
 	DBGEHND((stderr, "unw_retarg: Stack frame 0x"lvaddr" unwound - frame 0x"lvaddr" now current - New msp: 0x"lvaddr"\n",
 		 prevfp, frame_pointer, msp));

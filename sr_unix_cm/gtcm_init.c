@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -94,7 +94,9 @@ void gtcm_init(int argc, char_ptr_t argv[])
 	int		  	pid;
 	char			msg[256];
 	int			save_errno, maxfds;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	/*  Disassociate from the rest of the universe */
 	get_page_size();
 	gtm_wcswidth_fnptr = gtm_wcswidth;
@@ -167,6 +169,8 @@ void gtcm_init(int argc, char_ptr_t argv[])
 	assert(SIZEOF(gtcm_ast_avail) == 2);	/* check that short is size 2 bytes as following code relies on that */
 	gtcm_ast_avail = (maxfds > MAXINT2) ? MAXINT2 : maxfds;
 	stp_init(STP_INITSIZE);
+	stringpool.sort_array_pp = TADR(rts_sort_array_p);
+	stringpool.protect_array_pp = TADR(rts_protect_array_p);
 	rts_stringpool = stringpool;
 	curr_pattern = pattern_list = &mumps_pattern;
 	pattern_typemask = mumps_pattern.typemask;

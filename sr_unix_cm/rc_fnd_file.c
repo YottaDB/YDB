@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -35,7 +35,7 @@
 #include "change_reg.h"
 #include "mvalconv.h"
 #include "trans_log_name.h"
-#include "hashtab_mname.h"
+#include "hashtab_umname.h"
 #include "hashtab.h"
 #include "gvt_inline.h"		/* Before gtmio.h, which includes the open->open64 macro on AIX, which we don't want here. */
 #include "gtmio.h"
@@ -70,12 +70,13 @@ unsigned short rc_fnd_file(rc_xdsid *xdsid)
 	gd_binding	*map;
 	gd_addr		*addr;
 	char		buff[1024], *cp, *cp1, msg[MAX_FN_LEN + 1];
-	mstr		fpath1, fpath2;
+	mstr		fpath2;
 	mval		v;
-	mname_entry	gvname;
+	unmanaged_mname_entry	gvname;
 	int		i, keysize;
 	int             len, node2;
 	gvnh_reg_t	*gvnh_reg;
+	UMSTR_CONST(fpath1, RC_NSPACE_PATH);
 
 	GET_SHORT(dsid, &xdsid->dsid.value);
 	GET_SHORT(node, &xdsid->node.value);
@@ -85,8 +86,6 @@ unsigned short rc_fnd_file(rc_xdsid *xdsid)
 		dsid_list = (rc_dsid_list *)malloc(SIZEOF(rc_dsid_list));
 		dsid_list->dsid = RC_NSPACE_DSID;
 		dsid_list->next = NULL;
-		fpath1.addr = RC_NSPACE_PATH;
-		fpath1.len = SIZEOF(RC_NSPACE_PATH);
 		if (SS_NORMAL != TRANS_LOG_NAME(&fpath1, &fpath2, buff, SIZEOF(buff), do_sendmsg_on_log2long))
 		{
 			SNPRINTF(msg, MAX_FN_LEN + 1, "Invalid DB filename, \"%s\"", fpath1.addr);
@@ -153,8 +152,8 @@ unsigned short rc_fnd_file(rc_xdsid *xdsid)
 		DUMMY_GLD_MAP_INIT(addr, RELATIVE_OFFSET_FALSE, gv_cur_region);
 #		endif
 		dsid_list->gda->max_rec_size = gv_cur_region->max_rec_size;
-		dsid_list->gda->tab_ptr = (hash_table_mname *)malloc(SIZEOF(hash_table_mname));
-		init_hashtab_mname(dsid_list->gda->tab_ptr, 0, HASHTAB_NO_COMPACT, HASHTAB_NO_SPARE_TABLE);
+		dsid_list->gda->tab_ptr = (hash_table_umname *)malloc(SIZEOF(hash_table_umname));
+		init_hashtab_umname(dsid_list->gda->tab_ptr, 0, HASHTAB_NO_COMPACT, HASHTAB_NO_SPARE_TABLE);
 		change_reg();
 		if (rc_overflow->top < cs_addrs->hdr->blk_size)
 		{
@@ -287,8 +286,8 @@ unsigned short rc_fnd_file(rc_xdsid *xdsid)
 		DUMMY_GLD_MAP_INIT(addr, RELATIVE_OFFSET_FALSE, gv_cur_region);
 #		endif
 		fdi_ptr->gda->max_rec_size = gv_cur_region->max_rec_size;
-		fdi_ptr->gda->tab_ptr = (hash_table_mname *)malloc(SIZEOF(hash_table_mname));
-		init_hashtab_mname(fdi_ptr->gda->tab_ptr, 0, HASHTAB_NO_COMPACT, HASHTAB_NO_SPARE_TABLE);
+		fdi_ptr->gda->tab_ptr = (hash_table_umname *)malloc(SIZEOF(hash_table_umname));
+		init_hashtab_umname(fdi_ptr->gda->tab_ptr, 0, HASHTAB_NO_COMPACT, HASHTAB_NO_SPARE_TABLE);
 		fdi_ptr->next = dsid_list->next;
 		dsid_list->next = fdi_ptr;
 	}

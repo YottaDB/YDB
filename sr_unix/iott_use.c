@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -46,6 +46,7 @@
 #include "indir_enum.h"
 #include "svnames.h"
 #include "util.h"
+#include "noprincio_if_needed_inline.h"
 
 LITDEF nametabent filter_names[] =
 {
@@ -94,7 +95,7 @@ void iott_use(io_desc *iod, mval *pp)
 	io_termmask		mask_term;
 	struct sigaction	act;
 	struct termios		t;
-	mstr			chset_mstr;
+	unmanaged_mstr		chset_mstr;
 	gtm_chset_t		temp_chset = -1, old_ochset, old_ichset;
 	uint4			mask_in;
 	unsigned char		ch, len;

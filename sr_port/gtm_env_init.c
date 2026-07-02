@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2004-2025 Fidelity National Information	*
+ * Copyright (c) 2004-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -90,7 +90,8 @@ void	gtm_env_init(void)
 	double			time;
 	int			i, j, save_errno;
 	int4			status, tpnat;
-	mstr			val, trans;
+	mstr			trans;
+	unmanaged_mstr		val;
 	size_t			tmp_malloc_limit;
 	uint4			cachent, memsize, reservesize, tdbglvl, tmsock, trctblbytes, trctblsize;
 	uint4			max_threads, max_procs;
@@ -437,6 +438,9 @@ void	gtm_env_init(void)
 		if (is_defined)
 			TREF(gtm_dynamic_varnames) = ret;
 		/* Platform specific initializations */
+		glist_init_str(&(TREF(director_mval)).str);
+		glist_init_str(&(TREF(window_mval)).str);
+		glist_init_str(&(TREF(indirection_mval)).str);
 		gtm_env_init_sp();
 	}
 }

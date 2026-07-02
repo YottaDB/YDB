@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -70,21 +70,21 @@ void op_use(mval *v, mval *p)
 		}
 	}
 	if (0 == dollar_zpselect)
-		nl = get_log_name(&v->str, NO_INSERT);
+		nl = get_log_name(&v->str.umstr, NO_INSERT);
 	else
-		nl = get_log_name(&dollar_prin_log, NO_INSERT);
+		nl = get_log_name(&dollar_prin_log.umstr, NO_INSERT);
 	if (!nl)
 	{
-		stat = TRANS_LOG_NAME(&v->str, &tn, buf1, SIZEOF(buf1), do_sendmsg_on_log2long);
+		stat = TRANS_LOG_NAME(&v->str.umstr, &tn, buf1, SIZEOF(buf1), do_sendmsg_on_log2long);
 		if (stat != SS_NORMAL)
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_IONOTOPEN);
 		else
 		{
-			if ((tl = get_log_name(&tn, NO_INSERT)) == 0)
+			if ((tl = get_log_name(&tn.umstr, NO_INSERT)) == 0)
 				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_IONOTOPEN);
 			if (!tl->iod)
 				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_IONOTOPEN);
-			nl = get_log_name(&v->str, INSERT);
+			nl = get_log_name(&v->str.umstr, INSERT);
 			nl->iod = tl->iod;
 		}
 	}

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -38,7 +38,7 @@ typedef	struct zro_ent_type
 {
 	uint4		type;
 	int4		count;
-	mstr		str;			/* Path name */
+	unmanaged_mstr		str;			/* Path name */
 	void_ptr_t	shrlib; 		/* Result of dlopen(), if a shared library */
 	void_ptr_t	shrsym; 		/* Placeholder for result of fgn_getrtn(), which we pass from zro_search() to
 						 * incr_link().
@@ -46,8 +46,8 @@ typedef	struct zro_ent_type
 	void_ptr_t	relinkctl_sgmaddr;	/* Shared memory control structure associated with this $ZRO entry */
 } zro_ent;
 
-int zro_gettok(char **lp, char *top, mstr *tok);
-void zro_search(mstr *objstr, zro_ent **objdir, mstr *srcstr, zro_ent **srcdir, boolean_t skip);
+int zro_gettok(char **lp, char *top, unmanaged_mstr *tok);
+void zro_search(const unmanaged_mstr *objstr, zro_ent **objdir, const unmanaged_mstr *srcstr, zro_ent **srcdir, boolean_t skip);
 #ifdef AUTORELINK_SUPPORTED
 zro_hist *zro_search_hist(char *objnamebuf, zro_ent **objdir);
 #endif

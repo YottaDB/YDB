@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2015-2021 Fidelity National Information	*
+ * Copyright (c) 2015-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -57,6 +57,7 @@ void op_zut(mval *s)
 		s->m[1] = microseconds / pwr;
 	}
 	s->mvtype = MV_NM;
+	s->str.len = 0;
 	s->e = MV_XBIAS + numdigs;
 	s->sgn = 0;
 	return;

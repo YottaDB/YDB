@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -18,7 +18,7 @@
 #include "filestruct.h"
 #include "gtmimagename.h"
 #include "mdef.h"
-#include <mdefsp.h>
+#include "mdefsp.h"
 #include "gtmio.h"
 #include "io.h"
 #include "db_header_conversion.h"
@@ -33,6 +33,8 @@ error_def(ERR_INVSTATSDB);
 error_def(ERR_STATSDBINUSE);
 error_def(ERR_DBBLKSIZEALIGN);
 GBLREF uint4 process_id;
+
+#define	USUAL_UMASK	022
 
 /* Macros to send warning or error messages to the correct destination:
  *  - If MUPIP image, message goes to stderr of the process.

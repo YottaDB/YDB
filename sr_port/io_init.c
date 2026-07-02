@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -96,10 +96,9 @@ void io_init(boolean_t term_ctrl)
 	};
 
 	int4			status;
-        mval			val;
+        mval			val = {{0}};
 	mstr			tn;
- 	MSTR_CONST		(gtm_netout, "GTM_NETOUT");
- 	MSTR_CONST		(sys_net, "SYS$NET");
+ 	UMSTR_CONST		(gtm_netout, "GTM_NETOUT");
 	char			buf1[MAX_TRANS_NAME_LEN]; /* buffer to hold translated name */
 	mval			pars;
 	io_log_name		*inp, *outp;
@@ -126,14 +125,14 @@ void io_init(boolean_t term_ctrl)
 	val.mvtype = MV_STR;
 	val.str.addr = "0";
 	val.str.len = 1;
-	ln = get_log_name(&val.str, INSERT);
+	ln = get_log_name(&val.str.umstr, INSERT);
 	assert(ln != 0);
-	val.str = gtm_principal;
-	status = TRANS_LOG_NAME(&val.str, &tn, buf1, SIZEOF(buf1), dont_sendmsg_on_log2long);
+	val.str.umstr = gtm_principal.umstr;
+	status = TRANS_LOG_NAME(&val.str.umstr, &tn, buf1, SIZEOF(buf1), dont_sendmsg_on_log2long);
 	if (SS_NOLOGNAM == status)
 		dollar_principal = 0;
 	else if (SS_NORMAL == status)
-		dollar_principal = get_log_name(&tn, INSERT);
+		dollar_principal = get_log_name(&tn.umstr, INSERT);
 #	ifdef UNIX
 	else if (SS_LOG2LONG == status)
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_LOGTOOLONG, 3, val.str.len, val.str.addr, SIZEOF(buf1) - 1);
@@ -142,10 +141,10 @@ void io_init(boolean_t term_ctrl)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 
 	/* open devices */
-	val.str = sys_input;
-	inp = get_log_name(&val.str, INSERT);
+	val.str.umstr = sys_input.umstr;
+	inp = get_log_name(&val.str.umstr, INSERT);
 	pars.mvtype = MV_STR;
-	status = TRANS_LOG_NAME(&val.str, &tn, buf1, SIZEOF(buf1), dont_sendmsg_on_log2long);
+	status = TRANS_LOG_NAME(&val.str.umstr, &tn, buf1, SIZEOF(buf1), dont_sendmsg_on_log2long);
 	if (SS_NOLOGNAM == status)
 	{
 		pars.str.len = SIZEOF(nolognam_params_list);
@@ -157,10 +156,6 @@ void io_init(boolean_t term_ctrl)
 		{
 			pars.str.len = SIZEOF(no_params);
 			pars.str.addr = (char *)&no_params;
-		} else  if (io_is_sn(&val.str))
-		{
-			pars.str.len = SIZEOF(open_params_list);
-			pars.str.addr = (char *)open_params_list;
 		} else
 		{
 			pars.str.len = SIZEOF(shr_params);
@@ -176,13 +171,9 @@ void io_init(boolean_t term_ctrl)
 	ESTABLISH(io_init_ch);
 	(*op_open_ptr)(&val, &pars, (mval *)&literal_zero, 0);
 	io_curr_device.in  = io_std_device.in  = inp->iod;
-	val.str = sys_output;
-	if ((SS_NORMAL == TRANS_LOG_NAME(&gtm_netout, &tn, buf1, SIZEOF(buf1), do_sendmsg_on_log2long))
-			&& (SS_NORMAL == TRANS_LOG_NAME(&sys_net, &tn, buf1, SIZEOF(buf1), do_sendmsg_on_log2long))
-			&& io_is_sn(&sys_net))
-		val.str = sys_net;
-	outp = get_log_name(&val.str, INSERT);
-	status = TRANS_LOG_NAME(&val.str, &tn, buf1, SIZEOF(buf1), dont_sendmsg_on_log2long);
+	val.str.umstr = sys_output.umstr;
+	outp = get_log_name(&val.str.umstr, INSERT);
+	status = TRANS_LOG_NAME(&val.str.umstr, &tn, buf1, SIZEOF(buf1), dont_sendmsg_on_log2long);
 	if ((SS_NORMAL != status) && (SS_NOLOGNAM != status))
 	{
 #		ifdef UNIX
@@ -192,9 +183,6 @@ void io_init(boolean_t term_ctrl)
 #		endif
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 	}
-	if ((val.str.addr == sys_net.addr) && (pars.str.addr == (char *)open_params_list))
-		/* sys$net is the only input thing that uses open_params_list */
-		outp->iod = io_curr_device.in;
 	/* For terminals and mailboxes and sockets, SYS$INPUT and SYS$OUTPUT may point to
 		the same device.  If input is one of those, then check translated
 		name for output against translated name for input;

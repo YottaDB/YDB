@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -143,13 +143,14 @@ typedef struct
 } uic_struct;
 
 LITREF	unsigned char		io_params_size[];
+LITREF	mval			literal_null;
 GBLREF	boolean_t		gtm_utf8_mode;
 GBLREF	io_pair			io_std_device;		/* standard device	*/
 
 
 #ifdef UTF8_SUPPORTED
 GBLREF	UConverter		*chset_desc[];
-LITREF	mstr			chset_names[];
+LITREF	unmanaged_mstr		chset_names[];
 #endif
 
 enum
@@ -188,7 +189,7 @@ void	iorm_use(io_desc *iod, mval *pp)
 	d_rm_struct	*rm_ptr;
 	struct stat	statbuf;
 	int		p_offset;
-	mstr		chset_mstr;
+	unmanaged_mstr	chset_mstr;
 	gtm_chset_t	width_chset, temp_chset = CHSET_MAX_IDX_ALL;
 	int		seek_len;
 	char		seek_str[LIMIT_SEEK_STR];
@@ -201,7 +202,7 @@ void	iorm_use(io_desc *iod, mval *pp)
 	off_t		cur_position;
 	int		bom_size_toread;
 	io_log_name	*dev_name;
-	mstr		input_iv = {0, 0, NULL}, output_iv = {0, 0, NULL}, input_key = {0, 0, NULL}, output_key = {0, 0, NULL};
+	mstr		input_iv = {{{0}}}, output_iv = {{{0}}}, input_key = {{{0}}}, output_key = {{{0}}};
 	char		error_str[MAX_ERROR_SIZE];
 	boolean_t	ch_set, def_recsize_before;
 	int		disk_block_multiple;
@@ -1034,6 +1035,10 @@ void	iorm_use(io_desc *iod, mval *pp)
 				else
 				{
 					rm_ptr->input_encrypted = FALSE;
+					glist_unprotect_str(&rm_ptr->input_iv);
+					rm_ptr->input_iv.umstr = literal_null.str.umstr;
+					glist_unprotect_str(&rm_ptr->input_key);
+					rm_ptr->input_key.umstr = literal_null.str.umstr;
 					reset_input_encryption = init_input_encryption = FALSE;
 					if (GTMCRYPT_INVALID_KEY_HANDLE != rm_ptr->input_cipher_handle)
 					{
@@ -1084,6 +1089,10 @@ void	iorm_use(io_desc *iod, mval *pp)
 				else
 				{
 					rm_ptr->output_encrypted = FALSE;
+					glist_unprotect_str(&rm_ptr->output_iv);
+					rm_ptr->output_iv.umstr = literal_null.str.umstr;
+					glist_unprotect_str(&rm_ptr->output_key);
+					rm_ptr->output_key.umstr = literal_null.str.umstr;
 					reset_output_encryption = init_output_encryption = FALSE;
 					if (GTMCRYPT_INVALID_KEY_HANDLE != rm_ptr->output_cipher_handle)
 					{
@@ -1137,6 +1146,8 @@ void	iorm_use(io_desc *iod, mval *pp)
 		rm_ptr->input_iv.len = input_iv.len;
 		s2pool(&rm_ptr->input_key);
 		s2pool(&rm_ptr->input_iv);
+		glist_sync_static_str(&rm_ptr->input_iv);
+		glist_sync_static_str(&rm_ptr->input_key);
 	} else if (reset_input_encryption)
 	{
 		INIT_CIPHER_CONTEXT(GTMCRYPT_OP_DECRYPT, rm_ptr->input_key, rm_ptr->input_iv,
@@ -1160,6 +1171,8 @@ void	iorm_use(io_desc *iod, mval *pp)
 		rm_ptr->output_iv.len = output_iv.len;
 		s2pool(&rm_ptr->output_key);
 		s2pool(&rm_ptr->output_iv);
+		glist_sync_static_str(&rm_ptr->output_iv);
+		glist_sync_static_str(&rm_ptr->output_key);
 	} else if (reset_output_encryption)
 	{
 		INIT_CIPHER_CONTEXT(GTMCRYPT_OP_ENCRYPT, rm_ptr->output_key, rm_ptr->output_iv,

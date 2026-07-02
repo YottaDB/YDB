@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -54,7 +54,7 @@ GBLREF io_desc		*active_device;
 
 void op_wttab(mint col)
 {
-	mstr		spaces;
+	unmanaged_mstr	spaces;
 	int		delta, args_written = 0;
 	boolean_t	need_to_write = FALSE, nonblocking_socket = FALSE;
 	io_desc		*iod;

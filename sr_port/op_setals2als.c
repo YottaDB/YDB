@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2009-2025 Fidelity National Information	*
+ * Copyright (c) 2009-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -16,7 +16,7 @@
 #include "gtm_string.h"
 
 #include "gtmio.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "stack_frame.h"
 #include "op.h"
 #include "lv_val.h"
@@ -26,6 +26,7 @@
 #include "gdsbt.h"
 #include "gdsfhead.h"
 #include "alias.h"
+#include "stringpool.h"
 
 GBLREF stack_frame	*frame_pointer;
 GBLREF symval		*curr_symval;
@@ -42,7 +43,8 @@ GBLREF uint4		dollar_tlevel;
 void op_setals2als(lv_val *srclv, int destindx)
 {
 	ht_ent_mname	*tabent;
-	mname_entry	*varname = NULL;
+	unmanaged_mname_entry	*varname = NULL;
+	mname_entry	lcl_mname = {{{0}}};
 	lv_val		*dstlv;
 	boolean_t	added;
 
@@ -52,10 +54,11 @@ void op_setals2als(lv_val *srclv, int destindx)
 	assert(LV_IS_BASE_VAR(srclv));	/* Verify base var */
 	DEBUG_ONLY(added = FALSE);
 	/* Find hash table entry */
-	if (NULL == (tabent = (ht_ent_mname *)frame_pointer->l_symtab[destindx]))	/* note tabent assignment */
+	if (NULL == (tabent = frame_pointer->l_symtab[destindx]))	/* note tabent assignment */
 	{	/* No fast path to hash table entry -- look it up the hard(er) way */
-		varname = &(((mname_entry *)frame_pointer->vartab_ptr)[destindx]);
-		added = add_hashtab_mname_symval(&curr_symval->h_symtab, varname, NULL, &tabent, TRUE);
+		varname = &((frame_pointer->vartab_ptr)[destindx]);
+		lcl_mname.umname = *varname;
+		added = add_hashtab_mname_symval(&curr_symval->h_symtab, &lcl_mname, NULL, &tabent, TRUE);
 		varname = NULL; /* If need varname to be valid, do fixup before calling add_hashtab_mname_symval and pass FALSE */
 	}
 	assert(tabent);

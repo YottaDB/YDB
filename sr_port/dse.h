@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -43,14 +43,14 @@ error_def(ERR_DSEWCREINIT);
 	assert(SIZEOF(dollarh_buffer) >= dollarh_mval.str.len);									\
 	/* if op_fnzdate (called below) calls stp_gcol, dollarh_mval might get corrupt because it is not known to stp_gcol.	\
 	 * To prevent problems, copy from stringpool to local buffer */								\
-	memcpy((void *)dollarh_buffer, dollarh_mval.str.addr, dollarh_mval.str.len);						\
+	memcpy(dollarh_buffer, dollarh_mval.str.addr, dollarh_mval.str.len);						\
 	dollarh_mval.str.addr = (char *)dollarh_buffer;										\
 	stringpool.free -= dollarh_mval.str.len; /* now that we've made a copy, we don't need dollarh_mval in stringpool */	\
 	op_fnzdate(&dollarh_mval, &dse_dmp_time_fmt, (mval *)&literal_null, (mval *)&literal_null, &zdate_mval);		\
 		/* op_fnzdate() returns zdate formatted string in stringpool */							\
 	assert(SIZEOF(zdate_buffer) >= zdate_mval.str.len);									\
 	/* copy over stringpool string into local buffer to ensure zdate_mval will not get corrupt */				\
-	memcpy((void *)zdate_buffer, zdate_mval.str.addr, zdate_mval.str.len);							\
+	memcpy(zdate_buffer, zdate_mval.str.addr, zdate_mval.str.len);							\
 	zdate_mval.str.addr = (char *)zdate_buffer;										\
 	stringpool.free -= zdate_mval.str.len; /* now that we've made a copy, we don't need zdate_mval in stringpool anymore */	\
 }

@@ -895,7 +895,7 @@ GTMSECSHRSGIDF	<gtmsecshr server setgid to root failed>/warning/fao=0!/ansi=0
 GTMSECSHRSSIDF	<gtmsecshr server setsid failed>/warning/fao=0!/ansi=0
 GTMSECSHRFORKF	<gtmsecshr server unable to fork off a child process>/fatal/fao=0!/ansi=0
 DBFSYNCERR	<Error synchronizing database file !AD to disk>/error/fao=2!/ansi=0
-UNUSEDMSG898	<EXCEEDRCTLRNDWN removed from code after V7.1-002 Sep 2023>/error/fao=0!/ansi=0
+XPELNOTP	<TP not allowed in an XPEL routine>/error/fao=0!/ansi=0
 SCNDDBNOUPD	<Database Updates not allowed on the secondary>/error/fao=0!/ansi=0
 MUINFOUINT4	<!AD : !UL [0x!XL]>/info/fao=4!/ansi=0
 NLMISMATCHCALC	<Location of !AD expected at 0x!XL, but found at 0x!XL>/error/fao=4!/ansi=0
@@ -1214,7 +1214,7 @@ REPLINSTRECR	<Error recreating replication instance file !AD>/error/fao=2!/ansi=
 SEMUNDOOVERFLOW	<The operating system per-process SEM_UNDO table is full and region !AD cannot be opened.>/error/fao=2!/ansi=0//1
 ENCODING	<M or W-1252 code designation for character set encoding, might return unexpected results when "UTF-8"=$ZCHSET>/warning/fao=0!/ansi=0
 DBMINRESBYTES	<Minimum RESERVED BYTES value required for certification/upgrade is !UL - Currently is !UL>/error/fao=2!/ansi=0
-UNUSEDMSG1217	<DBCNOTSAMEDB removed from code in V7.0-000 Nov 2020>/error/fao=0!/ansi=0
+TRIGNOXPEL	<Triggers are not allowed in an XPEL routine>/error/fao=0!/ansi=0
 UNUSEDMSG1218	<DBCDBCERTIFIED removed from code in V7.0-000 Nov 2020>/info/fao=0!/ansi=0
 UNUSEDMSG1219	<DBCMODBLK2BIG removed from code in V7.0-000 Nov 2020>/error/fao=0!/ansi=0
 UNUSEDMSG1220	<DBCREC2BIG removed from code in V7.0-000 Nov 2020>/error/fao=0!/ansi=0

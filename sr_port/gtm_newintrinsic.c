@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -12,13 +12,14 @@
 
 #include "mdef.h"
 
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "mv_stent.h"
 #include "stack_frame.h"
 #include "tp_frame.h"
 #include "gtm_string.h"
 #include "gtm_newintrinsic.h"
 #include "op.h"
+#include "gcol_list.h"
 
 GBLREF mv_stent		*mv_chain;
 GBLREF unsigned char	*stackbase, *stacktop, *msp, *stackwarn;
@@ -48,13 +49,25 @@ void gtm_newintrinsic(mval *intrinsic)
 	SETUP_THREADGBL_ACCESS;
 	assert(intrinsic);
 	PUSH_MV_STENT(MVST_MSAV);
-	mv_chain->mv_st_cont.mvs_msav.v = *intrinsic;
+	mv_chain->mv_st_cont.mvs_msav.v.umval = intrinsic->umval;
 	mv_chain->mv_st_cont.mvs_msav.addr = intrinsic;
 	/* Clear the intrinsic var's current value if not $ZTWORMHOLE or $ETRAP */
+	/* Etrap and ztrap may originally be pointed to static 'B' character for 'Break' default and
+	 * are unprotected in that situation. So do not assert or guarantee sync_mval or sync_str, but just
+	 * ensure that the protection, if it exists, follows the saved value.
+	 */
 	if ((&(TREF(dollar_etrap)) != intrinsic) GTMTRIG_ONLY(&& (&dollar_ztwormhole != intrinsic)))
 	{
+		if (glist_str_protected(&intrinsic->str))
+			glist_transfer_protection_to_from(&mv_chain->mv_st_cont.mvs_msav.v.str, &intrinsic->str);
 		intrinsic->mvtype = MV_STR;
 		intrinsic->str.len = 0;
+		intrinsic->str.addr = NULL;
+	} else if (glist_str_protected(&intrinsic->str))
+	{
+		/* Maximize stable-in-array-time */
+		glist_transfer_protection_to_from(&mv_chain->mv_st_cont.mvs_msav.v.str, &intrinsic->str);
+		glist_protect_str(&intrinsic->str);
 	}
 	return;
 }

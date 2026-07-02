@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -30,7 +30,7 @@
 
 #include "gtm_string.h"
 
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "cmd_qlf.h"
 #include "stack_frame.h"
 #include "lv_val.h"
@@ -43,26 +43,31 @@ unsigned char	*format_lvname(lv_val *startlv, unsigned char *buff, int size)
 	int		i, len;
 	ht_ent_mname	**j;
 	mident		*vent, lcl_vent;
+	stack_frame	*fp;
 
 	if (!startlv)
 		return buff;
-	if ((startlv >= (lv_val *)frame_pointer->temps_ptr)
-			&& (startlv <= (lv_val *)(frame_pointer->temps_ptr + frame_pointer->rvector->temp_size)))
+	if (frame_pointer->old_frame_pointer && frame_pointer->flags & SFF_PARM_IN_PROG)
+		fp = frame_pointer->old_frame_pointer;
+	else
+		fp = frame_pointer;
+	if ((startlv >= (lv_val *)fp->temps_ptr)
+			&& (startlv <= (lv_val *)(fp->temps_ptr + fp->rvector->temp_size)))
 		return buff;
-	for (i = 0, j = frame_pointer->l_symtab;  i < frame_pointer->vartab_len;  i++, j++)
+	for (i = 0, j = fp->l_symtab;  i < fp->vartab_len;  i++, j++)
 	{
 		if (*j && (lv_val *)((*j)->value) == startlv)
 			break;
 	}
-	if (i >= frame_pointer->vartab_len)
+	if (i >= fp->vartab_len)
 		return buff;
-	vent = &(((var_tabent *)frame_pointer->vartab_ptr)[i].var_name);
-	assert(!DYNAMIC_VARNAMES_ACTIVE(frame_pointer) || (INDIR_MARKED != (((var_tabent *)frame_pointer->vartab_ptr)[i].marked)));
-	if ((INDIR_MARKED != (((var_tabent *)frame_pointer->vartab_ptr)[i].marked)) && DYNAMIC_VARNAMES_ACTIVE(frame_pointer))
+	vent = &((fp->vartab_ptr)[i].var_name);
+	assert(!DYNAMIC_VARNAMES_ACTIVE(fp) || (INDIR_MARKED != ((fp->vartab_ptr)[i].marked)));
+	if ((INDIR_MARKED != ((fp->vartab_ptr)[i].marked)) && DYNAMIC_VARNAMES_ACTIVE(fp))
 	{
 		lcl_vent = *vent;
 		vent = &lcl_vent;
-		RELOCATE(vent->addr, char *, frame_pointer->rvector->literal_text_adr);
+		RELOCATE(vent->addr, char *, fp->rvector->literal_text_adr);
 	}
 	assert(vent->len <= MAX_MIDENT_LEN);
 	len = MIN(size, vent->len);

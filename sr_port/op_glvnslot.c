@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2012-2026 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,7 +19,7 @@
 #include "indir_enum.h"
 #include "cache.h"
 #include "op.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "valid_mname.h"
 #include "gtm_string.h"
 #include "cachectl.h"
@@ -54,10 +55,13 @@ uint4 op_glvnslot(uint4 recycle)
 		findx = (TREF(glvn_pool_ptr))->for_slot[recycle];
 		if (((GLVN_INDX(frame_pointer) <= findx) || (GLVN_POOL_EMPTY == GLVN_INDX(frame_pointer))) && (findx < indx))
 		{	/* reuse and pop anything beyond it */
+			op_glvnpop(findx);
+#			ifdef DEBUG
 			slot = &(TREF(glvn_pool_ptr))->slot[findx];
-			(TREF(glvn_pool_ptr))->top = findx + 1;
-			(TREF(glvn_pool_ptr))->mval_top = slot->mval_top;
-			return findx;
+			assert((TREF(glvn_pool_ptr))->top == findx);
+			assert((TREF(glvn_pool_ptr))->mval_top == slot->mval_top);
+#			endif
+			return (TREF(glvn_pool_ptr))->top++;
 		}
 		/* point new slot's precursor field at indx, which corresponds an earlier frame */
 		(TREF(glvn_pool_ptr))->for_slot[recycle] = indx;

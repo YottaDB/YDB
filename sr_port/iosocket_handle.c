@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -12,14 +12,14 @@
 
 /* iosocket_handle.c */
 
-/*	newhandle == TRUE
+/*	iosocket_new_handle
  *
  *		create a new handle
  *		return the old dsocketptr->n_socket
  *			(i.e. number of socket)
  *			(i.e. index of the new socket)
  *
- *	newhandle == FALSE
+ *	iosocket_get_handle
  *
  *		check if the handle exist
  *		yes ==> return the index
@@ -43,37 +43,47 @@
 #include "gt_timer.h"
 #include "iosocketdef.h"
 
-int4 iosocket_handle(char *handle, int *len, boolean_t newhandle, d_socket_struct *dsocketptr)
+int4 iosocket_new_handle(char *handle, int *len_p, const d_socket_struct *dsocketptr)
 {
 	boolean_t	unique;
-	int4 		ii, loop_flag = 1;
+	int4 		i;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	while(loop_flag)
+	do
 	{
-		if (newhandle)
-		{
-			SNPRINTF(handle, MAX_HANDLE_LEN, "h%ld%03d", time((time_t *)0), ((TREF(socket_handle_counter))++ % 1000));
-			*len = (short)strlen(handle);
-		}
-		ii = 0;
+		SNPRINTF(handle, MAX_HANDLE_LEN, "h%ld%03d", time((time_t *)0), ((TREF(socket_handle_counter))++ % 1000));
+		*len_p = (int)strlen(handle);
+		i = 0;
 		unique = TRUE;
-		while(ii < dsocketptr->n_socket)
+		while(i < dsocketptr->n_socket)
 		{
-			if ((*len == dsocketptr->socket[ii]->handle_len) &&
-				(0 == memcmp(handle, dsocketptr->socket[ii]->handle, *len)))
+			if ((*len_p == dsocketptr->socket[i]->handle_len) &&
+				(0 == memcmp(handle, dsocketptr->socket[i]->handle, *len_p)))
 			{
 				unique = FALSE;
 				break;
 			}
-			ii++;
+			i++;
 		}
-		if (!newhandle)
-			return	(unique ? -1 : ii);
 		if (unique)
-			return ii;
-	}
+			return i;
+	} while (TRUE);
+	assert(FALSE);
 	/* it will never reach here */
+	return -1;
+
+}
+
+int4 iosocket_get_handle(const char *handle, int len, const d_socket_struct *dsocketptr)
+{
+	int4 		i;
+
+	for (i = 0; i < dsocketptr->n_socket; i++)
+	{
+		if ((len == dsocketptr->socket[i]->handle_len) &&
+			(0 == memcmp(handle, dsocketptr->socket[i]->handle, len)))
+			return i;
+	}
 	return -1;
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -71,7 +71,7 @@ void	dse_open (void)
 
 	mval		val;
 	mval		open_pars, use_pars;
-	mstr		chset_mstr;
+	unmanaged_mstr	chset_mstr;
 	int		cnt;
 
 	static readonly unsigned char open_params_list[] =

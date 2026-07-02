@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -35,8 +35,7 @@ void gvzwr_out(void)
 {
 	int	n;
 	mval	val;
-	mval	outdesc;
-	mstr	one;
+	unmanaged_mstr outdesc;
 	char	buff[MAX_ZWR_KEY_SZ], *end;
 
 	if ((end = (char *)format_targ_key((uchar_ptr_t)&buff[0], MAX_ZWR_KEY_SZ, gv_currkey, TRUE)) == 0)
@@ -45,14 +44,13 @@ void gvzwr_out(void)
 	if (!MV_DEFINED(&val))
 		return;
 	MV_FORCE_STRD(&val);
-	outdesc.mvtype = MV_STR;
-	outdesc.str.addr = &buff[0];
-	outdesc.str.len = INTCAST(end - outdesc.str.addr);
-	zshow_output(zwr_output, &outdesc.str);
+	outdesc.addr = &buff[0];
+	outdesc.len = INTCAST(end - outdesc.addr);
+	zshow_output(zwr_output, &outdesc);
 	buff[0] = '=';
-	one.addr = &buff[0];
-	one.len = 1;
-	zshow_output(zwr_output, &one);
+	outdesc.addr = &buff[0];
+	outdesc.len = 1;
+	zshow_output(zwr_output, &outdesc);
 	mval_write(zwr_output, &val, TRUE);
 	gvzwrite_block->ref_gbldir = gd_header;
 	DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC(CHECK_CSA_TRUE);

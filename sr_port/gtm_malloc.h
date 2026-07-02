@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2022 Fidelity National Information	*
+ * Copyright (c) 2003-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -28,13 +28,23 @@ typedef struct storElemStruct
 	 * Also I have not researched what they are, there are a bunch of 8 byte allocates in GT.M that if we were to go to
 	 * a 16 byte header would make the minimum block size 32 bytes thus doubling the storage requirements for these small
 	 * blocks. SE 03/2002 [Note 16 byte header is the norm in 64 bit]
+	 *
+	 * We do not have enough space in our 16 byte header to record the size of the user's initial
+	 * allocation request (which is stored as allocLen in DEBUG), but we do have space for a uint4
+	 * to record the difference between the number of bytes requested and the number actually allocated:
+	 *	allocDiff = realLen - allocLen
+	 * so in PRO, allocLen can be recovered by
+	 *	allocLen = realLen - allocDiff
+	 *
+	 * (This assumes that there will never be 4G of difference between was was asked for and what was
+	 * actually alloated, which seems reasonable.)
 	 */
 	signed char	queueIndex;			/* Index into TwoTable for this size of element */
 	unsigned char	state;				/* State of this block */
 	unsigned short	extHdrOffset;			/* For MAXTWO sized elements: offset to the
 							 * header that describes the extent.
 							 */
-	GTM64_ONLY(char filler[4];) 			/* Explicit filler to align the length - may be repurposed */
+	uint4		allocDiff;			/* Actually allocated memory - requested size */
 	gtm_msize_t	realLen;			/* Real (total) length of allocation */
 #	ifdef DEBUG
 	struct	storElemStruct	*fPtr;			/* Next storage element on free/allocated queue */

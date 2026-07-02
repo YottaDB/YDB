@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,6 +10,7 @@
  *								*
  ****************************************************************/
 
+#include "mdef.h"
 struct startup_vector
 {
 	int4		argcnt;		/* number of bytes in vector */
@@ -37,6 +39,6 @@ struct startup_vector
 	int4		lvnullsubs;
 	int4		zdir_form;
 	int4		zdate_form;
-	mstr		*sysid_ptr;
+	unmanaged_mstr	*sysid_ptr;
 	unsigned char	*dlr_truth;
 };

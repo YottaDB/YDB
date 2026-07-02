@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -24,7 +24,7 @@ GBLREF boolean_t        gtm_utf8_mode;
 void	op_fnascii(int4 num, mval* in, mval* out)
 {
 	int	bytelen;
-	unsigned int code;
+	wint_t	code;
 	char	*in_ptr, *in_top;
 
 	DCL_THREADGBL_ACCESS;
@@ -40,16 +40,16 @@ void	op_fnascii(int4 num, mval* in, mval* out)
 		assert(MV_IS_STRING(in));  /* MV_UTF_LEN must subsume MV_STR */
 		if ((num < in->str.len) && (num >= 0))
 		{
-			if ((code = *(unsigned char *)(in->str.addr + num)) > ASCII_MAX)
+			if ((code = (wint_t)*(unsigned char *)(in->str.addr + num)) > ASCII_MAX)
 			{	/* Isolated bytes in the range [0x80,0xFF] must be considered illegal */
 				if (!gtm_utf8_mode || badchar_inhibit)
-					code = (unsigned int)-1;
+					code = WEOF;
 				else
 					UTF8_BADCHAR(1, in->str.addr + num, NULL, 0, NULL);
 			}
 
 		} else
-			code = (unsigned int)-1;
+			code = WEOF;
 	} else
 	{ /* Generic processing for strings with multi-byte characters */
 		MV_FORCE_STR(in);
@@ -74,12 +74,12 @@ void	op_fnascii(int4 num, mval* in, mval* out)
 			if (WEOF == code)
 			{
 				if (badchar_inhibit)
-					code = (unsigned int)-1;
+					code = WEOF;
 				else
 					UTF8_BADCHAR(0, in_ptr, in_top, 0, NULL);
 			}
 		} else
-			code = (unsigned int)-1; /* required character position exceeds the character length */
+			code = WEOF; /* required character position exceeds the character length */
 	}
 	MV_FORCE_MVAL(out, (int)code);
 }

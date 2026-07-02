@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -159,13 +159,13 @@ static	void	pte_csh_insert(char *patptr, char *strptr, int4 charlen, int repcnt,
 	min_pte->match = match;
 }
 
-int do_patalt(uint4 *firstalt, unsigned char *strptr, unsigned char *strtop, int4 repmin, int4 repmax, int totchar, int repcnt,
+int do_patalt(ua_patatom *firstalt, unsigned char *strptr, unsigned char *strtop, int4 repmin, int4 repmax, int totchar, int repcnt,
 											int4 min_incr, int4 max_incr)
 {
 	boolean_t	fixed;
 	int4		alt_tot_min, alt_tot_max, new_pte_csh_size, tmp_do_patalt_calls;
-	uint4		*cur_alt, tempuint;
-	uint4		*patptr;
+	uint4		tempuint;
+	ua_patatom	*patptr, *cur_alt;
 	int		match, alt_size, charlen, bytelen, pat_found;
 	mval		alt_pat, alt_str;
 	pte_csh		*tmp_pte;

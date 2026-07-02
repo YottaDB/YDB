@@ -17,7 +17,7 @@
 #define IL_RECOMPILE	0
 
 #ifdef USHBIN_SUPPORTED
-#include <incr_link_sp.h>
+#include "incr_link_sp.h"
 #endif
 #include "zroutinessp.h"	/* need zro_ent typedef */
 

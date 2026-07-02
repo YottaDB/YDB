@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -14,7 +14,7 @@
 
 #include "gtm_stdio.h"
 
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "stack_frame.h"
 #include "mv_stent.h"
 #include "tp_frame.h"
@@ -64,12 +64,13 @@ void op_unwind(void)
 {
 	boolean_t	will_underflow;
 	mv_stent	*mvc, *mv_prev, *mv_curr;
-	unsigned int	lcl_type, lcl_diff, lcl_size;
+	unsigned int	lcl_type, lcl_diff, lcl_size, ptemp_cnt;
 	unsigned char	*lcl_msp, *lcl_mv_chain;
 	rhdtyp		*rtnhdr;
 	stack_frame 	*prevfp;
 	unsigned short	prevtype;
 	boolean_t	unwound_stent;
+	mval			*m, *mtop;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -108,6 +109,29 @@ void op_unwind(void)
 	/* See if unwinding an indirect frame */
 	IF_INDR_FRAME_CLEANUP_CACHE_ENTRY(frame_pointer);
 	mv_prev = NULL;
+	if (0 <= frame_pointer->dollar_test)		/* get dollar_test if it has been set */
+		dollar_truth = frame_pointer->dollar_test;
+	if (is_tracing_on GTMTRIG_ONLY( && !(frame_pointer->type & SFT_TRIGR)))
+		(*unw_prof_frame_ptr)();
+	DRAIN_GLVN_POOL_IF_NEEDED;
+	PARM_ACT_UNSTACK_IF_NEEDED;
+	USHBIN_ONLY(rtnhdr = frame_pointer->rvector);	/* Save rtnhdr for cleanup call below */
+	m = (mval *)frame_pointer->temps_ptr;
+	ptemp_cnt = PTEMP_CNT(frame_pointer);
+	if (ptemp_cnt != INVALID_PTEMP_CNT)
+	{
+		for (mtop = m + frame_pointer->temp_mvals; ptemp_cnt && m < mtop; m++)
+		{
+			/* The line below is logically equivalent to
+			 * if (m->str.in_array)
+			 *     ptemp_cnt--;
+			 * but written in a way that avoids branching.
+			 */
+			ptemp_cnt -= !!m->str.in_array;
+			glist_unprotect_str(&m->str);
+		}
+		assert(0 == ptemp_cnt || PTEMP_CNT(frame_pointer) == ptemp_cnt);
+	}
 	will_underflow = (stackbase < ((unsigned char *)frame_pointer + SIZEOF(stack_frame)));
 	will_underflow = will_underflow || (frame_pointer->old_frame_pointer
 			&& ((frame_pointer->old_frame_pointer < (stack_frame *)((char *)frame_pointer + SIZEOF(stack_frame)))
@@ -128,12 +152,9 @@ void op_unwind(void)
 			/* Create backwards list of stack elements to push */
 			mv_curr->mv_st_next = (mv_prev) ? ((char *)mv_curr - (char *)mv_prev) : 0;
 			mv_prev = mv_curr;
-		}
+		} else
+			unprotect_mv_ent(mv_curr);
 	}
-	if (0 <= frame_pointer->dollar_test)		/* get dollar_test if it has been set */
-		dollar_truth = frame_pointer->dollar_test;
-	if (is_tracing_on GTMTRIG_ONLY( && !(frame_pointer->type & SFT_TRIGR)))
-		(*unw_prof_frame_ptr)();
 	mv_chain = mvc;
 	msp = (unsigned char *)frame_pointer + SIZEOF(stack_frame);
 	if (msp > stackbase)
@@ -141,12 +162,14 @@ void op_unwind(void)
 	if (SSF_NORET_VIA_MUMTSTART & frame_pointer->type)
 		DBGTRIGR((stderr, "op_unwind: Unwinding frame 0x"lvaddr" with type %d which has SSF_NORET_VIA_MUMTSTART enabled\n",
 			  frame_pointer, frame_pointer->type));
-	DRAIN_GLVN_POOL_IF_NEEDED;
-	PARM_ACT_UNSTACK_IF_NEEDED;
-	USHBIN_ONLY(rtnhdr = frame_pointer->rvector);	/* Save rtnhdr for cleanup call below */
 	frame_pointer = frame_pointer->old_frame_pointer;
 	DBGEHND((stderr, "op_unwind: Stack frame 0x"lvaddr" unwound - frame 0x"lvaddr" now current - New msp: 0x"lvaddr"\n",
 		 prevfp, frame_pointer, msp));
+	if ((TREF(zinxpel_rtn_fp)) == prevfp)
+	{
+		TREF(zinxpel_no_tp_or_trig) = FALSE;
+		TREF(zinxpel_rtn_fp) = NULL;
+	}
 	if (NULL != zyerr_frame && frame_pointer > zyerr_frame)
 		zyerr_frame = NULL;	/* If we have unwound past zyerr_frame, clear it */
 	if (frame_pointer)
@@ -167,11 +190,13 @@ void op_unwind(void)
 		lcl_type = mv_curr->mv_st_type;
 		lcl_size = mvs_size[lcl_type];
 		lcl_msp -= lcl_size;
+		prep_mv_stent_for_move(mv_curr);
 		memcpy(lcl_msp, mv_curr, lcl_size);
 		lcl_diff = (lcl_mv_chain - lcl_msp);
 		assert(((mv_stent *)lcl_msp)->mv_st_type == lcl_type);
 		((mv_stent *)lcl_msp)->mv_st_next = lcl_diff;
 		lcl_mv_chain = lcl_msp;
+		handle_mv_stent_after_move((mv_stent *)lcl_mv_chain);
 	}
 	msp = lcl_msp;
 	mv_chain = (mv_stent *)lcl_mv_chain;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -35,7 +35,7 @@ void op_indname(mval *dst, mval *target, mval *subs)
 	MV_FORCE_STR(subs);
 	if ((target->str.len + subs->str.len) > MAX_SRCLINE)
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_INDRMAXLEN, 1, MAX_SRCLINE);
-	ENSURE_STP_FREE_SPACE(MAX_SRCLINE);
+	ENSURE_STP_FREE_SPACE(target->str.len + 3 + subs->str.len);	/* 3 extra bytes are for possible "@#(" */
 	start = out = stringpool.free;
 	for (cp = (unsigned char *)target->str.addr, i = target->str.len, quoted = 0; i; i--)
 	{	/* simple parsing transfer rather than memcpy so an embedded "comment" doesn't cause premature truncation */

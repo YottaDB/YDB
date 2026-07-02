@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2018 Fidelity National Information	*
+ * Copyright (c) 2006-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -38,6 +38,7 @@
 #include "min_max.h"
 #include "op.h"
 #include "gtm_utf8.h"
+#include "gcol_list.h"
 
 GBLREF boolean_t	gtm_utf8_mode;		/* We are indeed doing the UTF8 thang */
 GBLREF boolean_t	badchar_inhibit;	/* No BADCHAR errors should be signaled */
@@ -48,7 +49,7 @@ void op_fnp1(mval *src, int delim, int trgpcidx,  mval *dst)
 	unsigned int	*pcoff, *pcoffmax, fnpc_indx, slen;
 	int		trgpc, cpcidx, spcidx, mblen, dlmlen;
 	boolean_t       valid_char;
-	mval		ldst;		/* Local copy since &dst == &src .. move to dst at return */
+	mval		ldst = {{0}};		/* Local copy since &dst == &src .. move to dst at return */
 	fnpc   		*cfnpc;
 	delimfmt	ldelim;
 	DCL_THREADGBL_ACCESS;
@@ -73,7 +74,7 @@ void op_fnp1(mval *src, int delim, int trgpcidx,  mval *dst)
 	{
 		ldst.str.addr = (char *)start;
 		ldst.str.len  = 0;
-		*dst = ldst;
+		dst->umval = ldst.umval;
 		return;
 	}
 	/* Test mval for valid cache: index ok, mval addr same, delim same. One additional test
@@ -85,7 +86,7 @@ void op_fnp1(mval *src, int delim, int trgpcidx,  mval *dst)
 	cfnpc = &(TREF(fnpca)).fnpcs[fnpc_indx];
 	if (FNPC_MAX > fnpc_indx && cfnpc->last_str.addr == (char *)first &&
 	    cfnpc->last_str.len == slen && cfnpc->delim == ldelim.unichar_val &&
-	    !cfnpc->byte_oriented) /* cannot use the cache created by an earlier $ZPIECE() */
+		(cfnpc->gcols == stringpool.gcols) && !cfnpc->byte_oriented) /* cannot use the cache created by ZPIECE */
 	{
 		/* Have valid cache. See if piece we want already in cache */
 		COUNT_EVENT(hit);
@@ -97,7 +98,7 @@ void op_fnp1(mval *src, int delim, int trgpcidx,  mval *dst)
 			ldst.str.addr = (char *)first + cfnpc->pstart[trgpcidx - 1];
 			ldst.str.len = cfnpc->pstart[trgpcidx] - cfnpc->pstart[trgpcidx - 1] - dlmlen;
 			assert(ldst.str.len >= 0 && ldst.str.len <= src->str.len);
-			*dst = ldst;
+			dst->umval = ldst.umval;
 			return;
 		} else
 		{
@@ -121,9 +122,10 @@ void op_fnp1(mval *src, int delim, int trgpcidx,  mval *dst)
 		if ((TREF(fnpca)).fnpcmax < cfnpc)
 			cfnpc = &(TREF(fnpca)).fnpcs[0];
 		(TREF(fnpca)).fnpcsteal = cfnpc + 1;	/* -> next element to steal */
-		cfnpc->last_str = src->str;		/* Save validation info */
+		cfnpc->last_str = src->str.umstr;		/* Save validation info */
 		cfnpc->delim = ldelim.unichar_val;
 		cfnpc->npcs = 0;
+		cfnpc->gcols = stringpool.gcols;
 		cfnpc->byte_oriented = FALSE;
 		src->fnpc_indx = cfnpc->indx + 1;	/* Save where we are putting this element
 							 * (1 based index in mval so 0 isn't so common)
@@ -200,6 +202,6 @@ void op_fnp1(mval *src, int delim, int trgpcidx,  mval *dst)
 		ldst.str.len  = 0;
 	assert(0 < cfnpc->npcs);
 	assert((0 <= ldst.str.len) && (ldst.str.len <= src->str.len));
-	*dst = ldst;
+	dst->umval = ldst.umval;
 	return;
 }

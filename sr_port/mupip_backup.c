@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -237,7 +237,8 @@ void mupip_backup(void)
 				tempnam_prefix[MAX_FN_LEN], tempdir_full_buffer[MAX_FN_LEN + 1];
 	char			*jnl_str_ptr, jnl_str[256], entry[256], prev_jnl_fn[JNL_NAME_SIZE];
 	int			index, jnl_fstat, attemptcnt, maxtries;
-	mstr			tempdir_log, tempdir_trans, *file, *rfile, *replinstfile, tempdir_full, filestr;
+	mstr			tempdir_trans, *file, *rfile, *replinstfile, tempdir_full, filestr;
+	unmanaged_mstr		tempdir_log;
 	uint4			jnl_status, temp_file_name_len, tempdir_trans_len, trans_log_name_status = SS_NORMAL;
 	boolean_t		jnl_options[jnl_end_of_list] = {FALSE, FALSE, FALSE}, save_no_prev_link;
 	jnl_private_control	*jpc;
@@ -798,7 +799,7 @@ void mupip_backup(void)
 				reg->rname[reg->rname_len] = '\0';
 				udi = FILE_INFO(reg);
 				seg = reg->dyn.addr;
-				memcpy((char *)seg->fname, replpool_id.instfilename, full_len);
+				memcpy(seg->fname, replpool_id.instfilename, full_len);
 				udi->fn = (char *)seg->fname;
 				seg->fname_len = full_len;
 				seg->fname[full_len] = '\0';

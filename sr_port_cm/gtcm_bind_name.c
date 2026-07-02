@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -20,7 +20,7 @@
 #include "gdsfhead.h"
 #include "filestruct.h"		/* needed for "jnl.h" and others */
 #include "cmidef.h"
-#include "hashtab_mname.h"
+#include "hashtab_umname.h"
 #include "cmmdef.h"
 #include "gtcm_bind_name.h"
 #include "gv_xform_key.h"
@@ -39,15 +39,15 @@ GBLREF gv_namehead	*gv_target;
 
 void gtcm_bind_name(cm_region_head *rh, boolean_t xform)
 {
-	ht_ent_mname	*tabent;
-	mname_entry	 gvent;
-	gvnh_reg_t	*gvnh_reg;
+	ht_ent_umname			*tabent;
+	unmanaged_mname_entry		gvent; /* Points to gv_currkey buff */
+	gvnh_reg_t			*gvnh_reg;
 
 	GTCM_CHANGE_REG(rh);	/* sets the global variables gv_cur_region/cs_addrs/cs_data appropriately */
 	gvent.var_name.addr = (char *)gv_currkey->base;
 	gvent.var_name.len = STRLEN((char *)gv_currkey->base);
 	COMPUTE_HASH_MNAME(&gvent);
-	if (NULL != (tabent = lookup_hashtab_mname(rh->reg_hash, &gvent)))	/* WARNING ASSIGNMENT */
+	if (NULL != (tabent = lookup_hashtab_umname(rh->reg_hash, &gvent)))	/* WARNING ASSIGNMENT */
 	{
 		gvnh_reg = (gvnh_reg_t *)tabent->value;
 		assert(NULL != gvnh_reg);

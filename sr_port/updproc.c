@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -55,7 +55,7 @@
 #include "gtmio.h"
 #include "repl_inst_dump.h"		/* for "repl_dump_histinfo" prototype */
 #ifdef GTM_TRIGGER
-#include <rtnhdr.h>			/* for rtn_tabent in gv_trigger.h */
+#include "rtnhdr.h"			/* for rtn_tabent in gv_trigger.h */
 #include "gv_trigger.h"
 #include "gtm_trigger.h"
 #include "targ_alloc.h"
@@ -547,7 +547,7 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 	seq_num			jnlpool_ctl_seqno, rec_strm_seqno, strm_seqno;
 	char			*val_ptr;
 	jnl_string		*keystr = NULL;
-	mname_entry		gvname;
+	unmanaged_mname_entry	gvname;
 	char			*key, *keytop;
 	gv_key			*gv_failed_key = NULL, *gv_failed_key_ptr;
 	unsigned char		*endBuff, fmtBuff[MAX_ZWR_KEY_SZ];
@@ -662,8 +662,8 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 			}
 			if (upd_proc_local->changelog & REPLIC_CHANGE_LOGFILE)
 			{
-				log_switched = TRUE;
-				upd_log_init(UPDPROC);
+				if (SS_NORMAL == upd_log_init(UPDPROC))
+					log_switched = TRUE;
 			}
 			if ( log_switched == TRUE )
 				repl_log(updproc_log_fp, TRUE, TRUE, "Change log to %s successful\n",
@@ -1078,8 +1078,10 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 					 * string if somehow $ZTWORMHOLE is referenced before the replicating instance
 					 * receives a new value (like in a jobexam dump).
 					 */
-					GTMTRIG_ONLY(dollar_ztwormhole.mvtype = 0);
-					GTMTRIG_ONLY(dollar_ztwormhole.str.len = 0);
+					dollar_ztwormhole.mvtype = 0;
+					dollar_ztwormhole.str.len = 0;
+					dollar_ztwormhole.str.addr = NULL;
+					glist_unprotect_str(&dollar_ztwormhole.str);
 					tcom_num = tupd_num = upd_rec_seqno = 0;
 					incr_seqno = TRUE;
 				}

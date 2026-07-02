@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -72,7 +72,7 @@
 #include "inline_atomic_pid.h"
 
 #ifdef GTM_TRIGGER
-#include <rtnhdr.h>		/* for rtn_tabent in gv_trigger.h */
+#include "rtnhdr.h"		/* for rtn_tabent in gv_trigger.h */
 #include "gv_trigger.h"
 #include "gtm_trigger.h"
 #endif
@@ -500,14 +500,14 @@ enum cdb_sc	op_tcommit(void)
 				{
 					csa = si->tp_csa;
 					cnl = csa->nl;
-					INCR_GVSTATS_COUNTER(csa, cnl, n_tp_blkread, si->num_of_blks);
+					INCR_HEAVYWEIGHT_GVSTATS_COUNTER(csa, cnl, n_tp_blkread, si->num_of_blks);
 					if (!si->update_trans)
 					{
-						INCR_GVSTATS_COUNTER(csa, cnl, n_tp_readonly, 1);
+						INCR_HEAVYWEIGHT_GVSTATS_COUNTER(csa, cnl, n_tp_readonly, 1);
 						continue;
 					}
-					INCR_GVSTATS_COUNTER(csa, cnl, n_tp_readwrite, 1);
-					INCR_GVSTATS_COUNTER(csa, cnl, n_tp_blkwrite, si->cw_set_depth);
+					INCR_HEAVYWEIGHT_GVSTATS_COUNTER(csa, cnl, n_tp_readwrite, 1);
+					INCR_HEAVYWEIGHT_GVSTATS_COUNTER(csa, cnl, n_tp_blkwrite, si->cw_set_depth);
 					GVSTATS_SET_CSA_STATISTIC(csa, db_curr_tn, si->start_tn);
 					TP_TEND_CHANGE_REG(si);
 					wcs_timer_start(gv_cur_region, TRUE);
@@ -545,6 +545,7 @@ enum cdb_sc	op_tcommit(void)
 		assert(UNIX_ONLY(jgbl.onlnrlbk || TREF(in_trigger_upgrade) || ) (0 == have_crit(CRIT_HAVE_ANY_REG)));
 		/* Commit was successful */
 		dollar_trestart = 0;
+		TREF(dollar_zinxpel) = 0;
 		t_tries = 0;
 		if (in_timed_tn)
 			(*tp_timeout_clear_ptr)(TRUE);  /* cancel/clear pending TP timeout if real commit (i.e. outermost commit) */
@@ -560,7 +561,6 @@ enum cdb_sc	op_tcommit(void)
 				}
 				ENABLE_WBTEST_ABANDONEDKILL;
 				TP_CHANGE_REG_IF_NEEDED(si->gv_cur_region);
-				ACCUMULATE_LCL_GVSTATS_COUNTER(cs_addrs, cs_addrs->nl, n_cache_reads);
 				sgm_info_ptr = si;	/* needed in gvcst_expand_free_subtree */
 				gvcst_expand_free_subtree(si->kill_set_head);
 				assert(NULL != si->kill_set_head);

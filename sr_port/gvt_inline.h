@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2020-2023 Fidelity National Information	*
+ * Copyright (c) 2020-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -175,8 +175,8 @@ static inline void gvzprevious_append_max_subs_key(gv_key *gvkey, gv_namehead *g
 
 static inline void dbg_check_gvtarget_gvcurrkey_in_sync(boolean_t check_csaddrs)
 {
-	mname_entry		*gvent;
-	mstr			*varname;
+	unmanaged_mname_entry		*gvent;
+	mident			*varname;
 	int			varlen;
 	unsigned short		keyend;
 	unsigned char		*keybase;

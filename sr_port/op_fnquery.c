@@ -19,7 +19,7 @@
 #include "lv_val.h"
 #include "subscript.h"
 #include "stringpool.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "mv_stent.h"
 #include "collseq.h"
 #include "compiler.h"
@@ -48,16 +48,16 @@ void op_fnquery(int sbscnt, mval *dst, ...)
 {
 	boolean_t		found, is_num, is_str, last_sub_null, nullify_term;
 	ht_ent_mname		*tabent;
-	int			dst_len, i, j, length;
+	int			dst_len, i, j, length, lcl_fnquery_cnt;
 	lv_val			*lvn, *lvns[MAX_LVSUBSCRIPTS], *v, *ve;
 	lvTree			*lvt;
 	lvTreeNode		**h1, **h2, *history[MAX_LVSUBSCRIPTS], *node, *nullsubsnode, *nullsubsparent, *parent;
-	mname_entry		lvent;
+	unmanaged_mname_entry	lvent;
 	mval			*arg1 = NULL, **argpp, *argp2, **argpp2, *args[MAX_LVSUBSCRIPTS], *lfrsbs, *mv, tmpmv, tmp_sbs,
 				*varname, *v1, *v2;
-	mval			xform_args[MAX_LVSUBSCRIPTS];	/* for lclcol */
 	mstr			format_out;
-	va_list			var;
+	va_list			var, var_dup;
+	unsigned int		gcols;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -69,6 +69,7 @@ void op_fnquery(int sbscnt, mval *dst, ...)
 	assert(v);
 	if (MAX_MIDENT_LEN < varname->str.len)
 		varname->str.len = MAX_MIDENT_LEN;
+	DBG_START_NO_GCOLS(gcols);
 	lvent.var_name.len = varname->str.len;
 	lvent.var_name.addr = varname->str.addr;
 	COMPUTE_HASH_MNAME(&lvent);
@@ -82,15 +83,17 @@ void op_fnquery(int sbscnt, mval *dst, ...)
 		assert((NULL == lvt) || (LV_GET_CHILD(v) == lvt));
 	} else
 		lvt = NULL;
+	DBG_END_NO_GCOLS(gcols);
 	if (NULL == lvt)
 	{	/* no such unsubscripted variable or no descendants */
-		*dst = literal_null;
+		dst->umval = literal_null.umval;
 		return;
 	}
 	h1 = history;
 	*h1++ = (lvTreeNode *)v;
 	found = FALSE;
 	DEBUG_ONLY(node = NULL;)
+	tmp_sbs.str.in_array = FALSE;
 	for (i = 0, argpp = &args[0]; i < sbscnt; i++, argpp++, h1++)
 	{
 		if (NULL == lvt)
@@ -176,27 +179,27 @@ void op_fnquery(int sbscnt, mval *dst, ...)
 			if (TREF(local_collseq))
 			{
 				ALLOC_XFORM_BUFF(arg1->str.len);
-				/* D9607-258 changed xback to xform and added xform_args[] to hold mval pointing to
-				 * xform'd subscript which is in pool space.  tmp_sbs (which is really a mval) was being
-				 * overwritten if >1 alpha subscripts */
 				assert(NULL != TREF(lcl_coll_xform_buff));
 				tmp_sbs.mvtype = MV_STR;
 				tmp_sbs.str.addr = TREF(lcl_coll_xform_buff);
 				tmp_sbs.str.len = TREF(max_lcl_coll_xform_bufsiz);
+				tmp_sbs.str.in_array = FALSE;
 				/* KMK subscript index is i+1 */
 				do_xform(TREF(local_collseq), XFORM, &arg1->str, &tmp_sbs.str, &length);
 				tmp_sbs.str.len = length;
-				s2pool(&(tmp_sbs.str));
-				xform_args[i] = tmp_sbs;
-				arg1 = &xform_args[i];
+				arg1 = &tmp_sbs;
+				assert(!glist_str_in_stringpool(&arg1->str));
 			}
 			node = lvAvlTreeLookupStr(lvt, arg1, &parent);
 		} else
 		{
-			tmp_sbs = *arg1;
+			tmp_sbs.umval = arg1->umval;
 			arg1 = &tmp_sbs;
 			MV_FORCE_NUM(arg1);
 			TREE_KEY_SUBSCR_SET_MV_CANONICAL_BIT(arg1); /* used by the lvAvlTreeLookup* functions below */
+			tmp_sbs.mvtype &= (MV_STR_OFF & MV_UTF_LEN_OFF);
+			tmp_sbs.str.addr = NULL;
+			tmp_sbs.str.len = 0;
 			if (MVTYPE_IS_INT(arg1->mvtype))
 				node = lvAvlTreeLookupInt(lvt, arg1, &parent);
 			else
@@ -246,7 +249,7 @@ void op_fnquery(int sbscnt, mval *dst, ...)
 			assert(h1 >= &history[0]);
 			if (h1 == &history[0])
 			{
-				*dst = literal_null;
+				dst->umval = literal_null.umval;
 				return;
 			}
 			node = *h1;
@@ -261,8 +264,14 @@ void op_fnquery(int sbscnt, mval *dst, ...)
 		}
 	}
 	/* Saved last query result is irrelevant now */
-	TREF(last_fnquery_return_subcnt) = 0;
+	glist_unprotect_str(&((TREF(last_fnquery_return_varname)).str));
 	(TREF(last_fnquery_return_varname)).str.len = 0;
+	for (lcl_fnquery_cnt = (TREF(last_fnquery_return_subcnt) - 1); lcl_fnquery_cnt >= 0; lcl_fnquery_cnt--)
+	{
+		glist_unprotect_str(&(TAREF1(last_fnquery_return_sub, lcl_fnquery_cnt)).str);
+	}
+	assert(lcl_fnquery_cnt == -1);
+	TREF(last_fnquery_return_subcnt) = 0;
 	/* Go down leftmost subtree path (potentially > 1 avl trees) starting from "node" until you find the first DEFINED mval */
 	while (!LV_IS_VAL_DEFINED(node))
 	{
@@ -289,6 +298,7 @@ void op_fnquery(int sbscnt, mval *dst, ...)
 	v2 = &mv_chain->mv_st_cont.mvs_mval;
 	v2->mvtype = 0;	/* initialize it to 0 to avoid "stp_gcol" from getting confused if it gets invoked before v2 has been
 			 * completely setup. */
+	v2->str.len = 0;
 	memcpy(stringpool.free, varname->str.addr, varname->str.len);
 	if (last_sub_null)
 	{
@@ -312,7 +322,7 @@ void op_fnquery(int sbscnt, mval *dst, ...)
 				INVOKE_STP_GCOL(MAX_NUM_SIZE);
 				assert(IS_AT_END_OF_STRINGPOOL(v1->str.addr, v1->str.len));
 			}
-			*v2 = *mv;
+			v2->umval = mv->umval;
 			/* Now that we have ensured enough space in the stringpool, we dont expect any more
 			 * garbage collections or expansions until we are done with the n2s.
 			 */
@@ -321,7 +331,10 @@ void op_fnquery(int sbscnt, mval *dst, ...)
 			/* Now that we are done with any stringpool.free usages, mark as free for expansion */
 			DBG_MARK_STRINGPOOL_EXPANDABLE;
 			if (last_sub_null)
-				TAREF1(last_fnquery_return_sub,(TREF(last_fnquery_return_subcnt))++) = *v2;
+			{
+				TAREF1(last_fnquery_return_sub,(TREF(last_fnquery_return_subcnt))).umval = v2->umval;
+				glist_protect_str(&(TAREF1(last_fnquery_return_sub,(TREF(last_fnquery_return_subcnt))++)).str);
+			}
 		} else
 		{	/* string */
 			assert(MV_IS_STRING(mv));
@@ -329,6 +342,7 @@ void op_fnquery(int sbscnt, mval *dst, ...)
 			v2->mvtype = 0;	/* initialize it to 0 to avoid "stp_gcol" from getting confused
 					 * if it gets invoked before v2 has been completely setup.
 					 */
+			v2->str.len = 0;
 			if (TREF(local_collseq))
 			{
 				ALLOC_XFORM_BUFF(mv->str.len);
@@ -337,9 +351,9 @@ void op_fnquery(int sbscnt, mval *dst, ...)
 				tmp_sbs.str.len = TREF(max_lcl_coll_xform_bufsiz);
 				do_xform(TREF(local_collseq), XBACK, &mv->str, &tmp_sbs.str, &length);
 				tmp_sbs.str.len = length;
-				v2->str = tmp_sbs.str;
+				v2->str.umstr = tmp_sbs.str.umstr;
 			} else
-				v2->str = mv->str;
+				v2->str.umstr = mv->str.umstr;
 			/* Now that v2->str has been initialized, initialize mvtype as well (doing this in the other
 			 * order could cause "stp_gcol" (if invoked in between) to get confused since v2->str is
 			 * not yet initialized with current subscript (in the M-stack).
@@ -373,7 +387,9 @@ void op_fnquery(int sbscnt, mval *dst, ...)
 					TAREF1(last_fnquery_return_sub,(TREF(last_fnquery_return_subcnt))).mvtype = MV_STR;
 					TAREF1(last_fnquery_return_sub,(TREF(last_fnquery_return_subcnt))).str.addr =
 						(char *)stringpool.free;
-					TAREF1(last_fnquery_return_sub,(TREF(last_fnquery_return_subcnt))++).str.len = v2->str.len;
+					TAREF1(last_fnquery_return_sub,(TREF(last_fnquery_return_subcnt))).str.len = v2->str.len;
+					glist_protect_str(&(TAREF1(last_fnquery_return_sub,
+						(TREF(last_fnquery_return_subcnt))++)).str);
 				}
 				stringpool.free += v2->str.len;
 				*stringpool.free++ = '\"';
@@ -384,8 +400,10 @@ void op_fnquery(int sbscnt, mval *dst, ...)
 					TAREF1(last_fnquery_return_sub,(TREF(last_fnquery_return_subcnt))).mvtype = MV_STR;
 					TAREF1(last_fnquery_return_sub,(TREF(last_fnquery_return_subcnt))).str.addr =
 						(char *)stringpool.free;
-					TAREF1(last_fnquery_return_sub,(TREF(last_fnquery_return_subcnt))++).str.len =
+					TAREF1(last_fnquery_return_sub,(TREF(last_fnquery_return_subcnt))).str.len =
 						format_out.len;
+					glist_protect_str(&(TAREF1(last_fnquery_return_sub,
+						(TREF(last_fnquery_return_subcnt))++)).str);
 				}
 				stringpool.free += format_out.len;
 			}
@@ -403,18 +421,19 @@ void op_fnquery(int sbscnt, mval *dst, ...)
 	dst->str.addr = v1->str.addr;
 	POP_MV_STENT();	/* v2 */
 	POP_MV_STENT();	/* v1 */
+	return;
 }
 
 /* op_fnquery should generally be maintained in parallel */
-boolean_t op_fnquery_runtime(mval *src, int sbscnt, int *start, int *stop, mval *dst)
+void op_fnquery_runtime(mval *src, int sbscnt, int *start, int *stop, mval *dst)
 {
 	boolean_t		found, is_num, is_str, last_sub_null, nullify_term;
 	ht_ent_mname		*tabent;
-	int			dst_len, i, j, length;
+	int			dst_len, i, j, length, lcl_fnquery_cnt;
 	lv_val			*lvn, *lvns[MAX_LVSUBSCRIPTS], *ve, *tmp_ve;
 	lvTree			*lvt;
 	lvTreeNode		**h1, **h2, *history[MAX_LVSUBSCRIPTS], *node, *nullsubsnode, *nullsubsparent, *parent;
-	mname_entry		lvent;
+	unmanaged_mname_entry	lvent;
 	mval			*arg1 = NULL, **argpp, *argp2, **argpp2, *args[MAX_LVSUBSCRIPTS], *lfrsbs, *mv, tmpmv, tmp_sbs,
 				*v1, *v2;
 	mval			xform_args[MAX_LVSUBSCRIPTS];	/* for lclcol */
@@ -448,14 +467,16 @@ boolean_t op_fnquery_runtime(mval *src, int sbscnt, int *start, int *stop, mval 
 		lvt = NULL;
 	if (NULL == lvt)
 	{	/* no such unsubscripted variable or no descendants */
-		*dst = literal_null;
-		return TRUE;
+		dst->umval = literal_null.umval;
+		return;
 	}
 	h1 = history;
 	*h1++ = (lvTreeNode *)tmp_ve;
 	found = FALSE;
 	DEBUG_ONLY(node = NULL;)
 	targ = &subs_mval;
+	tmp_sbs.str.in_array = FALSE;
+	subs_mval.str.in_array = FALSE;
 	for (i = 0, argpp = &args[0]; i < sbscnt; i++, argpp++, h1++)
 	{
 		if (NULL == lvt)
@@ -536,17 +557,19 @@ boolean_t op_fnquery_runtime(mval *src, int sbscnt, int *start, int *stop, mval 
 				/* KMK subscript index is i+1 */
 				do_xform(TREF(local_collseq), XFORM, &arg1->str, &tmp_sbs.str, &length);
 				tmp_sbs.str.len = length;
-				s2pool(&(tmp_sbs.str));
-				xform_args[i] = tmp_sbs;
-				arg1 = &xform_args[i];
+				arg1 = &tmp_sbs;
+				assert(!glist_str_in_stringpool(&arg1->str));
 			}
 			node = lvAvlTreeLookupStr(lvt, arg1, &parent);
 		} else
 		{
-			tmp_sbs = *arg1;
+			tmp_sbs.umval = arg1->umval;
 			arg1 = &tmp_sbs;
 			MV_FORCE_NUM(arg1);
 			TREE_KEY_SUBSCR_SET_MV_CANONICAL_BIT(arg1); /* used by the lvAvlTreeLookup* functions below */
+			tmp_sbs.mvtype &= (MV_STR_OFF & MV_UTF_LEN_OFF);
+			tmp_sbs.str.addr = NULL;
+			tmp_sbs.str.len = 0;
 			if (MVTYPE_IS_INT(arg1->mvtype))
 				node = lvAvlTreeLookupInt(lvt, arg1, &parent);
 			else
@@ -595,8 +618,8 @@ boolean_t op_fnquery_runtime(mval *src, int sbscnt, int *start, int *stop, mval 
 			assert(h1 >= &history[0]);
 			if (h1 == &history[0])
 			{
-				*dst = literal_null;
-				return TRUE;
+				dst->umval = literal_null.umval;
+				return;
 			}
 			node = *h1;
 			assert(NULL != node);
@@ -608,11 +631,16 @@ boolean_t op_fnquery_runtime(mval *src, int sbscnt, int *start, int *stop, mval 
 				break;
 			}
 		}
-		return FALSE;	/* Use the compiler */
 	}
 	/* Saved last query result is irrelevant now */
-	TREF(last_fnquery_return_subcnt) = 0;
+	glist_unprotect_str(&((TREF(last_fnquery_return_varname)).str));
 	(TREF(last_fnquery_return_varname)).str.len = 0;
+	for (lcl_fnquery_cnt = (TREF(last_fnquery_return_subcnt) - 1); lcl_fnquery_cnt >= 0; lcl_fnquery_cnt--)
+	{
+		glist_unprotect_str(&(TAREF1(last_fnquery_return_sub, lcl_fnquery_cnt)).str);
+	}
+	assert(lcl_fnquery_cnt == -1);
+	TREF(last_fnquery_return_subcnt) = 0;
 	/* Go down leftmost subtree path (potentially > 1 avl trees) starting from "node" until you find the first DEFINED mval */
 	while (!LV_IS_VAL_DEFINED(node))
 	{
@@ -636,6 +664,7 @@ boolean_t op_fnquery_runtime(mval *src, int sbscnt, int *start, int *stop, mval 
 	v2 = &mv_chain->mv_st_cont.mvs_mval;
 	v2->mvtype = 0;	/* initialize it to 0 to avoid "stp_gcol" from getting confused if it gets invoked before v2 has been
 			 * completely setup. */
+	v2->str.len = 0;
 	memcpy(stringpool.free, varname->str.addr, varname->str.len);
 	if (last_sub_null)
 	{
@@ -659,7 +688,7 @@ boolean_t op_fnquery_runtime(mval *src, int sbscnt, int *start, int *stop, mval 
 				INVOKE_STP_GCOL(MAX_NUM_SIZE);
 				assert(IS_AT_END_OF_STRINGPOOL(v1->str.addr, v1->str.len));
 			}
-			*v2 = *mv;
+			v2->umval = mv->umval;
 			/* Now that we have ensured enough space in the stringpool, we dont expect any more
 			 * garbage collections or expansions until we are done with the n2s.
 			 */
@@ -668,7 +697,10 @@ boolean_t op_fnquery_runtime(mval *src, int sbscnt, int *start, int *stop, mval 
 			/* Now that we are done with any stringpool.free usages, mark as free for expansion */
 			DBG_MARK_STRINGPOOL_EXPANDABLE;
 			if (last_sub_null)
-				TAREF1(last_fnquery_return_sub,(TREF(last_fnquery_return_subcnt))++) = *v2;
+			{
+				TAREF1(last_fnquery_return_sub,(TREF(last_fnquery_return_subcnt))).umval = v2->umval;
+				glist_protect_str(&(TAREF1(last_fnquery_return_sub,(TREF(last_fnquery_return_subcnt))++)).str);
+			}
 		} else
 		{	/* string */
 			assert(MV_IS_STRING(mv));
@@ -676,6 +708,7 @@ boolean_t op_fnquery_runtime(mval *src, int sbscnt, int *start, int *stop, mval 
 			v2->mvtype = 0;	/* initialize it to 0 to avoid "stp_gcol" from getting confused
 					 * if it gets invoked before v2 has been completely setup.
 					 */
+			v2->str.len = 0;
 			if (TREF(local_collseq))
 			{
 				ALLOC_XFORM_BUFF(mv->str.len);
@@ -684,9 +717,9 @@ boolean_t op_fnquery_runtime(mval *src, int sbscnt, int *start, int *stop, mval 
 				tmp_sbs.str.len = TREF(max_lcl_coll_xform_bufsiz);
 				do_xform(TREF(local_collseq), XBACK, &mv->str, &tmp_sbs.str, &length);
 				tmp_sbs.str.len = length;
-				v2->str = tmp_sbs.str;
+				v2->str.umstr = tmp_sbs.str.umstr;
 			} else
-				v2->str = mv->str;
+				v2->str.umstr = mv->str.umstr;
 			v2->mvtype = MV_STR;
 			if (MAX_STRLEN < (dst_len = ZWR_EXP_RATIO(v2->str.len)))
 			{	/* Only do the expansion if there is a possibility of a length issue */
@@ -713,7 +746,9 @@ boolean_t op_fnquery_runtime(mval *src, int sbscnt, int *start, int *stop, mval 
 					TAREF1(last_fnquery_return_sub,(TREF(last_fnquery_return_subcnt))).mvtype = MV_STR;
 					TAREF1(last_fnquery_return_sub,(TREF(last_fnquery_return_subcnt))).str.addr =
 						(char *)stringpool.free;
-					TAREF1(last_fnquery_return_sub,(TREF(last_fnquery_return_subcnt))++).str.len = v2->str.len;
+					TAREF1(last_fnquery_return_sub,(TREF(last_fnquery_return_subcnt))).str.len = v2->str.len;
+					glist_protect_str(&(TAREF1(last_fnquery_return_sub,
+						(TREF(last_fnquery_return_subcnt))++)).str);
 				}
 				stringpool.free += v2->str.len;
 				*stringpool.free++ = '\"';
@@ -724,8 +759,10 @@ boolean_t op_fnquery_runtime(mval *src, int sbscnt, int *start, int *stop, mval 
 					TAREF1(last_fnquery_return_sub,(TREF(last_fnquery_return_subcnt))).mvtype = MV_STR;
 					TAREF1(last_fnquery_return_sub,(TREF(last_fnquery_return_subcnt))).str.addr =
 						(char *)stringpool.free;
-					TAREF1(last_fnquery_return_sub,(TREF(last_fnquery_return_subcnt))++).str.len =
+					TAREF1(last_fnquery_return_sub,(TREF(last_fnquery_return_subcnt))).str.len =
 						format_out.len;
+					glist_protect_str(&(TAREF1(last_fnquery_return_sub,
+						(TREF(last_fnquery_return_subcnt))++)).str);
 				}
 				stringpool.free += format_out.len;
 			}
@@ -743,5 +780,5 @@ boolean_t op_fnquery_runtime(mval *src, int sbscnt, int *start, int *stop, mval 
 	dst->str.addr = v1->str.addr;
 	POP_MV_STENT();	/* v2 */
 	POP_MV_STENT();	/* v1 */
-	return TRUE;
+	return;
 }

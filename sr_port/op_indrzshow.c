@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,7 +33,8 @@ void op_indrzshow(mval *s1, mval *s2)
 
 	SETUP_THREADGBL_ACCESS;
 	MV_FORCE_STR(s2);
-	indir_src.str = s2->str;
+	indir_src.str.umstr = s2->str.umstr;
+	indir_src.str.in_array = FALSE;
 	indir_src.code = indir_zshow;
 	if (NULL == (obj = cache_get(&indir_src)))
 	{
@@ -82,7 +84,8 @@ void op_indrzshow(mval *s1, mval *s2)
 		}
 		if (EXPR_FAIL == comp_fini(rval, obj, OC_RET, NULL, NULL, s2->str.len))
 			return;
-		indir_src.str = s2->str;
+		indir_src.str.umstr = s2->str.umstr;
+		assert(!indir_src.str.in_array);
 		indir_src.code = indir_zshow;
 		cache_put(&indir_src, obj);
 		/* Fall into code activation below */

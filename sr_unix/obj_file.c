@@ -18,7 +18,7 @@
 #include <errno.h>
 
 #include "compiler.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "obj_gen.h"
 #include "cgp.h"
 #include "mdq.h"
@@ -191,6 +191,7 @@ struct sym_table *define_symbol(unsigned char psect, mstr *name)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	symkey.str.in_array = FALSE;
 	usehtab = (SYM_HASH_CUTOVER < symcnt);
 	DEBUG_ONLY(syment = NULL);
 	if (!usehtab)
@@ -235,7 +236,7 @@ struct sym_table *define_symbol(unsigned char psect, mstr *name)
 				assert(syment->key.str.addr == (char *)&((struct sym_table *)syment->value)->name[0]);
 			}
 		}
-		symkey.str = *name;	/* Copy of the key */
+		symkey.str.umstr = name->umstr;	/* Copy of the key */
 		COMPUTE_HASH_STR(&symkey);
 		added = add_hashtab_str(compsyms_hashtab, &symkey, NULL, &syment);
 		if (!added)
@@ -390,7 +391,7 @@ void comp_linkages(void)
 
 void emit_literals(void)
 {
-	mstr			name;
+	mstr			name = {{{0}}};
 	uint4			offset, padsize;
 	mliteral		*p;
 	struct linkage_entry	*linkagep;
@@ -462,6 +463,8 @@ void emit_literals(void)
 	{
 		assert(p->rt_addr == offset);
 		MV_FORCE_NUMD(&p->v);
+		glist_unprotect_str(&p->v.str);
+		assert(glist_str_null(&p->v.str));
 		if (p->v.str.len)
 		{
 			assert(((char *)stringpool.base <= p->v.str.addr)
@@ -525,6 +528,6 @@ int	literal_offset(UINTPTR_T offset)
 {
 	/* If we have no offset assigned yet, assume a really big offset. */
 	if ((unsigned int)-1 == offset)
-		offset = MAXPOSINT4;
+		offset = INT32_MAX;
 	return (int)((run_time ? (offset - (UINTPTR_T)runtime_base) : offset));
 }

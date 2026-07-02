@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -34,11 +34,12 @@
 #include "io.h"
 #include "dse.h"
 #include "compiler.h"
-
 #include "dse_exit.h"
 #include "util_spawn.h"
 #include "util_help.h"
 #include "dse_cmd_disallow.h"
+#include "svnames.h"
+#include "noprincio_if_needed_inline.h"
 
 /*************************************************************
  * NOTE
@@ -266,6 +267,7 @@ static readonly CLI_ENTRY dse_dump_qual[] = {
 #endif
 { "OFFSET",     0,             0,             0, 0, 0, 0, VAL_REQ, 0, NON_NEG, VAL_NUM, VAL_HEX },
 { "RECORD",     0,             0,             0, 0, 0, 0, VAL_REQ, 0, NON_NEG, VAL_NUM, VAL_HEX },
+{ "STATUS",     0,             0,             0, 0, 0, 0, VAL_N_A, 0, NEG,     0,       0       },
 { "ZWR",        0,             0,             0, 0, 0, 0, VAL_N_A, 0, NON_NEG, 0,       0       },
 { "" }
 };

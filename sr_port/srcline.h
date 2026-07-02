@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,7 +30,7 @@ typedef struct
 	int		srcrecs;	/* Size of the mstr array */
 	unsigned int	srcstat;	/* Status of the array */
 	unsigned char	*srcbuff;	/* Pointer to source buffer holding all lines */
-	mstr		srclines[1];	/* Array size dependent on routine */
+	unmanaged_mstr	srclines[1];	/* Array size dependent on routine */
 } routine_source;
 
 #ifdef GTM_TRIGGER

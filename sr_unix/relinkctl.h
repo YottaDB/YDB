@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2013-2024 Fidelity National Information	*
+ * Copyright (c) 2013-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -190,7 +190,7 @@ typedef struct relinkctl_data_struct
 typedef struct open_relinkctl_struct
 {
 	struct open_relinkctl_struct	*next;			/* List of open ctl structures, sorted by zro_entry_name */
-	mstr				zro_entry_name;		/* object directory name from $zroutines */
+	unmanaged_mstr			zro_entry_name;		/* object directory name from $zroutines */
 	char				*relinkctl_path;	/* full path of the relinkctl file corresponding to this objdir */
 	uint4				n_records;		/* Private copy */
 	boolean_t			locked;			/* TRUE if this process owns exclusive lock */
@@ -288,11 +288,11 @@ typedef struct rtnobj_hdr_struct
 /*
  * Prototypes
  */
-open_relinkctl_sgm	*relinkctl_attach(mstr *obj_container_name, mstr *objpath, int objpath_alloc_len);
+open_relinkctl_sgm	*relinkctl_attach(unmanaged_mstr *obj_container_name, unmanaged_mstr *objpath, int objpath_alloc_len);
 void			relinkctl_incr_nattached(void);
-int			relinkctl_get_key(char key[GTM_PATH_MAX], mstr *zro_entry_name);
-relinkrec_t		*relinkctl_find_record(open_relinkctl_sgm *linkctl, mstr *rtnname, uint4 hash, uint4 *prev_hash_index);
-relinkrec_t		*relinkctl_insert_record(open_relinkctl_sgm *linkctl, mstr *rtnname);
+int			relinkctl_get_key(char key[GTM_PATH_MAX], const unmanaged_mstr *zro_entry_name);
+relinkrec_t		*relinkctl_find_record(open_relinkctl_sgm *linkctl, mident *rtnname, uint4 hash, uint4 *prev_hash_index);
+relinkrec_t		*relinkctl_insert_record(open_relinkctl_sgm *linkctl, mident *rtnname);
 int			relinkctl_open(open_relinkctl_sgm *linkctl, boolean_t obj_file_missing);
 void			relinkctl_init_exclu(open_relinkctl_sgm* linkctl);
 void			relinkctl_lock_exclu(open_relinkctl_sgm *linkctl);

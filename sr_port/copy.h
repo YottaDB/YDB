@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -9,99 +9,121 @@
  *	the license, please stop and do not read further.	*
  *								*
  ****************************************************************/
+#ifndef COPY_H_INCLUDED
+#define COPY_H_INCLUDED
+#include "gtm_string.h"
+#include "mdef.h"
 
-/* If unaligned access is supported UNALIGNED_ACCESS_SUPPORTED has to be defined in the appropriate mdefsp.h
- * On platforms where unaligned data is not legal,
- * the macros are defined using a series of character moves */
+/* Previously, the macros at the bottom were either bytewise copies on platforms that
+ * did not support unaligned memory access or cast-and-assign operationss on those that did.
+ * But unaligned access is undefined behavior in C, and even on platforms where some instructions
+ * permit undefined operands, others (such as vector instructions), may fault in that case. Now we
+ * always do bytewise copies, but through a call to memcpy which is strictly better than explicit
+ * byte copying since it allows the compiler to do more optimization. The old macros are redefined
+ * to use new static inline functions that wrap the memcpy calls, and the static inlines have been
+ * slightly renamed to remove legacy cruft (long->int, llong->long). Finally, the macros universally
+ * cast the source pointer to unsigned char * since such a cast does not in itself violate aliasing or
+ * alignment rules. It is likely that there are some or many callers of the GET_* and PUT_* macros which
+ * are relying on undefined behavior in creating pointers to higher-precision objects from pointers to
+ * char, but this change is sufficient to protect any accesses that go through these macros.
+ */
+static inline gtm_int8 get_long(const unsigned char *src)
+{
+	gtm_int8 res;
+	memcpy(&res, src, SIZEOF(res));
+	return res;
+}
 
-#ifdef UNALIGNED_ACCESS_SUPPORTED
-/* Unsigned versions are different from signed ones as we may get sign extension problems when promotion is needed */
-#define GET_LLONGP(X,Y)	(*(gtm_int8 *)(X) = *(gtm_int8 *)(Y))
-#define GET_LONGP(X,Y)	(*(int4 *)(X) = *(int4 *)(Y))
-#define GET_SHORTP(X,Y)	(*(short *)(X) = *(short *)(Y))
-#define GET_LLONG(X,Y)	((X) = *(gtm_int8 *)(Y))
-#define GET_ULLONG(X,Y)	((X) = *(gtm_uint8 *)(Y))
-#define GET_LONG(X,Y)	((X) = *(int4 *)(Y))
-#define GET_ULONG(X,Y)	((X) = *(uint4 *)(Y))
-#define GET_SHORT(X,Y)	((X) = *(short *)(Y))
-#define GET_USHORT(X,Y)	((X) = *(unsigned short *)(Y))
-#define GET_CHAR(X,Y)	((X) = *(unsigned char *)(Y))
-#define REF_CHAR(Y)	(*(unsigned char *)Y)
-#define PUT_ZERO(X)	((X) = 0)
-#define PUT_LLONG(X,Y)	(*(gtm_int8 *)(X) = (Y))
-#define PUT_ULLONG(X,Y)	(*(gtm_uint8 *)(X) = (Y))
-#define PUT_LONG(X,Y)	(*(int4 *)(X) = (Y))
-#define PUT_ULONG(X,Y)	(*(uint4 *)(X) = (Y))
-#define PUT_SHORT(X,Y)	(*(short *)(X) = (Y))
-#define PUT_USHORT(X,Y)	(*(unsigned short *)(X) = (Y))
+static inline gtm_uint8 get_ulong(const unsigned char *src)
+{
+	gtm_uint8 res;
+	memcpy(&res, src, SIZEOF(res));
+	return res;
+}
+
+static inline int4 get_int(const unsigned char *src)
+{
+	int4 res;
+	memcpy(&res, src, SIZEOF(res));
+	return res;
+}
+
+static inline uint4 get_uint(const unsigned char *src)
+{
+	uint4 res;
+	memcpy(&res, src, SIZEOF(res));
+	return res;
+}
+
+static inline short get_short(const unsigned char *src)
+{
+	short res;
+	memcpy(&res, src, SIZEOF(res));
+	return res;
+}
+
+static inline unsigned short get_ushort(const unsigned char *src)
+{
+	unsigned short res;
+	memcpy(&res, src, SIZEOF(res));
+	return res;
+}
+
+static inline unsigned char get_char(const unsigned char *src)
+{
+	unsigned char res;
+	memcpy(&res, src, SIZEOF(res));
+	return res;
+}
+
+static inline gtm_int8 put_long(unsigned char *dst, gtm_int8 val)
+{
+	memcpy(dst, &val, SIZEOF(val));
+	return val;
+}
+
+static inline gtm_uint8 put_ulong(unsigned char *dst, gtm_uint8 val)
+{
+	memcpy(dst, &val, SIZEOF(val));
+	return val;
+}
+
+static inline int4 put_int(unsigned char *dst, int4 val)
+{
+	memcpy(dst, &val, SIZEOF(val));
+	return val;
+}
+
+static inline uint4 put_uint(unsigned char *dst, uint4 val)
+{
+	memcpy(dst, &val, SIZEOF(val));
+	return val;
+}
+
+static inline short put_short(unsigned char *dst, short val)
+{
+	memcpy(dst, &val, SIZEOF(val));
+	return val;
+}
+
+static inline unsigned short put_ushort(unsigned char *dst, unsigned short val)
+{
+	memcpy(dst, &val, SIZEOF(val));
+	return val;
+}
+
+#define GET_LLONG(X,Y)	((X) = get_long((unsigned char *)(Y)))
+#define GET_ULLONG(X,Y)	((X) = get_ulong((unsigned char *)(Y)))
+#define GET_LONG(X,Y)	((X) = get_int((unsigned char *)(Y)))
+#define GET_ULONG(X,Y)	((X) = get_uint((unsigned char *)(Y)))
+#define GET_SHORT(X,Y)	((X) = get_short((unsigned char *)(Y)))
+#define GET_USHORT(X,Y)	((X) = get_ushort((unsigned char *)(Y)))
+#define GET_CHAR(X,Y)	((X) = get_char((unsigned char *)(Y)))
+#define PUT_LLONG(X,Y)	(put_long((unsigned char *)(X), (Y)))
+#define PUT_ULLONG(X,Y)	(put_ulong((unsigned char *)(X), (Y)))
+#define PUT_LONG(X,Y)	(put_int((unsigned char *)(X), (Y)))
+#define PUT_ULONG(X,Y)	(put_uint((unsigned char *)(X), (Y)))
+#define PUT_SHORT(X,Y)	(put_short((unsigned char *)(X), (Y)))
+#define PUT_USHORT(X,Y)	(put_ushort((unsigned char *)(X), (Y)))
 #define PUT_CHAR(X,Y)	(*(unsigned char *)(X) = (Y))
-#else
-#include <sys/types.h>
-#define GET_LLONGP(X,Y)	(*(caddr_t)(X)     = *(caddr_t)(Y),	\
-			 *((caddr_t)(X)+1) = *((caddr_t)(Y)+1),	\
-			 *((caddr_t)(X)+2) = *((caddr_t)(Y)+2),	\
-			 *((caddr_t)(X)+3) = *((caddr_t)(Y)+3),	\
-			 *((caddr_t)(X)+4) = *((caddr_t)(Y)+4),	\
-			 *((caddr_t)(X)+5) = *((caddr_t)(Y)+5),	\
-			 *((caddr_t)(X)+6) = *((caddr_t)(Y)+6),	\
-			 *((caddr_t)(X)+7) = *((caddr_t)(Y)+7))
-
-#define GET_LONGP(X,Y)	(*(caddr_t)(X)     = *(caddr_t)(Y), \
-			 *((caddr_t)(X)+1) = *((caddr_t)(Y)+1), \
-			 *((caddr_t)(X)+2) = *((caddr_t)(Y)+2), \
-			 *((caddr_t)(X)+3) = *((caddr_t)(Y)+3))
-
-#define GET_SHORTP(X,Y)	(*(caddr_t)(X) = *(caddr_t)(Y), *((caddr_t)(X)+1) = *((caddr_t)(Y)+1))
-
-/* Unsigned versions are same as the signed ones as we do char by char */
-#define GET_LLONG(X,Y)	(*(caddr_t)(&X)     = *(caddr_t)(Y), \
-			 *((caddr_t)(&X)+1) = *((caddr_t)(Y)+1), \
-			 *((caddr_t)(&X)+2) = *((caddr_t)(Y)+2), \
-			 *((caddr_t)(&X)+3) = *((caddr_t)(Y)+3), \
-			 *((caddr_t)(&X)+4) = *((caddr_t)(Y)+4), \
-			 *((caddr_t)(&X)+5) = *((caddr_t)(Y)+5), \
-			 *((caddr_t)(&X)+6) = *((caddr_t)(Y)+6), \
-			 *((caddr_t)(&X)+7) = *((caddr_t)(Y)+7))
-
-#define GET_ULLONG(X,Y)	GET_LLONG
-
-#define GET_LONG(X,Y)	(*(caddr_t)(&X)     = *(caddr_t)(Y), \
-			 *((caddr_t)(&X)+1) = *((caddr_t)(Y)+1), \
-			 *((caddr_t)(&X)+2) = *((caddr_t)(Y)+2), \
-			 *((caddr_t)(&X)+3) = *((caddr_t)(Y)+3))
-
-#define GET_ULONG	GET_LONG
-
-#define GET_SHORT(X,Y)	(*(caddr_t)(&X) = *(caddr_t)(Y), *((caddr_t)(&X)+1) = *((caddr_t)(Y)+1))
-
-#define GET_USHORT	GET_SHORT
-
-#define GET_CHAR(X,Y)	(*(caddr_t)(&X) = *(caddr_t)(Y))
-#define REF_CHAR(Y)	(*(caddr_t)(Y))
-
-#define PUT_ZERO(X)	(memset((caddr_t)&(X), 0, SIZEOF(X)))
-
-#define PUT_LLONG(X,Y)	(*(caddr_t)(X)     = *(caddr_t)(&Y), \
-			 *((caddr_t)(X)+1) = *((caddr_t)(&Y)+1), \
-			 *((caddr_t)(X)+2) = *((caddr_t)(&Y)+2), \
-			 *((caddr_t)(X)+3) = *((caddr_t)(&Y)+3), \
-			 *((caddr_t)(X)+4) = *((caddr_t)(&Y)+4), \
-			 *((caddr_t)(X)+5) = *((caddr_t)(&Y)+5), \
-			 *((caddr_t)(X)+6) = *((caddr_t)(&Y)+6), \
-			 *((caddr_t)(X)+7) = *((caddr_t)(&Y)+7))
-
-#define PUT_ULLONG(X,Y)	PUT_LLONG
-
-#define PUT_LONG(X,Y)	(*(caddr_t)(X)     = *(caddr_t)(&Y), \
-			 *((caddr_t)(X)+1) = *((caddr_t)(&Y)+1), \
-			 *((caddr_t)(X)+2) = *((caddr_t)(&Y)+2), \
-			 *((caddr_t)(X)+3) = *((caddr_t)(&Y)+3))
-
-#define PUT_ULONG	PUT_LONG
-
-#define PUT_SHORT(X,Y)	(*(caddr_t)(X) = *(caddr_t)(&Y), *((caddr_t)(X)+1) = *((caddr_t)(&Y)+1))
-
-#define PUT_USHORT	PUT_SHORT
-
-#define PUT_CHAR(X,Y)	(*(caddr_t)(X) = *(caddr_t)(&Y))
-#endif /*UNALIGNED_ACCESS_SUPPORTED*/
+#endif /* COPY_H_INCLUDED */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -58,7 +58,7 @@ void op_zedit(mval *v, mval *p)
 #	endif
 	bool		has_ext, exp_dir;
 	parse_blk	pblk;
-	mstr		src;
+	unmanaged_mstr	src;
 	zro_ent		*sp, *srcdir;
 	struct		sigaction act, intr;
 	DCL_THREADGBL_ACCESS;
@@ -76,20 +76,18 @@ void op_zedit(mval *v, mval *p)
 	}
 	MV_FORCE_STR(v);
 	MV_FORCE_STR(p);
-	src.len = v->str.len;
-	src.addr = v->str.addr;
-	if (0 == src.len)
+	if (0 == v->str.len)
 	{
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZEDFILSPEC, 2, src.len, src.addr);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZEDFILSPEC, 2, v->str.len, v->str.addr);
 		return;
 	}
 	memset(&pblk, 0, SIZEOF(pblk));
 	pblk.buffer = es;
 	pblk.buff_size = MAX_FN_LEN;
-	status = parse_file(&src, &pblk);
+	status = parse_file(&v->str.umstr, &pblk);
 	if (!(status & 1))
 	{
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_ZEDFILSPEC, 2, src.len, src.addr, status);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_ZEDFILSPEC, 2, v->str.len, v->str.addr, status);
 		return;
 	}
 	has_ext = 0 != (pblk.fnb & F_HAS_EXT);
@@ -133,8 +131,10 @@ void op_zedit(mval *v, mval *p)
 		} else if ((STR_LIT_LEN(DOTM) == pblk.b_ext) && !MEMCMP_LIT(ptr + pblk.b_name, DOTM))
 			typ = STR_LIT_LEN(DOTM);
 	}
+	assert(MV_IS_STRING(&dollar_zsource));
 	dollar_zsource.str.addr = es;
 	dollar_zsource.str.len = path_len - typ;
+	glist_sync_mval(&dollar_zsource);
 	s2pool(&dollar_zsource.str);
 	es[path_len] = 0;
 	if (!exp_dir)

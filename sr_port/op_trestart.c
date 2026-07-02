@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -27,11 +27,14 @@
 #include "tp.h"
 #include "tp_restart.h"
 #include "op.h"
+#include "tp_frame.h"
 
 GBLREF	unsigned char	t_fail_hist[CDB_MAX_TRIES];
 GBLREF	unsigned int	t_tries;
 GBLREF	trans_num	tstart_local_tn;	/* copy of global variable "local_tn" at op_tstart time */
 GBLREF	uint4		dollar_tlevel;
+GBLREF	unsigned char	*tpstackbase, *tstart_readdr;
+error_def(ERR_TLVLZERO);
 error_def(ERR_TPRETRY);
 error_def(ERR_TRESTMAX);
 
@@ -72,9 +75,37 @@ void	op_trestart_set_cdb_code(void)
 	t_fail_hist[t_tries] = cdb_sc_optrestart;
 }
 
-void	op_trestart(int newlevel)
+/* The rtn_name and lbl_name function parameters are supplied by the XPEL parameter */
+void	op_trestart(mval *rtn_name, mval *lbl_name, int newlevel)
 {
+	DCL_THREADGBL_ACCESS;
+
+	SETUP_THREADGBL_ACCESS;
+	if (!dollar_tlevel)
+	{
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_TLVLZERO);
+		return; /* for the compiler only -- never executed */
+	}
 	op_trestart_set_cdb_code();
-	assert(1 == newlevel);	/* newlevel probably needs to become GBLREF assigned here and reset to 1 in tp_restart */
+	assert(1 == newlevel);
+	assert(MAX_MIDENT_LEN >= rtn_name->str.len);
+	memcpy((TREF(trestart_xpel_rtn)).str.addr,rtn_name->str.addr, rtn_name->str.len);
+	(TREF(trestart_xpel_rtn)).str.len = rtn_name->str.len;
+	assert(MAX_MIDENT_LEN >= lbl_name->str.len);
+	memcpy((TREF(trestart_xpel_lab)).str.addr,lbl_name->str.addr, lbl_name->str.len);
+	(TREF(trestart_xpel_lab)).str.len = lbl_name->str.len;
+	/* If we have parameters from the XPEL parameter, there is a tp stack and we have the tstart restart address
+	*  then set the restart_pc to the tstart restart address. In case we are involved in a zgoto or error handling
+	*  that may remove our frame set the dollar_zinxpel_clear_mpc to the tstart restart address. If we see that
+	*  address as we are unwinding we will clean up XPEL processing
+	*/
+	if (((rtn_name->str.len > 0) || (lbl_name->str.len > 0)) && ((NULL != tpstackbase) && (NULL != tstart_readdr)))
+	{
+		TREF(in_xpel) = TRUE;
+		(TREF(dollar_zinxpel))++;
+		TREF(dollar_zinxpel_roll) = TRUE;
+		((tp_frame *) (tpstackbase - sizeof(tp_frame)))->restart_pc = tstart_readdr;
+		tstart_readdr = NULL; /* Has been placed in restart_pc so no longer useful */
+	}
 	INVOKE_RESTART;
 }

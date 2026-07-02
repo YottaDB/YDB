@@ -42,7 +42,7 @@
 #include "send_msg.h"
 #include "svnames.h"		/* for SV_ZTWORMHOLE */
 #ifdef GTM_TRIGGER
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "gv_trigger.h"
 #include "gdskill.h"
 #include "tp.h"

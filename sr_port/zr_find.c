@@ -12,7 +12,7 @@
 
 #include "mdef.h"
 
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "zbreak.h"
 
 /* Finds a breakpoint record for input "addr" in array of breakpoint records "zrecs".

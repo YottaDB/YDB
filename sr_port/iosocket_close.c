@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -71,6 +71,8 @@ void iosocket_close(io_desc *iod, mval *pp)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	/* Zero out $DEVICE at the beginning to avoid stale device information after CLOSE */
+	memcpy(iod->dollar.device, "0", SIZEOF("0"));
 	assert(iod->type == gtmsocket);
 	dsocketptr = (d_socket_struct *)iod->dev_sp;
 	ESTABLISH_GTMIO_CH(&iod->pair, ch_set);
@@ -126,7 +128,7 @@ void iosocket_close(io_desc *iod, mval *pp)
 	}
 	if (socket_specified)
 	{
-		if (0 > (index = iosocket_handle(sock_handle, &handle_len, FALSE, dsocketptr)))
+		if (0 > (index = iosocket_get_handle(sock_handle, handle_len, dsocketptr)))
 		{
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SOCKNOTFND, 2, handle_len, sock_handle);
 			return;
@@ -169,6 +171,7 @@ void iosocket_close_range(d_socket_struct *dsocketptr, int start, int end, boole
 	char		*path;
 	int		res;
 	int		null_fd = 0;
+	boolean_t	wbox_process_exiting = FALSE;
 
 	local_process_exiting = process_exiting;	/* record in case changes while here */
 	for (ii = start; ii >= end; ii--)
@@ -212,6 +215,29 @@ void iosocket_close_range(d_socket_struct *dsocketptr, int start, int end, boole
 					socketptr->obuffer_timer_set = FALSE;
 				}
 				status = 1;		/* OK value */
+				if (WBTEST_ENABLED(WBTEST_SOCKET_CLOSE))
+				{	/* White-box test: force buffer error conditions.
+					* We set obuffer_size non-zero and obuffer_errno to simulate a pre-existing
+					* buffered write error without initializing the other obuffer* fields (e.g.
+					* obuffer pointer, obuffer_length). This is safe because the non-zero
+					* obuffer_errno causes the code below to skip the buffer flush and go
+					* directly to iosocket_buffer_error() which only reads obuffer_errno.
+					* IOERROR is set by the M test code via the OPEN command parameter.
+					*/
+					if (0 == socketptr->obuffer_size)
+					{	/* Only inject error once; obuffer_size stays non-zero on retry */
+						socketptr->obuffer_size = 1;
+						socketptr->obuffer_errno = EIO;
+						if (1 == gtm_white_box_test_case_count)
+						{	/* process_exiting: should skip error handling */
+							if (!process_exiting)
+							{
+								process_exiting = TRUE;
+								wbox_process_exiting = TRUE;
+							}
+						}
+					}
+				}
 				if ((0 < socketptr->obuffer_length) && (0 == socketptr->obuffer_errno))
 				{
 					socketptr->obuffer_output_active = TRUE;
@@ -219,7 +245,26 @@ void iosocket_close_range(d_socket_struct *dsocketptr, int start, int end, boole
 					socketptr->obuffer_output_active = FALSE;
 				}
 				if ((0 < socketptr->obuffer_size) && ((0 >= status) || (0 != socketptr->obuffer_errno)))
-					iosocket_buffer_error(socketptr);	/* pre-existing error or error flushing buffer */
+				{	/* pre-existing error or error flushing buffer */
+					if (!process_exiting)
+					{
+						if (socketptr->ioerror)
+						{	/* IOERROR="TRAP": enable interrupts before rts_error */
+							ENABLE_INTERRUPTS(INTRPT_IN_SOCKET_CLOSE, prev_intrpt_state);
+							iosocket_buffer_error(socketptr);
+							/* iosocket_buffer_error with ioerror calls rts_error
+							 * which won't return. Re-defer if it somehow does.
+							 */
+							DEFER_INTERRUPTS(INTRPT_IN_SOCKET_CLOSE, prev_intrpt_state);
+						} else
+							iosocket_buffer_error(socketptr);
+					}
+				}
+				if (wbox_process_exiting)
+				{
+					process_exiting = FALSE;	/* restore after testing process_exiting path */
+					wbox_process_exiting = FALSE;
+				}
 #				ifdef GTM_TLS
 				if (socketptr->tlsenabled)
 				{

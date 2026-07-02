@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -152,6 +152,7 @@ void add_mvals(mval *u, mval *v, int subtraction, mval *result)
 			m1 = m0;
 			if (m1 == 0)
 			{
+				result->str.len = 0;
 				result->mvtype = MV_NM | MV_INT;
 				result->m[1] = 0;
 				return;
@@ -181,6 +182,7 @@ void add_mvals(mval *u, mval *v, int subtraction, mval *result)
 		x = m1 / factor;
 		if (x * factor == m1)
 		{
+			result->str.len = 0;
 			result->mvtype = MV_NM | MV_INT;
 			result->m[1] = rsign ? - x : x;
 			return;
@@ -191,9 +193,10 @@ void add_mvals(mval *u, mval *v, int subtraction, mval *result)
 		TREF(last_source_column) += (TK_EOL == TREF(director_token)) ? -2 : 2;	/* improve hints */
 		rts_error_csa(NULL, VARLSTCNT(1) ERR_NUMOFLOW); /* BYPASSRTSABT */
 	} else if (EXPLO > exp)
-		*result = literal_zero;
+		result->umval = literal_zero.umval;
 	else
 	{
+		result->str.len = 0;
 		result->mvtype = MV_NM;
 		result->sgn = rsign;
 		result->e = exp;
@@ -203,15 +206,17 @@ void add_mvals(mval *u, mval *v, int subtraction, mval *result)
 	return;
 
 result_is_u:
-	*result = *u;
+	result->umval = u->umval;
 	MV_FORCE_CANONICAL(result);
 	return;
 
 result_is_v:
 	if (subtraction)
 	{
+		result->str.len = 0;
 		if (v->mvtype & MV_INT)
 		{
+
 			result->mvtype = (MV_NM | MV_INT);
 			result->m[1] = - v->m[1];
 		} else
@@ -224,7 +229,7 @@ result_is_v:
 		}
 	} else
 	{
-		*result = *v;
+		result->umval = v->umval;
 		MV_FORCE_CANONICAL(result);
 	}
 	return;
@@ -242,6 +247,7 @@ void op_add (mval *u, mval *v, mval *s)
 	if ( utype & vtype & MV_INT )
 	{
 		m1 = u->m[1] + v->m[1] ;
+		s->str.len = 0;
 		if (m1 < MANT_HI && m1 > -MANT_HI)
 		{
 			s->mvtype = MV_INT | MV_NM ;
@@ -279,6 +285,7 @@ void op_sub (mval *u, mval *v, mval *s)
 	if ( utype & vtype & MV_INT )
 	{
 		m1 = u->m[1] - v->m[1] ;
+		s->str.len = 0;
 		if (m1 < MANT_HI && m1 > -MANT_HI)
 		{
 			s->mvtype = MV_INT | MV_NM ;

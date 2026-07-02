@@ -28,7 +28,7 @@
 #include "jnl.h"
 #include "buddy_list.h"		/* needed for tp.h */
 #include "tp.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "mv_stent.h"		/* for COPY_SUBS_TO_GVCURRKEY macro */
 #include "op.h"
 #include "gvcst_protos.h"	/* for gvcst_root_search prototype */
@@ -56,16 +56,13 @@ STATICFNDCL void op_gvname_common(int count, int hash_code, mval *val_arg, va_li
 void op_gvname(UNIX_ONLY_COMMA(int count_arg) mval *val_arg, ...)
 {
 	int	 	hash_code;
-	mval		tmpval;
 	va_list		var;
 	VMS_ONLY(int	count;)
 
-	tmpval = *val_arg;
-	tmpval.str.len = MIN(tmpval.str.len, MAX_MIDENT_LEN);
-	COMPUTE_HASH_MSTR(tmpval.str, hash_code);
+	COMPUTE_HASH_ADDR_LEN(val_arg->str.addr, MIN(val_arg->str.len, MAX_MIDENT_LEN), hash_code);
 	VAR_START(var, val_arg);
 	VMS_ONLY(va_count(count);)
-	op_gvname_common(UNIX_ONLY_COMMA(count_arg+1) VMS_ONLY_COMMA(count+1) hash_code, &tmpval, var);
+	op_gvname_common(UNIX_ONLY_COMMA(count_arg+1) VMS_ONLY_COMMA(count+1) hash_code, val_arg, var);
 	va_end(var);
 }
 
@@ -86,7 +83,7 @@ STATICFNDEF void op_gvname_common(int count, int hash_code, mval *val_arg, va_li
 	boolean_t	is_null, was_null;
 	boolean_t	bgormm;
 	mval		*val;
-	mname_entry	gvname;
+	unmanaged_mname_entry	gvname;
 	int		max_key, tmp_len;
 	gvnh_reg_t	*gvnh_reg;
 	char		varstr[MAX_MIDENT_LEN + 1];
@@ -149,10 +146,10 @@ STATICFNDEF void op_gvname_common(int count, int hash_code, mval *val_arg, va_li
 }
 
 /* op_gvname_common should generally be maintained in parallel */
-boolean_t op_gvname_runtime(mval *src, int subscripts, int *start, int *stop)
+void op_gvname_runtime(mval *src, int subscripts, int *start, int *stop)
 {
 	boolean_t	is_null, was_null;
-	mname_entry	gvname;
+	unmanaged_mname_entry	gvname;
 	int		max_key, tmp_len, i;
 	gvnh_reg_t	*gvnh_reg;
 	gd_region	*reg;
@@ -196,5 +193,5 @@ boolean_t op_gvname_runtime(mval *src, int subscripts, int *start, int *stop)
 	if (was_null && (NEVER == reg->null_subs))
 		sgnl_gvnulsubsc(NULL);
 	TREF(prev_gv_target) = gv_target;
-	return TRUE;
+	return;
 }

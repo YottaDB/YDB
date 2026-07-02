@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2013-2021 Fidelity National Information	*
+ * Copyright (c) 2013-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -21,7 +21,7 @@
 #include "cmd_qlf.h"
 #include "gtmio.h"
 #include "parse_file.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "obj_file.h"
 
 GBLREF command_qualifier	cmd_qlf;
@@ -160,13 +160,14 @@ void init_object_file_name(void)
 {
 	int		status, rout_len;
 	char		obj_name[SIZEOF(mident_fixed) + 5];
-	mstr		fstr;
+	unmanaged_mstr	fstr;
 	parse_blk	pblk;
 
 	fstr.len = (MV_DEFINED(&cmd_qlf.object_file) && (MAX_FN_LEN > cmd_qlf.object_file.str.len)
 		? cmd_qlf.object_file.str.len : 0);
 	fstr.addr = cmd_qlf.object_file.str.addr;
 	assert(!fstr.len || strlen(fstr.addr) == fstr.len);
+	assert(!glist_umstr_in_stringpool(&fstr));
 	memset(&pblk, 0, SIZEOF(pblk));
 	pblk.buffer = object_file_name;
 	pblk.buff_size = MAX_FN_LEN;

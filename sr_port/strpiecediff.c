@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2023 Fidelity National Information	*
+ * Copyright (c) 2010-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -182,7 +182,7 @@ void	strpiecediff(mstr *oldstr, mstr *newstr, mstr *delim,
 				bufflen = INTCAST(pcdiff_top - pcdiff_start);
 				newbufflen = bufflen * 2;
 				tmpbuff = (char *)malloc(newbufflen); /* expand by doubling buffer size */
-				memcpy((void *)tmpbuff, pcdiff_start, bufflen);
+				memcpy(tmpbuff, pcdiff_start, bufflen);
 				if (pcdiff_start != &pcdiff_buff[0])
 					free(pcdiff_start);	/* obtained by malloc. so free it */
 				pcdiff_len = INTCAST(pcdiff_ptr - pcdiff_start);

@@ -727,7 +727,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* GTMSECSHRSSIDF */
 	   0,	/* GTMSECSHRFORKF */
 	   0,	/* DBFSYNCERR */
-	   0,	/* UNUSEDMSG898 */
+	   0,	/* XPELNOTP */
 	   0,	/* SCNDDBNOUPD */
 	   0,	/* MUINFOUINT4 */
 	   0,	/* NLMISMATCHCALC */
@@ -1046,7 +1046,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* SEMUNDOOVERFLOW */
 	   0,	/* ENCODING */
 	   0,	/* DBMINRESBYTES */
-	   0,	/* UNUSEDMSG1217 */
+	   0,	/* TRIGNOXPEL */
 	   0,	/* UNUSEDMSG1218 */
 	   0,	/* UNUSEDMSG1219 */
 	   0,	/* UNUSEDMSG1220 */

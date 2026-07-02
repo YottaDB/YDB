@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -16,7 +16,7 @@
 #include "gtm_unistd.h"
 
 #include "lv_val.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "error.h"
 #include "mv_stent.h"
 #include "find_mvstent.h"	/* for zintcmd_active */
@@ -84,11 +84,12 @@ GBLREF zwr_hash_table		*zwrhtab;
 GBLREF boolean_t		run_time, *ztvalue_changed_ptr;
 GBLREF int			mumps_status;
 GBLREF int4			gtm_trigger_depth;
-GBLREF mstr			*dollar_ztname;
+GBLREF mident			*dollar_ztname;
 GBLREF mval			*dollar_ztdata, *dollar_ztdelim, *dollar_ztoldval, *dollar_ztriggerop, *dollar_ztupdate;
 GBLREF mval			*dollar_ztvalue;
 GBLREF symval			*trigr_symval_list;
 #  ifdef DEBUG
+GBLREF unsigned int		count_prohibit_longjmp;
 GBLREF ch_ret_type		(*ch_at_trigger_init)();
 GBLREF gtm_trigger_parms	*gtm_trigprm_last;
 GBLREF gv_trigger_t		*gtm_trigdsc_last;		/* For debugging purposes - parms gtm_trigger called with */
@@ -107,7 +108,9 @@ boolean_t unw_mv_ent(mv_stent *mv_st_ent, boolean_t unwind_newvars)
 	intrpt_state_t		prev_intrpt_state;
 	ht_ent_mname		*hte;
 	lv_blk			*lp, *lpnext;
-	lv_val			*lvval_ptr;
+	lv_val			*lvval_ptr, *lvlimit;
+	lvTree			*lvtree_base, *lvtree_limit;
+	lvTreeNode		*node, *node_limit;
 	lv_xnew_var		*xnewvar, *xnewvarnext;
 	lvzwrite_datablk	*zwrblk, *prevzwrblk;
 	socket_interrupt	*sockintr;
@@ -115,6 +118,9 @@ boolean_t unw_mv_ent(mv_stent *mv_st_ent, boolean_t unwind_newvars)
 	zintcmd_ops		zintcmd_command;
 	symval			*symval_ptr, *sym;
 	zwr_zav_blk		*zavb, *zavb_next;
+	unsigned short		zwr_index;
+	zwr_sub_lst		*zwr_sub;
+	size_t			clrlen;
 	DBGRFCT_ONLY(mident_fixed vname;)
 	DCL_THREADGBL_ACCESS;
 
@@ -127,16 +133,20 @@ boolean_t unw_mv_ent(mv_stent *mv_st_ent, boolean_t unwind_newvars)
 			if (unwind_newvars)
 			{
 				assert(frame_pointer->type & SFT_COUNT);
-				*mv_st_ent->mv_st_cont.mvs_msav.addr = mv_st_ent->mv_st_cont.mvs_msav.v;
+				glist_unprotect_str(&mv_st_ent->mv_st_cont.mvs_msav.addr->str);
+				mv_st_ent->mv_st_cont.mvs_msav.addr->umval = mv_st_ent->mv_st_cont.mvs_msav.v.umval;
+				if (glist_str_protected(&mv_st_ent->mv_st_cont.mvs_msav.v.str))
+					glist_transfer_protection_to_from(&mv_st_ent->mv_st_cont.mvs_msav.addr->str,
+						&mv_st_ent->mv_st_cont.mvs_msav.v.str);
 				if (&(TREF(dollar_etrap)) == mv_st_ent->mv_st_cont.mvs_msav.addr)
 				{
+					NULLIFY_TRAP(TREF(dollar_ztrap));
 					ztrap_explicit_null = FALSE;
-					(TREF(dollar_ztrap)).str.len = 0;
 				} else if (&(TREF(dollar_ztrap)) == mv_st_ent->mv_st_cont.mvs_msav.addr)
 				{
 					if (STACK_ZTRAP_EXPLICIT_NULL == (TREF(dollar_ztrap)).str.len)
 					{
-						(TREF(dollar_ztrap)).str.len = 0;
+						NULLIFY_TRAP(TREF(dollar_ztrap));
 						ztrap_explicit_null = TRUE;
 						if (!dollar_zininterrupt)
 						{
@@ -147,9 +157,10 @@ boolean_t unw_mv_ent(mv_stent *mv_st_ent, boolean_t unwind_newvars)
 						}
 					} else
 						ztrap_explicit_null = FALSE;
-					(TREF(dollar_etrap)).str.len = 0;
+					NULLIFY_TRAP(TREF(dollar_etrap));
 				} else if (mv_st_ent->mv_st_cont.mvs_msav.addr == &dollar_zgbldir)
 				{
+					assert(glist_mval_in_sync(mv_st_ent->mv_st_cont.mvs_msav.addr));
 					/* Restore GLD if a match is found, otherwise defer setting gd_header */
 					gd_header = zgbldir_name_lookup_only(&dollar_zgbldir);
 					if (gv_currkey)
@@ -159,12 +170,12 @@ boolean_t unw_mv_ent(mv_stent *mv_st_ent, boolean_t unwind_newvars)
 					}
 					if (gv_target)
 						gv_target->clue.end = 0;
-				}
+				} else
+					assert(glist_mval_in_sync(mv_st_ent->mv_st_cont.mvs_msav.addr));
 			} else
 				return FALSE;
 			return TRUE;
 		case MVST_MVAL:
-		case MVST_IARR:
 		case MVST_TPHOLD:
 		case MVST_STORIG:
 			return TRUE;
@@ -194,6 +205,64 @@ boolean_t unw_mv_ent(mv_stent *mv_st_ent, boolean_t unwind_newvars)
 					assert(NULL == symval_ptr->xnew_ref_list);
 					symval_ptr->last_tab = trigr_symval_list;
 					trigr_symval_list = symval_ptr;
+					for (lp = symval_ptr->lv_first_block; NULL != lp; lp = lpnext)
+					{
+						for (lvval_ptr = (lv_val *)LV_BLK_GET_BASE(lp),
+							lvlimit = LV_BLK_GET_FREE(lp, lvval_ptr);
+								lvval_ptr < lvlimit; lvval_ptr++)
+						{
+							assert(!glist_str_protected(&lvval_ptr->v.str) || LV_PARENT(lvval_ptr));
+							if (NULL == LV_PARENT(lvval_ptr))
+								continue;
+							glist_unprotect_str(&lvval_ptr->v.str);
+						}
+						lvval_ptr = (lv_val *)LV_BLK_GET_BASE(lp);
+						clrlen = (char *)lvlimit - (char *)lvval_ptr;
+						if (clrlen)
+						{
+							memset(lvval_ptr, 0, clrlen);
+							lp->numUsed = 0;
+						}
+						lpnext = lp->next;
+					}
+					for (lp = symval_ptr->lvtree_first_block; NULL != lp; lp = lpnext)
+					{
+						lvtree_base = (lvTree *)LV_BLK_GET_BASE(lp);
+						lvtree_limit = LV_BLK_GET_FREE(lp, lvtree_base);
+						clrlen = (char *)lvtree_limit - (char *)lvtree_base;
+						if (clrlen)
+						{
+							memset(lvtree_base, 0, clrlen);
+							lp->numUsed = 0;
+						}
+						lpnext = lp->next;
+					}
+					for (lp = symval_ptr->lvtreenode_first_block; NULL != lp; lp = lpnext)
+					{
+
+						for (node = (lvTreeNode *)LV_BLK_GET_BASE(lp),
+							node_limit = LV_BLK_GET_FREE(lp, node);
+								node < node_limit; node++)
+						{
+							if (NULL == LV_PARENT(node))
+							{
+								assert(!glist_str_protected(&node->v.str));
+								assert(!glist_lvTreeNode_key_protected(node));
+								continue;
+							}
+							glist_unprotect_str(&node->v.str);
+							glist_unprotect_lvTreeNode_key(node);
+						}
+						node = (lvTreeNode *)LV_BLK_GET_BASE(lp);
+						clrlen = (char *)node_limit - (char *)node;
+						if (clrlen)
+						{
+							memset(node, 0, clrlen);
+							lp->numUsed = 0;
+						}
+						lpnext = lp->next;
+					}
+					reinitialize_hashtab_mname(&symval_ptr->h_symtab);
 					/* Note we do not set SFF_UNW_SYMVAL here because this being a trigger related symbol
 					 * table, when it unwinds, so has any possible reference to what was using it.
 					 */
@@ -208,12 +277,13 @@ boolean_t unw_mv_ent(mv_stent *mv_st_ent, boolean_t unwind_newvars)
 					assert(NULL == symval_ptr->xnew_ref_list);	/* Without aliases, no ref list possible */
 					for (xnewvar = symval_ptr->xnew_var_list; xnewvar; xnewvar = xnewvarnext)
 					{
-						hte = lookup_hashtab_mname(&curr_symval->h_symtab, &xnewvar->key);
+						hte = lookup_hashtab_mname(&curr_symval->h_symtab, &xnewvar->key.umname);
 						lvval_ptr = (lv_val *)hte->value;
 						assert(lvval_ptr);
 						DECR_CREFCNT(lvval_ptr);
 						assert(1 <= lvval_ptr->stats.trefcnt);
 						DECR_BASE_REF_NOSYM(lvval_ptr, TRUE);
+						glist_unprotect_str(&xnewvar->key.var_name);
 						xnewvarnext = xnewvar->next;
 						xnewvar->next = xnewvar_anchor;
 						xnewvar_anchor = xnewvar;
@@ -221,6 +291,14 @@ boolean_t unw_mv_ent(mv_stent *mv_st_ent, boolean_t unwind_newvars)
 				}
 				for (lp = symval_ptr->lv_first_block; NULL != lp; lp = lpnext)
 				{
+					for (lvval_ptr = (lv_val *)LV_BLK_GET_BASE(lp), lvlimit = LV_BLK_GET_FREE(lp, lvval_ptr);
+							lvval_ptr < lvlimit; lvval_ptr++)
+					{
+						assert(!glist_str_protected(&lvval_ptr->v.str) || LV_PARENT(lvval_ptr));
+						if (NULL == LV_PARENT(lvval_ptr))
+							continue;
+						glist_unprotect_str(&lvval_ptr->v.str);
+					}
 					lpnext = lp->next;
 					free(lp);
 				}
@@ -233,6 +311,18 @@ boolean_t unw_mv_ent(mv_stent *mv_st_ent, boolean_t unwind_newvars)
 				symval_ptr->lvtree_first_block = NULL;
 				for (lp = symval_ptr->lvtreenode_first_block; NULL != lp; lp = lpnext)
 				{
+					for (node = (lvTreeNode *)LV_BLK_GET_BASE(lp), node_limit = LV_BLK_GET_FREE(lp, node);
+							node < node_limit; node++)
+					{
+						if (NULL == LV_PARENT(node))
+						{
+							assert(!glist_str_protected(&node->v.str));
+							assert(!glist_lvTreeNode_key_protected(node));
+							continue;
+						}
+						glist_unprotect_str(&node->v.str);
+						glist_unprotect_lvTreeNode_key(node);
+					}
 					lpnext = lp->next;
 					free(lp);
 				}
@@ -330,7 +420,7 @@ boolean_t unw_mv_ent(mv_stent *mv_st_ent, boolean_t unwind_newvars)
 				assert(SFT_COUNT & frame_pointer->type);
 				assert(mv_st_ent->mv_st_cont.mvs_nval.mvs_ptab.hte_addr);
 #				ifdef DEBUG
-				hte = lookup_hashtab_mname(&curr_symval->h_symtab, &mv_st_ent->mv_st_cont.mvs_nval.name);
+				hte = lookup_hashtab_mname(&curr_symval->h_symtab, &mv_st_ent->mv_st_cont.mvs_nval.name.umname);
 #				endif
 				assert(hte);
 				assert(hte == mv_st_ent->mv_st_cont.mvs_nval.mvs_ptab.hte_addr);
@@ -493,8 +583,16 @@ boolean_t unw_mv_ent(mv_stent *mv_st_ent, boolean_t unwind_newvars)
 			gtm_trigger_depth = mv_st_ent->mv_st_cont.mvs_trigr.gtm_trigger_depth_save;
 			if (0 == gtm_trigger_depth)
 			{	/* Only restore error handling environment if returning out of trigger-world */
-				TREF(dollar_etrap) = mv_st_ent->mv_st_cont.mvs_trigr.dollar_etrap_save;
-				TREF(dollar_ztrap) = mv_st_ent->mv_st_cont.mvs_trigr.dollar_ztrap_save;
+				glist_unprotect_str(&(TREF(dollar_etrap)).str);
+				glist_unprotect_str(&(TREF(dollar_ztrap)).str);
+				(TREF(dollar_etrap)).umval = mv_st_ent->mv_st_cont.mvs_trigr.dollar_etrap_save.umval;
+				if (glist_str_protected(&mv_st_ent->mv_st_cont.mvs_trigr.dollar_etrap_save.str))
+					glist_transfer_protection_to_from(&(TREF(dollar_etrap)).str,
+						&mv_st_ent->mv_st_cont.mvs_trigr.dollar_etrap_save.str);
+				(TREF(dollar_ztrap)).umval = mv_st_ent->mv_st_cont.mvs_trigr.dollar_ztrap_save.umval;
+				if (glist_str_protected(&mv_st_ent->mv_st_cont.mvs_trigr.dollar_ztrap_save.str))
+					glist_transfer_protection_to_from(&(TREF(dollar_ztrap)).str,
+						&mv_st_ent->mv_st_cont.mvs_trigr.dollar_ztrap_save.str);
 				ztrap_explicit_null = mv_st_ent->mv_st_cont.mvs_trigr.ztrap_explicit_null_save;
 			}
 			DEFER_INTERRUPTS(INTRPT_IN_CONDSTK, prev_intrpt_state);
@@ -520,6 +618,7 @@ boolean_t unw_mv_ent(mv_stent *mv_st_ent, boolean_t unwind_newvars)
 		case MVST_MRGZWRSV:
 			merge_args = mv_st_ent->mv_st_cont.mvs_mrgzwrsv.save_merge_args;
 			zwrtacindx = mv_st_ent->mv_st_cont.mvs_mrgzwrsv.save_zwrtacindx;
+			TREF(in_zwrite) = mv_st_ent->mv_st_cont.mvs_mrgzwrsv.save_in_zwrite;
 			if (NULL != mglvnp)
 			{	/* Release this block and sub-blocks */
 				FREEIFALLOC(mglvnp->gblp[0]);
@@ -531,6 +630,7 @@ boolean_t unw_mv_ent(mv_stent *mv_st_ent, boolean_t unwind_newvars)
 			{
 				for (zwrblk = lvzwrite_block; zwrblk; zwrblk = prevzwrblk)
 				{
+					glist_unprotect_lvzwrite_block(zwrblk, 0, zwrblk->mv_sub_top);
 					prevzwrblk = zwrblk->prev;
 					FREEIFALLOC(zwrblk->sub);
 					free(zwrblk);
@@ -551,11 +651,16 @@ boolean_t unw_mv_ent(mv_stent *mv_st_ent, boolean_t unwind_newvars)
 				for (zavb = zwrhtab->first_zwrzavb; zavb; zavb = zavb_next)
 				{
 					zavb_next = zavb->next;
+					while (zavb->zav_free > zavb->zav_base)
+						glist_unprotect_str(&(--zavb->zav_free)->zwr_var);
 					free(zavb);
 				}
 				free(zwrhtab);
 			}
 			zwrhtab = mv_st_ent->mv_st_cont.mvs_mrgzwrsv.save_zwrhtab;
+#			ifdef DEBUG
+			count_prohibit_longjmp = mv_st_ent->mv_st_cont.mvs_mrgzwrsv.save_count_prohibit_longjmp;
+#			endif
 			return TRUE;
 		case MVST_L_SYMTAB:
 			if (unwind_newvars && mv_st_ent->mv_st_cont.mvs_l_symtab.l_symtab)

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2005-2026 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,7 +39,7 @@
 /* This routine validates the key from journal record copying to memory pointed updproc_get_gblname
  * "gvname" is an mname_entry pointing to the global name (to be used for gv_bind_name) is set here.
  */
-enum upd_bad_trans_type updproc_get_gblname(char *src_ptr, int key_len, char *gv_mname, mname_entry *gvname)
+enum upd_bad_trans_type updproc_get_gblname(char *src_ptr, int key_len, char *gv_mname, unmanaged_mname_entry *gvname)
 {
 	char		*dest_ptr;
 	int		cplen;

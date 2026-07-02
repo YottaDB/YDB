@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -17,6 +17,7 @@
 #include "toktyp.h"
 #include "cgp.h"
 #include "gdsroot.h"
+#include "gcol_list.h"
 
 GBLREF char		cg_phase;	/* code generation phase */
 GBLREF boolean_t	is_dollar_incr;
@@ -44,7 +45,7 @@ char *s2n (mval *u)
 	if (0 == u->str.len)
 	{	/* Substitute pre-converted NULL/0 value */
 		TREF(s2n_intlit) = 1;
-		*u = literal_null;
+		u->umval = literal_null.umval;
 		return c;
 	}
 	eos = u->str.addr + u->str.len;				/* End of string marker */

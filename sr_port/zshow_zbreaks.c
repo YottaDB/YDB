@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -12,7 +12,7 @@
 
 #include "mdef.h"
 #include "gtm_string.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "zbreak.h"
 #include "zshow.h"
 #include "compiler.h"
@@ -43,7 +43,7 @@ void zshow_zbreaks(zshow_out *output)
 		memcpy(&zbreak.str.addr[zbreak.str.len], z_ptr->action->src.str.addr, z_ptr->action->src.str.len);
 		zbreak.str.len += z_ptr->action->src.str.len;
 		output->flush = TRUE;
-		zshow_output(output, &zbreak.str);
+		zshow_output(output, &zbreak.str.umstr);
 	}
 	return;
 }

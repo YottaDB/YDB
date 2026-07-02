@@ -28,7 +28,7 @@
 #include "copy.h"
 #include "longset.h"		/* also needed for cws_insert.h */
 #include "cws_insert.h"		/* for cw_stagnate_reinitialized and CWS_RESET */
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "gtm_trigger_trc.h"
 #include "gv_trigger.h"		/* for TP_INVALIDATE_TRIGGER_CYCLES_IF_NEEDED macro */
 

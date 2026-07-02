@@ -13,7 +13,7 @@
 #ifndef GTM_PERMISSIONS
 #define GTM_PERMISSIONS
 
-#include <mdefsp.h>
+#include "mdefsp.h"
 
 enum perm_target_types
 {

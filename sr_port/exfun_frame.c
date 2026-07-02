@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -15,7 +15,7 @@
 #include "gtm_stdio.h"
 #include "gtm_string.h"
 
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "stack_frame.h"
 #include "mprof.h"
 #include "error.h"
@@ -31,7 +31,11 @@ void exfun_frame (void)
 {
 	register stack_frame	*sf;
 	unsigned char		*msp_save;
+	mval 			*m, *mtop;
 
+        DCL_THREADGBL_ACCESS;
+
+        SETUP_THREADGBL_ACCESS;
 	msp_save = msp;
 	sf = (stack_frame *)(msp -= SIZEOF(stack_frame));	/* Note imbedded assignment */
 	assert(sf < frame_pointer);
@@ -60,6 +64,7 @@ void exfun_frame (void)
 	sf->temps_ptr = msp;
 	assert(msp < stackbase);
 	memset(msp, 0, sf->rvector->temp_size);
+	SET_PTEMP_CNT(sf, INVALID_PTEMP_CNT);
 	SET_GLVN_INDX(sf, GLVN_POOL_UNTOUCHED);
 	sf->ret_value = NULL;
 	sf->dollar_test = -1;
@@ -73,6 +78,11 @@ void exfun_frame (void)
 	DBGEHND((stderr, "exfun_frame: Added stackframe at addr 0x"lvaddr"  old-msp: 0x"lvaddr"  new-msp: 0x"lvaddr" for routine "
 		 "%.*s (rtnhdr 0x"lvaddr")\n", sf, msp_save, msp, sf->rvector->routine_name.len, sf->rvector->routine_name.addr,
 		 sf->rvector));
+        if ((TREF(zinxpel_rtn_fp_capture)))
+        {/* Capture the xpel routine's frame pointer */
+                TREF(zinxpel_rtn_fp) = sf;
+                TREF(zinxpel_rtn_fp_capture) = FALSE;
+        }
 	return;
 }
 

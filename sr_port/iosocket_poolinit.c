@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -55,7 +55,7 @@ void iosocket_poolinit(void)
 	TREF(is_socketpool) = TRUE;
 	op_open(&sockv, &sockp, (mval *)&literal_notimeout, &sockm);
 	TREF(is_socketpool) = FALSE;
-	nl = get_log_name(&sockv.str, NO_INSERT);
+	nl = get_log_name(&sockv.str.umstr, NO_INSERT);
 	assert(NULL != nl);
 	socket_pool =  (d_socket_struct *)(nl->iod->dev_sp);
 }

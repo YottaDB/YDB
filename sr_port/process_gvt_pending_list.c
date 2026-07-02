@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2008-2021 Fidelity National Information	*
+ * Copyright (c) 2008-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -21,7 +21,8 @@
 #include "process_gvt_pending_list.h"
 #include "targ_alloc.h"
 #include "buddy_list.h"
-#include "hashtab_mname.h"
+#include "hashtab_umname.h"
+#include "gcol_list.h"
 
 GBLREF	gvt_container	*gvt_pending_list;
 GBLREF	buddy_list	*gvt_pending_buddy_list;
@@ -47,8 +48,8 @@ void process_gvt_pending_list(gd_region *reg, sgmnt_addrs *csa)
 	gv_namehead		*old_gvt, *new_gvt, *gvtarg;
 	int4			db_max_key_size;
 	boolean_t		added, first_wasopen;
-	ht_ent_mname		*stayent, *old_gvt_ent;
-	hash_table_mname	*gvt_hashtab;
+	ht_ent_umname		*stayent, *old_gvt_ent;
+	hash_table_umname	*gvt_hashtab;
 	gvnh_reg_t		*gvnh_reg;
 	gvnh_spanreg_t		*gvspan;
 	int			reg_index;
@@ -80,8 +81,9 @@ void process_gvt_pending_list(gd_region *reg, sgmnt_addrs *csa)
 			prev_gvtc->next_gvtc = (struct gvt_container_struct *)next_gvtc;
 		}
 		if (NULL != (gvt_hashtab = csa->gvt_hashtab))
-			added = add_hashtab_mname(gvt_hashtab, &old_gvt->gvname, old_gvt, &stayent);
-		else
+		{
+			added = add_hashtab_umname(gvt_hashtab, &old_gvt->gvname, old_gvt, &stayent);
+		} else
 		{
 			added = TRUE;	/* even though there is no hashtable set added so we go through the appropriate codepath */
 			stayent = NULL;
@@ -99,7 +101,7 @@ void process_gvt_pending_list(gd_region *reg, sgmnt_addrs *csa)
 			if (old_gvt->clue.top != DBKEYSIZE(db_max_key_size))
 			{	/* key sizes are different, need to reallocate */
 				assert(IS_REG_BG_OR_MM(reg));
-				new_gvt = (gv_namehead *)targ_alloc(db_max_key_size, &old_gvt->gvname, reg);
+				new_gvt = targ_alloc(db_max_key_size, &old_gvt->gvname, reg);
 				new_gvt->noisolation = old_gvt->noisolation;	/* Copy over noisolation status from old_gvt */
 				new_gvt->act = old_gvt->act; /* copy over act,nct,ver from old_gvt (actually from the gld file) */
 				new_gvt->nct = old_gvt->nct;
@@ -126,9 +128,12 @@ void process_gvt_pending_list(gd_region *reg, sgmnt_addrs *csa)
 		if (NULL != new_gvt)
 		{
 			/* Locate prior hash table entry */
-			old_gvt_ent = (ht_ent_mname *)lookup_hashtab_mname(reg->owning_gd->tab_ptr, &old_gvt->gvname);
+			old_gvt_ent = lookup_hashtab_umname(reg->owning_gd->tab_ptr, &old_gvt->gvname);
 			assert(NULL != old_gvt_ent);	/* Processing a pre-existing entry */
 			/* Repoint hash table entry's key variable name into the newly allocated GVT */
+			/* These do not need protection against garbage collection and we should ensure all entries in the gvt tab
+			 * are not in lists.
+			 */
 			old_gvt_ent->key.var_name = new_gvt->gvname.var_name;
 			*gvtc->gvt_ptr = new_gvt;	/* change hash-table to eventually point to new gvt */
 			if (NULL != gvtc->gvt_ptr2)

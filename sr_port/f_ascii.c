@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -24,7 +24,7 @@ GBLREF boolean_t        gtm_utf8_mode;
 int f_ascii(oprtype *a, opctype op)
 {
 	triple *r;
-	mval tmp_mval;
+	mval tmp_mval = {{0}};
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;

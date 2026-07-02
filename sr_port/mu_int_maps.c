@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -50,6 +50,7 @@ GBLREF	sgmnt_data		*cs_data;
 GBLREF	sgmnt_addrs		*cs_addrs;
 
 GBLREF trans_num	largest_tn;
+GBLREF	gd_region	*gv_cur_region;
 
 error_def(ERR_DBREADBM);
 error_def(ERR_DBLVLINC);
@@ -87,12 +88,12 @@ void mu_int_maps(void)
 	SETUP_THREADGBL_ACCESS;
 	/* Before going into mu_int_maps, check if there are any KIPs and wait for them */
 	crit_counter = 1;
-	wait_on_kip = (cs_data && cs_data->kill_in_prog) || mu_int_data.kill_in_prog;
+	wait_on_kip = cs_data ? cs_data->kill_in_prog : mu_int_data.kill_in_prog;
 	if (wait_on_kip)
 	{
 		GET_CUR_TIME(time_str);
-		util_out_print("!/MUPIP INFO: mu_int_maps: !AD : Start kill-in-prog wait.", TRUE,
-			CTIME_BEFORE_NL, time_str);
+		util_out_print("MUPIP INFO: mu_int_maps: !AD : Start kill-in-prog wait for database !AD", TRUE,
+				CTIME_BEFORE_NL, time_str, DB_LEN_STR(gv_cur_region));
 	}
 #	ifdef DEBUG
 	if (WBTEST_ENABLED(WBTEST_INTEG_RTS_ERR))
@@ -101,7 +102,7 @@ void mu_int_maps(void)
 #	endif
 	/* MAX_CRIT_TRY is 1 minute (as of now).  However given how problematic going into integ with KIP is,
 	 * doubling that seems reasonable. */
-	while (((cs_data && cs_data->kill_in_prog) || mu_int_data.kill_in_prog) && ((2 * MAX_CRIT_TRY) > crit_counter++))
+	while ((cs_data ? cs_data->kill_in_prog : mu_int_data.kill_in_prog) && ((2 * MAX_CRIT_TRY) > crit_counter++))
 	{
 		if (cs_addrs)
 			GET_C_STACK_FOR_KIP(cs_addrs->nl->kip_pid_array, crit_counter, MAX_CRIT_TRY, 1, MAX_KIP_PID_SLOTS);
@@ -110,11 +111,12 @@ void mu_int_maps(void)
 	if (wait_on_kip)
 	{
 		GET_CUR_TIME(time_str);
-		util_out_print("!/MUPIP INFO: mu_int_maps: !AD : Done with kill-in-prog wait.", TRUE,
-			CTIME_BEFORE_NL, time_str);
-		if ((cs_data && cs_data->kill_in_prog) || mu_int_data.kill_in_prog)
-			util_out_print("!/MUPIP INFO: mu_int_maps: !AD : Kill-in-prog wait failed, proceeding anyway.", TRUE,
-				CTIME_BEFORE_NL, time_str);
+		util_out_print("MUPIP INFO: mu_int_maps: !AD : Done with kill-in-prog wait for database !AD", TRUE,
+				CTIME_BEFORE_NL, time_str, DB_LEN_STR(gv_cur_region));
+		if (cs_data ? cs_data->kill_in_prog : mu_int_data.kill_in_prog)
+			util_out_print("MUPIP INFO: mu_int_maps: !AD : Kill-in-prog wait failed for"
+				" database !AD, proceeding anyway.", TRUE,
+				CTIME_BEFORE_NL, time_str, DB_LEN_STR(gv_cur_region));
 	}
 	mu_int_offset[0] = 0;
 	maps = (mu_int_data.trans_hist.total_blks + mu_int_data.bplmap - 1) / mu_int_data.bplmap;

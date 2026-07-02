@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,22 +25,20 @@ GBLREF spdesc stringpool;
 
 void op_zhelp_xfr(mval *subject, mval *lib)
 {
-	mstr	x;
+	mstr	x = {{{0}}};
 	mval	*action;
 
 	MV_FORCE_STR(subject);
 	MV_FORCE_STR(lib);
 	if (!lib->str.len)
 		lib = &dlib;
-
 	flush_pio();
 	action = push_mval(subject);
-	action->mvtype = 0;
+	assert(glist_str_protected(&action->str));
 	action->str.len = SIZEOF("D ^GTMHELP(") - 1;
 	action->str.addr = "D ^GTMHELP(";
 	s2pool(&action->str);
 	action->mvtype = MV_STR;
-
 	mval_lex(subject, &x);
 	if (IS_AT_END_OF_STRINGPOOL(x.addr, 0))
 	{

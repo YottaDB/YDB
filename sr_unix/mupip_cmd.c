@@ -1,6 +1,6 @@
 /****************************************************************
- *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ *									*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -317,11 +317,6 @@ static	CLI_ENTRY	mup_freeze_qual[] = {		/* FREEZE */
 { "OVERRIDE",    mupip_freeze, 0, 0, 0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0 },
 { "RECORD",      mupip_freeze, 0, 0, 0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0 },
 { "" }
-};
-
-static	CLI_PARM	mup_ftok_parm[] = {
-{ "FILE", "File: ", PARM_REQ},
-{ "", "",}
 };
 
 static	CLI_ENTRY	mup_ftok_qual[] = {		/* FTOK */
@@ -721,11 +716,6 @@ static	CLI_ENTRY	mup_rundown_qual[] = {		/* RUNDOWN */
 { "" }
 };
 
-static	CLI_PARM	mup_sems_parm[] = {
-{ "SEMAPHORE", "Semaphore: ", PARM_REQ},
-{ "", "",}
-};
-
 static	CLI_PARM	mup_set_parm[] = {
 { "WHAT", "File or Region: ", PARM_REQ},
 { "", "",                     PARM_REQ}
@@ -857,7 +847,7 @@ GBLDEF	CLI_ENTRY	mupip_cmd_ary[] = {
 { "EXTEND",    mupip_extend,     mup_extend_qual,    mup_extend_parm,    0, 0,                            0, VAL_DISALLOWED, 1,         0, 0, 0 },
 { "EXTRACT",   mu_extract,       mup_extract_qual,   mup_extract_parm,   0, cli_disallow_mupip_extract,   0, VAL_DISALLOWED, 1,         0, 0, 0 },
 { "FREEZE",    mupip_freeze,     mup_freeze_qual,    mup_freeze_parm,    0, cli_disallow_mupip_freeze,    0, VAL_DISALLOWED, 1,         0, 0, 0 },
-{ "FTOK",      mupip_ftok,       mup_ftok_qual,      mup_ftok_parm,      0, 0,                            0, VAL_DISALLOWED, MAX_PARMS, 0, 0, 0 },
+{ "FTOK",      mupip_ftok,       mup_ftok_qual,      0,                  0, 0,                            0, VAL_DISALLOWED, MAX_PARMS, 0, 0, 0 },
 { "HASH",      mupip_hash,       0,                  0,                  0, 0,                            0, VAL_DISALLOWED, MAX_PARMS, 0, 0, 0 },
 { "HELP",      util_help,        0,                  0,                  0, 0,                            0, VAL_DISALLOWED, 1,         0, 0, 0 },
 { "INTEG",     mupip_integ,      mup_integ_qual,     mup_integ_parm,     0, cli_disallow_mupip_integ,     0, VAL_DISALLOWED, 1,         0, 0, 0 },
@@ -870,7 +860,7 @@ GBLDEF	CLI_ENTRY	mupip_cmd_ary[] = {
 { "REPLICATE", 0,                mup_replicate_qual, mup_replicate_parm, 0, cli_disallow_mupip_replicate, 0, VAL_DISALLOWED, 1,         0, 0, 0 },
 { "RESTORE",   mupip_restore,    mup_restore_qual,   mup_restore_parm,   0, 0,                            0, VAL_DISALLOWED, 2,         0, 0, 0 },
 { "RUNDOWN",   mupip_rundown,    mup_rundown_qual,   mup_rundown_parm,   0, cli_disallow_mupip_rundown,   0, VAL_DISALLOWED, 2,         0, 0, 0 },
-{ "SEMAPHORE", mupip_sems,       0,                  mup_sems_parm,      0, 0,                            0, VAL_DISALLOWED, MAX_PARMS, 0, 0, 0 },
+{ "SEMAPHORE", mupip_sems,       0,                  0,                  0, 0,                            0, VAL_DISALLOWED, MAX_PARMS, 0, 0, 0 },
 { "SET",       mupip_set,        mup_set_qual,       mup_set_parm,       0, cli_disallow_mupip_set,       0, VAL_DISALLOWED, 1,         0, 0, 0 },
 { "SIZE",      mupip_size,       mup_size_qual,      0,                  0, cli_disallow_mupip_size,      0, VAL_DISALLOWED, 1,         0, 0, 0 },
 { "STOP",      mupip_stop,       0,                  mup_stop_parm,      0, 0,                            0, VAL_DISALLOWED, 1,         0, 0, 0 },

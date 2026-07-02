@@ -17,7 +17,7 @@
 
 #include "min_max.h"
 #include "lv_val.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "mv_stent.h"
 #include "compiler.h"
 #include "gdsroot.h"
@@ -139,7 +139,7 @@ void push_parm(UNIX_ONLY_COMMA(unsigned int totalcnt) int truth_value, ...)
 	unsigned int		actualcnt, prev_count;
 	lv_val			*actp;
 	lv_val			**act_list_ptr;
-	stack_frame		*save_frame;
+	boolean_t		modified_frame = FALSE;
 	parm_slot		*curr_slot;
 	uint4			sidx;
 	uint4			*pmh;
@@ -173,11 +173,10 @@ void push_parm(UNIX_ONLY_COMMA(unsigned int totalcnt) int truth_value, ...)
 		/* Save a reference to the first vacant slot. */
 		act_list_ptr = &((*((TREF(parm_pool_ptr))->parms + (TREF(parm_pool_ptr))->start_idx)).actuallist);
 	}
-	save_frame = NULL;
 	if (frame_pointer->old_frame_pointer)
 	{	/* Temporarily rewind frame_pointer if the parent is not a base frame. */
-		save_frame = frame_pointer;
-		frame_pointer = frame_pointer->old_frame_pointer;
+		modified_frame = TRUE;
+		frame_pointer->flags |= SFF_PARM_IN_PROG;
 	}
 	for (i = 0; i < actualcnt; i++, act_list_ptr++)				/* Save parameters in the following empty slots. */
 	{
@@ -189,7 +188,9 @@ void push_parm(UNIX_ONLY_COMMA(unsigned int totalcnt) int truth_value, ...)
 			PUSH_MV_STENT(MVST_PVAL);
 			mv_chain->mv_st_cont.mvs_pval.mvs_val = lv_getslot(curr_symval);
 			LVVAL_INIT(mv_chain->mv_st_cont.mvs_pval.mvs_val, curr_symval);
-			mv_chain->mv_st_cont.mvs_pval.mvs_val->v = *actpmv;		/* Copy mval input. */
+			mv_chain->mv_st_cont.mvs_pval.mvs_val->v.umval = actpmv->umval;
+			assert(glist_str_protected(&mv_chain->mv_st_cont.mvs_pval.mvs_val->v.str));
+			/* TODO - can we delete from the list if it isn't in the stringpool at this point? */
 			mv_chain->mv_st_cont.mvs_pval.mvs_ptab.save_value = NULL;	/* Filled in by op_bindparm. */
 			mv_chain->mv_st_cont.mvs_pval.mvs_ptab.hte_addr = NULL;
 			DEBUG_ONLY(mv_chain->mv_st_cont.mvs_pval.mvs_ptab.nam_addr = NULL);
@@ -200,8 +201,8 @@ void push_parm(UNIX_ONLY_COMMA(unsigned int totalcnt) int truth_value, ...)
 			*act_list_ptr = actp;
 	}
 	va_end(var);
-	if (save_frame)								/* Restore frame_pointer if previously saved. */
-		frame_pointer = save_frame;
+	if (modified_frame)						/* Restore frame_pointer if previously saved. */
+		frame_pointer->flags &= SFF_PARM_IN_PROG_OFF;
 	frame_pointer->ret_value = ret_value;					/* Save the return value in the stack frame. */
 	if (ret_value)								/* Save $test value in the stack frame. */
 		frame_pointer->dollar_test = truth_value;

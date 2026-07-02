@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2008-2025 Fidelity National Information	*
+ * Copyright (c) 2008-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -582,9 +582,12 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 		if (gtmrecv_local->changelog & REPLIC_CHANGE_LOGFILE)
 		{
 			repl_log(gtmrecv_log_fp, TRUE, TRUE, "Changing log file to %s\n", gtmrecv_local->log_file);
-			repl_log_init(REPL_GENERAL_LOG, &gtmrecv_log_fd, gtmrecv_local->log_file);
-			repl_log_fd2fp(&gtmrecv_log_fp, gtmrecv_log_fd);
-			repl_log(gtmrecv_log_fp, TRUE, TRUE, "Change log to %s successful\n",gtmrecv_local->log_file);
+			if (SS_NORMAL == repl_log_init(REPL_GENERAL_LOG, &gtmrecv_log_fd, gtmrecv_local->log_file))
+			{
+				repl_log_fd2fp(&gtmrecv_log_fp, gtmrecv_log_fd);
+				repl_log(gtmrecv_log_fp, TRUE, TRUE, "Change log to %s successful\n",
+					gtmrecv_local->log_file);
+			}
 		}
 		/* NOTE: update process and receiver each ignore any setting specific to the other (REPLIC_CHANGE_UPD_LOGINTERVAL,
 		 * REPLIC_CHANGE_LOGINTERVAL) */

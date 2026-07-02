@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -28,6 +28,7 @@
 #ifdef DEBUG
 #include "arit.h"
 #endif
+#include "gcol_list.h"
 
 GBLREF	bool		devctlexp;
 GBLREF	boolean_t	run_time;
@@ -93,6 +94,7 @@ LITDEF nametabent svn_names[] =
 	,{ 7, "ZICUVER" }
 	,{12, "ZININTERRUPT" }
 	,{10, "ZINTERRUPT"}
+	,{ 7, "ZINXPEL"}
 	,{ 3, "ZIO" }
 	,{ 4, "ZJOB" }
 	,{ 4, "ZKEY" }
@@ -143,7 +145,7 @@ LITDEF nametabent svn_names[] =
 LITDEF unsigned char svn_index[27] = {
 	 0,  0,  0,  0,  2,  8,  8,  8, 10,	/* a b c d e f g h i */
 	12, 14 ,16, 16, 16, 16, 16, 18, 20,	/* j k l m n o p q r */
-	22, 28, 34 ,34, 34, 34, 35, 36, 103	/* s t u v w x y z ~ */
+	22, 28, 34 ,34, 34, 34, 35, 36, 104	/* s t u v w x y z ~ */
 };
 
 /* These entries correspond to the entries in the svn_names array */
@@ -191,6 +193,7 @@ LITDEF svn_data_type svn_data[] =
 	,{ SV_ZICUVER, FALSE, ALL_SYS}
 	,{ SV_ZININTERRUPT, FALSE, ALL_SYS}
 	,{ SV_ZINTERRUPT, TRUE, ALL_SYS}
+	,{ SV_ZINXPEL, FALSE, ALL_SYS}
 	,{ SV_ZIO, FALSE, ALL_SYS }
 	,{ SV_ZJOB, FALSE, ALL_SYS }
 	,{ SV_ZKEY, FALSE , ALL_SYS }
@@ -493,7 +496,7 @@ int expritem(oprtype *a)
 {
 	boolean_t	parse_warn, saw_local, saw_se, se_warn;
 	int		i, index, sv_opcode;
-	mval		v;
+	mval		v, *v_p;
 	oprtype		*j, *k, x1;
 	tbp		argbp, *funcbp, *tripbp;
 	triple		*argtrip, *functrip, *ref, *t1, *t2, *t3;
@@ -520,7 +523,10 @@ int expritem(oprtype *a)
 			else
 				(TREF(window_mval)).sgn = 1;
 			if (TK_NUMLIT == TREF(window_token))
+			{
 				n2s(&(TREF(window_mval)));
+				assert(MV_IS_STRING(TADR(window_mval)));
+			}
 		} else
 		{
 			if (!expratom(&x1))
@@ -697,7 +703,7 @@ int expritem(oprtype *a)
 							op_svget(sv_opcode, &v);
 							assert(MVTYPE_IS_NUMERIC(v.mvtype) && MVTYPE_IS_STRING(v.mvtype));
 							ENSURE_STP_FREE_SPACE(v.str.len);
-							memcpy((char *)stringpool.free, v.str.addr, v.str.len);
+							memcpy(stringpool.free, v.str.addr, v.str.len);
 							v.str.addr = (char *)stringpool.free;
 							stringpool.free += v.str.len;
 							*a = put_lit(&v);

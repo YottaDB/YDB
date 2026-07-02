@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2012-2026 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,10 +20,12 @@ void op_fnget1(mval *src, mval *dst)
 {
 	if (src && MV_DEFINED(src))
 	{
-		*dst = *src;
+		dst->umval = src->umval;
 		dst->mvtype &= ~MV_ALIASCONT;		/* Make sure alias container property does not pass */
-	}
-	else
+	} else
+	{
 		dst->mvtype = 0;
+		dst->str.len = 0;
+	}
 	return;
 }

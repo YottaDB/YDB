@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -24,9 +24,10 @@ error_def(ERR_LOGTOOLONG);
 
 void zco_init(void)
 {
-	int4	status;
-	mstr	val, tn;
-	char	buf1[MAX_TRANS_NAME_LEN]; /* buffer to hold translated name */
+	int4		status;
+	mstr		tn;
+	unmanaged_mstr 	val;
+	char		buf1[MAX_TRANS_NAME_LEN]; /* buffer to hold translated name */
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;

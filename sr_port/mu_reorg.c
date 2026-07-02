@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -234,7 +234,7 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 	super_srch_hist		super_dest_hist; /* dir_hist combined with reorg_gv_target->hist */
 	jnl_buffer_ptr_t	jbp;
 	trans_num		ret_tn;
-	mstr			*gn;
+	mident			*gn;
 	uint4			reorg_upgrade_pid;
 #	ifdef UNIX
 	DEBUG_ONLY(unsigned int	lcl_t_tries;)

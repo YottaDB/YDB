@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -59,7 +60,7 @@ void op_fnlvname(mval *src, boolean_t return_undef_aliases,  mval *dst)
 			}
 		}
 	}
-	dst->mvtype = 0; /* so stp_gcol (if invoked below) can free up space currently occupied by this to-be-overwritten mval */
+	dst->str.len = 0; /* so stp_gcol can free up space currently occupied by this to-be-overwritten mval */
 	if (min)
 	{
 		n = min->key.var_name.len;
@@ -68,7 +69,6 @@ void op_fnlvname(mval *src, boolean_t return_undef_aliases,  mval *dst)
 		dst->str.len = n;
 		dst->str.addr = (char *)stringpool.free;
 		stringpool.free += n;
-	} else
-		dst->str.len = 0;
+	}
 	dst->mvtype = MV_STR; /* initialize mvtype now that dst mval has been otherwise completely set up */
 }

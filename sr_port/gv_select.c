@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -45,11 +45,12 @@
 #include "buddy_list.h"		/* needed for tp.h */
 #include "hashtab_int4.h"	/* needed for tp.h */
 #include "tp.h"
-#include "hashtab_mname.h"
+#include "hashtab_umname.h"
 #include "gvnh_spanreg.h"
 #include "change_reg.h"
 #include "io.h"
 #include "gtmio.h"
+#include "stringpool.h"
 
 #ifdef EXTRACT_HASHT_GLOBAL
 # include "gv_trigger_common.h"	/* for IS_GVKEY_HASHT_GBLNAME and HASHT_GBL_CHAR1 macros */
@@ -88,15 +89,16 @@ void gv_select(char *cli_buff, int n_len, boolean_t freeze, char opname[], glist
 {
 	int			num_quote, len, gmap_size, new_gmap_size, estimated_entries, count, rslt, hash_code;
 	int			i, mini, maxi;
+	unsigned int		gcols;
 	char			*ptr, *ptr1, *c;
-	mname_entry		gvname;
-	mstr			gmap[512], *gmap_ptr, *gmap_ptr_base, gmap_beg, gmap_end;
-	mval			curr_gbl_name;
+	unmanaged_mname_entry	gvname;
+	unmanaged_mstr		gmap[512], *gmap_ptr, *gmap_ptr_base, gmap_beg = { 0 }, gmap_end = { 0 };
+	mval			curr_gbl_name = {{0}};
 	gd_region		*reg;
 	gv_namehead		*gvt;
 	gvnh_reg_t		*gvnh_reg;
 	gvnh_spanreg_t		*gvspan;
-	ht_ent_mname		*tabent_mname;
+	ht_ent_umname		*tabent_umname;
 	glist			*gl_tail;
 #	ifdef GTM64
 	hash_table_int8		ext_hash;
@@ -212,8 +214,8 @@ void gv_select(char *cli_buff, int n_len, boolean_t freeze, char opname[], glist
 		if (estimated_entries >= gmap_size)
 		{	/* Current gmap array does not have enough space. Double size before calling global_map */
 			new_gmap_size = gmap_size * 2;	/* double size of gmap array */
-			gmap_ptr = (mstr *)malloc(SIZEOF(mstr) * new_gmap_size);
-			memcpy(gmap_ptr, gmap_ptr_base, SIZEOF(mstr) * gmap_size);
+			gmap_ptr = (unmanaged_mstr *)malloc(SIZEOF(unmanaged_mstr) * new_gmap_size);
+			memcpy(gmap_ptr, gmap_ptr_base, SIZEOF(*gmap_ptr) * gmap_size);
 			if (gmap_ptr_base != &gmap[0])
 				free(gmap_ptr_base);
 			gmap_size = new_gmap_size;
@@ -242,7 +244,7 @@ void gv_select(char *cli_buff, int n_len, boolean_t freeze, char opname[], glist
 	for (gmap_ptr = gmap_ptr_base; gmap_ptr->addr ; gmap_ptr++)
 	{
 		curr_gbl_name.mvtype = MV_STR;
-		curr_gbl_name.str = *gmap_ptr++;
+		curr_gbl_name.str.umstr = *(gmap_ptr++);
 		DEBUG_ONLY(MSTRP_CMP(&curr_gbl_name.str, gmap_ptr, rslt);)
 		assert(0 >= rslt);
 		do
@@ -292,14 +294,20 @@ void gv_select(char *cli_buff, int n_len, boolean_t freeze, char opname[], glist
 			assert(IS_REG_BG_OR_MM(gv_cur_region));
 				/* for dba_cm or dba_usr, op_gvname_fast/gv_bind_name/gv_init_reg would have errored out */
 			gvname.hash_code = hash_code;
-			gvname.var_name = curr_gbl_name.str;
-			tabent_mname = lookup_hashtab_mname((hash_table_mname *)gd_header->tab_ptr, &gvname);
-			assert(NULL != tabent_mname);
-			gvnh_reg = (gvnh_reg_t *)tabent_mname->value;
+			/* gvname.var_name is not protected against stringpool garbage collection so
+			 * we assert none takes place until
+			 * after we use it.
+			 */
+			DBG_START_NO_GCOLS(gcols);
+			gvname.var_name = curr_gbl_name.str.mident;
+			tabent_umname = lookup_hashtab_umname(gd_header->tab_ptr, &gvname);
+			DBG_END_NO_GCOLS(gcols);
+			assert(NULL != tabent_umname);
+			gvnh_reg = (gvnh_reg_t *)tabent_umname->value;
 			assert(gv_cur_region == gvnh_reg->gd_reg);
 			gvspan = gvnh_reg->gvspan;
 			if (NULL == gvspan)
-				gv_select_reg((void *)&ext_hash, freeze, reg_max_rec, reg_max_key, reg_max_blk,
+				gv_select_reg(&ext_hash, freeze, reg_max_rec, reg_max_key, reg_max_blk,
 										restrict_reg, gvnh_reg, &gl_tail);
 			else
 			{	/* If global spans multiple regions, make sure gv_targets corresponding to ALL

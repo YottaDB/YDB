@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -20,6 +20,7 @@
 #include "fileinfo.h"
 #include "gdsbt.h"
 #include "gdsfhead.h"
+#include "gcol_list.h"
 #ifdef VMS
 #include <fab.h>		/* needed for dbgbldir_sysops.h */
 #endif
@@ -65,8 +66,11 @@ void op_newintrinsic(int intrtype)
 			DEBUG_ONLY(stored_explicit_null = FALSE;)
 			if (ztrap_explicit_null && (0 == (TREF(dollar_ztrap)).str.len))
 			{
+				assert(!glist_str_protected(&((TREF(dollar_ztrap)).str)));
+				assert(NULL == (TREF(dollar_ztrap)).str.addr);
 				DEBUG_ONLY(stored_explicit_null = TRUE;)
 				(TREF(dollar_ztrap)).str.len = STACK_ZTRAP_EXPLICIT_NULL;	/* used later by unw_mv_ent() */
+				assert(glist_mval_in_sync(&(TREF(dollar_ztrap))));
 			}
 			/* Intentionally omitted the "break" here */
 		case SV_ETRAP:
@@ -83,6 +87,7 @@ void op_newintrinsic(int intrtype)
 			intrinsic = &dollar_zyerror;
 			break;
 		case SV_ZGBLDIR:
+			assert(glist_mval_in_sync(&dollar_zgbldir));
 			intrinsic = &dollar_zgbldir;
 			break;
 #		ifdef GTM_TRIGGER

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2018 Fidelity National Information	*
+ * Copyright (c) 2006-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -69,7 +69,7 @@ void op_setpiece(mval *src, mval *del, mval *expr, int4 first, int4 last, mval *
 			return;
 		}
 		MV_FORCE_STR(expr);
-		*dst = *expr;
+		dst->umval = expr->umval;
 		return;
 	}
 	MV_FORCE_STR(expr);

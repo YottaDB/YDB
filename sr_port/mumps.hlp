@@ -3614,22 +3614,24 @@
    database updates performed within the transaction before they are made
    available to other processes. ROLLBACK also releases all resources LOCKed
    since the start of the transaction, and makes the naked reference
-   undefined. While it cause a significant process state change, unlike a
+   undefined. While it causes a significant process state change, unlike a
    RESTART, a TROLLBACK does not cause any transfer of control. Because of
    this, a useful technique is to set a flag in a local variable that is not
-   a restart variable, issue a TRESTART and have a block conditioned on the
-   flag variable which does a TROLLBACK.
+   a restart variable, issue a TRESTART, which transfers to the instruction
+   immediately after the initial TSTART, and have a block there conditioned
+   on the flag variable which does a TROLLBACK.
 
-   A RESTART is a transfer of control to the TSTART at the beginning of the
-   transaction. RESTART implicitly includes a ROLLBACK and may optionally
+   A RESTART does not terminate the transaction, but is a transfer of control
+   to immediately after the TSTART at the beginning of the transaction.
+   RESTART implicitly includes a non-terminating ROLLBACK and may optionally
    restore local variables, known as restart variables, to the values they
    had when the initial TSTART originally executed. A RESTART always restores
    $TEST and the naked reference to the values they had when the initial
    TSTART executed. RESTART does not manage device state information. A
-   RESTART is invoked by the TRESTART command or by M if it is determined
-   that the transaction is in conflict with other database updates. RESTART
-   can only successfully occur if the initial TSTART includes an argument
-   that enables RESTART, which FIS strongly recommends in order to deal with
+   RESTART is invoked by the TRESTART command or by GT.M if it has determined
+   the transaction is in conflict with other database updates. RESTART can
+   only successfully occur if the initial TSTART includes an argument that
+   enables RESTART, which FIS strongly recommends in order to deal with
    implicit RESTARTs.
 
 3 TP_Performance
@@ -4869,7 +4871,7 @@
 
    The format for the TRESTART command is:
 
-   TRE[START][:tvexpr]
+   TRE[START][:tvexpr] [XPEL=label]
 
    For an example of the use of the TRESTART command, refer to the chapter on
    "General Language Features of M" in the GT.M Programmer's Guide.
@@ -12754,7 +12756,6 @@
    Example:
 
    GTM>job ^mode
-
    > cat mode.mjo
    OTHER
 
@@ -16004,9 +16005,7 @@
    server reads two characters (but the client sends three) and $ZKEY shows
    sockets with unread characters.Please click Download sockexamplemulti32.m
    to download the sockexamplemulti32.m program and follow instructions in
-   the comments near the top of the program file. You can also download
-   sockexamplemulti32.m from
-   http://tinco.pair.com/bhaskar/gtm/doc/books/pg/UNIX_manual/sockexamplemulti32.m.
+   the comments near the top of the program file.
 
    You can start a GT.M process in response to a connection request made
    using inetd/xinetd. The following example uses inetd/xinetd to implement a
@@ -19369,13 +19368,27 @@
    containing the pathname of the shareable library file followed by one or
    more specification lines in the following format:
 
-   entryref: return-value routine-name (parameter, parameter, ... ) [: SIGSAFE]
+   entryref: return-value routine-name (parameter, parameter, ... ) [: [ACIDTP] [SIGSAFE] [TERMIO] ]
+
+   The optional case-insensitive keyword ACIDTP following the parameter list
+   specifies the external call does not interact with an external actor and
+   completes in a reliably short time; this allows GT.M to skip TPNOTACID
+   checking otherwise associated with an external call. Improperly using this
+   feature can lead to intermittant and hard to diagnose performance issues
+   including hangs.
 
    The optional case-insensitive keyword SIGSAFE following the parameter list
    specifies the external call does not create its own signal handlers; this
    allows GT.M to avoid burdensome signal handler coordination for the
    external call. By default, GT.M saves and restores signal setups for
    external calls.
+
+   The optional case-insensitive keyword TERMIO following the parameter list
+   specifies the external call may read from a terminal device so GT.M should
+   reset the terminal attributes whenever control is given to the routine.
+   Care is still needed to avoid issues due to GT.M using the read() system
+   service if the external routine uses other services such as the fgets()
+   family.
 
    entryref is an M entryref, return-value is gtm_long_t, gtm_status_t, or
    void, and parameters are in the format:
@@ -19820,6 +19833,11 @@
        documentation or man pages for this information. Such services cause
        non-deterministic failures when they are interrupted by a function
        that then attempts to call them, wrongly assuming they are reentrant.
+    6. GT.M performs device input using the read() system service. UNIX
+       documentation recommends against mixing this type of input with
+       buffered input services in the fgets() family and ignoring this
+       recommendation is likely to cause loss of input that is difficult to
+       diagnose and understand.
 
 3 Examples
    Examples
@@ -20200,6 +20218,35 @@
    that has itself been called from M code), gtm_init() is not needed,
    because GT.M is initialized before the External Call. All gtm_init() calls
    from External Calls functions are ignored by GT.M.
+
+   gtm_status_t gtm_init_extra(gtm_long_t gtmci_flag, ...);
+
+   gtm_init_extra() is an alternative to gtm_init() which allows additional
+   behaviors to be specified.
+
+   The values for gtmci_flag are defined in gtmxc_types.h:
+
+   +------------------------------------------------------------------------+
+   |        Flag name         |                    Usage                    |
+   |--------------------------+---------------------------------------------|
+   | GTMCI_FLAG_TERMIO_ALWAYS | reset terminal attributes after each call,  |
+   |                          | requires GTMCI_FLAG_TERMIO_ENABLE as well.  |
+   |--------------------------+---------------------------------------------|
+   |                          | reset terminal attributes after             |
+   |                          | gtm_init_extra() and gtm_exit() and allow   |
+   | GTMCI_FLAG_TERMIO_ENABLE | the gtm_terminal_reset() routine to be      |
+   |                          | called as desired after other calls to      |
+   |                          | GT.M.                                       |
+   |--------------------------+---------------------------------------------|
+   | GTMCI_FLAG_GTMJI         | Same function as gtm_jinit()                |
+   +------------------------------------------------------------------------+
+
+   gtm_status_t gtm_terminal_reset(void)
+
+   If gtm_init_extra() was used to initialize GT.M with
+   GTMCI_FLAG_TERMIO_ENABLE but not GTMCI_FLAG_TERMIO_ALWAYS, calling this
+   routine after calling gtm_ci() or gtm_cip() resets terminal attributes to
+   their state before calling gtm_init_extra().
 
 4 Call_from_C
    Call from C
@@ -21309,11 +21356,9 @@
    correctly configured environment variables, with appropriate directories
    and files.
 
-    1. Download col_reverse_32.c from
-       http://tinco.pair.com/bhaskar/gtm/doc/books/pg/UNIX_manual/col_reverse_32.c.
-       It contain code for transformation routine (gtm_ac_xform_1), reverse
-       transformation routine (gtm_ac_xback_1) and version control routines
-       (gtm_ac_version and gtm_ac_verify).
+    1. Download col_reverse_32.c It contain code for transformation routine
+       (gtm_ac_xform_1), reverse transformation routine (gtm_ac_xback_1) and
+       version control routines (gtm_ac_version and gtm_ac_verify).
     2. Save and compile col_reverse_32.c. On x86 GNU/Linux (64-bit Ubuntu
        10.10), execute a command like the following:
 

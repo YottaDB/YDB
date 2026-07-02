@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -20,7 +20,7 @@
 
 #include "gtm_string.h"
 #include "cmd_qlf.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "stack_frame.h"
 #include "hashtab_mname.h"
 #include "fix_pages.h"
@@ -87,7 +87,7 @@ bool zlput_rname (rhdtyp *hdr)
 				((RTNTBL_EXP_MIN > size) ? RTNTBL_EXP_MIN : ((RTNTBL_EXP_MAX < size) ? RTNTBL_EXP_MAX : size)),
 				SIZEOF(rtn_tabent));
 			new = malloc(size);
-			memcpy((void *)new, rtn_names, (char *)mid - (char *)rtn_names);
+			memcpy(new, rtn_names, (char *)mid - (char *)rtn_names);
 			mid = (rtn_tabent *)((char *)mid + (new - (char *)rtn_names));
 			old_table = (char *)rtn_names;
 			/* Adjust rtn_named_end to point into new table by applying offset to new block */

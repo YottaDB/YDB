@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -24,7 +24,7 @@ UNIX_ONLY(error_def(ERR_ZINTRECURSEIO);)
 /* essentially the same as ionl_wteol */
 void iott_wteol(int4 val, io_desc *io_ptr)
 {
-	mstr		eol;
+	unmanaged_mstr	eol;
 	int		eol_cnt;
 	boolean_t	ch_set;
 	UNIX_ONLY(d_tt_struct	*tt_ptr;)

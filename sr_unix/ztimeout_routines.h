@@ -10,7 +10,7 @@
  *								*
  ****************************************************************/
 #include "mdef.h"
-#include <mdefsp.h>
+#include "mdefsp.h"
 
 typedef struct
 {

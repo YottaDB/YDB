@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2014-2023 Fidelity National Information	*
+ * Copyright (c) 2014-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -122,8 +122,6 @@ void iosocket_pass_local(io_desc *iod, pid_t pid, int4 msec_timeout, int argcnt,
 	socket_struct		*socketptr, *psocketptr;
 	int			argn, index, rval, save_errno;
 	mval			*handle;
-	mstr			handlestr;
-	mstr			handles[MAX_PASS_FDS];
 	char			cmsg_buffer[SIZEOF(struct cmsghdr) * 2 + CMSG_SPACE(MAX_PASS_FDS * SIZEOF(int))];
 	int4			cmsg_buflen;
 	struct iovec		iov;
@@ -137,6 +135,7 @@ void iosocket_pass_local(io_desc *iod, pid_t pid, int4 msec_timeout, int argcnt,
 	char			*errptr;
 	int4			errlen;
 	boolean_t		ch_set;
+	va_list			args_cpy;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -192,25 +191,29 @@ void iosocket_pass_local(io_desc *iod, pid_t pid, int4 msec_timeout, int argcnt,
 #	endif
 	/* pass fds */
 	fds = (int *)CMSG_DATA((struct cmsghdr *)cmsg_buffer);
+	va_copy(args_cpy, args);
 	for (argn = 0; argn < argcnt; argn++)
 	{
-		handle = va_arg(args, mval *);
+		handle = va_arg(args_cpy, mval *);
+		/* Issue errors if necessary prior to sending anything */
 		if ((NULL == handle) || !MV_DEFINED(handle))
 		{
+			va_end(args_cpy);
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(2) ERR_EXPR, 0);
 			return;
 		}
 		MV_FORCE_STR(handle);
 		if ((NULL == socket_pool)
-			|| (0 > (index = iosocket_handle(handle->str.addr, &handle->str.len, FALSE, socket_pool))))
+			|| (0 > (index = iosocket_get_handle(handle->str.addr, handle->str.len, socket_pool))))
 		{
+			va_end(args_cpy);
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SOCKNOTFND, 2, handle->str.len, handle->str.addr);
 			return;
 		}
-		handles[argn] = handle->str;
 		psocketptr = socket_pool->socket[index];
 		fds[argn] = psocketptr->sd;
 	}
+	va_end(args_cpy);
 	/* send argcnt with fds */
 	mdata.magic = MSG_MAGIC;
 	mdata.proto_version = MSG_PROTO_VERSION;
@@ -242,35 +245,39 @@ void iosocket_pass_local(io_desc *iod, pid_t pid, int4 msec_timeout, int argcnt,
 	if (-1 == rval)
 		goto ioerr;
 	assert(rval == iov.iov_len);
+	va_copy(args_cpy, args);
 	for (argn = 0; argn < argcnt; argn++)
 	{
-		if (0 > (index = iosocket_handle(handles[argn].addr, &handles[argn].len, FALSE, socket_pool)))
+		handle = va_arg(args_cpy, mval *);
+		if (0 > (index = iosocket_get_handle(handle->str.addr, handle->str.len, socket_pool)))
 		{
+			va_end(args_cpy);
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SOCKNOTFND, 2, handle->str.len, handle->str.addr);
 			return;
 		}
 		psocketptr = socket_pool->socket[index];
 		/* send handle length */
-		SENDALL(socketptr->sd, &handles[argn].len, SIZEOF(handles[argn].len), rval);
+		SENDALL(socketptr->sd, &handle->str.len, SIZEOF(handle->str.len), rval);
 		if (-1 == rval)
-			goto ioerr;
-		assert(rval == SIZEOF(handles[argn].len));
+			goto ioerr_args_cpy;
+		assert(rval == SIZEOF(handle->str.len));
 		/* send handle */
-		SENDALL(socketptr->sd, handles[argn].addr, handles[argn].len, rval);
+		SENDALL(socketptr->sd, handle->str.addr, handle->str.len, rval);
 		if (-1 == rval)
-			goto ioerr;
-		assert(rval == handles[argn].len);
+			goto ioerr_args_cpy;
+		assert(rval == handle->str.len);
 		/* send buffer length */
 		SENDALL(socketptr->sd, &psocketptr->buffered_length, SIZEOF(psocketptr->buffered_length), rval);
 		if (-1 == rval)
-			goto ioerr;
+			goto ioerr_args_cpy;
 		assert(rval == SIZEOF(psocketptr->buffered_length));
 		/* send buffer */
 		SENDALL(socketptr->sd, psocketptr->buffer + psocketptr->buffered_offset, psocketptr->buffered_length, rval);
 		if (-1 == rval)
-			goto ioerr;
+			goto ioerr_args_cpy;
 		assert(rval == psocketptr->buffered_length);
 	}
+	va_end(args_cpy);
 	SENDALL(socketptr->sd, PASS_COMPLETE, STR_LIT_LEN(PASS_COMPLETE), rval);
 	if (-1 == rval)
 		goto ioerr;
@@ -299,17 +306,20 @@ void iosocket_pass_local(io_desc *iod, pid_t pid, int4 msec_timeout, int argcnt,
 		assert(timer_id);
 		cancel_timer(timer_id);
 	}
+	va_copy(args_cpy, args);
 	for (argn = 0; argn < argcnt; argn++)
 	{
-		handlestr = handles[argn];
-		if (-1 != (index = iosocket_handle(handlestr.addr, &handlestr.len, FALSE, socket_pool)))
+		handle = va_arg(args_cpy, mval *);
+		if (-1 != (index = iosocket_get_handle(handle->str.addr, handle->str.len, socket_pool)))
 			iosocket_close_one(socket_pool, index);
 	}
+	va_end(args_cpy);
 	if (NO_M_TIMEOUT != msec_timeout)
 		dollar_truth = TRUE;
 	REVERT_GTMIO_CH(&iod->pair, ch_set);
 	return;
-
+ioerr_args_cpy:
+	va_end(args_cpy);
 ioerr:
 	save_errno = errno;
 	if (out_of_time && (EINTR == save_errno))
@@ -335,10 +345,10 @@ void iosocket_accept_local(io_desc *iod, mval *handlesvar, pid_t pid, int4 msec_
 {
 	d_socket_struct 	*dsocketptr;
 	socket_struct		*socketptr, *psocketptr;
+	socket_struct 		*psockets[MAX_PASS_FDS];
 	int			argn, index, fdcount = 0, fdn, scnt = 0, rval, save_errno, handleslen = 0;
 	mval			*handle, tmp;
-	mstr			handles[MAX_PASS_FDS];
-	mstr			handlestr;
+	unmanaged_mstr		handlestr;
 	char			cmsg_buffer[SIZEOF(struct cmsghdr) * 2 + CMSG_SPACE(MAX_PASS_FDS * SIZEOF(int))];
 	int4			cmsg_buflen;
 	struct iovec		iov;
@@ -355,6 +365,8 @@ void iosocket_accept_local(io_desc *iod, mval *handlesvar, pid_t pid, int4 msec_
 	char			*errptr;
 	int4			errlen;
 	boolean_t		ch_set;
+	va_list			args_cpy;
+	char			lcl_handle[MAX_HANDLE_LEN];
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -406,17 +418,14 @@ void iosocket_accept_local(io_desc *iod, mval *handlesvar, pid_t pid, int4 msec_
 	/* accept fds */
 	if (NULL == socket_pool)
 		iosocket_poolinit();
+	va_copy(args_cpy, args);
 	for (argn = 0; argn < argcnt; argn++)
 	{
-		handle = va_arg(args, mval *);
+		handle = va_arg(args_cpy, mval *);
 		if ((NULL != handle) && MV_DEFINED(handle))
 			MV_FORCE_STR(handle);
-		if ((NULL == handle) || !MV_DEFINED(handle)
-				|| (-1 != iosocket_handle(handle->str.addr, &handle->str.len, FALSE, socket_pool)))
-			handles[argn].addr = NULL;	/* use passed or generated handle */
-		else
-			handles[argn] = handle->str;
 	}
+	va_end(args_cpy);
 	memcpy(iod->dollar.device, "0", SIZEOF("0"));
 	if (NO_M_TIMEOUT != msec_timeout)
 	{
@@ -503,34 +512,42 @@ void iosocket_accept_local(io_desc *iod, mval *handlesvar, pid_t pid, int4 msec_
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_SOCKMAX, 1, gtm_max_sockets);
 		return;
 	}
+
+	va_copy(args_cpy, args);
 	for (fdn=0; fdn < fdcount; fdn++)
 	{
 		/* read handle length */
 		RECVALL(socketptr->sd, &handlestr.len, SIZEOF(handlestr.len), rval);
 		if (-1 == rval)
-			goto ioerr;
+			goto ioerr_args_cpy;
 		assertpro(SIZEOF(handlestr.len) == rval);
+		assert(SIZEOF(lcl_handle) >= handlestr.len);
+		handlestr.len = MIN(handlestr.len, SIZEOF(lcl_handle));
 		/* read handle */
-		ENSURE_STP_FREE_SPACE(MAX_HANDLE_LEN);
-		handlestr.addr = (char *)stringpool.free;
+		handlestr.addr = lcl_handle;
 		RECVALL(socketptr->sd, handlestr.addr, handlestr.len, rval);
 		if (-1 == rval)
-			goto ioerr;
+			goto ioerr_args_cpy;
 		assertpro(handlestr.len == rval);
-		if ((fdn >= argcnt) || (NULL == handles[fdn].addr))
+		handle = NULL;
+		if (fdn < argcnt)
+		{
+			handle = va_arg(args_cpy, mval *);
+			if (handle && (!MV_DEFINED(handle)
+				|| (-1 != iosocket_get_handle(handle->str.addr, handle->str.len, socket_pool))))
+				handle = NULL;
+		}
+		if (NULL == handle)
 		{
 			/* If the passed handle name already exists in the socket pool, create a new one */
-			if (-1 != iosocket_handle(handlestr.addr, &handlestr.len, FALSE, socket_pool))
-				iosocket_handle(handlestr.addr, &handlestr.len, TRUE, socket_pool);
-			stringpool.free += handlestr.len;
-			handles[fdn] = handlestr;
-		}
-		else
-			handlestr = handles[fdn];	/* Use the handle from the argument list */
+			if (-1 != iosocket_get_handle(handlestr.addr, handlestr.len, socket_pool))
+				iosocket_new_handle(handlestr.addr, &handlestr.len, socket_pool);
+		} else
+			handlestr = handle->str.umstr;	/* Use the handle from the argument list */
 		/* read socket buffer length */
 		RECVALL(socketptr->sd, &tmpbuflen, SIZEOF(tmpbuflen), rval);
 		if (-1 == rval)
-			goto ioerr;
+			goto ioerr_args_cpy;
 		assertpro(SIZEOF(tmpbuflen) == rval);
 		psocketptr = iosocket_create(NULL,
 					((tmpbuflen > DEFAULT_SOCKET_BUFFER_SIZE) ? tmpbuflen : DEFAULT_SOCKET_BUFFER_SIZE),
@@ -541,6 +558,7 @@ void iosocket_accept_local(io_desc *iod, mval *handlesvar, pid_t pid, int4 msec_
 		psocketptr->dev = socket_pool;
 		socket_pool->socket[socket_pool->n_socket++] = psocketptr;
 		socket_pool->current_socket = socket_pool->n_socket - 1;
+		psockets[fdn] = psocketptr;
 		scnt++;
 		if (0 < tmpbuflen)
 		{
@@ -548,12 +566,13 @@ void iosocket_accept_local(io_desc *iod, mval *handlesvar, pid_t pid, int4 msec_
 			psocketptr->buffered_length = tmpbuflen;
 			RECVALL(socketptr->sd, psocketptr->buffer, psocketptr->buffered_length, rval);
 			if (-1 == rval)
-				goto ioerr;
+				goto ioerr_args_cpy;
 			assertpro(psocketptr->buffered_length == rval);
 		}
 		psocketptr->buffered_offset = 0;
 		handleslen += handlestr.len;
 	}
+	va_end(args_cpy);
 	RECVALL(socketptr->sd, complete_buf, STR_LIT_LEN(PASS_COMPLETE), rval);
 	if (-1 == rval)
 		goto ioerr;
@@ -565,14 +584,11 @@ void iosocket_accept_local(io_desc *iod, mval *handlesvar, pid_t pid, int4 msec_
 			assert(timer_id);
 			cancel_timer(timer_id);
 		}
+		assert(scnt == fdcount);
 		for (fdn = scnt - 1; fdn >= 0; fdn--)
 		{
-			if (-1 != (index = iosocket_handle(handles[fdn].addr, &handles[fdn].len, FALSE, socket_pool)))
+			if (-1 != (index = iosocket_get_handle(psockets[fdn]->handle, psockets[fdn]->handle_len, socket_pool)))
 				iosocket_close_one(socket_pool, index);
-		}
-		for (fdn = scnt; fdn < fdcount; fdn++)
-		{
-			CLOSE(fds[fdn], rval);
 		}
 		iod->dollar.za = ZA_IO_ERR;
 		errptr = PROTOCOL_ERROR;
@@ -591,7 +607,7 @@ void iosocket_accept_local(io_desc *iod, mval *handlesvar, pid_t pid, int4 msec_
 		assert(timer_id);
 		cancel_timer(timer_id);
 	}
-	if (NULL != handlesvar)
+	if (fdcount && (NULL != handlesvar))
 	{
 		handleslen += (fdcount > 1) ? (fdcount - 1) : 0;		/* space for delimiters */
 		ENSURE_STP_FREE_SPACE(handleslen);
@@ -600,19 +616,21 @@ void iosocket_accept_local(io_desc *iod, mval *handlesvar, pid_t pid, int4 msec_
 		handlesvar->mvtype = MV_STR;
 		handlesvar->str.addr = hptr;
 		handlesvar->str.len = handleslen;
-		memcpy(hptr, handles[0].addr, handles[0].len);
-		hptr += handles[0].len;
+		memcpy(hptr, psockets[0]->handle, psockets[0]->handle_len);
+		hptr += psockets[0]->handle_len;
 		for (fdn=1; fdn < fdcount; fdn++)
 		{
 			*hptr++ = '|';
-			memcpy(hptr, handles[fdn].addr, handles[fdn].len);
-			hptr += handles[fdn].len;
+			memcpy(hptr, psockets[fdn]->handle, psockets[fdn]->handle_len);
+			hptr += psockets[fdn]->handle_len;
 		}
 	}
 	if (NO_M_TIMEOUT != msec_timeout)
 		dollar_truth = TRUE;
 	return;
 
+ioerr_args_cpy:
+	va_end(args_cpy);
 ioerr:
 	save_errno = errno;
 	if (out_of_time && (EINTR == save_errno))
@@ -623,7 +641,7 @@ ioerr:
 		cancel_timer(timer_id);
 	for (fdn = scnt - 1; fdn >= 0; fdn--)
 	{
-		if (-1 != (index = iosocket_handle(handles[fdn].addr, &handles[fdn].len, FALSE, socket_pool)))
+		if (-1 != (index = iosocket_get_handle(psockets[fdn]->handle, psockets[fdn]->handle_len, socket_pool)))
 			iosocket_close_one(socket_pool, index);
 	}
 	assert(fds || (scnt >= fdcount));

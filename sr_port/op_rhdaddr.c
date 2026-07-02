@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -14,7 +14,7 @@
 
 #include "gtm_string.h"
 
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "stack_frame.h"
 #include "op.h"
 #include "min_max.h"
@@ -27,9 +27,9 @@
 #define REBUFFER_MIDENT(MVAL, NEWMVAL, BUFFER)					\
 {										\
 	MV_FORCE_STR(MVAL);							\
-	*(NEWMVAL) = *(MVAL);							\
+	(NEWMVAL)->umval = (MVAL)->umval;					\
 	(NEWMVAL)->str.len = MIN(MAX_MIDENT_LEN, (NEWMVAL)->str.len);		\
-	memcpy((void *)&BUFFER, (NEWMVAL)->str.addr, (NEWMVAL)->str.len);	\
+	memcpy(&BUFFER, (NEWMVAL)->str.addr, (NEWMVAL)->str.len);		\
 	(NEWMVAL)->str.addr = (char *)&(BUFFER);				\
 }
 /* Macro to do extra VMS checks in INITZLINK below*/
@@ -49,7 +49,7 @@
 {														\
 	REBUFFER_MIDENT(NAME, &RTNNAME, RTNNAME_BUFF);								\
 	op_zlink(&RTNNAME, NULL);										\
-	RHD = find_rtn_hdr(&RTNNAME.str);									\
+	RHD = find_rtn_hdr(&RTNNAME.str.umstr);									\
 	if (NULL == RHD)											\
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_ZLINKFILE, 2, NAME->str.len, NAME->str.addr,	\
 			      ERR_ZLMODULE, 2, strlen(&zlink_mname.c[0]), &zlink_mname);			\
@@ -103,7 +103,7 @@ NON_ARLINK_ONLY(rhdtyp *op_rhdaddr(mval *name, rhdtyp *rhd))
 	assert((-1 == rhdidx) || ((0 <= rhdidx) && (rhdidx <= frame_pointer->rvector->linkage_len)));
 	rhd = (-1 == rhdidx) ? NULL : (rhdtyp *)frame_pointer->rvector->linkage_adr[rhdidx].ext_ref;
 	/* If below block is changed, check if need to update bock not related to autorelink at bottom of routine */
-	if ((NULL == rtn_names) || ((NULL == rhd) && (NULL == (rhd = find_rtn_hdr(&name->str)))))	/* Note assignment */
+	if ((NULL == rtn_names) || ((NULL == rhd) && (NULL == (rhd = find_rtn_hdr(&name->str.umstr)))))	/* Note assignment */
 	{	/* Initial check for rtn_names is so we avoid the call to find_rtn_hdr() if we have just
 		 * unlinked all modules as find_rtn_hdr() does not deal well with an empty rtn table.
 		 */

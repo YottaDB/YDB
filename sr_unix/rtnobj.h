@@ -15,7 +15,7 @@
 
 #ifdef AUTORELINK_SUPPORTED
 
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 
 #define	LATCH_GRABBED_FALSE	FALSE
 #define	LATCH_GRABBED_TRUE	TRUE

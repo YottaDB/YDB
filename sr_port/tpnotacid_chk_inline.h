@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -21,7 +21,7 @@
 #include "gdsfhead.h"
 #include "filestruct.h"
 #include "stringpool.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "stack_frame.h"
 #include "getzposition.h"
 #include "send_msg.h"
@@ -217,12 +217,11 @@ static inline void tptimeout_post_callG(boolean_t safe, ABS_TIME b_time, int gra
 	}
 	check_for_timer_pops(!safe);
 	if (dollar_tlevel
-		&& (!(CDB_STAGNATE > dollar_trestart)				/* grace not offered TODO: remove: now irrelevant */
-		|| ((0 == prior_grace)						/* in the last grace period */
-		&& (prior_grace == TREF(tptimeout_grace_periods)))))		/* no pop from check */
+		&& (0 == prior_grace)						/* in the last grace period */
+		&& (prior_grace == TREF(tptimeout_grace_periods)))		/* no pop from check */
 	{       /* may have lost original timer, timer math is painful and this is already running long, so fake expiration */
 		DBGDFRDEVNT((stderr, "preemtive expire\n"));
-		cancel_timer(TP_TIMER_ID);	/* TODO: do painful math or expose/use code to find timer, as this can shave time */
+		cancel_timer(TP_TIMER_ID);	/* TODO: do icky math or expose/use code to find timer, as this can shorten time */
 		tp_expire_now();		/* this either restarts the timer or does the deferred logic cleanup */
 	}
 }

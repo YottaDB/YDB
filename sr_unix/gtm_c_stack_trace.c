@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2022 Fidelity National Information	*
+ * Copyright (c) 2012-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -44,9 +44,10 @@ void gtm_c_stack_trace(char *message, pid_t waiting_pid, pid_t blocking_pid, uin
 	char 	 	*command;
 	char		*currpos;
 	int		save_errno;
-	mstr		envvar_logical, trans;
+	mstr		trans;
 	char		buf[GTM_PATH_MAX];
 	int		status;
+	UMSTR_CONST(envvar_logical, GTM_PROCSTUCKEXEC);
 #	ifdef _BSD
 	union wait      wait_stat;
 #	else
@@ -60,8 +61,6 @@ void gtm_c_stack_trace(char *message, pid_t waiting_pid, pid_t blocking_pid, uin
 	arr_len = GTM_MAX_DIR_LEN + messagelen + (3 * MAX_PIDSTR_LEN) + 5;	/* 4 spaces and a terminator */
 	if (!(TREF(gtm_waitstuck_script)).len)
 	{	/* uninitialized buffer - translate logical and move it to the buffer */
-		envvar_logical.addr = GTM_PROCSTUCKEXEC;
-		envvar_logical.len = SIZEOF(GTM_PROCSTUCKEXEC) - 1;
 		if (SS_NORMAL == (status = TRANS_LOG_NAME(&envvar_logical, &trans, buf, SIZEOF(buf), do_sendmsg_on_log2long)))
 		{	/* the environmental variable is defined */
 			assert(SIZEOF(buf) > trans.len);

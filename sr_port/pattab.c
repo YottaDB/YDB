@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -172,8 +172,8 @@ int initialize_pattern_table(void)
 	char	buffer[MAX_TRANS_NAME_LEN];
 	int	status, letter;
 	mstr	patname, transnam;
-	static MSTR_CONST(pat_file,  PAT_FILE);
-	static MSTR_CONST(pat_table, PAT_TABLE);
+	static UMSTR_CONST(pat_file,  PAT_FILE);
+	static UMSTR_CONST(pat_table, PAT_TABLE);
 
 	/* Initialize the pattern/typemask table size. Note that in UTF-8 mode, we
 	 * only use the lower half of the table (0 - 127). Although we do not extend
@@ -230,7 +230,7 @@ int load_pattern_table(int name_len,char *file_name)
 				pattab_error(name_len, file_name, pat_linenum); /* error trap does not return */
 			}
 			newnamlen = idlen;
-			memcpy((void *)newtabnam, ident, newnamlen + 1);
+			memcpy(newtabnam, ident, newnamlen + 1);
 			if (T_NL != (token = pat_lex()))
 			{
 				util_out_print("Unrecognized text at end of line", TRUE);
@@ -479,7 +479,7 @@ static void pattab_error(int name_len,char *file_name,int linenum)
 	RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_PATTABSYNTAX, 3, name_len, file_name, linenum);
 }
 
-int setpattab(mstr *table_name)
+int setpattab(const mstr *table_name)
 {
 	int		letter;
 	pattern		**patp;

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -52,7 +53,8 @@ void op_indmerge(mval *glvn_mv, mval *arg1_or_arg2)
 		((MARG2_LCL | MARG2_GBL) == MV_FORCE_INT(arg1_or_arg2)));
 	leftarg = ((MARG1_LCL | MARG1_GBL) == MV_FORCE_INT(arg1_or_arg2)) ? TRUE : FALSE;
 	MV_FORCE_STR(glvn_mv);
-	indir_src.str = glvn_mv->str;
+	indir_src.str.umstr = glvn_mv->str.umstr;
+	indir_src.str.in_array = FALSE;
 	indir_src.code = leftarg ? indir_merge1 : indir_merge2;
 	if (NULL == (obj = cache_get(&indir_src)))
 	{
@@ -79,7 +81,8 @@ void op_indmerge(mval *glvn_mv, mval *arg1_or_arg2)
 			if (EXPR_FAIL != (rval = indirection(&mopr)))	/* NOTE assignment */
 			{
 				ref = maketriple(OC_INDMERGE);
-				arg_copy = *arg1_or_arg2;
+				arg_copy.umval = arg1_or_arg2->umval;
+				arg_copy.str.in_array = FALSE;
 				if (MV_IS_STRING(&arg_copy))
 				    s2pool(&arg_copy.str);
 				ref->operand[0] = put_lit(&arg_copy);

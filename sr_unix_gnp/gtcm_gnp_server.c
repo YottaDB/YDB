@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -418,6 +418,8 @@ int main(int argc, char **argv, char **envp)
         assert(0 == EMPTY_QUEUE);
 	licensed = TRUE;
 	stp_init(STP_INITSIZE);
+	stringpool.sort_array_pp = TADR(rts_sort_array_p);
+	stringpool.protect_array_pp = TADR(rts_protect_array_p);
 	rts_stringpool = stringpool;
 	getzdir();
 	sig_init(generic_signal_handler, null_handler, suspsigs_handler, continue_handler); /* should do be done before cmi_init */

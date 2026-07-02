@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -32,11 +32,12 @@
 #include "gtm_conv.h"
 #include "gtm_utf8.h"
 #endif
+#include "noprincio_if_needed_inline.h"
 
 GBLREF boolean_t	prin_in_dev_failure, prin_out_dev_failure;
 GBLREF io_pair		io_curr_device, io_std_device;
 #ifdef UTF8_SUPPORTED
-LITREF mstr		chset_names[];
+LITREF unmanaged_mstr	chset_names[];
 #endif
 GBLREF mval		dollar_zstatus;
 
@@ -112,7 +113,7 @@ int  iorm_write_utf_ascii(io_desc *iod, char *string, int len)
 	return outlen;
 }
 
-void iorm_write_utf(mstr *v)
+void iorm_write_utf(const unmanaged_mstr *v)
 {
 	int4		inchars, char_count;		/* in characters */
 	int4		inlen, outbytes, mblen;		/* in bytes */
@@ -353,7 +354,7 @@ void iorm_write_utf(mstr *v)
 	return;
 }
 
-void iorm_write(mstr *v)
+void iorm_write(const unmanaged_mstr *v)
 {
 	io_desc		*iod;
 	char		*out, *out_ptr;

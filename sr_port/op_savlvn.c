@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2012, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2012-2026 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,7 +19,7 @@
 #include "indir_enum.h"
 #include "cache.h"
 #include "op.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "valid_mname.h"
 #include "gtm_string.h"
 #include "cachectl.h"
@@ -40,7 +41,7 @@ void op_savlvn(UNIX_ONLY_COMMA(int argcnt) lv_val *start, ...)
 	int			i;
 	VMS_ONLY(int		argcnt;)
 	lvname_info		*lvn_info;
-	mident			*lvent;
+	mstr			*lvent;
 	mname_entry		*targ_key;
 	mval			*m, *key;
 	unsigned char		*c, *ptr;
@@ -60,9 +61,12 @@ void op_savlvn(UNIX_ONLY_COMMA(int argcnt) lv_val *start, ...)
 	lvent = &slot->lvname->str;
 	ptr = stringpool.free;
 	c = format_lvname(start, ptr, SIZEOF(mident_fixed));
+	assert(slot->mval_top == (TREF(glvn_pool_ptr))->mval_top);
+	assert(!glist_str_protected(lvent));
 	lvent->addr = (char *)ptr;
 	lvent->len = (char *)c - (char *)ptr;
 	stringpool.free = c;
+	glist_protect_str(lvent);
 	m++;
 	(TREF(glvn_pool_ptr))->mval_top++;
 	lvn_info = (lvname_info *)&slot->glvn_info;
@@ -71,10 +75,15 @@ void op_savlvn(UNIX_ONLY_COMMA(int argcnt) lv_val *start, ...)
 	{	/* now all the pieces of the key */
 		key = va_arg(var, mval *);
 		MV_FORCE_DEFINED(key);
-		*m = *key;
+		assert(!glist_str_protected(&m->str));
+		m->umval = key->umval;
 		lvn_info->lv_subs[i] = m;
 		(TREF(glvn_pool_ptr))->mval_top++;
-		if (MV_IS_STRING(m) && !IS_IN_STRINGPOOL(m->str.addr, m->str.len))
-			s2pool(&m->str);
+		if (MV_IS_STRING(m) && m->str.len)
+		{
+			if (!IS_IN_STRINGPOOL(m->str.addr, m->str.len))
+				s2pool(&m->str);
+		}
+		glist_protect_str(&m->str);
 	}
 }

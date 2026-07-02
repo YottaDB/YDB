@@ -11,10 +11,10 @@
  ****************************************************************/
 
 #include "mdef.h"
-#include <emit_code_sp.h>
+#include "emit_code_sp.h"
 #include "xfer_enum.h"
 #include "i386.h"
-#include <rtnhdr.h>	/* Needed by zbreak.h */
+#include "rtnhdr.h"	/* Needed by zbreak.h */
 #include "zbreak.h"
 
 GBLREF emit_base_info_struct	emit_base_info;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2004-2020 Fidelity National Information	*
+ * Copyright (c) 2004-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -13,7 +13,7 @@
 #ifndef TRANS_NUMERIC_H_INCLUDED
 #define TRANS_NUMERIC_H_INCLUDED
 
-uint4 trans_numeric(mstr *log, boolean_t *is_defined, boolean_t ignore_errors);
-gtm_uint8 trans_numeric_64(mstr *log, boolean_t *is_defined, boolean_t ignore_errors);
+uint4 trans_numeric(const unmanaged_mstr *log, boolean_t *is_defined, boolean_t ignore_errors);
+gtm_uint8 trans_numeric_64(const unmanaged_mstr *log, boolean_t *is_defined, boolean_t ignore_errors);
 
 #endif

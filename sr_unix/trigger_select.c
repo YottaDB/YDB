@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2023 Fidelity National Information	*
+ * Copyright (c) 2010-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -21,7 +21,7 @@
 #include "gdsroot.h"
 #include "gdsbt.h"
 #include "gdsfhead.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "gv_trigger.h"
 #include "targ_alloc.h"
 #include "filestruct.h"
@@ -99,7 +99,7 @@ LITREF	char 			*trigger_subs[];
 		OUT_PTR = OUT_BUFF;									\
 	} else												\
 	{												\
-		memcpy(OUT_PTR, (const void *)VAL, VAL_LEN);						\
+		memcpy(OUT_PTR, VAL, VAL_LEN);								\
 		OUT_PTR += VAL_LEN;									\
 	}												\
 }
@@ -388,6 +388,7 @@ STATICFNDEF void write_out_trigger(char *gbl_name, uint4 gbl_name_len, int nam_i
 					}
 				}
 				protect_trig_mval->mvtype = 0; /* can now be garbage collected in the next iteration */
+				protect_trig_mval->str.len = 0;
 			}
 			/* we had better have an XECUTE STRING, if not it is a restartable situation */
 			DEBUG_ONLY(if (NULL == xecute_buff) TREF(donot_commit) |= DONOTCOMMIT_TRIGGER_SELECT_XECUTE;)
@@ -728,7 +729,7 @@ STATICFNDEF boolean_t trigger_select(char *select_list, uint4 select_list_len)
 	char			save_select_list[MAX_BUFF_SIZE];
 	char			*sel_ptr, *strtok_ptr, *prev_ptr = NULL, *ptr1, *ptr2;
 	int			gbl_len, prev_len;
-	mname_entry		gvname;
+	unmanaged_mname_entry	gvname; /* Points to save_select_list local buff */
 	int			len, len1, badpos;
 	boolean_t		trig_name;
 	gv_key_buf		save_currkey;

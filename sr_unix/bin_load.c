@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -41,7 +41,7 @@
 #include "gtm_utf8.h"
 #include "io.h"
 #include "gtmcrypt.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "gv_trigger.h"
 #include "gvcst_protos.h"	/* for gvcst_root_search in GV_BIND_NAME_AND_ROOT_SEARCH macro */
 #include "format_targ_key.h"
@@ -284,7 +284,7 @@ void bin_load(gtm_uint64_t begin, gtm_uint64_t end, char *line1_ptr, int line1_l
 	boolean_t		is_hidden_subscript, ok_to_put = TRUE, putting_a_sn = FALSE, sn_incmp_gbl_already_killed = FALSE;
 	rec_hdr			*rp, *next_rp;
 	mval			v, tmp_mval, *val = NULL;
-	mname_entry		gvname;
+	unmanaged_mname_entry		gvname; /* points to buff1 */
 	mstr			mstr_src, mstr_dest, opstr;
 	collseq			*extr_collseq, *db_collseq, *save_gv_target_collseq;
 	coll_hdr		extr_collhdr = { 0, 0, 0, 0,}, db_collhdr = { 0, 0, 0, 0 };
@@ -312,8 +312,6 @@ void bin_load(gtm_uint64_t begin, gtm_uint64_t end, char *line1_ptr, int line1_l
 	unsigned char		*temp, coll_typr_char;
 	boolean_t		switch_db, mu_load_error = FALSE;
 	gd_binding		*map;
-	ht_ent_mname		*tabent;
-	hash_table_mname	*tab_ptr;
 	char			msg_buff[MAX_RECLOAD_ERR_MSG_SIZE];
 	gd_region		**reg_list;
 	DCL_THREADGBL_ACCESS;
@@ -1273,7 +1271,7 @@ gvnh_reg_t *bin_call_db(int routine, int err_code, INTPTR_T parm1, INTPTR_T parm
 			op_gvput((mval *)parm1);
 			break;
 		case BIN_BIND:
-			GV_BIND_NAME_AND_ROOT_SEARCH((gd_addr *)parm1, (mname_entry *)parm2, gvnh_reg);
+			GV_BIND_NAME_AND_ROOT_SEARCH((gd_addr *)parm1, &(((mname_entry *)parm2)->umname), gvnh_reg);
 			break;
 		case ERR_COR:
 			/* We use rts_error_csa instead of gtm_putmsg_csa here even though we are eating the error with

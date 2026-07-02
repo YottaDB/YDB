@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -27,7 +27,7 @@ void zshow_locks(zshow_out *output, boolean_t total_only)
 	static readonly char lvl[] = " LEVEL=";
 	static readonly char mlg[] = "MLG:";	/* # of M Lock commands Granted   */
 	static readonly char mlt[] = ",MLT:";	/* # of M Lock commands Timed-out */
-	mval		v;
+	mval		v = {{0}};
 	mlk_pvtblk	*temp;
 	unsigned char	valstr[MAX_DIGITS_IN_INT8];
 	uchar_ptr_t	ptr;
@@ -36,23 +36,23 @@ void zshow_locks(zshow_out *output, boolean_t total_only)
 	output->flush = FALSE;
 	v.str.addr = &mlg[0];
 	v.str.len = SIZEOF(mlg) - 1;
-	zshow_output(output, &v.str);
+	zshow_output(output, &v.str.umstr);
 	ptr = i2ascl((uchar_ptr_t)valstr, mlk_stats.n_user_locks_success);
 	v.str.len = (mstr_len_t)(ptr - &valstr[0]);
 	v.str.addr = (char *)&valstr[0];
-	zshow_output(output, &v.str);
+	zshow_output(output, &v.str.umstr);
 	/* Print LUF statistic */
 	output->flush = FALSE;
 	v.str.addr = &mlt[0];
 	v.str.len = SIZEOF(mlt) - 1;
-	zshow_output(output, &v.str);
+	zshow_output(output, &v.str.umstr);
 	ptr = i2ascl((uchar_ptr_t)valstr, mlk_stats.n_user_locks_fail);
 	v.str.len = (mstr_len_t)(ptr - &valstr[0]);
 	v.str.addr = (char *)&valstr[0];
-	zshow_output(output, &v.str);
+	zshow_output(output, &v.str.umstr);
 	output->flush = TRUE;
 	v.str.len = 0;
-	zshow_output(output,&v.str);
+	zshow_output(output,&v.str.umstr);
 	if (!total_only)
 	{
 		for (temp = mlk_pvt_root; temp; temp = temp->next)
@@ -67,41 +67,41 @@ void zshow_locks(zshow_out *output, boolean_t total_only)
 			{
 				v.str.addr = &zal[0];
 				v.str.len = SIZEOF(zal) - 1;
-				zshow_output(output,&v.str);
+				zshow_output(output, &v.str.umstr);
 				zshow_format_lock(output,temp);
 				output->flush = TRUE;
 				v.str.len = 0;
-				zshow_output(output,&v.str);
+				zshow_output(output, &v.str.umstr);
 				output->flush = FALSE;
 				v.str.addr = &lck[0];
 				v.str.len = SIZEOF(lck) - 1;
-				zshow_output(output,&v.str);
+				zshow_output(output, &v.str.umstr);
 				zshow_format_lock(output,temp);
 				v.str.addr = &lvl[0];
 				v.str.len = SIZEOF(lvl) - 1;
-				zshow_output(output,&v.str);
+				zshow_output(output, &v.str.umstr);
 				MV_FORCE_MVAL(&v,(int)temp->level) ;
 				mval_write(output,&v,TRUE);
 			} else if (temp->level)
 			{
 				v.str.addr = &lck[0];
 				v.str.len = SIZEOF(lck) - 1;
-				zshow_output(output,&v.str);
+				zshow_output(output, &v.str.umstr);
 				zshow_format_lock(output,temp);
 				v.str.addr = &lvl[0];
 				v.str.len = SIZEOF(lvl) - 1;
-				zshow_output(output,&v.str);
+				zshow_output(output, &v.str.umstr);
 				MV_FORCE_MVAL(&v,(int)temp->level) ;
 				mval_write(output,&v,TRUE);
 			} else if (temp->zalloc)
 			{
 				v.str.addr = &zal[0];
 				v.str.len = SIZEOF(zal) - 1;
-				zshow_output(output,&v.str);
+				zshow_output(output, &v.str.umstr);
 				zshow_format_lock(output,temp);
 				output->flush = TRUE;
 				v.str.len = 0;
-				zshow_output(output,&v.str);
+				zshow_output(output, &v.str.umstr);
 			}
 		}
 	}

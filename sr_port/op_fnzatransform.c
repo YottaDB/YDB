@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2023 Fidelity National Information	*
+ * Copyright (c) 2012-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -128,7 +128,7 @@ void op_fnzatransform(mval *msrc, int col, int reverse, int forceStr, mval *dst)
 
 	if (0 == msrc->str.len)
 	{	/* Null string, return it back */
-		*dst=*msrc;
+		dst->umval = msrc->umval;
 		return;
 	}
 	/* Temporarily repoint global variables "gv_target" and "transform".
@@ -149,7 +149,9 @@ void op_fnzatransform(mval *msrc, int col, int reverse, int forceStr, mval *dst)
 	gvkey->top = DBKEYSIZE(MAX_KEY_SZ);
 	gvkey->end = 0;
 	/* Avoid changing the characteristics of the caller's MVAL */
-	lcl_src = *msrc;
+	/* TODO: Does this need protection? */
+	lcl_src.umval = msrc->umval;
+	lcl_src.str.in_array = FALSE;
 	src = &lcl_src;
 	if (forceStr)
 	{
@@ -197,7 +199,7 @@ void op_fnzatransform(mval *msrc, int col, int reverse, int forceStr, mval *dst)
 					/* If we can't go down, return null string */
 					if (-1 == res)
 					{
-						*dst = literal_null;
+						dst->umval = literal_null.umval;
 					} else
 					{
 						c = (unsigned char)res;
@@ -227,7 +229,7 @@ void op_fnzatransform(mval *msrc, int col, int reverse, int forceStr, mval *dst)
 					{
 						COPY_ARG_TO_STRINGPOOL(dst, (&c)+1, &c);
 					} else
-						*dst = literal_null;
+						dst->umval = literal_null.umval;
 				}
 			} else
 				coll_failxutil = 1;	/*We do not support UTF-8 yet */
@@ -248,7 +250,7 @@ void op_fnzatransform(mval *msrc, int col, int reverse, int forceStr, mval *dst)
 					/* If we can't go up, return null string */
 					if (-1 == res)
 					{
-						*dst = literal_null;
+						dst->umval = literal_null.umval;
 					} else
 					{
 						c = (unsigned char)res;
@@ -278,7 +280,7 @@ void op_fnzatransform(mval *msrc, int col, int reverse, int forceStr, mval *dst)
 					{
 						COPY_ARG_TO_STRINGPOOL(dst, (&c)+1, &c);
 					} else
-						*dst = literal_null;
+						dst->umval = literal_null.umval;
 				}
 			} else
 				coll_failxutil = 1;	/* We do not support UTF-8 yet */

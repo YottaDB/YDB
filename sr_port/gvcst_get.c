@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -31,7 +31,7 @@
 #include "tp.h"			/* needed for T_BEGIN_READ_NONTP_OR_TP macro */
 #include "repl_msg.h"
 #include "gtmsource.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "stack_frame.h"
 #include "wbox_test_init.h"
 
@@ -49,7 +49,7 @@
 #include "gtmimagename.h"
 
 LITREF	mval		literal_batch;
-LITREF	mstr		nsb_dummy;
+LITREF	unmanaged_mstr	nsb_dummy;
 
 GBLREF	gv_namehead	*gv_target;
 GBLREF	gv_key		*gv_currkey;
@@ -76,7 +76,7 @@ boolean_t gvcst_get(mval *v)
 
 	DEBUG_ONLY(save_dollar_tlevel = dollar_tlevel);
 	gotit = gvcst_get2(v, NULL);
-	INCR_GVSTATS_COUNTER(cs_addrs, cs_addrs->nl, n_get, (gtm_uint64_t) 1);
+	INCR_HEAVYWEIGHT_GVSTATS_COUNTER(cs_addrs, cs_addrs->nl, n_get, 1);
 	WBTEST_ONLY(WBTEST_QUERY_HANG,
 		LONG_SLEEP(2);
 	);
@@ -214,9 +214,18 @@ boolean_t gvcst_get2(mval *v, unsigned char *sn_ptr)
 				{
 					if (!sn_ptr)
 					{
+#						ifdef DEBUG
+						if (!(TREF(in_statsDB_remove_linkage)))
+						{
+							ENSURE_STP_FREE_SPACE(data_len);
+							assert(stringpool.top - stringpool.free >= data_len);
+							memcpy(stringpool.free, (sm_uc_ptr_t)rp + rsiz - data_len, data_len);
+						}
+#						else
 						ENSURE_STP_FREE_SPACE(data_len);
 						assert(stringpool.top - stringpool.free >= data_len);
 						memcpy(stringpool.free, (sm_uc_ptr_t)rp + rsiz - data_len, data_len);
+#						endif
 					} else
 						memcpy(sn_ptr, (sm_uc_ptr_t)rp + rsiz - data_len, data_len);
 
@@ -237,8 +246,19 @@ boolean_t gvcst_get2(mval *v, unsigned char *sn_ptr)
 					v->str.len = data_len;
 					if (!sn_ptr)
 					{
+#						ifdef DEBUG
+						if (!(TREF(in_statsDB_remove_linkage)))
+						{
+#						endif
 						v->str.addr = (char *)stringpool.free;
 						stringpool.free += data_len;
+#						ifdef DEBUG
+						} else
+						{
+							v->str.addr = NULL;
+							v->str.len = 0;
+						}
+#						endif
 					} else
 						v->str.addr = (char *)sn_ptr;
 					return TRUE;

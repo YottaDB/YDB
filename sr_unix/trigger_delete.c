@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2023 Fidelity National Information	*
+ * Copyright (c) 2010-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -17,7 +17,7 @@
 #include "gdsbt.h"			/* for gdsfhead.h */
 #include "gdsfhead.h"			/* For gvcst_protos.h */
 #include "gvcst_protos.h"
-#include <rtnhdr.h>			/* for gv_trigger.h */
+#include "rtnhdr.h"			/* for gv_trigger.h */
 #include "gv_trigger.h"
 #include "gdscc.h"			/* needed for tp.h */
 #include "gdskill.h"			/* needed for tp.h */
@@ -486,6 +486,7 @@ boolean_t trigger_delete_name(mval *trigger_rec, uint4 *trig_stats)
 					}
 				}
 				trigger_count->mvtype = 0; /* allow stp_gcol to release the current contents if necessary */
+				trigger_count->str.len = 0;
 				RESTORE_REGION_INFO(save_currkey, save_gv_target, save_gv_cur_region, save_sgm_info_ptr,
 							save_jnlpool);
 				triggers_deleted++;

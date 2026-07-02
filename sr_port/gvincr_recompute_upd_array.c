@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2004-2023 Fidelity National Information	*
+ * Copyright (c) 2004-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -61,7 +61,7 @@ enum cdb_sc	gvincr_recompute_upd_array(srch_blk_status *bh, struct cw_set_elemen
 	int4			blk_size, blk_fill_size, cur_blk_size, blk_seg_cnt, delta, tail_len, new_rec_size;
 	int4			target_key_size, data_len;
 	int			tmp_cmpc;
-	mstr			value;
+	unmanaged_mstr		value;
 	rec_hdr_ptr_t		curr_rec_hdr, rp;
 	sm_uc_ptr_t		cp1, buffaddr;
 	unsigned short		rec_size;
@@ -124,7 +124,7 @@ enum cdb_sc	gvincr_recompute_upd_array(srch_blk_status *bh, struct cw_set_elemen
 		return status;
 	}
 	assert(MV_IS_STRING(post_incr_mval));	/* gvincr_recompute_post_incr should have set it to be a of type MV_STR */
-	value = post_incr_mval->str;
+	value = post_incr_mval->str.umstr;
 	new_rec_size = rec_size - data_len + value.len;
 	delta = new_rec_size - rec_size;
 	if ((cur_blk_size + delta) > blk_fill_size)

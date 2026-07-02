@@ -12,7 +12,7 @@
 
 #include "mdef.h"
 
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "private_code_copy.h"
 #include "gtm_text_alloc.h"
 #include "arlinkdbg.h"

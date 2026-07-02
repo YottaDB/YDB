@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -25,7 +25,7 @@ error_def(ERR_ERRWZTIMEOUT);
 
 /* Note assertpro() checks have extra text in them to identify which assertpro tripped */
 #define SET_ERR_CODE(fp, errmsg)					\
-{									\
+MBSTART {								\
 	switch (fp->type)						\
 	{								\
 		case SFT_ZBRK_ACT:					\
@@ -54,6 +54,6 @@ error_def(ERR_ERRWZTIMEOUT);
 		default:						\
 			assertpro(FALSE && fp->type);			\
 	}								\
-}
+} MBEND
 
 #endif

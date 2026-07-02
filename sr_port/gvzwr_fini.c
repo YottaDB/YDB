@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -51,6 +51,7 @@ void gvzwr_fini(zshow_out *out, int pat)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	local.str.in_array = data.str.in_array = FALSE;
 	if (!gv_currkey)
 		gvinit();
 	zwr_output = out;
@@ -67,7 +68,7 @@ void gvzwr_fini(zshow_out *out, int pat)
 	gvzwrite_block->gv_some_subsc_null = TREF(gv_some_subsc_null);
 	if (!pat)
 	{	/* just a reference */
-		local = *gvzwrite_block->pat;
+		local.umval = gvzwrite_block->pat->umval;
 		if (local.str.len)
 		{	/* new reference. gets new gv_target */
 			gv_target = NULL;

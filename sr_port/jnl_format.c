@@ -27,7 +27,7 @@
 #include "jnl.h"
 #include "gdscc.h"
 #include "iosp.h"
-#include <mdefsp.h>
+#include "mdefsp.h"
 #include "ccp.h"
 #include "buddy_list.h"		/* needed for tp.h */
 #include "tp.h"

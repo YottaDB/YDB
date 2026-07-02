@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2011-2023 Fidelity National Information	*
+ * Copyright (c) 2011-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -14,6 +14,7 @@
 #define TREE_H_INCLUDED
 
 #include <stdarg.h>
+#include "gcol_list.h"
 
 /* The "lvTree"     typedef defines an AVL tree. One such structure exists for each local variable subscript level (starting from 0)
  * The "lvTreeNode" typedef defines the layout of the tree node. One structure exists for each tree node in an AVL tree.
@@ -79,6 +80,7 @@ typedef struct lvTreeNodeNumStruct
 	} key_flags;
 	int4			key_m0;
 	int4			key_m1;
+	unsigned long		padding2;
 	struct treeNodeStruct	*avl_left;	/* left AVL subtree at this subscript level */
 	struct treeNodeStruct	*avl_right;	/* right AVL subtree at this subscript level */
 	struct treeNodeStruct	*avl_parent;	/* parent node within the current subscript level AVL tree */
@@ -91,17 +93,28 @@ typedef struct treeNodeStruct
 						 * overloaded as the free list pointer if this "lvTreeNode" is in the free list.
 						 */
 	struct lvTreeStruct	*tree_parent;	/* pointer to lvTreeStruct under whose avl tree this node belongs */
-	unsigned short		key_mvtype;	/* will have MV_STR bit set */
-	signed char		balance;	/* height(left) - height(right). Can be -1, 0, or 1 */
-	unsigned char		descent_dir;	/* direction of descent (LEFT = 0, RIGHT = 1) */
-	uint4			key_len;	/* byte length of string */
-	char			*key_addr;	/* pointer to string */
-	NON_GTM64_ONLY(uint4	filler_8byte;)	/* needed to ensure lvTreeNodeNum & lvTreeNode structures have
-						 * 	same size & layout for 32-bit platforms also */
+	union {
+		struct {
+			unsigned short		key_mvtype;	/* will have MV_STR bit set */
+			signed char		balance;	/* height(left) - height(right). Can be -1, 0, or 1 */
+			unsigned char		descent_dir;	/* direction of descent (LEFT = 0, RIGHT = 1) */
+			mstr_len_t		key_len;	/* byte length of string */
+			union {
+				char	*key_addr;	/* pointer to mstr in stp garbage collection array */
+				/* uint_least64_t in_array; */
+				unsigned long padding2;
+			};
+			uint_least64_t in_array;
+		};
+		mstr	str;
+	};
 	struct treeNodeStruct	*avl_left;	/* left AVL subtree at this subscript level */
 	struct treeNodeStruct	*avl_right;	/* right AVL subtree at this subscript level */
 	struct treeNodeStruct	*avl_parent;	/* parent node within the current subscript level AVL tree */
 } lvTreeNode;
+
+static_assert((OFFSETOF(lvTreeNode, key_len) == (OFFSETOF(lvTreeNode, str) + OFFSETOF(mstr, len))),
+	"mstr overlay in string lv node does not match\n");
 
 /* Given a pointer to a "lvTreeNode" structure, the mvtype field will tell us whether it is a lvTreeNodeStr or lvTreeNodeNum type.
  * key_mvtype will have the MV_STR bit set in case of lvTreeNodeStr and otherwise if lvTreeNodeNum.
@@ -128,6 +141,44 @@ typedef struct lvTreeStruct
 	lvTreeNode		*sbs_parent;/* pointer to parent (points to lv_val if sbs_depth==1 and lvTreeNode if sbs_depth>1) */
 	treeSrchStatus		lastLookup; /* clue to last node lookup in the AVL tree rooted at "avl_root" */
 } lvTree;
+
+static inline void glist_first_init_lvTreeNode_key(lvTreeNode *node)
+{
+	return glist_first_init_str(&node->str);
+}
+static inline void glist_init_lvTreeNode_key(lvTreeNode *node)
+{
+	return glist_init_str(&node->str);
+}
+static inline void glist_protect_lvTreeNode_key(lvTreeNode *node)
+{
+	return glist_protect_str(&node->str);
+}
+static inline bool glist_lvTreeNode_key_protected(lvTreeNode *node)
+{
+	return glist_str_protected(&node->str);
+}
+
+static inline void glist_unprotect_lvTreeNode_key(lvTreeNode *node)
+{
+	return glist_unprotect_str(&node->str);
+}
+static inline void glist_sync_lvTreeNode_key(lvTreeNode *node)
+{
+	return glist_sync_static_str(&node->str);
+}
+static inline bool glist_lvTreeNode_key_in_sync(lvTreeNode *node)
+{
+	return glist_static_str_in_sync(&node->str);
+}
+
+static inline void glist_sync_lvTreeNode_key_move(lvTreeNode *node, const char *l, const char *r)
+{
+	if (node->str.len && IS_PTR_IN_RANGE(node->str.addr, l, r))
+		glist_protect_str(&node->str);
+	else
+		assert(glist_static_str_in_sync(&node->str));
+}
 
 /* This section defines macros for the AVL tree implementation. Note that an AVL tree maintains its log(n) height by ensuring
  * the left and right subtrees at any level never differ in height by more than 1.
@@ -158,24 +209,26 @@ typedef struct lvTreeStruct
 #define TREE_KEY_SUBSCR_RESET_MV_CANONICAL_BIT(A_MVAL)	(A_MVAL)->mvtype &= MV_CANONICAL_OFF
 
 /* Macro to get numeric valued subscript in an lv node */
-#define	LV_NUM_NODE_GET_KEY(NODE, KEY)								\
-{												\
-	lvTreeNodeNum	*lcl_flt_node;								\
-	int		lcl_mvtype;								\
-												\
-	lcl_flt_node = (lvTreeNodeNum *)NODE;							\
-	lcl_mvtype = lcl_flt_node->key_mvtype;							\
-	assert(MVTYPE_IS_NUMERIC(lcl_mvtype));							\
-	if (MV_INT & lcl_mvtype)								\
-		(KEY)->m[1] = lcl_flt_node->key_m0;						\
-	else											\
-	{											\
-		assert(lcl_flt_node->key_flags.key_bits.key_e || !lcl_flt_node->key_m1);	\
-		((mval_gen *)(KEY))->byte.sgne = lcl_flt_node->key_flags.key_bytes.key_sgne;	\
-		(KEY)->m[0] = lcl_flt_node->key_m0;						\
-		(KEY)->m[1] = lcl_flt_node->key_m1;						\
-	}											\
-	(KEY)->mvtype = lcl_mvtype;								\
+#define	LV_NUM_NODE_GET_KEY(NODE, KEY)									\
+{													\
+	lvTreeNodeNum	*lcl_flt_node;									\
+	int		lcl_mvtype;									\
+													\
+	lcl_flt_node = (lvTreeNodeNum *)NODE;								\
+	lcl_mvtype = lcl_flt_node->key_mvtype;								\
+	assert(!(MV_STR & lcl_mvtype));									\
+	assert(MVTYPE_IS_NUMERIC(lcl_mvtype));								\
+	(KEY)->str.len = 0;										\
+	if (MV_INT & lcl_mvtype)									\
+		(KEY)->m[1] = lcl_flt_node->key_m0;							\
+	else												\
+	{												\
+		assert(lcl_flt_node->key_flags.key_bits.key_e || !lcl_flt_node->key_m1);		\
+		((unsigned char *)(KEY))[SGNE_OFFSET] = lcl_flt_node->key_flags.key_bytes.key_sgne;	\
+		(KEY)->m[0] = lcl_flt_node->key_m0;							\
+		(KEY)->m[1] = lcl_flt_node->key_m1;							\
+	}												\
+	(KEY)->mvtype = lcl_mvtype;									\
 }
 
 /* Macro to get string valued subscript in an lv node */
@@ -299,13 +352,22 @@ void		lvAvlTreeNodeDelete(lvTree *lvt, lvTreeNode *node);
         	cloneTree->avl_root = NULL;										\
 }
 
-#ifdef TREE_DEBUG
+#ifdef TREE_DEBUG_EXTRA
 #        define TREE_DEBUG1(p)			{printf(p);             FFLUSH(stdout);}
 #        define TREE_DEBUG2(p, q)		{printf(p, q);          FFLUSH(stdout);}
 #        define TREE_DEBUG3(p, q, r)		{printf(p, q, r);       FFLUSH(stdout);}
 #        define TREE_DEBUG4(p, q, r, s)		{printf(p, q, r, s);    FFLUSH(stdout);}
 #        define TREE_DEBUG5(p, q, r, s, t)	{printf(p, q, r, s, t); FFLUSH(stdout);}
-#        define	TREE_DEBUG_ONLY(X)			X
+#        define	TREE_DEBUG_ONLY(X)		X
+#        define	TREE_DEBUG_EXTRA_ONLY(X)	X
+#elif defined(TREE_DEBUG)
+#        define TREE_DEBUG1(p)
+#        define TREE_DEBUG2(p, q)
+#        define TREE_DEBUG3(p, q, r)
+#        define TREE_DEBUG4(p, q, r, s)
+#        define TREE_DEBUG5(p, q, r, s, t)
+#        define	TREE_DEBUG_ONLY(X)		X
+#        define	TREE_DEBUG_EXTRA_ONLY(X)
 #else
 #        define TREE_DEBUG1(p)
 #        define TREE_DEBUG2(p, q)
@@ -313,6 +375,7 @@ void		lvAvlTreeNodeDelete(lvTree *lvt, lvTreeNode *node);
 #        define TREE_DEBUG4(p, q, r, s)
 #        define TREE_DEBUG5(p, q, r, s, t)
 #        define	TREE_DEBUG_ONLY(X)
+#        define	TREE_DEBUG_EXTRA_ONLY(X)
 #endif
 
 #endif

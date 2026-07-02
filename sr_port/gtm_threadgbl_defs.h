@@ -48,7 +48,7 @@ THREADGBLDEF(code_generated,			boolean_t)			/* flag that the compiler generated 
 THREADGBLDEF(codegen_padlen,			int4)				/* used to pad code to section alignment */
 THREADGBLDEF(compile_time,			boolean_t)			/* flag that the compiler's at work */
 THREADGBLDEF(curtchain,				triple *)			/* pointer to anchor of current triple chain */
-THREADGBLDEF(director_ident,			mstr)				/* look-ahead scanner mident from advancewindow */
+THREADGBLDEF(director_ident,			mident)				/* look-ahead scanner mident from advancewindow */
 THREADGBLDEF(director_mval,			mval)				/* look-ahead scanner mval from advancewindow*/
 THREADGBLDEF(director_token,			char)				/* look-ahead scanner token from advancewindow */
 THREADGBLDEF(dollar_zcstatus,			int4)				/* return status for zcompile and others */
@@ -87,7 +87,7 @@ THREADGBLDEF(source_error_found,		int4)				/* flag to partially defer compiler e
 THREADGBLDEF(temp_subs,				boolean_t)			/* flag temp storing of subscripts to preserve
 										 * current evaluation */
 THREADGBLDEF(trigger_compile_and_link,		boolean_t)			/* A trigger compilation/link is active */
-THREADGBLDEF(window_ident,			mstr)				/* current scanner mident from advancewindow */
+THREADGBLDEF(window_ident,			mident)				/* current scanner mident from advancewindow */
 THREADGBLDEF(window_mval,			mval)				/* current scanner mval from advancewindow */
 THREADGBLDEF(window_token,			unsigned char)			/* current scanner token from advancewindow */
 THREADGBLDEF(xecute_literal_parse,		boolean_t)			/* flag TRUE when trying what its name says */
@@ -207,6 +207,16 @@ THREADGBLDEF(wcs_recover_done,			boolean_t)			/* TRUE if wcs_recover was ever in
 THREADGBLDEF(statsdb_fnerr_reason,		int)				/* Failure code for "gvcst_set_statsdb_fname" */
 THREADGBLDEF(statsdb_memerr,			boolean_t)			/* If true, Failed to write to statsdb (SIG7)" */
 THREADGBLDEF(non_tp_noiso_key_n_value,		key_cum_value)			/* for non-TP recompute block */
+THREADGBLDEF(trestart_xpel_rtn,			mval)				/* xpel routine name from trestart */
+THREADGBLDEF(trestart_xpel_lab,			mval)				/* xpel label name from trestart */
+THREADGBLDEF(trestart_xpel_rtnlab,		mval)				/* combined label^routine for xpel restart */
+THREADGBLDEF(in_xpel,				boolean_t)			/* Help manage restarting, unwinding, etc. */
+THREADGBLDEF(dollar_zinxpel,			int4)				/* If we are doing some number of xpels */
+THREADGBLDEF(dollar_zinxpel_roll,		boolean_t)			/* If TRUE zinxpel rollback underway */
+THREADGBLDEF(zinxpel_no_tp_or_trig,		boolean_t)			/* If inxpel TP & triggers not allowed */
+THREADGBLDEF(zinxpel_rtn_fp,			stack_frame *)			/* If non-NULL fp of xpel routine */
+THREADGBLDEF(zinxpel_rtn_fp_capture,		boolean_t)			/* If TRUE capture zinxpel fp via new_stack_frame */
+THREADGBLDEF(zinxpel_compile,			boolean_t)			/* If TRUE indirect compiling for zinxpel */
 
 /* Local variables */
 THREADGBLDEF(curr_symval_cycle,			unsigned int)			/* When curr_symval is changed, counter is bumped */
@@ -532,6 +542,10 @@ THREADGBLDEF(enable_autodelete,			boolean_t)	/* Enables autodelete if MUPIP/DSE/
 THREADGBLDEF(gtm_dynamic_varnames,		boolean_t)	/* Whether or not newly linked-in routine should have dynamic
 								 * variable name handling
 								 */
+THREADGBLDEF(indr_sort_array_p,			mstr_sort_array *)
+THREADGBLDEF(indr_protect_array_p,		mstr_protect_array *)
+THREADGBLDEF(rts_sort_array_p,			mstr_sort_array *)
+THREADGBLDEF(rts_protect_array_p,		mstr_protect_array *)
 /* Debug values */
 #ifdef DEBUG
 THREADGBLDEF(donot_commit,			boolean_t)			/* debug-only - see gdsfhead.h for purpose */
@@ -573,6 +587,10 @@ THREADGBLDEF(fork_without_child_wait,		boolean_t)	/*  we did a FORK but did not 
 								 *  inherited shm so shm_nattch could be higher than we expect.
 								 */
 THREADGBLDEF(cur_cmt_step,			enum cmt_step)	/* Current step of commit. Intended to validate t_commit_cleanup */
+THREADGBLDEF(in_statsDB_remove_linkage,		boolean_t)	/* We do a debug-only gvcst_get of the statsDB node on rundown
+								 * which means we can trigger (in this case) a gcol in timers/exit
+								 * handling; this var is used to avoid that.
+								 */
 #endif	/* #ifdef DEBUG */
 /* (DEBUG_ONLY relevant points reproduced from the comment at the top of this file)
  *   5. It is important for ANY DEBUG_ONLY fields to go at the VERY END. Failure to do this breaks gtmpcat.

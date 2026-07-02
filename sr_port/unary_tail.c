@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -152,7 +152,8 @@ void unary_tail(oprtype *opr)
 					if (num)	/* if an "outer" OC_NEG or OC_FORCENUM, get it over with at compile time */
 					{
 						mv = (mval *)mcalloc(SIZEOF(mval));
-						*mv = *v;
+						mv->umval = v->umval;
+						mv->str.in_array = FALSE;
 						if (neg)
 						{
 							if (MV_INT & mv->mvtype)

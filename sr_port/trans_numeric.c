@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2004-2021 Fidelity National Information	*
+ * Copyright (c) 2004-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -23,7 +23,7 @@
 error_def(ERR_LOGTOOLONG);
 error_def(ERR_TRNLOGFAIL);
 
-uint4 trans_numeric(mstr *log, boolean_t *is_defined,  boolean_t ignore_errors)
+uint4 trans_numeric(const unmanaged_mstr *log, boolean_t *is_defined,  boolean_t ignore_errors)
 {
 	/* return
 	 * - 0 on error if ignore_errors is set (otherwise error is raised and no return is made) or
@@ -67,7 +67,7 @@ uint4 trans_numeric(mstr *log, boolean_t *is_defined,  boolean_t ignore_errors)
 	return 0;
 }
 
-gtm_uint8 trans_numeric_64(mstr *log, boolean_t *is_defined, boolean_t ignore_errors)
+gtm_uint8 trans_numeric_64(const unmanaged_mstr *log, boolean_t *is_defined, boolean_t ignore_errors)
 {
 	/* return
 	 * - 0 on error if ignore_errors is set (otherwise error is raised and no return is made) or

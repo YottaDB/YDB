@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -38,14 +38,13 @@ error_def(ERR_PATNOTFOUND);
 int do_patfixed(mval *str, mval *pat)
 {
 	int4			count, tempint;
-	int4			*min, *reptr, *rtop;
 	int4			repeat;
 	int			letter;
 	int			repcnt;
 	int			bytelen, charlen, pbytelen, strbytelen;
 	unsigned char		*strptr, *strtop, *strnext, *pstr, *ptop, *pnext;
 	uint4			code, tempuint, patstream_len;
-	uint4			*patptr;
+	ua_patatom		*patptr, *min, *rtop, *reptr;
 	boolean_t		flags, pvalid, strvalid;
 	UTF8_ONLY(
 	wint_t			utf8_codepoint;
@@ -55,7 +54,7 @@ int do_patfixed(mval *str, mval *pat)
 	SETUP_THREADGBL_ACCESS;
 	/* set up information */
 	MV_FORCE_STR(str);
-	patptr =  (uint4 *)pat->str.addr;
+	patptr = (ua_patatom *)pat->str.addr;
 	DEBUG_ONLY(
 		GET_ULONG(tempuint, patptr);
 		assert(tempuint);	/* ensure first uint4 is non-zero indicating fixed length pattern string */
@@ -81,13 +80,13 @@ int do_patfixed(mval *str, mval *pat)
 	if (tempuint != charlen)
 		return FALSE;
 	patptr++;
-	min = (int4 *)patptr;
+	min = patptr;
 	rtop = min + count; /* Note: the compiler generates: rtop = min + SIZEOF(int4) * count */
 
 	/* attempt a match */
 	strptr = (unsigned char *)str->str.addr;
 	strtop = &strptr[str->str.len];
-	patptr = (uint4 *)pat->str.addr;
+	patptr = (ua_patatom *)pat->str.addr;
 	patptr += 2;
 	for (reptr = min; reptr < rtop ; reptr++)
 	{
@@ -131,7 +130,7 @@ int do_patfixed(mval *str, mval *pat)
 			/* ensure pattern atom length is within limits of the complete pattern stream */
 			assert((0 <= bytelen)
 					&& ((patptr + DIVIDE_ROUND_UP(bytelen, SIZEOF(*patptr)))
-						<= ((uint4 *)(pat->str.addr) + patstream_len + 2)));
+						<= ((ua_patatom *)(pat->str.addr) + patstream_len + 2)));
 			pstr = (unsigned char *)patptr;
 			if (1 == bytelen)
 			{

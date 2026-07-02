@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,7 +39,7 @@ bool gtcmtr_data(void)
 	cm_region_list *reg_ref;
 	unsigned char *ptr,regnum;
 	unsigned short top,len;
-	mval	v;
+	mval	v = {{0}};
 	int x;
 
 	ptr = curr_entry->clb_ptr->mbf;
@@ -54,7 +55,7 @@ bool gtcmtr_data(void)
 	x = 0;
  	if (gv_target->root)
 		x = gvcst_data();
-	v = *fndata_table[x / 10][x & 1];
+	v.umval = fndata_table[x / 10][x & 1]->umval;
 
 	ptr = curr_entry->clb_ptr->mbf;
 	*ptr++ = CMMS_R_DATA;

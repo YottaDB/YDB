@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -21,6 +21,7 @@
 #include "gtm_caseconv.h"
 #include "advancewindow.h"
 #include "show_source_line.h"
+#include "gcol_list.h"
 
 #ifdef UTF8_SUPPORTED
 #include "gtm_utf8.h"
@@ -62,11 +63,14 @@ void advancewindow(void)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	assert(glist_str_protected(&(TREF(window_mval)).str));
+	assert(glist_str_protected(&(TREF(director_mval)).str));
 	TREF(last_source_column) = source_column;
 	source_column = (TREF(lexical_ptr) - (TREF(source_buffer)).addr + 1);
 	TREF(window_token) = TREF(director_token);
-	TREF(window_mval) = TREF(director_mval);
-	(TREF(director_mval)).mvtype = 0; /* keeps mval from being GC'd since it is not useful until re-used */
+	(TREF(window_mval)).umval = (TREF(director_mval)).umval;
+	(TREF(director_mval)).str.len = 0; /* keeps mval from being GC'd since it is not useful until re-used */
+	(TREF(director_mval)).mvtype = 0;
 	tmp = (TREF(window_ident)).addr;  /* More efficient to swap pointers between window_ident.addr & director_ident.addr */
 	TREF(window_ident) = TREF(director_ident);	/* than to copy text from director_ident to window_ident */
 	(TREF(director_ident)).addr = tmp;
@@ -205,7 +209,9 @@ void advancewindow(void)
 		(TREF(director_mval)).mvtype = MV_STR;
 		CLEAR_MVAL_BITS(TADR(director_mval));
 		TREF(lexical_ptr) = (char *)s2n(&(TREF(director_mval)));
-		if (!((TREF(director_mval)).mvtype &= MV_NUM_MASK))
+		(TREF(director_mval)).mvtype &= MV_NUM_MASK;
+		(TREF(director_mval)).str.len = 0;
+		if (!((TREF(director_mval)).mvtype))
 		{
 			TREF(last_source_column) += (TK_EOL == TREF(director_token)) ? -2 : 2;	/* improve hints */
 			stx_error(ERR_NUMOFLOW);
@@ -214,15 +220,14 @@ void advancewindow(void)
 		}
 		if (TREF(s2n_intlit))
 		{
-			TREF(director_token) = TK_NUMLIT ;
+			TREF(director_token) = TK_NUMLIT;
 			n2s(&(TREF(director_mval)));
 		} else
 		{
-			TREF(director_token) = TK_INTLIT ;
+			TREF(director_token) = TK_INTLIT;
 			(TREF(director_mval)).str.len = INTCAST(TREF(lexical_ptr) - (TREF(director_mval)).str.addr);
-			ENSURE_STP_FREE_SPACE((TREF(director_mval)).str.len);
-			memcpy(stringpool.free, (TREF(director_mval)).str.addr, (TREF(director_mval)).str.len);
-			assert (stringpool.free <= stringpool.top) ;
+			s2pool(&(TREF(director_mval)).str);
+			(TREF(director_mval)).mvtype |= MV_STR;
 		}
 		return;
 	case TK_APOSTROPHE:

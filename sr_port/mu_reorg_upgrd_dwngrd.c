@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2005-2025 Fidelity National Information	*
+ * Copyright (c) 2005-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -153,13 +153,11 @@ void	mu_reorg_upgrd_dwngrd(void)
 	int4			lcnt, resetcnt, sleepcnt, status;
 	jnl_private_control	*jpc;
 	jnl_buffer_ptr_t	jbp;
-	mname_entry		gvname;
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
 	trans_num		curr_tn;
 	tp_region		*rptr, single;
 	uint4			jnl_status;
-	unsigned char		gname[SIZEOF(mident_fixed) + 2];
 
 #ifndef V6TOV7UPGRADEABLE	/* Reject until upgrades are enabled */
 	mupip_exit(ERR_GTMCURUNSUPP);
@@ -275,8 +273,7 @@ interact1:
 		inline_atomic_pid_set(&csa->nl->reorg_upgrade_pid, process_id);
 		util_out_print("!/Region !AD : MUPIP REORG -UPGRADE of !AD started (!UL of !UL)", TRUE,
 					REG_LEN_STR(reg), DB_LEN_STR(reg), csd->blks_to_upgrd, csd->trans_hist.total_blks);
-		gvname.var_name.addr = (char *)gname;
-		gv_target = targ_alloc(csa->hdr->max_key_size, &gvname, reg);
+		gv_target = targ_alloc(csa->hdr->max_key_size, NULL, reg);
 		gv_target->root = DIR_ROOT;
 		gv_target->clue.end = 0;
 		curr_blk = DIR_ROOT;			/* DIR_ROOT to variable makes pointer to pass below */
@@ -472,7 +469,7 @@ enum cdb_sc find_gvt_roots(block_id *curr_blk, gd_region *reg, cache_rec_ptr_t *
 	gtm_int8	lcl_gv_trees;
 	int		key_cmpc, key_len, level, new_blk_sz, num_recs, rec_sz, split_blks_added, split_levels_added;
 	int4		lcnt, status;
-	mname_entry	gvname;
+	unmanaged_mname_entry	gvname; /* Points to key_buff */
 	sgmnt_addrs	*csa;
 	sgmnt_data	*csd;
 	sm_uc_ptr_t	blkBase, blkEnd, lrecBase, recBase;
@@ -718,7 +715,7 @@ enum cdb_sc find_gvt_roots(block_id *curr_blk, gd_region *reg, cache_rec_ptr_t *
  * 	*cr points to the cache record that this function was working on for the caller to release
  * 	(enum_cdb_sc) returns cdb_sc_normal which the code expects or a retry code
  ******************************************************************************************/
-enum cdb_sc upgrade_idx_block(block_id *curr_blk, gd_region *reg, mname_entry *gvname, cache_rec_ptr_t *cr)
+enum cdb_sc upgrade_idx_block(block_id *curr_blk, gd_region *reg, unmanaged_mname_entry *gvname, cache_rec_ptr_t *cr)
 {
 	blk_hdr		blkHdr;
 	blk_segment	*bs1, *bs_ptr;
@@ -731,7 +728,7 @@ enum cdb_sc upgrade_idx_block(block_id *curr_blk, gd_region *reg, mname_entry *g
 	int		blk_seg_cnt, i, key_cmpc, key_len, level, max_fill, max_key, max_rightblk_lvl, new_blk_sz, num_recs, rec_sz,
 			space_need, split_blks_added, split_levels_added, tmp_len, v7_rec_sz;
 	int4		blk_size, child_data_blks, status;
-	mname_entry	gvt_name;
+	unmanaged_mname_entry	gvt_name; /* Points to key_buff */
 	sgmnt_addrs	*csa;
 	sm_uc_ptr_t	blkBase, blkEnd, recBase, v7bp, v7end, v7recBase;
 	srch_blk_status	blkHist, *curr_blk_hist_ptr;

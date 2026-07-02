@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -68,16 +68,19 @@ boolean_t dse_b_dmp(void)
 #	ifndef BLK_NUM_64BIT
 	gtm_int8	count2;
 #	endif
-	int4		bplmap, dummy_int, head, iter1, iter2, len, mapsize, nocrit_present, util_len, lmap_indx, mask2;
-	sm_uc_ptr_t	bp = NULL, b_top, mb, rp;
+	int4		bplmap, dummy_int, head, iter1, iter2, len, mapsize, nocrit_present, util_len, lmap_indx, mask2,
+			st_len, blk_stat;
+	sm_uc_ptr_t	bp = NULL, b_top, mb, rp, lmap_bp, status;
 	unsigned char	mask, util_buff[MAX_UTIL_LEN];
 	char		image_fn[MAX_FN_LEN + 1];
 	unsigned short	image_fn_len = SIZEOF(image_fn);
 	int		image_fd, image_status;
 	struct stat     image_stat_buf;
 	boolean_t	use_image = FALSE;
+	const char	*block_status[BLK_RECYCLED + 1] = {"Busy", "Free", "Corrupt", "Recycled"};
 
 	head = cli_present("HEADER");
+	blk_stat = cli_present("STATUS");
 	if (BADDSEBLK == (blk = dse_getblk("BLOCK", DSEBMLOK, DSEBLKCUR)))		/* WARNING: assignment */
 		return FALSE;
 	if (CLI_PRESENT == cli_present("COUNT"))
@@ -182,10 +185,29 @@ boolean_t dse_b_dmp(void)
 				len = STRLEN(gtm_dbversion_table[ondsk_blkver]);
 				memcpy(&util_buff[util_len], gtm_dbversion_table[ondsk_blkver], len);
 				util_len += len;
+				util_buff[util_len] = 0;
+				util_out_print((caddr_t)util_buff, FALSE, ((blk_hdr_ptr_t) bp)->levl );
+				mask2 = BLK_MAPINVALID;
+				if (!use_image)
+				{
+					lmap_num = ROUND_DOWN(blk, bplmap);
+					lmap_bp = t_qread(lmap_num, &dummy_int, &cr);
+					if (NULL != lmap_bp)
+						mask2 = dse_lm_blk_free((blk % bplmap), lmap_bp + SIZEOF(blk_hdr));
+				}
+				util_len = 0;
+				if (CLI_NEGATED != blk_stat)
+				{
+					st_len = snprintf((char *)util_buff, MAX_UTIL_LEN, "   Bitmap Status: %s",
+							(char *)block_status[mask2]);
+					if (MAX_UTIL_LEN <= st_len)
+						st_len = MAX_UTIL_LEN - 1;
+					util_len = st_len;
+				}
 				memcpy(&util_buff[util_len], "!/", 2);
 				util_len += 2;
 				util_buff[util_len] = 0;
-				util_out_print((caddr_t)util_buff, TRUE, ((blk_hdr_ptr_t) bp)->levl );
+				util_out_print((caddr_t)util_buff, TRUE);
 			}
 			rp = bp + SIZEOF(blk_hdr);
 			if (CLI_PRESENT != head && (!patch_is_fdmp || ((blk_hdr_ptr_t) bp)->levl == 0))
@@ -216,8 +238,8 @@ boolean_t dse_b_dmp(void)
 					 * since the value should always fit in 2-bytes
 					 */
 					util_len += i2hex_nofill(mapsize, &util_buff[util_len], MAX_HEX_SHORT);
-					memcpy(&util_buff[util_len], "   Master Status: Cannot Determine (bplmap == 0)!/", 50);
-					util_len += 50;
+					memcpy(&util_buff[util_len], "   Block Status: Cannot Determine (bplmap == 0)!/", 49);
+					util_len += 49;
 					util_buff[util_len] = 0;
 					util_out_print((caddr_t)util_buff, TRUE );
 				} else
@@ -244,10 +266,17 @@ boolean_t dse_b_dmp(void)
 					util_buff[util_len] = 0;
 					util_out_print((caddr_t)util_buff, FALSE, ((blk_hdr_ptr_t)bp)->levl );
 					util_len = 0;
-					memcpy(&util_buff[util_len], "   Master Status: !AD!/",23);
-					util_len = 23;
+					if (CLI_NEGATED != blk_stat)
+					{
+						util_len = snprintf((char *)util_buff, MAX_UTIL_LEN, "   Block Status: %s",
+								bm_free ? "Freespace" : "Full");
+						if (MAX_UTIL_LEN <= util_len)
+							util_len = MAX_UTIL_LEN - 1;
+					}
+					memcpy(&util_buff[util_len], "!/", 2);
+					util_len += 2;
 					util_buff[util_len] = 0;
-					util_out_print((caddr_t)util_buff, TRUE, bm_free ? 10 : 4, bm_free ? "Free Space" : "Full");
+					util_out_print((caddr_t)util_buff, TRUE);
 				}
 			}
 			if (CLI_PRESENT != head)

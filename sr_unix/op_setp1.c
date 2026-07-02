@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2021 Fidelity National Information	*
+ * Copyright (c) 2006-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -100,6 +100,7 @@ void op_setp1(mval *src, int delim, mval *expr, int ind, mval *dst)
 			assert(cfnpc->last_str.addr == src->str.addr);
 			assert(cfnpc->last_str.len == src->str.len);
 			assert(cfnpc->delim == delim);
+			assert(cfnpc->gcols == stringpool.gcols);
 			assert(0 < cfnpc->npcs);
 			/* Three more scenarios: #1 piece all in cache, #2 piece would be in cache but ran
 			 * out of text or #3 piece is beyond what can be cached
@@ -136,6 +137,7 @@ void op_setp1(mval *src, int delim, mval *expr, int ind, mval *dst)
 			assert(cfnpc->last_str.addr == src->str.addr);
 			assert(cfnpc->last_str.len == src->str.len);
 			assert(cfnpc->delim == delim);
+			assert(cfnpc->gcols == stringpool.gcols);
 			assert(0 < cfnpc->npcs);
 			if (FNPC_ELEM_MAX > cfnpc->npcs)
 			{	/* We ran out of text so the scan is complete. This is basically the same
@@ -312,9 +314,10 @@ void op_setp1(mval *src, int delim, mval *expr, int ind, mval *dst)
 				cfnpc = &(TREF(fnpca)).fnpcs[0];
 			(TREF(fnpca)).fnpcsteal = cfnpc + 1;	/* -> next element to steal */
 		} while (cfnpc == pfnpc);		/* Make sure we don't step on ourselves */
-		cfnpc->last_str = dst->str;		/* Save validation info */
+		cfnpc->last_str = dst->str.umstr;		/* Save validation info */
 		cfnpc->delim = delim;
 		cfnpc->npcs = cpy_cache_lines;
+		cfnpc->gcols = stringpool.gcols;
 		dst->fnpc_indx = cfnpc->indx + 1;	/* Save where we are putting this element
 							 * (1 based index in mval so 0 isn't so common)
 							 */

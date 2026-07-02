@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -85,7 +85,7 @@ char	*jnl2extcvt(jnl_record *rec, int4 jnl_len, char **ext_buff, int *extract_bu
 			tmp = malloc(tmpbufsiz);
 			origbuf = *ext_buff;
 			tmpsize = extbuf - origbuf;
-			memcpy((void *)tmp, origbuf, tmpsize);
+			memcpy(tmp, origbuf, tmpsize);
 			free(origbuf);
 			*ext_buff = tmp;
 			*extract_bufsiz = tmpbufsiz;
@@ -132,7 +132,7 @@ char	*jnl2ext(char *jnl_buff, char *ext_buff, char *ext_bufftop)
 	{
 		if (FALSE == first_tstart)
 		{
-			GET_SHORTP(curr, &muext_code[MUEXT_TSTART][0]);
+			memcpy(curr, &muext_code[MUEXT_TSTART][0], 2);
 			curr += 2;
 			DELIMIT_CURR;
 			MEMCPY_LIT(curr, ZERO_TIME_DELIM);
@@ -155,7 +155,7 @@ char	*jnl2ext(char *jnl_buff, char *ext_buff, char *ext_bufftop)
 		{
 			num_tcommits = num_tstarts = 0;
 			first_tstart = FALSE;
-			GET_SHORTP(curr, &muext_code[MUEXT_TCOMMIT][0]);
+			memcpy(curr, &muext_code[MUEXT_TCOMMIT][0], 2);
 			curr += 2;
 			DELIMIT_CURR;
 			MEMCPY_LIT(curr, ZERO_TIME_DELIM);
@@ -181,21 +181,21 @@ char	*jnl2ext(char *jnl_buff, char *ext_buff, char *ext_bufftop)
 		return ext_buff;
 	}
 	if (IS_SET(rectype))
-		GET_SHORTP(curr, &muext_code[MUEXT_SET][0]);
+		memcpy(curr, &muext_code[MUEXT_SET][0], 2);
 	else if (IS_KILL(rectype))
-		GET_SHORTP(curr, &muext_code[MUEXT_KILL][0]);
+		memcpy(curr, &muext_code[MUEXT_KILL][0], 2);
 	else if (IS_ZKILL(rectype))
-		GET_SHORTP(curr, &muext_code[MUEXT_ZKILL][0]);
+		memcpy(curr, &muext_code[MUEXT_ZKILL][0], 2);
 	else if (IS_ZTWORM(rectype))
-		GET_SHORTP(curr, &muext_code[MUEXT_ZTWORM][0]);
+		memcpy(curr, &muext_code[MUEXT_ZTWORM][0], 2);
 	else if (IS_LGTRIG(rectype))
-		GET_SHORTP(curr, &muext_code[MUEXT_LGTRIG][0]);
+		memcpy(curr, &muext_code[MUEXT_LGTRIG][0], 2);
 	else if (IS_ZTRIG(rectype))
-		GET_SHORTP(curr, &muext_code[MUEXT_ZTRIG][0]);
+		memcpy(curr, &muext_code[MUEXT_ZTRIG][0], 2);
 	else /* if (JRT_NULL == rectype) */
 	{
 		assert(JRT_NULL == rectype);
-		GET_SHORTP(curr, &muext_code[MUEXT_NULL][0]);
+		memcpy(curr, &muext_code[MUEXT_NULL][0], 2);
 	}
 	curr += 2;
 	DELIMIT_CURR;

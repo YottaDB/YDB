@@ -1,6 +1,6 @@
 /****************************************************************
  *                                                              *
- * Copyright (c) 2006-2024 Fidelity National Information	*
+ * Copyright (c) 2006-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *                                                              *
  *      This source code contains the intellectual property     *
@@ -20,12 +20,12 @@
 #define MIN_CHSET_LEN	1		/* minimum length of CHSET names */
 #define MAX_CHSET_LEN	8		/* maximum length of CHSET names */
 
-int verify_chset(const mstr *parm);
-int verify_case(const mstr *parm);
-UConverter* get_chset_desc(const mstr *chset);
-int gtm_conv(UConverter* from, UConverter* to, mstr* src, char* dstbuff, int* bufflen);
-gtm_chset_t check_w1252(const mstr *parm);
-gtm_chset_t check_valid_utf(const mstr *parm);
+int verify_chset(const unmanaged_mstr *parm);
+int verify_case(const unmanaged_mstr *parm);
+UConverter* get_chset_desc(const unmanaged_mstr *chset);
+int gtm_conv(UConverter* from, UConverter* to, const unmanaged_mstr* src, char* dstbuff, int* bufflen);
+gtm_chset_t check_w1252(const unmanaged_mstr *parm);
+gtm_chset_t check_valid_utf(const unmanaged_mstr *parm);
 
 typedef void 	(*m_casemap_t)(uchar_ptr_t, uchar_ptr_t, int4);
 typedef int32_t	(*u_casemap_t)(UChar *dest, int32_t destCapacity, const UChar *src,

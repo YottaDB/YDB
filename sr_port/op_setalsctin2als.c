@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2009-2025 Fidelity National Information	*
+ * Copyright (c) 2009-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -16,7 +16,7 @@
 #include "gtm_string.h"
 
 #include "gtmio.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "stack_frame.h"
 #include "op.h"
 #include "lv_val.h"
@@ -27,6 +27,7 @@
 #include "gdsfhead.h"
 #include "alias.h"
 #include "min_max.h"
+#include "stringpool.h"
 
 GBLREF stack_frame	*frame_pointer;
 GBLREF symval		*curr_symval;
@@ -48,7 +49,8 @@ error_def(ERR_ALIASEXPECTED);
 void op_setalsctin2als(lv_val *srclv, int destindx)
 {
 	ht_ent_mname	*tabent;
-	mname_entry	*varname = NULL;
+	var_tabent	*varname = NULL;
+	mname_entry	lcl_mname;
 	lv_val		*srclvc, *dstlv, *src_baselv;
 	int4		srcsymvlvl;
 	boolean_t	added;
@@ -66,12 +68,14 @@ void op_setalsctin2als(lv_val *srclv, int destindx)
 	assert(1 <= srclvc->stats.crefcnt);		/* Verify we have an existing container reference */
 	src_baselv = LV_GET_BASE_VAR(srclv);
 	srcsymvlvl = LV_SYMVAL(src_baselv)->symvlvl;	/* lv_val may go away below so record symlvl */
-	varname = &(((mname_entry *)frame_pointer->vartab_ptr)[destindx]);
+	varname = &((frame_pointer->vartab_ptr)[destindx]);
 	DEBUG_ONLY(added = FALSE);
 	/* Find hash table entry */
 	/* If no fast path to hash table entry -- look it up the hard(er) way */
-	if (NULL == (tabent = (ht_ent_mname *)frame_pointer->l_symtab[destindx]))	/* note tabent assignment */
-		added = add_hashtab_mname_symval(&curr_symval->h_symtab, varname, NULL, &tabent, TRUE);
+	lcl_mname.umname = *varname;
+	lcl_mname.var_name.in_array = FALSE;
+	if (NULL == (tabent = frame_pointer->l_symtab[destindx]))	/* note tabent assignment */
+		added = add_hashtab_mname_symval(&curr_symval->h_symtab, &lcl_mname, NULL, &tabent, TRUE);
 	varname = NULL; /* Don't store varname anywhere - where it points not guaranteed to outlast the execution of the current
 			 * frame, and it might have a relative addr offset if dynamic varnames are enabled;
 			 */

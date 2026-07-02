@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-; Copyright (c) 2001-2023 Fidelity National Information		;
+; Copyright (c) 2001-2026 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -13,7 +13,7 @@
 	;
 kill(gname)
 	new $ETRAP,blkidlen
-	set $ETRAP="goto error"
+	set $ETRAP="goto error^"_$text(+0)
 	if $TLEVEL zmessage 150383202	; TPNOSUPPORT error
 	if '$$edit(.gname) quit 0
 	if $zfind($view("REGION",gname),",") zmessage 150383194:gname	; ISSPANGBL
@@ -28,7 +28,7 @@ kill(gname)
 	;
 set(gname,nct,act)
 	new $ETRAP,blkidlen,ver
-	set $ETRAP="goto error"
+	set $ETRAP="goto error^"_$text(+0)
 	if $TLEVEL zmessage 150383202	; TPNOSUPPORT error
 	if '$$edit(.gname) q 0
 	if $zfind($view("REGION",gname),",") zmessage 150383194:gname	; ISSPANGBL error
@@ -47,7 +47,7 @@ set(gname,nct,act)
 	;
 get(gname,reg)
 	new t,tl,$ETRAP,nct,act,ver,ret,dir,dl,error,label,blkidend
-	set $ETRAP="goto error"
+	set $ETRAP="goto error^"_$text(+0)
 	if '$$edit(.gname) quit 0
 	set:$get(reg)="" reg=$piece($view("REGION",gname),",",1)
 	set label=$extract($$^%PEEKBYNAME("sgmnt_data.label",reg),1,11)
@@ -89,4 +89,4 @@ edit(gname)
 	quit 1
 	;
 error	set $ECODE="",error=1
-	quit 0
+	quit:$quit 0 quit

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -66,14 +66,13 @@ int do_pattern(mval *str, mval *pat)
 	int		atom, unit, idx, index, hasfixed;
 	uint4		z_diff, *rpt, *rtop, rept;
 	uint4		repeat[MAX_PATTERN_ATOMS];
-	uint4		*patidx[MAX_PATTERN_ATOMS];
+	ua_patatom	*patidx[MAX_PATTERN_ATOMS];
 	unsigned char	*stridx[MAX_PATTERN_ATOMS];
 	unsigned char	*strptr, *strtop, *strnext, *pstr, *ptop, *pnext;
-	uint4		code, tempuint;
-	uint4		*dfa_ptr, dfa_val;
-	uint4		*patptr;
+	uint4		code, tempuint, dfa_val;
+	ua_patatom	*patptr, *dfa_ptr;
 	uint4		flags;
-	int4		*min, *max, *size;
+	ua_patatom	*min, *max, *size;
 	int4		mintmp, maxtmp, sizetmp;
 	int		alt;
 	boolean_t	pte_csh_init;
@@ -86,7 +85,7 @@ int do_pattern(mval *str, mval *pat)
 	SETUP_THREADGBL_ACCESS;
 	/* set up information */
 	MV_FORCE_STR(str);
-	patptr = (uint4 *) pat->str.addr;
+	patptr = (ua_patatom *)pat->str.addr;
 	GET_ULONG(tempuint, patptr);
 	if (tempuint)
 	{	/* tempuint non-zero implies fixed length pattern string. this in turn implies we are not called from op_pattern.s
@@ -122,9 +121,9 @@ int do_pattern(mval *str, mval *pat)
 	)
 	if (length < total_min || length > total_max)
 		return FALSE;
-	min = (int4 *)patptr;
+	min = patptr;
 	patptr += count;
-	max = (int4 *)patptr;
+	max = patptr;
 	patptr += count;
 	if (MIN_SPLIT_N_MATCH_COUNT <= count)
 	{
@@ -142,7 +141,7 @@ int do_pattern(mval *str, mval *pat)
 		if (hasfixed && (DO_PATSPLIT_FAIL != (match = do_patsplit(str, pat))))
 			return match;
 	}
-	size = (int4 *)patptr;
+	size = patptr;
 	memcpy(repeat, min, count * SIZEOF(*min));
 	rtop = &repeat[0] + count;
 	count--;

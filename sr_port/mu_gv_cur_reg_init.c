@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -20,6 +20,7 @@
 #include "gdsbt.h"
 #include "gdsfhead.h"
 #include "filestruct.h"
+#include "hashtab_umname.h"
 #include "mu_gv_cur_reg_init.h"
 
 GBLREF	gd_region	*gv_cur_region;
@@ -74,7 +75,7 @@ void mu_gv_cur_reg_free(void)
 	}
 	if (NULL != gdhdr->tab_ptr)
 	{
-		free_hashtab_mname(gdhdr->tab_ptr);
+		free_hashtab_umname(gdhdr->tab_ptr);
 		free(gdhdr->tab_ptr);
 		gdhdr->tab_ptr = NULL;
 	}

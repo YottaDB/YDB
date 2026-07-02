@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -11,7 +11,7 @@
  ****************************************************************/
 
 #include "mdef.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "stack_frame.h"
 #include "stringpool.h"
 #include "objlabel.h"
@@ -66,6 +66,7 @@ void trans_code_cleanup(void)
 	if (stringpool.base != rts_stringpool.base)
 	{
 		indr_stringpool = stringpool;
+
 		stringpool = rts_stringpool;
 	}
 	for (fp = frame_pointer; fp; fp = fpprev)
@@ -86,7 +87,7 @@ void trans_code_cleanup(void)
 				/* Turn off any device exception related flags now that we are going to handle errors using
 				 * $ETRAP or $ZTRAP AT THE PARENT LEVEL only (no more device exceptions).
 				 */
-				(TREF(dollar_ztrap)).str.len = 0;
+				NULLIFY_TRAP(TREF(dollar_ztrap));
 				ztrap_explicit_null = FALSE;
 				fp->flags &= SFF_DEV_ACT_ERR_OFF;
 				fp->flags &= SFF_ZTRAP_ERR_OFF;

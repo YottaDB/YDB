@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -29,17 +29,17 @@ typedef struct gvt_container_struct
 	struct gvt_container_struct	*next_gvtc;
 } gvt_container;
 
-boolean_t	get_first_gdr_name(gd_addr *current_gd_header, mstr *log_nam);
+boolean_t	get_first_gdr_name(gd_addr *current_gd_header, unmanaged_mstr *log_nam);
 gd_addr		*zgbldir(mval *v);
 gd_addr		*zgbldir_name_lookup_only(mval *v);
-gd_addr		*gd_load(mstr *v);
+gd_addr		*gd_load(unmanaged_mstr *v);
 gd_addr		*get_next_gdr(gd_addr *prev);
-mstr		*get_name(mstr *ms);
+unmanaged_mstr	*get_name(const unmanaged_mstr *ms);
 void		cm_add_gdr_ptr(gd_region *greg);
 void		cm_del_gdr_ptr(gd_region *greg);
-void		*open_gd_file(mstr *v);
+void		*open_gd_file(unmanaged_mstr *v);
 void		gd_rundown(void);
-void 		gd_ht_kill(struct hash_table_mname_struct *table, boolean_t contents);
+void 		gd_ht_kill(struct hash_table_umname_struct *table, boolean_t contents);
 
 GBLREF	mstr			extnam_str;
 GBLREF	mval			dollar_zgbldir;

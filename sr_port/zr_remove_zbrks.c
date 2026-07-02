@@ -12,7 +12,7 @@
 
 #include "mdef.h"
 
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "zbreak.h"
 #include "break.h"
 #include "gtmmsg.h"

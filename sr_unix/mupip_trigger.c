@@ -24,7 +24,7 @@
 #include "gdsbt.h"
 #include "gdsfhead.h"
 #include "filestruct.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "gv_trigger.h"
 #include "mupip_trigger.h"
 #include "mu_trig_trgfile.h"

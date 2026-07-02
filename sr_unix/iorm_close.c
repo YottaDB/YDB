@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -32,6 +32,7 @@
 #include "wake_alarm.h"
 #include "copy.h"
 #include "error.h"
+#include "device_cleanup.h"
 #include "is_file_identical.h"
 
 GBLREF io_pair		io_curr_device;
@@ -381,7 +382,9 @@ test_rename_gap:
 		}
 	}
 	if ((rm_destroy || rm_ptr->is_pipe || rm_ptr->fifo) && !rm_rundown)
-	        remove_rms (iod);
+	        remove_rms(iod);
+	else if (rm_rundown)
+		cleanup_device_stp_residents(iod);
 	REVERT_GTMIO_CH(&iod->pair, ch_set);
 	return;
 	assertpro(FALSE);	/* ensure we never reach the goto below */

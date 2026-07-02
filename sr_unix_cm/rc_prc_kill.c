@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,6 +26,7 @@
 #include "gtcm.h"
 #include "gvcst_protos.h"	/* for gvcst_kill prototype */
 #include "hashtab_mname.h"
+#include "stringpool.h"
 
 GBLREF gv_key 		*gv_currkey;
 GBLREF gv_namehead 	*gv_target;
@@ -38,7 +40,7 @@ int rc_prc_kill(rc_q_hdr *qhdr)
     rc_kill	*req;
     rc_kill	*rsp;
     int		 i;
-    mname_entry	gvname;
+    unmanaged_mname_entry	gvname;
     char	*cp1;
     gvnh_reg_t	*gvnh_reg;
 

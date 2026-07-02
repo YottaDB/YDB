@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -65,7 +65,7 @@ void op_gvorder(mval *v)
 	gvnh_spanreg_t		*gvspan;
 	int			i, maxi, min_reg_index, mini, reg_index, res;
 	int4			n;
-	mname_entry		gvname;
+	unmanaged_mname_entry	gvname;
 	mstr			opstr;
 	mval			tmpmval, *datamval;
 	sgm_info		*save_sgm_info_ptr;
@@ -108,6 +108,7 @@ void op_gvorder(mval *v)
 			found = gvusr_order();
 		v->mvtype = 0; /* so stp_gcol (if invoked below) can free up space currently occupied by (BYPASSOK)
 				* this to-be-overwritten mval */
+		v->str.len = 0;
 		if (found)
 		{
 			gv_altkey->prev = gv_currkey->prev;
@@ -323,6 +324,7 @@ void op_gvorder(mval *v)
 		change_reg();
 		v->mvtype = 0; /* so stp_gcol (if invoked below) can free up space currently occupied by (BYPASSOK)
 				* this to-be-overwritten mval */
+		v->str.len = 0;
 		if (found)
 		{
 			if (!IS_STP_SPACE_AVAILABLE(gvname.var_name.len + 1))

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -38,7 +38,7 @@
 #include "repl_msg.h"
 #include "gtmsource.h"
 #include "interlock.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "stack_frame.h"
 #include "gv_trigger.h"
 #include "gtm_trigger.h"
@@ -411,7 +411,8 @@ void	gvcst_kill2(boolean_t do_subtree, boolean_t *span_status, boolean_t killing
 					 * code and literal_null is in read-only segment so will not be modifiable.
 					 * Hence the need for a dummy local variable mval "ztvalue_new" in the C stack.
 					 */
-					ztvalue_new = literal_null;
+					ztvalue_new.umval = literal_null.umval;
+					ztvalue_new.str.in_array = FALSE;
 					trigparms.ztvalue_new = &ztvalue_new;
 				}
 				gvtr_parms.gvtr_cmd = do_subtree ? GVTR_CMDTYPE_KILL : GVTR_CMDTYPE_ZKILL;

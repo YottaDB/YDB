@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -11,26 +11,31 @@
  ****************************************************************/
 
 #include "mdef.h"
+#include "stdio.h"
+#include "gtmio.h"
+#include "io.h"
 #include "zstep.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "stack_frame.h"
 #include "xfer_enum.h"
 #include "indir_enum.h"
 #include "op.h"
 #include "fix_xfer_entry.h"
+#include "gcol_list.h"
 #include "have_crit.h"
 #include "deferred_events_queue.h"
 #include "deferred_events.h"
+#include "error_trap.h"
+#include "try_event_pop.h"
 #include "restrict.h"
 
+GBLDEF stack_frame	*zstep_level;
+
 GBLREF bool		neterr_pending;
-GBLREF int		iott_write_error;
+GBLREF boolean_t	is_tracing_on;
 GBLREF intrpt_state_t	intrpt_ok_state;
 GBLREF stack_frame	*frame_pointer;
-GBLDEF stack_frame	*zstep_level;
-GBLREF volatile int4	outofband;
-GBLREF xfer_entry_t	xfer_table[];
-
+GBLREF	volatile int4	fast_lock_count;
 void op_zstep(uint4 code, mval *action)
 {
 	boolean_t	already_ev_handling;
@@ -38,35 +43,41 @@ void op_zstep(uint4 code, mval *action)
 	intrpt_state_t	prev_intrpt_state = INTRPT_NUM_STATES;
 	save_xfer_entry	*entry;
 	stack_frame	*fp;
-	xfer_entry_t	curr_entry;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	assert(!(RESTRICTED(zbreak_op)));
-	TAREF1(save_xfer_root, zstep_pending).event_state = pending;
-	TAREF1(save_xfer_root, zstep_pending).param_val = (int)code;
+	if (!(already_ev_handling = ((INTRPT_IN_EVENT_HANDLING == intrpt_ok_state) || multi_thread_in_use)))
+		DEFER_INTERRUPTS(INTRPT_IN_EVENT_HANDLING, prev_intrpt_state);
+	if (not_in_play == TAREF1(save_xfer_root, zstep_pending).event_state)
+		TAREF1(save_xfer_root, zstep_pending).event_state = pending;
+	if (ZSTEP_WHATEVER != code)		/* WHATEVER used by callers to mean work with existing state to reestablish ZSTEP */
+		TAREF1(save_xfer_root, zstep_pending).param_val = (int)code;
+	else
+		assert(NULL != action);						/* WHATEVER callers must send &TREF(zstep_action) */
+	assert(TAREF1(save_xfer_root, zstep_pending).param_val);
 	if (neterr_pending)
 		return;
 	if (NULL == action)
-		TREF(zstep_action) = TREF(dollar_zstep);	/* no action specified on the command - use $ZSTEP */
+		(TREF(zstep_action)).umval = (TREF(dollar_zstep)).umval;	/* no action specified on command - use $ZSTEP */
 	else
-	{	/* compile the action to make it ready to execute */
+	{	/* compile action to ensure it's valid */
 		op_commarg(action, indir_linetail);
 		op_unwind();
-		TREF(zstep_action) = *action;
+		(TREF(zstep_action)).umval = action->umval;
 	}
+	glist_sync_mval(TADR(zstep_action));
 	if (0 == (TREF(zstep_action)).str.len)
 	{	/* if an action does not exist shut down zstepping */
 		DBGDFRDEVNT((stderr, "%d %s: ctrap_set - removing zstep from play\n", __LINE__, __FILE__));
 		TAREF1(save_xfer_root, zstep_pending).event_state = not_in_play;
+		DEFER_OUT_OF_XFER_TAB(is_tracing_on);
+		if (!already_ev_handling)
+			ENABLE_EVENT_INTERRUPTS(prev_intrpt_state);
+		TRY_EVENT_POP;
 		return;
 	}
-	if ((ZSTEP_WHATEVER == code)	/* WHATEVER used by callers to mean work with available state to reestablish ZSTEP */
-			&& ((op_linefetch == (curr_entry = xfer_table[xf_linefetch])) || (op_mproflinefetch == curr_entry)))
-		code = ZSTEP_INTO;			/* if no evidence of current code default to INTO */
 	/* WARNING! AIO sets multi_thread_in_use which disables DEFER_INTERRUPTS, treat it like an active event */
-	if (!(already_ev_handling = ((INTRPT_IN_EVENT_HANDLING == intrpt_ok_state) || multi_thread_in_use)))
-		DEFER_INTERRUPTS(INTRPT_IN_EVENT_HANDLING, prev_intrpt_state);
 	for (ev = ctrlc; ev <  DEFERRED_EVENTS; ev++)
 	{	/* make any thing we've potentially overlaying queued */
 		if (zstep_pending == ev)
@@ -85,7 +96,7 @@ void op_zstep(uint4 code, mval *action)
 			break;
 		}
 	}
-	switch(code)
+	switch (code)
 	{
 		case ZSTEP_WHATEVER:
 			break;						/* rely on what's already there */
@@ -98,7 +109,6 @@ void op_zstep(uint4 code, mval *action)
 			break;
 		case ZSTEP_OVER:
 		case ZSTEP_OUTOF:
-
 			for (fp = frame_pointer; fp && !(fp->type & SFT_COUNT); fp = fp->old_frame_pointer)
 				; /* don't place in a non VM frame if we are in one */
 			zstep_level = fp;

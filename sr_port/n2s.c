@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -16,6 +16,7 @@
 
 #include "arit.h"
 #include "stringpool.h"
+#include "gcol_list.h"
 
 #define PACKED_DIGITS	(MAX_DIGITS_IN_INT - 1)	/* maximum packed decimal representation is 999999999 (nine nines) */
 
@@ -26,9 +27,12 @@ unsigned char *n2s(mval *mv_ptr)
 	unsigned char	*start, *cp, *cp1;
 	int4		exp, n0, m1, m0, tmp;
 	unsigned char	lcl_buf[MAX_DIGITS_IN_INT];
+	boolean_t	protected;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	if (!MV_DEFINED(mv_ptr))
-		GTMASSERT;
+		assertpro(FALSE);
 	ENSURE_STP_FREE_SPACE(MAX_NUM_SIZE);
 	start = stringpool.free;
 	cp = start;

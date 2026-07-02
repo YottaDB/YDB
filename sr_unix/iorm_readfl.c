@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -40,6 +40,7 @@
 #include "gtm_conv.h"
 #include "gtm_utf8.h"
 #endif
+#include "noprincio_if_needed_inline.h"
 
 GBLREF	boolean_t       	gtm_utf8_mode, prin_dm_io, prin_in_dev_failure, prin_out_dev_failure;
 GBLREF	io_pair			io_curr_device, io_std_device;
@@ -51,7 +52,7 @@ GBLREF	volatile boolean_t      dollar_zininterrupt;
 GBLREF	volatile int4		outofband;
 #ifdef UTF8_SUPPORTED
 GBLREF	UConverter	*chset_desc[];
-LITREF mstr            chset_names[];
+LITREF unmanaged_mstr	chset_names[];
 LITREF	UChar32		u32_line_term[];
 #endif
 
@@ -362,6 +363,7 @@ int	iorm_readfl (mval *v, int4 width, int4 msec_timeout) /* timeout in milliseco
 				POP_MV_STENT();         /* pop if top of stack */
 			else
 			{	/* else mark it unused */
+				glist_unprotect_str(&mv_zintdev->mv_st_cont.mvs_zintdev.curr_sp_buffer);
 				mv_zintdev->mv_st_cont.mvs_zintdev.buffer_valid = FALSE;
 				mv_zintdev->mv_st_cont.mvs_zintdev.curr_sp_buffer.len = 0;
 				mv_zintdev->mv_st_cont.mvs_zintdev.curr_sp_buffer.addr = NULL;
@@ -630,6 +632,7 @@ int	iorm_readfl (mval *v, int4 width, int4 msec_timeout) /* timeout in milliseco
 								(char *)stringpool.free;
 							mv_chain->mv_st_cont.mvs_zintdev.curr_sp_buffer.len = tot_bytes_read;
 							mv_chain->mv_st_cont.mvs_zintdev.buffer_valid = TRUE;
+							glist_protect_str(&mv_chain->mv_st_cont.mvs_zintdev.curr_sp_buffer);
 							pipeintr->who_saved = pipewhich_readfl;
 							if ((0 < msec_timeout) && (NO_M_TIMEOUT != msec_timeout))
 							{
@@ -697,6 +700,7 @@ int	iorm_readfl (mval *v, int4 width, int4 msec_timeout) /* timeout in milliseco
 				{
 					PIPE_DEBUG(PRINTF(" %d fixed outofband\n", pid); DEBUGPIPEFLUSH);
 					PUSH_MV_STENT(MVST_ZINTDEV);
+					glist_protect_str(&mv_chain->mv_st_cont.mvs_zintdev.curr_sp_buffer);
 					mv_chain->mv_st_cont.mvs_zintdev.io_ptr = io_ptr;
 					mv_chain->mv_st_cont.mvs_zintdev.curr_sp_buffer.addr = (char *)stringpool.free;
 					mv_chain->mv_st_cont.mvs_zintdev.curr_sp_buffer.len = tot_bytes_read;
@@ -827,6 +831,7 @@ int	iorm_readfl (mval *v, int4 width, int4 msec_timeout) /* timeout in milliseco
 								PIPE_DEBUG(PRINTF(" %d M 2 stream outofband\n",
 										  pid); DEBUGPIPEFLUSH);
 								PUSH_MV_STENT(MVST_ZINTDEV);
+								glist_protect_str(&mv_chain->mv_st_cont.mvs_zintdev.curr_sp_buffer);
 								mv_chain->mv_st_cont.mvs_zintdev.io_ptr = io_ptr;
 								mv_chain->mv_st_cont.mvs_zintdev.curr_sp_buffer.addr
 									= (char *)stringpool.free;
@@ -896,6 +901,7 @@ int	iorm_readfl (mval *v, int4 width, int4 msec_timeout) /* timeout in milliseco
 					{
 						PIPE_DEBUG(PRINTF(" %d utf2 stream outofband\n", pid); DEBUGPIPEFLUSH);
 						PUSH_MV_STENT(MVST_ZINTDEV);
+						glist_protect_str(&mv_chain->mv_st_cont.mvs_zintdev.curr_sp_buffer);
 						mv_chain->mv_st_cont.mvs_zintdev.io_ptr = io_ptr;
 						mv_chain->mv_st_cont.mvs_zintdev.curr_sp_buffer.addr =
 							(char *)stringpool.free;
@@ -1034,6 +1040,7 @@ int	iorm_readfl (mval *v, int4 width, int4 msec_timeout) /* timeout in milliseco
 					PIPE_DEBUG(PRINTF(" %d utf fixed outofband, buff_len: %d done_1st_read: %d\n", pid,
 							  buff_len, rm_ptr->done_1st_read); DEBUGPIPEFLUSH);
 					PUSH_MV_STENT(MVST_ZINTDEV);
+					glist_protect_str(&mv_chain->mv_st_cont.mvs_zintdev.curr_sp_buffer);
 					mv_chain->mv_st_cont.mvs_zintdev.io_ptr = io_ptr;
 					mv_chain->mv_st_cont.mvs_zintdev.curr_sp_buffer.addr = (char *)stringpool.free;
 					mv_chain->mv_st_cont.mvs_zintdev.curr_sp_buffer.len = 0;
@@ -1139,7 +1146,7 @@ int	iorm_readfl (mval *v, int4 width, int4 msec_timeout) /* timeout in milliseco
 					{
 						v->str.addr = (char *)rm_ptr->inbuf_off;
 						v->str.len = gtm_conv(chset_desc[chset], chset_desc[CHSET_UTF8],
-								      &v->str, NULL, NULL);
+								      &v->str.umstr, NULL, NULL);
 					}
 					v->str.addr = (char *)stringpool.free;
 					rm_ptr->inbuf_off += char_ptr - rm_ptr->inbuf_off;
@@ -1229,6 +1236,7 @@ int	iorm_readfl (mval *v, int4 width, int4 msec_timeout) /* timeout in milliseco
 					{
 						PIPE_DEBUG(PRINTF(" %d utf1 stream outofband\n", pid); DEBUGPIPEFLUSH);
 						PUSH_MV_STENT(MVST_ZINTDEV);
+						glist_protect_str(&mv_chain->mv_st_cont.mvs_zintdev.curr_sp_buffer);
 						mv_chain->mv_st_cont.mvs_zintdev.io_ptr = io_ptr;
 						mv_chain->mv_st_cont.mvs_zintdev.curr_sp_buffer.addr = (char *)stringpool.free;
 						mv_chain->mv_st_cont.mvs_zintdev.curr_sp_buffer.len = 0;
@@ -1345,6 +1353,8 @@ int	iorm_readfl (mval *v, int4 width, int4 msec_timeout) /* timeout in milliseco
 									PIPE_DEBUG(PRINTF(" %d utf2 stream outofband\n",
 											  pid); DEBUGPIPEFLUSH);
 									PUSH_MV_STENT(MVST_ZINTDEV);
+									glist_protect_str(
+										&mv_chain->mv_st_cont.mvs_zintdev.curr_sp_buffer);
 									mv_chain->mv_st_cont.mvs_zintdev.io_ptr = io_ptr;
 									mv_chain->mv_st_cont.mvs_zintdev.curr_sp_buffer.addr
 										= (char *)stringpool.free;
@@ -1415,6 +1425,7 @@ int	iorm_readfl (mval *v, int4 width, int4 msec_timeout) /* timeout in milliseco
 						{
 							PIPE_DEBUG(PRINTF(" %d utf2 stream outofband\n", pid); DEBUGPIPEFLUSH);
 							PUSH_MV_STENT(MVST_ZINTDEV);
+							glist_protect_str(&mv_chain->mv_st_cont.mvs_zintdev.curr_sp_buffer);
 							mv_chain->mv_st_cont.mvs_zintdev.io_ptr = io_ptr;
 							mv_chain->mv_st_cont.mvs_zintdev.curr_sp_buffer.addr =
 								(char *)stringpool.free;

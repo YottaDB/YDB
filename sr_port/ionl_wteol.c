@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,7 +29,7 @@ void ionl_wteol(int4 val, io_desc *io_ptr)
 	for (eol_cnt = val; eol_cnt--; )
 	{
 		io_ptr->dollar.x = 0; /* so that ionl_write doesn't try to wrap (based on escape state and width) */
-		ionl_write(&eol);
+		ionl_write(&eol.umstr);
 	}
 	/* $X is maintained in VMS without the below assignment (resetting to 0) because the NATIVE_TTEOL is \015\012
 	 * and the <CR> (\015) triggers appropriate maintenance of $X.  In UNIX, NATIVE_TTEOL is \012, so

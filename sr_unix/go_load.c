@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -37,7 +37,7 @@
 #include "str2gvkey.h"
 #include "gtmmsg.h"
 #include "gtm_utf8.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "gv_trigger.h"
 #include "mu_interactive.h"
 #include "wbox_test_init.h"
@@ -86,7 +86,7 @@ error_def(ERR_GBLOFLOW);
 #define GO_SET_EXTRACT		2
 
 STATICFNDEF boolean_t get_mname_from_key(char *ptr, int key_length, char *key, gtm_uint64_t iter,
-					gtm_uint64_t first_failed_rec_count, mname_entry *gvname);
+					gtm_uint64_t first_failed_rec_count, unmanaged_mname_entry *gvname);
 #define ISSUE_TRIGDATAIGNORE_IF_NEEDED(KEYLENGTH, PTR, HASHT_GBL, IGNORE)						\
 /* The ordering of the && below is important as the caller uses HASHT_GBL to be set to TRUE if the global pointed to 	\
  * by PTR is ^#t. 													\
@@ -121,7 +121,7 @@ if ((HASHT_GBL = IS_GVKEY_HASHT_FULL_GBLNAME(KEYLENGTH, PTR)) && !IGNORE)						\
 }																\
 
 STATICFNDEF boolean_t get_mname_from_key(char *ptr, int key_length, char *key, gtm_uint64_t iter,
-					gtm_uint64_t first_failed_rec_count, mname_entry *gvname)
+					gtm_uint64_t first_failed_rec_count, unmanaged_mname_entry *gvname)
 {
 	int			length, key_name_len;
 	char			*ptr1, msg_buff[128];
@@ -164,7 +164,7 @@ void go_load(gtm_uint64_t begin, gtm_uint64_t end, unsigned char *rec_buff, char
 	uint4	        max_data_len, max_subsc_len, num_of_reg;
 	char		key[MAX_KEY_SZ], msg_buff[MAX_RECLOAD_ERR_MSG_SIZE];
 	gd_region	**reg_list;
-	mname_entry	gvname;
+	unmanaged_mname_entry	gvname;
 
 	gvinit();
 	reg_list = (gd_region **) malloc(gd_header->n_regions * SIZEOF(gd_region *));

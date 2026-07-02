@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2015 Fidelity National Information	*
+ * Copyright (c) 2006-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -43,12 +43,12 @@ error_def(ERR_COMMA);
 int f_piece(oprtype *a, opctype op)
 {
 	delimfmt	unichar;
-	mval		*delim_mval, tmp_mval;
+	mval		*delim_mval, tmp_mval = {{0}};
 	oprtype		x, *newop;
 	triple		*delimiter, *first, *last, *r;
-	static mstr	scratch_space = {0, 0, 0};
-
+	static mstr	scratch_space = {{{0}}}; /* Adopt the nullptr convention for strs we should not protect */
 	DCL_THREADGBL_ACCESS;
+
 	SETUP_THREADGBL_ACCESS;
 	r = maketriple(op);
 	if (EXPR_FAIL == expr(&(r->operand[0]), MUMPS_STR))
@@ -122,9 +122,8 @@ int f_piece(oprtype *a, opctype op)
 					first->operand[0].oprval.tref->operand[0].oprval.ilit,
 					&tmp_mval);
 			}
-			s2pool(&tmp_mval.str);
 			newop = (oprtype *)mcalloc(SIZEOF(oprtype));
-			*newop = put_lit(&tmp_mval);				/* Copies mval so stack var tmp_mval not an issue */
+			*newop = put_lit(&tmp_mval);	/* Copies and s2pools mval so stack var tmp_mval not an issue */
 			assert(TRIP_REF == newop->oprclass);
 			newop->oprval.tref->src = r->src;
 			*a = put_tref(newop->oprval.tref);
@@ -179,9 +178,8 @@ int f_piece(oprtype *a, opctype op)
 				first->operand[0].oprval.tref->operand[0].oprval.ilit,
 				last->operand[0].oprval.tref->operand[0].oprval.ilit, &tmp_mval);
 		}
-		s2pool(&tmp_mval.str);
 		newop = (oprtype *)mcalloc(SIZEOF(oprtype));
-		*newop = put_lit(&tmp_mval);			/* Copies mval so stack var tmp_mval not an issue */
+		*newop = put_lit(&tmp_mval);			/* Copies and s2pools mval so stack var tmp_mval not an issue */
 		assert(TRIP_REF == newop->oprclass);
 		newop->oprval.tref->src = r->src;
 		*a = put_tref(newop->oprval.tref);

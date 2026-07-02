@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2014-2015 Fidelity National Information 	*
+ * Copyright (c) 2014-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -27,7 +27,7 @@
  * Return:
  *   - operator descriptor
  */
-oprtype put_cdidx(mstr *x)
+oprtype put_cdidx(const unmanaged_mstr *x)
 {
 	triple	*ref;
 #	ifdef AUTORELINK_SUPPORTED

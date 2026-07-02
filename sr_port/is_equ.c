@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -32,7 +32,8 @@ int is_equ(mval *u,mval *v)
 			return 0;
 		}
 		/* They are both decimal floating numbers, do a full comparison */
-		return ((((mval_b *)u)->sgne == ((mval_b *)v)->sgne) && (u->m[1] == v->m[1]) && (u->m[0]==v->m[0]));
+		return ((((unsigned char *)u)[SGNE_OFFSET] == ((unsigned char *)v)[SGNE_OFFSET])
+			&& (u->m[1] == v->m[1]) && (u->m[0] == v->m[0]));
 	}
 	/* At least one of the numbers is not in numeric form or is not a cannoical number, do a string compare */
 	MV_FORCE_STR(u);

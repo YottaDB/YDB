@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -148,7 +148,7 @@ typedef struct coll_hdr_struct
 #define NEEDS_ENCRYPTION		3
 #define NEEDS_NO_ENCRYPTION		4
 
-char		*mu_extr_ident(mstr *a);
+char		*mu_extr_ident(const unmanaged_mstr *a);
 void		mu_extract(void);
 int		mu_extr_getblk(unsigned char *ptr, unsigned char *encr_ptr, boolean_t use_null_iv, int *got_encrypted_block);
 boolean_t	mu_extr_gblout(glist *gl_ptr, mu_extr_stats *st, int format, boolean_t any_file_encrypted,

@@ -36,7 +36,7 @@
 
 #include "job.h"
 #include "error.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "io.h"
 #include "iormdef.h"
 #include "io_params.h"

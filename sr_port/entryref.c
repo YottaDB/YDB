@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -21,7 +21,7 @@
 #include "mlabel2xtern.h"
 #include "mrout2xtern.h"
 #include "gtmimagename.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "stack_frame.h"
 
 STATICFNDCL oprtype insert_extref(mident *rtnname);
@@ -75,8 +75,8 @@ triple *entryref(opctype op1, opctype op2, mint commargcode, boolean_t can_comma
 {
 	oprtype 	offset, label, routine, rte1;
 	char		rtn_text[SIZEOF(mident_fixed)], lab_text[SIZEOF(mident_fixed)];
-	mident		rtnname, labname;
-	mstr 		rtn_str, lbl_str;
+	mident		rtnname;
+	mident		labname;
 	triple 		*ref, *next, *rettrip;
 	DCL_THREADGBL_ACCESS;
 
@@ -262,7 +262,7 @@ triple *entryref(opctype op1, opctype op2, mint commargcode, boolean_t can_comma
 STATICFNDEF triple *insert_extref_fast(opctype op1, opctype op2, mident *rtnname, mident *labname)
 {
 	triple 		*rettrip;
-	mstr		lbl_str;
+	mstr		lbl_str =  {{{0}}};
 	mlabel		*mlab;
 
 	/* Do LABEL^RTN comes here (LABEL is *not* indirect) */
@@ -282,7 +282,7 @@ STATICFNDEF triple *insert_extref_fast(opctype op1, opctype op2, mident *rtnname
 	CONVERT_MUTIL_NAME_PERCENT_TO_UNDERSCORE(rtnname);
 	rettrip->operand[0] = PUT_CDREF(rtnname);
 	mlabel2xtern(&lbl_str, rtnname, labname);
-	rettrip->operand[1] = PUT_CDREF(&lbl_str);
+	rettrip->operand[1] = PUT_CDREF(&lbl_str.mident);
 	ins_triple(rettrip);
 	return rettrip;
 }

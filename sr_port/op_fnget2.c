@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,6 +12,7 @@
 
 #include "mdef.h"
 #include "op.h"
+#include "gcol_list.h"
 
 LITREF mval		literal_null;
 
@@ -20,7 +22,7 @@ LITREF mval		literal_null;
 void op_fnget2(mval *src, mval *def, mval *dst)
 {
 	MV_FORCE_DEFINED(def);
-	*dst = MV_DEFINED(src) ? *src : *def;
+	dst->umval = MV_DEFINED(src) ? src->umval : def->umval;
 	assert(0 == (dst->mvtype & MV_ALIASCONT));	/* Should be no alias container flag */
 	return;
 }

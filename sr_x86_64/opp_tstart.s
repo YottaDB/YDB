@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2007-2015 Fidelity National Information 	#
+# Copyright (c) 2007-2026 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -16,6 +16,7 @@
 
 	.DATA
 	.extern	frame_pointer
+	.extern tstart_readdr
 
 	.text
 	.extern	op_tstart
@@ -41,6 +42,9 @@ FRAME_SIZE	= 16
 # stack space for the return address then adding 16 bytes for save area, just reduce by the difference.
 #
 ENTRY	opp_tstart
+	movq    frame_pointer(REG_IP), REG64_SCRATCH1
+	movq    msf_mpc_off(REG64_SCRATCH1), REG64_SCRATCH1 # Pickup saved tstart address before putframe updates it
+	movq    REG64_SCRATCH1,tstart_readdr(REG_IP)
         putframe
 	leaq	8(REG_SP), %rbp				# Address of start of parameter list on stack
         subq    $FRAME_SIZE-8, REG_SP 			# Burn the return pc, add 16 byte save area and 16 byte align stack

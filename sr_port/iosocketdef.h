@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -392,9 +392,9 @@ typedef struct socket_struct_type
 	int				bufsiz;				/* OS internal buffer size */
 	int				n_delimiter;
 	int				last_recv_errno;
-	mstr				delimiter[MAX_N_DELIMITER];
-	mstr				idelimiter[MAX_N_DELIMITER];
-	mstr				odelimiter0;
+	unmanaged_mstr			delimiter[MAX_N_DELIMITER];
+	unmanaged_mstr			idelimiter[MAX_N_DELIMITER];
+	unmanaged_mstr			odelimiter0;
 	size_t				buffer_size;			/* size of the buffer for this socket */
 	size_t				buffered_length;		/* length of stuff buffered for this socket */
 	size_t				buffered_offset;		/* offset of the buffered stuff to buffer head */
@@ -407,8 +407,8 @@ typedef struct socket_struct_type
 	uint				filemode;		/* for LOCAL */
 	uint				filemode_mask;		/* to tell which modes specified */
 	uic_struct_int			uic;
-	mstr				zff;
-	mstr				ozff;			/* UTF-16 if chset is UTF-16 else copy  of zff */
+	unmanaged_mstr			zff;
+	unmanaged_mstr			ozff;			/* UTF-16 if chset is UTF-16 else copy  of zff */
 	uint4				lastaction;		/* waitcycle  count */
 	uint4				readycycle;		/* when was ready */
 	uint4				pendingevent;		/* bitmask, if listening, needs accept */
@@ -494,13 +494,14 @@ void iosocket_idelim_conv(socket_struct *socketptr, gtm_chset_t to_chset);
 void iosocket_odelim_conv(socket_struct *socketptr, gtm_chset_t to_chset);
 void iosocket_delimiter_copy(socket_struct *from, socket_struct *to);
 boolean_t iosocket_switch(char *handle, int handle_len, d_socket_struct *from, d_socket_struct *to);
-int4 iosocket_handle(char *handle, int *len, boolean_t newhandle, d_socket_struct *dsocketptr);
+int4 iosocket_get_handle(const char *handle, int len, const d_socket_struct *dsocketptr);
+int4 iosocket_new_handle(char *handle, int *len_p, const d_socket_struct *dsocketptr);
 socket_struct *iosocket_create(char *sockaddr, uint4 bfsize, int file_des, boolean_t listen_specified);
 ssize_t iosocket_snr(socket_struct *socketptr, void *buffer, size_t maxlength, int flags, ABS_TIME *time_for_read);
 void iosocket_unsnr(socket_struct *socketptr, unsigned char *buffer, size_t len);
 ssize_t iosocket_snr_utf_prebuffer(io_desc *iod, socket_struct *socketptr, int flags, ABS_TIME *time_for_read,
 				   boolean_t wait_for_input);
-void iosocket_write_real(mstr *v, boolean_t convert_output);
+void iosocket_write_real(const unmanaged_mstr *v, boolean_t convert_output);
 void iosocket_readfl_badchar(mval *vmvalptr, int datalen, int delimlen, unsigned char *delimptr, unsigned char *strend);
 boolean_t iosocket_listen_sock(socket_struct *socketptr, unsigned short len);
 void iosocket_close_one(d_socket_struct *dsocketptr, int index);

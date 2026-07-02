@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2005-2025 Fidelity National Information	*
+ * Copyright (c) 2005-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -239,7 +239,10 @@ typedef enum {
 	WBTEST_JNL_PREAD,			/* 189 : Benchmark pread() against lseek()+read() */
 	WBTEST_INTEG_RTS_ERR,			/* 190 : Force an RTS_ERROR inside of mu_int_maps */
 	WBTEST_REPEAT_DBFILOPN,			/* 191 : force dbfilopn to return -2 to the parent to call for a repeat. */
-	WBTEST_HOLD_BUFFER			/* 192 : force process to hold a buffer for >6 but <60 seconds. */
+	WBTEST_HOLD_BUFFER,			/* 192 : force process to hold a buffer for >6 but <60 seconds. */
+	WBTEST_RCVR_STALE_STRMCACHE,		/* 193 : Force stale stream cache in receiver to reproduce STRMNUMMISMTCH2 */
+	WBTEST_SOCKET_CLOSE,			/* 194 : Force buffer error conditions during socket close */
+	WBTEST_ABUSE_TIMERS			/* 195 : Establish a user timer handler that will do some unusual things */
 
 	/* Note 1: when adding new white box test cases, please make use of WBTEST_ENABLED and WBTEST_ASSIGN_ONLY (defined below)
 	 * whenever applicable

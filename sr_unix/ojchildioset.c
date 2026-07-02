@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -59,7 +59,7 @@ int ojchildioset(job_params_type *jparms)
 	if (IS_JOB_SOCKET(jparms->params.input.buffer, jparms->params.input.len))
 	{
 		handle_len = JOB_SOCKET_HANDLE_LEN(jparms->params.input.len);
-		index = iosocket_handle(JOB_SOCKET_HANDLE(jparms->params.input.buffer), &handle_len, FALSE, socket_pool);
+		index = iosocket_get_handle(JOB_SOCKET_HANDLE(jparms->params.input.buffer), handle_len, socket_pool);
 		if (-1 == index)
 		{
 			joberr = joberr_stdin_socket_lookup;
@@ -103,7 +103,7 @@ int ojchildioset(job_params_type *jparms)
 	if (IS_JOB_SOCKET(jparms->params.output.buffer, jparms->params.output.len))
 	{
 		handle_len = JOB_SOCKET_HANDLE_LEN(jparms->params.output.len);
-		index = iosocket_handle(JOB_SOCKET_HANDLE(jparms->params.output.buffer), &handle_len, FALSE, socket_pool);
+		index = iosocket_get_handle(JOB_SOCKET_HANDLE(jparms->params.output.buffer), handle_len, socket_pool);
 		if (-1 == index)
 		{
 			joberr = joberr_stdout_socket_lookup;
@@ -152,7 +152,7 @@ int ojchildioset(job_params_type *jparms)
 	if (IS_JOB_SOCKET(jparms->params.error.buffer, jparms->params.error.len))
 	{
 		handle_len = JOB_SOCKET_HANDLE_LEN(jparms->params.error.len);
-		index = iosocket_handle(JOB_SOCKET_HANDLE(jparms->params.error.buffer), &handle_len, FALSE, socket_pool);
+		index = iosocket_get_handle(JOB_SOCKET_HANDLE(jparms->params.error.buffer), handle_len, socket_pool);
 		if (-1 == index)
 		{
 			joberr = joberr_stderr_socket_lookup;

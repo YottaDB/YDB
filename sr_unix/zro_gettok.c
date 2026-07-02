@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,7 +16,7 @@
 #endif
 #include "zroutines.h"
 
-int zro_gettok (char **lp, char *top, mstr *tok)
+int zro_gettok (char **lp, char *top, unmanaged_mstr *tok)
 {
 	int	toktyp;
 

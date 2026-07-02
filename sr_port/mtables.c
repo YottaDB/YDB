@@ -15,7 +15,7 @@
 #include "compiler.h"
 #include "opcode.h"
 #include "toktyp.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "mv_stent.h"
 #include "release_name.h"
 #include "gdsroot.h"		/* needed for tp.h & gv_trigger.h */
@@ -139,7 +139,7 @@ LITDEF toktabtype tokentable[] =
 };
 
 GBLREF mv_stent *mv_chain;	/* Needed for MV_SIZE macro */
-LITDEF unsigned char mvs_size[] =
+LITDEF unsigned short mvs_size[] =
 {
 	MV_SIZE(mvs_msav),
 	MV_SIZE(mvs_mval),
@@ -178,7 +178,7 @@ LITDEF boolean_t mvs_save[] =
 	TRUE,	/* MVST_MSAV */
 	FALSE,	/* MVST_MVAL */
 	TRUE,	/* MVST_STAB */
-	FALSE,	/* MVST_IARR */
+	FALSE,	/* MVST_UNUSED1 */
 	TRUE,	/* MVST_NTAB */
 	TRUE,	/* MVST_ZINTCMD */
 	TRUE,	/* MVST_PVAL */
@@ -280,11 +280,11 @@ LITDEF	gtmImageName	gtmImageNames[n_image_types] =
 #define DEFAULT_ETRAP		"IF $ZJOBEXAM()"
 LITDEF mval default_etrap = DEFINE_MVAL_LITERAL(MV_STR, 0 , 0 , (SIZEOF(DEFAULT_ETRAP) - 1),  DEFAULT_ETRAP , 0 , 0 );
 
-LITDEF mname_entry 	null_mname_entry =
+LITDEF unmanaged_mname_entry 	null_mname_entry =
 {
-	{UNIX_ONLY_COMMA(0) 0, NULL},
 	0,
-	FALSE
+	FALSE,
+	{UNIX_ONLY_COMMA(0) 0, NULL}
 };
 
 LITDEF mval *fndata_table[2][2] =
@@ -446,7 +446,7 @@ LITDEF char 	alphanumeric_table[] = {'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I'
 					'8', '9', '\0'};
 LITDEF int	alphanumeric_table_len = (SIZEOF(alphanumeric_table) - 1);
 
-LITDEF mstr chset_names[CHSET_MAX_IDX_ALL] =
+LITDEF unmanaged_mstr chset_names[CHSET_MAX_IDX_ALL] =
 { /* Supported character set (CHSET) codes for the 3-argument form of $ZCONVERT.
    *  Note: Update the *_CHSET_LEN macros below if new CHSETs are added.
    */
@@ -477,8 +477,7 @@ GBLDEF casemap_t casemaps[MAX_CASE_IDX] =
 
 #ifdef UNIX
 /* Used as the value for "regular" key (i.e., the one with no hidden subscripts) of a spanning node. */
-LITDEF mstr	nsb_dummy = {0, 1, "\0"};
-/*LITDEF mstr	nsb_dummy = {0, LEN_AND_LIT("dummy")};*/
+LITDEF unmanaged_mstr	nsb_dummy = {0, 1, "\0"};
 #endif
 
 #define	ENUM_ENTRY(NAME)	#NAME
@@ -1009,7 +1008,7 @@ LITDEF char vxi_opcode[][6] =
  */
 void mtables_chk(void)
 {
-	assert(SIZEOF(mvs_size) == (MVST_LAST));
-	assert(SIZEOF(mvs_save) == (SIZEOF(boolean_t) * (MVST_LAST)));
+	assert(ARRAYSIZE(mvs_size) == (MVST_LAST));
+	assert(ARRAYSIZE(mvs_save) == (MVST_LAST));
 }
 #endif

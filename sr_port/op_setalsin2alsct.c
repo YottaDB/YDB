@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2009, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2009-2026 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,7 +16,7 @@
 #include "gtm_string.h"
 
 #include "gtmio.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "stack_frame.h"
 #include "op.h"
 #include "lv_val.h"
@@ -56,7 +57,7 @@ void op_setalsin2alsct(lv_val *srclv, lv_val *dstlv)
 	/* Decrement alias container refs (if any) and cleanup if necessary */
 	DECR_AC_REF(dstlv, TRUE);
 	/* Reset value of lv_val to now be a container ref to the supplied base var */
-	memcpy(&dstlv->v, &literal_null, SIZEOF(mval));
+	dstlv->v.umval = literal_null.umval;
 	dstlv->v.mvtype |= MV_ALIASCONT;				/* Set the magic container flag */
 	dstlv->v.str.addr = (char *)srclv;				/* And save our reference */
 	assert(0 < srclv->stats.trefcnt);

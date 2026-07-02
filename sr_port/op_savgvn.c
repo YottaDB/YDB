@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2012, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2012-2026 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,7 +19,7 @@
 #include "indir_enum.h"
 #include "cache.h"
 #include "op.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "valid_mname.h"
 #include "gtm_string.h"
 #include "cachectl.h"
@@ -50,16 +51,21 @@ void op_savgvn(UNIX_ONLY_COMMA(int argcnt) int hash_code_dummy, mval *val_arg, .
 	--argcnt;	/* remove hash_code_dummy from parameter list before storing */
 	ENSURE_GLVN_POOL_SPACE(argcnt);
 	GET_GLVN_POOL_STATE(slot, m);
+	assert(slot->mval_top == (TREF(glvn_pool_ptr))->mval_top);
 	gvn_info = (gparam_list *)&slot->glvn_info;
 	gvn_info->n = argcnt;
 	key = val_arg;
 	for (i = 0; ; )
 	{
-		*m = *key;
+		m->umval = key->umval;
 		gvn_info->arg[i] = m;
 		(TREF(glvn_pool_ptr))->mval_top++;
-		if (MV_IS_STRING(m) && !IS_IN_STRINGPOOL(m->str.addr, m->str.len))
-			s2pool(&m->str);
+		if (MV_IS_STRING(m) && m->str.len)
+		{
+			if (!IS_IN_STRINGPOOL(m->str.addr, m->str.len))
+				s2pool(&m->str);
+		}
+		glist_protect_str(&m->str);
 		m++;
 		if (++i < argcnt)
 			key = va_arg(var, mval *);

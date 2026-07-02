@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -52,7 +53,7 @@ void op_write(mval *v)
 	}
 #endif
 
-	(io_curr_device.out->disp_ptr->write)(&v->str);
+	(io_curr_device.out->disp_ptr->write)(&v->str.umstr);
 
 #if defined(KEEP_zOS_EBCDIC) || defined(VMS)
 	if (DEFAULT_CODE_SET != active_device->out_code_set)

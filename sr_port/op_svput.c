@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -38,7 +38,7 @@
 #include "error_trap.h"
 #include "gtm_ctype.h"
 #include "setzdir.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "stack_frame.h"
 #include "getzdir.h"
 #include "gtm_newintrinsic.h"
@@ -111,7 +111,7 @@ void op_svput(int varnum, mval *v)
 	size_t		rtmp;
 	sgmnt_addrs	*csa;			/* for ZGBLDIR */
 	gd_region	*reg, *reg_top;
-	mval		save_mval, *save_mval_ptr;
+	mval		save_mval = {{0}}, *save_mval_ptr;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -141,7 +141,8 @@ void op_svput(int varnum, mval *v)
 			MV_FORCE_STR(v);
 			op_commarg(v,indir_linetail);
 			op_unwind();
-			TREF(dollar_zstep) = *v;
+			(TREF(dollar_zstep)).umval = v->umval;
+			glist_sync_mval(TADR(dollar_zstep));
 			break;
 		case SV_ZGBLDIR:
 			MV_FORCE_STR(v);
@@ -154,9 +155,13 @@ void op_svput(int varnum, mval *v)
 				} else
 				{
 					gd_header = zgbldir(v);
+					assert(glist_mval_in_sync(&dollar_zgbldir));
 					dollar_zgbldir.str.len = v->str.len;
 					dollar_zgbldir.str.addr = v->str.addr;
+					assert(MV_IS_STRING(&dollar_zgbldir));
+					glist_sync_mval(&dollar_zgbldir);
 					s2pool(&dollar_zgbldir.str);
+					assert(glist_mval_in_sync(&dollar_zgbldir));
 					if (jnlpool_head && jnlpool_head->next)
 					{	/* only makes sense to change jnlpool if more than one attached */
 						for (reg = gd_header->regions, reg_top = reg + gd_header->n_regions;
@@ -186,8 +191,7 @@ void op_svput(int varnum, mval *v)
 			}
 			break;
 		case SV_ZMAXTPTIME:
-			save_mval = *v;	/* use a stack variable copy to avoid modifying the state of what might be a GT.M literal */
-			save_mval_ptr = push_mval(&save_mval);	/* compiled code-runtime interactions rely on stable shared lits */
+			save_mval_ptr = push_mval(v);	/* compiled code-runtime interactions rely on stable shared lits */
 			MV_FORCE_NUM(save_mval_ptr);
 			assert(MV_BIAS == MILLISECS_IN_SEC);				/* check math if this changes */
 			if (0 != save_mval_ptr->m[1])
@@ -195,6 +199,7 @@ void op_svput(int varnum, mval *v)
 			        op_fnj3(save_mval_ptr, 0, 3, save_mval_ptr);
 			        MV_FORCE_INT(save_mval_ptr);
 			        save_mval_ptr->mvtype = MV_INT | MV_NM;
+				save_mval_ptr->str.len = 0;
 			}
 			if (!((0 >= (save_mval_ptr->m[1] / TPTIMEOUT_GRACE_RNDS)) || (TPTIMEOUT_MAX_TIME < save_mval_ptr->m[1])))
 			        TREF(dollar_zmaxtptime) = save_mval_ptr->m[1];
@@ -217,7 +222,8 @@ void op_svput(int varnum, mval *v)
 		case SV_ZSOURCE:
 			MV_FORCE_STR(v);
 			dollar_zsource.mvtype = MV_STR;
-			dollar_zsource.str = v->str;
+			dollar_zsource.str.umstr = v->str.umstr;
+			glist_sync_mval(&dollar_zsource);
 			break;
 		case SV_ZTRAP:
 #			ifdef GTM_TRIGGER
@@ -225,13 +231,9 @@ void op_svput(int varnum, mval *v)
 				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_NOZTRAPINTRIG);
 #			endif
 			MV_FORCE_STR(v);
-			/* Save v->str before op_newintrinsic(), which might overflow it. (gtm-DE304273) */
-			save_mval = *v;
-			DBG_MARK_STRINGPOOL_UNEXPANDABLE;
+			save_mval_ptr = push_mval(v);
 			if (ztrap_new)
 				op_newintrinsic(SV_ZTRAP);
-			DBG_MARK_STRINGPOOL_EXPANDABLE;
-			save_mval_ptr = push_mval(&save_mval);
 			s2pool(&save_mval_ptr->str);
 #ifdef			DEBUG
 			if (WBTEST_ENABLED(WBTEST_MUNMAP_FREE) && (3 == gtm_white_box_test_case_count))
@@ -244,8 +246,9 @@ void op_svput(int varnum, mval *v)
 			if (!save_mval_ptr->str.len)
 			{	/* Setting $ZTRAP to empty causes any current error trapping to be canceled */
 				(TREF(dollar_etrap)).mvtype = (TREF(dollar_ztrap)).mvtype = MV_STR;
-				(TREF(dollar_ztrap)).str = save_mval_ptr->str;
-				(TREF(dollar_etrap)).str.len = 0;
+				(TREF(dollar_ztrap)).str.umstr = save_mval_ptr->str.umstr;
+				glist_sync_mval(&(TREF(dollar_ztrap)));
+				NULLIFY_TRAP(TREF(dollar_etrap));
 				ztrap_explicit_null = TRUE;
 				if ((MVST_MVAL == mv_chain->mv_st_type) && (save_mval_ptr == &mv_chain->mv_st_cont.mvs_mval))
 					POP_MV_STENT();
@@ -260,7 +263,8 @@ void op_svput(int varnum, mval *v)
 					op_unwind();
 				}
 				(TREF(dollar_ztrap)).mvtype = MV_STR;
-				(TREF(dollar_ztrap)).str = save_mval_ptr->str;
+				(TREF(dollar_ztrap)).str.umstr = save_mval_ptr->str.umstr;
+				glist_sync_mval(&(TREF(dollar_ztrap)));
 				if ((MVST_MVAL == mv_chain->mv_st_type) && (save_mval_ptr == &mv_chain->mv_st_cont.mvs_mval))
 					POP_MV_STENT();
 				if ((TREF(dollar_etrap)).str.len > 0)
@@ -275,7 +279,8 @@ void op_svput(int varnum, mval *v)
 		case SV_ZSTATUS:
 			MV_FORCE_STR(v);
 			dollar_zstatus.mvtype = MV_STR;
-			dollar_zstatus.str = v->str;
+			dollar_zstatus.str.umstr = v->str.umstr;
+			glist_sync_mval(&dollar_zstatus);
 			break;
 		case SV_PROMPT:
 			MV_FORCE_STR(v);
@@ -350,7 +355,9 @@ void op_svput(int varnum, mval *v)
 			if ((TREF(dollar_ztrap)).str.len > 0)
 			{	/* replacing ZTRAP with ETRAP */
 				NULLIFY_TRAP(TREF(dollar_ztrap));
-				(TREF(dollar_etrap))= default_etrap;	/* want change, so use default value in case of bad value */
+				(TREF(dollar_etrap)).umval = default_etrap.umval;	/* want change, so use default
+											 * value in case of bad value
+											 */
 			}
 			if (v->str.len)
 			{	/* check we have valid code */
@@ -358,22 +365,30 @@ void op_svput(int varnum, mval *v)
 				op_unwind();
 			}	/* set $etrap="" clears any current value, but doesn't cancal all trapping the way $ZTRAP="" does */
 			(TREF(dollar_etrap)).mvtype = MV_STR;
-			(TREF(dollar_etrap)).str = v->str;
+			(TREF(dollar_etrap)).str.umstr = v->str.umstr;
+			glist_sync_mval(TADR(dollar_etrap));
+			/* Both ztrap and etrap have been set to non-default values explicitly or implicitly */
+			assert(glist_mval_in_sync(TADR(dollar_etrap)));
+			assert(glist_mval_in_sync(TADR(dollar_ztrap)));
 			break;
 		case SV_ZERROR:
 			MV_FORCE_STR(v);
 			dollar_zerror.mvtype = MV_STR;
-			dollar_zerror.str = v->str;
+			dollar_zerror.str.umstr = v->str.umstr;
+			glist_sync_mval(&dollar_zerror);
 			break;
 		case SV_ZYERROR:
 			MV_FORCE_STR(v);
 			dollar_zyerror.mvtype = MV_STR;
-			dollar_zyerror.str = v->str;
+			dollar_zyerror.str.umstr = v->str.umstr;
+			glist_sync_mval(&dollar_zyerror);
 			break;
 		case SV_SYSTEM:
 			MV_FORCE_STR(v);
 			if (0 == v->str.len)
-				dollar_system = dollar_system_initial;	/* input is empty: set back to initial value */
+				dollar_system.umval = dollar_system_initial.umval;	/* input is empty: set back to
+											 * initial value
+											 */
 			else if ((MAX_TRANS_NAME_LEN + STR_LIT_LEN("47,")) > (i = (dollar_system_initial.str.len + v->str.len)))
 			{	/* value fits, so append the value; WARNING assignment above */
 				ENSURE_STP_FREE_SPACE(i);
@@ -393,7 +408,8 @@ void op_svput(int varnum, mval *v)
 		case SV_ZINTERRUPT:
 			MV_FORCE_STR(v);
 			dollar_zinterrupt.mvtype = MV_STR;
-			dollar_zinterrupt.str = v->str;
+			dollar_zinterrupt.str.umstr = v->str.umstr;
+			glist_sync_mval(&dollar_zinterrupt);
 			break;
 		case SV_ZDATE_FORM:
 			MV_FORCE_NUM(v);
@@ -402,7 +418,8 @@ void op_svput(int varnum, mval *v)
 		case SV_ZTEXIT:
 			MV_FORCE_STR(v);
 			dollar_ztexit.mvtype = MV_STR;
-			dollar_ztexit.str = v->str;
+			dollar_ztexit.str.umstr = v->str.umstr;
+			glist_sync_mval(&dollar_ztexit);
 			/* Coercing $ZTEXIT to boolean at SET command is more efficient than coercing before each
 			 * rethrow at TR/TRO. Since we want to maintain dollar_ztexit as a string, coercion should
 			 * not be performed on dollar_ztext, but on a temporary (i.e. parameter v)
@@ -420,7 +437,7 @@ void op_svput(int varnum, mval *v)
 			if (dollar_ztriggerop != &gvtr_cmd_mval[GVTR_CMDTYPE_SET])
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SETINSETTRIGONLY, 2, RTS_ERROR_TEXT("$ZTVALUE"));
 			assert(0 < gtm_trigger_depth);
-			memcpy(dollar_ztvalue, v, SIZEOF(mval));
+			dollar_ztvalue->umval = v->umval;
 			dollar_ztvalue->mvtype &= ~MV_ALIASCONT;	/* Make sure to shut off alias container flag on copy */
 			assert(NULL != ztvalue_changed_ptr);
 			*ztvalue_changed_ptr = TRUE;
@@ -436,7 +453,8 @@ void op_svput(int varnum, mval *v)
 			if (MAX_ZTWORMHOLE_SIZE < v->str.len)
 				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_ZTWORMHOLE2BIG, 2, v->str.len, MAX_ZTWORMHOLE_SIZE);
 			dollar_ztwormhole.mvtype = MV_STR;
-			dollar_ztwormhole.str = v->str;
+			dollar_ztwormhole.str.umstr = v->str.umstr;
+			glist_sync_mval(&dollar_ztwormhole);
 			break;
 #			else
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_UNIMPLOP);
@@ -448,7 +466,8 @@ void op_svput(int varnum, mval *v)
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SETINTRIGONLY, 2, RTS_ERROR_TEXT("$ZTSLATE"));
 			assert(0 < gtm_trigger_depth);
 			MV_FORCE_DEFINED(v);
-			memcpy((char *)&dollar_ztslate, v, SIZEOF(mval));
+			dollar_ztslate.umval = v->umval;
+			glist_sync_mval(&dollar_ztslate);
 			dollar_ztslate.mvtype &= ~MV_ALIASCONT;	/* Make sure to shut off alias container flag on copy */
 			break;
 #			else

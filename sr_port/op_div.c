@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -43,22 +43,23 @@ void	op_div (mval *u, mval *v, mval *q)
 		promo = eb_mvint_div(u->m[1], v->m[1], q->m);
 		if (!promo)
 		{
+			q->str.len = 0;
 			q->mvtype = MV_NM | MV_INT;
 			return;
 		} else
 		{
-			w = *u;	     z = *v;
+			w.umval = u->umval;	     z.umval = v->umval;
 			promote(&w); promote(&z);
 			u = &w;	     v = &z;
 		}
 	} else if (u->mvtype & MV_INT)
 	{
-		w = *u;
+		w.umval = u->umval;
 		promote(&w);
 		u = &w;
 	} else if (v->mvtype & MV_INT)
 	{
-		w = *v;
+		w.umval = v->umval;
 		promote(&w);
 		v = &w;
 	}
@@ -69,11 +70,12 @@ void	op_div (mval *u, mval *v, mval *q)
 		TREF(last_source_column) += (TK_EOL == TREF(director_token)) ? -2 : 2;	/* improve hints */
 		rts_error_csa(NULL, VARLSTCNT(1) ERR_NUMOFLOW);	/* BYPASSRTSABT */
 	} else if (exp < EXPLO)
-		*q = literal_zero;
+		q->umval = literal_zero.umval;
 	else if (exp < EXP_INT_OVERF  &&  exp > EXP_INT_UNDERF  &&  q->m[0] == 0  &&  (q->m[1]%ten_pwr[EXP_INT_OVERF-1-exp] == 0))
 		demote(q, exp, u->sgn ^ v->sgn);
 	else
 	{
+		q->str.len = 0;
 		q->mvtype = MV_NM;
 		q->sgn = u->sgn ^ v->sgn;
 		q->e = exp;

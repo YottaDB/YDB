@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -14,17 +14,18 @@
 
 #include "stringpool.h"
 #include "zshow.h"
+#include "gcol_list.h"
 
 GBLREF spdesc stringpool;
 
-/* WARNING!!! - the it is left to the caller of this routine to protect the stringpool if appropriate */
+/* WARNING!!! - it is left to the caller of this routine to protect the stringpool if appropriate */
 void mval_lex(mval *v, mstr *output)
 {
 	int space_needed, des_len;
 
 	MV_FORCE_STR(v);
 	if (MV_IS_CANONICAL(v))
-		*output = v->str;
+		output->umstr = v->str.umstr;
 	else
 	{
 		space_needed = ZWR_EXP_RATIO(v->str.len);

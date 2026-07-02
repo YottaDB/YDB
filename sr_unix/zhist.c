@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2013-2015 Fidelity National Information 	*
+ * Copyright (c) 2013-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -15,10 +15,11 @@
 #include "gtm_string.h"
 
 #include "min_max.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "gtmlink.h"
 #include "error.h"
 #include "gtmio.h"
+#include "stringpool.h"
 
 #ifdef AUTORELINK_SUPPORTED /* This entire file */
 GBLREF	int	object_file_des;
@@ -92,7 +93,7 @@ zro_hist *zro_zhist_saverecent(zro_search_hist_ent *zhist_valent_end, zro_search
 	zro_hist		*lcl_recent_zhist;
 	zro_validation_entry	*zhent;
 	zro_search_hist_ent	*zhist_valent;
-	mstr			rtnname;
+	mident			rtnname;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -112,12 +113,13 @@ zro_hist *zro_zhist_saverecent(zro_search_hist_ent *zhist_valent_end, zro_search
 	{
 		rtnname.addr = zhist_valent->rtnname.c;
 		rtnname.len = zhist_valent->rtnname_len;
+		assert(!IS_IN_STRINGPOOL(rtnname.addr, rtnname.len));
 		assert(NULL != zhist_valent->zro_valent.relinkctl_bkptr);
 		rec = relinkctl_insert_record(zhist_valent->zro_valent.relinkctl_bkptr, &rtnname);
 		assert(NULL != rec);
 		zhist_valent->zro_valent.relinkrec = rec;
 		zhist_valent->zro_valent.cycle = rec->cycle;
-		memcpy((char *)zhent, (char *)&zhist_valent->zro_valent, SIZEOF(zro_validation_entry));
+		memcpy(zhent, &zhist_valent->zro_valent, SIZEOF(zro_validation_entry));
 	}
 	REVERT;
 	TREF(save_zhist) = NULL;
@@ -146,10 +148,10 @@ CONDITION_HANDLER(zro_ins_rec_fail_ch)
  * Parameters:
  *   zhist_valent	- $ZROUTINES search history entry to be filled in.
  *   obj_container	- $ZROUTINES entry for a given object directory.
- *   rtnname		- mstr addr containing name of the routine.
+ *   rtnname		- mident addr containing name of the routine.
  *
  */
-void zro_record_zhist(zro_search_hist_ent *zhist_valent, zro_ent *obj_container, mstr *rtnname)
+void zro_record_zhist(zro_search_hist_ent *zhist_valent, zro_ent *obj_container, mident *rtnname)
 {
 	open_relinkctl_sgm	*linkctl;
 	int			len;

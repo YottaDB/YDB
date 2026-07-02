@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -14,7 +14,7 @@
 
 #include "gtm_string.h"
 
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "stack_frame.h"
 #include "stringpool.h"
 #include "error_trap.h"
@@ -160,18 +160,20 @@ void	get_frame_place_mcode(int level, stack_mode_t mode, int cur_zlevel, mval *r
 				irtnhdr = (ihdtyp *)((char *)vp + *vp);
 				indce = irtnhdr->indce;
 				assert(NULL != indce);
-				assert(0 < indce->refcnt);	/* currently used in the M stack better have a non-zero refcnt */
-				s2pool(&indce->src.str);
-				result->str = indce->src.str;
-				assert(IS_AT_END_OF_STRINGPOOL(result->str.addr, result->str.len));
-			} else
-			{	/* Not a real indirect. The mpc may have been reset by error handling to various assembler
-				 * routines or it just may be broken. Whatever the reason, the value to return is that the
-				 * code address and thus the code itself is not available so make an appropriate return.
-				 */
-				result->str.addr = "N/A";
-				result->str.len = SIZEOF("N/A") - 1;
+				if (0 < indce->refcnt)	/* currently used in the M stack needs to have a non-zero refcnt */
+				{
+					s2pool(&indce->src.str);
+					result->str.umstr = indce->src.str.umstr;
+					assert(IS_IN_STRINGPOOL(result->str.addr, result->str.len));
+					return;
+				}
 			}
+			/* Not a useful indirect. The mpc may have been reset by error handling to various assembler
+			 * routines or it just may be broken. Whatever the reason, the value to return is not at the
+			 * code address and thus the code itself is not available so make an appropriate return text.
+			 */
+			result->str.addr = "N/A";
+			result->str.len = SIZEOF("N/A") - 1;
 		}
 	}
 	return;

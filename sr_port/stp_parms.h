@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -9,7 +9,8 @@
  *	the license, please stop and do not read further.	*
  *								*
  ****************************************************************/
-
+#ifndef STP_PARMS_H_INCLUDED
+#define STP_PARMS_H_INCLUDED
 /*
  *	STP_PARMS.H - String pool parameters
  */
@@ -21,6 +22,7 @@
 #define STP_MAXINITSIZE	(61035 * STP_PAGE_SIZE) /* maximum initial size of string pool */
 #define STP_INITSIZE_REQUESTED  (INITIAL_STP_PAGES * STP_PAGE_SIZE) /* requested size of string pool */
 #define STP_MAXITEMS	8192	/* initial number of mval's for garbage collection; also grow by this value*/
+#define STP_ARRAY_STARTITEMS 1024
 #define STP_NUM_INCRS	4 /* number of increments on the sliding scale used to grow string pool. Should be a power of 2 so that
 			 * so that divides can be done as shifts */
 #define STP_LOWRECLAIM_LEVEL(x) (((x) >> 2) + ((x) >> 3) - ((x) >> 4)) /* level of available string pool (after reclaim) to
@@ -33,3 +35,4 @@
 			 */
 #define STP_GCOL_TRIGGER_FLOOR 100000 /* Don't set the target level to call the garbage collector below this value. */
 #define STP_MIN_CONTRACTION (1024 * 1024) /* Don't contract (mmap/munmap) the stringpool below this value (1MiB) */
+#endif

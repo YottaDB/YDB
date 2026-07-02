@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,12 +19,12 @@
 
 bool gvcmx_get(mval *v)
 {
-	mval temp;
+	mval temp = {{0}};
 
 	temp.mvtype = 0;
 	gvcmz_doop(CMMS_Q_GET, CMMS_R_GET, &temp);
 	if (MV_DEFINED(&temp))
-		*v = temp;
+		v->umval = temp.umval;
 
 	return MV_DEFINED(&temp);
 }

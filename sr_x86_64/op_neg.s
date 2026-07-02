@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2007-2015 Fidelity National Information 	#
+# Copyright (c) 2007-2026 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -46,9 +46,11 @@ numer:
 	movl	mval_l_m1(REG64_RET1), REG32_RET1
 	negl	REG32_RET1
 	movl	REG32_RET1, mval_l_m1(REG64_RET0)
+	movl	$0,mval_l_strlen(REG64_RET0)
 	jmp	done
 float:
 	movw	$mval_m_nm, mval_w_mvtype(REG64_RET0)
+	movl	$0,mval_l_strlen(REG64_RET0)
 	movb	mval_b_exp(REG64_RET1), REG8_SCRATCH1
 	xorb	$mval_esign_mask, REG8_SCRATCH1		# Flip the sign bit
 	movb	REG8_SCRATCH1, mval_b_exp(REG64_RET0)

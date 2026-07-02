@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -12,7 +12,7 @@
 
 #include "mdef.h"
 #include "compiler.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "cache.h"
 #include "obj_file.h"
 #include "cg_var.h"
@@ -26,7 +26,7 @@ void ind_cg_var(mtreenode *node, void *var_tabent_arg)
 	var_tabent **p = var_tabent_arg;
 
 	assert((char *)indr_stringpool.base <= node->var.mvname.addr && node->var.mvname.addr < (char *)indr_stringpool.top);
-	(*p)[node->var.mvidx].var_name = node->var.mvname;
+	(*p)[node->var.mvidx].var_name = node->var.mvname.mident;
 	COMPUTE_HASH_MNAME(&((*p)[node->var.mvidx]));
 	(*p)[node->var.mvidx].var_name.addr = (char *)((node->var.mvname.addr - (char *)indr_stringpool.base) +
 						ROUND_UP2(SIZEOF(ihdtyp), NATIVE_WSIZE));

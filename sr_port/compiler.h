@@ -13,6 +13,7 @@
 #define COMPILER_H_INCLUDED
 
 #include "mdq.h"
+#include "gcol_list.h"
 
 /* Values for oprclass - Changes made here need to be reflected in cdbg_dump opr_type_names table */
 typedef enum
@@ -50,7 +51,7 @@ typedef struct	mvarstruct
 	struct	mvarstruct	*lson,
 				*rson;
 	int4			mvidx;
-	mident			mvname;
+	mstr			mvname;
 	struct	tripletype	*last_fetch;
 } mvar;
 
@@ -78,7 +79,7 @@ typedef struct	mlabstruct
 	struct	mlabstruct	*lson,
 				*rson;
 	mline			*ml;
-	mident			mvname;
+	mstr			mvname;
 	int			formalcnt;
 	boolean_t		gbl;
 } mlabel;
@@ -325,9 +326,30 @@ error_def(ERR_SVNOSET);
 #define COMPLITS_HASHTAB_CLEANUP									\
 	{												\
 		GBLREF hash_table_str		*complits_hashtab;					\
+		GBLREF	mliteral	literal_chain;							\
+		ht_ent_str		*tabent_lit, *topent_lit;					\
+		mliteral		*mlit;								\
 		if (complits_hashtab && complits_hashtab->base)						\
 		{	/* Release hash table itself but leave hash table descriptor if exists */ 	\
+			for (tabent_lit = complits_hashtab->base, topent_lit = complits_hashtab->top;	\
+					tabent_lit < topent_lit; tabent_lit++)				\
+			{										\
+				if (HTENT_VALID_STR(tabent_lit, mliteral, mlit))			\
+				{									\
+					glist_unprotect_str(&mlit->v.str);				\
+					delete_hashtab_ent_str(complits_hashtab, tabent_lit);		\
+				}									\
+			}										\
 			free_hashtab_str(complits_hashtab);						\
+			complits_hashtab->base = NULL;							\
+			dqinit(&literal_chain, que);							\
+		} else if (literal_chain.que.fl && literal_chain.que.fl != &literal_chain)		\
+		{											\
+ 			dqloop(&literal_chain, que, mlit)						\
+			{										\
+				glist_unprotect_str(&mlit->v.str);					\
+			}										\
+			dqinit(&literal_chain, que);							\
 		}											\
 	}
 #define COMPSYMS_HASHTAB_CLEANUP									\
@@ -541,11 +563,11 @@ typedef struct
  * be (re)set by the s2n/n2s calls we do. If not, the mval could have random bits in it which, as far as the mval is concerned
  * is not a problem but interferes with getting a consistent object hash value when the same source is (re)compiled.
  */
-#define CLEAR_MVAL_BITS(mvalptr) 			\
-{							\
-	((mval_gen *)(mvalptr))->byte.sgne = 0;		\
-	(mvalptr)->fnpc_indx = 0xff;			\
-	UTF8_ONLY((mvalptr)->utfcgr_indx = 0xff);	\
+#define CLEAR_MVAL_BITS(MVAL_P) 					\
+{									\
+	((unsigned char *)(MVAL_P))[SGNE_OFFSET] = 0;			\
+	(MVAL_P)->fnpc_indx = 0xff;					\
+	UTF8_ONLY((MVAL_P)->utfcgr_indx = 0xff);			\
 }
 
 /* Macro to put a literal truth value as an operand */
@@ -553,16 +575,16 @@ typedef struct
 MBSTART {												\
 	LITREF mval		literal_zero, literal_one;						\
 													\
-	mval	*V;											\
+	mval	V;											\
 													\
-	V = (mval *)mcalloc(SIZEOF(mval));								\
-	*V = (TV) ? literal_one : literal_zero;								\
-	assert((1 == literal_one.str.len) && (1 == literal_zero.str.len));				\
 	ENSURE_STP_FREE_SPACE(1);									\
-	*(char *)stringpool.free = *V->str.addr;							\
-	V->str.addr = (char *)stringpool.free;								\
+	V.umval = (TV) ? literal_one.umval : literal_zero.umval;					\
+	V.str.in_array = FALSE;										\
+	assert((1 == literal_one.str.len) && (1 == literal_zero.str.len));				\
+	*(char *)stringpool.free = *V.str.addr;								\
+	V.str.addr = (char *)stringpool.free;								\
 	stringpool.free += 1;										\
-	put_lit_s(V, TRIP_REF);										\
+	put_lit_s(&V, TRIP_REF);									\
 } MBEND
 
 /* Macro to decide whether an invocation of unary tail has any promise */
@@ -595,7 +617,10 @@ MBSTART {													\
 	SAVE_PARSE_PTR->block_level = TREF(block_level);							\
 	SAVE_PARSE_PTR->director_ident_len = (TREF(director_ident)).len;					\
 	memcpy(SAVE_PARSE_PTR->ident_buffer, (TREF(director_ident)).addr, SAVE_PARSE_PTR->director_ident_len);	\
-	SAVE_PARSE_PTR->director_mval = TREF(director_mval);							\
+	glist_unprotect_str(&(SAVE_PARSE_PTR)->director_mval.str);						\
+	(SAVE_PARSE_PTR)->director_mval.umval = (TREF(director_mval)).umval;					\
+	glist_transfer_protection_to_from(&(SAVE_PARSE_PTR)->director_mval.str, &(TREF(director_mval)).str);	\
+	glist_protect_str(&(TREF(director_mval)).str);								\
 	SAVE_PARSE_PTR->director_token = TREF(director_token);							\
 	SAVE_PARSE_PTR->lexical_ptr = TREF(lexical_ptr);							\
 	SAVE_PARSE_PTR->source_column = source_column;								\
@@ -611,7 +636,9 @@ MBSTART {													\
 	TREF(block_level) = SAVE_PARSE_PTR->block_level;							\
 	(TREF(director_ident)).len = SAVE_PARSE_PTR->director_ident_len;					\
 	memcpy((TREF(director_ident)).addr, SAVE_PARSE_PTR->ident_buffer, SAVE_PARSE_PTR->director_ident_len);	\
-	TREF(director_mval) = SAVE_PARSE_PTR->director_mval;							\
+	glist_unprotect_str(&(TREF(director_mval)).str);							\
+	(TREF(director_mval)).umval = (SAVE_PARSE_PTR)->director_mval.umval;					\
+	glist_transfer_protection_to_from(&(TREF(director_mval)).str, &(SAVE_PARSE_PTR)->director_mval.str);	\
 	TREF(director_token) = SAVE_PARSE_PTR->director_token;							\
 	TREF(lexical_ptr) = SAVE_PARSE_PTR->lexical_ptr;							\
 	(TREF(source_buffer)).addr = (char *)&aligned_source_buffer;						\
@@ -781,8 +808,8 @@ int		one_job_param(char **parptr);
 int		parse_until_rparen_or_space(void);
 oprtype		put_ocnt(void);
 oprtype		put_tsiz(void);
-oprtype		put_cdlt(mstr *x);
-oprtype		put_cdidx(mstr *x);
+oprtype		put_cdlt(const unmanaged_mstr *x);
+oprtype		put_cdidx(const unmanaged_mstr *x);
 oprtype		put_ilit(mint x);
 oprtype		put_indr(oprtype *x);
 oprtype		put_lit(mval *x);

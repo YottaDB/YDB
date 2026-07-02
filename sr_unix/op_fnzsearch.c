@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -34,6 +34,7 @@
 #include "gdsbt.h"
 #include "have_crit.h"
 #include "op_fnzsearch.h"
+#include "mv_stent.h"
 
 LITREF		mval	literal_null;
 
@@ -74,7 +75,7 @@ int op_fnzsearch(mval *pattern, mint indx, mint mfunc, mval *ret)
 	char		pblk_buf[GTM_PATH_MAX], sanitized_buf[GTM_PATH_MAX];
 	char		*match, *buf_ptr;
 	int		i, status, length;
-	mval		file;
+	mval		*file;
 	parse_blk	pblk;
 	lv_val		*var_ref;
 	plength		*match_len;
@@ -88,6 +89,8 @@ int op_fnzsearch(mval *pattern, mint indx, mint mfunc, mval *ret)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	PUSH_MV_STENT(MVST_MVAL);
+	file = &mv_chain->mv_st_cont.mvs_mval;
 	if (mfunc && ((MAX_STRM_CT <= indx) || (0 > indx)))	/* Allow an out-of-range stream only if used internally. */
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_ZSRCHSTRMCT);
 	ESTABLISH_RET(fnzsrch_ch, -1);
@@ -96,8 +99,8 @@ int op_fnzsearch(mval *pattern, mint indx, mint mfunc, mval *ret)
 	MV_FORCE_STR(pattern);
 	if (MAX_FN_LEN < pattern->str.len)
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_INVSTRLEN, 2, pattern->str.len, MAX_FN_LEN);
-	MV_FORCE_MVAL(((mval *)TADR(fnzsearch_sub_mval)), indx);
-	TREF(fnzsearch_lv_vars) = op_srchindx(VARLSTCNT(2) TREF(zsearch_var), (mval *)TADR(fnzsearch_sub_mval));
+	MV_FORCE_MVAL((TADR(fnzsearch_sub_mval)), indx);
+	TREF(fnzsearch_lv_vars) = op_srchindx(VARLSTCNT(2) TREF(zsearch_var), TADR(fnzsearch_sub_mval));
 	if (TREF(fnzsearch_lv_vars))
 	{	/* If the parameter is different, kill the local with previous results. */
 		assert((TREF(fnzsearch_lv_vars))->v.mvtype & MV_STR);
@@ -114,10 +117,11 @@ int op_fnzsearch(mval *pattern, mint indx, mint mfunc, mval *ret)
 		memset(&pblk, 0, SIZEOF(pblk));
 		pblk.buffer = pblk_buf;
 		pblk.buff_size = MAX_FN_LEN;
-		if (parse_file(&pattern->str, &pblk) & 1)
+		if (parse_file(&pattern->str.umstr, &pblk) & 1)
 		{	/* Establish new search context. */
 			TREF(fnzsearch_lv_vars) = op_putindx(VARLSTCNT(2) TREF(zsearch_var), TADR(fnzsearch_sub_mval));
-			(TREF(fnzsearch_lv_vars))->v = *pattern;	/* zsearch_var(indx)=original spec */
+			(TREF(fnzsearch_lv_vars))->v.umval = pattern->umval;
+			assert(glist_str_protected(&(TREF(fnzsearch_lv_vars))->v.str));
 			if (0 != pblk.b_esl)
 			{	/* Create a NULL-terminated buffer with the pattern to be passed to glob(). If we are dealing with a
 				 * relative-path pattern, prepend it with the absolute path of the working directory first.
@@ -165,7 +169,7 @@ int op_fnzsearch(mval *pattern, mint indx, mint mfunc, mval *ret)
 				if (0 == status)
 				{
 					TREF(fnzsearch_globbuf_ptr) = &globbuf;
-					file.mvtype = MV_STR;
+					file->mvtype = MV_STR;
 					for (i = 0; i < globbuf.gl_pathc; i++)
 					{	/* We do not care for . and .. */
 #ifdef _AIX
@@ -183,14 +187,14 @@ int op_fnzsearch(mval *pattern, mint indx, mint mfunc, mval *ret)
 						if (MAX_FN_LEN < length)
 							continue;
 						ENSURE_STP_FREE_SPACE(length);
-						file.str.addr = match;
-						file.str.len = length;
-						s2pool(&file.str);
-						var_ref = op_putindx(VARLSTCNT(2) TREF(fnzsearch_lv_vars), &file);
+						file->str.addr = match;
+						file->str.len = length;
+						s2pool(&file->str);
+						var_ref = op_putindx(VARLSTCNT(2) TREF(fnzsearch_lv_vars), file);
 						var_ref->v.mvtype = MV_STR;
 						var_ref->v.str.len = 0;
 						match_len = (plength *)&(var_ref->v.m[1]);
-						SET_LENGTHS(match_len, file.str.addr, length, TRUE);
+						SET_LENGTHS(match_len, file->str.addr, length, TRUE);
 					}
 #ifdef _AIX
 					if (!use_stat)
@@ -237,6 +241,9 @@ int op_fnzsearch(mval *pattern, mint indx, mint mfunc, mval *ret)
 	assert((0 == ret->str.len) || (pret.p.pblk.b_esl == ret->str.len));
 	TREF(lv_null_subs) = TREF(fnzsearch_nullsubs_sav);
 	REVERT;
+	assert(file == &mv_chain->mv_st_cont.mvs_mval);
+	if (file == &mv_chain->mv_st_cont.mvs_mval)
+		POP_MV_STENT();
 	return pret.p.pint;
 }
 

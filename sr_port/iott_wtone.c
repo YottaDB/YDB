@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -19,11 +19,11 @@
 
 GBLREF	io_pair		io_curr_device;
 GBLREF	boolean_t	gtm_utf8_mode;
-LITREF	mstr		chset_names[];
+LITREF	unmanaged_mstr	chset_names[];
 
 void iott_wtone(int v)
 {
-	mstr	temp;
+	unmanaged_mstr	temp;
 	char	p[1];
 #ifdef UTF8_SUPPORTED
 	unsigned char	utf_buf[GTM_MB_LEN_MAX], *up;
@@ -45,7 +45,7 @@ void iott_wtone(int v)
 		temp.len = INTCAST(up - utf_buf);
 		temp.addr = (char *)&utf_buf[0];
 	} else
-		RTS_ERROR_ABT(VARLSTCNT(4) ERR_BADCHSET, 2, chset_names[io_curr_device.out->ochset].len,
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_BADCHSET, 2, chset_names[io_curr_device.out->ochset].len,
 			chset_names[io_curr_device.out->ochset].addr);
 #endif
 	iott_write(&temp);

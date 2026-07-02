@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2007-2022 Fidelity National Information		#
+# Copyright (c) 2007-2026 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -40,8 +40,11 @@ mval_m_retarg		=	0x080
 mval_m_utflen		=	0x100
 mval_m_aliascont	=	0x200
 
-mval_byte_len		=	32				# Length of mval in bytes
+# Must be accompanied by asserts in mdef.h that byte_lens are evenly divisible by quadword size
+mval_byte_len		=	40				# Length of mval in bytes
 mval_qword_len		=	((mval_byte_len + 7) / 8)	# Length of mval in quadwords (8 byte words)
+umval_byte_len		=	32				# Length of mval-minus-que in bytes
+umval_qword_len		=	((umval_byte_len + 7) / 8)	# Length of mval-minus-que in quadwords (8 byte words)
 
 #
 # Offsets of type, exp, strlen, stradd, num in mval structure
@@ -139,6 +142,7 @@ top			=	16
 #
 .macro	mv_i2mval int, mval
 	movw	$mval_m_int, mval_w_mvtype(\mval)
+	movl	$0,mval_l_strlen(\mval)
 	movl	\int, %eax
 	imull	$MV_BIAS, %eax, %eax
 	movl	%eax, mval_l_m1(\mval)

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -17,7 +17,7 @@
 #include "cmd_qlf.h"
 #include "list_file.h"
 #include "source_file.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "obj_file.h"
 #include "reinit_compilation_externs.h"
 #include "compiler.h"
@@ -26,7 +26,6 @@
 #include "stp_parms.h"
 #include "stringpool.h"
 
-GBLREF boolean_t		mstr_native_align, save_mstr_native_align;
 GBLREF char			cg_phase;
 GBLREF command_qualifier	cmd_qlf;
 GBLREF spdesc			indr_stringpool, rts_stringpool, stringpool;
@@ -53,8 +52,8 @@ CONDITION_HANDLER(compiler_ch)
 	if (CQ_WARNINGS & cmd_qlf.qlf)
 		PRN_ERROR;
 	COMPILE_HASHTAB_CLEANUP;
+	glist_clear_arrays(&indr_stringpool);
 	reinit_compilation_externs();
-	mstr_native_align = save_mstr_native_align;
 	if (CGP_MACHINE == cg_phase)
 		drop_object_file();
 	if (CGP_NOSTATE < cg_phase)

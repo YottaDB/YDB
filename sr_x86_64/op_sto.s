@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2007-2016 Fidelity National Information		#
+# Copyright (c) 2007-2026 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -27,12 +27,15 @@ ENTRY	op_sto
 	CHKSTKALIGN						# Verify stack alignment
 	mv_if_notdefined REG64_RET1, notdef
 nowdef:
-	movl	$mval_qword_len, REG32_ARG3
-	movq	REG64_RET1, REG64_ARG1
-	movq	REG64_RET0, REG64_ARG0
-	REP
-	movsq
-	andw	$~mval_m_aliascont, mval_w_mvtype(REG64_RET0)	# Don't propagate alias container flag
+	movq	(REG64_RET1), REG64_OUT_ARG0 # Move first qword of source mval to 64bit register rdi
+	andq	$~mval_m_aliascont, REG64_OUT_ARG0	# Don't propagate alias container flag. Only works if mval_w_mvtype == 0
+	movq	8(REG64_RET1), REG64_OUT_ARG1 # Move second qword of source mval to rsi.
+	movq	16(REG64_RET1), REG64_OUT_ARG2 # Move third qword from source mval into register
+	movq	24(REG64_RET1), REG64_OUT_ARG3 # Move fourth qword from source mval into register
+	movq	REG64_OUT_ARG0, (REG64_RET0) # Move first qword (less alias bit) to dest mval
+	movq	REG64_OUT_ARG1, 8(REG64_RET0) # Move second qword to dest mval
+	movq	REG64_OUT_ARG2, 16(REG64_RET0) # Move third qword to dest mval
+	movq	REG64_OUT_ARG3, 24(REG64_RET0) # Move fourth qword to dest mval
 done:
 	addq	$8, REG_SP					# Remove stack alignment bump
 	ret

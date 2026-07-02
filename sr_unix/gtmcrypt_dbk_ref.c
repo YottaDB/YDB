@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2009-2025 Fidelity National Information	*
+ * Copyright (c) 2009-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -384,7 +384,7 @@ STATICFNDEF gtm_keystore_t *keystore_lookup_by_unres_key(char *search_field1, in
 {
 	gtm_keystore_unres_key_link_t	*curr, *prev;
 	gtm_keystore_t			*node;
-	int				name_length, path_length, search_fail;
+	int				name_length, path_length, search_fail, save_errno;
 	char				*name_search_field_ptr, *path_search_field_ptr, *ynew_ext;
 	char				*lcl_key_name, lcl_key_name_buff[GTM_PATH_MAX];
 	char				name_search_field_buff[GTM_PATH_MAX];
@@ -454,8 +454,9 @@ STATICFNDEF gtm_keystore_t *keystore_lookup_by_unres_key(char *search_field1, in
 					} else if (ENOENT != errno)
 					{
 						*error = TRUE;
+						save_errno = errno;
 						UPDATE_ERROR_STRING("Could not obtain the real path of the database " STR_ARG
-							". %s", ELLIPSIZE(curr->key_name), strerror(errno));
+							". %s", ELLIPSIZE(curr->key_name), strerror(save_errno));
 						return NULL;
 					}
 					/* If we are looking by a keyname, and the database is missing, skip the entry. Otherwise,
@@ -628,7 +629,7 @@ STATICFNDEF gtm_keystore_t *gtmcrypt_decrypt_key(char *key_path, int path_length
  */
 STATICFNDEF int keystore_refresh(void)
 {
-	int		cfg_version = 1, n_mappings, status, just_read;
+	int		cfg_version = 1, n_mappings, status, just_read, save_errno;
 	size_t		envvar_len;
 	char		*config_env;
 	struct stat	stat_info;
@@ -663,8 +664,9 @@ STATICFNDEF int keystore_refresh(void)
 		}
 		if (0 != stat(config_env, &stat_info))
 		{
+			save_errno = errno;
 			UPDATE_ERROR_STRING("Cannot stat configuration file: " STR_ARG ". %s", ELLIPSIZE(config_env),
-				strerror(errno));
+				strerror(save_errno));
 			return -1;
 		}
 		if (!S_ISREG(stat_info.st_mode))
@@ -681,8 +683,9 @@ STATICFNDEF int keystore_refresh(void)
 	/* Stat the file if not done already, so that we can get the last modified date. */
 	if ((!just_read) && (0 != stat(gc_config_filename, &stat_info)))
 	{
+		save_errno = errno;
 		UPDATE_ERROR_STRING("Cannot stat configuration file " STR_ARG ". %s", ELLIPSIZE(gc_config_filename),
-			strerror(errno));
+			strerror(save_errno));
 		return -1;
 	}
 	/* If the config file has not been modified since the last time we checked, return right away. */
@@ -741,7 +744,7 @@ STATICFNDEF int keystore_refresh(void)
  */
 STATICFNDEF int read_files_section(config_setting_t *parent, enum key_encr_mech encryptor)
 {
-	int			i, name_length, lcl_n_maps;
+	int			i, name_length, lcl_n_maps, save_errno;
 	config_setting_t	*setting, *elem;
 	gtm_keystore_t		*node;
 	char			*key_name, *key_path;
@@ -780,8 +783,9 @@ STATICFNDEF int read_files_section(config_setting_t *parent, enum key_encr_mech 
 		/* Key path needs to be fully resolved before we can reliably use it, hence realpath-ing. */
 		if (NULL == realpath(key_path, path_array))
 		{
+			save_errno = errno;
 			UPDATE_ERROR_STRING("In config file " STR_ARG ", could not obtain the real path of 'files' "
-				"entry #%d's key. %s", ELLIPSIZE(gc_config_filename), i + 1, strerror(errno));
+				"entry #%d's key. %s", ELLIPSIZE(gc_config_filename), i + 1, strerror(save_errno));
 			return -1;
 		}
 		/* Duplicate names with different keys are prohibited for files, though they are allowed for databases. */
@@ -811,7 +815,7 @@ STATICFNDEF int read_files_section(config_setting_t *parent, enum key_encr_mech 
  */
 STATICFNDEF int read_database_section(config_setting_t *parent, enum key_encr_mech encryptor)
 {
-	int			i, name_length, lcl_n_maps;
+	int			i, name_length, lcl_n_maps, save_errno;
 	config_setting_t	*setting, *elem;
 	gtm_keystore_t		*node;
 	char			*key_name, *key_path;
@@ -857,8 +861,9 @@ STATICFNDEF int read_database_section(config_setting_t *parent, enum key_encr_me
 		/* Key path needs to be fully resolved before we can reliably use it, hence realpath-ing. */
 		if (NULL == realpath(key_path, path_array))
 		{
+			save_errno = errno;
 			UPDATE_ERROR_STRING("In config file " STR_ARG ", could not obtain the real path of 'database.keys' "
-				"entry #%d's key. %s", ELLIPSIZE(gc_config_filename), i + 1, strerror(errno));
+				"entry #%d's key. %s", ELLIPSIZE(gc_config_filename), i + 1, strerror(save_errno));
 			return -1;
 		}
 		/* Duplicate names with different keys are allowed for databases, though they are prohibited for files. */

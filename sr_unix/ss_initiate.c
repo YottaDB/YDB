@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2009-2025 Fidelity National Information	*
+ * Copyright (c) 2009-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -204,7 +204,8 @@ boolean_t	ss_initiate(gd_region *reg,			/* Region in which snapshot has to be st
 	int			save_errno, shdw_fd, status, tmpfd, user_id;
 	ZOS_ONLY(int		realfiletag;)
 	long			ss_shmid = INVALID_SHMID;
-	mstr			tempdir_full, tempdir_log, tempdir_trans;
+	mstr			tempdir_full, tempdir_trans;
+	unmanaged_mstr		tempdir_log;
 	uint4			*kip_pids_arr_ptr;
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
@@ -528,19 +529,20 @@ boolean_t	ss_initiate(gd_region *reg,			/* Region in which snapshot has to be st
 			if (csa->now_crit)	/* In MUPIP INTEG and instance freeze, it is possible we don't have crit */
 				rel_crit(reg);
 			GET_CUR_TIME(time_str);
-			util_out_print("!/MUPIP INFO: !AD : Start kill-in-prog wait for database !AD", TRUE,
+				util_out_print("MUPIP INFO: ss_initiate: !AD : Start kill-in-prog wait for database !AD", TRUE,
 				CTIME_BEFORE_NL, time_str, DB_LEN_STR(reg));
 			while (csd->kill_in_prog && (MAX_CRIT_TRY > crit_counter++))
 			{
 				GET_C_STACK_FOR_KIP(kip_pids_arr_ptr, crit_counter, MAX_CRIT_TRY, 1, MAX_KIP_PID_SLOTS);
 				wcs_sleep(crit_counter);
 			}
-			if (debug_mupip)
-			{
-				GET_CUR_TIME(time_str);
-				util_out_print("!/MUPIP INFO: !AD : Done with kill-in-prog wait on !AD", TRUE,
-					CTIME_BEFORE_NL, time_str, DB_LEN_STR(reg));
-			}
+			GET_CUR_TIME(time_str);
+			util_out_print("MUPIP INFO: ss_initiate: !AD : Done with kill-in-prog wait for database !AD", TRUE,
+				CTIME_BEFORE_NL, time_str, DB_LEN_STR(reg));
+			if (csd->kill_in_prog)
+				util_out_print(
+				"MUPIP INFO: ss_initiate: !AD : Kill-in-prog wait failed for database !AD, proceeding anyway.",
+				TRUE, CTIME_BEFORE_NL, time_str, DB_LEN_STR(reg));
 		}
 		grab_crit(reg, WS_98);
 		/* After we have created the shared memory and before we grab crit, another process can add new blocks to the

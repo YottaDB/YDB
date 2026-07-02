@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2021 Fidelity National Information	*
+ * Copyright (c) 2006-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -152,11 +152,11 @@ int utf8_len_strict(unsigned char* ptr, int len)
  * 	- does NOT do BADCHAR check.
  *	- treats illegal characters as unprintable characters (for width).
  */
-int gtm_wcswidth(unsigned char* ptr, int len, boolean_t strict, int nonprintwidth)
+int gtm_wcswidth(const unsigned char* ptr, int len, boolean_t strict, int nonprintwidth)
 {
-	int		strwidth, cwidth;
-	uint4		ch;
-	unsigned char	*ptrtop, *ptrnext;
+	int			strwidth, cwidth;
+	uint4			ch;
+	const unsigned char	*ptrtop, *ptrnext;
 
 	assert(gtm_utf8_mode);
 	ptrtop = ptr + len;

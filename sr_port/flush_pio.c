@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -109,13 +109,13 @@ void write_text_newline_and_flush_pio(mstr *text)
 						if ('\n' == c)
 						{
 							text->len = i - (text->addr - msg_start);
-							(io_std_device.out->disp_ptr->write)(text);
+							(io_std_device.out->disp_ptr->write)(&text->umstr);
 							(io_std_device.out->disp_ptr->wteol)(1, io_std_device.out);
 							text->addr += text->len + 1;
 						} else if ('\f' == c)
 						{
 							text->len = i - (text->addr - msg_start);
-							(io_std_device.out->disp_ptr->write)(text);
+							(io_std_device.out->disp_ptr->write)(&text->umstr);
 							(io_std_device.out->disp_ptr->wtff)();
 							text->addr += text->len + 1;
 						}
@@ -125,7 +125,7 @@ void write_text_newline_and_flush_pio(mstr *text)
 					{	/* If we still have something to write, potentially after a form feed or newline, do
 						 * write it and follow up with a newline.
 						 */
-						(io_std_device.out->disp_ptr->write)(text);
+						(io_std_device.out->disp_ptr->write)(&text->umstr);
 						(io_std_device.out->disp_ptr->wteol)(1, io_std_device.out);
 					} else if ('\f' != c)
 						(io_std_device.out->disp_ptr->wteol)(1, io_std_device.out);

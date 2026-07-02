@@ -12,7 +12,7 @@
 #ifndef OBJ_FILE_INCLUDED
 #define OBJ_FILE_INCLUDED
 
-#include <obj_filesp.h>
+#include "obj_filesp.h"
 
 #define OUTPUT_SYMBOL_SIZE (SIZEOF(int4) + sym_table_size)
 #define PADCHARS	"PADDING PADDING"

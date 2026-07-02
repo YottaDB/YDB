@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -18,8 +18,10 @@
 #include "gtm_stdio.h"
 #include "have_crit.h"
 #include "gtmimagename.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "stack_frame.h"
+#include "tp_restart.h"
+#include "op.h"
 
 #ifdef __MVS__
 #  define GTMCORENAME "gtmcore"
@@ -45,6 +47,7 @@
  * Note, if ever call-ins fully support TP processing such that each trigger frame could have it's own callin
  * in addition to the other handlers for each trigger frame, the maximums may need to be re-visited.
  */
+#define LONGJMP_PROHIBITED_LVZWR 1
 #ifdef DEBUG
 #  define CONDSTK_INITIAL_INCR	5	/* Lower initial limit for DEBUG to exercise extensions. Note that values below 5 cause
 					 * issues with nested malloc()s when using certain gtmdbglvl values. */
@@ -161,11 +164,14 @@ void ch_trace_point() {return;}
 #define MUM_TSTART		{												\
 					GBLREF unsigned short	proc_act_type;							\
 					GBLREF int		process_exiting;						\
-																\
+					DEBUG_ONLY(GBLREF unsigned int	count_prohibit_longjmp;)				\
 					intrpt_state_t		prev_intrpt_state;						\
+					DCL_THREADGBL_ACCESS;									\
 																\
+					SETUP_THREADGBL_ACCESS;									\
 					assert(!multi_thread_in_use);								\
 					assert(!process_exiting);								\
+					assert(!count_prohibit_longjmp);							\
 					CHTRACEPOINT;										\
 					DEFER_INTERRUPTS(INTRPT_IN_CONDSTK, prev_intrpt_state);					\
 					for ( ;(ctxt > &chnd[0]) && (ctxt->ch != &mdb_condition_handler); ctxt--);		\
@@ -180,6 +186,8 @@ void ch_trace_point() {return;}
 					restart = mum_tstart;									\
 					active_ch = ctxt;									\
 					ENABLE_INTERRUPTS(INTRPT_IN_CONDSTK, prev_intrpt_state);				\
+					if (TREF(in_xpel))									\
+						tp_restart_add_to_M_stack(); 							\
 					longjmp(ctxt->jmp, 1);									\
 				}
 
@@ -428,6 +436,7 @@ MBSTART {													\
 					GBLREF	uint4			dollar_tlevel;						\
 					GBLREF	ch_ret_type		(*t_ch_fnptr)();      /* Function pointer to t_ch */	\
 					GBLREF	ch_ret_type		(*dbinit_ch_fnptr)();/* Function pointer to dbinit_ch */\
+					DEBUG_ONLY(GBLREF 	unsigned int		count_prohibit_longjmp;)		\
 																\
 					intrpt_state_t			prev_intrpt_state;					\
 																\
@@ -451,6 +460,7 @@ MBSTART {													\
 					ENABLE_INTERRUPTS(INTRPT_IN_CONDSTK, prev_intrpt_state);				\
 					assert(UNWINDABLE(active_ch));								\
 					assert(active_ch->dollar_tlevel == dollar_tlevel);					\
+					assert((active_ch - chnd) >= count_prohibit_longjmp);					\
 					longjmp(active_ch->jmp, -1);								\
 				}
 

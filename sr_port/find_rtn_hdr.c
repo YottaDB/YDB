@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -13,7 +13,7 @@
 #include "mdef.h"
 
 #include "gtm_string.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "min_max.h"
 #include "stack_frame.h"
 #include "compiler.h"	/* for WANT_CURRENT_RTN_MSTR macro */
@@ -21,7 +21,7 @@
 GBLREF rtn_tabent	*rtn_names, *rtn_names_end;
 GBLREF stack_frame	*frame_pointer;
 
-rhdtyp	*find_rtn_hdr(mstr *name)
+rhdtyp	*find_rtn_hdr(const mident *name)
 {
 	rtn_tabent	*rtabent;
 
@@ -43,7 +43,7 @@ rhdtyp	*find_rtn_hdr(mstr *name)
  * 	include runtime disambiguators in their names.
  */
 
-boolean_t find_rtn_tabent(rtn_tabent **res, mstr *name)
+boolean_t find_rtn_tabent(rtn_tabent **res, const mident *name)
 {
 	rtn_tabent	*bot, *top, *mid;
 	int4		comp;

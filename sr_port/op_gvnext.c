@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -99,6 +99,7 @@ void op_gvnext(mval *v)
 	else
 		found = gvusr_order();
 	v->mvtype = 0; /* so stp_gcol, if invoked below, can free up space currently occupied by this to-be-overwritten mval */
+	v->str.len = 0;
 	if (!found)
 	{
 		ENSURE_STP_FREE_SPACE(2);

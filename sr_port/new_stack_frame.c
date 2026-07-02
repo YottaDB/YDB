@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -15,7 +15,7 @@
 #include "gtm_stdio.h"
 #include "gtm_string.h"
 
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "stack_frame.h"
 #include "mprof.h"
 #include "error.h"
@@ -33,7 +33,11 @@ void new_stack_frame(rhdtyp *rtn_base, unsigned char *context, unsigned char *tr
 	register stack_frame 	*sf;
 	unsigned char		*msp_save;
 	unsigned int		x1, x2;
+	mval			*m, *mtop;
 
+        DCL_THREADGBL_ACCESS;
+
+        SETUP_THREADGBL_ACCESS;
 	assert(NULL != rtn_base);
 	assert(NULL != transfer_addr);
 	assert((frame_pointer < frame_pointer->old_frame_pointer) || (NULL == frame_pointer->old_frame_pointer));
@@ -51,7 +55,7 @@ void new_stack_frame(rhdtyp *rtn_base, unsigned char *context, unsigned char *tr
 	assert((unsigned char *)msp < stackbase);
 	sf->old_frame_pointer = frame_pointer;
 	sf->rvector = rtn_base;
-	sf->vartab_ptr = (char *)VARTAB_ADR(rtn_base);
+	sf->vartab_ptr = VARTAB_ADR(rtn_base);
 	sf->vartab_len = sf->rvector->vartab_len;
 	sf->ctxt = context;
 	sf->mpc = transfer_addr;
@@ -59,6 +63,7 @@ void new_stack_frame(rhdtyp *rtn_base, unsigned char *context, unsigned char *tr
 	sf->restart_pc = frame_pointer->restart_pc;
 	sf->flags = 0;
 	SET_GLVN_INDX(sf, GLVN_POOL_UNTOUCHED);
+	SET_PTEMP_CNT(sf, INVALID_PTEMP_CNT);
 	sf->ret_value = NULL;
 	sf->dollar_test = -1;
 #	ifdef HAS_LITERAL_SECT
@@ -92,6 +97,11 @@ void new_stack_frame(rhdtyp *rtn_base, unsigned char *context, unsigned char *tr
 	DBGEHND((stderr, "new_stack_frame: Added stackframe at addr 0x"lvaddr"  old-msp: 0x"lvaddr"  new-msp: 0x"lvaddr
 		 " for routine %.*s (rtnhdr 0x"lvaddr")\n", sf, msp_save, msp, rtn_base->routine_name.len,
 		 rtn_base->routine_name.addr, rtn_base));
+	if ((TREF(zinxpel_rtn_fp_capture)))
+	{
+		TREF(zinxpel_rtn_fp) = sf;
+		TREF(zinxpel_rtn_fp_capture) = FALSE;
+	}
 	return;
 }
 

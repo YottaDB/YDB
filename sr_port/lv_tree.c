@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2011-2023 Fidelity National Information	*
+ * Copyright (c) 2011-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -33,7 +33,7 @@
 #include "fileinfo.h"
 #include "gdsbt.h"
 #include "gdsfhead.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "stack_frame.h"
 #include "alias.h"
 
@@ -642,6 +642,7 @@ lvTreeNode *lvAvlTreeCloneSubTree(lvTreeNode *node, lvTree *lvt, lvTreeNode *avl
 
 	assert(NULL != node);
 	cloneNode = lvtreenode_getslot(LVT_GET_SYMVAL(lvt));
+	glist_protect_str(&cloneNode->v.str);
 	/* The following is optimized to do the initialization of just the needed structure members. For that it assumes a
 	 * particular "lvTreeNode" structure layout. The assumed layout is asserted so any changes to the layout will
 	 * automatically show an issue here and cause the below initialization to be accordingly reworked.
@@ -655,7 +656,8 @@ lvTreeNode *lvAvlTreeCloneSubTree(lvTreeNode *node, lvTree *lvt, lvTreeNode *avl
 	assert(OFFSETOF(lvTreeNode, descent_dir) + SIZEOF(cloneNode->descent_dir) == OFFSETOF(lvTreeNode, key_len));
 	assert(OFFSETOF(lvTreeNode, key_len) + SIZEOF(cloneNode->key_len) == OFFSETOF(lvTreeNode, key_addr));
 	assert(OFFSETOF(lvTreeNode, key_mvtype) + 8 == OFFSETOF(lvTreeNode, key_addr));
-	GTM64_ONLY(assert(OFFSETOF(lvTreeNode, key_addr) + SIZEOF(cloneNode->key_addr) == OFFSETOF(lvTreeNode, avl_left));)
+	GTM64_ONLY(assert(OFFSETOF(lvTreeNode, key_addr) + SIZEOF(cloneNode->key_addr) == OFFSETOF(lvTreeNode, in_array));)
+	GTM64_ONLY(assert(OFFSETOF(lvTreeNode, in_array) + SIZEOF(cloneNode->in_array) == OFFSETOF(lvTreeNode, avl_left));)
 	NON_GTM64_ONLY(
 		assert(OFFSETOF(lvTreeNode, key_addr) + SIZEOF(cloneNode->key_addr) == OFFSETOF(lvTreeNode, filler_8byte));
 		assert(OFFSETOF(lvTreeNode, filler_8byte) + SIZEOF(cloneNode->filler_8byte) == OFFSETOF(lvTreeNode, avl_left));
@@ -663,7 +665,9 @@ lvTreeNode *lvAvlTreeCloneSubTree(lvTreeNode *node, lvTree *lvt, lvTreeNode *avl
 	assert(OFFSETOF(lvTreeNode, avl_left) + SIZEOF(cloneNode->avl_left) == OFFSETOF(lvTreeNode, avl_right));
 	assert(OFFSETOF(lvTreeNode, avl_right) + SIZEOF(cloneNode->avl_right) == OFFSETOF(lvTreeNode, avl_parent));
 	assert(OFFSETOF(lvTreeNode, avl_parent) + SIZEOF(cloneNode->avl_parent) == SIZEOF(lvTreeNode));
-	cloneNode->v = node->v;
+	assert(glist_str_protected(&node->v.str));
+	cloneNode->v.umval = node->v.umval;
+	assert(glist_str_protected(&cloneNode->v.str));
 	/* If refCntMaint is true, when an alias container is copied, we bump the reference counts of whatever it points to. This
 	 * keeps the reference counts correct across TP.
 	 */
@@ -678,6 +682,10 @@ lvTreeNode *lvAvlTreeCloneSubTree(lvTreeNode *node, lvTree *lvt, lvTreeNode *avl
 	/* cloneNode->key_mvtype/balance/descent_dir/key_len all initialized in one shot */
 	memcpy(&cloneNode->key_mvtype, &node->key_mvtype, 8);	/* Asserts above keep the 8 byte length secure */
 	cloneNode->key_addr = node->key_addr;
+	if (!TREE_KEY_SUBSCR_IS_CANONICAL(cloneNode->key_mvtype))
+	{
+		glist_sync_lvTreeNode_key(cloneNode);
+	}
 	NON_GTM64_ONLY(
 		assert(IS_OFFSET_AND_SIZE_MATCH(lvTreeNode, filler_8byte, lvTreeNodeNum, key_m1));
 		((lvTreeNodeNum *)cloneNode)->key_m1 = ((lvTreeNodeNum *)node)->key_m1;
@@ -707,7 +715,8 @@ STATICFNDEF boolean_t lvAvlTreeLookupKeyCheck(treeKeySubscr *key)
 	boolean_t	is_canonical;
 
 	/* Ensure "key->mvtype" comes in with the MV_CANONICAL bit set if applicable */
-	dummy_mval = *key;
+	dummy_mval.umval = key->umval;
+	dummy_mval.str.in_array = FALSE;
 	is_canonical = MV_IS_CANONICAL(&dummy_mval);
 	if (is_canonical)
 		TREE_KEY_SUBSCR_SET_MV_CANONICAL_BIT(&dummy_mval);
@@ -715,6 +724,7 @@ STATICFNDEF boolean_t lvAvlTreeLookupKeyCheck(treeKeySubscr *key)
 		TREE_KEY_SUBSCR_RESET_MV_CANONICAL_BIT(&dummy_mval);
 	assert(TREE_KEY_SUBSCR_IS_CANONICAL(key->mvtype) == TREE_KEY_SUBSCR_IS_CANONICAL(dummy_mval.mvtype));
 	assert(TREE_KEY_SUBSCR_IS_CANONICAL(key->mvtype) || MV_IS_STRING(key));
+	assert(!TREE_KEY_SUBSCR_IS_CANONICAL(key->mvtype) || !MV_IS_STRING(key));
 	assert(!TREE_KEY_SUBSCR_IS_CANONICAL(key->mvtype) || MV_IS_NUMERIC(key));
 	return TRUE;
 }
@@ -776,6 +786,8 @@ STATICFNDEF boolean_t lvAvlTreeNodeIsWellFormed(lvTree *lvt, lvTreeNode *node)
 
 	if (NULL == node)
 		return TRUE;
+	assert(glist_str_protected(&node->v.str));
+	assert(glist_lvTreeNode_key_in_sync(node));
 	assert(node->tree_parent == lvt);
 	left = node->avl_left;
 	assert((NULL == left) || (left->avl_parent == node));
@@ -876,8 +888,6 @@ void	assert_tree_member_offsets(void)
 		/*    lvTree.ident     == symval.ident           == lv_val.v.mvtype */
 		assert(IS_OFFSET_AND_SIZE_MATCH(lvTree, ident, symval, ident));
 		assert(IS_OFFSET_AND_SIZE_MATCH(lvTree, ident, lv_val, v.mvtype));
-		/* Verify two mval layouts are equivalent */
-		assert(SIZEOF(mval) == SIZEOF(mval_b));
 		/*    lvTree.sbs_depth == symval.sbs_depth */
 		assert(IS_OFFSET_AND_SIZE_MATCH(lvTree, sbs_depth, symval, sbs_depth));
 		/*	                  lvTreeNode.v           == lv_val.v */
@@ -1595,8 +1605,8 @@ lvTreeNode *lvAvlTreeNodeInsert(lvTree *lvt, treeKeySubscr *key, lvTreeNode *par
 	assert(NULL == lvAvlTreeLookup(lvt, key, &tmp_parent));
 	/* create a node in the avl tree and initialize it */
 	node = lvtreenode_getslot(LVT_GET_SYMVAL(lvt));
+	glist_protect_str(&node->v.str);
 	assert(NULL != node);
-	/* node->v must be initialized by caller */
 	node->sbs_child = NULL;
 	node->tree_parent = lvt;
 	node->avl_left = node->avl_right = NULL;
@@ -1612,7 +1622,7 @@ lvTreeNode *lvAvlTreeNodeInsert(lvTree *lvt, treeKeySubscr *key, lvTreeNode *par
 			fltNode->key_flags.key_bits.key_iconv = FALSE;
 		} else
 		{
-			fltNode->key_flags.key_bytes.key_sgne = ((mval_b *)key)->sgne;
+			fltNode->key_flags.key_bytes.key_sgne = ((unsigned char *)key)[SGNE_OFFSET];
 			fltNode->key_m0 = key->m[0];
 			fltNode->key_m1 = key->m[1];
 		}
@@ -1621,6 +1631,7 @@ lvTreeNode *lvAvlTreeNodeInsert(lvTree *lvt, treeKeySubscr *key, lvTreeNode *par
 		node->key_mvtype = MV_STR;	/* do not use input mvtype as it might have MV_NM or MV_NUM_APPROX bits set */
 		node->key_len = key->str.len;
 		node->key_addr = key->str.addr;
+		glist_sync_lvTreeNode_key(node);
 	}
 	node->balance = TREE_BALANCED;
 	/* node->descent_dir is initialized later when this node is part of a lvAvlTreeLookup operation.

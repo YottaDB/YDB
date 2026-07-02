@@ -48,8 +48,9 @@ void op_indfun(mval *v, mint argcode, mval *dst)
 	assert((SIZEOF(indir_opcode)/SIZEOF(indir_opcode[0])) > argcode);
 	assert(indir_opcode[argcode]);
 	MV_FORCE_STR(v);
-	indir_src.str = v->str;
+	indir_src.str.umstr = v->str.umstr;
 	indir_src.code = argcode;
+	indir_src.str.in_array = FALSE;
 	if (NULL == (obj = cache_get(&indir_src)))
 	{
 		switch(argcode)
@@ -64,7 +65,9 @@ void op_indfun(mval *v, mint argcode, mval *dst)
 				} else if ((LV_NAME == glvname))
 				{
 					if (NULL == (ret_lv = op_srchindx_runtime(v, subs, start, stop, &tmp_lv)))
-						*dst = literal_zero;	/* $[Z]DATA returns zero when lvn was not found */
+						dst->umval = literal_zero.umval;	/* $[Z]DATA returns zero when lvn
+											 * was not found.
+											 */
 					else if (indir_fndata == argcode)
 						op_fndata(ret_lv, dst);
 					else
@@ -109,8 +112,11 @@ void op_indfun(mval *v, mint argcode, mval *dst)
 				{
 					op_gvquery(dst);
 					return;
-				} else if ((LV_NAME == glvname) && (op_fnquery_runtime(v, subs, start, stop, dst)))
+				} else if (LV_NAME == glvname)
+				{
+					op_fnquery_runtime(v, subs, start, stop, dst);
 					return;
+				}
 				break;
 			default:		/* No-op: Use the compiler behavior */
 				break;

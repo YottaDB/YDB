@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -17,8 +17,7 @@
 #include "send_msg.h"
 #include "gtmmsg.h"
 #include "cmd_qlf.h"
-#include <rtnhdr.h>
-#include "hashtab_mname.h"
+#include "rtnhdr.h"
 #include "gdsroot.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
@@ -32,6 +31,7 @@ GBLREF stack_frame		*frame_pointer;
 GBLREF spdesc			rts_stringpool;
 
 #define MNAME_HASH
+#include "hashtab_mname.h"
 /* The below include generates the hash table routines for the "mname" hash type */
 #include "hashtab_implementation.h"
 
@@ -57,13 +57,18 @@ boolean_t add_hashtab_mname_symval(hash_table_mname *table, mname_entry *key, vo
 	assert(table == &curr_symval->h_symtab || table == &curr_symval->last_tab->h_symtab);
 	if (INDIR_MARKED == key->marked || (fixup && DYNAMIC_VARNAMES_ACTIVE(frame_pointer)))
 	{
-		lcl_mname = *key;
+		lcl_mname.umname = key->umname;
 		lcl_mname.marked = NOT_MARKED;
 		if (INDIR_MARKED == key->marked)
 		{
 			assert(stringpool.base == rts_stringpool.base);
 			if (!IS_IN_STRINGPOOL(lcl_mname.var_name.addr, lcl_mname.var_name.len))
+			{
+				/* Important to understand that we don't need protection here because we are not
+				 * pointing into the stringpool.
+				 */
 				s2pool(&lcl_mname.var_name);
+			}
 		} else if (fixup && DYNAMIC_VARNAMES_ACTIVE(frame_pointer))
 		{
 			RELOCATE(lcl_mname.var_name.addr, char *, frame_pointer->rvector->literal_text_adr);
@@ -84,7 +89,9 @@ boolean_t add_hashtab_mname_symval(hash_table_mname *table, mname_entry *key, vo
 	DEFER_BASE_REL_HASHTAB(table, TRUE);
 
 	/* Call real table function */
+	DEBUG_GCOL_ONLY(gcol_stack_lvl++;)
 	retval = add_hashtab_mname(table, key, value, tabentptr);
+	DEBUG_GCOL_ONLY(gcol_stack_lvl--;)
 
 	/* If the hash table has not changed, we are done */
 	if (table_base_orig == table->base)
@@ -102,3 +109,4 @@ boolean_t add_hashtab_mname_symval(hash_table_mname *table, mname_entry *key, vo
 
 	return retval;
 }
+#undef MNAME_HASH

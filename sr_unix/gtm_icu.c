@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2024 Fidelity National Information	*
+ * Copyright (c) 2006-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -113,7 +113,9 @@ NULL
 #include "gtm_icu.h"
 #undef ICU_DEF
 
-/* initialize the table of locations of function pointers that are set by dlsym() */
+/* initialize the table of locations of function pointers that are set by dlsym()
+ * Note that though the table type is of icu_func_t pointers, in fact each ICU function
+ * has its own signature and not that of icu_func_t (except for u_getVersion()) */
 #define ICU_DEF(x) &x##_ptr,
 GBLDEF icu_func_t *icu_fptr[] =
 {
@@ -205,6 +207,114 @@ static boolean_t parse_gtm_icu_version(char *icu_ver_buf, int len, char *icusymv
 	return TRUE;
 }
 
+/**
+ * @brief Check if ICU symbols are renamed, and if so, how.
+ *
+ * If environment variable gtm_icu_version was set at process start,
+ * then parse_gtm_icu_version() will have already set our ICU symbol renaming suffix.
+ * If that is not already set, and if renaming is detected, we use the modern ICU
+ * renaming convention to check versions out to version 20 (as of 2026, we are only at version 7).
+ *
+ * We have the advantage that parse_gtm_icu_version() does not have in that we have a dlopen()
+ * handle which we can quickly query with dlsym().
+ *
+ * Doing this once up-front considerably simplifies the later symbol processing.
+ *
+ * @param handle Handle from dlopen() for the ICU library
+ * @param icusmver The renaming string to use (may already be set)
+ * @param icusymver_lenp Pointer to the length of icusmver
+ *
+ * @return TRUE if symbols are renamed, FALSE if they are not
+ *
+ */
+boolean_t icu_symbols_renamed(void *handle, char *icusymver, int *icusymver_lenp)
+{
+	const char *version_func_name = icu_fname[u_getVersion_];
+	char rename_buf[strlen(version_func_name) + MAX_ICU_VERSION_STRLEN + 1];
+	int i,j;
+	boolean_t new_suf;
+
+	/* Found it, undecorated */
+	if (dlsym(handle, version_func_name))
+		return FALSE;
+
+	/*
+	 * Renaming is apparently in force.  If we already have a rename string from
+	 * parse_gtm_icu_version() just go with that and return
+	 */
+	if (0 < *icusymver_lenp)
+		return TRUE;
+	/*
+	 * We do need do rename, and we do not have an existing rename string.  Find the
+	 * answer from dlsym().  Supposedly from ICU 3.6 until ICU 4.2 the rename string
+	 * was "major_minor" & after that "_majorminor.
+	 */
+	for(i = 3; i <= 20; i++)
+	{
+		for (j = 0; j <= 9; j++)
+		{
+			new_suf = TRUE;
+
+			if ((4 > i) || ((4 == i) && (2 >= j)))
+				new_suf = FALSE;
+
+			if (new_suf)
+				snprintf(rename_buf, sizeof(rename_buf), "%s_%d%d", version_func_name, i, j);
+			else
+				snprintf(rename_buf, sizeof(rename_buf), "%s%d_%d", version_func_name, i, j);
+
+			if (dlsym(handle, rename_buf))
+			{
+				if (new_suf)
+					snprintf(icusymver, MAX_ICU_VERSION_STRLEN, "_%d%d", i, j);
+				else
+					snprintf(icusymver, MAX_ICU_VERSION_STRLEN, "%d_%d", i, j);
+
+				*icusymver_lenp = strlen(icusymver);
+				return TRUE;
+			}
+		}
+	}
+
+	/* If we get here, something went wrong.  We return FALSE for no rename
+	 * and let the symbol lookup loop abort for us later
+	 */
+	return FALSE;
+}
+
+/**
+ * @brief Direct ICU to use GT.M's memory allocation functions
+ *
+ * This function uses ICU's u_setMemoryFunctions() routine to
+ * direct ICU to use GTM's memory allocation and free functions,
+ * enabling the tools for displaying and debugging GTM memory
+ * to be aware of ICU memory.
+ *
+ * This setup must be done before any other ICU function (including
+ * (u_getVersion()) is called.
+ *
+ * @return true on success, false on error
+ */
+boolean_t gtm_icu_setmemfunc()
+{
+	/* Typedefs from unicode/uclean.h to avoid pulling it in here */
+	typedef void *UMemAllocFn(const void *context, size_t size);
+	typedef void *UMemReallocFn(const void *context, void *mem, size_t size);
+	typedef void UMemFreeFn(const void *context, void *mem);
+	typedef void setmemfunc_t(const void *context, UMemAllocFn *a, UMemReallocFn *r, UMemFreeFn *f,  int *status);
+
+	int		icu_error = 0;
+	int 		i;
+	setmemfunc_t    *fptr = (setmemfunc_t *)u_setMemoryFunctions_ptr;
+
+	/* Do the actual reassignment of ICU's memfuncs */
+	(*fptr)(ICU_MEM_CONTEXT, gtm_malloc_icu, gtm_realloc_icu, gtm_free_icu, &icu_error);
+	if (0 != icu_error)
+		return FALSE;	/* we were not able to assign the memory functions for some reason */
+
+	return TRUE;	/* All is well */
+}
+
 boolean_t gtm_icu_init(boolean_t called_by_zconvert)
 {
 	char		*locale, *chset, *libname, err_msg[MAX_ERRSTR_LEN];
@@ -213,15 +323,15 @@ boolean_t gtm_icu_init(boolean_t called_by_zconvert)
 	char		tmp_errstr[SIZEOF(ICU_LIBNAME) + STR_LIT_LEN(ICU_LIBNAME_SUFFIX)]; /* "libicuio.so has version" */
 	char		icu_libname[SIZEOF(ICU_LIBNAME) + MAX_ICU_VERSION_STRLEN];
 	char		*strtokptr;
-	const char	*cur_icu_fname;
-	int		icu_final_fname_len, icu_libname_len, len, save_fname_len, icusymver_len, iculibver_len;
+	int		icu_final_fname_len, icu_libname_len, len = 0, save_fname_len, icusymver_len = 0, iculibver_len;
 	void_ptr_t	handle;
 	char_ptr_t	err_str;
-	icu_func_t	fptr;
+	void		*fptr;
 	int		findx, ver;
-	boolean_t	icu_getversion_found = FALSE, gtm_icu_ver_defined, symbols_renamed = -1;
+	boolean_t	icu_getversion_found = FALSE, gtm_icu_ver_defined, symbols_renamed;
 	UVersionInfo	icu_version;
-	mstr		icu_ver, trans;
+	mstr		trans;
+	UMSTR_CONST(icu_ver, GTM_ICU_VERSION);
 	int		iculdflags = ICU_LIBFLAGS;
 	struct stat	libpath_stat;
 	char		real_path[GTM_PATH_MAX], librarypath[GTM_PATH_MAX];
@@ -263,8 +373,6 @@ boolean_t gtm_icu_init(boolean_t called_by_zconvert)
 	 * will be treated as if this environment variable was not set at all and the default behavior (which is to query for
 	 * symbols without appended version numbers) will be used.
 	 */
-	icu_ver.addr = GTM_ICU_VERSION;
-	icu_ver.len = STR_LIT_LEN(GTM_ICU_VERSION);
 	gtm_icu_ver_defined = FALSE;
 	if (SS_NORMAL == TRANS_LOG_NAME(&icu_ver, &trans, icu_ver_buf, SIZEOF(icu_ver_buf), do_sendmsg_on_log2long))
 	{	/* GTM_ICU_VERSION is defined. Do edit check on the value before considering it really defined */
@@ -439,80 +547,70 @@ boolean_t gtm_icu_init(boolean_t called_by_zconvert)
 		}
 #		endif
 	}
+
+	/*
+	 * Now that we have an ICU library handle, we can check to see if our ICU uses symbol renaming.
+	 * And then look up all our required ICU function pointers
+	 */
+	symbols_renamed = icu_symbols_renamed(handle, icusymver, &icusymver_len);
+
 	for (findx = 0; findx < icu_func_n; ++findx)
 	{
-		cur_icu_fname = icu_fname[findx];
-		icu_final_fname_len = 0;
-		len = STRLEN(cur_icu_fname);
-		assert(MAX_ICU_FNAME_LEN > len);	/* ensure we have enough space to hold the icu function */
-		memcpy(&icu_final_fname[icu_final_fname_len], cur_icu_fname, len);
-		icu_final_fname_len += len;
-		icu_final_fname[icu_final_fname_len] = '\0';
-		assert(SIZEOF(icu_final_fname) > icu_final_fname_len);
-		fptr = NULL;
-		assert((0 != findx) || (-1 == symbols_renamed));
-		assert((0 == findx) || (FALSE == symbols_renamed) || (TRUE == symbols_renamed));
-		if ((0 == findx) || !symbols_renamed)
-#ifdef __CYGWIN__ /* Don't ask why... I have no idea how all the funcs are just in the global space in Cygwin */
-			fptr = (icu_func_t)dlsym(NULL, icu_final_fname);
-#else
-			fptr = (icu_func_t)dlsym(handle, icu_final_fname);
-#endif
+		*icu_fptr[findx] = NULL;
+
+		snprintf(icu_final_fname, sizeof(icu_final_fname), "%s%s", icu_fname[findx], symbols_renamed ? icusymver : "");
+		fptr = dlsym(handle, icu_final_fname);
 		if (NULL == fptr)
-		{	/* If gtm_icu_version is defined to a proper value, then try function name with <major_ver>_<minor_ver> */
-			if (gtm_icu_ver_defined && ((0 == findx) || symbols_renamed))
-			{
-				memcpy(&icu_final_fname[icu_final_fname_len], icusymver, icusymver_len);
-				icu_final_fname_len += icusymver_len;
-				icu_final_fname[icu_final_fname_len] = '\0';
-				assert(SIZEOF(icu_final_fname) > icu_final_fname_len);
-#ifdef __CYGWIN__
-				fptr = (icu_func_t)dlsym(NULL, icu_final_fname);
-#else
-				fptr = (icu_func_t)dlsym(handle, icu_final_fname);
-#endif
-			}
-			if (NULL == fptr)
-			{
-				if (called_by_zconvert)
-					return FALSE;
-				COPY_DLLERR_MSG(err_str, err_msg);
-				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_ICUSYMNOTFOUND, 2, LEN_AND_STR(cur_icu_fname),
-					ERR_TEXT, 2, LEN_AND_STR(err_msg));
-			}
-			if (0 == findx)	/* record the fact that the symbols ARE renamed */
-				symbols_renamed = TRUE;
-		} else if (0 == findx)	/* record the fact that the symbols are NOT renamed */
-			symbols_renamed = FALSE;
-		assert((0 == findx) || icu_getversion_found || gtm_icu_ver_defined); /* u_getVersion should have been dlsym'ed */
-		*icu_fptr[findx] = fptr;
-		/* If the current function that is dlsym'ed is u_getVersion, then we use fptr to query for the library's ICU
-		 * version. If it is less than the least ICU version that GT.M supports we issue an error. If not, we continue
-		 * dlsym the rest of the functions. To facilitate issuing wrong version error early, the ICU function getVersion
-		 * should be the first function in gtm_icu.h. This way dlsym on u_getVersion will happen as the first thing in
-		 * this loop. But do all this only if gtm_icu_version is not defined in the environment. If it's defined to an
-		 * an appropriate value in the environment then the version check would have happened before and there isn't any
-		 * need to repeat it again.
-		 */
-		if (!icu_getversion_found && (0 == strcmp(cur_icu_fname, GET_ICU_VERSION_FNAME)))
 		{
-			icu_getversion_found = TRUE;
-			memset(icu_version, 0, MAX_ICU_VERSION_LENGTH);
-			fptr(icu_version);
-			if (!gtm_icu_ver_defined && !(IS_ICU_VER_GREATER_THAN_MIN_VER(icu_version[0], icu_version[1])))
-			{
-				/* Construct the first part of the ICUVERLT36 error message. */
-				SNPRINTF(tmp_errstr, SIZEOF(ICU_LIBNAME) + STR_LIT_LEN(ICU_LIBNAME_SUFFIX), "%s%s", ICU_LIBNAME,
-					ICU_LIBNAME_SUFFIX);
-				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_ICUVERLT36, 4,
-					LEN_AND_STR(tmp_errstr), icu_version[0], icu_version[1]);
-			}
-			dollar_zicuver.len = SNPRINTF(dollar_zicuver.addr, MAX_ICU_VERSION_STRLEN, "%hu.%hu",
-				icu_version[0], icu_version[1]);
-			if (MAX_ICU_VERSION_STRLEN <= dollar_zicuver.len)
-				dollar_zicuver.len = MAX_ICU_VERSION_STRLEN - 1;
+			/* we can't find the function at all, either return failure or abort depending on caller */
+			if (called_by_zconvert)
+				return FALSE;
+			COPY_DLLERR_MSG(err_str, err_msg);
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_ICUSYMNOTFOUND, 2, LEN_AND_STR(icu_final_fname),
+				ERR_TEXT, 2, LEN_AND_STR(err_msg));
 		}
+
+		/* If we get here, we have a valid ICU function pointer to store */
+		*icu_fptr[findx] = (icu_func_t) fptr;
 	}
+
+	/* All the ICU function pointers are now available (we would have returned or aborted were that not the case)
+	 * First we direct ICU to use the GT.M memory allocation functions.  Next, get & check the ICU version.
+	 */
+	assert(u_getVersion_ptr && u_setMemoryFunctions_ptr);
+
+	/* Set up memory handling */
+	if (!gtm_icu_setmemfunc())
+	{
+		if (called_by_zconvert)
+			return FALSE;
+
+		SNPRINTF(err_msg, sizeof(err_msg), "Could not establish custom memory handling for libicu");
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_DLLNOOPEN, 2, LEN_AND_STR(libname), ERR_TEXT, 2, LEN_AND_STR(err_msg));
+	}
+
+	/* Get the ICU version information */
+	memset(icu_version, 0, MAX_ICU_VERSION_LENGTH);
+	(*u_getVersion_ptr)(icu_version);
+
+	/* Check the ICU version.  We used to accept whatever was set in gtm_icu_version if set,
+	 * but we just called the version function, and it is definitive, so use that
+	 */
+	if (!(IS_ICU_VER_GREATER_THAN_MIN_VER(icu_version[0], icu_version[1])))
+	{
+		if (called_by_zconvert)
+			return FALSE;
+
+		/* Construct the first part of the ICUVERLT36 error message. */
+		SNPRINTF(tmp_errstr, SIZEOF(ICU_LIBNAME) + STR_LIT_LEN(ICU_LIBNAME_SUFFIX), "%s%s",
+			ICU_LIBNAME, ICU_LIBNAME_SUFFIX);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_ICUVERLT36, 4, LEN_AND_STR(tmp_errstr), icu_version[0], icu_version[1]);
+	}
+
+	dollar_zicuver.len = SNPRINTF(dollar_zicuver.addr, MAX_ICU_VERSION_STRLEN, "%hu.%hu", icu_version[0], icu_version[1]);
+	if (MAX_ICU_VERSION_STRLEN <= dollar_zicuver.len)
+		dollar_zicuver.len = MAX_ICU_VERSION_STRLEN - 1;
+
 	ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 	gtm_utf8_mode = TRUE;
 	/* gtm_wcswidth()/U_ISPRINT() in util_format() can henceforth be safely called now that ICU initialization is complete */

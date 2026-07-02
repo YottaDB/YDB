@@ -26,6 +26,7 @@
 #include "gtm_limits.h"
 #include "gtm_stdlib.h"
 #include "gtm_string.h"
+#include "stringpool.h"
 #include "gtm_time.h"
 #include "send_msg.h"
 #include "iosp.h"
@@ -1761,33 +1762,71 @@ n_db_csh_acct_rec_types
 #include "probecrit_rec.h"
 
 DEFINE_ATOMIC_OP(gtm_atomic_ulong, ATOMIC_FETCH_ADD, memory_order_relaxed);
-DEFINE_ATOMIC_OP(gtm_atomic_ulong, ATOMIC_STORE, memory_order_relaxed);
 
-#define	GVSTATS_SET_CSA_STATISTIC(CSA, COUNTER, VALUE)							\
-MBSTART {												\
-	ATOMIC_STORE(&(CSA)->gvstats_rec_p->COUNTER, VALUE, memory_order_relaxed);			\
+#define GVSTATS_COUNTER_UNIT 32
+
+#define	GVSTATS_SET_CSA_STATISTIC(CSA, COUNTER, VALUE)	\
+MBSTART {						\
+	(CSA)->gvstats_rec_p->COUNTER = VALUE;          \
 } MBEND
 
 #define	INCR_GVSTATS_COUNTER(CSA, CNL, COUNTER, INCREMENT)									\
 MBSTART {															\
-	ATOMIC_FETCH_ADD(&(CSA)->gvstats_rec_p->COUNTER, INCREMENT, memory_order_relaxed);	/* private or shared stats */	\
+	(CSA)->gvstats_rec_p->COUNTER += INCREMENT;	        /* private or shared stats */	                                \
 	ATOMIC_FETCH_ADD(&(CNL)->gvstats_rec.COUNTER, INCREMENT, memory_order_relaxed);		/* database stats */		\
 } MBEND
 
-#define INCR_LCL_GVSTATS_COUNTER(CSA, COUNTER, INCREMENT)				\
-MBSTART {										\
-	(CSA)->COUNTER += (INCREMENT);							\
+#define INCR_HEAVYWEIGHT_GVSTATS_COUNTER(CSA, CNL, COUNTER, INCREMENT)							        \
+MBSTART {															\
+	(CSA)->COUNTER += INCREMENT;												\
+	(CSA)->gvstats_rec_p->COUNTER += INCREMENT;	/* private or shared stats */						\
+	if ((CSA)->COUNTER >= GVSTATS_COUNTER_UNIT)										\
+	{															\
+		ATOMIC_FETCH_ADD(&(CNL)->gvstats_rec.COUNTER, (CSA)->COUNTER, memory_order_relaxed);	/* database stats */	\
+		(CSA)->COUNTER = 0;												\
+	}															\
 } MBEND
 
-#define	ACCUMULATE_LCL_GVSTATS_COUNTER(CSA, CNL, COUNTER)									\
+#define	ACCUMULATE_HEAVYWEIGHT_GVSTATS_COUNTER(CSA, CNL, COUNTER)								\
 MBSTART {															\
 	/* If CNL is invalid, just continue to increment locally (INCR_LCL) */							\
 	if ((CNL) && (CSA) && (CSA)->COUNTER)											\
 	{															\
-		ATOMIC_FETCH_ADD(&(CSA)->gvstats_rec_p->COUNTER, (CSA)->COUNTER, memory_order_relaxed);	/* solo/shared stats */	\
 		ATOMIC_FETCH_ADD(&(CNL)->gvstats_rec.COUNTER, (CSA)->COUNTER, memory_order_relaxed);	/* database stats */	\
 		(CSA)->COUNTER = 0;												\
 	}															\
+} MBEND
+
+#define	CLEAR_HEAVYWEIGHT_GVSTATS_COUNTERS(CSA)		\
+MBSTART {						\
+	(CSA)->n_cache_reads = 0;			\
+	(CSA)->n_nontp_readonly = 0;			\
+	(CSA)->n_nontp_blkread = 0;			\
+	(CSA)->n_nontp_blkwrite = 0;			\
+	(CSA)->n_nontp_readwrite = 0;			\
+	(CSA)->n_tp_readonly = 0;			\
+	(CSA)->n_tp_blkread = 0;			\
+	(CSA)->n_tp_blkwrite = 0;			\
+	(CSA)->n_tp_readwrite = 0;			\
+	(CSA)->n_get = 0;				\
+} MBEND
+
+#define	ACCUMULATE_HEAVYWEIGHT_GVSTATS_COUNTERS(CSA, CNL)									\
+MBSTART {															\
+        if (CNL)														\
+        {															\
+                ATOMIC_FETCH_ADD(&(CNL)->gvstats_rec.n_cache_reads, (CSA)->n_cache_reads, memory_order_relaxed);		\
+                ATOMIC_FETCH_ADD(&(CNL)->gvstats_rec.n_nontp_readonly, (CSA)->n_nontp_readonly, memory_order_relaxed);		\
+                ATOMIC_FETCH_ADD(&(CNL)->gvstats_rec.n_nontp_blkread, (CSA)->n_nontp_blkread, memory_order_relaxed);		\
+                ATOMIC_FETCH_ADD(&(CNL)->gvstats_rec.n_nontp_blkwrite, (CSA)->n_nontp_blkwrite, memory_order_relaxed);		\
+                ATOMIC_FETCH_ADD(&(CNL)->gvstats_rec.n_nontp_readwrite, (CSA)->n_nontp_readwrite, memory_order_relaxed);	\
+                ATOMIC_FETCH_ADD(&(CNL)->gvstats_rec.n_tp_readonly, (CSA)->n_tp_readonly, memory_order_relaxed);		\
+                ATOMIC_FETCH_ADD(&(CNL)->gvstats_rec.n_tp_blkread, (CSA)->n_tp_blkread, memory_order_relaxed);			\
+                ATOMIC_FETCH_ADD(&(CNL)->gvstats_rec.n_tp_blkwrite, (CSA)->n_tp_blkwrite, memory_order_relaxed);	        \
+                ATOMIC_FETCH_ADD(&(CNL)->gvstats_rec.n_tp_readwrite, (CSA)->n_tp_readwrite, memory_order_relaxed);		\
+                ATOMIC_FETCH_ADD(&(CNL)->gvstats_rec.n_get, (CSA)->n_get, memory_order_relaxed);				\
+        }															\
+        CLEAR_HEAVYWEIGHT_GVSTATS_COUNTERS(CSA);										\
 } MBEND
 
 
@@ -2630,8 +2669,8 @@ typedef struct	header_struct_struct
 
 typedef struct gdr_name_struct
 {
-	mstr			name;
-	mstr			exp_name;
+	unmanaged_mstr		name;
+	unmanaged_mstr		exp_name;
 	struct gdr_name_struct	*link;
 	struct gd_addr_struct	*gd_ptr;
 } gdr_name;
@@ -2656,7 +2695,7 @@ typedef struct	gd_addr_struct
 	struct gd_gblname_struct	*gblnames;
 	struct gd_inst_info_struct	*instinfo;
 	struct gd_addr_struct		*link;
-	struct hash_table_mname_struct  *tab_ptr;
+	struct hash_table_umname_struct *tab_ptr;
 	gd_id				*id;
 	UINTPTR_T			end;
 	uint4				has_span_gbls;	/* has at least one global which spans multiple regions */
@@ -2808,7 +2847,7 @@ typedef struct	sgmnt_addrs_struct
 	struct jnl_private_control_struct	*jnl;
 	struct sgm_info_struct			*sgm_info_ptr;
 	gd_region				*region;		/* the region corresponding to this csa */
-	struct hash_table_mname_struct		*gvt_hashtab;		/* NON-NULL only if regcnt > 1;
+	struct hash_table_umname_struct		*gvt_hashtab;		/* NON-NULL only if regcnt > 1;
 									 * Maintains all gv_targets mapped to this db file
 									 */
 	void					*miscptr;	/* pointer to rctl for this region (if jgbl.forw_phase_recovery)
@@ -2940,6 +2979,15 @@ typedef struct	sgmnt_addrs_struct
 							 */
 	boolean_t	in_read_wait;		/* TRUE if we are waiting in tq_read() for another process to complete a read */
 	unsigned long	n_cache_reads;
+	unsigned long	n_nontp_readonly;
+	unsigned long	n_nontp_blkread;
+	unsigned long 	n_nontp_blkwrite;
+	unsigned long	n_nontp_readwrite;
+	unsigned long	n_tp_readonly;
+	unsigned long	n_tp_blkread;
+	unsigned long 	n_tp_blkwrite;
+	unsigned long	n_tp_readwrite;
+	unsigned long 	n_get;
 } sgmnt_addrs;
 
 typedef struct gd_binding_struct
@@ -3170,7 +3218,7 @@ typedef struct	gv_namehead_struct
 	boolean_t	noisolation;			/* whether isolation is turned on or off for this global */
 	char		filler_8byte_align0[4];
 	block_id	root;				/* Root of global variable tree */
-	mname_entry	gvname;				/* the name of the global */
+	unmanaged_mname_entry	gvname;				/* the name of the global */
 	srch_hist	hist;				/* block history array */
 	int4		regcnt;				/* number of global directories whose hash-tables point to this gv_target.
 							 * 1 by default. > 1 if the same name in TWO DIFFERENT global directories
@@ -3316,7 +3364,7 @@ MBSTART {															\
 	 * no longer have a pointer but that is considered acceptable since these errors are very unlikely			\
 	 * and the alternative (to set up condition handlers etc.) is not considered worth the effort now.			\
 	 */															\
-	added = add_hashtab_mname((hash_table_mname *)HASHTAB, &GVT->gvname, GVNH_REG, &TABENT);				\
+	added = add_hashtab_umname(HASHTAB, &(GVT)->gvname, GVNH_REG, &(TABENT));						\
 	assert(added || (IS_STATSDB_REG(REG) && (STATSDB_GBLNAME_LEN == GVT->gvname.var_name.len)				\
 				&& (0 == memcmp(GVT->gvname.var_name.addr, STATSDB_GBLNAME, STATSDB_GBLNAME_LEN))));		\
 } MBEND
@@ -3708,7 +3756,7 @@ MBSTART {										\
  */
 #define	DEBUG_GVT_CLUE_VALIDATE(GVT)											\
 MBSTART {														\
-	mname_entry		*gvent;											\
+	unmanaged_mname_entry	*gvent;										\
 	unsigned short		klen;											\
 	gv_namehead		*gvt;											\
 															\
@@ -4608,7 +4656,7 @@ typedef struct redo_root_search_context_struct
 
 #define SET_GV_CURRKEY_FROM_GVT(GVT)						\
 MBSTART {									\
-	mname_entry		*gvent;						\
+	unmanaged_mname_entry	*gvent;						\
 	int			end;						\
 										\
 	GBLREF	gv_key		*gv_currkey;					\
@@ -4873,14 +4921,14 @@ MBSTART {										\
 MBSTART {														\
 	gvnh_reg_t			*gvnhReg; /* use unique name to avoid name collisions with macro caller */	\
 	DEBUG_ONLY(													\
-		ht_ent_mname		*tabent;									\
+		ht_ent_umname		*tabent;									\
 		GBLREF gv_namehead	*gv_target;									\
 		gvnh_reg_t		*tmp_gvnhReg;									\
 	)														\
 															\
 	gvnhReg = GVNH_REG;	/* set by op_gvname in previous call */							\
 	DEBUG_ONLY(													\
-		tabent = lookup_hashtab_mname((hash_table_mname *)((GD_HEADER)->tab_ptr), &gv_target->gvname);		\
+		tabent = lookup_hashtab_umname(((GD_HEADER)->tab_ptr), &gv_target->gvname);				\
 		assert(NULL != tabent);											\
 		tmp_gvnhReg = (gvnh_reg_t *)tabent->value;								\
 		assert(NULL != tmp_gvnhReg);										\
@@ -4932,7 +4980,7 @@ MBSTART {										\
 	assert(INVALID_GV_TARGET != gvt);						\
 	if (NULL == gvt)								\
 	{										\
-		gvt = targ_alloc(REG->max_key_size, &GVNH_REG->gvt->gvname, REG);	\
+		gvt = targ_alloc(REG->max_key_size, &(GVNH_REG)->gvt->gvname, REG);	\
 		COPY_ACT_FROM_GVNH_REG_TO_GVT(GVNH_REG, gvt, REG);			\
 		/* See comment in GVNH_REG_INIT macro for why the below assignment is	\
 		 * placed AFTER all error conditions (in above macro) have passed.	\
@@ -5099,7 +5147,6 @@ MBSTART {										\
 	*((DST) + 2) = *((SRC) + 2);							\
 } MBEND
 
-/*#include "mv_stent.h"*/
 typedef struct
 {
 	boolean_t		span_status;
@@ -5450,7 +5497,7 @@ gd_binding	*gv_srch_map(gd_addr *addr, char *key, int key_len, boolean_t skip_ba
 gd_binding	*gv_srch_map_linear(gd_binding *start_map, char *key, int key_len);
 gd_binding	*gv_srch_map_linear_backward(gd_binding *start_map, char *key, int key_len);
 gd_gblname	*gv_srch_gblname(gd_addr *addr, char *key, int key_len);
-gvnh_reg_t	*gv_bind_name(gd_addr *addr, mname_entry *targ);
+gvnh_reg_t	*gv_bind_name(gd_addr *addr, unmanaged_mname_entry *targ);
 void		gv_bind_subsname(gd_addr *addr, gv_key *key, gvnh_reg_t *gvnh_reg);
 
 void db_csh_ini(sgmnt_addrs *cs);

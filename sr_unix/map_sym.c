@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -15,7 +15,7 @@
 #include "gtm_stdlib.h"
 
 #include "collseq.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "lv_val.h"		/* needed for "fgncal.h" */
 #include "fgncal.h"
 #include "iosp.h"
@@ -43,18 +43,18 @@ boolean_t map_collseq(mstr *fspec, collseq *ret_collseq)
 	void_ptr_t 	handle;
 	boolean_t	coll_lib_found;
 
-	static MSTR_CONST(xform_sym_1, "gtm_ac_xform_1");
-	static MSTR_CONST(xback_sym_1, "gtm_ac_xback_1");
-	static MSTR_CONST(xform_sym, "gtm_ac_xform");
-	static MSTR_CONST(xback_sym, "gtm_ac_xback");
-	static MSTR_CONST(verify_sym, "gtm_ac_verify");
-	static MSTR_CONST(xutil_sym, "gtm_ac_xutil");
-	static MSTR_CONST(version_sym, "gtm_ac_version");
+	static UMSTR_CONST(xform_sym_1, "gtm_ac_xform_1");
+	static UMSTR_CONST(xback_sym_1, "gtm_ac_xback_1");
+	static UMSTR_CONST(xform_sym, "gtm_ac_xform");
+	static UMSTR_CONST(xback_sym, "gtm_ac_xback");
+	static UMSTR_CONST(verify_sym, "gtm_ac_verify");
+	static UMSTR_CONST(xutil_sym, "gtm_ac_xutil");
+	static UMSTR_CONST(version_sym, "gtm_ac_version");
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	coll_lib_found = FALSE;
-	if (SS_NORMAL != (status = TRANS_LOG_NAME(fspec, &fspec_trans, buffer, SIZEOF(buffer), do_sendmsg_on_log2long)))
+	if (SS_NORMAL != (status = TRANS_LOG_NAME(&fspec->umstr, &fspec_trans, buffer, SIZEOF(buffer), do_sendmsg_on_log2long)))
 		return FALSE;
 	if (NULL == (handle = fgn_getpak(buffer, INFO)))
 		return FALSE;

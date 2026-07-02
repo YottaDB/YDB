@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2013-2017 Fidelity National Information	*
+ * Copyright (c) 2013-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -86,7 +86,7 @@ void gvnh_spanreg_subs_gvt_init(gvnh_reg_t *gvnh_reg, gd_addr *addr, viewparm *p
 			 */
 			if ((NULL == parmblk) && !reg->open)
 				gv_init_reg(reg, NULL);
-			gvt = (gv_namehead *)targ_alloc(reg->max_key_size, &name_gvt->gvname, reg);
+			gvt = targ_alloc(reg->max_key_size, &name_gvt->gvname, reg);
 			COPY_ACT_FROM_GVNH_REG_TO_GVT(gvnh_reg, gvt, reg);
 			/* See comment in GVNH_REG_INIT macro for why the below assignment is
 			 * placed AFTER all error conditions (in above macro) have passed.

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -14,7 +14,7 @@
 
 #include "hashtab.h"	/* needed for STR_HASH (in COMPUTE_HASH_MNAME) */
 #include "mdef.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 
 typedef struct
 {
@@ -62,13 +62,21 @@ typedef struct hash_table_mname_struct
 	STR_HASH((hkey).addr, (hkey).len, hash_code, 0);		\
 }
 
-/* Prototypes for mname hash routines. See hashtab_implementation.h for detail interface and implementation */
+#define COMPUTE_HASH_ADDR_LEN(ADDR, LEN, HASH_CODE)			\
+MBSTART {								\
+	assert((0 < (LEN)) && (MAX_MIDENT_LEN >= (LEN)));		\
+	STR_HASH((ADDR), (LEN), (HASH_CODE), 0);			\
+} MBEND
+
+/* Prototypes for mname hash routines. See hashtab_implementation.h for detail interface and implementation
+ * protos that are potentially involved with lifetime maintainence take the full mname_entry pointer, whereas
+ * protos which do not add/remove hashtab entries take the unmanaged mname (or union member of the regular mname)*/
 void init_hashtab_mname(hash_table_mname *table, int minsize, boolean_t dont_compact, boolean_t dont_keep_spare_table);
 void expand_hashtab_mname(hash_table_mname *table, int minsize);
 boolean_t add_hashtab_mname(hash_table_mname *table, mname_entry *key, void *value, ht_ent_mname **tabentptr);
 boolean_t add_hashtab_mname_symval(hash_table_mname *table, mname_entry *key, void *value, ht_ent_mname **tabentptr,
 		boolean_t fixup);
-void *lookup_hashtab_mname(hash_table_mname *table, mname_entry *key);
+ht_ent_mname *lookup_hashtab_mname(hash_table_mname *table, const unmanaged_mname_entry *key);
 void delete_hashtab_ent_mname(hash_table_mname *table, ht_ent_mname *tabent);
 boolean_t delete_hashtab_mname(hash_table_mname *table, mname_entry *key);
 void free_hashtab_mname(hash_table_mname *table);
@@ -78,5 +86,9 @@ sm_uc_ptr_t copy_hashtab_to_buffer_mname(hash_table_mname *table,
 		sm_uc_ptr_t buffer, int (*copy_entry_to_buffer)(ht_ent_mname *, sm_uc_ptr_t));
 hash_table_mname *activate_hashtab_in_buffer_mname(sm_uc_ptr_t buffer,
 		int (*copy_entry_from_buffer)(ht_ent_mname *, sm_uc_ptr_t));
+
+#if !defined(MNAME_HASH) && !defined(UMNAME_HASH)
+#include "hashtab_umname.h"
+#endif
 
 #endif

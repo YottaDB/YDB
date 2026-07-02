@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -61,7 +61,8 @@ error_def(ERR_ZLINKFILE);
  *
  * No return value.
  */
-void zro_search(mstr *objstr, zro_ent **objdir, mstr *srcstr, zro_ent **srcdir, boolean_t skip_shlib)
+void zro_search(const unmanaged_mstr *objstr, zro_ent **objdir, const unmanaged_mstr *srcstr, zro_ent **srcdir,
+	boolean_t skip_shlib)
 {
 	uint4			status;
 	zro_ent			*op, *sp, *op_result, *sp_result;
@@ -69,7 +70,7 @@ void zro_search(mstr *objstr, zro_ent **objdir, mstr *srcstr, zro_ent **srcdir, 
 	int			objcnt, srccnt;
 	struct stat		outbuf;
 	int			stat_res;
-	mstr			rtnname;
+	mident			rtnname;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -207,7 +208,8 @@ zro_hist *zro_search_hist(char *objnamebuf, zro_ent **objdir)
 	uint4			status;
 	parse_blk		pblk;
 	zro_ent			*op, *op_result;
-	mstr			objstr, dirpath, rtnname, zroentname;
+	unmanaged_mstr		objstr, dirpath, zroentname;
+	mident			rtnname;
 	int			objcnt;
 	zro_search_hist_ent	zhent_base[ZRO_MAX_ENTS];
 	zro_search_hist_ent	*zhent;

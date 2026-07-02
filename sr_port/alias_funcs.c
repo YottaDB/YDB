@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2009-2023 Fidelity National Information	*
+ * Copyright (c) 2009-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -17,7 +17,7 @@
 
 #include <stddef.h>
 
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "stack_frame.h"
 #include "op.h"
 #include "stp_parms.h"
@@ -61,7 +61,7 @@ GBLREF lv_xnew_var	*xnewvar_anchor;
 GBLREF lv_xnew_ref	*xnewref_anchor;
 GBLREF mval		*alias_retarg;
 
-LITREF mname_entry	null_mname_entry;
+LITREF unmanaged_mname_entry	null_mname_entry;
 
 /* Local routines -- not made static so they show up in pro core stack traces */
 STATICFNDCL void als_xnew_killaliasarray(lvTree *lvt);
@@ -90,6 +90,7 @@ CONDITION_HANDLER(als_check_xnew_var_aliases_ch);
 	if (0 == (lvp)->stats.trefcnt)					\
 	{								\
 		(lvp)->v.mvtype = 0;					\
+		(lvp)->v.str.len = 0;					\
 		lvt_child = LV_GET_CHILD(lvp);				\
 		if (lvt_child)						\
 		{							\
@@ -172,11 +173,15 @@ CONDITION_HANDLER(als_check_xnew_var_aliases_ch);
 	newlv = lv_getslot(cursymval);												\
 	DBGRFCT((stderr, "CLONE_LVVAL: Copy started - oldlv: 0x"lvaddr"  newlv: 0x"lvaddr"  cursymval: 0x"lvaddr" at "		\
 		 "%s at line %d\n", (oldlv), (newlv), (cursymval), __FILE__, __LINE__));					\
-	*newlv = *oldlv;													\
+	glist_str_before_move(&(oldlv)->v.str);											\
+	memcpy((ok_to_clobber_mstr_p)(newlv), (ok_to_clobber_mstr_p)(oldlv), SIZEOF(*(newlv))); /* BYPASSOK clobber */		\
+	glist_str_after_move(&(newlv)->v.str);											\
+	(oldlv)->v.str.in_array = FALSE;											\
 	assert(NULL == newlv->tp_var);												\
 	LV_SYMVAL(newlv) = cursymval;												\
 	lv_var_clone(newlv, newlv, FALSE);			/* no refcnt maint here */					\
 	oldlv->v.mvtype = MV_LVCOPIED;												\
+	oldlv->v.str.len = 0;													\
 	oldlv->ptrs.copy_loc.newtablv = newlv;											\
 	/* If popdsymval had alias activity, it is possible the alias activity got inherited into cursymval.			\
 	 * Since we cannot easily determine this for sure, err on the side of caution.						\
@@ -409,7 +414,7 @@ void als_check_xnew_var_aliases(symval *popdsymval, symval *cursymval)
 	cursymtab = &cursymval->h_symtab;
 	for (xnewvar = popdsymval->xnew_var_list; xnewvar; xnewvar = xnewvar->next)
 	{
-		tabent = lookup_hashtab_mname(popdsymtab, &xnewvar->key);
+		tabent = lookup_hashtab_mname(popdsymtab, &xnewvar->key.umname);
 		assert(tabent);
 		xnewvar->lvval = (lv_val *)tabent->value;	/* Cache lookup results for 2nd pass in step 4 */
 		delete_hashtab_ent_mname(popdsymtab, tabent);
@@ -463,7 +468,7 @@ void als_check_xnew_var_aliases(symval *popdsymval, symval *cursymval)
 	for (xnewvar = popdsymval->xnew_var_list; xnewvar; xnewvar = xnewvar_next)
 	{
 		bypass_lvscan = bypass_lvrepl = FALSE;
-		tabent = lookup_hashtab_mname(cursymtab, &xnewvar->key);
+		tabent = lookup_hashtab_mname(cursymtab, &xnewvar->key.umname);
 		assert(tabent);				/* Had better be there since it was passed in thru the exclusive new */
 		prevlv = (lv_val *)tabent->value;
 		popdlv = xnewvar->lvval;		/* Value of this var in popped symtab */
@@ -519,6 +524,7 @@ void als_check_xnew_var_aliases(symval *popdsymval, symval *cursymval)
 		}
 		assert(1 <= prevlv->stats.trefcnt);	/* verify op_xnew's bump is still there (may be only one) */
 		DECR_BASE_REF_NOSYM(prevlv, TRUE);	/* undo bump by op_xnew */
+		glist_unprotect_str(&xnewvar->key.var_name);
 		xnewvar_next = xnewvar->next;
 		xnewvar->next = xnewvar_anchor;
 		xnewvar_anchor = xnewvar;
@@ -891,9 +897,15 @@ void als_zwrhtab_init(void)
 		if (zavb)
 		{
 			for (zavb_next = zavb->next; zavb_next; zavb = zavb_next, zavb_next = zavb->next)
+			{
+				while (zavb->zav_free > zavb->zav_base)
+					glist_unprotect_str(&(--zavb->zav_free)->zwr_var);
 				/* Leave one block on queue if it exists .. get rid of others */
 				free(zavb);
+			}
 			assert(zavb);
+			while (zavb->zav_free > zavb->zav_base)
+				glist_unprotect_str(&(--zavb->zav_free)->zwr_var);
 			zwrhtab->first_zwrzavb = zavb;
 		}
 		reinitialize_hashtab_addr(&zwrhtab->h_zwrtab);
@@ -925,6 +937,12 @@ zwr_alias_var *als_getzavslot(void)
 	assert(zavb->zav_free < zavb->zav_top);
 	zav = zavb->zav_free++;
 	zav->value_printed = FALSE;
+	glist_first_init_str(&zav->zwr_var); /* BYPASSOK - zwr_var was malloced and is not in use until increment of zav_free */
+	/* Unconditionally protected since it can be copied over from varname, which can
+	 * be pointed to literalpool until original routine is unlinked and we need an
+	 * stp_move.
+	 */
+	glist_protect_str(&zav->zwr_var);
 	return zav;
 }
 
@@ -1170,7 +1188,12 @@ int als_lvval_gc(void)
 				DECR_BASE_REF_NOSYM(lvp, FALSE); /* Var might go away now, or later if need more deletes first */
 			} else
 				DBGRFCT((stderr, "\nals_lvval_gc: Orphaned lvval 0x"lvaddr" has been freed\n", lvp));
+			assert(LV_SYMVAL(lvp) || !glist_str_protected(&lvp->v.str));
+		} else
+		{
+			assert(glist_str_protected(&lvp->v.str));
 		}
+
 	}
 	DBGRFCT((stderr, "\nals_lvval_gc: final orphaned lvval scan completed\n"));
 #	ifdef DEBUG

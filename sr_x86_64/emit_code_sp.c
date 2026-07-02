@@ -1,6 +1,6 @@
 /****************************************************************
  *                                                              *
- * Copyright (c) 2007-2023 Fidelity National Information	*
+ * Copyright (c) 2007-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *                                                              *
  *      This source code contains the intellectual property     *
@@ -20,13 +20,13 @@
 #include "gtm_stdio.h"
 #include "opcode.h"
 #include "mdq.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "vxi.h"
 #include "vxt.h"
 #include "cgp.h"
 #include "compiler.h"
 #include "list_file.h"
-#include <emit_code.h>
+#include "emit_code.h"
 
 #define SET_OBPT_STR(str, len)	(memcpy(obpt, str, len), obpt += len)
 #define SET_OBPT_INT4(value)	obpt = i2asc(obpt, value)
@@ -80,7 +80,7 @@ struct instruction_mnemonics
 
 #undef I386_OP
 #define I386_OP(opcode, operand, num)	#opcode ,
-#define REG_RIP 16
+#define GTM_REG_RIP 16
 
 LITDEF char *mnemonic_list[] = {
 	#include "i386_ops.h"
@@ -471,9 +471,9 @@ void set_memory_reg()
  	if (instruction.reg_rip)
  	{
 		if (instruction.source_operand_class == memory_class)
-			instruction.source_operand_reg = (char *)register_list[REG_RIP];
+			instruction.source_operand_reg = (char *)register_list[GTM_REG_RIP];
 		else if (instruction.destination_operand_class == memory_class)
-			instruction.destination_operand_reg = (char *)register_list[REG_RIP];
+			instruction.destination_operand_reg = (char *)register_list[GTM_REG_RIP];
 		else
 			assertpro(FALSE);
  	}

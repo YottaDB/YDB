@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -16,7 +16,7 @@
 #include "gtm_limits.h"
 #include <dlfcn.h>
 
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "real_len.h"	/* for COPY_DLERR_MSG */
 #include "lv_val.h"	/* needed for "fgncal.h" */
 #include "fgncal.h"
@@ -109,7 +109,7 @@ void_ptr_t fgn_getpak(char *package_name, int msgtype)
  * Note: If msgtype is SUCCESS, errors are not issued. It is useful if the callers are not
  * interested in message report and not willing to have condition handler overhead (eg. zro_search).
  */
-fgnfnc fgn_getrtn(void_ptr_t package_handle, mstr *entry_name, int msgtype)
+fgnfnc fgn_getrtn(void_ptr_t package_handle, const mident *entry_name, int msgtype)
 {
 	void_ptr_t	sym_addr;
 	char_ptr_t	dummy_err_str;

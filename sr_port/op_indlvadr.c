@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,7 +24,6 @@
 #include "stack_frame.h"
 #include "stringpool.h"
 
-GBLREF	boolean_t		mstr_native_align;
 GBLREF	hash_table_objcode	cache_table;
 GBLREF	stack_frame		*frame_pointer;
 
@@ -45,7 +45,8 @@ void	op_indlvadr(mval *target)
 
 	SETUP_THREADGBL_ACCESS;
 	MV_FORCE_STR(target);
-	indir_src.str = target->str;
+	indir_src.str.in_array = FALSE;
+	indir_src.str.umstr = target->str.umstr;
 	indir_src.code = indir_lvadr;
 	saved_indx = NULL;
 	if (NULL == (obj = cache_get(&indir_src)))

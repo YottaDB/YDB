@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2008-2023 Fidelity National Information	*
+ * Copyright (c) 2008-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -749,14 +749,15 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 		   op_open does to create and insert io_log_name * in io_root_log_name. */
 
 
-		MSTR_DEF(stderr_mstr, slen[PSTDERR], sparams[PSTDERR]);
+		UMSTR_DEF(stderr_mstr, slen[PSTDERR], sparams[PSTDERR]);
 		stderr_naml = get_log_name(&stderr_mstr, INSERT);
 
-		stderr_iod = stderr_naml->iod =  (io_desc *)malloc(SIZEOF(io_desc));
+		stderr_iod = stderr_naml->iod = (io_desc *)malloc(SIZEOF(io_desc));
 		memset((char*)stderr_naml->iod, 0, SIZEOF(io_desc));
-		stderr_naml->iod->pair.in  = stderr_naml->iod;
+		stderr_naml->iod->pair.in = stderr_naml->iod;
 		stderr_naml->iod->pair.out = stderr_naml->iod;
 		stderr_naml->iod->trans_name = stderr_naml;
+		glist_first_init_str(&stderr_iod->error_handler);
 		(stderr_iod->pair.in)->trans_name = stderr_naml;
 		{
 			io_desc		*io_ptr;

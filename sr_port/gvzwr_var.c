@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -51,6 +51,7 @@ void gvzwr_var(uint4 data, int4 n)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	mv.str.in_array = subdata.str.in_array = FALSE;
 	if (outofband)
 		async_action(FALSE);
 	zwr_sub = (zwr_sub_lst *)gvzwrite_block->sub;
@@ -89,7 +90,7 @@ void gvzwr_var(uint4 data, int4 n)
 		    && zwr_sub->subsc_list[n].first
 		    && ZWRITE_PATTERN != zwr_sub->subsc_list[n].subsc_type)
 		{
-			mv = *zwr_sub->subsc_list[n].first;
+			mv.umval = zwr_sub->subsc_list[n].first->umval;
 			mval2subsc(&mv, gv_currkey, gv_cur_region->std_null_coll);
 			if ((mv.mvtype & MV_STR) && !mv.str.len)
 				seen_null = 1;

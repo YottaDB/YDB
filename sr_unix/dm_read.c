@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -45,6 +45,7 @@
 #include "gtm_icu_api.h"
 #include "gtm_utf8.h"
 #endif
+#include "noprincio_if_needed_inline.h"
 
 GBLREF boolean_t		dmterm_default, gtm_utf8_mode, prin_in_dev_failure,
 				prin_out_dev_failure;
@@ -172,11 +173,10 @@ mval 	*dm_read (mval *v)
 	int		instr;			/* insert point in input string */
 	int		ioptr_width;		/* display width of the IO device */
 	int		outlen;			/* total characters in line so far */
-	int		match_length, msk_in, msk_num, num_chars_left, num_lines_above, right, selstat, status, up, utf8_more = 0;
+	int		match_length, msk_in, msk_num, num_chars_left, num_lines_above, right, pollstat, status, up, utf8_more = 0;
 	io_desc 	*io_ptr;
 	io_termmask	mask_term;
-	mv_stent	*mvc, *mv_zintdev;
-	mval		dummy;
+	mv_stent	*mv_zintdev;
 	tt_interrupt	*tt_state;
 	uint4		mask;
 	unsigned int	exp_length, len, length;
@@ -186,7 +186,7 @@ mval 	*dm_read (mval *v)
 	unsigned char	inbyte, *outptr, *outtop, *ptr, *ptrnext, *ptrtop;
 	unsigned char	more_buf[GTM_MB_LEN_MAX + 1], *more_ptr = NULL;	/* to build up multi byte for character */
 	unsigned short	escape_length = 0;
-	wint_t		*buffer_32_start = NULL, codepoint, *current_32_ptr, inchar, *ptr32;
+	wint_t		*buffer_32_start = NULL, codepoint, *current_32_ptr, inchar;
 	int		poll_timeout;
 	nfds_t		poll_nfds;
 	struct pollfd	poll_fdlist[1];
@@ -252,7 +252,7 @@ mval 	*dm_read (mval *v)
 				current_32_ptr = buffer_32_start;
 				utf8_more = tt_state->utf8_more;
 				more_ptr = tt_state->more_ptr;
-				memcpy((void*)more_buf, tt_state->more_buf, SIZEOF(more_buf));
+				memcpy(more_buf, tt_state->more_buf, SIZEOF(more_buf));
 			}
 			instr = tt_state->instr;
 			outlen = tt_state->outlen;
@@ -329,6 +329,7 @@ mval 	*dm_read (mval *v)
 				mv_chain->mv_st_cont.mvs_zintdev.curr_sp_buffer.addr = (char *)buffer_start;
 				mv_chain->mv_st_cont.mvs_zintdev.curr_sp_buffer.len = exp_length;
 				mv_chain->mv_st_cont.mvs_zintdev.buffer_valid = TRUE;
+				glist_protect_str(&mv_chain->mv_st_cont.mvs_zintdev.curr_sp_buffer);
 				mv_chain->mv_st_cont.mvs_zintdev.io_ptr = io_ptr;
 				if (utf8_active)
 				{
@@ -366,15 +367,15 @@ mval 	*dm_read (mval *v)
 		poll_nfds = 1;
 		/* Arbitrarily-chosen timeout value to prevent consumption of resources in tight loop when no input is available. */
 		poll_timeout = 100 * MILLISECS_IN_SEC;
-		selstat = poll(&poll_fdlist[0], poll_nfds, poll_timeout);
-		if (0 > selstat)
+		pollstat = poll(&poll_fdlist[0], poll_nfds, poll_timeout);
+		if (0 > pollstat)
 			if (EINTR != errno)
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) errno);
 			else
 				continue;
-		else if (0 == selstat)
+		else if (0 == pollstat)
 			continue;	/* timeout but still not ready for reading, try again */
-		/* selstat > 0; try reading something */
+		/* pollstat > 0; try reading something */
 		else if (0 > (status = (int)read(tt_ptr->fildes, &inbyte, 1)))
 		{	/* Error return from read(). */
 			if (EINTR != errno)
@@ -941,13 +942,14 @@ mval 	*dm_read (mval *v)
 	v->str.addr = (char *)buffer_start;
 	if (0 != v->str.len)
 	{
-		cl = clmod (comline_index - 1);
+		cl = clmod(comline_index - 1);
 		if ((v->str.len != comline_base[cl].len) || (memcmp(comline_base[cl].addr, buffer_start, v->str.len)))
 		{
-			comline_base[comline_index] = v->str;
-			comline_index = clmod (comline_index + 1);
+			glist_protect_str(&comline_base[comline_index]);
+			comline_base[comline_index].umstr = v->str.umstr;
+			comline_index = clmod(comline_index + 1);
 			if (MAX_RECALL != recall_num)
-				recall_num ++;
+				recall_num++;
 		}
 		if (IS_AT_END_OF_STRINGPOOL(buffer_start, 0))
 			stringpool.free += v->str.len;	/* otherwise using space from before interrupt */

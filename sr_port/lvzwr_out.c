@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -44,7 +44,7 @@
 #include "callg.h"
 #include "gtmimagename.h"
 #include "format_targ_key.h"	/* for ISSUE_GVSUBOFLOW_ERROR macro */
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "stack_frame.h"
 #include "jobsp.h"
 
@@ -59,31 +59,35 @@ GBLREF uint4			zwrtacindx;		/* When creating $ZWRTACxxx vars for ZWRite, this ho
 GBLREF zshow_out		*zwr_output;
 GBLREF zwr_hash_table		*zwrhtab;		/* Used to track aliases during zwrites */
 
-LITDEF MSTR_CONST(semi_star, " ;*");
-LITDEF MSTR_CONST(dzwrtac_clean, "$ZWRTAC=\"\"");
+LITDEF UMSTR_CONST(semi_star, " ;*");
+LITDEF UMSTR_CONST(dzwrtac_clean, "$ZWRTAC=\"\"");
 
 #define	NONULLSUBS	"MERGE failed because"
 
 error_def(ERR_MAXNRSUBSCRIPTS);
 error_def(ERR_MERGEINCOMPL);
 
-void lvzwr_out_targkey(mstr *one);
+void lvzwr_out_targkey(void);
 
 
-void lvzwr_out_targkey(mstr *one)
+void lvzwr_out_targkey(void)
 {
 	int	n, nsubs;
+	unmanaged_mstr one;
+	char	buff;
 #	ifdef DEBUG
 	int4	length;
 #	endif
 
-	zshow_output(zwr_output, lvzwrite_block->curr_name);
+	one.addr = &buff;
+	one.len = 1;
+	zshow_output(zwr_output, &lvzwrite_block->curr_name->umstr);
 	nsubs = lvzwrite_block->curr_subsc;
 	if (nsubs)
 	{
 		DEBUG_ONLY(length = 0;)
-		*one->addr = '(';
-		zshow_output(zwr_output, one);
+		*one.addr = '(';
+		zshow_output(zwr_output, &one);
 		for (n = 0 ; ; )
 		{	/* the following check protects against an apparent bug in the system service managing (at least) terminal
 			 * output where it gets overwhelmed and hangs in __write_nocancel (cat does too, so it's not GT.M); because
@@ -93,15 +97,15 @@ void lvzwr_out_targkey(mstr *one)
 			DEBUG_ONLY(MV_FORCE_STR(((zwr_sub_lst *)lvzwrite_block->sub)->subsc_list[n].actual);)
 			assert(MAX_STRLEN	/* WARNING assignment below; check in op_putindx should assure this */
 				>= (length += ((zwr_sub_lst *)lvzwrite_block->sub)->subsc_list[n].actual->str.len));
-			mval_write(zwr_output, ((zwr_sub_lst *)lvzwrite_block->sub)->subsc_list[n].actual, FALSE);
+			mval_write(zwr_output, lvzwrite_block->sub->subsc_list[n].actual, FALSE);
 			if (++n < nsubs)
 			{
-				*one->addr = ',';
-				zshow_output(zwr_output, one);
+				*one.addr = ',';
+				zshow_output(zwr_output, &one);
 			} else
 			{
-				*one->addr = ')';
-				zshow_output(zwr_output, one);
+				*one.addr = ')';
+				zshow_output(zwr_output, &one);
 				break;
 			}
 		}
@@ -115,7 +119,7 @@ void lvzwr_out(lv_val *lvp)
 	uchar_ptr_t		lastc;
 	int			n, nsubs, sbs_depth, tmp_len;
 	lv_val			*dst_lv, *lvpc, *res_lv;
-	mstr			one;
+	unmanaged_mstr		one;
 	mval			outindx, *subscp, *val;
 	ht_ent_addr		*tabent_addr;
 	ht_ent_mname		*tabent_mname;
@@ -125,10 +129,13 @@ void lvzwr_out(lv_val *lvp)
 	lvzwrite_datablk	*newzwrb;
 	gparam_list		param_list;	/* for op_putindx call through callg */
 	gvnh_reg_t		*gvnh_reg;
+	unsigned int		gcols;
+	mstr			tmp_mstr;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	val = &lvp->v;
+	assert(glist_str_protected(&val->str));
 	assert(lvzwrite_block);
 	if (!merge_args)
 	{	/* The cases that exist here are:
@@ -157,13 +164,13 @@ void lvzwr_out(lv_val *lvp)
 				assert(HTENT_VALID_ADDR(tabent_addr, zwr_alias_var, zav));
 				*one.addr = '*';
 				zshow_output(zwr_output, &one);
-				lvzwr_out_targkey(&one);
+				lvzwr_out_targkey();
 				*one.addr = '=';
 				zshow_output(zwr_output, &one);
 				zav = (zwr_alias_var *)tabent_addr->value;
 				assert(0 < zav->zwr_var.len);
 				zwr_output->flush = TRUE;
-				zshow_output(zwr_output, (const mstr *)&zav->zwr_var);
+				zshow_output(zwr_output, &zav->zwr_var.umstr);
 				return;
 			}
 			/* This lv_val isn't known to us yet. Scan the hash curr_symval hash table to see if it is known as a
@@ -178,7 +185,8 @@ void lvzwr_out(lv_val *lvp)
 			{	/* Found a base var it can reference -- create a zwrhtab entry for it */
 				assert(tabent_mname->key.var_name.len);
 				newzav = als_getzavslot();
-				newzav->zwr_var = tabent_mname->key.var_name;
+				assert(glist_str_protected(&newzav->zwr_var));
+				newzav->zwr_var.umstr = tabent_mname->key.var_name.umstr;
 				htent_added = add_hashtab_addr(&zwrhtab->h_zwrtab, (char **)&lvpc, newzav, &tabent_addr);
 				assert(htent_added);
 				dump_container = FALSE;
@@ -196,10 +204,11 @@ void lvzwr_out(lv_val *lvp)
 				}
 				MEMCPY_LIT(zwrt_varname.c, DOLLAR_ZWRTAC);
 				lastc = i2asc((uchar_ptr_t)zwrt_varname.c + STR_LIT_LEN(DOLLAR_ZWRTAC), zwrtacindx);
-				newzav =  als_getzavslot();
+				newzav = als_getzavslot();
 				newzav->zwr_var.addr = zwrt_varname.c;
 				newzav->zwr_var.len = INTCAST(((char *)lastc - &zwrt_varname.c[0]));
 				s2pool(&newzav->zwr_var);
+				assert(glist_str_protected(&newzav->zwr_var));
 				htent_added = add_hashtab_addr(&zwrhtab->h_zwrtab, (char **)&lvpc, newzav, &tabent_addr);
 				assert(htent_added);
 				dump_container = TRUE;
@@ -210,11 +219,11 @@ void lvzwr_out(lv_val *lvp)
 			 */
 			*one.addr = '*';
 			zshow_output(zwr_output, &one);
-			lvzwr_out_targkey(&one);
+			lvzwr_out_targkey();
 			*one.addr = '=';
 			zshow_output(zwr_output, &one);
 			zwr_output->flush = TRUE;
-			zshow_output(zwr_output, (const mstr *)&newzav->zwr_var);
+			zshow_output(zwr_output, &newzav->zwr_var.umstr);
 			ZWRITE_OUTPUT_HOOK();
 			if (dump_container)
 			{	/* We want to dump the entire container variable but the name doesn't match the var we are
@@ -224,6 +233,7 @@ void lvzwr_out(lv_val *lvp)
 				newzwrb = (lvzwrite_datablk *)malloc(SIZEOF(lvzwrite_datablk));
 				memset(newzwrb, 0, SIZEOF(lvzwrite_datablk));
 				newzwrb->sub = (zwr_sub_lst *)malloc(SIZEOF(zwr_sub_lst) * MAX_LVSUBSCRIPTS);
+				memset(newzwrb->sub, 0, SIZEOF(zwr_sub_lst) * MAX_LVSUBSCRIPTS);
 				newzwrb->curr_name = &newzav->zwr_var;
 				newzwrb->prev = lvzwrite_block;
 				lvzwrite_block = newzwrb;
@@ -250,13 +260,13 @@ void lvzwr_out(lv_val *lvp)
 					*one.addr = '*';	/* Flag as creating an alias */
 					zshow_output(zwr_output, &one);
 					/* Now for (new) variable name */
-					zshow_output(zwr_output, lvzwrite_block->curr_name);
+					zshow_output(zwr_output, &lvzwrite_block->curr_name->umstr);
 					*one.addr = '=';
 					zshow_output(zwr_output, &one);
 					/* .. and the var name aliasing to (the first seen with this lv_val) */
 					assert(zav->zwr_var.len);
 					zwr_output->flush = TRUE;
-					zshow_output(zwr_output, &zav->zwr_var);
+					zshow_output(zwr_output, &zav->zwr_var.umstr);
 					return;
 				}
 				/* Else the value for this entry has not yet been printed so let us fall into case 3
@@ -270,7 +280,7 @@ void lvzwr_out(lv_val *lvp)
 			} else
 			{	/* Entry was added so is first appearance -- give it a value to hold onto and print it */
 				newzav = als_getzavslot();
-				newzav->zwr_var = *lvzwrite_block->curr_name;
+				newzav->zwr_var.umstr = lvzwrite_block->curr_name->umstr;
 				newzav->value_printed = TRUE;		/* or rather it will be shortly.. */
 				tabent_addr->value = (void *)newzav;
 				lvzwrite_block->zav_added = TRUE;
@@ -281,7 +291,7 @@ void lvzwr_out(lv_val *lvp)
 		if (!MV_DEFINED(val))
 			return;
 		MV_FORCE_STR(val);
-		lvzwr_out_targkey(&one);
+		lvzwr_out_targkey();
 		*one.addr = '=';
 		zshow_output(zwr_output, &one);
 		mval_write(zwr_output, val, !htent_added);
@@ -304,7 +314,8 @@ void lvzwr_out(lv_val *lvp)
 			gv_currkey->end = mglvnp->gblp[IND1]->s_gv_currkey->end;
 			for (n = 0; n < nsubs; n++)
 			{
-				subscp = ((zwr_sub_lst *)lvzwrite_block->sub)->subsc_list[n].actual;
+				subscp = lvzwrite_block->sub->subsc_list[n].actual;
+				assert(glist_str_protected(&subscp->str));
 				MV_FORCE_STR(subscp);
 				mval2subsc(subscp, gv_currkey, gv_cur_region->std_null_coll);
 				if (!subscp->str.len &&	(ALWAYS != gv_cur_region->null_subs))
@@ -343,10 +354,12 @@ void lvzwr_out(lv_val *lvp)
 			}
 			param_list.n = n + 1;
 			dst_lv = (lv_val *)callg((callgfnptr)op_putindx, &param_list);
+			assert(glist_str_protected(&dst_lv->v.str));
 			MV_FORCE_STR(val);
 			assert(!(MV_ALIASCONT & dst_lv->v.mvtype));	/* op_putindx would have already done DECR_AC_REF for us */
-			dst_lv->v = *val;
+			dst_lv->v.umval = val->umval;
 			dst_lv->v.mvtype &= ~MV_ALIASCONT;	/* Make sure alias container property does not pass */
 		}
 	}
+	assert(glist_str_protected(&val->str));
 }

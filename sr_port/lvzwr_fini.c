@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -15,7 +15,7 @@
 #include "gtm_string.h"
 
 #include "lv_val.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "mv_stent.h"
 #include "mlkdef.h"
 #include "zshow.h"
@@ -27,6 +27,7 @@
 #include "zwrite.h"
 #include "op.h"
 #include "patcode.h"
+#include "stringpool.h"
 
 GBLREF symval		*curr_symval;
 GBLREF lvzwrite_datablk	*lvzwrite_block;
@@ -37,18 +38,18 @@ error_def(ERR_UNDEF);
 
 void lvzwr_fini(zshow_out *out, int t)
 {
-	int4		size;
-	mval 		local;
-	mname_entry	temp_key;
-	ht_ent_mname	*tabent;
-	mident_fixed	m;
+	int4			size;
+	mval 			local;
+	unmanaged_mname_entry	temp_key;
+	ht_ent_mname		*tabent;
+	mident_fixed		m;
 
 	zwr_output = out;
 	assert(lvzwrite_block);
 	if (zwr_patrn_mident == lvzwrite_block->zwr_intype)
 	{	/* Mident specified for "pattern" (fixed name, no pattern) */
 		size = (lvzwrite_block->pat->str.len <= MAX_MIDENT_LEN) ? lvzwrite_block->pat->str.len : MAX_MIDENT_LEN;
-		temp_key.var_name = lvzwrite_block->pat->str;
+		temp_key.var_name = lvzwrite_block->pat->str.mident;
 		COMPUTE_HASH_MNAME(&temp_key);
 		tabent = lookup_hashtab_mname(&curr_symval->h_symtab, &temp_key);
 		if (!tabent || (!LV_IS_VAL_DEFINED(tabent->value) && !LV_HAS_CHILD(tabent->value)))
@@ -76,7 +77,7 @@ void lvzwr_fini(zshow_out *out, int t)
 			if (do_pattern(&local, lvzwrite_block->pat))
 			{
 				memset(&m.c[local.str.len], 0, SIZEOF(m.c) - local.str.len);
-				temp_key.var_name = local.str;
+				temp_key.var_name = local.str.mident;
 				COMPUTE_HASH_MNAME(&temp_key);
 				if (NULL != (tabent = lookup_hashtab_mname(&curr_symval->h_symtab, &temp_key)))
 				{
@@ -90,6 +91,7 @@ void lvzwr_fini(zshow_out *out, int t)
 			local.str.addr = &m.c[0];
 		}
 	}
+	assert(!lvzwrite_block->curr_subsc);
 	lvzwrite_block->curr_subsc = lvzwrite_block->subsc_count = 0;
 	return;
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -19,6 +19,8 @@
 #include "io.h"
 #include "lv_val.h"
 #include "error.h"
+#include "mdq.h"
+#include "gcol_list.h"
 
 typedef struct
 {
@@ -35,6 +37,7 @@ typedef struct
 {
 	lv_val		*mvs_val;	/* lv_val created to hold new value */
 	mvs_ntab_struct	mvs_ptab;	/* Restoration-on-pop info */
+	DEBUG_ONLY(mname_entry	name;)	/* name.var_name.addr points to whatever the original vartab entry points to */
 } mvs_pval_struct;
 
 /* NVAL is similar to PVAL except when dealing with indirect frames, the name of the var in the indirect frame's l_symtab
@@ -50,7 +53,7 @@ typedef struct
 {
 	lv_val		*mvs_val;	/* lv_val created to hold new value */
 	mvs_ntab_struct	mvs_ptab;	/* Restoration-on-pop info */
-	DEBUG_ONLY(var_tabent	name;)	/* name.var_name.addr points to whatever the original vartab entry points to */
+	DEBUG_ONLY(mname_entry	name;)	/* name.var_name.addr points to whatever the original vartab entry points to */
 } mvs_nval_struct;
 
 typedef struct
@@ -92,7 +95,7 @@ typedef struct
 	 */
 	boolean_t		*ztvalue_changed_ptr;	/* pointer to ztvalue_changed for previous trigger level */
 	mval			*ztvalue_save;		/* Save it once per trigger level */
-	mstr			*ztname_save;
+	mident			*ztname_save;
 	mval			*ztdata_save;
 	mval			*ztdelim_save;
 	mval			*ztoldval_save;
@@ -119,7 +122,9 @@ typedef struct
 	int					save_merge_args;
 	uint4					save_zwrtacindx;
 	boolean_t				save_in_zwrite;
-	GTM64_ONLY(int4				filler;)
+#	ifdef DEBUG
+	unsigned int				save_count_prohibit_longjmp;
+#	endif
 	struct merge_glvn_struct_type		*save_mglvnp;
 	struct gvzwrite_datablk_struct		*save_gvzwrite_block;
 	struct lvzwrite_datablk_struct		*save_lvzwrite_block;
@@ -168,7 +173,6 @@ typedef struct
 
 /* Homogenous mv_stent structure containing all types. This structure is never allocated as is but is allocated
  * on the M stack using the size for the size defined in mvs_size[] array in mtables.c
- * Note that since mvs_size is unsigned char, the sizeof each struct must be under 256 bytes
  */
 typedef struct mv_stent_struct
 {
@@ -211,7 +215,7 @@ typedef struct mv_stent_struct
 } mv_stent;
 
 /* Declare those global variables and error messages that are used by the PUSH_MV_STENT and POP_MV_STENT macros */
-LITREF	unsigned char	mvs_size[];
+LITREF	unsigned short	mvs_size[];
 GBLREF	unsigned char	*stackbase, *stacktop, *stackwarn, *msp;
 GBLREF	mv_stent	*mv_chain;
 
@@ -232,7 +236,7 @@ void push_stck(void* val, int val_size, void** addr, int mvst_stck_type);
 				 */
 #define MVST_MVAL	1	/* An mval which will be dropped at pop time */
 #define MVST_STAB	2	/* A symbol table */
-#define MVST_IARR	3	/* An array of (literal or temp) mval's and mstr's on the stack, due to indirection */
+#define MVST_UNUSED1	3	/* UNUSED - An array of (literal or temp) mval's and mstr's on the stack, due to indirection */
 #define	MVST_NTAB	4	/* A place to save old name hash table values during parameter passed functions (used for dotted
 				 * parm/alias)  */
 #define MVST_ZINTCMD	5	/* Non IO timed commands when ZINTR */
@@ -271,7 +275,7 @@ static inline void push_mv_stent(int T)
 	GBLREF	unsigned char		*stackbase;
 	GBLREF	unsigned char		*stacktop;
 	GBLREF	mv_stent		*mv_chain;
-	LITREF	unsigned char		mvs_size[];
+	LITREF	unsigned short		mvs_size[];
 
 	if ((msp -= mvs_size[T]) <= stackwarn)
 	{
@@ -289,6 +293,38 @@ static inline void push_mv_stent(int T)
 		((mv_stent *)msp)->mv_st_type = T;
 		((mv_stent *)msp)->mv_st_next = (int)((unsigned char *) mv_chain - msp);
 		mv_chain = (mv_stent *)msp;
+		switch (T)
+		{
+		case MVST_MVAL:
+			glist_first_init_str(&mv_chain->mv_st_cont.mvs_mval.str);
+			glist_protect_str(&mv_chain->mv_st_cont.mvs_mval.str);
+			break;
+		case MVST_MSAV:
+			glist_first_init_str(&mv_chain->mv_st_cont.mvs_msav.v.str);
+			break;
+		case MVST_TRIGR:
+			glist_first_init_str(&mv_chain->mv_st_cont.mvs_trigr.dollar_etrap_save.str);
+			glist_first_init_str(&mv_chain->mv_st_cont.mvs_trigr.dollar_ztrap_save.str);
+			/* FALLTHROUGH */
+		case MVST_ZINTR:
+			glist_first_init_str(&mv_chain->mv_st_cont.mvs_zintr.savextref);
+			glist_first_init_str(&mv_chain->mv_st_cont.mvs_zintr.savtarg.str);
+			break;
+		case MVST_TPHOLD:
+			glist_first_init_str(&mv_chain->mv_st_cont.mvs_tp_holder.ztwormhole_save.str);
+			break;
+		case MVST_NVAL:
+#			ifdef DEBUG
+			glist_first_init_str(&mv_chain->mv_st_cont.mvs_nval.name.var_name);
+			glist_protect_str(&mv_chain->mv_st_cont.mvs_nval.name.var_name);
+#			endif
+			break;
+		case MVST_ZINTDEV:
+			glist_first_init_str(&mv_chain->mv_st_cont.mvs_zintdev.curr_sp_buffer);
+			break;
+		default:
+			break;
+		}
 	}
 }
 
@@ -301,7 +337,7 @@ inline static void push_mv_stck(int size, int st_type)
 	GBLREF	unsigned char		*stackbase;
 	GBLREF	unsigned char		*stacktop;
 	GBLREF	mv_stent		*mv_chain;
-	LITREF	unsigned char		mvs_size[];
+	LITREF	unsigned short		mvs_size[];
 
 	if ((msp -= ROUND_UP(mvs_size[st_type] + size, SIZEOF(char *))) <= stackwarn)
 	{
@@ -325,33 +361,135 @@ inline static void push_mv_stck(int size, int st_type)
 	}
 }
 
+static inline void unprotect_mv_ent(mv_stent *mv_st_ent)
+{
+	switch (mv_st_ent->mv_st_type)
+	{
+	case MVST_MVAL:
+		glist_unprotect_str(&mv_st_ent->mv_st_cont.mvs_mval.str);
+		break;
+	case MVST_MSAV:
+		glist_unprotect_str(&mv_st_ent->mv_st_cont.mvs_msav.v.str);
+		break;
+	case MVST_TRIGR:
+		glist_unprotect_str(&mv_st_ent->mv_st_cont.mvs_trigr.dollar_etrap_save.str);
+		glist_unprotect_str(&mv_st_ent->mv_st_cont.mvs_trigr.dollar_ztrap_save.str);
+		/* FALLTHROUGH */
+	case MVST_ZINTR:
+		glist_unprotect_str(&mv_st_ent->mv_st_cont.mvs_zintr.savextref);
+		glist_unprotect_str(&mv_st_ent->mv_st_cont.mvs_zintr.savtarg.str);
+		break;
+	case MVST_TPHOLD:
+		glist_unprotect_str(&mv_st_ent->mv_st_cont.mvs_tp_holder.ztwormhole_save.str);
+		break;
+	case MVST_NVAL:
+		DEBUG_ONLY(glist_unprotect_str(&mv_st_ent->mv_st_cont.mvs_nval.name.var_name));
+		break;
+	case MVST_ZINTDEV:
+		glist_unprotect_str(&mv_st_ent->mv_st_cont.mvs_zintdev.curr_sp_buffer);
+		break;
+	default:
+		break;
+	}
+
+}
+
 #define POP_MV_STENT() pop_mv_stent()
 
-inline static void pop_mv_stent(void)
-{
-	GBLREF	unsigned char		*msp;
-	GBLREF	unsigned char		*stackwarn;
-	GBLREF	unsigned char		*stackbase;
-	GBLREF	unsigned char		*stacktop;
-	GBLREF	mv_stent		*mv_chain;
-	LITREF	unsigned char		mvs_size[];
-
-	assert(msp == (unsigned char *) mv_chain);
-	msp += mvs_size[mv_chain->mv_st_type];
-	mv_chain = (mv_stent *)((char *) mv_chain + mv_chain->mv_st_next);
-	if (msp <= stackwarn)
-	{
-		if (msp <= stacktop)
+		inline static void pop_mv_stent(void)
 		{
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STACKOFLOW);
-		} else
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STACKCRIT);
-	} else if (msp > stackbase)
+			GBLREF	unsigned char		*msp;
+			GBLREF	unsigned char		*stackwarn;
+			GBLREF	unsigned char		*stackbase;
+			GBLREF	unsigned char		*stacktop;
+			GBLREF	mv_stent		*mv_chain;
+			LITREF	unsigned short		mvs_size[];
+
+			assert(msp == (unsigned char *)mv_chain);
+			unprotect_mv_ent(mv_chain);
+			msp += mvs_size[mv_chain->mv_st_type];
+			mv_chain = (mv_stent *)((char *)mv_chain + mv_chain->mv_st_next);
+			if (msp <= stackwarn)
+			{
+				if (msp <= stacktop)
+				{
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STACKOFLOW);
+				} else
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STACKCRIT);
+			} else if (msp > stackbase)
+			{
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STACKUNDERFLO);
+			}
+		}
+
+#define	IS_PTR_INSIDE_M_STACK(PTR)	(((unsigned char *)PTR < (sm_uc_ptr_t)stackbase) && ((unsigned char *)PTR > stacktop))
+
+static inline void prep_mv_stent_for_move(mv_stent *mv_ent)
+{
+	switch (mv_ent->mv_st_type)
 	{
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STACKUNDERFLO);
+		case MVST_MVAL:
+			glist_str_before_move(&mv_ent->mv_st_cont.mvs_mval.str);
+			break;
+		case MVST_MSAV:
+			glist_str_before_move(&mv_ent->mv_st_cont.mvs_msav.v.str);
+			break;
+		case MVST_STAB:
+			break;
+		case MVST_TPHOLD:
+			glist_str_before_move(&mv_ent->mv_st_cont.mvs_tp_holder.ztwormhole_save.str);
+			break;
+		case MVST_NVAL:
+			DEBUG_ONLY(glist_str_before_move(&mv_ent->mv_st_cont.mvs_nval.name.var_name));
+			break;
+		case MVST_TRIGR:
+			glist_str_before_move(&mv_ent->mv_st_cont.mvs_trigr.dollar_etrap_save.str);
+			glist_str_before_move(&mv_ent->mv_st_cont.mvs_trigr.dollar_ztrap_save.str);
+			/* WARNING - fallthrough */
+		case MVST_ZINTR:
+			glist_str_before_move(&mv_ent->mv_st_cont.mvs_zintr.savextref);
+			glist_str_before_move(&mv_ent->mv_st_cont.mvs_zintr.savtarg.str);
+			break;
+		case MVST_ZINTDEV:
+			glist_str_before_move(&mv_ent->mv_st_cont.mvs_zintdev.curr_sp_buffer);
+			break;
+		default:
+			break;
 	}
 }
 
-#define	IS_PTR_INSIDE_M_STACK(PTR)	(((unsigned char *)PTR < (sm_uc_ptr_t)stackbase) && ((unsigned char *)PTR > stacktop))
+static inline void handle_mv_stent_after_move(mv_stent *mv_ent)
+{
+	switch (mv_ent->mv_st_type)
+	{
+		case MVST_MVAL:
+			glist_str_after_move(&mv_ent->mv_st_cont.mvs_mval.str);
+			break;
+		case MVST_MSAV:
+			glist_str_after_move(&mv_ent->mv_st_cont.mvs_msav.v.str);
+			break;
+		case MVST_STAB:
+			break;
+		case MVST_TPHOLD:
+			glist_str_after_move(&mv_ent->mv_st_cont.mvs_tp_holder.ztwormhole_save.str);
+			break;
+		case MVST_NVAL:
+			DEBUG_ONLY(glist_str_after_move(&mv_ent->mv_st_cont.mvs_nval.name.var_name));
+			break;
+		case MVST_TRIGR:
+			glist_str_after_move(&mv_ent->mv_st_cont.mvs_trigr.dollar_etrap_save.str);
+			glist_str_after_move(&mv_ent->mv_st_cont.mvs_trigr.dollar_ztrap_save.str);
+			/* WARNING - fallthrough */
+		case MVST_ZINTR:
+			glist_str_after_move(&mv_ent->mv_st_cont.mvs_zintr.savextref);
+			glist_str_after_move(&mv_ent->mv_st_cont.mvs_zintr.savtarg.str);
+			break;
+		case MVST_ZINTDEV:
+			glist_str_after_move(&mv_ent->mv_st_cont.mvs_zintdev.curr_sp_buffer);
+			break;
+		default:
+			break;
+	}
+}
 
 #endif

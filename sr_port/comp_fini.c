@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -16,7 +16,7 @@
 #include "opcode.h"
 #include "toktyp.h"
 #include "stringpool.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "mv_stent.h"
 #include "cgp.h"
 #include "alloc_reg.h"
@@ -81,7 +81,13 @@ int comp_fini(int status, mstr *obj, opctype retcode, oprtype *retopr, oprtype *
 			stringpool = rts_stringpool;
 			TREF(compile_time) = FALSE;
 			ind_code(obj);
-			indr_stringpool.free = indr_stringpool.base;
+			rts_stringpool = stringpool;
+			stringpool = indr_stringpool;
+			COMPILE_HASHTAB_CLEANUP;
+			glist_clear_arrays(&stringpool);
+			stringpool.free = stringpool.base;
+			indr_stringpool = stringpool;
+			stringpool = rts_stringpool;
 		}
 	} else
 	{	/* If this assert fails, it means a syntax problem could have been caught earlier. Consider placing a more useful
@@ -92,6 +98,8 @@ int comp_fini(int status, mstr *obj, opctype retcode, oprtype *retopr, oprtype *
 	}
 	if (EXPR_FAIL == status)
 	{
+		COMPILE_HASHTAB_CLEANUP;
+		glist_clear_arrays(&indr_stringpool);
 		assert(indr_stringpool.base == stringpool.base);
 		indr_stringpool = stringpool;
 		stringpool = rts_stringpool;
@@ -101,7 +109,6 @@ int comp_fini(int status, mstr *obj, opctype retcode, oprtype *retopr, oprtype *
 	}
 	assert(!TREF(compile_time));
 	TREF(transform) = TRUE;
-	COMPILE_HASHTAB_CLEANUP;
 	mcfree();
 	return status;
 }

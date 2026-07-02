@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2022 Fidelity National Information	*
+ * Copyright (c) 2012-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -22,7 +22,7 @@ mval *underr_overwrite(mval *start, ...)
 	va_list		var;
 
 	va_start(var, start);
-	*start = *underr(start);
+	start->umval = underr(start)->umval;
 	va_end(var);
 	return start;
 }

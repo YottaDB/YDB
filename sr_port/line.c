@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -125,13 +125,15 @@ boolean_t line(uint4 *lnc)
 					added_ret->parent = &mline_root;
 					added_ret->child = added_ret->sibling = NULL;
 					mline_tail = added_ret;
+				} else
+				{
+					e = maketriple(OC_RTERROR);
+					e->operand[0] = put_ilit(ERR_FALLINTOFLST);
+					e->operand[1] = put_ilit(FALSE);	/* Not a subroutine/func reference. */
+					r = parmbase->exorder.bl->exorder.bl;
+					dqins(r, exorder, e);
+					embed_error = TRUE;
 				}
-				e = maketriple(OC_RTERROR);
-				e->operand[0] = put_ilit(ERR_FALLINTOFLST);
-				e->operand[1] = put_ilit(FALSE);	/* Not a subroutine/func reference. */
-				r = parmbase->exorder.bl->exorder.bl;
-				dqins(r, exorder, e);
-				embed_error = TRUE;
 			}
 			if (success)
 			{

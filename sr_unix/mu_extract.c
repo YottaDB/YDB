@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -97,7 +97,7 @@ LITDEF mval	mu_bin_datefmt	= DEFINE_MVAL_LITERAL(MV_STR, 0, 0, SIZEOF(BIN_HEADER
 						      BIN_HEADER_DATEFMT, 0, 0);
 LITREF	mval	literal_zero;
 
-LITREF mstr	chset_names[];
+LITREF unmanaged_mstr	chset_names[];
 
 STATICDEF readonly unsigned char	datefmt_txt[] = "DD-MON-YEAR  24:60:SS";
 STATICDEF readonly unsigned char	select_text[] = "SELECT";
@@ -208,8 +208,8 @@ void mu_extract(void)
 	unsigned short			label_len, n_len, ch_set_len, buflen;
 	unsigned char			*outbuf, *outptr, *chptr, *leadptr;
 	struct stat                     statbuf;
-	mval				val, curr_gbl_name, op_val, op_pars;
-	mstr				chset_mstr;
+	mval				val, curr_gbl_name, op_val = {{0}}, op_pars = {{0}};
+	unmanaged_mstr			chset_mstr;
 	mname_entry			gvname;
 	gtm_chset_t 			saved_out_set;
 	coll_hdr			extr_collhdr;
@@ -421,7 +421,7 @@ void mu_extract(void)
 	MU_EXTR_STATS_INIT(global_total);
 	n_len = SIZEOF(outfilename);
 	if (CLI_PRESENT == cli_present("STDOUT"))
-		op_val.str = sys_output;	/* Redirect to standard output */
+		op_val.str.umstr = sys_output.umstr;	/* Redirect to standard output */
 	else if (FALSE == cli_get_str("FILE", outfilename, &n_len))
 	{
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_MUPCLIERR);
@@ -573,7 +573,7 @@ void mu_extract(void)
 		op_write(&op_val);
 		op_zhorolog(&val, FALSE);
 		op_fnzdate(&val, &datefmt, &null_str, &null_str, &val);
-		op_val = val;
+		op_val.umval = val.umval;
 		op_val.mvtype = MV_STR;
 		op_write(&op_val);
 		if (MU_FMT_ZWR == format)

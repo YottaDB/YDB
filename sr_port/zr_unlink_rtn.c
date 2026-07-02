@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2013-2025 Fidelity National Information	*
+ * Copyright (c) 2013-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -16,7 +16,7 @@
 #include "gtm_stdlib.h"
 #include "gtm_string.h"
 
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "fix_pages.h"
 #include "zbreak.h"
 #include "private_code_copy.h"
@@ -177,5 +177,5 @@ void zr_unlink_rtn(rhdtyp *old_rhead, boolean_t free_all)
 #		endif
 	}
 	if (not_in_play < TAREF1(save_xfer_root, zstep_pending).event_state)
-		op_zstep(ZSTEP_WHATEVER, NULL);			/* ZSTEP in play - try not to lose it */
+		op_zstep(ZSTEP_WHATEVER, &TREF(zstep_action));	/* ZSTEP in play - try not to lose it */
 }

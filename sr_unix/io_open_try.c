@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -47,6 +47,7 @@
 #include "gtmio.h"
 #include "op.h"
 #include "indir_enum.h"
+#include "gcol_list.h"
 
 #define  LOGNAME_LEN 255
 /* avoid calling getservbyname for shell and Kerberos shell */
@@ -61,7 +62,7 @@ GBLREF	bool			out_of_time;
 GBLREF	volatile int4		outofband;
 GBLREF	int4			write_filter;
 
-LITREF	mstr			chset_names[];
+LITREF	unmanaged_mstr		chset_names[];
 LITREF	unsigned char		io_params_size[];
 
 error_def(ERR_GETNAMEINFO);
@@ -139,6 +140,7 @@ boolean_t io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 msec_ti
 			temp_iod->pair.out = temp_iod;
 			temp_iod->trans_name = tl;
 			temp_iod->type = n_io_dev_types;
+			glist_first_init_str(&temp_iod->error_handler);
 			p_offset = 0;
 			while(iop_eol != *(pp->str.addr + p_offset))
 			{
@@ -153,25 +155,9 @@ boolean_t io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 msec_ti
 			if (ff == temp_iod->type)
 			{
 				/* fifo with RW permissions for owner, group, other */
-				if ((-1 != MKNOD(buf, FIFO_PERMISSION, 0))
-#					ifdef __MVS__
-					|| (EEXIST == errno)
-#					endif
-					)
-				{
-#					ifdef __MVS__
-					if (EEXIST != errno)
-						filecreated = TRUE;
-					/*	create another one for fifo write	*/
-					temp_iod->pair.out = (io_desc *)malloc(SIZEOF(io_desc));
-					(temp_iod->pair.out)->pair.in = temp_iod;
-					(temp_iod->pair.out)->pair.out = (temp_iod->pair.out);
-					(temp_iod->pair.out)->trans_name = tl;
-					(temp_iod->pair.out)->type = ff;
-#					else
+				if ((-1 != MKNOD(buf, FIFO_PERMISSION, 0)))
 					filecreated = TRUE;
-#					endif
-				} else  if (EEXIST != errno)
+				else  if (EEXIST != errno)
 				{
 					mknod_err = TRUE;
 					save_mknod_err = errno;

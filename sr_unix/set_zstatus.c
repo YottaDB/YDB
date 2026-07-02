@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -15,36 +15,40 @@
 #include "gtm_string.h"
 #include "gtm_stdio.h"
 
+#include "gcol_list.h"
 #include "gtm_multi_thread.h"
 #include "error.h"
 #include "min_max.h"
 #include "stringpool.h"
 #include "mlkdef.h"
 #include "zshow.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "stack_frame.h"
 #include "mvalconv.h"
 #include "error_trap.h"
 #include "trans_code_cleanup.h"
 #include "util.h"
 #include "gtmmsg.h"
+#include "mdq.h"
 
 GBLREF mval		dollar_zstatus, dollar_zerror;
 GBLREF stack_frame	*zyerr_frame, *frame_pointer;
 GBLREF mstr             *err_act;
+GBLREF	unsigned short	proc_act_type;
 
 error_def(ERR_MEMORY);
 
 unsigned char *set_zstatus(mstr *src, int max_len, int arg, unsigned char **ctxtp, boolean_t need_rtsloc)
 {
 	unsigned char	*b_line;	/* beginning of line (used to restart line) */
-	mval		val;		/* pointer to dollar_zstatus */
+	mval		val = {{0}};		/* pointer to dollar_zstatus */
 	unsigned char	zstatus_buff[2*OUT_BUFF_SIZE];
 	unsigned char	*zstatus_bptr, *zstatus_iter;
 	int		save_arg;
 	size_t		util_len ;
 	mval		*status_loc;
 	boolean_t 	trans_frame;
+	unsigned short	save_type = FALSE;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -56,18 +60,26 @@ unsigned char *set_zstatus(mstr *src, int max_len, int arg, unsigned char **ctxt
 		 * indirection constitutes MUMPS code that is "unknown" is the sense that there is no
 		 * line address for it.
 		 */
-		trans_frame = !(SFT_DM & frame_pointer->type) && ((!(frame_pointer->type & SFT_COUNT
-			|| 0 == frame_pointer->type)) || (SFT_ZINTR & frame_pointer->type));
+		trans_frame = !(SFT_DM & frame_pointer->type)
+			&& ((!(frame_pointer->type & SFT_COUNT || 0 == frame_pointer->type))
+				|| (SFT_ZINTR & frame_pointer->type) || (save_type = proc_act_type));
 		if (trans_frame)
 		{
 			save_arg = arg;
-			SET_ERR_CODE(frame_pointer, arg);
+			if (save_type)
+			{
+				save_type = frame_pointer->type;
+				frame_pointer->type = proc_act_type;
+				SET_ERR_CODE(frame_pointer, arg);
+				frame_pointer->type = save_type;
+			} else
+				SET_ERR_CODE(frame_pointer, arg);
 		}
 		src->len = INTCAST(get_symb_line((unsigned char*)src->addr, max_len, &b_line, ctxtp) - (unsigned char*)src->addr);
 	}
 	MV_FORCE_MVAL(&val, arg);
-	n2s(&val);
-	memcpy((void *)zstatus_buff, val.str.addr, val.str.len);
+	n2s(&val); /* protection not necessary since we immediately copy to zstatus_buff */
+	memcpy(zstatus_buff, val.str.addr, val.str.len);
 	zstatus_bptr = zstatus_buff + val.str.len;
 	*zstatus_bptr++ = ',';
 	if (NULL != b_line)
@@ -111,6 +123,7 @@ unsigned char *set_zstatus(mstr *src, int max_len, int arg, unsigned char **ctxt
 	status_loc->str.addr = (char *)zstatus_buff;
 	s2pool(&status_loc->str);
 	status_loc->mvtype = MV_STR;
+	glist_sync_mval(status_loc);
         /* If this is a MEMORY issue, setting the ecode is of dubious worth since we are not going
          * to drive any handlers and it can definitely be expensive in terms of memory use as ecode_add()
          * (further down the pike) is likely to load the text of the module into storage if it can. So we bypass

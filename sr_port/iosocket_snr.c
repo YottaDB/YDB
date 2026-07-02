@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -101,7 +101,7 @@ ssize_t iosocket_snr(socket_struct *socketptr, void *buffer, size_t maxlength, i
 	{
 		DBGSOCK2((stdout, "socsnr: read from buffer - buffered_length: %d\n", socketptr->buffered_length));
 		bytesread = MIN(socketptr->buffered_length, maxlength);
-		memcpy(buffer, (void *)(socketptr->buffer + socketptr->buffered_offset), bytesread);
+		memcpy(buffer, (socketptr->buffer + socketptr->buffered_offset), bytesread);
 		socketptr->buffered_offset += bytesread;
 		socketptr->buffered_length -= bytesread;
 		DBGSOCK2((stdout, "socsnr: after buffer read - buffered_offset: %d  buffered_length: %d\n",

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -33,7 +33,12 @@
 MBSTART {									\
 	if (HT_DELETED_ENTRY == (tabent)->value)				\
 		(table)->del_count--; 						\
-	(tabent)->key = *hkey; 							\
+	ASSERT_KEY_NOT_IN_LIST((tabent)->key);					\
+	ASSIGN_KEY((tabent)->key, hkey); 					\
+	DEBUG_GCOL_ONLY(gcol_stack_lvl++;)					\
+	PROTECT_KEY((tabent)->key);						\
+	DEBUG_GCOL_ONLY(gcol_stack_lvl--;)					\
+	ASSERT_KEY_PROTECTED((tabent)->key);					\
 	(tabent)->value = value;						\
 	(table)->count++;							\
 } MBEND

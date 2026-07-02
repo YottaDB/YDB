@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -370,10 +370,12 @@ void	op_view(int numarg, mval *keyword, ...)
 			break;
 		case VTK_PATCODE:
 			if (arg)
-				tmpstr = parmblk.value->str;
+				status = setpattab(&parmblk.value->str);
 			else
+			{
 				tmpstr.len = 0;
-			status = setpattab(&tmpstr);
+				status = setpattab(&tmpstr);
+			}
 			if (0 == status)
 			{
 				va_end(var);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2017 Fidelity National Information	*
+ * Copyright (c) 2003-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -213,15 +213,18 @@ boolean_t cli_disallow_dse_dump(void)
 
 	disallow_return_value = d_c_cli_present("FILEHEADER") && (d_c_cli_present("BLOCK")
 								|| d_c_cli_present("HEADER")
+								|| d_c_cli_present("STATUS")
 								|| d_c_cli_present("COUNT")
 								|| d_c_cli_present("GLO")
 								|| d_c_cli_present("ZWR"));
 	CLI_DIS_CHECK_N_RESET;
 	disallow_return_value = d_c_cli_present("GLO") && d_c_cli_present("ZWR");
 	CLI_DIS_CHECK_N_RESET;
-	disallow_return_value = d_c_cli_present("GLO") && d_c_cli_present("HEADER");
+	disallow_return_value = d_c_cli_present("GLO") && (d_c_cli_present("HEADER")
+							|| d_c_cli_present("STATUS"));
 	CLI_DIS_CHECK_N_RESET;
-	disallow_return_value = d_c_cli_present("ZWR") && d_c_cli_present("HEADER");
+	disallow_return_value = d_c_cli_present("ZWR") && (d_c_cli_present("HEADER")
+							|| d_c_cli_present("STATUS"));
 	CLI_DIS_CHECK_N_RESET;
 	disallow_return_value = d_c_cli_present("COUNT") && !d_c_cli_present("HEADER")
 					&& !(d_c_cli_present("RECORD") || d_c_cli_present("OFFSET")) && !d_c_cli_present("BLOCK");

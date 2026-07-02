@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2024 Fidelity National Information		*
+ * Copyright (c) 2024-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -43,7 +43,7 @@ void	op_fnreplace(mval *src, mval* substr, mval* rplc, mval* dst)
 	{
 		assert(MAX_STRLEN >= src->str.len);
 		dstlen = no_conversion(&src->str);
-		MV_INIT_STRING(dst, dstlen, stringpool.free);
+		UMV_INIT_STRING(&dst->umval, dstlen, stringpool.free);
 		stringpool.free += dst->str.len;
 		return;
 	}
@@ -102,7 +102,7 @@ void	op_fnreplace(mval *src, mval* substr, mval* rplc, mval* dst)
 	}
 	if (MAX_STRLEN < dstlen)
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_MAXSTRLEN);
-	MV_INIT_STRING(dst, dstlen, stringpool.free);
+	UMV_INIT_STRING(&dst->umval, dstlen, stringpool.free);
 	stringpool.free += dst->str.len;
 }
 #endif /* UTF8_SUPPORTED */
@@ -119,7 +119,7 @@ void	op_fnzreplace(mval *src, mval* substr, mval* rplc, mval* dst)
 	{
 		assert(MAX_STRLEN >= src->str.len);
 		dstlen = no_conversion(&src->str);
-		MV_INIT_STRING(dst, dstlen, stringpool.free);
+		UMV_INIT_STRING(&dst->umval, dstlen, stringpool.free);
 		stringpool.free += dst->str.len;
 		return;
 	}
@@ -158,6 +158,6 @@ void	op_fnzreplace_common(mval *src, mval* substr, mval* rplc, mval* dst)
 			i += substr->str.len;
 		}
 	}
-	MV_INIT_STRING(dst, dstlen, stringpool.free);
+	UMV_INIT_STRING(&dst->umval, dstlen, stringpool.free);
 	stringpool.free += dst->str.len;
 }

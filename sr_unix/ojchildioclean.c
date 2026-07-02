@@ -27,7 +27,7 @@
 #include "jobsp.h"
 #include "gtmio.h"
 #include "gtmcrypt.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "relinkctl.h"
 
 GBLREF	int			mutex_sock_fd;

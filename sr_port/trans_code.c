@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -17,7 +17,7 @@
 #endif
 #include "error.h"
 #include "indir_enum.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "mv_stent.h"
 #include "stack_frame.h"
 #include "stringpool.h"
@@ -43,6 +43,7 @@
 # include "gtm_trigger.h"
 #endif
 #include "ztimeout_routines.h"
+#include "gcol_list.h"
 
 #define POP_SPECIFIED 	(ZTRAP_POP & (TREF(ztrap_form)) && (level2go = MV_FORCE_INTD(&ztrap_pop2level))) /* note: assignment */
 
@@ -103,7 +104,6 @@ CONDITION_HANDLER(zyerr_ch)
 
 void trans_code_finish(void)
 {
-	mval		dummy;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -111,10 +111,9 @@ void trans_code_finish(void)
 	proc_act_type = 0;
 	if (0 != dollar_zyerror.str.len)
 	{
-		dummy.mvtype = MV_STR;
-		dummy.str = dollar_zyerror.str;
+		assert(MV_IS_STRING(&dollar_zyerror));
 		ESTABLISH(zyerr_ch);
-		op_commarg(&dummy, indir_do);
+		op_commarg(&dollar_zyerror, indir_do);
 		REVERT;
 		op_newintrinsic(SV_ZYERROR); /* for user's convenience */
 		assert(NULL == zyerr_frame);
@@ -126,7 +125,7 @@ void trans_code_finish(void)
 
 CONDITION_HANDLER(trans_code_ch)
 {
-	mval		dummy;
+	mval		dummy = {{0}};
 	int		level2go;
 
 	START_CH(TRUE);
@@ -158,7 +157,7 @@ CONDITION_HANDLER(trans_code_ch)
 		GOLEVEL(level2go, TRUE);
 		/* previous trans_code_pop would have been popped out */
 		dummy.mvtype = MV_STR;
-		dummy.str = *err_act;
+		dummy.str.umstr = err_act->umstr;
 		TREF(trans_code_pop) = push_mval(&dummy);
 	}
 	op_commarg(TREF(trans_code_pop), indir_goto);
@@ -181,7 +180,7 @@ CONDITION_HANDLER(trans_code_ch)
 
 void trans_code(void)
 {
-	mval		dummy;
+	mval		dummy = {{0}};
 	int		level2go;
 	DCL_THREADGBL_ACCESS;
 
@@ -215,7 +214,7 @@ void trans_code(void)
 		GOLEVEL(level2go, TRUE);
 	}
 	dummy.mvtype = MV_STR;
-	dummy.str = *err_act;
+	dummy.str.umstr = err_act->umstr;
 	TREF(trans_code_pop) = push_mval(&dummy);
 	ESTABLISH(trans_code_ch);
 	op_commarg(TREF(trans_code_pop), (ZTRAP_CODE & (TREF(ztrap_form)) || IS_ETRAP) ? indir_linetail : indir_goto);

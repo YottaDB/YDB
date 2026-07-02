@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -99,7 +99,7 @@ cm_region_head *gtcmd_ini_reg(connection_struct *cnx)
 		memcpy(ptr->reg->dyn.addr->fname, fname, len);
 		ptr->reg->dyn.addr->fname_len = len;
 		set_gdid_from_stat(&FILE_INFO(ptr->reg)->fileid, &stat_buf);
-		ptr->reg_hash = (hash_table_mname *)malloc(SIZEOF(hash_table_mname));
+		ptr->reg_hash = (hash_table_umname *)malloc(SIZEOF(hash_table_umname));
 		if (-1 != gethostname((char *)node, SIZEOF(node)))
 		{	/* In case the nodename is in lower-case, convert it to upper-case. This is because
 			 * region-names that start with a lower-case have special meaning in GT.M. See IS_STATSDB_REGNAME.

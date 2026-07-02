@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2022 Fidelity National Information	*
+ * Copyright (c) 2012-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -15,6 +15,7 @@
 #include "gtm_stdio.h"
 #include "gtm_unistd.h"
 #include "gtm_socket.h"
+#include "device_cleanup.h"
 
 #include "io.h"
 #include "iosocketdef.h"
@@ -32,6 +33,7 @@ void iosocket_destroy (io_desc *ciod)
 	assert(ciod->newly_created || (ciod->state != dev_open));
 	if ((NULL == ciod) || (gtmsocket != ciod->type))
 		return;			/* nothing to do here */
+	cleanup_device_stp_residents(ciod);
 	dsocketptr = (d_socket_struct *) ciod->dev_sp;
 	/* This routine is called from iosocket_close.c with no SOCKET=
 	 * specified and DESTROY after closing all sockets in the device.

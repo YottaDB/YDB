@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -137,13 +137,14 @@ int repl_log_init(repl_log_file_t log_type,
 			*log_fd = tmp_fd;
 		} else
 		{
+			CLOSEFILE_RESET(tmp_fd, rc);
 			err_code = STRERROR(save_errno);
-			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(10) ERR_REPLLOGOPN, 6,
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(12) ERR_REPLLOGOPN, 6,
 			 	   LEN_AND_STR(log_file_name),
 				   LEN_AND_STR(err_code),
-				   strlen(log),
-				   log,
+				   LEN_AND_STR(log),
 				   ERR_TEXT, 2, RTS_ERROR_LITERAL("Error in dup2"));
+			return(EREPL_LOGFILEOPEN);
 		}
 	}
 	return(SS_NORMAL);

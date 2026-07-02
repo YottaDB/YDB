@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2011-2025 Fidelity National Information	*
+ * Copyright (c) 2011-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -21,7 +21,7 @@
 #include "gdsbt.h"			/* for gdsfhead.h */
 #include "gdsfhead.h"
 #include "gvcst_protos.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "gv_trigger.h"
 #include "gtm_trigger.h"
 #include "trigger.h"
@@ -60,6 +60,8 @@
 #include "io.h"
 #include "repl_msg.h"			/* for gtmsource.h */
 #include "gtmsource.h"			/* for jnlpool_addrs_ptr_t */
+#include "stringpool.h"
+#include "gcol_list.h"
 
 GBLREF	uint4			dollar_tlevel;
 GBLREF	sgmnt_addrs		*cs_addrs;
@@ -314,7 +316,8 @@ STATICFNDEF int trigger_source_raov(mstr *trigname, gd_region *reg, rhdtyp **rtn
 	gvt_trigger_t		*gvt_trigger;
 	int			index;
 	mident			rtn_name;
-	mstr			gbl, xecute_buff;
+	mstr			gbl;
+	unmanaged_mstr		xecute_buff;
 	mval			trig_index;
 	rhdtyp			*rtn_vector;
 	rtn_tabent		*rttabent = rtn_names_end + 1;
@@ -332,7 +335,7 @@ STATICFNDEF int trigger_source_raov(mstr *trigname, gd_region *reg, rhdtyp **rtn
 	SAVE_REGION_INFO(save_currkey, save_gv_target, save_gv_cur_region, save_sgm_info_ptr, save_jnlpool);
 	if (NULL != *rtn_vec)
 		rtn_vector = *rtn_vec;
-	else if (find_rtn_tabent(&rttabent, trigname))
+	else if (find_rtn_tabent(&rttabent, &trigname->mident))
 		rtn_vector = rttabent->rt_adr;
 	else
 		rtn_vector = NULL;
@@ -482,7 +485,7 @@ STATICFNDEF int trigger_source_raov(mstr *trigname, gd_region *reg, rhdtyp **rtn
 			i2mval(&trig_index, index);
 			xecute_buff.addr = trigger_gbl_fill_xecute_buffer(gbl.addr, gbl.len, &trig_index, NULL,
 									  (int4 *)&xecute_buff.len);
-			trigdsc->xecute_str.str = xecute_buff;
+			trigdsc->xecute_str.str.umstr = xecute_buff;
 		}
 	}
 	/* If the trigger is not already compiled, it needs to be since the routine header is the method for obtaining the
@@ -521,8 +524,8 @@ STATICFNDEF boolean_t trigger_source_raov_trigload(mstr *trigname, gv_trigger_t 
 	sgmnt_data_ptr_t	csd;
 	gv_namehead		*gvt;
 	gvt_trigger_t		*gvt_trigger;
-	mstr			xecute_buff;
-	mname_entry		gvname;
+	unmanaged_mstr		xecute_buff;
+	unmanaged_mname_entry	gvname;
 	int			index;
 	mval			trig_index;
 	gv_trigger_t		*trigdsc;
@@ -530,6 +533,7 @@ STATICFNDEF boolean_t trigger_source_raov_trigload(mstr *trigname, gv_trigger_t 
 	gvnh_reg_t		*gvnh_reg;
 	boolean_t		name_not_found;
 	int			trig_protected_mval_push_count;
+	char			gvname_buf[MAX_MIDENT_LEN + 1];
 
 	trig_protected_mval_push_count = 0;
 	INCR_AND_PUSH_MV_STENT(val); /* Protect val from garbage collection */
@@ -544,6 +548,8 @@ STATICFNDEF boolean_t trigger_source_raov_trigload(mstr *trigname, gv_trigger_t 
 	ptr = val->str.addr;
 	len = MIN(val->str.len, MAX_MIDENT_LEN);	/* Look for NULL within the MIN */
 	STRNLEN(ptr, len, len);
+	memcpy(gvname_buf, ptr, len);
+	gvname_buf[len] = '\0';
 	ptr += len;
 	if ((val->str.len == len) || ('\0' != *ptr))
 	{
@@ -561,7 +567,7 @@ STATICFNDEF boolean_t trigger_source_raov_trigload(mstr *trigname, gv_trigger_t 
 		/* Return an error instead of TRIGDEFBAD. The caller will throw the error */
 		RETURN_AND_POP_MVALS(TRIG_FAILURE);
 	}
-	gvname.var_name.addr = val->str.addr;
+	gvname.var_name.addr = gvname_buf;
 	gvname.var_name.len = len;
 	COMPUTE_HASH_MNAME(&gvname);
 	GV_BIND_NAME_ONLY(gd_header, &gvname, gvnh_reg);	/* does tp_set_sgm() */
@@ -601,7 +607,7 @@ STATICFNDEF boolean_t trigger_source_raov_trigload(mstr *trigname, gv_trigger_t 
 	i2mval(&trig_index, index);
 	xecute_buff.addr = trigger_gbl_fill_xecute_buffer(gvname.var_name.addr, gvname.var_name.len,
 							  &trig_index, NULL, (int4 *)&xecute_buff.len);
-	trigdsc->xecute_str.str = xecute_buff;
+	trigdsc->xecute_str.str.umstr = xecute_buff;
 	*ret_trigdsc = trigdsc;
 	RETURN_AND_POP_MVALS(TRIG_SUCCESS);
 }

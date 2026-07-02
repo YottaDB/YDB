@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -21,9 +21,10 @@
 #include <stdarg.h>
 
 #include "gt_timer.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "stack_frame.h"
 #include "mv_stent.h"
+#include "gcol_list.h"
 #ifdef __MVS__
 #include "gtm_zos_io.h"
 #endif
@@ -195,7 +196,7 @@ typedef struct io_log_name_struct
 	char		dollar_io[1];	/* _$IO hidden variable	*/
 }io_log_name;
 
-io_log_name *get_log_name(mstr *v, bool insert);
+io_log_name *get_log_name(const unmanaged_mstr *v, bool insert);
 
 /* wttab is not used in the IO dispatch, but used in the user defined dispatch for ious*. Even though all the entries are NULL in
  * the IO dispatch table are NULL in the IO dispatch tables, they have to remain. */
@@ -206,7 +207,7 @@ typedef struct dev_dispatch_struct
 	void	(*use)(io_desc *, mval *);
 	int	(*read)(mval *, int4);
 	int	(*rdone)(mint *, int4);
-	void	(*write)(mstr *);
+	void	(*write)(const unmanaged_mstr *);
 	void	(*wtone)(int);
 	void	(*wteol)(int4, io_desc *);
 	void	(*wtff)(void);
@@ -223,7 +224,6 @@ typedef struct dev_dispatch_struct
 void io_rundown(int rundown_type);
 void io_init(boolean_t term_ctrl);
 bool io_is_rm(mstr *name);
-bool io_is_sn(mstr *tn);
 struct mv_stent_struct *io_find_mvstent(io_desc *io_ptr, boolean_t clear_mvstent);
 boolean_t io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 msec_timeout, mval *mspace);
 enum io_dev_type io_type(mstr *tn);
@@ -235,7 +235,7 @@ void io_init_name(void);
 #define ioxx_use(X)		void io##X##_use(io_desc *iod, mval *pp)
 #define ioxx_read(X)		int io##X##_read(mval *v, int4 msec_timeout)
 #define ioxx_rdone(X)		int io##X##_rdone (mint *v, int4 msec_timeout)
-#define ioxx_write(X)		void io##X##_write(mstr *v)
+#define ioxx_write(X)		void io##X##_write(const unmanaged_mstr *v)
 #define ioxx_wtone(X)		void io##X##_wtone(int c)
 #define ioxx_wteol(X)		void io##X##_wteol(int4 cnt, io_desc *iod)
 #define ioxx_wtff(X)		void io##X##_wtff(void)
@@ -381,18 +381,18 @@ LITREF unsigned char ebcdic_spaces_block[];
 }
 
 /* iosocket_open needs to prevent changing chset sometimes */
-#define SET_ENCODING_VALIDATE(CHSET, CHSET_MSTR, VALIDATE)									\
+#define SET_ENCODING_VALIDATE(CHSET, CHSET_UMSTR, VALIDATE)									\
 {																\
 	int 	chset_idx;													\
 																\
-	chset_idx = verify_chset(CHSET_MSTR);											\
+	chset_idx = verify_chset(CHSET_UMSTR);											\
 	VALIDATE;														\
 	if (0 <= chset_idx)													\
 		(CHSET) = (gtm_chset_t)chset_idx;										\
 	else															\
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_BADCHSET, 2, (CHSET_MSTR)->len, (CHSET_MSTR)->addr);		\
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_BADCHSET, 2, (CHSET_UMSTR)->len, (CHSET_UMSTR)->addr);		\
 }
-#define SET_ENCODING(CHSET, CHSET_MSTR)	SET_ENCODING_VALIDATE(CHSET, CHSET_MSTR,)
+#define SET_ENCODING(CHSET, CHSET_UMSTR)	SET_ENCODING_VALIDATE(CHSET, CHSET_UMSTR,)
 
 #define GET_ADDR_AND_LEN(ADDR, LEN)												\
 {																\
@@ -489,7 +489,7 @@ LITREF unsigned char ebcdic_spaces_block[];
 
 #define DEF_EXCEPTION(PP, P_OFF, IOD)									\
 MBSTART {												\
-	mval	MV, *MV_P;										\
+	mval	MV = {{0}}, *MV_P;									\
 													\
 	MV.mvtype = MV_STR;										\
 	MV.str.len = (unsigned char)(*(PP->str.addr + P_OFF));						\
@@ -502,8 +502,10 @@ MBSTART {												\
 		op_commarg(MV_P, indir_linetail);							\
 		op_unwind();										\
 	}												\
-	IOD->error_handler = MV_P->str;									\
-	s2pool(&IOD->error_handler);									\
+	s2pool(&(MV_P)->str);										\
+	glist_unprotect_str(&(IOD)->error_handler);							\
+	(IOD)->error_handler.umstr = (MV_P)->str.umstr;							\
+	glist_transfer_protection_to_from(&(IOD)->error_handler, &(MV_P)->str);				\
 	if ((MVST_MVAL == mv_chain->mv_st_type) && (MV_P == &mv_chain->mv_st_cont.mvs_mval))		\
 		POP_MV_STENT();										\
 } MBEND
@@ -602,50 +604,6 @@ MBSTART {											\
 		MSTR->addr = IOD->dollar.devicebuffer;						\
 		MSTR->len = STRLEN(IOD->dollar.devicebuffer);					\
 	}											\
-} MBEND
-
-/* Set prin_*_dev_failure if a read or write failed on the principal device. If it is a recurrence,
- * issue the NOPRINCIO error.
- */
-#define ISSUE_NOPRINCIO_IF_NEEDED(IOD, WRITE, SOCNOERR)							\
-MBSTART {												\
-	/* the following literal and the game played with it deal with the suppression of the */	\
-	/* maintenance of $ZSTATUS while in direct mode */						\
-	LITDEF mstr    dm_did_it = {0, LEN_AND_LIT("Direct Mode activity")};				\
-	LITDEF mstr    silent_soc = {0, LEN_AND_LIT("socket with IOERROR disabled")};			\
-	mval dev, zpos, zstatus;									\
-													\
-	if ((IOD) == ((WRITE) ? io_std_device.out : io_std_device.in))					\
-	{												\
-		if ((WRITE) ? prin_out_dev_failure : prin_in_dev_failure)				\
-		{											\
-			util_out_print("", RESET);	/* Reset output buffer */			\
-			op_svget(SV_ZPOS, &zpos);							\
-			if (memcmp("+1^GTM$DMOD", zpos.str.addr, STR_LIT_LEN("+1^GTM$DMOD")))		\
-			{	/* not in base direct mode so do noisy exit */				\
-				dev.str.len = (WRITE) ? io_std_device.out->trans_name->len		\
-					: io_std_device.in->trans_name->len;				\
-				dev.str.addr = (WRITE) ? io_std_device.out->trans_name->dollar_io	\
-					: io_std_device.in->trans_name->dollar_io;			\
-				if (SOCNOERR)								\
-					zstatus.str = silent_soc;	/* suppressing socket errors */	\
-				else									\
-					zstatus.str = dollar_zstatus.str;				\
-				if (0 == zstatus.str.len)						\
-					zstatus.str = dm_did_it;	/* in case there's no zstatus */\
-				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(10) ERR_NOPRINCIO, 8, 		\
-					RTS_ERROR_STRING((WRITE) ? "WRITE to" : "READ from"),		\
-					dev.str.len, dev.str.addr, zpos.str.len, zpos.str.addr,		\
-					zstatus.str.len, zstatus.str.addr);				\
-			} else if (!prin_out_dev_failure)	/* in direct mode so go quietly */	\
-				flush_pio();			/* unless output is still OK */		\
-			stop_image_no_core();								\
-		}											\
-		if (WRITE)										\
-			prin_out_dev_failure = TRUE;							\
-		else											\
-			prin_in_dev_failure = TRUE;							\
-	}												\
 } MBEND
 
 #endif /* IO_H */

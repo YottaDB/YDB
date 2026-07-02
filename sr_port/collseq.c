@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,10 +24,9 @@ int find_local_colltype(void)
 {
 	int	lct, status;
 	char	transbuf[MAX_TRANS_NAME_LEN];
-	mstr	lognam, transnam;
+	mstr	transnam;
+	UMSTR_CONST(lognam, LCT_PREFIX);
 
-	lognam.len = SIZEOF(LCT_PREFIX) - 1;
-	lognam.addr = LCT_PREFIX;
 	status = TRANS_LOG_NAME(&lognam, &transnam, transbuf, SIZEOF(transbuf), do_sendmsg_on_log2long);
 	if (SS_NORMAL != status)
 		return 0;

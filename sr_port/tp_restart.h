@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -27,7 +27,7 @@
 
 /* Helper function */
 void	op_trestart_set_cdb_code(void);
-
+void tp_restart_add_to_M_stack(void);
 int tp_restart(int newlevel, boolean_t handle_errors_internally);
 
 #endif

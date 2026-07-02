@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -37,6 +37,7 @@
 #include "svnames.h"
 #include "util.h"
 #include "deferred_events_queue.h"
+#include "noprincio_if_needed_inline.h"
 
 #define	DIRECTMODESTR	"DIRECT MODE (any TP RESTART will fail)"
 
@@ -62,7 +63,7 @@ void	op_dmode(void)
 	d_tt_struct		*tt_ptr;
 	gd_region		*save_re;
 	io_desc			*io_ptr;
-	mval			prompt, dummy, *input_line;
+	mval			prompt, *input_line;
 	boolean_t		xec_cmd = TRUE;			/* Determines if command should be
 								 * executed (for direct mode auditing purposes)
 								 */
@@ -71,7 +72,6 @@ void	op_dmode(void)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	dummy.mvtype = dummy.str.len = 0;
 	assert((intptr_t)frame_pointer->l_symtab > (intptr_t)msp);
 	assert(MVST_MVAL == ((mv_stent *)(((char *)frame_pointer->l_symtab) - mvs_size[MVST_MVAL]))->mv_st_type);
 	input_line = &((mv_stent *)(((char *)frame_pointer->l_symtab) - mvs_size[MVST_MVAL]))->mv_st_cont.mvs_mval;
@@ -119,7 +119,8 @@ void	op_dmode(void)
 	} else
 	{
 		prompt.mvtype = MV_STR;
-		prompt.str = TREF(gtmprompt);
+		prompt.str.umstr = (TREF(gtmprompt)).umstr;
+		prompt.str.in_array = FALSE;
 		prin_dm_io = TRUE;
 		op_write(&prompt);
 		op_read(input_line, (mval *)&literal_notimeout);

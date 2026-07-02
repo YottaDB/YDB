@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -917,6 +917,7 @@ void gvcst_init(gd_region *reg, gd_addr *addr)
 		/* we don't know of a practical way except wbox to get errors in each of the for-loop attempts above */
 		assert(WBTEST_ENABLED(WBTEST_REPEAT_DBFILOPN));
 		/* "db_init" returned with an unexpected error. Issue a generic error to note this out-of-design state */
+		FILE_CNTL_FREE(reg->dyn.addr);
 		RTS_ERROR_CSA_ABT(CSA_ARG(NULL) VARLSTCNT(6) ERR_REGOPENFAIL, 4, REG_LEN_STR(reg), DB_LEN_STR(reg));
 	} else
 		DBGRDB((stderr, "%s:%d:%s: process id %d finished db_init of file %s for region %s\n", __FILE__, __LINE__, __func__,

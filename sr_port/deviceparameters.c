@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -24,12 +24,10 @@
 #include "int_namelook.h"
 #include "cvtparm.h"
 #include "deviceparameters.h"
-#include "arit.h"
 
 error_def(ERR_DEVPARINAP);
 error_def(ERR_DEVPARUNK);
 error_def(ERR_DEVPARVALREQ);
-error_def(ERR_NUMOFLOW);
 error_def(ERR_RPARENMISSING);
 
 LITREF unsigned char io_params_size[];
@@ -273,7 +271,7 @@ int deviceparameters(oprtype *c, char who_calls)
 {
 	oprtype 	x;
 	oprtype 	cat_list[n_iops];
-	int		cat_cnt;
+	int		cat_cnt, sav_col;
 	mval		tmpmval;
 	triple		*ref, *parm;
 	int		n;
@@ -514,11 +512,7 @@ int deviceparameters(oprtype *c, char who_calls)
 			break;
 		}
 		advancewindow();
-		if (EXPHI < (TREF(director_mval)).e)
-		{
-			stx_error(ERR_NUMOFLOW);
-			break;
-		}
+		sav_col = TREF(last_source_column);
 		*parptr++ = n;
 		if (io_params_size[n])
 		{
@@ -546,6 +540,7 @@ int deviceparameters(oprtype *c, char who_calls)
 				status = cvtparm(n, &x.oprval.tref->operand[0].oprval.mlit->v, &tmpmval);
 				if (status)
 				{
+					TREF(last_source_column) = sav_col;
 					stx_error(status);
 					return FALSE;
 				}

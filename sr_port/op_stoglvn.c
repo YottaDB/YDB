@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2012, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2012-2026 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,7 +19,7 @@
 #include "indir_enum.h"
 #include "cache.h"
 #include "op.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "valid_mname.h"
 #include "gtm_string.h"
 #include "cachectl.h"
@@ -48,7 +49,8 @@ void op_stoglvn(uint4 indx, mval *value)
 		 * it is not easily possible due to op_sto expecting its arguments in registers which this
 		 * C function cannot ensure. Any changes to op_sto.s might need to be correspondingly made here.
 		 */
-		lv->v = *value;
+		assert(glist_str_protected(&lv->v.str));
+		lv->v.umval = value->umval;
 		lv->v.mvtype &= ~MV_ALIASCONT;	/* Make sure alias container property does not pass */
 	} else if (OC_NOOP != oc)		/* if indirect error blew set up, skip this */
 	{	/* gvn */

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,7 +15,7 @@
 #include "gtm_string.h"		/* for memcpy() */
 
 #include "min_max.h"		/* for MIN macro */
-#include <rtnhdr.h>		/* for stack_frame.h */
+#include "rtnhdr.h"		/* for stack_frame.h */
 #include "stack_frame.h"	/* for stack_frame type */
 #include "error_trap.h"
 
@@ -25,6 +26,8 @@ GBLREF	dollar_ecode_type	dollar_ecode;			/* structure containing $ECODE related 
 GBLREF	dollar_stack_type	dollar_stack;			/* structure containing $STACK related information */
 GBLREF	stack_frame		*error_frame;			/* "frame_pointer" at the time of adding the current ECODE */
 GBLREF	stack_frame		*frame_pointer;
+
+error_def(ERR_ECLOSTMID);
 
 #define		INCR_ECODE_INDEX(ecode_index, str, strlen)				\
 {											\
@@ -73,7 +76,7 @@ static	boolean_t	fill_dollar_stack_info(mval *mvalptr, mstr *mstrptr)
 static	boolean_t	fill_dollar_stack_level(int array_level, int frame_level, int cur_zlevel)
 {
 	mstr			*mstrptr;
-	mval			tmpmval;
+	mval			tmpmval = {{0}};
 	dollar_stack_struct	*dstack;
 
 	assert(FALSE == dollar_stack.incomplete);	/* we should not have come here if previous $STACK levels were incomplete */
@@ -110,8 +113,6 @@ boolean_t	ecode_add(mstr *str)		/* add "str" to $ECODE and return whether SUCCES
  	int		cur_zlevel, level;
 	char		eclostmid_buf[MAX_DIGITS_IN_INT + STR_LIT_LEN(",Z,")], *dest;
 	ssize_t		space_left, eclostmid_len;
-
-	error_def(ERR_ECLOSTMID);
 
 	dest = &eclostmid_buf[0];
 	*dest++ = ',';

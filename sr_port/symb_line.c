@@ -14,7 +14,7 @@
 
 #include "gtm_string.h"
 
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "stack_frame.h"
 #include "min_max.h"
 

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2009-2025 Fidelity National Information	*
+ * Copyright (c) 2009-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -109,8 +109,8 @@ int			gc_pk_establish_pkcs_cfg(config_setting_t *parent, char *config_fn);
 
 #define GC_PK_APPEND_UNIQ_STRING(in_buff, symmetric_key)								\
 {															\
-	memcpy((void *)in_buff, symmetric_key, SYMMETRIC_KEY_MAX);							\
-	memcpy((void *)(in_buff + SYMMETRIC_KEY_MAX), UNIQ_ENC_PARAM_STRING, UNIQ_ENC_PARAM_LEN);			\
+	memcpy(in_buff, symmetric_key, SYMMETRIC_KEY_MAX);								\
+	memcpy((in_buff + SYMMETRIC_KEY_MAX), UNIQ_ENC_PARAM_STRING, UNIQ_ENC_PARAM_LEN);				\
 }
 
 #ifdef USE_OPENSSL

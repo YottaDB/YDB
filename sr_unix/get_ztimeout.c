@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2018-2023 Fidelity National Information	*
+ * Copyright (c) 2018-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -64,7 +64,7 @@ int get_ztimeout(mval *result)
 	result->str.addr = (char *)cp;
 	result->str.len = req_len;
 	result->mvtype = MV_STR;
-	memcpy((void *)cp, full_ztimeout, time_len);
+	memcpy(cp, full_ztimeout, time_len);
 	if ((0 < ztimeout_vector_len) && (NULL != ztimeout_vector_ptr))
 		memcpy(cp + time_len, ztimeout_vector_ptr, ztimeout_vector_len);
 	assert(IS_AT_END_OF_STRINGPOOL(cp, req_len));

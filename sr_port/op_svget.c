@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -26,7 +26,7 @@
 #include "io.h"
 #include "iottdef.h"
 #include "jnl.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "stack_frame.h"
 #include "stringpool.h"
 #include "svnames.h"
@@ -80,7 +80,7 @@ GBLREF volatile boolean_t	dollar_zininterrupt;
 #ifdef GTM_TRIGGER
 GBLREF	boolean_t		ztwormhole_used;		/* TRUE if $ztwormhole was used by trigger code */
 GBLREF	int4			gtm_trigger_depth;
-GBLREF	mstr			*dollar_ztname;
+GBLREF	mident			*dollar_ztname;
 GBLREF	mval			*dollar_ztdata, *dollar_ztdelim, *dollar_ztoldval, *dollar_ztriggerop;
 GBLREF	mval			dollar_ztslate, *dollar_ztupdate, *dollar_ztvalue, dollar_ztwormhole;
 #endif
@@ -139,7 +139,7 @@ void op_svget(int varnum, mval *v)
 			break;
 		case SV_ZGBLDIR:
 			v->mvtype = MV_STR;
-			v->str = dollar_zgbldir.str;
+			v->str.umstr = dollar_zgbldir.str.umstr;
 			break;
 		case SV_ZPIN:
 			/* if not a split device then ZPIN and ZPOUT will fall through to ZPRINCIPAL */
@@ -192,8 +192,8 @@ void op_svget(int varnum, mval *v)
 					v->str.len -= ESC_OFFSET;
 				}
 			}
-			s2pool(&(v->str));
 			v->mvtype = MV_STR;
+			s2pool(&(v->str));
 			break;
 		case SV_ZIO:
 			v->mvtype = MV_STR;
@@ -215,13 +215,13 @@ void op_svget(int varnum, mval *v)
 			s2pool(&(v->str));
 			break;
 		case SV_JOB:
-			*v = dollar_job;
+			v->umval = dollar_job.umval;
 			break;
 		case SV_REFERENCE:
 			get_reference(v);
 			break;
 		case SV_SYSTEM:
-			*v = dollar_system;
+			v->umval = dollar_system.umval;
 			break;
 		case SV_STORAGE:
 			count = (0 < zmalloclim) ? ((int)zmalloclim) : ((int)gtm_getrlimit());
@@ -232,6 +232,10 @@ void op_svget(int varnum, mval *v)
 			break;
 		case SV_TLEVEL:
 			count = (int)dollar_tlevel;
+			MV_FORCE_MVAL(v, count);
+			break;
+		case SV_ZINXPEL:
+			count = (int)TREF(dollar_zinxpel);
 			MV_FORCE_MVAL(v, count);
 			break;
 		case SV_TRESTART:
@@ -273,15 +277,15 @@ void op_svget(int varnum, mval *v)
 				d_rm = (d_rm_struct *)io_curr_device.in->dev_sp;
 				if (RM_READ != d_rm->lastop)
 				{
-					*v = literal_zero;
+					v->umval = literal_zero.umval;
 					break;
 				}
 			}
 #			endif
-			*v = io_curr_device.in->dollar.zeof ? literal_one : literal_zero;
+			v->umval = io_curr_device.in->dollar.zeof ? literal_one.umval : literal_zero.umval;
 			break;
 		case SV_ZQUIT:
-			*v = dollar_zquit_anyway ? literal_one : literal_zero;
+			v->umval = dollar_zquit_anyway ? literal_one.umval : literal_zero.umval;
 			break;
 		case SV_IO:
 			v->str.addr = io_curr_device.in->name->dollar_io;
@@ -297,8 +301,8 @@ void op_svget(int varnum, mval *v)
 					v->str.len -= ESC_OFFSET;
 				}
 			}
-			s2pool(&(v->str));
 			v->mvtype = MV_STR;
+			s2pool(&(v->str));
 			break;
 		case SV_PROMPT:
 			v->mvtype = MV_STR;
@@ -308,7 +312,7 @@ void op_svget(int varnum, mval *v)
 			break;
 		case SV_ZCOMPILE:
 			v->mvtype = MV_STR;
-			v->str = TREF(dollar_zcompile);
+			v->str.umstr = (TREF(dollar_zcompile)).umstr;
 			s2pool(&(v->str));
 			break;
 		case SV_ZDIR:
@@ -320,14 +324,15 @@ void op_svget(int varnum, mval *v)
 			s2pool(&(v->str));
 			break;
 		case SV_ZSTEP:
-			*v = TREF(dollar_zstep);
+			v->umval = (TREF(dollar_zstep)).umval;
 			break;
 		case SV_ZMODE:
-			*v = TREF(dollar_zmode);
+			v->umval = (TREF(dollar_zmode)).umval;
 			break;
 		case SV_ZMAXTPTIME:
 			v->m[0] = v->sgn = 0;
 			v->mvtype = (MV_NM | MV_INT);
+			v->str.len = 0;
 			assert(MV_BIAS == MILLISECS_IN_SEC);				/* check math if this changes */
 			v->m[1] = TREF(dollar_zmaxtptime);
 			MV_FORCE_STR(v);
@@ -337,7 +342,7 @@ void op_svget(int varnum, mval *v)
 			break;
 		case SV_ZPROC:
 			getzprocess();
-			*v = dollar_zproc;
+			v->umval = dollar_zproc.umval;
 			break;
 		case SV_ZLEVEL:
 			count = dollar_zlevel();
@@ -352,20 +357,21 @@ void op_svget(int varnum, mval *v)
 			if (!TREF(zro_root) && !process_exiting)
 				zro_init();
 			v->mvtype = MV_STR;
-			v->str = TREF(dollar_zroutines);
+			v->str.umstr = (TREF(dollar_zroutines)).umstr;
 			s2pool(&(v->str));
 			break;
 		case SV_ZSOURCE:
+			assert(glist_mval_in_sync(&dollar_zsource));
 			v->mvtype = MV_STR;
-			v->str = dollar_zsource.str;
+			v->str.umstr = dollar_zsource.str.umstr;
 			break;
 		case SV_ZSTATUS:
-			*v = dollar_zstatus;
+			v->umval = dollar_zstatus.umval;
 			s2pool(&(v->str));
 			break;
 		case SV_ZTRAP:
 			v->mvtype = MV_STR;
-			v->str = (TREF(dollar_ztrap)).str;
+			v->str.umstr = (TREF(dollar_ztrap)).str.umstr;
 			assert(!v->str.len || !ztrap_explicit_null);
 			s2pool(&(v->str));
 			break;
@@ -387,7 +393,7 @@ void op_svget(int varnum, mval *v)
 			break;
 		case SV_ZICUVER:
 			v->mvtype = MV_STR;
-			v->str = dollar_zicuver;
+			v->str.umstr = dollar_zicuver.umstr;
 			break;
 		case SV_ZSYSTEM:
 			MV_FORCE_MVAL(v, dollar_zsystem);
@@ -412,7 +418,7 @@ void op_svget(int varnum, mval *v)
 			break;
 		case SV_ETRAP:
 			v->mvtype = MV_STR;
-			v->str = (TREF(dollar_etrap)).str;
+			v->str.umstr = (TREF(dollar_etrap)).str.umstr;
 			assert(!v->str.len || !ztrap_explicit_null);
 			s2pool(&(v->str));
 			break;
@@ -422,17 +428,17 @@ void op_svget(int varnum, mval *v)
 			break;
 		case SV_ZERROR:
 			v->mvtype = MV_STR;
-			v->str = dollar_zerror.str;
+			v->str.umstr = dollar_zerror.str.umstr;
 			s2pool(&(v->str));
 			break;
 		case SV_ZYERROR:
 			v->mvtype = MV_STR;
-			v->str = dollar_zyerror.str;
+			v->str.umstr = dollar_zyerror.str.umstr;
 			s2pool(&(v->str));
 			break;
 		case SV_ZINTERRUPT:
 			v->mvtype = MV_STR;
-			v->str = dollar_zinterrupt.str;
+			v->str.umstr = dollar_zinterrupt.str.umstr;
 			s2pool(&(v->str));
 			break;
 		case SV_ZININTERRUPT:
@@ -445,7 +451,7 @@ void op_svget(int varnum, mval *v)
 			MV_FORCE_MVAL(v, TREF(zdate_form));
 			break;
 		case SV_ZTEXIT:
-			*v = dollar_ztexit;
+			v->umval = dollar_ztexit.umval;
 			break;
 		case SV_ZALLOCSTOR:
 			ucount = (gtm_uint64_t)totalAlloc + (gtm_uint64_t)totalAllocGta;
@@ -461,17 +467,17 @@ void op_svget(int varnum, mval *v)
 			break;
 		case SV_ZCHSET:
 			v->mvtype = MV_STR;
-			v->str = dollar_zchset;
+			v->str.umstr = dollar_zchset.umstr;
 			break;
 		case SV_ZPATNUMERIC:
 			v->mvtype = MV_STR;
-			v->str = dollar_zpatnumeric;
+			v->str.umstr = dollar_zpatnumeric.umstr;
 			break;
 		case SV_ZTNAME:
 		case SV_ZTCODE:		/* deprecated */
 #			ifdef GTM_TRIGGER
 			if (NULL == dollar_ztname)
-				memcpy(v, &literal_null, SIZEOF(mval));
+				v->umval = literal_null.umval;
 			else
 			{
 				v->mvtype = MV_STR;
@@ -488,7 +494,7 @@ void op_svget(int varnum, mval *v)
 			assert(!dollar_ztdata || MV_DEFINED(dollar_ztdata));
 			if (NULL != dollar_ztdata)
 				MV_FORCE_STR(dollar_ztdata);
-			memcpy(v, (NULL != dollar_ztdata) ? dollar_ztdata : &literal_null, SIZEOF(mval));
+			v->umval = (NULL != dollar_ztdata) ? dollar_ztdata->umval : literal_null.umval;
 			break;
 #			else
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_UNIMPLOP);
@@ -497,9 +503,9 @@ void op_svget(int varnum, mval *v)
 #			ifdef GTM_TRIGGER
 			assert(!dollar_ztdelim || MV_DEFINED(dollar_ztdelim));
 			if (NULL == dollar_ztdelim || !(MV_STR & dollar_ztdelim->mvtype) || (0 == dollar_ztdelim->str.len))
-				memcpy(v, &literal_null, SIZEOF(mval));
+				v->umval = literal_null.umval;
 			else
-				memcpy(v, dollar_ztdelim, SIZEOF(mval));
+				v->umval = dollar_ztdelim->umval;
 			break;
 #			else
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_UNIMPLOP);
@@ -510,7 +516,7 @@ void op_svget(int varnum, mval *v)
 			assert(!dollar_ztoldval || MV_DEFINED(dollar_ztoldval));
 			if (NULL != dollar_ztoldval)
 				MV_FORCE_STR(dollar_ztoldval);
-			memcpy(v, (NULL != dollar_ztoldval) ? dollar_ztoldval : &literal_null, SIZEOF(mval));
+			v->umval = (NULL != dollar_ztoldval) ? dollar_ztoldval->umval : literal_null.umval;
 			break;
 #			else
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_UNIMPLOP);
@@ -519,7 +525,7 @@ void op_svget(int varnum, mval *v)
 #			ifdef GTM_TRIGGER
 			/* Value comes from GT.M, but assert it's a string */
 			assert(!dollar_ztriggerop || (MV_STR & dollar_ztriggerop->mvtype));
-			memcpy(v, (NULL != dollar_ztriggerop) ? dollar_ztriggerop : &literal_null, SIZEOF(mval));
+			v->umval = (NULL != dollar_ztriggerop) ? dollar_ztriggerop->umval : literal_null.umval;
 			break;
 #			else
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_UNIMPLOP);
@@ -529,8 +535,8 @@ void op_svget(int varnum, mval *v)
 			/* Value comes from GT.M, but if there were no delims involved, the value will be undefined, and
 			 * we return a "literal_null".
 			 */
-			memcpy(v, ((NULL != dollar_ztupdate && (MV_STR & dollar_ztupdate->mvtype)) ? dollar_ztupdate
-				   : &literal_null), SIZEOF(mval));
+			v->umval = ((NULL != dollar_ztupdate) && (MV_STR & dollar_ztupdate->mvtype)) ? dollar_ztupdate->umval
+				   : literal_null.umval;
 			break;
 #			else
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_UNIMPLOP);
@@ -541,7 +547,7 @@ void op_svget(int varnum, mval *v)
 			assert(!dollar_ztvalue || MV_DEFINED(dollar_ztvalue));
 			if (NULL != dollar_ztvalue)
 				MV_FORCE_STR(dollar_ztvalue);
-			memcpy(v, (NULL != dollar_ztvalue) ? dollar_ztvalue : &literal_null, SIZEOF(mval));
+			v->umval = (NULL != dollar_ztvalue) ? dollar_ztvalue->umval : literal_null.umval;
 			break;
 #			else
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_UNIMPLOP);
@@ -553,9 +559,10 @@ void op_svget(int varnum, mval *v)
 			if (MV_DEFINED(mvp))
 			{
 				MV_FORCE_STR(mvp);
-				memcpy(v, mvp, SIZEOF(mval));
+				glist_sync_mval(mvp);
+				v->umval = mvp->umval;
 			} else
-				memcpy(v, &literal_null, SIZEOF(mval));
+				v->umval = literal_null.umval;
 			ztwormhole_used = TRUE;
 			break;
 #			else
@@ -567,7 +574,8 @@ void op_svget(int varnum, mval *v)
 			assert(MV_DEFINED((&dollar_ztslate)));
 			mvp = &dollar_ztslate;
 			MV_FORCE_STR(mvp);
-			memcpy(v, mvp, SIZEOF(mval));
+			glist_sync_mval(mvp);
+			v->umval = mvp->umval;
 			break;
 #			else
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_UNIMPLOP);

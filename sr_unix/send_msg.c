@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -86,6 +86,8 @@ void send_msg_va(void *csa, int arg_count, va_list var)
         int		dummy, fao_actual, fao_count, i, msg_id, freeze_msg_id;
         char    	msg_buffer[PUT_BUFF_SIZE];
         mstr    	msg_string;
+	const err_msg	*msg;
+	const err_ctl	*ctl;
 	char		*save_util_outptr;
 	va_list		save_last_va_list_ptr;
 	boolean_t	util_copy_saved = FALSE;
@@ -117,6 +119,10 @@ void send_msg_va(void *csa, int arg_count, va_list var)
                 msg_id = (int) va_arg(var, VA_ARG_TYPE);
 		CHECK_IF_FREEZE_ON_ERROR_NEEDED(csa, msg_id, freeze_needed, freeze_msg_id, local_jnlpool);
                 --arg_count;
+		if (NULL == (ctl = err_check(msg_id)))
+			msg = NULL;
+		else
+			GET_MSG_INFO(msg_id, ctl, msg);
                 msg_string.addr = msg_buffer;
                 msg_string.len = SIZEOF(msg_buffer);
                 gtm_getmsg(msg_id, &msg_string);
@@ -124,7 +130,10 @@ void send_msg_va(void *csa, int arg_count, va_list var)
                 {
                         fao_actual = (int) va_arg(var, VA_ARG_TYPE);
                         --arg_count;
-                        fao_count = fao_actual;
+			if (NULL != msg)
+				fao_count = fao_actual < msg->parm_count ? fao_actual : msg->parm_count;
+			else
+				fao_count = fao_actual;
                         if (fao_count > MAX_FAO_PARMS)
 			{
 				assert(FALSE);
@@ -135,8 +144,14 @@ void send_msg_va(void *csa, int arg_count, va_list var)
                 util_out_print_vaparm(msg_string.addr, NOFLUSH_OUT, var, fao_count);
 		va_end(var);	/* need this before used as dest in copy */
 		VAR_COPY(var, TREF(last_va_list_ptr));
-		va_end(TREF(last_va_list_ptr));
 		arg_count -= fao_count;
+		/* Skim off any extra parameters */
+		for (i = fao_count;  i < fao_actual;  ++i)
+		{
+			dummy = va_arg(var, int);
+			--arg_count;
+		}
+		va_end(TREF(last_va_list_ptr));
 
                 if (0 >= arg_count)
                 {

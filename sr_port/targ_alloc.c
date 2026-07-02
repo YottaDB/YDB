@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -25,7 +25,7 @@
 #include "filestruct.h"
 #include "targ_alloc.h"
 #include "min_max.h"
-#include "hashtab_mname.h"
+#include "hashtab_umname.h"
 #include "gtmimagename.h"
 #include "dpgbldir.h"
 #include "io.h"
@@ -37,14 +37,14 @@ GBLREF	int			process_exiting;
 GBLREF	uint4			mu_upgrade_in_prog;
 GBLREF	sgmnt_addrs		*cs_addrs;
 
-gv_namehead *targ_alloc(int keysize, mname_entry *gvent, gd_region *reg)
+gv_namehead *targ_alloc(int keysize, unmanaged_mname_entry *gvent, gd_region *reg)
 {
 	gv_namehead		*gvt, *gvt1;
 	int4			index;
 	int4			partial_size = 0;
 	int4			gvn_size;
 	sgmnt_addrs		*csa;
-	ht_ent_mname		*tabent;
+	ht_ent_umname		*tabent;
 	boolean_t		gvt_hashtab_present, added;
 	enum db_acc_method	acc_meth;
 #	ifdef DEBUG
@@ -108,7 +108,7 @@ gv_namehead *targ_alloc(int keysize, mname_entry *gvent, gd_region *reg)
 		{	/* Check if incoming gvname is already part of the database file specific hashtable. If so,
 			 * return gv_target that already exists here instead of mallocing something new.
 			 */
-			if (NULL != (tabent = lookup_hashtab_mname(csa->gvt_hashtab, gvent)))
+			if (NULL != (tabent = lookup_hashtab_umname(csa->gvt_hashtab, gvent)))
 			{
 				gvt = (gv_namehead *)tabent->value;
 				assert(NULL != gvt);
@@ -205,7 +205,7 @@ gv_namehead *targ_alloc(int keysize, mname_entry *gvent, gd_region *reg)
 	gv_target_list = gvt;
 	if (gvt_hashtab_present)
 	{	/* Add new gvt to the database-file specific gvt hashtable */
-		added = add_hashtab_mname(csa->gvt_hashtab, &gvt->gvname, gvt, &tabent);
+		added = add_hashtab_umname(csa->gvt_hashtab, &gvt->gvname, gvt, &tabent);
 		assert(added);
 	}
 	gvt->gd_csa = csa;

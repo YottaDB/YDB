@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -29,6 +29,7 @@
 #include "t_retry.h"
 #include "t_end.h"
 #include "hashtab_mname.h"
+#include "stringpool.h"
 
 GBLREF int		rc_size_return;
 GBLREF gd_addr		*gd_header;
@@ -48,7 +49,7 @@ void rc_gbl_ord(rc_rsp_page *rsp)
 	blk_hdr		*bp;
 	bool		found;
 	enum cdb_sc	status;
-	mname_entry	gvname;
+	unmanaged_mname_entry	gvname;
 	short		bsiz, size_return;
 	srch_blk_status	*bh;
 	gvnh_reg_t	*gvnh_reg;

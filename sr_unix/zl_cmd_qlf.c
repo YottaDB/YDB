@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -22,6 +22,7 @@
 #include "toktyp.h"		/* Needed for "valid_mname.h" */
 #include "valid_mname.h"
 #include "gtmmsg.h"
+#include "gcol_list.h"
 
 #define SET_OBJ(NAME, LEN)					\
 MBSTART {							\
@@ -54,7 +55,7 @@ void zl_cmd_qlf(mstr *quals, command_qualifier *qualif, char *srcstr, unsigned s
 	CLI_ENTRY	*save_cmd_ary;
 	int		ci, parse_ret, status;
 	mident		file;
-	mstr		fstr;
+	unmanaged_mstr	fstr;
 	parse_blk	pblk;
 	short		object_name_mvtype;
 	unsigned short	clen = 0;
@@ -103,6 +104,7 @@ void zl_cmd_qlf(mstr *quals, command_qualifier *qualif, char *srcstr, unsigned s
 		pblk.fop = F_SYNTAXO;
 		fstr.addr = srcstr;
 		fstr.len = *srclen;
+		assert(!glist_umstr_in_stringpool(&fstr));
 		status = parse_file(&fstr, &pblk);
 		if (!(status & 1) || !pblk.b_name)
 		{

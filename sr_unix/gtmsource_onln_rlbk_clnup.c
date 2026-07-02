@@ -21,7 +21,7 @@
 #include "gdscc.h"
 #include "filestruct.h"
 #include "jnl.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "buddy_list.h"		/* needed for tp.h */
 #include "tp.h"
 #include "repl_msg.h"		/* for gtmsource.h */

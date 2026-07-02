@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2015-2023 Fidelity National Information	*
+ * Copyright (c) 2015-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -10,6 +10,7 @@
  *								*
  ****************************************************************/
 
+#include "gcol_list.h"
 #include "mdef.h"
 
 #include "gtm_stdio.h"
@@ -90,9 +91,10 @@ utfcgr *utfcgr_getcache(mval *mv)
 	/* Doesn't matter if utfcgrsteal is off end - gets fixed when it is picked up for the next getcache() */
 	(TREF(utfcgra)).utfcgrsteal = (utfcgr *)((UINTPTR_T)utfcgrp + (TREF(utfcgra)).utfcgrsize);
 	mv->utfcgr_indx = utfcgrp->idx + 1;			/* Point supplied mval to new slot - always stored + 1 */
-	utfcgrp->last_str = mv->str;				/* Save mstr info */
+	utfcgrp->last_str = mv->str.umstr;				/* Save mstr info */
 	utfcgrp->ngrps = 1;					/* Initialize group in use */
 	utfcgrp->reference = FALSE;
+	utfcgrp->gcols = stringpool.gcols;
 	return utfcgrp;
 }
 
@@ -209,7 +211,7 @@ boolean_t utfcgr_scanforcharN(int char_num, utfscan_parseblk *utf_parse_blk)
 		tcharcnt = tbyteidx = 0;				/* Init counters */
 		/* Validate cache entry for this string still intact (index valid, string addr/len the same) */
 		if ((TREF(gtm_utfcgr_strings) > utfcgridx) && (utfcgrp->last_str.addr == mv->str.addr)
-		    && (utfcgrp->last_str.len == mv->str.len))
+		    && (utfcgrp->last_str.len == mv->str.len) && (utfcgrp->gcols == stringpool.gcols))
 		{	/* Cache validated */
 			DUMP_UTFCACHE_START(mv, utfcgrp);
 			COUNT_UTF_EVENT(hit);

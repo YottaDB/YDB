@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -14,7 +14,7 @@
 
 #include "gtm_stdio.h"
 
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "stack_frame.h"
 #include "mprof.h"
 #include "error.h"
@@ -51,6 +51,7 @@ void copy_stack_frame(void)
 					 * rewritten by ZGOTO to a "regular" frame, this frame type *can* propagate.
 					 */
 	SET_GLVN_INDX(sf, GLVN_POOL_UNTOUCHED);
+	SET_PTEMP_CNT(sf, INVALID_PTEMP_CNT);
 	sf->ret_value = NULL;
 	sf->dollar_test = -1;		/* initialize it with -1 for indication of not yet being used */
 	frame_pointer = sf;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2016-2025 Fidelity National Information	*
+ * Copyright (c) 2016-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -34,7 +34,7 @@
 #include "gds_rundown.h"
 #include "min_max.h"
 #include "gtm_caseconv.h"
-#include "hashtab_mname.h"
+#include "hashtab_umname.h"
 #include "send_msg.h"
 #include "error.h"
 #include "gtm_logicals.h"
@@ -166,9 +166,9 @@ void gvcst_init_statsDB(gd_region *baseDBreg, boolean_t do_statsdb_init)
 	boolean_t			save_gv_last_subsc_null, save_gv_some_subsc_null, longjmp_done1, longjmp_done2;
 	boolean_t			save_gvcst_statsDB_open_ch_active;
 	gd_binding			*ygs_map;
-	mname_entry			gvname;
+	unmanaged_mname_entry		gvname; /* Points to STATSDB_GBLNAME string literal */
 	sigset_t			unblock_sigbus;
-	ht_ent_mname			*tabent;
+	ht_ent_umname			*tabent;
 	gvnh_reg_t			*gvnh_reg;
 	DCL_THREADGBL_ACCESS;
 
@@ -317,7 +317,7 @@ void gvcst_init_statsDB(gd_region *baseDBreg, boolean_t do_statsdb_init)
 			gvname.var_name.addr = STATSDB_GBLNAME;
 			gvname.var_name.len = STATSDB_GBLNAME_LEN;
 			COMPUTE_HASH_MSTR(gvname.var_name, gvname.hash_code);
-			tabent = lookup_hashtab_mname((hash_table_mname *)gd_header->tab_ptr, &gvname);
+			tabent = lookup_hashtab_umname(gd_header->tab_ptr, &gvname);
 			if (NULL != tabent)
 			{	/* Repoint ^%YGS hashtable entry to point unsubscripted global name to new statsdb region */
 				gvnh_reg = (gvnh_reg_t *)tabent->value;
@@ -588,7 +588,9 @@ void gvcst_remove_statsDB_linkage(gd_region *baseDBreg)
 		{
 			baseDBcsa = &FILE_INFO(baseDBreg)->s_addrs;
 #			ifdef DEBUG
+			TREF(in_statsDB_remove_linkage) = TRUE;
 			gvcst_get(&stats_rec);				/* Fetch record to set history for DEBUG mode validation */
+			TREF(in_statsDB_remove_linkage) = FALSE;
 			bh = gv_target->hist.h;
 			assert(0 != bh->curr_rec.match);		/* Shouldn't be possible to create a GVT with this call */
 			assert((gv_currkey->end + 1) == bh->curr_rec.match);
@@ -714,6 +716,7 @@ CONDITION_HANDLER(gvcst_remove_statsDB_linkage_ch)
 
 	START_CH(TRUE);
 	/* Save error that brought us here */
+	DEBUG_ONLY(TREF(in_statsDB_remove_linkage) = FALSE;)
 	msglen = TREF(util_outptr) - TREF(util_outbuff_ptr);
 	assert(OUT_BUFF_SIZE > msglen);
 	memcpy(buffer, TREF(util_outbuff_ptr), msglen);
@@ -743,11 +746,14 @@ void	gvcst_set_statsdb_fname(sgmnt_data_ptr_t csd, gd_region *baseDBreg, char *s
 	int		int_status;
 	key_t		hash_ftok;
 	gd_segment	*baseDBseg;
-	mstr		dbfile, trans, val;
+	mstr		trans;
+	unmanaged_mstr	dbfile;
+	UMSTR_CONST(val, GTM_STATSDIR);
 	parse_blk	pblk;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	trans.in_array = FALSE;
 	/* Database file name could be relative path (e.g. mupip rundown -file mumps.dat or other mupip commands
 	 * that require standalone access which specify a relative file name). Convert it to absolute path if possible.
 	 * The ftok of the path to the basedb is needed by in order to derive the statsdb file name .
@@ -786,8 +792,6 @@ void	gvcst_set_statsdb_fname(sgmnt_data_ptr_t csd, gd_region *baseDBreg, char *s
 		 * Note: The stats db will be created later when it actually needs to be opened by a process that has
 		 * opted in (VIEW STATSHARE or $gtm_statshare env var set).
 		 */
-		val.addr = GTM_STATSDIR;
-		val.len = SIZEOF(GTM_STATSDIR) - 1;
 		statsBuf = &tmp_fname[0];
 		/* Note: "gtm_env_init_sp" already processed GTM_STATSDIR to make it default to GTM_TMP_ENV etc. */
 		int_status = TRANS_LOG_NAME(&val, &trans, statsBuf, MAX_STATSDIR_LEN, do_sendmsg_on_log2long);
@@ -857,6 +861,7 @@ void	gvcst_set_statsdb_fname(sgmnt_data_ptr_t csd, gd_region *baseDBreg, char *s
 		memcpy(tmp_fname, statsBuf, statsBufLen);
 		dbfile.addr = tmp_fname;
 		dbfile.len = statsBufLen;
+		assert(!glist_umstr_in_stringpool(&dbfile));
 		memset(&pblk, 0, SIZEOF(pblk));
 		pblk.buffer = statsdb_fname;
 		pblk.buff_size = (unsigned char)(MAX_FN_LEN);/* Pass buffersize - 1 (standard protocol for parse_file) */

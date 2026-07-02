@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -36,6 +36,7 @@ void tripinit(void)
 
 	SETUP_THREADGBL_ACCESS;
 	COMPILE_HASHTAB_CLEANUP;
+	glist_clear_arrays(&indr_stringpool);
 	if (!mcavailbase)
 	{
 		mcavailbase = (mcalloc_hdr *)malloc(MC_DSBLKSIZE);
@@ -69,5 +70,8 @@ void tripinit(void)
 	mline_tail = &mline_root;
 	TREF(block_level) = 0;
 	setcurtchain(&t_orig);
+	glist_protect_str(&((TREF(director_mval)).str));
+	glist_protect_str(&((TREF(window_mval)).str));
+	glist_protect_str(&((TREF(indirection_mval)).str));
 	return;
 }

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,7 +15,7 @@
 #include "compiler.h"
 #include "mdq.h"
 #include "stringpool.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "copy.h"
 #include "obj_file.h"
 #include "cache.h"
@@ -45,6 +46,8 @@ void indir_lits(ihdtyp *ihead)
 		{
 			ihead->fixup_vals_num++;
 			lit->rt_addr = (INTPTR_T)stringpool.free;
+			glist_unprotect_str(&lit->v.str);
+			assert(glist_str_null(&lit->v.str));
 			lit->v.str.addr =  (char *)((lit->v.str.addr - (char *)indr_stringpool.base) +
 						SIZEOF(ihdtyp) + hdr_pad_len);
 			emit_immed((char *)&lit->v, SIZEOF(mval));

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2005-2025 Fidelity National Information	*
+ * Copyright (c) 2005-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -60,6 +60,7 @@
 #include "updproc_get_gblname.h"
 #include "gtmmsg.h"
 #include "mupip_reorg_encrypt.h"
+#include "stringpool.h"
 
 #ifdef REPL_DEBUG
 #include "format_targ_key.h"
@@ -67,7 +68,7 @@
 #endif
 
 #ifdef GTM_TRIGGER
-#include <rtnhdr.h>		/* for rtn_tabent in gv_trigger.h */
+#include "rtnhdr.h"		/* for rtn_tabent in gv_trigger.h */
 #include "gv_trigger.h"
 #include "tp_set_sgm.h"
 #endif
@@ -151,7 +152,7 @@ boolean_t updproc_preread(void)
 	int			rec_len, cnt, retries, spins, maxspins, key_len;
 	enum jnl_record_type	rectype;
 	mstr_len_t		val_len;
-	mname_entry		gvname;
+	unmanaged_mname_entry		gvname;
 	sm_uc_ptr_t		readaddrs;	/* start of current rec in pool */
 	sm_uc_ptr_t		limit_readaddrs;
 	jnl_record		*rec;
@@ -332,7 +333,7 @@ boolean_t updproc_preread(void)
 					 * changed during the copy, a further validation on the key length (key_len) is done below
 					 * in the if.
 					 */
-					memcpy((void *)lcl_key, keystr->text, key_len);
+					memcpy(lcl_key, keystr->text, key_len);
 					if ((0 < key_len) && (0 == lcl_key[key_len - 1])
 						&& (upd_good_record == updproc_get_gblname(lcl_key, key_len, gv_mname, &gvname))
 						&& (key_len == keystr->length))	/* If the shared copy changed underneath us, what
@@ -379,7 +380,6 @@ boolean_t updproc_preread(void)
 							assert(!csa->now_crit);
 							INCR_GVSTATS_COUNTER(csa, csa->nl, n_pre_read_globals, 1);
 							status = gvcst_search(gv_currkey, NULL);
-							ACCUMULATE_LCL_GVSTATS_COUNTER(csa, csa->nl, n_cache_reads);
 							assert(!csa->now_crit);
 							TREF(tqread_nowait) = FALSE;	/* reset as soon as possible */
 							if (cdb_sc_normal != status)

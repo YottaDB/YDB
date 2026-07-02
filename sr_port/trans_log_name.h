@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -12,6 +12,7 @@
 
 #ifndef TRANS_LOG_NAME_H_INCLUDED
 #define TRANS_LOG_NAME_H_INCLUDED
+#include "mdef.h"
 
 typedef enum
 {
@@ -19,7 +20,7 @@ typedef enum
 	do_sendmsg_on_log2long
 } translog_act;
 
-int4 trans_log_name(mstr *log, mstr *trans, char *buffer, int4 buffer_len, translog_act do_sendmsg);
+int4 trans_log_name(const unmanaged_mstr *log, mstr *trans, char *buffer, int4 buffer_len, translog_act do_sendmsg);
 #define TRANS_LOG_NAME(log, trans, buffer, buffer_len, do_sendmsg) trans_log_name(log, trans, buffer, buffer_len, do_sendmsg)
 
 #endif

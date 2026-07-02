@@ -30,7 +30,7 @@
 #include "comp_esc.h"
 #include "resolve_blocks.h"
 #include "hashtab_str.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "rtn_src_chksum.h"
 #include "gtmmsg.h"
 #include "iosp.h"	/* for SS_NORMAL */
@@ -40,7 +40,6 @@
 
 GBLREF int	source_column;
 
-GBLREF boolean_t		mstr_native_align, save_mstr_native_align;
 GBLREF char			cg_phase;	/* code generation phase */
 GBLREF command_qualifier	cmd_qlf;
 GBLREF hash_table_str		*complits_hashtab;
@@ -68,6 +67,7 @@ boolean_t compiler_startup(void)
 	unsigned char		err_buf[45];
 	unsigned char 		*cp, *cp2;
 	int			errknt;
+	unsigned int		gcols;
 	int4			n;
 	uint4			line_count, total_source_len;
 	mlabel			*null_lab;
@@ -81,6 +81,7 @@ boolean_t compiler_startup(void)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	str.in_array = FALSE;
 	/* Although we have an invocation of compiler cleanups at the end of this module, there exist ways to avoid this
 	 * cleanup by working in direct mode, getting certain types of errors combined with an argumentless ZGOTO that unwinds
 	 * pretty much everything that can bypass that cleanup. So do a quick check if it is needed and if so, git-r-done
@@ -98,6 +99,8 @@ boolean_t compiler_startup(void)
 		if (!indr_stringpool.base)
 		{
 			stp_init(STP_INITSIZE);
+			stringpool.sort_array_pp = TADR(indr_sort_array_p);
+			stringpool.protect_array_pp = TADR(indr_protect_array_p);
 			indr_stringpool = stringpool;
 		} else
 			stringpool = indr_stringpool;
@@ -106,23 +109,18 @@ boolean_t compiler_startup(void)
 	TREF(compile_time) = TRUE;
 	TREF(transform) = FALSE;
 	TREF(dollar_zcstatus) = SS_NORMAL;
+	assert(stringpool.sort_array_pp && stringpool.protect_array_pp);
 	reinit_compilation_externs();
+	assert(!(*stringpool.sort_array_pp) || (!(*stringpool.sort_array_pp)->count));
+	assert(!(*stringpool.protect_array_pp) || (!(*stringpool.protect_array_pp)->count));
 	memset(&null_mident, 0, SIZEOF(null_mident));
 	ESTABLISH_RET(compiler_ch, FALSE);
-	/* Since the stringpool alignment is solely based on mstr_native_align, we need to initialize it based
-	 * on the ALIGN_STRINGS qualifier so that all strings in the literal text pool are aligned.
-	 * However, when a module is compiled at runtime, we need to preserve the existing runtime setting
-	 * (that was initialized at GT.M startup) once the compilation is done.  save_mstr_native_align is used for
-	 * this purpose. */
 	/* If last compile errored out, it may have left stuff - find out how much space we have in mcalloc blocks */
 	for (mcallocated = 0, nextmca = mcavailptr; nextmca; nextmca = nextmca->link)
 		mcallocated += nextmca->size;
 	if (0 == mcallocated)
 		mcallocated = MC_DSBLKSIZE - MCALLOC_HDR_SZ;	/* Min size is one default block size */
 	COMPILE_HASHTAB_CLEANUP;
-	save_mstr_native_align = mstr_native_align;
-	/* mstr_native_align = (cmd_qlf.qlf & CQ_ALIGN_STRINGS) ? TRUE : FALSE; */
-	mstr_native_align = FALSE; /* TODO: remove this line and  uncomment the above line */
 	cg_phase = CGP_NOSTATE;
 	TREF(source_error_found) = errknt = 0;
 	open_source_file();
@@ -203,7 +201,7 @@ boolean_t compiler_startup(void)
 		TREF(routine_source_offset) = (uint4)(stringpool.free - stringpool.base);
 		dqloop(&src_head, que, sl)
 		{
-			str = sl->str;
+			str.umstr = sl->str.umstr;
 			s2pool(&str); /* changes str.addr, points it into stringpool */
 		}
 		DBG_MARK_STRINGPOOL_EXPANDABLE;
@@ -247,6 +245,7 @@ boolean_t compiler_startup(void)
 	if (cmd_qlf.qlf & CQ_LIST || cmd_qlf.qlf & CQ_CROSS_REFERENCE)
 		close_list_file();
 	COMPILE_HASHTAB_CLEANUP;
+	glist_clear_arrays(&indr_stringpool);
 	reinit_compilation_externs();
 	/* Determine if need to remove any added mc blocks. Min value of mcallocated ensures we leave at least one block alone. */
 	for (alloc = 0, nextmca = mcavailptr;
@@ -277,9 +276,10 @@ boolean_t compiler_startup(void)
 		 * However, there is no guarantee GT.M would have another compilation.
 		 */
 		stp_fini(indr_stringpool.base, indr_stringpool.lastallocbytes);
-		indr_stringpool.base = NULL;
+		gcols = indr_stringpool.gcols;
+		memset(&indr_stringpool, 0, SIZEOF(indr_stringpool));
+		indr_stringpool.gcols = gcols;
 	}
-	mstr_native_align = save_mstr_native_align;
 	REVERT;
 	return errknt ? TRUE : FALSE;
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -69,7 +69,7 @@ boolean_t op_gvget(mval *v)
 	if (!gotit)
 	{
 		if (undef_inhibit)
-			*v = literal_null;
+			v->umval = literal_null.umval;
 		else
 			sgnl_gvundef();
 	}

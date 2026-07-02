@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2002-2021 Fidelity National Information	*
+ * Copyright (c) 2002-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -29,7 +29,8 @@ error_def(ERR_TRNLOGFAIL);
 void zdate_form_init(struct startup_vector *svec)
 {
 	int4		status;
-	mstr		val, tn;
+	mstr		tn;
+	unmanaged_mstr	val;
 	char		buf[MAX_TRANS_NAME_LEN];
 	DCL_THREADGBL_ACCESS;
 

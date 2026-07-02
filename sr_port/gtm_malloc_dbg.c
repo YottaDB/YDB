@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -41,6 +41,7 @@
 
 #  define gtmSmInit gtmSmInit_dbg
 #  define gtm_malloc_main gtm_malloc_dbg
+#  define gtm_realloc gtm_realloc_dbg
 #  define gtm_free_main gtm_free_dbg
 #  define findStorElem findStorElem_dbg
 #  define processDeferredFrees processDeferredFrees_dbg
@@ -70,6 +71,7 @@
 */
 void gtm_malloc_dbg(size_t size, int stack_level);
 void gtm_free_dbg(void *addr, int stack_level);
+void *gtm_realloc_dbg(void *ptr, size_t size);
 
 void gtm_malloc_dbg(size_t size, int stack_level)
 {
@@ -79,6 +81,11 @@ void gtm_malloc_dbg(size_t size, int stack_level)
 void gtm_free_dbg(void *addr, int stack_level)
 {
 	assertpro(FALSE && "gtm_free_dbg called directly");
+}
+
+void *gtm_realloc_dbg(void *ptr, size_t size)
+{
+	assertpro(FALSE && "gtm_realloc_dbg called directly");
 }
 #endif
 #undef GTM_MALLOC_BUILD

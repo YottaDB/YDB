@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -27,7 +27,7 @@
 #include "error.h"
 #include "iosp.h"		/* for declaration of SS_NORMAL */
 #include "jnl.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "mv_stent.h"
 #include "stack_frame.h"
 #include "buddy_list.h"		/* needed for tp.h */
@@ -41,6 +41,7 @@
 #include "targ_alloc.h"
 #include "getzposition.h"
 #include "wcs_recover.h"
+#include "stringpool.h"
 #include "tp_unwind.h"
 #include "wcs_backoff.h"
 #include "rel_quant.h"
@@ -64,6 +65,7 @@
 #endif
 #include "gtmci.h"
 #include "gvt_inline.h"
+#include "indir_enum.h"
 
 GBLREF	boolean_t		caller_id_flag, is_updproc, mupip_jnl_recover;
 GBLREF	int			dollar_truth, mumps_status;
@@ -106,6 +108,48 @@ error_def(ERR_TRESTLOC);
 error_def(ERR_TRESTNOT);
 
 void gtm_levl_ret_code(void);
+
+/* Function to do a full rollback and  place the call to the XPEL routine call on the M-Stack */
+void tp_restart_add_to_M_stack()
+{
+	mstr_len_t len;
+	DCL_THREADGBL_ACCESS;
+
+	SETUP_THREADGBL_ACCESS;
+	assert(TREF(in_xpel));
+
+	OP_TROLLBACK(0);
+	assert(stringpool.base == rts_stringpool.base);
+	assert(!glist_str_protected(&(TREF(trestart_xpel_rtnlab)).str));
+	glist_unprotect_str(&(TREF(trestart_xpel_rtnlab)).str); /* Should be redundant but worth being paranoid at low cost */
+	(TREF(trestart_xpel_rtnlab)).str.len = 0;
+	len = ((TREF(trestart_xpel_lab)).str.len + ((TREF(trestart_xpel_rtn)).str.len ? (TREF(trestart_xpel_rtn)).str.len + 1 : 0));
+	assert(len);
+	ENSURE_STP_FREE_SPACE(len);
+	(TREF(trestart_xpel_rtnlab)).str.addr = (char *)stringpool.free;
+	if (0 < (TREF(trestart_xpel_lab)).str.len)
+	{
+		assert(MAX_MIDENT_LEN >= (TREF(trestart_xpel_lab)).str.len);
+		memcpy(stringpool.free, (TREF(trestart_xpel_lab)).str.addr, (TREF(trestart_xpel_lab)).str.len);
+		stringpool.free += (TREF(trestart_xpel_lab)).str.len;
+	}
+	if (0 < (TREF(trestart_xpel_rtn)).str.len)
+	{
+		assert(MAX_MIDENT_LEN >= (TREF(trestart_xpel_rtn)).str.len);
+		*stringpool.free++ = '^';
+		memcpy(stringpool.free, (TREF(trestart_xpel_rtn)).str.addr, (TREF(trestart_xpel_rtn)).str.len);
+		stringpool.free += (TREF(trestart_xpel_rtn)).str.len;
+	}
+	(TREF(trestart_xpel_rtnlab)).str.len = len;
+	(TREF(trestart_xpel_rtnlab)).mvtype = MV_STR;
+	/* Explicit protection deferred to preamble of stp_gcol if necessary */
+	TREF(zinxpel_no_tp_or_trig) = TRUE;
+	TREF(zinxpel_rtn_fp_capture) = TRUE;
+	TREF(zinxpel_compile) = TRUE;
+	op_commarg(TADR(trestart_xpel_rtnlab), indir_do);
+	glist_unprotect_str(&(TREF(trestart_xpel_rtnlab)).str);
+	(TREF(trestart_xpel_rtnlab)).str.len = 0;
+}
 
 CONDITION_HANDLER(tp_restart_ch)
 {
@@ -172,11 +216,6 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 		ESTABLISH_RET(tp_restart_ch, tprestart_rc);
 	}
 	assert(1 == newlevel);
-	if (!dollar_tlevel)
-	{
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_TLVLZERO);
-		return 0; /* for the compiler only -- never executed */
-	}
 #	ifdef GTM_TRIGGER
 	DBGTRIGR((stderr, "tp_restart: Entry state: %d\n", tprestart_state));
 	save_jnlpool = jnlpool;
@@ -779,6 +818,7 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 		assert((MVST_TPHOLD != mvc->mv_st_type) || ((newlevel - 1) != mvc->mv_st_cont.mvs_tp_holder.tphold_tlevel));
 		DBGEHND((stderr, "tp_restart: unwinding mv_stent addr 0x"lvaddr" type %d\n", mvc, mvc->mv_st_type));
 		unw_mv_ent(mvc, UNWIND_NEWVARS);
+		unprotect_mv_ent(mvc);
 		mvc = (mv_stent *)(mvc->mv_st_next + (char *)mvc);
 	}
 	assert((void *)mvc < (void *)frame_pointer);
@@ -791,9 +831,13 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 #	ifdef GTM_TRIGGER
 	/* Revert $ZTWormhole to its previous value */
 	DBGTRIGR((stderr, "tp_restart: Restoring $ZTWORMHOLE and NULLifying $ZTSLATE (state %d)\n", tprestart_state));
-	memcpy(&dollar_ztwormhole, &mvc->mv_st_cont.mvs_tp_holder.ztwormhole_save, SIZEOF(mval));
+	dollar_ztwormhole.umval = mvc->mv_st_cont.mvs_tp_holder.ztwormhole_save.umval;
+	glist_sync_mval(&dollar_ztwormhole);
 	if (1 == newlevel)
-		memcpy(&dollar_ztslate, &literal_null, SIZEOF(mval));	/* Zap $ZTSLate at (re)start of lvl 1 transaction */
+	{
+		dollar_ztslate.umval = literal_null.umval;
+		glist_unprotect_str(&dollar_ztslate.str);
+	}
 #	endif
 	assert(curr_symval == tf->sym);
 	if (frame_pointer->flags & SFF_UNW_SYMVAL)
@@ -819,7 +863,8 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 	assert(tf == tp_pointer);
 	assert(NULL == tf->old_tp_frame);
 	dollar_truth = tf->dlr_t;
-	dollar_zgbldir = tf->zgbldir;
+	dollar_zgbldir.umval = tf->zgbldir.umval;
+	glist_sync_mval(&dollar_zgbldir);
 	assert(0 != dollar_zgbldir.mvtype);
 	GTMTRIG_ONLY(tprestart_state = TPRESTART_STATE_NORMAL);
 	if (FALSE == tf->restartable)

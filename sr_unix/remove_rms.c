@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -17,6 +17,7 @@
 #include "gtm_string.h"
 
 #include "io.h"
+#include "device_cleanup.h"
 #include "gtm_limits.h"
 #include "iormdef.h"
 #include "gtmio.h"
@@ -70,6 +71,7 @@ void remove_rms (io_desc *ciod)
 		if (0 != rc)
 			GTMCRYPT_REPORT_ERROR(rc, rts_error, ciod->trans_name->len, ciod->trans_name->dollar_io);
 	}
+	cleanup_device_stp_residents(ciod);
 	if (rm_ptr && (NULL != rm_ptr->fsblock_buffer))
 		free(rm_ptr->fsblock_buffer);
 	if ((n_io_dev_types != ciod->type) && ciod->newly_created)
@@ -129,7 +131,7 @@ void remove_rms (io_desc *ciod)
 					free(rm_ptr->dev_param_pairs.pairs[i].definition);
 			}
 		}
-		free (rm_ptr);
+		free(rm_ptr);
 	}
 	free(ciod);
 }

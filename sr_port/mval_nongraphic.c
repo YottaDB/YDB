@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -17,15 +17,14 @@
 void mval_nongraphic(zshow_out *output,char *cp, int len, int num)
 {
 	/* sub-program for mval_write() */
-	mval tmpmval;
+	unmanaged_mstr	umstr;
 	char buff[10];	/* sufficient to hold all possible UTF8 code point values */
 	char *ptr;
 	int n, m;
 
-	tmpmval.mvtype = MV_STR;
-	tmpmval.str.addr = cp;
-	tmpmval.str.len = len;
-	zshow_output(output,&tmpmval.str);
+	umstr.addr = cp;
+	umstr.len = len;
+	zshow_output(output, &umstr);
 	for (ptr = buff + SIZEOF(buff) , n = num, m = SIZEOF(buff) ; m > 0 ; m--)
 	{
 		*--ptr = (n % 10) + '0';
@@ -33,8 +32,8 @@ void mval_nongraphic(zshow_out *output,char *cp, int len, int num)
 		if (!n)
 			break;
 	}
-	tmpmval.str.addr = ptr;
-	tmpmval.str.len = INTCAST(buff - ptr + SIZEOF(buff));
-	zshow_output(output,&tmpmval.str);
+	umstr.addr = ptr;
+	umstr.len = INTCAST(buff - ptr + SIZEOF(buff));
+	zshow_output(output, &umstr);
 	return;
 }

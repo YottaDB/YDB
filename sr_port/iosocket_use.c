@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2013-2023 Fidelity National Information	*
+ * Copyright (c) 2013-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -49,7 +49,7 @@ GBLREF	void			(*ctrlc_handler_ptr)();
 LITREF	nametabent		filter_names[];
 LITREF	unsigned char		filter_index[27];
 LITREF 	unsigned char		io_params_size[];
-LITREF	mstr			chset_names[];
+LITREF	unmanaged_mstr		chset_names[];
 
 error_def(ERR_ABNCOMPTINC);
 error_def(ERR_ACOMPTBINC);
@@ -110,7 +110,8 @@ void	iosocket_use(io_desc *iod, mval *pp)
 	uint4		bfsize = DEFAULT_SOCKET_BUFFER_SIZE, ibfsize = MAXUINT4;
 	char		*tab;
 	int		save_errno;
-	mstr		chset_mstr, optionstr;
+	mstr		optionstr;
+	unmanaged_mstr	chset_mstr;
 	gtm_chset_t	temp_ochset = CHSET_MAX_IDX_ALL, temp_ichset = CHSET_MAX_IDX_ALL;
 	size_t		d_socket_struct_len;
 	boolean_t	ch_set;
@@ -452,7 +453,7 @@ void	iosocket_use(io_desc *iod, mval *pp)
 	if (socket_specified)
 	{
 		/* use the socket flag to identify which socket to apply changes */
-		if (0 > (index = iosocket_handle(handles, &handles_len, FALSE, dsocketptr)))
+		if (0 > (index = iosocket_get_handle(handles, handles_len, dsocketptr)))
 		{
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SOCKNOTFND, 2, handles_len, handles);
 			return;
@@ -533,7 +534,7 @@ void	iosocket_use(io_desc *iod, mval *pp)
 			return;
 		}
 		/* give the new socket a handle */
-		iosocket_handle(handles, &handles_len, TRUE, dsocketptr);
+		iosocket_new_handle(handles, &handles_len, dsocketptr);
 		socketptr->handle_len = handles_len;
 		memcpy(socketptr->handle, handles, handles_len);
 		socketptr->dev = newdsocket;	/* use newdsocket temporarily for the sake of bind/connect */

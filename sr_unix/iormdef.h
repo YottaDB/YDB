@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -297,7 +297,7 @@ int iorm_get_fol(io_desc *io_ptr, int4 *tot_bytes_read, int4 *msec_timeout, bool
 int iorm_get(io_desc *io_ptr, int *blocked_in, boolean_t ispipe, int flags, int4 *tot_bytes_read,
 	     TID timer_id, int4 *msec_timeout, boolean_t colon_zero, boolean_t zint_restart);
 int iorm_write_utf_ascii(io_desc *iod, char *string, int len);
-void iorm_write_utf(mstr *v);
+void iorm_write_utf(const unmanaged_mstr *v);
 void iorm_readfl_badchar(mval *vmvalptr, int datalen, int delimlen, unsigned char *delimptr, unsigned char *strend);
 int open_get_bom(io_desc *io_ptr, int bom_size);
 int open_get_bom2(io_desc *io_ptr, int max_bom_size );

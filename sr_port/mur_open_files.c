@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2025 Fidelity National Information	*
+ * Copyright (c) 2003-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -32,6 +32,7 @@
 #include "hashtab_int4.h"	/* needed for muprec.h */
 #include "hashtab_int8.h"	/* needed for muprec.h */
 #include "hashtab_mname.h"	/* needed for muprec.h */
+#include "hashtab_umname.h"
 #include "hashtab.h"
 #include "muprec.h"
 #include "io.h"
@@ -522,7 +523,7 @@ int4 mur_open_files(boolean_t retry)
 						 * so consider this rctl only after those have been initialized.
 						 */
 		/* Do region specific initialization */
-		init_hashtab_mname(&rctl->gvntab, 0, HASHTAB_NO_COMPACT, HASHTAB_NO_SPARE_TABLE); /* for mur_forward() */
+		init_hashtab_umname(&rctl->gvntab, 0, HASHTAB_NO_COMPACT, HASHTAB_NO_SPARE_TABLE); /* for mur_forward() */
 		if (!retry) rctl->db_ctl = (file_control *)malloc(SIZEOF(file_control));
 		memset(rctl->db_ctl, 0, SIZEOF(file_control));
 		/* Allocate rctl->mur_desc associated buffers if required, which are only released by mur_close_files */

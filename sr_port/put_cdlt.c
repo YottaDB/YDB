@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -21,7 +21,7 @@
 /* Return an operator type containing a filled in CDLT_REF - i.e. a literal address reference to a routine or label table
  * component - typically resolved to a linkage table entry in SHBIN builds and to an absolute address in non SHBIN builds.
  */
-oprtype put_cdlt(mstr *x)
+oprtype put_cdlt(const unmanaged_mstr *x)
 {
 	triple	*ref;
 	mstr	*str;

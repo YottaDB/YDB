@@ -30,7 +30,7 @@
 #include "dpgbldir.h"
 #include "sgnl.h"
 #include "mvalconv.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "mv_stent.h"		/* for COPY_SUBS_TO_GVCURRKEY macro */
 #include "gvcst_protos.h"	/* for gvcst_root_search in GV_BIND_NAME_AND_ROOT_SEARCH macro */
 #include "gvt_inline.h"
@@ -86,7 +86,7 @@ STATICFNDEF void op_gvextnam_common(int count, int hash_code, mval *val1, va_lis
 	boolean_t	is_null, was_null;
 	mstr		*tmp_mstr_ptr;
 	mval		*val, *val2, val_xlated;
-	mname_entry	gvname;
+	unmanaged_mname_entry	gvname;
 	uint4		max_key;
 	gd_addr		*tmpgd;
 	gvnh_reg_t	*gvnh_reg;
@@ -128,7 +128,7 @@ STATICFNDEF void op_gvextnam_common(int count, int hash_code, mval *val1, va_lis
 	assert((NULL == gv_target) || (INVALID_GV_TARGET != gv_target));
 	val = va_arg(var, mval *);
 	assertpro(MV_IS_STRING(val));
-	gvname.var_name = val->str;
+	gvname.var_name = val->str.umstr;
 	gvname.hash_code = hash_code;
 	TREF(gd_targ_addr) = tmpgd;		/* needed by name-level $order/$zprevious and various other functions */
 	GV_BIND_NAME_AND_ROOT_SEARCH(tmpgd, &gvname, gvnh_reg);
@@ -158,12 +158,12 @@ STATICFNDEF void op_gvextnam_common(int count, int hash_code, mval *val1, va_lis
 }
 
 /* op_gvextnam_common should generally be maintained in parallel */
-boolean_t op_gvextnam_runtime(mval *src, int subscripts, int *start, int *stop)
+void op_gvextnam_runtime(mval *src, int subscripts, int *start, int *stop)
 {
 	boolean_t	is_null, was_null;
 	mstr		*gld_mstr_ptr;
 	mval		*val, *dst, gld_mval;
-	mname_entry	gvname;
+	unmanaged_mname_entry	gvname;
 	uint4		max_key;
 	gd_addr		*tmpgd;
 	gvnh_reg_t	*gvnh_reg;
@@ -228,5 +228,5 @@ boolean_t op_gvextnam_runtime(mval *src, int subscripts, int *start, int *stop)
 	TREF(gv_last_subsc_null) = is_null;
 	if (was_null && (NEVER == reg->null_subs))
 		sgnl_gvnulsubsc(NULL);
-	return TRUE;
+	return;
 }

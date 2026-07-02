@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -74,7 +74,7 @@ uint4 mupip_set_jnlfile_aux(jnl_file_header *header, char *jnl_fname)
 	if (!need_no_standalone)
 	{
 		mu_gv_cur_reg_init();
-		memcpy((char *)gv_cur_region->dyn.addr->fname, header->data_file_name, header->data_file_name_length);
+		memcpy(gv_cur_region->dyn.addr->fname, header->data_file_name, header->data_file_name_length);
 		gv_cur_region->dyn.addr->fname_len = header->data_file_name_length;
 		if (!STANDALONE(gv_cur_region))
 		{

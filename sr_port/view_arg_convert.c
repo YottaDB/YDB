@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -35,6 +35,7 @@
 #include "zshow.h"		/* needed for format2zwr */
 #include "cli.h"
 #include "stringpool.h"
+#include "hashtab_umname.h"
 #include "mv_stent.h"
 
 LITREF mval 		literal_one;
@@ -61,11 +62,13 @@ void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *pa
 	gvnh_reg_t		*gvnh_reg;
 	gvnh_spanreg_t		*gvspan;
 	gv_namehead		*tmp_gvt;
-	ht_ent_mname		*tabent;
+	ht_ent_umname		*umname_ent;
+	ht_ent_mname		*mname_ent;
 	int			cmp, len, n, reg_index, targ;
 	mident_fixed		lcl_buff;
-	mname_entry		gvent, lvent;
-	mstr			namestr, tmpstr;
+	unmanaged_mname_entry	gvent, lvent;
+	mstr			tmpstr;
+	unmanaged_mstr		namestr;
 	mval			*tmpmv;
 	tp_region		*vr, *vr_nxt;
 	unsigned char 		*c, *c_top, *dst, *dst_top, global_names[MAX_PARMS], *nextsrc, *src, *src_top, stashed, y;
@@ -230,7 +233,7 @@ void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *pa
 			parmblk->str.len = (char *)c - parmblk->str.addr;
 			if (MAX_MIDENT_LEN < parmblk->str.len)
 				parmblk->str.len = MAX_MIDENT_LEN;
-			if (!valid_mname(&parmblk->str))
+			if (!valid_mname(&parmblk->str.mident))
 			{	/* here & 2 other places use stringpool because we use format2zwr to ensure the message is graphic
 				 * & we don't return from the rts_error, so a fixed or malloc'd location seems even less attractive
 				 */
@@ -360,9 +363,9 @@ void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *pa
 					tmp_gvt = NULL;
 					gvent.var_name.addr = &lcl_buff.c[0];
 					COMPUTE_HASH_MNAME(&gvent);
-					if (NULL != (tabent = lookup_hashtab_mname(gd_header->tab_ptr, &gvent)))
+					if (NULL != (umname_ent = lookup_hashtab_umname(gd_header->tab_ptr, &gvent)))
 					{
-						gvnh_reg = (gvnh_reg_t *)tabent->value;
+						gvnh_reg = (gvnh_reg_t *)umname_ent->value;
 						assert(NULL != gvnh_reg);
 						tmp_gvt = gvnh_reg->gvt;
 					} else
@@ -370,9 +373,9 @@ void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *pa
 						gd_map = gv_srch_map(gd_header, gvent.var_name.addr, gvent.var_name.len,
 													SKIP_BASEDB_OPEN_FALSE);
 						r_ptr = gd_map->reg.addr;
-						tmp_gvt = (gv_namehead *)targ_alloc(r_ptr->max_key_size, &gvent, r_ptr);
+						tmp_gvt = targ_alloc(r_ptr->max_key_size, &gvent, r_ptr);
 						GVNH_REG_INIT(gd_header, gd_header->tab_ptr, gd_map, tmp_gvt,
-											r_ptr, gvnh_reg, tabent);
+											r_ptr, gvnh_reg, umname_ent);
 						/* In case of a global spanning multiple regions, the gvt pointer corresponding to
 						 * the region where the unsubscripted global reference maps to is stored in TWO
 						 * locations (one in gvnh_reg->gvspan->gvt_array[index] and one in gvnh_reg->gvt.
@@ -429,8 +432,8 @@ void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *pa
 				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_VIEWLVN, 2, parm->str.len, parm->str.addr);
 			/* Now look up the name.. */
 			COMPUTE_HASH_MNAME(&lvent);
-			if ((tabent = lookup_hashtab_mname(&curr_symval->h_symtab, &lvent)) && (NULL != tabent->value))
-				parmblk->value = (mval *)tabent->value;	/* Return lv_val ptr */
+			if ((mname_ent = lookup_hashtab_mname(&curr_symval->h_symtab, &lvent)) && (NULL != mname_ent->value))
+				parmblk->value = (mval *)mname_ent->value;	/* Return lv_val ptr */
 			else
 				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_VIEWLVN, 2, parm->str.len, parm->str.addr);
 			break;

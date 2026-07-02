@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -38,7 +38,7 @@
 #include "anticipatory_freeze.h"
 #include "tp.h"
 #ifdef GTM_TRIGGER
-#include <rtnhdr.h>		/* for rtn_tabent in gv_trigger.h */
+#include "rtnhdr.h"		/* for rtn_tabent in gv_trigger.h */
 #include "gv_trigger.h"
 #endif
 
@@ -415,7 +415,7 @@ boolean_t mu_int_blk(
 	buff_length = 0;
 	comp_length = bot_len;
 	is_top = FALSE;
-	memcpy((void *)buff, bot_key, bot_len);
+	memcpy(buff, bot_key, bot_len);
 	mu_sub_list[0].index = NO_SUBSCRIPTS;
 	rec_num = 0;
 	if (level)
@@ -562,7 +562,7 @@ boolean_t mu_int_blk(
 						(unsigned int)blk_levl);
 				}
 			}
-			memcpy((void *)old_buff, buff, comp_length);
+			memcpy(old_buff, buff, comp_length);
 			memcpy(buff + rec_cmpc, key_base, key_size);
 			buff_length = rec_cmpc + key_size;
 			rec_len = buff_length;
@@ -1013,7 +1013,7 @@ boolean_t mu_int_blk(
 				}
 				*c1 = 0;
 				assert(SIZEOF(muint_temp_buff) == SIZEOF(temp_buff));
-				memcpy((void *)muint_temp_buff, temp_buff, SIZEOF(temp_buff));
+				memcpy(muint_temp_buff, temp_buff, SIZEOF(temp_buff));
 				if (mu_key)
 				{
 					if (mu_end_key)	/* range */

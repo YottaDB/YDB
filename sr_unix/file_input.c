@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2023 Fidelity National Information	*
+ * Copyright (c) 2010-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -297,7 +297,7 @@ int file_input_get(char **in_ptr, unsigned int max_len)
 				return FILE_INPUT_GET_ERROR;
 			}
 			assert(new_mbuff_len >= ret_len); /* For SCA */
-			memcpy((void *)tmp_ptr, mbuff, ret_len);
+			memcpy(tmp_ptr, mbuff, ret_len);
 			if (mbuff != buff1)	/* do not free static array, free all later expansions (malloc buffers) */
 				free(mbuff);
 			mbuff = tmp_ptr;

@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2001-2023 Fidelity National Information		#
+# Copyright (c) 2001-2026 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -111,8 +111,8 @@ if ( $?gtm_version_change == "1" ) then
 		setenv gt_as_options_common	"--defsym cygwin=1"
 	    	setenv gt_as_option_debug	"--gdwarf-2"
 	    else
-		setenv gt_as_option_debug      "--gstabs"
-		setenv gt_as_option_debug_scan "--gdwarf-2 --nocompress-debug-sections"
+		setenv gt_as_option_debug	"--gdwarf-2"
+		setenv gt_as_option_debug_scan	"--gdwarf-2 --nocompress-debug-sections"
 	    endif
 	    if ($?scan_image) setenv gt_as_option_debug	"--gdwarf-2 --nocompress-debug-sections"
 	endif

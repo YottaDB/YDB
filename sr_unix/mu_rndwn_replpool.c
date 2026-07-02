@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -108,7 +108,7 @@ int     mu_rndwn_replpool2(replpool_identifier *replpool_id, repl_inst_hdr_ptr_t
 	/* assert that the identifiers are at the top of replpool control structure */
 	assert(0 == offsetof(jnlpool_ctl_struct, jnlpool_id));
 	assert(0 == offsetof(recvpool_ctl_struct, recvpool_id));
-	memcpy((void *)replpool_id, (void *)start_addr, SIZEOF(replpool_identifier));
+	memcpy(replpool_id, start_addr, SIZEOF(replpool_identifier));
 	if (memcmp(replpool_id->label, GDS_RPL_LABEL, GDS_LABEL_SZ - 1))
 	{
 		if (!memcmp(replpool_id->label, GDS_RPL_LABEL, GDS_LABEL_SZ - 3))

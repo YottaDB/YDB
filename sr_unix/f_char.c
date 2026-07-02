@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2018 Fidelity National Information	*
+ * Copyright (c) 2006-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -81,7 +81,7 @@ int f_char(oprtype *a, opctype op)
 			}
 		}
 		stringpool.free = outptr;
-		MV_INIT_STRING(&v, outptr - base, base);
+		UMV_INIT_STRING(&v.umval, outptr - base, base);
 		v.str.char_len = char_len;
 		v.mvtype |= MV_UTF_LEN;
 		CLEAR_MVAL_BITS(&v);

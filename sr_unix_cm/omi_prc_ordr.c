@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -46,7 +46,7 @@ int omi_prc_ordr(omi_conn *cptr, char *xend, char *buff, char *bend)
 {
 	char		*bptr;
 	int		rv;
-	mname_entry	gvname;
+	unmanaged_mname_entry	gvname;
 	omi_li		len;
 	mval		vo, vd, vg;
 	gvnh_reg_t	*gvnh_reg;

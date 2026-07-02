@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2021 Fidelity National Information	*
+ * Copyright (c) 2006-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -42,7 +42,7 @@ GBLREF	spdesc		stringpool;
 GBLREF	volatile bool	out_of_time;
 GBLREF  boolean_t       gtm_utf8_mode;
 GBLREF	volatile int4	outofband;
-LITREF	mstr		chset_names[];
+LITREF	unmanaged_mstr	chset_names[];
 
 error_def(ERR_BOMMISMATCH);
 

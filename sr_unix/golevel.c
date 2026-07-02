@@ -14,7 +14,7 @@
 
 #include "gtm_stdio.h"
 
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "stack_frame.h"
 #include "tp_frame.h"
 #include "golevel.h"

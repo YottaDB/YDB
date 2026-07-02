@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -17,7 +17,7 @@
 #include <errno.h>
 
 #include "compiler.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "obj_gen.h"
 #include "cgp.h"
 #include "mdq.h"
@@ -425,6 +425,8 @@ void emit_literals(void)
 	{
 		assert (p->rt_addr == offset);
 		MV_FORCE_NUMD(&p->v);
+		glist_unprotect_str(&p->v.str);
+		assert(glist_str_null(&p->v.str));
 		if (p->v.str.len)
 			emit_pidr(p->rt_addr + ((char *) &p->v.str.addr - (char *)&p->v),
 				 p->v.str.addr - (char *) stringpool.base, (int4 *)&p->v.str.addr);

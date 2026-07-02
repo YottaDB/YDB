@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2009-2025 Fidelity National Information	*
+ * Copyright (c) 2009-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -119,16 +119,18 @@ unsigned char *gc_pk_get_symmetric_key(const char *key_path, size_t *rawkey_leng
 
 	while (-1 == (fd = open(key_path, O_RDONLY)))
 	{
-		if (EINTR == errno)
+		save_errno = errno;
+		if (EINTR == save_errno)
 			continue;
-		UPDATE_ERROR_STRING("Symmetric key " STR_ARG " open:%s", ELLIPSIZE(key_path), strerror(errno));
+		UPDATE_ERROR_STRING("Symmetric key " STR_ARG " open:%s", ELLIPSIZE(key_path), strerror(save_errno));
 		return NULL;
 	}
 	while (-1 == fstat(fd, &stat_info))
 	{
-		if (EINTR == errno)
+		save_errno = errno;
+		if (EINTR == save_errno)
 			continue;
-		UPDATE_ERROR_STRING("Symmetric key " STR_ARG " fstat:%s", ELLIPSIZE(key_path), strerror(errno));
+		UPDATE_ERROR_STRING("Symmetric key " STR_ARG " fstat:%s", ELLIPSIZE(key_path), strerror(save_errno));
 		return NULL;
 	}
 	if (!(S_IFREG && stat_info.st_mode))
@@ -178,6 +180,7 @@ gpgme_error_t gc_pk_get_decrypted_key_pkcs(const char *key_path, unsigned char *
 	unsigned char		*key_buff = NULL, *temp = NULL;
 	size_t			key_buff_len = 0, len = 0, olen = 0;
 	unsigned long 		oerr;
+	int			save_errno;
 	char			oerrstr[2048];
 
 	/* Acquire (encrypted) symmetric key in an allocated buffer */
@@ -212,8 +215,9 @@ gpgme_error_t gc_pk_get_decrypted_key_pkcs(const char *key_path, unsigned char *
 	temp = calloc(len, sizeof(char));
 	if ((0 == olen) || (NULL == temp))
 	{
+		save_errno = errno;
 		UPDATE_ERROR_STRING("Failure to allocate memory to decrypt " STR_ARG " for reason %s",
-				ELLIPSIZE(key_path), strerror(errno));
+				ELLIPSIZE(key_path), strerror(save_errno));
 		free(key_buff);
 		EVP_PKEY_CTX_free(ctx);
 		return -1;
@@ -237,7 +241,7 @@ gpgme_error_t gc_pk_get_decrypted_key_pkcs(const char *key_path, unsigned char *
 		EVP_PKEY_CTX_free(ctx);
 		return -1;
 	}
-	memcpy((void *)plain_text, (void *)temp, (size_t)len);
+	memcpy(plain_text, temp, len);
 	*plain_text_length = len;
 	EVP_PKEY_CTX_free(ctx);
 	free(key_buff);
@@ -246,7 +250,7 @@ gpgme_error_t gc_pk_get_decrypted_key_pkcs(const char *key_path, unsigned char *
 
 int gc_pk_establish_pkcs_cfg(config_setting_t *parent, char *config_fn)
 {
-	int			name_length;
+	int			name_length, save_errno;
 	const char		*cert_path, *key_format, *key_path, *key_type;
 	int			cfg_enabled = 0, cfg_version = 1, envvar_len;
 	FILE			*fp;
@@ -275,14 +279,16 @@ int gc_pk_establish_pkcs_cfg(config_setting_t *parent, char *config_fn)
 	{	/* Key path needs to be fully resolved before we can reliably use it, hence realpath-ing. */
 		if (NULL == realpath(key_path, path_array))
 		{
+			save_errno = errno;
 			UPDATE_ERROR_STRING("In config file " STR_ARG ", could not obtain the real path of 'plugins"
-				".openssl-pkcs8.key' %s. %s", ELLIPSIZE(config_fn), key_path, strerror(errno));
+				".openssl-pkcs8.key' %s. %s", ELLIPSIZE(config_fn), key_path, strerror(save_errno));
 			return -1;
 		}
 		if (0 != stat(key_path, &stat_info))
 		{
+			save_errno = errno;
 			UPDATE_ERROR_STRING("Cannot stat key file: " STR_ARG ". %s", ELLIPSIZE(key_path),
-				strerror(errno));
+				strerror(save_errno));
 			return -1;
 		}
 		if (!S_ISREG(stat_info.st_mode))
@@ -329,7 +335,8 @@ int gc_pk_establish_pkcs_cfg(config_setting_t *parent, char *config_fn)
 		{
 			if (NULL == fp)
 			{
-				UPDATE_ERROR_STRING("Error opening file %s: %s.", key_path, strerror(errno));
+				save_errno = errno;
+				UPDATE_ERROR_STRING("Error opening file %s: %s.", key_path, strerror(save_errno));
 			} else if (ERR_GET_REASON(ERR_peek_error()) == PEM_R_NO_START_LINE)
 			{	/* give clearer error if only cert given but it doesn't have the key */
 				UPDATE_ERROR_STRING("Private key missing from file %s.", key_path);
@@ -345,14 +352,16 @@ int gc_pk_establish_pkcs_cfg(config_setting_t *parent, char *config_fn)
 	{	/* Cert path needs to be fully resolved before we can reliably use it, hence realpath-ing. */
 		if (NULL == realpath(cert_path, path_array))
 		{
+			save_errno = errno;
 			UPDATE_ERROR_STRING("In config file " STR_ARG ", could not obtain the real path of 'plugins"
-				".openssl-pkcs8.cert' %s. %s", ELLIPSIZE(config_fn), cert_path, strerror(errno));
+				".openssl-pkcs8.cert' %s. %s", ELLIPSIZE(config_fn), cert_path, strerror(save_errno));
 			return -1;
 		}
 		if (0 != stat(cert_path, &stat_info))
 		{
+			save_errno = errno;
 			UPDATE_ERROR_STRING("Cannot stat certificate file: " STR_ARG ". %s", ELLIPSIZE(cert_path),
-				strerror(errno));
+				strerror(save_errno));
 			return -1;
 		}
 		if (!S_ISREG(stat_info.st_mode))
@@ -503,7 +512,7 @@ gpgme_error_t gc_pk_get_decrypted_key(const char *cipher_file, unsigned char *pl
 int gc_pk_gpghome_has_permissions()
 {
 	char		pathname[GTM_PATH_MAX], *ptr;
-	int		gnupghome_set, perms;
+	int		gnupghome_set, perms, save_errno;
 	size_t		pathlen;
 
 	/* See if GNUPGHOME is set in the environment */
@@ -543,6 +552,9 @@ int gc_pk_gpghome_has_permissions()
 		} else
 			UPDATE_ERROR_STRING("No read permissions on $%s/%s", HOME, DOT_GNUPG);
 	} else	/* Some other error */
-		UPDATE_ERROR_STRING("Cannot stat on " STR_ARG " - %d", ELLIPSIZE(pathname), errno);
+	{
+		save_errno = errno;
+		UPDATE_ERROR_STRING("Cannot stat on " STR_ARG " - %d", ELLIPSIZE(pathname), save_errno);
+	}
 	return -1;
 }

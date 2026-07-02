@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -102,6 +102,8 @@ int main (int argc, char *argv[])
 	primary_exit_handler = util_exit_handler;
 	stp_init(STP_INITSIZE);
 	stpgc_ch = &stp_gcol_ch;
+	stringpool.sort_array_pp = TADR(rts_sort_array_p);
+	stringpool.protect_array_pp = TADR(rts_protect_array_p);
 	rts_stringpool = stringpool;
 	getjobname();
 	getzdir();

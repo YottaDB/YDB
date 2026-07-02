@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -167,7 +167,8 @@ int rc_cpt_entry(block_id blk)
 static int rc_init_ipc(void)
 {
 	key_t		rc_key;
-	mstr		fpath1, fpath2;
+	mstr		fpath2;
+	UMSTR_CONST(fpath1, RC_CPT_PATH);
 	int		old_errno;
 	char		buff[1024];
 
@@ -179,8 +180,6 @@ static int rc_init_ipc(void)
 		(void) shmdt((char *)rc_cpt);
 		rc_cpt = NULL;
 	}
-	fpath1.addr = RC_CPT_PATH;
-	fpath1.len = SIZEOF(RC_CPT_PATH);
 	if (SS_NORMAL != TRANS_LOG_NAME(&fpath1, &fpath2, buff, SIZEOF(buff), do_sendmsg_on_log2long))
 	{
 		PERROR("Error translating rc path");
@@ -289,7 +288,8 @@ static void rc_cpt_lock(void)
 int rc_cpt_inval(void)
 {
 	key_t		rc_key;
-	mstr		fpath1, fpath2;
+	mstr		fpath2;
+	UMSTR_CONST(fpath1, RC_CPT_PATH);
 	int4		entry;
 	struct sembuf	sop[2];
 	int		i, old_errno;
@@ -300,8 +300,7 @@ int rc_cpt_inval(void)
 	FPRINTF(stderr,"\trc_cpt_inval()\n");
 #	endif
 	if (!rc_cpt)
-	{	fpath1.addr = RC_CPT_PATH;
-		fpath1.len = SIZEOF(RC_CPT_PATH);
+	{
 		if (SS_NORMAL != TRANS_LOG_NAME(&fpath1, &fpath2, buff, SIZEOF(buff), do_sendmsg_on_log2long))
 		{
 			PERROR("Error translating rc path");
@@ -371,14 +370,13 @@ int mupip_rundown_cpt()
 {
 	char		buff[1024];
 	key_t		rc_key;
-	mstr		fpath1, fpath2;
+	mstr		fpath2;
+	UMSTR_CONST(fpath1, RC_CPT_PATH);
 	struct shmid_ds	shm_buf;
 
 	/* detach from CPT if we happen to be connected */
 	if (rc_cpt)
 		(void) shmdt((char *)rc_cpt);
-	fpath1.addr = RC_CPT_PATH;
-	fpath1.len = SIZEOF(RC_CPT_PATH);
 	if (SS_NORMAL != TRANS_LOG_NAME(&fpath1, &fpath2, buff, SIZEOF(buff), do_sendmsg_on_log2long))
 	{	/* invalid environment variable setup....error */
 		return -1;
@@ -482,14 +480,13 @@ int rc_create_cpt(void)
 	int		old_errno;
 	int		semop_rv;
 	key_t		rc_key;
-	mstr		fpath1, fpath2;
+	mstr		fpath2;
+	UMSTR_CONST(fpath1, RC_CPT_PATH);
 	struct sembuf	sop[2];
 	struct shmid_ds	shm_buf;
 
 	if (rc_cpt)
 		return 0;
-	fpath1.addr = RC_CPT_PATH;
-	fpath1.len = SIZEOF(RC_CPT_PATH);
 	if (SS_NORMAL != TRANS_LOG_NAME(&fpath1, &fpath2, buff, SIZEOF(buff), do_sendmsg_on_log2long))
 	{
 		PERROR("Error translating rc path");

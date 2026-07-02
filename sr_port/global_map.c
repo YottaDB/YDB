@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,9 +25,9 @@
  * Note that a point is represented as a range whose begin and end are the same.
  */
 
-void global_map(mstr map[], mstr *beg, mstr *end)
+void global_map(unmanaged_mstr map[], unmanaged_mstr *beg, unmanaged_mstr *end)
 {
-	mstr	*left, *right, rangestart, rangeend, tmpmstr;
+	unmanaged_mstr	*left, *right, rangestart, rangeend, tmpmstr;
 	int	rslt;
 
 	DEBUG_ONLY(
@@ -59,14 +60,14 @@ void global_map(mstr map[], mstr *beg, mstr *end)
 		while (left->addr)
 		{	/* {rangestart, rangeend} is the current range to be inserted */
 			tmpmstr = *left;
-			*left++ = rangestart;
+			*(left++) = rangestart;
 			rangestart = tmpmstr;
 			tmpmstr = *left;
-			*left++ = rangeend;
+			*(left++) = rangeend;
 			rangeend = tmpmstr;
 		}
-		*left++ = rangestart;
-		*left++ = rangeend;
+		*(left++) = rangestart;
+		*(left++) = rangeend;
 		left->addr = 0;
 		return;
 	}
@@ -74,14 +75,14 @@ void global_map(mstr map[], mstr *beg, mstr *end)
 	 * replace intersecting ranges with one union range e.g. replace {1, 10} {5, 15} {12, 20} with {1, 20}
 	 */
 	if (0 == ((left - map) & 1))
-		*left++ = *beg;
+		*(left++) = *beg;
 	if (0 == ((right - map) & 1))
 		*(--right) = *end;
 	if (left == right) /* possible if {beg, end} is exactly equal to an existing range in map[] */
 		return;
 	do
 	{
-		*left++ = *right;
+		*(left++) = *right;
 	} while ((right++)->addr);
 	/* note that replacing atleast 2 existing ranges with {begin, end} into one union range will cause a reduction
 	 * in the number of ranges in map[] effectively causing higher-valued ranges on the right to shift left.

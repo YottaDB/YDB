@@ -1,10 +1,12 @@
 gtm_main
 gtm_init
+gtm_init_extra
 gtm_jinit
 gtm_ci
 gtm_cij
 gtm_cip
 gtm_exit
+gtm_terminal_reset
 gtm_zstatus
 gtm_hiber_start
 gtm_hiber_start_wait_any

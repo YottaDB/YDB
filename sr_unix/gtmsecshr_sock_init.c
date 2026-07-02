@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -72,9 +72,10 @@ int4 gtmsecshr_pathname_init(int caller, char *execpath, int execpathln)
 {
 	int			ret_status = 0, status, len;
 	char			*dir_error_mesg, *error_mesg;
-	mstr			secshrsock_lognam, secshrsock_transnam;
+	mstr			secshrsock_transnam;
 	struct stat		buf;
 	int4			max_sock_path_len;
+	UMSTR_CONST(secshrsock_lognam, GTMSECSHR_SOCK_DIR);
 
 	if (!process_id)
 		getjobnum();
@@ -87,8 +88,6 @@ int4 gtmsecshr_pathname_init(int caller, char *execpath, int execpathln)
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_GTMDISTUNVERIF, 4, STRLEN(gtm_dist), gtm_dist,
 					gtmImageNames[image_type].imageNameLen, gtmImageNames[image_type].imageName);
 	}
-	secshrsock_lognam.addr = GTMSECSHR_SOCK_DIR;
-	secshrsock_lognam.len = SIZEOF(GTMSECSHR_SOCK_DIR) - 1;
 	/* Get the maximum size of the path excluding the socket filename */
 	max_sock_path_len = SIZEOF(gtmsecshr_sock_name.sun_path) - MAX_SECSHR_SOCKFILE_NAME_LEN;
 	/* Make sure this length is atmost equal to the size of the buffer that will hold the socket path */

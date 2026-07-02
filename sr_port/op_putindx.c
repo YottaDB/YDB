@@ -31,12 +31,13 @@
 #include "alias.h"
 #include "compiler.h"
 #include "callg.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "toktyp.h"
 #include "valid_mname.h"
 #include "stack_frame.h"
 #include "op.h"
 #include "min_max.h"
+#include "mv_stent.h"
 #ifdef DEBUG
 #include "gtm_ctype.h"
 #include "trans_numeric.h"
@@ -105,7 +106,8 @@ lv_val	*op_putindx(int argcnt, lv_val *start, ...)
 	lvTree			*lvt;
 	lvTreeNode		*parent;
 	mident_fixed		name;
-	mval			*key, tmp_sbs;
+	mval			*key;
+	mval			*tmp_sbs;
 	va_list			var;
 	DEBUG_ONLY(int		orig_subs_level;)
 	DCL_THREADGBL_ACCESS;
@@ -113,6 +115,8 @@ lv_val	*op_putindx(int argcnt, lv_val *start, ...)
 	SETUP_THREADGBL_ACCESS;
 	VAR_START(var, start);
 	assert(0 < argcnt);
+	PUSH_MV_STENT(MVST_MVAL);
+	tmp_sbs = &mv_chain->mv_st_cont.mvs_mval;
 	is_base_var = LV_IS_BASE_VAR(start);
 	/* If this variable is marked as a Transaction Processing protected variable, clone the tree.
 	 * It is possible the input "start" is NOT a base lv_val. In that case, we want to make sure that
@@ -155,14 +159,14 @@ lv_val	*op_putindx(int argcnt, lv_val *start, ...)
 			if (TREF(local_collseq))
 			{	/* Do collation transformations */
 				ALLOC_XFORM_BUFF(key->str.len);
-				tmp_sbs.mvtype = MV_STR;
-				tmp_sbs.str.len = TREF(max_lcl_coll_xform_bufsiz);
+				tmp_sbs->mvtype = MV_STR;
+				tmp_sbs->str.len = TREF(max_lcl_coll_xform_bufsiz);
 				assert(NULL != TREF(lcl_coll_xform_buff));
-				tmp_sbs.str.addr = TREF(lcl_coll_xform_buff);
-				do_xform(TREF(local_collseq), XFORM, &key->str, &tmp_sbs.str, &length);
-				tmp_sbs.str.len = length;
-				s2pool(&(tmp_sbs.str));
-				key = &tmp_sbs;
+				tmp_sbs->str.addr = TREF(lcl_coll_xform_buff);
+				do_xform(TREF(local_collseq), XFORM, &key->str, &tmp_sbs->str, &length);
+				tmp_sbs->str.len = length;
+				s2pool(&(tmp_sbs->str));
+				key = tmp_sbs;
 			}
 			if ((lvt = LV_GET_CHILD(lv)))	/* caution: assignment */
 				assert(MV_LV_TREE == lvt->ident);
@@ -174,8 +178,8 @@ lv_val	*op_putindx(int argcnt, lv_val *start, ...)
 			 * But input mval could be read-only so cannot modify that even if temporarily.
 			 * So take a copy of the mval and modify that instead.
 			 */
-			tmp_sbs = *key;
-			key = &tmp_sbs;
+			tmp_sbs->umval = key->umval;
+			key = tmp_sbs;
 			MV_FORCE_NUM(key);
 			TREE_KEY_SUBSCR_SET_MV_CANONICAL_BIT(key);	/* used by the lvAvlTreeLookup* functions below */
 			/* Since this mval has the MV_CANONICAL bit set, reset MV_STR bit in case it is set.
@@ -184,12 +188,14 @@ lv_val	*op_putindx(int argcnt, lv_val *start, ...)
 			 * There is code (e.g. op_fnascii) that expects MV_UTF_LEN bit to be set only if MV_STR is set.
 			 * Since we are turning off MV_STR, turn off MV_UTF_LEN bit also in case it is set.
 			 */
-			tmp_sbs.mvtype &= (MV_STR_OFF & MV_UTF_LEN_OFF);
+			tmp_sbs->mvtype &= (MV_STR_OFF & MV_UTF_LEN_OFF);
+			tmp_sbs->str.addr = NULL;
+			tmp_sbs->str.len = 0;
 			if ((lvt = LV_GET_CHILD(lv)))	/* caution: assignment */
 				assert(MV_LV_TREE == lvt->ident);
 			else	/* No children exist at this level - create a child */
 				LV_TREE_CREATE(lvt, (lvTreeNode *)lv, subs_level, base_lv);
-			if (MVTYPE_IS_INT(tmp_sbs.mvtype))
+			if (MVTYPE_IS_INT(tmp_sbs->mvtype))
 				lv = (lv_val *)lvAvlTreeLookupInt(lvt, key, &parent);
 			else
 				lv = (lv_val *)lvAvlTreeLookupNum(lvt, key, &parent);
@@ -198,11 +204,13 @@ lv_val	*op_putindx(int argcnt, lv_val *start, ...)
 		{
 			lv = (lv_val *)lvAvlTreeNodeInsert(lvt, key, parent);
 			lv->v.mvtype = 0;	/* initialize mval to undefined value at this point */
+			assert(lv->v.str.len == 0);
 			/* maintain active_lv so we free this lv_val (and parent lv_vals as appropriate) in case of a
 			 * runtime error (e.g. UNDEF or LVNULLSUBS) in this for loop.
 			 */
 			SET_ACTIVE_LV(lv, (orig_subs_level == (subs_level + 1)) ? TRUE : FALSE, actlv_op_putindx1);
 		}
+		assert(glist_str_protected(&lv->v.str));
 		/* the following check could be based on allowing the name and each subscript to be of maximum length; however,
 		 * then $QUERY() could produce a result greatly exceeding MAX_STRLEN, which, while it seems to work, should not
 		 * (although our testing coverage of all cases currently unknown) be consumable by other commands, functions or
@@ -241,6 +249,9 @@ lv_val	*op_putindx(int argcnt, lv_val *start, ...)
 		assert(NULL != lv);
 		SET_ACTIVE_LV(lv, (orig_subs_level == (subs_level + 1)) ? TRUE : FALSE, actlv_op_putindx2);
 	}
+	assert(tmp_sbs == &mv_chain->mv_st_cont.mvs_mval);
+	if (tmp_sbs == &mv_chain->mv_st_cont.mvs_mval)
+		POP_MV_STENT();
 	return lv;
 }
 
@@ -254,19 +265,22 @@ lv_val  *op_putindx_runtime(mval *src, int subscripts, int *start, int *stop, lv
 	lvTree			*lvt;
 	lvTreeNode		*parent;
 	mident_fixed		name;
-	mval			*key, tmp_sbs;
-	var_tabent              targ_key;
-	mval                    *val, *varname, lvname_mval, subs_mval;
+	mval			*key, *tmp_sbs, *tmp_sbs2;
+	mname_entry              targ_key = {{{0}}};
+	mval                    *val;
 	ht_ent_mname            *tabent;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	assert(0 <= subscripts);
-	varname = &lvname_mval;
+	PUSH_MV_STENT(MVST_MVAL);
+	tmp_sbs = &mv_chain->mv_st_cont.mvs_mval;
+	PUSH_MV_STENT(MVST_MVAL);
+	tmp_sbs2 = &mv_chain->mv_st_cont.mvs_mval;
 	val = src;
-	op_fnqsubscript_fast(val, 0, varname, subscripts, start[0], stop[0]);       /* 0 : for the unsubscripted name */
-	targ_key.var_name.len = MIN(varname->str.len, MAX_MIDENT_LEN);
-	targ_key.var_name.addr = varname->str.addr;
+	op_fnqsubscript_fast(val, 0, tmp_sbs, subscripts, start[0], stop[0]);       /* 0 : for the unsubscripted name */
+	targ_key.var_name.len = MIN(tmp_sbs->str.len, MAX_MIDENT_LEN);
+	targ_key.var_name.addr = tmp_sbs->str.addr;
 	COMPUTE_HASH_MNAME(&targ_key);
 	targ_key.marked = NOT_MARKED;
 	if (add_hashtab_mname_symval(&curr_symval->h_symtab, &targ_key, NULL, &tabent, FALSE))
@@ -289,9 +303,9 @@ lv_val  *op_putindx_runtime(mval *src, int subscripts, int *start, int *stop, lv
 	lv = ve;
 	assert(NULL != lv);
 	LV_SBS_DEPTH(ve, is_base_var, subs_level);
+	key = tmp_sbs;
 	for (i = 1, subs_level++; i <= subscripts; i++, subs_level++)
 	{
-                key = &subs_mval;       /* reinitialize each iteration to avoid tmp_sbs corruption */
                 op_fnqsubscript_fast(val, i, key, subscripts, start[i], stop[i]);
 		MV_FORCE_DEFINED(key);	/* Subscripts for set shouldn't be undefined - check here enables lvnullsubs to work */
 		if (!(is_canonical = MV_IS_CANONICAL(key)))
@@ -306,14 +320,14 @@ lv_val  *op_putindx_runtime(mval *src, int subscripts, int *start, int *stop, lv
 			if (TREF(local_collseq))
 			{	/* Do collation transformations */
 				ALLOC_XFORM_BUFF(key->str.len);
-				tmp_sbs.mvtype = MV_STR;
-				tmp_sbs.str.len = TREF(max_lcl_coll_xform_bufsiz);
+				tmp_sbs2->mvtype = MV_STR;
+				tmp_sbs2->str.len = TREF(max_lcl_coll_xform_bufsiz);
 				assert(NULL != TREF(lcl_coll_xform_buff));
-				tmp_sbs.str.addr = TREF(lcl_coll_xform_buff);
-				do_xform(TREF(local_collseq), XFORM, &key->str, &tmp_sbs.str, &length);
-				tmp_sbs.str.len = length;
-				s2pool(&(tmp_sbs.str));
-				key = &tmp_sbs;
+				tmp_sbs2->str.addr = TREF(lcl_coll_xform_buff);
+				do_xform(TREF(local_collseq), XFORM, &key->str, &tmp_sbs2->str, &length);
+				tmp_sbs2->str.len = length;
+				s2pool(&(tmp_sbs2->str));
+				key = tmp_sbs2;
 			}
 			if ((lvt = LV_GET_CHILD(lv)))	/* caution: assignment */
 				assert(MV_LV_TREE == lvt->ident);
@@ -322,16 +336,16 @@ lv_val  *op_putindx_runtime(mval *src, int subscripts, int *start, int *stop, lv
 			lv = (lv_val *)lvAvlTreeLookupStr(lvt, key, &parent);
 		} else
 		{
-			tmp_sbs = *key;
-			key = &tmp_sbs;
 			MV_FORCE_NUM(key);
 			TREE_KEY_SUBSCR_SET_MV_CANONICAL_BIT(key);	/* used by the lvAvlTreeLookup* functions below */
-			tmp_sbs.mvtype &= (MV_STR_OFF & MV_UTF_LEN_OFF);
+			key->mvtype &= (MV_STR_OFF & MV_UTF_LEN_OFF);
+			key->str.addr = NULL;
+			key->str.len = 0;
 			if ((lvt = LV_GET_CHILD(lv)))	/* caution: assignment */
 				assert(MV_LV_TREE == lvt->ident);
 			else	/* No children exist at this level - create a child */
 				LV_TREE_CREATE(lvt, (lvTreeNode *)lv, subs_level, base_lv);
-			if (MVTYPE_IS_INT(tmp_sbs.mvtype))
+			if (MVTYPE_IS_INT(key->mvtype))
 				lv = (lv_val *)lvAvlTreeLookupInt(lvt, key, &parent);
 			else
 				lv = (lv_val *)lvAvlTreeLookupNum(lvt, key, &parent);
@@ -365,5 +379,11 @@ lv_val  *op_putindx_runtime(mval *src, int subscripts, int *start, int *stop, lv
 		}
 		assert(NULL != lv);
 	}
+	assert(tmp_sbs2 == &mv_chain->mv_st_cont.mvs_mval);
+	if (tmp_sbs2 == &mv_chain->mv_st_cont.mvs_mval)
+		POP_MV_STENT();
+	assert(tmp_sbs == &mv_chain->mv_st_cont.mvs_mval);
+	if (tmp_sbs == &mv_chain->mv_st_cont.mvs_mval)
+		POP_MV_STENT();
 	return lv;
 }

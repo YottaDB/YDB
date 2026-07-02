@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -94,7 +94,7 @@ error_def(ERR_VIEWFN);
 error_def(ERR_VIEWGVN);
 
 LITREF	gtmImageName	gtmImageNames[];
-LITREF	mstr		relink_allowed_mstr[];
+LITREF	unmanaged_mstr	relink_allowed_mstr[];
 LITREF	mval		literal_zero;
 LITREF	mval		literal_one;
 
@@ -212,6 +212,7 @@ void	op_fnview(int numarg, mval *dst, ...)
 			ENSURE_STP_FREE_SPACE((STATS_MAX_DIGITS * 3) + 2);
 			MV_FORCE_MVAL(dst, (int)(stringpool.top - stringpool.base));
 			MV_FORCE_STR(dst);
+			assert(vtp->restype & MV_STR);
 			dst->mvtype = vtp->restype;
 			s2pool_concat(dst, &commastr);
 			arg2 = &tmpmval;
@@ -221,9 +222,9 @@ void	op_fnview(int numarg, mval *dst, ...)
 			break;
 		case VTK_GDSCERT:
 			if (certify_all_blocks)
-				*dst = literal_one;
+				dst->umval = literal_one.umval;
 			else
-				*dst = literal_zero;
+				dst->umval = literal_zero.umval;
 			break;
 		case VTK_GVACC_METH:
 			assert(gd_header);
@@ -252,7 +253,7 @@ void	op_fnview(int numarg, mval *dst, ...)
 				default:
 					assertpro(FALSE && REG_ACC_METH(parmblk.gv_ptr));
 			}
-			dst->str = tmpstr;
+			dst->str.umstr = tmpstr.umstr;
 			break;
 		case VTK_FULLBOOL:
 			switch (TREF(gtm_fullbool))
@@ -276,13 +277,13 @@ void	op_fnview(int numarg, mval *dst, ...)
 				default:
 					assertpro(FALSE && TREF(gtm_fullbool));
 			}
-			dst->str = tmpstr;
+			dst->str.umstr = tmpstr.umstr;
 			break;
 		case VTK_GVDUPSETNOOP:
 			if (gvdupsetnoop)
-				*dst = literal_one;
+				dst->umval = literal_one.umval;
 			else
-				*dst = literal_zero;
+				dst->umval = literal_zero.umval;
 			break;
 		case VTK_GVFILE:
 			assert(gd_header);
@@ -292,7 +293,7 @@ void	op_fnview(int numarg, mval *dst, ...)
 			tmpstr.addr = (char *)parmblk.gv_ptr->dyn.addr->fname;
 			tmpstr.len = parmblk.gv_ptr->dyn.addr->fname_len;
 			s2pool(&tmpstr);
-			dst->str = tmpstr;
+			dst->str.umstr = tmpstr.umstr;
 			break;
 		case VTK_GVFIRST:
 			if (!gd_header)
@@ -300,7 +301,7 @@ void	op_fnview(int numarg, mval *dst, ...)
 			tmpstr.addr = (char *)gd_header->regions->rname;
 			tmpstr.len = gd_header->regions->rname_len;
 			s2pool(&tmpstr);
-			dst->str = tmpstr;
+			dst->str.umstr = tmpstr.umstr;
 			break;
 		case VTK_GVNEXT:
 			assert(gd_header);
@@ -318,7 +319,7 @@ void	op_fnview(int numarg, mval *dst, ...)
 				tmpstr.addr = (char *)parmblk.gv_ptr->rname;
 				tmpstr.len = parmblk.gv_ptr->rname_len;
 				s2pool(&tmpstr);
-				dst->str = tmpstr;
+				dst->str.umstr = tmpstr.umstr;
 			}
 			break;
 		case VTK_JNLACTIVE:
@@ -409,7 +410,8 @@ void	op_fnview(int numarg, mval *dst, ...)
 			}
 			if (tmpstr.len)
 				s2pool(&tmpstr);
-			dst->str = tmpstr;
+			dst->str.umstr = tmpstr.umstr;
+			assert(vtp->restype & MV_STR);
 			dst->mvtype = vtp->restype;
 			break;
 		case VTK_JNLTRANSACTION:
@@ -431,7 +433,7 @@ void	op_fnview(int numarg, mval *dst, ...)
 		case VTK_PATCODE:
 			getpattabnam(&tmpstr);
 			s2pool(&tmpstr);
-			dst->str = tmpstr;
+			dst->str.umstr = tmpstr.umstr;
 			break;
 		case VTK_POOLLIMIT:
 			assert(NULL != gd_header);	/* view_arg_convert would have done this for VTK_POOLLIMIT */
@@ -571,7 +573,8 @@ void	op_fnview(int numarg, mval *dst, ...)
 					if (map == start_map)
 					{
 						s2pool(&tmpstr);
-						dst->str = tmpstr;
+						dst->str.umstr = tmpstr.umstr;
+						assert(vtp->restype & MV_STR);
 						dst->mvtype = vtp->restype;
 					} else
 					{
@@ -666,7 +669,7 @@ void	op_fnview(int numarg, mval *dst, ...)
 					tf = tf->old_tp_frame;
 					tl--;
 				}
-				*dst = tf->trans_id;
+				dst->umval = tf->trans_id.umval;
 			}
 			break;
 		case VTK_YCOLLATE:
@@ -707,6 +710,7 @@ void	op_fnview(int numarg, mval *dst, ...)
 				commastr.addr = ",";
 				MV_FORCE_MVAL(dst, nct);
 				MV_FORCE_STR(dst);
+				assert(vtp->restype & MV_STR);
 				dst->mvtype = vtp->restype;
 				s2pool_concat(dst, &commastr);
 				arg2 = &tmpmval;
@@ -722,7 +726,7 @@ void	op_fnview(int numarg, mval *dst, ...)
 				 * Do not return "0,0,0" as this might not be distinguishable from the case where
 				 * act of 0, ver of 0 was defined explicitly for this global in the gld.
 				 */
-				*dst = literal_zero;
+				dst->umval = literal_zero.umval;
 			}
 			break;
 		case VTK_YDIRTREE:
@@ -845,7 +849,7 @@ void	op_fnview(int numarg, mval *dst, ...)
 			break;
 		case VTK_LINK:
 			assert((0 <= TREF(relink_allowed)) && (TREF(relink_allowed) < LINK_MAXTYPE));
-			dst->str = relink_allowed_mstr[TREF(relink_allowed)];
+			dst->str.umstr = relink_allowed_mstr[TREF(relink_allowed)];
 			s2pool(&dst->str);
 			break;
 		case VTK_DMTERM:
@@ -895,4 +899,6 @@ void	op_fnview(int numarg, mval *dst, ...)
 		}
 	} else
 		dst->mvtype = vtp->restype;
+	if (!(dst->mvtype & MV_STR))
+		dst->str.len = 0;
 }

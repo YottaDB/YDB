@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -93,7 +93,7 @@ unsigned char *ext2jnlcvt(char *ext_buff, int4 ext_len, unsigned char **tr, int 
 			} else
 			{
 				tmp = malloc(tmpbufsiz);
-				memcpy((void *)tmp, origbuf, tmpsize);
+				memcpy(tmp, origbuf, tmpsize);
 				free(origbuf);
 				*tr = tmp;
 				*tr_bufsiz = tmpbufsiz;

@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2007-2022 Fidelity National Information 	#
+# Copyright (c) 2007-2026 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -69,6 +69,7 @@ ENTRY	op_forloop
 	jle	L67
 	movw	$mval_m_int, mval_w_mvtype(REG64_ARG1)
 	movl	REG32_ACCUM, mval_l_m1(REG64_ARG1)
+	movl	$0,mval_l_strlen(REG64_ARG1)
 	jmp	L63
 L67:
 	movb	$mval_esign_mask, mval_b_exp(REG64_ARG1) # Set sign bit
@@ -78,6 +79,7 @@ L68:
 	movb	$0, mval_b_exp(REG64_ARG1)		# Clear sign bit
 L69:
 	movw	$mval_m_nm, mval_w_mvtype(REG64_ARG1)
+	movl	$0,mval_l_strlen(REG64_ARG1)
 	orb	$69, mval_b_exp(REG64_ARG1)		# Set exponent field
 	movl	REG32_ACCUM, REG32_SCRATCH1
 	movl	$0, REG32_ARG2
@@ -144,6 +146,7 @@ tcmp:
 	jle	l67
 	movw	$mval_m_int, mval_w_mvtype(REG64_ARG1)
 	movl	REG32_ACCUM, mval_l_m1(REG64_ARG1)
+	movl	$0,mval_l_strlen(REG64_ARG1)
 	jmp	done
 l67:
 	movb	$mval_esign_mask, mval_b_exp(REG64_ARG1) # Set sign bit
@@ -153,6 +156,7 @@ l68:
 	movb	$0, mval_b_exp(REG64_ARG1)		# Clear sign bit
 l69:
 	movw	$mval_m_nm, mval_w_mvtype(REG64_ARG1)
+	movl	$0,mval_l_strlen(REG64_ARG1)
 	orb	$69, mval_b_exp(REG64_ARG1)
 	movl	REG32_ACCUM, REG32_SCRATCH1
 	movl	$0, REG32_ARG2				# Set edx to 0 before div

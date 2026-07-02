@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -21,7 +21,7 @@
 #include "gtm_stdio.h"
 #include "gtm_stat.h"
 
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "compiler.h"
 #include "urx.h"
 #include "objlabel.h"
@@ -166,7 +166,7 @@ boolean_t incr_link(int *file_desc, zro_ent *zro_entry, uint4 fname_len, char *f
 	pre_v5_mident		*pre_v5_routine_name;
 	urx_rtnref		urx_lcl_anchor;
 	unsigned char		*shdr, *rel_base, *newaddr;
-	mstr			rtnname;
+	mstr			rtnname = {{{0}}};
 	mval			*curlit, *littop;
 	lab_tabent		*curlbe, *lbetop;
 	var_tabent		*curvar, *vartop;
@@ -450,7 +450,7 @@ boolean_t incr_link(int *file_desc, zro_ent *zro_entry, uint4 fname_len, char *f
 	{
 		ARLINK_ONLY(case LINK_SHROBJ:);
 		case LINK_PPRIVOBJ:
-			rtnname = ((rhdtyp *)hdr)->routine_name;
+			rtnname.mident = ((rhdtyp *)hdr)->routine_name;
 			rtnname_off = (size_t)hdr->literal_text_adr + (size_t)rtnname.addr;	/* Offset into object of rtnname */
 			ZOS_ONLY(assertpro(FALSE /* Read file pointer being reset - recode for ZOS */));
 			/* Read the routine name from the object file */
@@ -468,7 +468,7 @@ boolean_t incr_link(int *file_desc, zro_ent *zro_entry, uint4 fname_len, char *f
 				zl_error(RECENT_ZHIST, linktyp, file_desc, ERR_INVOBJFILE, fname_len, fname, 0, NULL);
 			break;
 		case LINK_SHRLIB:
-			rtnname = ((rhdtyp *)shdr)->routine_name;
+			rtnname.mident = ((rhdtyp *)shdr)->routine_name;
 			/* Routine name not yet relocated so effectively do so */
 			rtnname.addr = (char *)shdr + (size_t)((rhdtyp *)shdr)->literal_text_adr + (size_t)rtnname.addr;
 			break;
@@ -481,7 +481,7 @@ boolean_t incr_link(int *file_desc, zro_ent *zro_entry, uint4 fname_len, char *f
 	 * set of shared memory structures to be able to bypass the link. This might could be eased in the future for certain
 	 * special cases.
 	 */
-	if (find_rtn_tabent(&tabent_ptr, &rtnname))
+	if (find_rtn_tabent(&tabent_ptr, &rtnname.mident))
 	{
 		old_rhead = (rhdtyp *)tabent_ptr->rt_adr;
 		assert(NULL != old_rhead);
@@ -509,8 +509,6 @@ boolean_t incr_link(int *file_desc, zro_ent *zro_entry, uint4 fname_len, char *f
 			/* Info level message that link was bypassed. Since this could pollute the error buffer, save and
 			 * restore it across the info message we put out (it is either displayed or it isn't - no need to cache it.
 			 */
-			if (not_in_play < TAREF1(save_xfer_root, zstep_pending).event_state)
-				op_zstep(ZSTEP_WHATEVER, NULL);			/* ZSTEP in play - try not to lose it */
 			DBGARLNK((stderr, "incr_link: Bypassing (re)zlink for routine %.*s (old rhead 0x"lvaddr") - same objhash\n",
 				  old_rhead->routine_name.len, old_rhead->routine_name.addr, old_rhead));
 #			ifdef ZLINK_BYPASS /* #ifdef'd out for now due to issues with ERRWETRAP */
@@ -908,6 +906,8 @@ boolean_t incr_link(int *file_desc, zro_ent *zro_entry, uint4 fname_len, char *f
 		/* relinkctl_bkptr should characterize this old header */
 		old_rhead = (rhdtyp *)old_rhead->old_rhead_adr;
 	}
+	if (not_in_play < TAREF1(save_xfer_root, zstep_pending).event_state)
+		op_zstep(ZSTEP_WHATEVER, &TREF(zstep_action));		/* ZSTEP in play - try not to lose it */
 	/* Add local unresolves to global chain freeing elements that already existed in the global chain */
 	urx_add(&urx_lcl_anchor);
 	/* Resolve all unresolved entries in the global chain that reference this routine */
@@ -1093,7 +1093,7 @@ STATICFNDEF boolean_t addr_fix(int file, unsigned char *shdr, linktype linktyp, 
 			rtnid.c[0] = '%';
 		rtn_str.addr = &rtnid.c[0];
 		rtn_str.len = sym_size;
-		rtn = find_rtn_hdr(&rtn_str);	/* Routine already resolved? */
+		rtn = find_rtn_hdr(&rtn_str.mident);	/* Routine already resolved? */
 		sym_size = 0;
 		labsym = FALSE;
 		/* If symbol is for a label, find the end of the label name */

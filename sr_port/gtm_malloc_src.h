@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -429,6 +429,7 @@ storElem *findStorElem(int sizeIndex, int stack_level);
 void release_unused_storage(void);
 void *gtm_malloc_main(size_t, int stack_level);
 void gtm_free_main(void *, int stack_level);
+void *gtm_realloc(void *ptr, size_t size);
 #ifdef DEBUG
 void backfill(unsigned char *ptr, gtm_msize_t len);
 boolean_t backfillChk(unsigned char *ptr, gtm_msize_t len);
@@ -761,6 +762,8 @@ void *gtm_malloc_main(size_t size, int stack_level)	/* Note renamed to gtm_mallo
 				totalAlloc += tSize;
 				INCR_CNTR(mallocCnt[sizeIndex]);
 				uStor->state = Allocated;
+				uStor->allocDiff = (uint4) (uStor->realLen - size);	/* To obtain original size requested: */
+											/* actual allocation size - allocDiff */
 #				ifdef DEBUG
 				/* Fill in extra debugging fields in header */
 				uStor->allocatedBy = CALLERID;				/* Who allocated us */
@@ -1485,8 +1488,143 @@ void *gtm_malloc(size_t size)
 	return gtm_malloc_main(size, TAIL_CALL_LEVEL);
 }
 
+/**
+ * @brief wrapper for ICU functions to call gtm_malloc
+ *
+ * When a malloc() function is registered with ICU, it
+ * will always receive a "context" pointer, which must
+ * be stripped before calling gtm_malloc().
+ *
+ * In dbg we do check "context" to see if it is expected, but
+ * otherwise we do not use it.
+ *
+ * @param context ICU custom nonce
+ * @param size Number of bytes to allocate
+ *
+ * @return Pointer to allocated memory or NULL
+ */
+void *gtm_malloc_icu(const void *context, size_t size)
+{
+	assert(ICU_MEM_CONTEXT == context);
+	return gtm_malloc(size);
+}
+
 void gtm_free(void *addr)
 {
 	gtm_free_main(addr, TAIL_CALL_LEVEL);
 }
+
+/**
+ * @brief wrapper for ICU functions to call gtm_free
+ *
+ * When a free() function is registered with ICU, it
+ * will always receive a "context" pointer, which must
+ * be stripped before calling gtm_free().
+ *
+ * In dbg we do check "context" to see if it is expected, but
+ * otherwise we do not use it.
+ *
+ * @param context ICU custom nonce
+ * @param addr Pointer to space to deallocate
+ *
+ * @return None
+ */
+void gtm_free_icu(const void *context, void *addr)
+{
+	assert(ICU_MEM_CONTEXT == context);
+	if (!addr)
+		return;
+	gtm_free(addr);
+}
+
+/**
+ * @brief wrapper for ICU functions to call gtm_realloc
+ *
+ * When a realloc() function is registered with ICU, it
+ * will always receive a "context" pointer, which must
+ * be stripped before calling gtm_realloc().
+ *
+ * In dbg we do check "context" to see if it is expected, but
+ * otherwise we do not use it.
+ *
+ * @param context ICU custom nonce
+ * @param ptr Pointer to space to reallocate
+ * @param size Size of the reallocation
+ *
+ * @return Pointer (which may be the same as ptr) to allocation
+ */
+void *gtm_realloc_icu(const void *context, void *ptr, size_t size)
+{
+	assert(ICU_MEM_CONTEXT == context);
+	return gtm_realloc(ptr, size);
+}
 #endif
+
+/**
+ * @brief Implement realloc() in terms of gtm_malloc() & gtm_free()
+ *
+ * The specific motivator here is ICU, which, if handed custom memory allocation
+ * functions to use, needs a realloc() as well as malloc() & free().  Since we
+ * are implemented in terms of those, we let the base functions handle the
+ * locking.
+ *
+ * The bones of this routine come from google's AI assistant when searching
+ * for something like "realloc() implemented with malloc() & free(),
+ * which looked pretty reasonable aside from needing a way to find the size
+ * of the block being reallocated.
+ *
+ * The behavior is intended to be that described by "man realloc".
+ *
+ * @param ptr Pointer to the block to be reallocated
+ * @param size The new size for the block
+ *
+ * @return The original block if there was enough size still in it, a new block, or NULL on failure
+ */
+void *gtm_realloc(void *ptr, size_t size)
+{
+	storElem 	*uStor, *buddyElem;
+	size_t bytes_to_copy;
+	size_t old_size;
+	void		*new_ptr;
+	int	hdrSize;
+
+	if (gtmSystemMalloc)
+		return realloc(ptr, size);
+
+	/* If ptr is NULL, this degenrates into malloc(size) */
+	if (!ptr)
+		return gtm_malloc(size);
+
+	/* If size is 0 and ptr is not NULL, degenerates into free(ptr),
+	 * which begs the question of what to return as free() is a void function
+	 * The man page suggests NULL or a freeable ptr.  We go with NULL.
+	 */
+	if ((!size) && ptr)
+	{
+		gtm_free(ptr);
+		return NULL;
+	}
+
+	/* Get the storElem that cooresponds to our allocation, so we can know the size (realLen) */
+	hdrSize = OFFSETOF(storElem, userStorage);
+	uStor = (storElem *)((unsigned long)ptr - hdrSize);
+	old_size = uStor->realLen - hdrSize;
+
+	/* Attempt to allocate a new block of memory */
+	new_ptr = gtm_malloc(size);
+	if (NULL == new_ptr)
+	{
+		/* Allocation failed; the original block is untouched and still valid. */
+		return NULL;
+	}
+
+	/* If allocation succeeds, copy the data from the old block to the new one.
+	 * We need the original size (realLen - hdrSize) to know how much to copy.
+	 */
+	bytes_to_copy = (size < old_size) ? size : old_size;
+	memcpy(new_ptr, ptr, bytes_to_copy);
+
+	gtm_free(ptr);
+
+	return new_ptr;
+}

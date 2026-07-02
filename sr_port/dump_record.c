@@ -32,7 +32,7 @@
 
 #ifdef GTM_TRIGGER
 #include "hashtab_mname.h"
-#include <rtnhdr.h>		/* needed for gv_trigger.h */
+#include "rtnhdr.h"		/* needed for gv_trigger.h */
 #include "targ_alloc.h"
 #endif
 #ifdef UTF8_SUPPORTED

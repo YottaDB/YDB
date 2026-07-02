@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2005-2019 Fidelity National Information	*
+ * Copyright (c) 2005-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -21,7 +21,8 @@
 void wbox_test_init(void)
 {
 #	if defined (DEBUG) && !defined (STATIC_ANALYSIS)
-	mstr	envvar_logical, trans_name;
+	mstr	trans_name;
+	unmanaged_mstr envvar_logical;
 	char	trans_bufr[MAX_TRANS_NAME_LEN];
 
 	envvar_logical.addr = GTM_WHITE_BOX_TEST_CASE_ENABLE;

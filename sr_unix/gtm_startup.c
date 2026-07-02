@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -18,7 +18,7 @@
 #include "gtm_signal.h"
 
 #include "error.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "stack_frame.h"
 #include "stringpool.h"
 #include "stp_parms.h"
@@ -121,7 +121,6 @@ GBLREF lv_val			*zsrch_var, *zsrch_dir1, *zsrch_dir2;
 GBLREF symval			*curr_symval;
 GBLREF boolean_t		is_replicator;
 GBLREF void			(*ctrlc_handler_ptr)();
-GBLREF boolean_t		mstr_native_align;
 GBLREF boolean_t		gtm_utf8_mode;
 GBLREF casemap_t		casemaps[];
 GBLREF void             	(*cache_table_relobjs)(void);   /* Function pointer to call cache_table_rebuild() */
@@ -144,9 +143,8 @@ void gtm_startup(struct startup_vector *svec)
 	 * hence, various references to data copied from *svec could profitably be referenced directly
 	 */
 	boolean_t	is_defined;
-	char		*temp;
 	int4		temp_gtm_strpllim;
-	mstr		log_name;
+	unmanaged_mstr	log_name;
 	stack_frame 	*frame_pointer_lcl;
 	static char 	other_mode_buf[] = "OTHER";
 	DCL_THREADGBL_ACCESS;
@@ -179,6 +177,12 @@ void gtm_startup(struct startup_vector *svec)
 		svec->user_strpl_size = STP_MAXINITSIZE;
 	stp_init(svec->user_strpl_size);
 	assertpro(stringpool.base);
+	glist_new_protect_array(TADR(rts_protect_array_p), STP_ARRAY_STARTITEMS, RTS_PROTECT_ARRAY);
+	glist_new_protect_array(TADR(indr_protect_array_p), STP_ARRAY_STARTITEMS, INDR_PROTECT_ARRAY);
+	glist_new_sort_array(TADR(rts_sort_array_p), STP_ARRAY_STARTITEMS, RTS_SORT_ARRAY);
+	glist_new_sort_array(TADR(indr_sort_array_p), STP_ARRAY_STARTITEMS, INDR_SORT_ARRAY);
+	stringpool.sort_array_pp = TADR(rts_sort_array_p);
+	stringpool.protect_array_pp = TADR(rts_protect_array_p);
 	rts_stringpool = stringpool;
 	TREF(compile_time) = FALSE;
 	/* assert that is_replicator and run_time is properly set by gtm_imagetype_init invoked at process entry */
@@ -196,11 +200,6 @@ void gtm_startup(struct startup_vector *svec)
 	}
 #	endif
 	gtm_utf8_init(); /* Initialize the runtime for UTF8 */
-	/* Initialize alignment requirement for the runtime stringpool */
-	log_name.addr = DISABLE_ALIGN_STRINGS;
-	log_name.len = STR_LIT_LEN(DISABLE_ALIGN_STRINGS);
-	/* mstr_native_align = logical_truth_value(&log_name, FALSE, NULL) ? FALSE : TRUE; */
-	mstr_native_align = FALSE; /* TODO: remove this line and uncomment the above line */
 	/* See if $gtm_string_pool_limit is set */
 	log_name.addr = GTM_STRPLLIM;
 	log_name.len = SIZEOF(GTM_STRPLLIM) - 1;

@@ -22,7 +22,7 @@
 
 #include "stringpool.h"
 #include "copy.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "stack_frame.h"
 #include "op.h"
 #include "lv_val.h"		/* needed for "fgncal.h" */
@@ -39,6 +39,9 @@
 #include "gtm_malloc.h"		/* for VERIFY_STORAGE_CHAINS */
 #include "send_msg.h"
 #include "io.h"
+#include "iottdef.h"
+#include "gtmio.h"
+#include "iott_setterm.h"
 #include "tpnotacid_chk_inline.h"
 
 /******************************************************************************
@@ -111,6 +114,7 @@ GBLREF stack_frame     *frame_pointer;
 GBLREF uint4		dollar_tlevel, dollar_trestart;
 GBLREF unsigned char   *msp;
 GBLREF volatile int4	gtmMallocDepth;
+GBLREF	io_pair		io_std_device;
 #ifdef GTM_PTHREAD
 GBLREF boolean_t	gtm_jvm_process, gtm_main_thread_id_set;
 GBLREF pthread_t	gtm_main_thread_id;
@@ -160,7 +164,7 @@ static const char *buff_end_border = "EMARKER";
 #define	VALIDATE_AND_CONVERT_PTR_TO_TYPE(LMVTYPE, TYPE, CONTAINER, DST, SRC)	\
 MBSTART {									\
 	if (NULL == SRC)							\
-		*DST = literal_null;						\
+		(DST)->umval = literal_null.umval;				\
 	else 									\
 	{									\
 		CONTAINER = *((TYPE *)SRC);					\
@@ -328,7 +332,7 @@ STATICFNDEF void extarg2mval(void *src, enum gtm_types typ, mval *dst, boolean_t
 					 * value buffer is legitimate (non-null and non-empty), we free it on the GT.M side. */
 					free(sp->addr);
 				} else
-					*dst = literal_null;
+					dst->umval = literal_null.umval;
 				break;
 			default:
 				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_UNIMPLOP);
@@ -383,7 +387,7 @@ STATICFNDEF void extarg2mval(void *src, enum gtm_types typ, mval *dst, boolean_t
 		case gtm_string_star:
 			sp = (struct extcall_string *)src;
 			if (NULL == sp) /* If the assigned pointer value is NULL, pass back a literal_null */
-				*dst = literal_null;
+				dst->umval = literal_null.umval;
 			else
 			{
 				dst->mvtype = MV_STR;
@@ -400,19 +404,19 @@ STATICFNDEF void extarg2mval(void *src, enum gtm_types typ, mval *dst, boolean_t
 					dst->str.addr = sp->addr;
 					s2pool(&dst->str);
 				} else
-					*dst = literal_null;
+					dst->umval = literal_null.umval;
 			}
 			break;
 		case gtm_float_star:
 			if (NULL == src) /* If the assigned pointer value is NULL, pass back a literal_null */
-				*dst = literal_null;
+				dst->umval = literal_null.umval;
 			else
 				float2mval(dst, *((float *)src));
 			break;
 		case gtm_char_star:
 			cp = (char *)src;
 			if (NULL == cp) /* If the assigned pointer value is NULL, pass back a literal_null */
-				*dst = literal_null;
+				dst->umval = literal_null.umval;
 			else
 			{
 				assert(((INTPTR_T)cp < (INTPTR_T)stringpool.base) || ((INTPTR_T)cp > (INTPTR_T)stringpool.top));
@@ -430,14 +434,14 @@ STATICFNDEF void extarg2mval(void *src, enum gtm_types typ, mval *dst, boolean_t
 			break;
 		case gtm_char_starstar:
 			if (NULL == src) /* If the assigned pointer value is NULL, pass back a literal_null */
-				*dst = literal_null;
+				dst->umval = literal_null.umval;
 			else
 				extarg2mval(*((char **)src), gtm_char_star, dst, java, starred, prealloc_size, m_label,
 						ext_buff_start, ext_buff_len);
 			break;
 		case gtm_double_star:
 			if (NULL == src) /* If the assigned pointer value is NULL, pass back a literal_null */
-				*dst = literal_null;
+				dst->umval = literal_null.umval;
 			else
 				double2mval(dst, *((double *)src));
 			break;
@@ -543,7 +547,7 @@ void op_fgnjavacal(mval *dst, mval *package, mval *extref, gtm_uint8 mask, int4 
 	struct extcall_package_list *package_ptr, struct extcall_entry_list *entry_ptr, va_list var)
 {
 	ABS_TIME	b_time;
-	boolean_t	error_in_xc = FALSE, safe;
+	boolean_t	no_acid_tp_behavior, error_in_xc = FALSE, safe;
 	char		*free_string_pointer, *free_string_pointer_start, jtype_char;
 	char		str_buffer[MAX_NAME_LENGTH], *tmp_buff_ptr, *jni_err_buf;
 	char		*types_descr_ptr, *types_descr_dptr, *xtrnl_table_name;
@@ -804,13 +808,16 @@ void op_fgnjavacal(mval *dst, mval *package, mval *extref, gtm_uint8 mask, int4 
 	assert((char *)free_space_pointer <= free_string_pointer_start);
 	va_end(var_copy);
 	param_list->n = argcnt + 3;		/* Take care of the three implicit parameters. */
-	DBGEXCAL((stderr, "Entry: %s, Calls: %s, Safe: %d, ACIDTP: %d\n", entry_ptr->entry_name.addr, entry_ptr->call_name.addr,
-		entry_ptr->ext_call_behaviors[0], entry_ptr->ext_call_behaviors[1]));	/* WARNING: sloppy string termination */
 	safe = 0 != entry_ptr->ext_call_behaviors[SIGSAFE];
+	no_acid_tp_behavior = !entry_ptr->ext_call_behaviors[ACIDTP];
+	DBGEXCAL((stderr, "Entry: %s, Calls: %s, ACIDTP: %d, Safe: %d\n", entry_ptr->entry_name.addr, entry_ptr->call_name.addr,
+		no_acid_tp_behavior, safe));
 	VERIFY_STORAGE_CHAINS;
-	if (!entry_ptr->ext_call_behaviors[ACIDTP])
+	if (no_acid_tp_behavior)
 		TPNOTACID_CHECK(EXCALLSTR);
-	save_mumps_status = mumps_status; 	/* Save mumps_status as a callin from external call may change it. */
+	if (entry_ptr->ext_call_behaviors[TERMIO] && (tt == io_std_device.in->type))
+		iott_resetterm(io_std_device.in);
+	save_mumps_status = mumps_status; 			/* Save mumps_status as callin from external call may change it. */
 	if (dollar_tlevel)
 		sys_get_curr_time(&b_time);				/* time starting the external call */
 	assert(INTRPT_OK_TO_INTERRUPT == intrpt_ok_state);		/* Expected for DEFERRED_EXIT_HANDLING_CHECK below */
@@ -818,7 +825,10 @@ void op_fgnjavacal(mval *dst, mval *package, mval *extref, gtm_uint8 mask, int4 
 	TREF(in_ext_call) = TRUE;
 	status = callg((callgfnptr)entry_ptr->fcn, param_list);
 	TREF(in_ext_call) = FALSE;
-	TPTIMEOUT_POST_CALLG(safe, b_time, grace);			/* deal with potential signal disruption primarily in TP */
+	if (entry_ptr->ext_call_behaviors[TERMIO] && (tt == io_std_device.in->type))
+		iott_setterm(io_std_device.in);
+	if (no_acid_tp_behavior)					/* ACIDTP promises minimal exposure, so risk it */
+		TPTIMEOUT_POST_CALLG(safe, b_time, grace);		/* deal with potential signal disruption primarily in TP */
 	verify_buffer((char *)param_list, n, entry_ptr->entry_name.addr);
 	mumps_status = save_mumps_status;
 	/* The first byte of the type description argument gets set to 0xFF in case error happened in JNI glue code,
@@ -911,7 +921,7 @@ void op_fgnjavacal(mval *dst, mval *package, mval *extref, gtm_uint8 mask, int4 
 void op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 maskhi, uint4 masklo, int4 argcnt, ...)
 {
 	ABS_TIME	b_time;
-	boolean_t	java = FALSE, safe;
+	boolean_t	no_acid_tp_behavior, java = FALSE, safe;
 	char		*free_string_pointer, *free_string_pointer_start;
 	char		str_buffer[MAX_NAME_LENGTH], *tmp_buff_ptr, *xtrnl_table_name;
 	int		grace, i, pre_alloc_size, rslt, save_mumps_status;
@@ -1216,13 +1226,16 @@ void op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 ma
 	assert((char *)free_space_pointer <= free_string_pointer_start);
 	va_end(var);
 	param_list->n = argcnt;
-	DBGEXCAL((stderr, "Entry: %s, Calls: %s, Safe: %d, ACIDTP: %d\n", entry_ptr->entry_name.addr, entry_ptr->call_name.addr,
-		entry_ptr->ext_call_behaviors[0], entry_ptr->ext_call_behaviors[1]));	/* WARNING: sloppy string termination */
 	safe = 0 != entry_ptr->ext_call_behaviors[SIGSAFE];
+	no_acid_tp_behavior = !entry_ptr->ext_call_behaviors[ACIDTP];
+	DBGEXCAL((stderr, "Entry: %s, Calls: %s, ACIDTP: %d, Safe: %d\n", entry_ptr->entry_name.addr, entry_ptr->call_name.addr,
+		no_acid_tp_behavior, safe));
 	VERIFY_STORAGE_CHAINS;
-	if (!entry_ptr->ext_call_behaviors[ACIDTP])
+	if (no_acid_tp_behavior)
 		TPNOTACID_CHECK(EXCALLSTR);
-	save_mumps_status = mumps_status; /* Save mumps_status as a callin from external call may change it */
+	if (entry_ptr->ext_call_behaviors[TERMIO] && (tt == io_std_device.in->type))
+		iott_resetterm(io_std_device.in);
+	save_mumps_status = mumps_status; 			/* Save mumps_status as a callin from external call may change it */
 	if (dollar_tlevel)
 		sys_get_curr_time(&b_time);				/* time starting the external call */
 	assert(INTRPT_OK_TO_INTERRUPT == intrpt_ok_state);		/* Expected for DEFERRED_EXIT_HANDLING_CHECK below */
@@ -1230,7 +1243,10 @@ void op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 ma
 	TREF(in_ext_call) = TRUE;
 	status = callg((callgfnptr)entry_ptr->fcn, param_list);
 	TREF(in_ext_call) = FALSE;
-	TPTIMEOUT_POST_CALLG(safe, b_time, grace);			/* deal with potential signal siruption primarily in TP */
+	if (entry_ptr->ext_call_behaviors[TERMIO] && (tt == io_std_device.in->type))
+		iott_setterm(io_std_device.in);
+	if (no_acid_tp_behavior)					/* ACIDTP promises minimal exposure, so risk it */
+		TPTIMEOUT_POST_CALLG(safe, b_time, grace);		/* deal with potential signal disruption primarily in TP */
 	verify_buffer((char *)param_list, (2*n), entry_ptr->entry_name.addr);
 	mumps_status = save_mumps_status;
 	/* Exit from the residual call-in environment(SFF_CI and base frames) which might

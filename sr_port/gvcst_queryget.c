@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -52,7 +52,7 @@
 #include "gtmimagename.h"
 
 LITREF	mval		literal_batch;
-LITREF	mstr		nsb_dummy;
+LITREF unmanaged_mstr	nsb_dummy;
 
 GBLREF gd_region	*gv_cur_region;
 GBLREF gv_namehead	*gv_target;
@@ -83,7 +83,7 @@ boolean_t gvcst_queryget(mval *val)
 	assert(save_dollar_tlevel == dollar_tlevel);
 	CHECK_HIDDEN_SUBSCRIPT(gv_altkey, is_hidden);
 	if (found)
-		INCR_GVSTATS_COUNTER(cs_addrs, cs_addrs->nl, n_get, (gtm_uint64_t) 1);
+		INCR_HEAVYWEIGHT_GVSTATS_COUNTER(cs_addrs, cs_addrs->nl, n_get, 1);
 	if (found && IS_SN_DUMMY(val->str.len, val->str.addr))
 		is_dummy = TRUE;
 	if (!found || (!is_dummy && !is_hidden))

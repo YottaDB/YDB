@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2005-2018 Fidelity National Information	*
+ * Copyright (c) 2005-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -68,9 +68,12 @@ int upd_log_init(recvpool_user who)
 	if (FD_INVALID == *fd_addrs || (UPDPROC == who && 0 != strcmp(log_file, recvpool.upd_proc_local->log_file)))
 	{
 		status = repl_log_init(REPL_GENERAL_LOG, fd_addrs, log_file);
-		repl_log_fd2fp(fp_addrs, *fd_addrs);
-		if (UPDPROC == who)
-			strcpy(recvpool.upd_proc_local->log_file, log_file);
+		if (SS_NORMAL == status)
+		{
+			repl_log_fd2fp(fp_addrs, *fd_addrs);
+			if (UPDPROC == who)
+				strcpy(recvpool.upd_proc_local->log_file, log_file);
+		}
 	}
 	return(status);
 }

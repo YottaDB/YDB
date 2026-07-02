@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2016-2024 Fidelity National Information	*
+ * Copyright (c) 2016-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -145,7 +145,7 @@ MBSTART {								\
 #define ISSUE_SYSCALL_RTS_ERROR_WITH_GD(GD, ERROR_LIT, SAVE_ERRNO)			\
 MBSTART {										\
 	mstr		*gldname;							\
-	mstr 		gld_str_tmp;							\
+	unmanaged_mstr 	gld_str_tmp;							\
 	char		err_buffer[GTM_PATH_MAX + SIZEOF(ERROR_LIT) + 3];		\
 	/* save errno in case SNPRINTF modifies errno and SAVE_ERRNO passed		\
 	 * in is "errno" in caller.							\

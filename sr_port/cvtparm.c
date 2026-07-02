@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -14,6 +14,7 @@
 
 #include "gtm_string.h"
 
+#include "arit.h"
 #include "compiler.h"
 #include "stringpool.h"
 #include "io_params.h"
@@ -29,6 +30,7 @@ LITREF unsigned char io_params_size[];
 
 error_def(ERR_DEVPARTOOBIG);
 error_def(ERR_DEVPARPROT);
+error_def(ERR_NUMOFLOW);
 
 #define IOP_DESC(a,b,c,d,e) {d, e}
 LITDEF dev_ctl_struct dev_param_control[] =
@@ -54,6 +56,8 @@ int4 cvtparm(int iocode, mval *src, mval *dst)
 		case IOP_SRC_INT:
 			assert(siz == SIZEOF(int4) || siz == SIZEOF(short));
 			MV_FORCE_NUM(src);
+			if (MV_NUM_APPROX == ((MV_NM | MV_NUM_APPROX) & src->mvtype))
+				return ERR_NUMOFLOW;
 			nl = MV_FORCE_INT(src);
 			if (siz == SIZEOF(int4))
 				cp = (unsigned char *)&nl;
@@ -69,7 +73,7 @@ int4 cvtparm(int iocode, mval *src, mval *dst)
 			assert(siz == IOP_VAR_SIZE);
 			MV_FORCE_STR(src);
 			if (src->str.len > 255)	/*one byte string lengths within a parameter string*/
-				return (int4) ERR_DEVPARTOOBIG;
+				return ERR_DEVPARTOOBIG;
 			strlen = src->str.len;
 			siz = strlen + SIZEOF(unsigned char);
 			cp = (unsigned char *) src->str.addr;
@@ -102,7 +106,7 @@ int4 cvtparm(int iocode, mval *src, mval *dst)
 			MV_FORCE_STR(src);
 			nl = cvtprot(src->str.addr, src->str.len);
 			if (nl == -1)
-				return  (int4) ERR_DEVPARPROT;
+				return ERR_DEVPARPROT;
 			msk = nl;
 			cp = &msk;
 			break;

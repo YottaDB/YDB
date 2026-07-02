@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2017 Fidelity National Information 		*
+ * Copyright (c) 2017-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -62,6 +62,7 @@ void lvmon_pull_values(int lvmon_ary_idx)
 	ht_ent_mname	*tabent;
 	lv_val		*lv_val_p;
 	lvmon_value_ent	*lvmon_val_ent_p;
+	uint_least64_t	in_array;
 	DEBUG_ONLY(boolean_t lvmon_wbtest_break_mstr;)
 	DCL_THREADGBL_ACCESS;
 
@@ -79,7 +80,7 @@ void lvmon_pull_values(int lvmon_ary_idx)
 		{	/* Either lv_val pointer does not exist or is no longer valid so needs to be re-located */
 			DBGLVMON((stderr, "** lvmon_pull_values: (Re)Pull lv_val addr for %.*s\n",
 				  lvmon_var_p->lvmv.var_name.len, lvmon_var_p->lvmv.var_name.addr));
-			tabent = lookup_hashtab_mname(&curr_symval->h_symtab, &lvmon_var_p->lvmv);
+			tabent = lookup_hashtab_mname(&curr_symval->h_symtab, &lvmon_var_p->lvmv.umname);
 			if (NULL == tabent)
 			{	/* Variable does not exist in this symbol table so clear the array index for the value
 				 * and continue on. Note do not clear the alloclen field or the address of the value in
@@ -96,7 +97,9 @@ void lvmon_pull_values(int lvmon_ary_idx)
 			lvmon_var_p->varlvadr = lv_val_p = ((lv_val *)tabent->value);
 		} else
 			lv_val_p = lvmon_var_p->varlvadr;
-		lvmon_val_ent_p->varlvval = *lv_val_p;		/* Save entire previous lv_val */
+		memcpy((ok_to_clobber_mstr_p)&lvmon_val_ent_p->varlvval, (ok_to_clobber_mstr_p)lv_val_p,
+			SIZEOF(lvmon_val_ent_p->varlvval));
+		lvmon_val_ent_p->varlvval.v.str.in_array = FALSE; /* These are all unprotected */
 		/* Common code if lv_val is string - update fields in the specified index of the value array */
 		if (MV_IS_STRING(&lv_val_p->v))
 		{	/* We have a string, see about storing it in a malloc'd buffer. Since we are going

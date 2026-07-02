@@ -18,7 +18,7 @@
 #include "opcode.h"
 #include "stringpool.h"
 #include "fullbool.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "stack_frame.h"
 
 GBLREF	stack_frame	*frame_pointer;

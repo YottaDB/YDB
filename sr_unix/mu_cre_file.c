@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -39,19 +39,25 @@ error_def(ERR_MUCREFILERR);
 error_def(ERR_NOCRENETFILE);
 error_def(ERR_PARNORMAL);
 error_def(ERR_RAWDEVUNSUP);
+error_def(ERR_FILECREERR);
 
 GBLREF uint4 process_id;
 
 unsigned char mu_cre_file(gd_region *reg)
 {
 	char		path[MAX_FN_LEN + 1];
-	int		retcode;
+	int		retcode, perms, user_id, group_id, umask_orig = 0;
+	struct perm_diag_data	pdd;
 	int4		save_errno;
-	mstr		file;
+	unmanaged_mstr	file;
 	parse_blk	pblk = { 0 };
 	int		mu_cre_file_fd = FD_INVALID;
 	gd_segment	*seg;
+	struct stat	stat_buf;
+	gd_region	*baseDBreg;
 	unix_db_info	*udi;
+	sgmnt_addrs	*baseDBcsa;
+	node_local_ptr_t baseDBnl;
 	uint4		gtmcrypt_errno;
 	ZOS_ONLY(int	realfiletag;)
 	DCL_THREADGBL_ACCESS;
@@ -103,10 +109,41 @@ unsigned char mu_cre_file(gd_region *reg)
 			return EXIT_ERR;
 		}
 	}
+	/* If we are opening a statsDB, use IPC type permissions derived from the baseDB */
+	if (IS_STATSDB_REG(reg))
+	{
+		STATSDBREG_TO_BASEDBREG(reg, baseDBreg);
+#		ifndef _AIX
+		assert(baseDBreg->open);
+#		endif
+		baseDBcsa = &FILE_INFO(baseDBreg)->s_addrs;
+		baseDBnl = baseDBcsa->nl;
+		assert(baseDBnl);
+		STAT_FILE((char *)baseDBnl->fname, &stat_buf, retcode);
+		if (0 > retcode)
+		{	/* Should be rare-if-ever message as we just opened the baseDB so it should be there */
+			save_errno = errno;
+			PUTMSG_MSG_ROUTER_CSA(baseDBcsa, reg, 7, ERR_FILECREERR, 4,
+					 LEN_AND_LIT("getting base file information"), LEN_AND_STR(path), save_errno);
+			return EXIT_ERR;
+		}
+		if (!gtm_permissions(&stat_buf, &user_id, &group_id, &perms, PERM_IPC, &pdd))
+		{	/* Not sure what could cause this as we would have done the same call when opening the baseDB but
+			 * make sure it is present just in case.
+			 */
+			PUTMSG_MSG_ROUTER_CSA(baseDBcsa, reg, 7, ERR_FILECREERR, 4,
+					 LEN_AND_LIT("obtaining permissions from base DB"),  LEN_AND_STR(path), EPERM);
+			return EXIT_ERR;
+		}
+		umask_orig = umask(0000); /* Reset umask to 0000 to ensure our statsdb file gets the baseDB ipc's permissions */
+	} else
+		perms = 0666; /* open()/create inherently masks this with umask where chmod does not, so no need to do manually */
 	do
 	{
-		mu_cre_file_fd = OPEN3(pblk.l_dir, O_CREAT | O_EXCL | O_RDWR, 0600);
+		mu_cre_file_fd = OPEN3(pblk.l_dir, O_CREAT | O_EXCL | O_RDWR, perms);
 	} while ((FD_INVALID == mu_cre_file_fd) && (EINTR == errno));
+	if (umask_orig)
+		umask(umask_orig);	/* reset to original umask if we changed it */
 	if (FD_INVALID == mu_cre_file_fd)
 	{	/* Avoid error message if file already exists (another process created it) for AUTODBs.
 		 */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -50,7 +50,8 @@ void	database_clean(char *path);
 
 void	clean_mem(char *name)
 {
-	mstr	path1, path2;
+	mstr	path2;
+	unmanaged_mstr path1;
 	int	semid;
 	key_t	msg_key;
 	char	buff[512];

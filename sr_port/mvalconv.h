@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -29,6 +29,6 @@ int4		mval2i(mval *v);
 gtm_int64_t	mval2i8(mval *v);
 gtm_uint64_t	mval2ui8(mval *v);
 uint4		mval2ui(mval *v);
-boolean_t	isint (mval *v, int4 *intval);
+boolean_t	isint(mval *v, int4 *intval);
 
 #endif

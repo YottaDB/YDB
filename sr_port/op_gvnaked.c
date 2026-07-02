@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -28,13 +28,14 @@
 #include "jnl.h"
 #include "buddy_list.h"		/* needed for tp.h */
 #include "tp.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "mv_stent.h"		/* for COPY_SUBS_TO_GVCURRKEY macro */
 #include "subscript.h"
 #include "op.h"
 #include "gvcst_protos.h"	/* for gvcst_root_search prototype */
 #include "format_targ_key.h"
 #include "gvsub2str.h"
+#include "hashtab_umname.h"
 #include "sgnl.h"
 #include "mvalconv.h"
 #include "tp_set_sgm.h"
@@ -84,7 +85,7 @@ STATICFNDEF void op_gvnaked_common(int count, int hash_code_dummy, mval *val_arg
 	unsigned char	*ptr, *end_ptr;
 	gd_region	*reg, *reg_start, *reg_top;
 	gd_addr		*addr_ptr;
-	ht_ent_mname	*tabent;
+	ht_ent_umname	*tabent;
 	gv_namehead	*gvt;
 	gvnh_reg_t	*gvnh_reg;
 	DCL_THREADGBL_ACCESS;
@@ -128,9 +129,9 @@ STATICFNDEF void op_gvnaked_common(int count, int hash_code_dummy, mval *val_arg
 				break;
 		}
 		assert(NULL != addr_ptr);
-		tabent = lookup_hashtab_mname((hash_table_mname *)addr_ptr->tab_ptr, &gv_target->gvname);
+		tabent = lookup_hashtab_umname(addr_ptr->tab_ptr, &gv_target->gvname);
 		assert(NULL != tabent);
-		gvnh_reg = (gvnh_reg_t *)tabent->value;
+		gvnh_reg = tabent->value;
 		gvt = gvnh_reg->gvt;
 		/* Assert that the unsubscripted gv_target has the same collation characteristics as the current "gv_target".
 		 * This makes it safe to use the current "gv_target" for the COPY_SUBS_TO_GVCURRKEY macro.

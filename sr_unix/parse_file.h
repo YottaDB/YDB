@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -217,6 +217,6 @@ typedef struct plength_struct
 	*dst = '\0';												\
 }
 
-int4 parse_file(mstr *file, parse_blk *pblk);
+int4 parse_file(const unmanaged_mstr *file, parse_blk *pblk);
 
 #endif /* PARSE_FILE_H_INCLUDED */

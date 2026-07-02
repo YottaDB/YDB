@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -159,7 +159,10 @@ void gvcmz_doop(unsigned char query_code, unsigned char reply_code, mval *v)
 			gvcmz_errmsg(lnk, FALSE);
 		}
 		if (CMMS_Q_INCREMENT == query_code)
+		{
 			v->mvtype = 0;	/* set the result to be undefined */
+			v->str.len = 0;
+		}
 		return;
 	}
 	ptr++;
@@ -206,7 +209,10 @@ void gvcmz_doop(unsigned char query_code, unsigned char reply_code, mval *v)
 		if (CMMS_R_QUERY != reply_code || 1 == len || !((link_info *)lnk->usr)->query_is_queryget)
 		{
 			if (CMMS_R_QUERY == reply_code && ((link_info *)lnk->usr)->query_is_queryget)
+			{
 				v->mvtype = 0; /* force undefined to distinguish $Q returning "" from value of QUERYGET being 0 */
+				v->str.len = 0;
+			}
 			return;
 		}
 	}

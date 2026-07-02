@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,7 +18,7 @@ void op_iretmval(mval *v, mval *dst)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	*dst = *v;
+	dst->umval = v->umval;
 	dst->mvtype &= ~MV_ALIASCONT;		/* Make sure alias container property does not pass */
 	op_unwind();
 }

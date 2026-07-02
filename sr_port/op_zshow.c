@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -163,7 +163,7 @@ void op_zshow(mval *func, int type, lv_val *lvn)
 	}
 	output.code = 0;
 	output.flush = TRUE;
-	zshow_output(&output,0);
+	zshow_output(&output, 0);
 	MAXSTR_BUFF_FINI;
 	/* If ZSHOW was done onto a subscripted lvn but no zshow records got dumped in that lvn, it might have $data = 0.
 	 * Kill it in that case as otherwise it will create an out-of-design situation for $query(lvn).

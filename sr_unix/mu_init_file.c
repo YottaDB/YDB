@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -129,7 +129,6 @@ MBSTART {														\
 #define PUTMSG_WARN_CSA(CSAARG, REG, VARCNT, ERRORID, ...) PUTMSG_MSG_ROUTER_CSA(CSAARG, REG, VARCNT, ERRORID, __VA_ARGS__)
 
 #define	OUT_LINE	(512 + 1)
-#define	USUAL_UMASK	022
 
 GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	uint4			gtmDebugLevel;
@@ -186,7 +185,7 @@ unsigned char mu_init_file(gd_region *reg, boolean_t has_ftok)
 	size_t		read_len;
 	int4		save_errno;
 	gtm_uint64_t	avail_blocks, blocks_for_create, blocks_for_extension, delta_blocks;
-	mstr		file;
+	unmanaged_mstr	file;
 	parse_blk	pblk;
 	unix_db_info	*udi;
 	gd_segment	*seg;
@@ -627,70 +626,6 @@ unsigned char mu_init_file(gd_region *reg, boolean_t has_ftok)
 			REVERT;
 			return EXIT_ERR;
 		}
-	}
-	/* If we are opening a statsDB, use IPC type permissions derived from the baseDB */
-	if (IS_STATSDB_REG(reg))
-	{
-		STATSDBREG_TO_BASEDBREG(reg, baseDBreg);
-		assert(baseDBreg->open);
-		baseDBcsa = &FILE_INFO(baseDBreg)->s_addrs;
-		baseDBnl = baseDBcsa->nl;
-		assert(baseDBnl);
-		STAT_FILE((char *)baseDBcsa->nl->fname, &stat_buf, retcode);
-		if (0 > retcode)
-		{	/* Should be rare-if-ever message as we just opened the baseDB so it should be there */
-			save_errno = errno;
-			PUTMSG_ERROR_CSA(mu_init_cs_addrs, reg, 7, ERR_FILECREERR, 4,
-					 LEN_AND_LIT("getting base file information"), LEN_AND_STR(path), save_errno);
-				/* Note: Above macro internally invokes CLEANUP(EXIT_ERR) */
-			REVERT;
-			return EXIT_ERR;
-		}
-		if (!gtm_permissions(&stat_buf, &user_id, &group_id, &perms, PERM_IPC, &pdd))
-		{	/* Not sure what could cause this as we would have done the same call when opening the baseDB but
-			 * make sure it is present just in case.
-			 */
-			PUTMSG_ERROR_CSA(mu_init_cs_addrs, reg, 7, ERR_FILECREERR, 4,
-					 LEN_AND_LIT("obtaining permissions from base DB"),  LEN_AND_STR(path), EPERM);
-				/* Note: Above macro internally invokes CLEANUP(EXIT_ERR) */
-			REVERT;
-			return EXIT_ERR;
-		}
-	} else
-	{
-		/* gtm_permissions() is derived from the DB file permissions. Only enforce umask when creating DBs */
-		umask_orig = umask(USUAL_UMASK);	/* determine umask (destructive) */
-		if (USUAL_UMASK != umask_orig)
-			(void)umask(umask_orig);	/* reset umask */
-		perms = 0666 & ~umask_orig;
-	}
-	if (-1 == CHMOD(pblk.l_dir, perms))
-	{
-		save_errno = errno;
-		PUTMSG_WARN_CSA(mu_init_cs_addrs, reg, 7, MAKE_MSG_WARNING(ERR_FILECREERR), 4, LEN_AND_LIT("changing file mode"),
-				LEN_AND_LIT(path), save_errno);
-		MARK_CREATE_COMPLETE(mu_init_cs_addrs, mu_init_cs_data, udi, status);
-		if (0 != status)
-		{
-			PUTMSG_ERROR_CSA(mu_init_cs_addrs, reg, 7, ERR_FILECREERR, 4, LEN_AND_LIT("writing out file header"),
-					LEN_AND_LIT(path), status);
-			/* Note: Above macro internally invokes CLEANUP(EXIT_ERR) */
-			REVERT;
-			return EXIT_ERR;
-		}
-		GTM_FSYNC(udi->fd, status);
-		if (0 != status)
-		{
-			PUTMSG_ERROR_CSA(mu_init_cs_addrs, reg, 7, ERR_FILECREERR, 4, LEN_AND_LIT("Flushing new file to disk"),
-					LEN_AND_LIT(path), status);
-			/* Note: Above macro internally invokes CLEANUP(EXIT_ERR) */
-			REVERT;
-			return EXIT_ERR;
-		}
-		REVERT;
-		reg->file_initialized = TRUE;
-		CLEANUP(EXIT_WRN);
-		return EXIT_WRN;
 	}
 	if ((32 * 1024 - SIZEOF(shmpool_blk_hdr)) < mu_init_cs_data->blk_size)
 		PUTMSG_WARN_CSA(mu_init_cs_addrs, reg, 5, ERR_MUNOSTRMBKUP, 3, RTS_ERROR_STRING(path), 32 * 1024 - DISK_BLOCK_SIZE);

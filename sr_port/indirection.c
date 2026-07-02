@@ -1,7 +1,7 @@
 
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -21,6 +21,7 @@
 #include "fullbool.h"
 #include "show_source_line.h"
 #include "stringpool.h"
+#include "gcol_list.h"
 
 GBLREF	boolean_t	run_time;
 GBLREF	spdesc		stringpool;
@@ -60,6 +61,7 @@ int indirection(oprtype *a)
 	if ((TK_ATSIGN == TREF(window_token)) || ((TK_ATHASH == TREF(window_token)) && concat_athashes))
 	{
 		(TREF(indirection_mval)).mvtype = 0;
+		assert(glist_str_protected(&(TREF(indirection_mval)).str));
 		(TREF(indirection_mval)).str.len = 0;
 		CLEAR_MVAL_BITS(TADR(indirection_mval));
 		do
@@ -102,7 +104,8 @@ int indirection(oprtype *a)
 		ref = newtriple(OC_INDNAME);
 		ref->operand[0] = *a;
 		ref->operand[1] = put_lit(&(TREF(indirection_mval)));
-		(TREF(indirection_mval)).mvtype = 0;	/* so stp_gcol (BYPASSOK) - if invoked later - can free up space */
+		(TREF(indirection_mval)).mvtype = 0;
+		(TREF(indirection_mval)).str.len = 0; /* so stp_gcol - if invoked later - can free up space */
 		*a = put_tref(ref);
 	}
 	return TRUE;

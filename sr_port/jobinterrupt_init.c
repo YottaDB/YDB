@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -37,7 +37,7 @@ GBLREF	mval	dollar_zinterrupt;
 
 void jobinterrupt_init(void)
 {
-	mstr	envvar_logical;
+	UMSTR_CONST(envvar_logical, GTM_ZINTERRUPT);
 	char	trans_bufr[MAX_TRANS_NAME_LEN];
 	DCL_THREADGBL_ACCESS;
 	struct sigaction new_action;
@@ -51,15 +51,16 @@ void jobinterrupt_init(void)
 	sigaction(SIGUSR1, &new_action, NULL);
 
 	/* Provide initial setting for $ZINTERRUPT */
-	envvar_logical.addr = GTM_ZINTERRUPT;
-	envvar_logical.len = SIZEOF(GTM_ZINTERRUPT) - 1;
 	if ((SS_NORMAL != TRANS_LOG_NAME(&envvar_logical, &dollar_zinterrupt.str, trans_bufr, SIZEOF(trans_bufr),
 						do_sendmsg_on_log2long)) || (0 == dollar_zinterrupt.str.len))
 	{	/* Translation failed - use default */
 		dollar_zinterrupt.str.addr = DEF_ZINTERRUPT;
 		dollar_zinterrupt.str.len = SIZEOF(DEF_ZINTERRUPT) - 1;
 	} else	/* put value in stringpool if translation succeeded */
+	{
 		s2pool(&dollar_zinterrupt.str);
+		glist_protect_str(&dollar_zinterrupt.str);
+	}
 	dollar_zinterrupt.mvtype = MV_STR;
 	return;
 }

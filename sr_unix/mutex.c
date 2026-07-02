@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -517,7 +517,7 @@ static	enum cdb_sc mutex_long_sleep(mutex_struct_ptr_t addr, sgmnt_addrs *csa,  
 	struct sockaddr_un	mutex_woke_me_proc;
 	GTM_SOCKLEN_TYPE	mutex_woke_me_proc_len;
 	mutex_wake_msg_t	mutex_wake_msg[2];
-	int			sel_stat;
+	int			poll_stat;
 	ssize_t			nbrecvd;
 	int			timeout_intr_slpcnt;
 	long			timeout_val;
@@ -606,14 +606,14 @@ static	enum cdb_sc mutex_long_sleep(mutex_struct_ptr_t addr, sgmnt_addrs *csa,  
 			poll_nfds = 1;
 			poll_timeout = (long)((timeout.tv_sec * MILLISECS_IN_SEC) +
 					DIVIDE_ROUND_UP(timeout.tv_usec, MICROSECS_IN_MSEC));
-			while (-1 == (sel_stat = poll(&poll_fdlist[0], poll_nfds, poll_timeout)))
+			while (-1 == (poll_stat = poll(&poll_fdlist[0], poll_nfds, poll_timeout)))
 			{
 				if (EINTR == errno)
 				{	/* somebody interrupted me, reduce the timeout by half and continue */
 					MUTEX_TRACE_CNTR(mutex_trc_slp_intr);
 					if (!(timeout_intr_slpcnt--)) /* Assume timed out */
 					{
-						sel_stat = 0;
+						poll_stat = 0;
 						MUTEX_TRACE_CNTR(mutex_trc_intr_tmout);
 						break;
 					}
@@ -627,7 +627,7 @@ static	enum cdb_sc mutex_long_sleep(mutex_struct_ptr_t addr, sgmnt_addrs *csa,  
 					timeout.tv_usec);
 				MUTEX_TRACE_CNTR(mutex_trc_slp);
 			}
-			if (1 == sel_stat) /* Somebody woke me up */
+			if (1 == poll_stat) /* Somebody woke me up */
 			{
 				mutex_woke_me_proc_len = SIZEOF(struct sockaddr_un);
 				RECVFROM_SOCK(mutex_sock_fd, (void *)&mutex_wake_msg[0], SIZEOF(mutex_wake_msg), 0,
@@ -651,7 +651,7 @@ static	enum cdb_sc mutex_long_sleep(mutex_struct_ptr_t addr, sgmnt_addrs *csa,  
 				} /* else, old wake msg, ignore */
 				MUTEX_DPRINT3("%d: %d sent me delayed wake msg\n", process_id, mutex_wake_msg[0].pid);
 				MUTEX_TRACE_CNTR(mutex_trc_xplct_dlyd_wkup);
-			} else if (0 == sel_stat) /* Timed out */
+			} else if (0 == poll_stat) /* Timed out */
 			{
 				MUTEX_DPRINT2("%d: Sleep done, go wake others\n", process_id);
 				MUTEX_TRACE_CNTR(mutex_trc_slp_tmout);

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,6 +18,7 @@
 #include "gtm_caseconv.h"
 #include "min_max.h"
 #include "stringpool.h"
+#include "gcol_list.h"
 
 GBLREF mlabel 			*mlabtab;
 GBLREF command_qualifier 	cmd_qlf;
@@ -27,7 +29,6 @@ mlabel *get_mladdr(mident *lab_name)
 	mident		*lname, upper_lname;
 	mlabel		**p;
 	int4		x;
-	mstr		lab_str;
 
 	lname = lab_name;
 	if (!(cmd_qlf.qlf & CQ_LOWER_LABELS))
@@ -40,19 +41,18 @@ mlabel *get_mladdr(mident *lab_name)
 	for (p = &mlabtab; *p; )
 	{
 		MIDENT_CMP(&(*p)->mvname, lname, x);
-		if (x < 0)
+		if (0 > x)
 			p = &((*p)->rson);
-		else if (x > 0)
+		else if (0 < x)
 			p = &((*p)->lson);
 		else
 			return *p;
 	}
-	lab_str.len = lname->len;
-	lab_str.addr = lname->addr;
-	s2pool_align(&lab_str);
-	*p = (mlabel *) mcalloc(SIZEOF(mlabel));
-	(*p)->mvname.len = lab_str.len;
-	(*p)->mvname.addr = lab_str.addr;
+	*p = (mlabel *)mcalloc(SIZEOF(mlabel));
+	glist_first_init_str(&(*p)->mvname);
+	glist_protect_str(&(*p)->mvname);
+	(*p)->mvname.umstr = *lname;
+	s2pool(&(*p)->mvname);
 	assert(!(*p)->lson && !(*p)->rson);
 	(*p)->formalcnt = NO_FORMALLIST;
 	(*p)->gbl = TRUE;

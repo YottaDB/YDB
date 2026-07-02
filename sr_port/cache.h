@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -12,6 +12,8 @@
 
 #ifndef CACHE_H
 #define CACHE_H
+#include "mdef.h"
+#include "gcol_list.h"
 
 /* Macros to add debugging to objcode cache for indirects. To enable, uncomment line below */
 /*#define DEBUG_CACHE */
@@ -63,5 +65,33 @@ mstr *cache_get(icode_str *indir_src);
 void cache_put(icode_str *src, mstr *object);
 void cache_table_rebuild(void);
 void cache_stats(void);
+
+static inline void unprotect_ihdr(ihdtyp *ihead)
+{
+	int fixup_cnt, i;
+	mval *fix, *fix_base;
+
+	fixup_cnt = ihead->fixup_vals_num;
+	if (fixup_cnt)
+	{
+		fix_base = (mval *)((char *)ihead + ihead->fixup_vals_off);
+		for (fix = fix_base, i = 0; i < fixup_cnt; i++, fix++)
+		{
+			assert(glist_mval_in_sync(fix));
+			glist_unprotect_str(&fix->str);
+		}
+	}
+}
+
+static inline void unprotect_obj_cache_entry(cache_entry *csp)
+{
+	ihdtyp *ihead;
+
+	assert((char *)csp->obj.addr == ((char *)csp + ICACHE_SIZE));
+	assert(glist_str_protected(&csp->src.str));
+	glist_unprotect_str(&csp->src.str);
+	ihead = (ihdtyp *)((char *)csp + ICACHE_SIZE);
+	unprotect_ihdr(ihead);
+}
 
 #endif

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -34,6 +34,7 @@
 #include "gtm_conv.h"
 #include "gtm_utf8.h"
 #endif
+#include "noprincio_if_needed_inline.h"
 
 GBLREF boolean_t	prin_in_dev_failure, prin_out_dev_failure;
 GBLREF io_pair		io_std_device;
@@ -41,7 +42,7 @@ GBLREF mval		dollar_zstatus;
 #ifdef UTF8_SUPPORTED
 GBLREF UConverter	*chset_desc[];
 
-LITREF mstr		chset_names[];
+LITREF unmanaged_mstr		chset_names[];
 #endif
 
 error_def(ERR_CRYPTBADWRTPOS);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -13,11 +13,18 @@
 #include "mdef.h"
 #include "stringpool.h"
 #include "reinit_compilation_externs.h"
+#include "gcol_list.h"
+#include "gtm_threadgbl.h"
+
 
 GBLREF spdesc 		stringpool;
 
 void reinit_compilation_externs(void)
 {
+	DCL_THREADGBL_ACCESS;
+
+	SETUP_THREADGBL_ACCESS;
+	glist_clear_arrays(&stringpool);
 	stringpool.free = stringpool.base;
 	mcfree();
 }

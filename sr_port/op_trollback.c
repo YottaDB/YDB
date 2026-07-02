@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -166,6 +166,8 @@ void	op_trollback(int rb_levels)		/* rb_levels -> # of transaction levels by whi
 		/* Now that we are out of TP, reset the debug-only global variable that is relevant only if we are in TP */
 		DEBUG_ONLY(donot_INVOKE_MUMTSTART = FALSE;)
 		dollar_trestart = 0;
+		if (!(TREF(dollar_zinxpel_roll)))
+			TREF(dollar_zinxpel) = 0;
 		if (!reg_reset)
 			RESTORE_GV_CUR_REGION;
 		/* Transaction is complete as the outer transaction has been rolled back. Check now to see if any statsDB

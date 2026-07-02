@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2015 Fidelity National Information 		*
+ * Copyright (c) 2015-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -99,10 +99,11 @@ typedef struct utfcgr_entry_struct
  */
 typedef struct utfcgr_struct
 {
-	mstr		last_str;		/* The last string (addr/len) we used in cache */
+	unmanaged_mstr	last_str;		/* The last string (addr/len) we used in cache */
 	unsigned short	ngrps;			/* Number of groups for which values are filled in */
 	unsigned short	idx;			/* The index of this group in the entry[] array */
 	boolean_t	reference;		/* Reference bit(s) to prevent overwrite if possible */
+	unsigned int gcols;
 	utfcgr_entry	entry[1]; 		/* Table of  char groups for this string. This is a variable dimension
 						 * field - dimension is in TREF(gtm_utfcgr_string_groups).
 						 */

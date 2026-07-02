@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,7 +24,8 @@ void op_fnzm(mint x, mval *v)
 	mstr	msg;
 
 	l_x = x;
-	v->mvtype = 0; /* so stp_gcol (if invoked below) can free up space currently occupied by this to-be-overwritten mval */
+	v->mvtype = 0;
+	v->str.len = 0; /* so stp_gcol can free up space currently occupied by this to-be-overwritten mval */
 	ENSURE_STP_FREE_SPACE(MAX_MSG_SIZE);
 	v->str.addr = (char *)stringpool.free;
 	msg.addr = (char*) stringpool.free;

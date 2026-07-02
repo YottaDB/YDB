@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2008-2020 Fidelity National Information	*
+ * Copyright (c) 2008-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -26,6 +26,7 @@
  */
 
 #include "mdef.h"
+#include "min_max.h"
 
 #include "gtm_stdlib.h"
 #include "gtm_signal.h"
@@ -85,7 +86,7 @@ caddr_t caller_id(unsigned int extra_frames)
 		SIGPROCMASK(SIG_SETMASK, &savemask, NULL, rc);
 	/* backtrace will return call stack with address.*/
 	if (RETURN_ADDRESS_DEPTH <= trace_size)
-		return (caddr_t)trace[RETURN_ADDRESS_DEPTH + extra_frames];
+		return (caddr_t)trace[MIN(RETURN_ADDRESS_DEPTH + extra_frames, MAX_TRACE_DEPTH - 1)];
 	else
 		return NULL;
 }

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2011, 2013 Fidelity Information Services, Inc *
+ * Copyright (c) 2011-2026 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,7 +16,7 @@
 #include "io.h"
 #include "iotimer.h"
 #include "iosocketdef.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "mv_stent.h"
 #include "find_mvstent.h"
 #include "stack_frame.h"
@@ -49,6 +50,7 @@ mv_stent *io_find_mvstent(io_desc *io_ptr, boolean_t clear_mvstent)
 		else
 		{
 			mv_zintdev->mv_st_cont.mvs_zintdev.io_ptr = NULL;
+			glist_unprotect_str(&mv_zintdev->mv_st_cont.mvs_zintdev.curr_sp_buffer);
 			mv_zintdev->mv_st_cont.mvs_zintdev.buffer_valid = FALSE;
 		}
 	}

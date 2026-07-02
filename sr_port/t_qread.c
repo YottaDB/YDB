@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -286,6 +286,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 #	ifdef DEBUG
 	if (WBTEST_ENABLED(WBTEST_BLKRDFAIL_TQREAD) && (wbox_tqread_count >= gtm_white_box_test_case_count))
 	{
+		rdfail_detail = cdb_sc_normal;	/* using appropriate cdb_sc_rdfail makes output inconsistant with test theme */
 		return (sm_uc_ptr_t)NULL;
 	}
 	wbox_tqread_count++;
@@ -889,7 +890,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 				if ((0 < tmp_levl) && (255 != tmp_levl))
 					INCR_DB_CSH_COUNTER(csa, n_idxblk_csh_hit, 1);
 #endif
-				INCR_LCL_GVSTATS_COUNTER(csa, n_cache_reads, 1);
+				INCR_HEAVYWEIGHT_GVSTATS_COUNTER(csa, cnl, n_cache_reads, 1);
 				return (sm_uc_ptr_t)GDS_ANY_REL2ABS(csa, cr->buffaddr);
 			}
 			if (blk != cr->blk)
@@ -940,8 +941,9 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 							RELEASE_BUFF_READ_LOCK(cr);
 						} else
 						{
-							if (!hold_onto_crit)
-								rel_crit(gv_cur_region);
+
+							REL_CRIT_IF_NEEDED(csa, gv_cur_region, was_crit, hold_onto_crit);
+							assert(was_crit == csa->now_crit);
 							send_msg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_DBFILERR, 2,
 									DB_LEN_STR(gv_cur_region));
 #							if PTHREAD_MUTEX_ROBUST_SUPPORTED

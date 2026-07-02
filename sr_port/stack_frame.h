@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -57,7 +57,7 @@ typedef struct stack_frame_struct	/* contents of the GT.M MUMPS stack frame */
 #endif
 	unsigned char	*temps_ptr;	/* pointer to base of temps */
 #endif
-	char		*vartab_ptr;	/* variable table may be in rvector or on stack */
+	var_tabent	*vartab_ptr;	/* variable table may be in rvector or on stack */
 	GTM64_ONLY(struct stack_frame_struct *old_frame_pointer;)	/* Moved old_frame_pointer near all pointers
 									 * for alignment and smaller stackframe	size
 									 */
@@ -73,6 +73,7 @@ typedef struct stack_frame_struct	/* contents of the GT.M MUMPS stack frame */
 	unsigned char	flags;
 	signed char	dollar_test;
 	/*uint4		glvn_indx;*/	/* state of glvn pool at frame creation time. For use when gtmpcat is changed. */
+	/*uint4		ptemp_count;*/	    /* protected temp count */
 	unsigned char	*for_ctrl_stack;/* NOTE: temporarily using this field for glvn_indx so that gtmpcat works */
 	unsigned char	*restart_pc;	/* interrupt restart program counter */
 	unsigned char	*restart_ctxt;	/* interrupt restart context pointer */
@@ -91,6 +92,7 @@ typedef struct stack_frame_struct	/* contents of the GT.M MUMPS stack frame */
 #define SFT_ZINTR	(1 << 8)	/* 0x0100 $zinterrupt frame */
 #define SFT_TRIGR	(1 << 9)	/* 0x0200 Trigger base frame */
 #define SFT_ZTIMEOUT	(1 << 10)	/* 0x0400 ZTIMEOUT frame */
+#define SFT_BASE	(1 << 11)	/* 0x0800 base_frame with old frame_pointer below */
 #define SFT_ZINTR_OFF	~(SFT_ZINTR)	/* Mask to turn off SFF_ZINTR */
 
 /* The following definition identifies a frame that is running a line of code - either in a routine or what amounts to an XECUTE
@@ -114,6 +116,9 @@ typedef struct stack_frame_struct	/* contents of the GT.M MUMPS stack frame */
 					 *	and then adapted for spanning node/region transactions.
 					 *	See comments in tp_restart.c for further details.
 					 */
+#define SFF_PARM_IN_PROG (1U << 7)	/* 0x80 This frame encountered an error accessing its parameters (eg underr)
+					 * and should be unwound before error processing continues for the parent frame
+					 */
 
 #define SFF_INDCE_OFF   		~(SFF_INDCE)			/* Mask to turn off SFF_INDCE */
 #define SFF_ZTRAP_ERR_OFF		~(SFF_ZTRAP_ERR)		/* Mask to turn off SFF_ZTRAP_ERR */
@@ -122,6 +127,7 @@ typedef struct stack_frame_struct	/* contents of the GT.M MUMPS stack frame */
 #define SFF_ETRAP_ERR_OFF		~(SFF_ETRAP_ERR)		/* Mask to turn off SFF_ETRAP_ERR */
 #define SFF_UNW_SYMVAL_OFF		~(SFF_UNW_SYMVAL)		/* Mask to turn off SFF_UNW_SYMVAL */
 #define SSF_NORET_VIA_MUMTSTART_OFF	~(SSF_NORET_VIA_MUMTSTART)	/* Mask to turn off SSF_NORET_VIA_MUMTSTART */
+#define SFF_PARM_IN_PROG_OFF		~(SFF_PARM_IN_PROG)		/* Mask to turn off SFF_PARM_IN_PROG */
 
 #define	ADJUST_FRAME_POINTER(fptr, shift)			\
 {								\
@@ -136,6 +142,14 @@ typedef struct stack_frame_struct	/* contents of the GT.M MUMPS stack frame */
 		error_frame = fptr;				\
 	}							\
 }
+
+#define INVALID_PTEMP_CNT (USHRT_MAX + 1)
+#define PTEMP_CNT(FP)	((unsigned int)((UINTPTR_T)(FP)->for_ctrl_stack >> 32))
+#define SET_PTEMP_CNT(FP, VALUE)									\
+MBSTART {												\
+	(FP)->for_ctrl_stack = (unsigned char *)							\
+		(((UINTPTR_T)(FP)->for_ctrl_stack & (UINTPTR_T)UINT_MAX) | ((UINTPTR_T)(VALUE) << 32));	\
+} MBEND
 
 /*
  * Skip past trigger base frames

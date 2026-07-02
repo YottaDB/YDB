@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -46,7 +46,6 @@ typedef struct
 #define CQ_DYNAMIC_LITERALS	(1 << 14)	/* 0x4000 */
 #define CQ_EMBED_SOURCE		(1 << 15)	/* 0x8000 */
 
-/* TODO: add CQ_ALIGN_STRINGS to the default list below when alignment is supported */
 #define CQ_DEFAULT (CQ_WARNINGS | CQ_OBJECT | CQ_IGNORE | CQ_LOWER_LABELS | CQ_LINE_ENTRY | CQ_INLINE_LITERALS)
 
 #define LISTTAB 10
@@ -61,6 +60,16 @@ typedef struct
 	CMD_QLF.ceprep_file.str.addr = CEPREP_FILE;					\
 	CMD_QLF.ceprep_file.str.len = SIZE;						\
 }
+#define SYNC_CMD_QLF_STRINGS(CMD_QLF)							\
+{											\
+	if (!(CMD_QLF).object_file.mvtype)						\
+		(CMD_QLF).object_file.str.len = 0;					\
+	if (!(CMD_QLF).list_file.mvtype)						\
+		(CMD_QLF).list_file.str.len = 0;					\
+	if (!(CMD_QLF).ceprep_file.mvtype)						\
+		(CMD_QLF).ceprep_file.str.len = 0;					\
+}
+
 
 typedef struct src_line_type
 {

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2024 Fidelity National Information	*
+ * Copyright (c) 2006-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -860,7 +860,7 @@ int		utf8_len_silent(mstr* str);
 int		utf8_len_strict(unsigned char* ptr, int len);
 STATICFNDCL int utf8_len_real(utf8_err_type err_type, mstr* str);
 int		gtm_wcwidth(wint_t code);
-int		gtm_wcswidth(unsigned char* ptr, int len, boolean_t strict, int nonprintwidth);
+int		gtm_wcswidth(const unsigned char* ptr, int len, boolean_t strict, int nonprintwidth);
 void		utf8_badchar(int len, unsigned char* str, unsigned char *strtop, int chset_len, unsigned char* chset);
 void		utf8_badchar_dec(int len, unsigned char* str, unsigned char *strtop, int chset_len, unsigned char* chset);
 void		utf8_badchar_stx(int len, unsigned char* str, unsigned char *strtop, int chset_len, unsigned char* chset);
@@ -873,7 +873,7 @@ boolean_t       valid_utf_string(const mstr *str);
  * we define a function-pointer variable and initialize it at startup to NULL only in GTMSECSHR and thereby avoid pulling
  * in all the unneeded / unwanted executables.
  */
-typedef	int	(*gtm_wcswidth_fnptr_t)(unsigned char* ptr, int len, boolean_t strict, int nonprintwidth);
+typedef	int	(*gtm_wcswidth_fnptr_t)(const unsigned char* ptr, int len, boolean_t strict, int nonprintwidth);
 
 GBLREF	gtm_wcswidth_fnptr_t	gtm_wcswidth_fnptr;	/* see comment above about this typedef */
 

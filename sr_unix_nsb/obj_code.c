@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -21,7 +21,7 @@
 
 #include "compiler.h"
 #include "obj_gen.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "cmd_qlf.h"
 #include "cgp.h"
 #ifdef UNIX
@@ -196,7 +196,7 @@ void	obj_code (uint4 src_lines, void *checksum_ctx)
 void	cg_lab (mtreenode *node, void *arg)
 {
 	int4		base = *arg;
-	mstr		glob_name;
+	mstr		glob_name = {{{0}}};
 	lab_tabent	lent;
 
 	if (node->lab.ml && node->lab.gbl)
@@ -206,7 +206,7 @@ void	cg_lab (mtreenode *node, void *arg)
 		lent.LABENT_LNR_OFFSET = (SIZEOF(lnr_tabent) * node->lab.ml->line_number) + base;
 		lent.has_parms = (NO_FORMALLIST != node->lab.formalcnt);	/* Flag to indicate a formallist */
 		emit_immed((char *)&lent, SIZEOF(lent));
-		mlabel2xtern(&glob_name, &int_module_name, &node->lab.mvname);
-		define_symbol(GTM_CODE, &glob_name, lent.LABENT_LNR_OFFSET);
+		mlabel2xtern(&glob_name, &int_module_name, &node->lab.mvname.mident);
+		define_symbol(GTM_CODE, &glob_name lent.LABENT_LNR_OFFSET);
 	}
 }

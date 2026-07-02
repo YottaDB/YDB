@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -67,8 +68,15 @@ void lvzwr_init(enum zwr_init_types zwrpattyp, mval *val)
 	} else
 		lvzwrite_block->pat = NULL;
 	lvzwrite_block->mask = lvzwrite_block->subsc_count = 0;
+	assert(!lvzwrite_block->mv_sub_top);
 	if (!lvzwrite_block->sub)
+	{
 		lvzwrite_block->sub = (zwr_sub_lst *)malloc(SIZEOF(zwr_sub_lst) * MAX_LVSUBSCRIPTS);
+		memset(lvzwrite_block->sub, 0, MAX_LVSUBSCRIPTS * SIZEOF(zwr_sub_lst));
+	} else if (lvzwrite_block->mv_sub_top)
+	{
+		glist_unprotect_lvzwrite_block(lvzwrite_block, 0, lvzwrite_block->mv_sub_top);
+	}
 	lvzwrite_block->fixed = TRUE;
 	TREF(in_zwrite) = TRUE;
 	return;

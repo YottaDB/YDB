@@ -1,6 +1,6 @@
 /****************************************************************
  *                                                              *
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *                                                              *
  *      This source code contains the intellectual property     *
@@ -30,11 +30,10 @@ error_def(ERR_TRNLOGFAIL);
 void gtm_env_xlate_init(void)
 {
 	int4		status;
-	mstr		val, tn;
+	mstr		tn;
+	UMSTR_CONST(val, GTM_ENV_XLATE);
 	char		buf[GTM_PATH_MAX];
 
-	val.addr = GTM_ENV_XLATE;
-	val.len =  STR_LIT_LEN(GTM_ENV_XLATE);
 	env_gtm_env_xlate.len = 0; /* default */
 	if (SS_NORMAL != (status = TRANS_LOG_NAME(&val, &tn, buf, SIZEOF(buf), dont_sendmsg_on_log2long)))
 	{

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2002-2018 Fidelity National Information	*
+ * Copyright (c) 2002-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -21,7 +21,7 @@
 #include "mstack_size_init.h"
 
 GBLREF unsigned char            *stackbase, *stacktop, *stackwarn, *msp;
-LITREF unsigned char mvs_size[];
+LITREF unsigned short mvs_size[];
 
 error_def(ERR_MSTACKSZNA);
 error_def(ERR_MSTACKCRIT);
@@ -44,10 +44,10 @@ void mstack_size_init(struct startup_vector *svec)
 	SETUP_THREADGBL_ACCESS;
 	val.addr = GTM_MSTACK_SIZE;
 	val.len = SIZEOF(GTM_MSTACK_SIZE) - 1;
-	gtm_mstack_size = trans_numeric(&val, &is_defined, TRUE);
+	gtm_mstack_size = trans_numeric(&val.umstr, &is_defined, TRUE);
 	val.addr = GTM_MSTACK_CRIT_THRESH;
 	val.len = SIZEOF(GTM_MSTACK_CRIT_THRESH) - 1;
-	gtm_mstack_crit_range = trans_numeric(&val, &is_defined, TRUE);
+	gtm_mstack_crit_range = trans_numeric(&val.umstr, &is_defined, TRUE);
 	if (0 == gtm_mstack_size)
 		gtm_mstack_size = MSTACK_DEF_SIZE;
 	else if (MSTACK_MIN_SIZE > gtm_mstack_size)

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,8 +35,9 @@ void	op_indfnname(mval *dst, mval *target, mval *depth)
 
 	SETUP_THREADGBL_ACCESS;
 	MV_FORCE_STR(target);
-	indir_src.str = target->str;
+	indir_src.str.umstr = target->str.umstr;
 	indir_src.code = indir_fnname;
+	indir_src.str.in_array = FALSE;
 	if (NULL == (obj = cache_get(&indir_src)))	/* NOTE assignment */
 	{
 		obj = &object;

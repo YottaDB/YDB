@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -154,7 +154,7 @@ typedef struct cm_region_head_struct
 		struct gd_region_struct		*reg;
 		gtm_uint64_t			wakeup;
 		uint4				refcnt;
-		hash_table_mname		*reg_hash;
+		hash_table_umname		*reg_hash;
 	} cm_region_head;
 
 typedef struct cm_lk_response_struct

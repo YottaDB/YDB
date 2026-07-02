@@ -1,6 +1,6 @@
 /***************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -589,7 +589,7 @@ typedef struct reg_ctl_list_struct
 							 * journal file of interrupted recovery.
 							 */
 	jnl_ctl_list		*jctl_error;		/* jctl where an error occurred during mur_back_process */
-	hash_table_mname	gvntab;			/* Used for gv_target info for globals in mur_output_record() */
+	hash_table_umname	gvntab;			/* Used for gv_target info for globals in mur_output_record() */
 	jnl_tm_t		lvrec_time;		/* Last Valid Journal Record's Time Stamp across all generations */
 	int			jnl_state;
 	int			repl_state;

@@ -170,6 +170,7 @@ error_def(ERR_DBTNLTCTN);
 error_def(ERR_DBTNRESET);
 error_def(ERR_DBTNRESETINC);
 error_def(ERR_INTEGERRS);
+error_def(ERR_MUKILLIP);
 error_def(ERR_MUNOACTION);
 error_def(ERR_MUNOFINISH);
 error_def(ERR_MUNOTALLINTEG);
@@ -220,7 +221,7 @@ void mupip_integ(void)
 	mu_region_found = TRUE;
 	TREF(in_mupip_integ) = TRUE;	/* This is for mupip integ to continue in case of error, to report a better msg. */
 	if (NULL == gv_target)
-		gv_target = (gv_namehead *)targ_alloc(DUMMY_GLOBAL_VARIABLE_LEN, NULL, NULL);
+		gv_target = targ_alloc(DUMMY_GLOBAL_VARIABLE_LEN, NULL, NULL);
 	if (CLI_PRESENT == (cli_status = cli_present("MAXKEYSIZE")))
 	{
 		assert(SIZEOF(disp_maxkey_errors) == SIZEOF(int4));
@@ -723,6 +724,14 @@ void mupip_integ(void)
 		if (muint_all_index_blocks)
 		{
 			mu_int_maps();
+			if (0 != (csa ? csa->hdr->kill_in_prog : mu_int_data.kill_in_prog))
+			{
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUKILLIP, 4,
+					DB_LEN_STR(gv_cur_region), LEN_AND_LIT("MUPIP INTEG"));
+				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(6) MAKE_MSG_INFO(ERR_MUKILLIP), 4,
+					DB_LEN_STR(gv_cur_region), LEN_AND_LIT("MUPIP INTEG"));
+				mu_int_errknt++;
+			}
 			if (!mu_int_errknt)
 			{	/* because it messes with the totals, the white box case does not produce an accurate result */
 				blocks_free = (gtm_uint64_t)mu_int_data.trans_hist.total_blks

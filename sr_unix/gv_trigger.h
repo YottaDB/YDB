@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2025 Fidelity National Information	*
+ * Copyright (c) 2010-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -242,7 +242,6 @@ typedef struct gvtr_invoke_parms_struct
 			 */													\
 			assert(!jgbl.forw_phase_recovery);									\
 			LCL_TSTART = TRUE;											\
-			DEBUG_ONLY(ACCUMULATE_LCL_GVSTATS_COUNTER(CSA, CSA->nl, n_cache_reads));				\
 			 /* 0 ==> save no locals but RESTART OK */ 								\
 			op_tstart((IMPLICIT_TSTART + IMPLICIT_TRIGGER_TSTART), TRUE, &literal_batch, 0);			\
 			/* Ensure that the op_tstart done above has set up the TP frame and that the first entry is		\
@@ -401,33 +400,24 @@ typedef struct gvtr_invoke_parms_struct
 				 * later. */									\
 }
 
-/* The POP_MVALS_FROM_M_STACK_IF_NEEDED macro below pops some mvals pushed on the stack but pops them in an unusual way for
- * performance reasons (not really popping them but just restoring previous pointers). The debug version of that macro will use the
- * slightly longer but verifying form of unwind defined below to make sure we aren't popping something we need in an invisible and
- * tough to track fashion.
- */
-#ifdef DEBUG
-#define UNW_MV_STENT_TO(prev_msp, prev_mv_chain)				\
-{										\
-	mv_stent *mvc;								\
-	mvc = mv_chain;								\
-	while (mvc < prev_mv_chain)						\
-	{									\
-		assert(MVST_MVAL == mvc->mv_st_type);				\
-		mvc = (mv_stent *)(mvc->mv_st_next + (char *)mvc);		\
-	}									\
-	assert(prev_mv_chain == mvc);						\
-	assert(prev_msp <= (unsigned char *)mvc);				\
-	msp = prev_msp;								\
-	mv_chain = mvc;								\
-}
-#else
-#define UNW_MV_STENT_TO(prev_msp, prev_mv_chain)			\
-{									\
-	msp = prev_msp;							\
-	mv_chain = prev_mv_chain;					\
-}
-#endif
+#define UNW_MV_STENT_TO(prev_msp, prev_mv_chain)					\
+MBSTART {										\
+	GBLREF mv_stent		*mv_chain;						\
+	GBLREF unsigned char 	*msp;							\
+	LITREF unsigned short 	mvs_size[];						\
+											\
+	assert(mv_chain <= (prev_mv_chain));						\
+	assert(msp == (unsigned char *)mv_chain);					\
+	while (mv_chain < (prev_mv_chain))						\
+	{										\
+		assert(MVST_MVAL == mv_chain->mv_st_type);				\
+		unprotect_mv_ent(mv_chain);						\
+		msp += mvs_size[mv_chain->mv_st_type];					\
+		mv_chain = (mv_stent *)((char *)mv_chain + mv_chain->mv_st_next);	\
+	}										\
+	assert((prev_mv_chain) == mv_chain);						\
+	assert((prev_msp) == msp);							\
+} MBEND
 
 #define	POP_MVALS_FROM_M_STACK_IF_NEEDED(ZTOLD_MVAL, SAVE_MSP, SAVE_MV_CHAIN)		\
 {											\
@@ -449,7 +439,7 @@ typedef struct gvtr_invoke_parms_struct
 
 #define SET_GVTARGET_TO_HASHT_GBL(CSA)								\
 {												\
-	mname_entry	gvname;									\
+	unmanaged_mname_entry	gvname; /* Points to HASHT_GBLNAME */				\
 	gv_namehead	*hasht_tree;								\
 												\
 	GBLREF	gv_namehead	*gv_target;							\
@@ -553,15 +543,19 @@ GBLREF	int4		tstart_trigger_depth;
 }
 
 #define	TRIG_PROCESS_JNL_STR_NODEFLAGS(NODEFLAGS)			\
-{									\
+MBSTART {								\
 	GBLREF	boolean_t	skip_dbtriggers;			\
 	GBLREF	mval		dollar_ztwormhole;			\
 									\
 	assert(!(JS_NOT_REPLICATED_MASK & NODEFLAGS));			\
 	skip_dbtriggers = (NODEFLAGS & JS_SKIP_TRIGGERS_MASK);		\
 	if (NODEFLAGS & JS_NULL_ZTWORM_MASK)				\
+	{								\
 		dollar_ztwormhole.str.len = 0;				\
-}
+		dollar_ztwormhole.str.addr = NULL;			\
+		glist_unprotect_str(&dollar_ztwormhole.str);		\
+	}								\
+} MBEND
 
 #define	JNL_FORMAT_ZTWORM_IF_NEEDED(CSA, WRITE_LOGICAL_JNLRECS, JNL_OP, KEY, VAL, ZTWORM_JFB, JFB, JNL_FORMAT_DONE)	\
 {															\

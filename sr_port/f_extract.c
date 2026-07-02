@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved. *
  *								*
  *	This source code contains the intellectual property	*
@@ -37,7 +37,7 @@ int f_extract(oprtype *a, opctype op)
 	mval	tmp_mval;
 	oprtype	*newop;
 
-	static mstr scratch_space = {0, 0, 0};
+	static mstr scratch_space = {{{0}}};
 
 	DCL_THREADGBL_ACCESS;
 

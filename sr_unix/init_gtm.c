@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -19,7 +19,7 @@
 
 #include "gtm_multi_thread.h"
 #include "startup.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "stack_frame.h"
 #include "error.h"
 #include "cli.h"
@@ -52,7 +52,7 @@ GBLREF int4		exi_condition;
 GBLREF mstr		dollar_zchset;
 GBLREF int		(*op_open_ptr)(mval *v, mval *p, mval *t, mval *mspace);
 GBLREF mstr		dollar_zpatnumeric;
-GBLREF mstr		default_sysid;
+GBLREF unmanaged_mstr	default_sysid;
 GBLREF pattern		*pattern_list;
 GBLREF pattern		*curr_pattern;
 GBLREF pattern		mumps_pattern;
@@ -90,8 +90,6 @@ void init_gtm(void)
 	struct startup_vector   svec;
 	int			i;
 	int4			lct;
-	DEBUG_ONLY(mval		chkmval;)
-	DEBUG_ONLY(mval		chkmval_b;)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -114,9 +112,6 @@ void init_gtm(void)
 	assert(BITS_PER_UCHAR == 8);
 	assert(SIZEOF(enum db_ver) == SIZEOF(int4));
 	assert(254 >= FNPC_MAX);	/* The value 255 is reserved */
-	assert(SIZEOF(mval) == SIZEOF(mval_b));
-	assert(SIZEOF(chkmval.fnpc_indx) == SIZEOF(chkmval_b.fnpc_indx));
-	assert(OFFSETOF(mval, fnpc_indx) == OFFSETOF(mval_b, fnpc_indx));
 	DEBUG_ONLY(mtables_chk());	/* Validate mtables.c assumptions */
 	SFPTR(create_fatal_error_zshow_dmp_fptr, create_fatal_error_zshow_dmp);
 #	ifdef GTM_PTHREAD

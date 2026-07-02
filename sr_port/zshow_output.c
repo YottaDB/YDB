@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -19,7 +19,7 @@
 #include "error.h"
 #include "lv_val.h"
 #include "subscript.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "mv_stent.h"
 #include "mlkdef.h"
 #include "zshow.h"
@@ -75,7 +75,7 @@ error_def(ERR_MAXNRSUBSCRIPTS);
 static int gv_sbs_depth(gv_key *key)
 {
 	int i, depth;
-	
+
 	depth = 0;
 	for (i = 0; i < key->end; ++i)
 	{
@@ -85,7 +85,7 @@ static int gv_sbs_depth(gv_key *key)
 	return depth;
 }
 
-void zshow_output(zshow_out *out, const mstr *str)
+void zshow_output(zshow_out *out, const unmanaged_mstr *str)
 {
 	boolean_t	is_base_var, lvundef, utf8_active, zshow_depth;
 	char		buff, *leadptr, *piecestr, *strbase, *strnext, *strptr, *strtokptr, *strtop, *tempstr;
@@ -93,8 +93,10 @@ void zshow_output(zshow_out *out, const mstr *str)
 	gvnh_reg_t	*gvnh_reg;
 	int		dbg_sbs_depth, sbs_depth, str_processed, tmp_len;
 	lv_val		*lv, *lv_child;
-	mval		lmv, *mv_child, *mv;
+	mval		*mv_child, *mv;
+	mval 		lmv = {{0}};
 	ssize_t		buff_len, cumul_width, device_width, inchar_width, len, outlen, chcnt, char_len, disp_len;
+	unsigned int gcols;
 #ifdef UTF8_SUPPORTED
 	wint_t		codepoint;
 #endif
@@ -115,6 +117,7 @@ void zshow_output(zshow_out *out, const mstr *str)
 	} else
 		mv = &lmv;
 	mv->mvtype = 0; /* initialize mval in M-stack in case stp_gcol gets called before value gets initialized below */
+	mv->str.len = 0;
 	/* does this zshow "code" use subscripts for output */
 	if ((('C' == out->code) || ('c' == out->code)) && ((ZSHOW_LOCAL == out->type) || (ZSHOW_GLOBAL == out->type)))
 	{
@@ -128,7 +131,8 @@ void zshow_output(zshow_out *out, const mstr *str)
 		mv_child->str.addr = (char *)stringpool.free;
 		*mv_child->str.addr = out->code;
 		mv_child->str.len = 1;
-		stringpool.free +=1;
+		stringpool.free += 1;
+		assert(glist_str_protected(&mv_child->str));
 	}
 	else
 		zshow_depth = FALSE;
@@ -201,6 +205,7 @@ void zshow_output(zshow_out *out, const mstr *str)
 			{
 				/* if the subscript "code" already exists, delete it */
 				lv = out->out_var.lv.lvar;
+				assert(glist_str_protected(&lv->v.str));
 				if (out->code != out->curr_code)
 				{
 					lv_child = op_srchindx(VARLSTCNT(2) lv, mv_child);
@@ -215,7 +220,10 @@ void zshow_output(zshow_out *out, const mstr *str)
 						}
 						op_kill(lv_child);
 						if (lvundef)
+						{
 							lv->v.mvtype = 0;
+							lv->v.str.len = 0;
+						}
 					}
 				}
 				/* make sure another subscript will fit */
@@ -226,6 +234,7 @@ void zshow_output(zshow_out *out, const mstr *str)
 				/* add the subscript for the "code" */
 				lv_child = op_putindx(VARLSTCNT(2) lv, mv_child);
 				lv_child->v.mvtype = 0; /* don't want a node so make it undef'd */
+				lv_child->v.str.len = 0;
 				for (tempstr = str->addr; NULL != (piecestr = STRTOK_R(tempstr,".", &strtokptr));
 						tempstr = NULL) /* WARNING inline assignment in test */
 				{
@@ -233,8 +242,9 @@ void zshow_output(zshow_out *out, const mstr *str)
 					assert((0 < len) && (MAX_MIDENT_LEN >= len));
 					/* create the mval for the next subscript */
 					ENSURE_STP_FREE_SPACE(len);
+					assert(glist_str_protected(&mv_child->str));
 					mv_child->str.addr = (char *)stringpool.free;
-					stringpool.free +=len;
+					stringpool.free += len;
 					memcpy(mv_child->str.addr, piecestr, (size_t)len);
 					mv_child->str.len = len;
 					/* make sure the subscript will fit */
@@ -245,8 +255,10 @@ void zshow_output(zshow_out *out, const mstr *str)
 					/* add the subscript */
 					lv_child = op_putindx(VARLSTCNT(2) lv_child, mv_child);
 					lv_child->v.mvtype = 0; /* if it is not the last one, no node */
+					lv_child->v.str.len = 0;
 				}
-				lv_child->v = literal_null; /* make a node out of the last one with a value of "" */
+				assert(glist_str_protected(&lv_child->v.str));
+				lv_child->v.umval = literal_null.umval; /* make a node out of the last one with a value of "" */
 				POP_MV_STENT(); /* we are done with our mval */
 				break;
 			}
@@ -271,7 +283,11 @@ void zshow_output(zshow_out *out, const mstr *str)
 					}
 					op_kill(lv_child);
 					if (lvundef)
+					{
 						lv->v.mvtype = 0;
+						lv->v.str.len = 0;
+					}
+					assert(glist_str_protected(&lv->v.str));
 				}
 				/* Check if we can add two more subscripts 1) out->code & 2) out->line_num */
 				is_base_var = LV_IS_BASE_VAR(lv);
@@ -325,7 +341,7 @@ void zshow_output(zshow_out *out, const mstr *str)
 						mv->str.len = INTCAST(out->ptr - out->buff);
 						memcpy(mv->str.addr, &out->buff[0], mv->str.len);
 						stringpool.free += mv->str.len;
-						lv->v = *mv;
+						lv->v.umval = mv->umval;
 						out->ptr = out->buff;
 						out->line_num++;
 					}
@@ -350,7 +366,7 @@ void zshow_output(zshow_out *out, const mstr *str)
 				mv->mvtype = MV_STR;
 				memcpy(mv->str.addr, &out->buff[0], mv->str.len);
 				stringpool.free += mv->str.len;
-				lv->v = *mv;
+				lv->v.umval = mv->umval;
 				out->ptr = out->buff;
 				out->line_num++;
 			}
@@ -377,6 +393,7 @@ void zshow_output(zshow_out *out, const mstr *str)
 			}
 			tempstr=str->addr;
 			/* build the key by adding the rest of the subscripts */
+			assert(glist_str_protected(&mv_child->str));
 			for (tempstr = str->addr; NULL != (piecestr = STRTOK_R(tempstr,".", &strtokptr)); /* inline assignment */
 					tempstr = NULL)
 			{
@@ -474,15 +491,15 @@ void zshow_output(zshow_out *out, const mstr *str)
 											gv_cur_region->max_key_size, gv_cur_region);
 						}
 					}
-					ENSURE_STP_FREE_SPACE((int)(out->ptr - out->buff));
-					mv->str.addr = (char *)stringpool.free;
+					mv->str.addr = out->buff;
 					mv->str.len = INTCAST(out->ptr - out->buff);
 					mv->mvtype = MV_STR;
-					memcpy(mv->str.addr, &out->buff[0], mv->str.len);
-					stringpool.free += mv->str.len;
 					op_gvput(mv);
-					stringpool.free = (unsigned char *)mv->str.addr;	/* prevent bloat in the loop */
-					out->ptr = out->buff;
+					/* If any copies outlive us, the original action below of resetting the stringpool.free
+					 * is incorrect, because any more writes will clobber valid mvals that might point there.
+					 * If copies don't outlive us, then moving this to the stringpool rather than the MAXSTR
+					 * buffer is unnecessary. So let's just not put it in the stringpool.
+					 */
 					if (!out->line_cont)
 					{	/* the initial chunk went at the line_num right under the code */
 						MV_FORCE_MVAL(mv, out->line_cont);	/* but the rest go down a level */
@@ -492,6 +509,7 @@ void zshow_output(zshow_out *out, const mstr *str)
 							ISSUE_GVSUBOFLOW_ERROR(gv_currkey, KEY_COMPLETE_TRUE, (tmp_len+1),
 											gv_cur_region->max_key_size, gv_cur_region);
 					}
+					out->ptr = out->buff;
 				}
 			}
 			memcpy(out->ptr, str->addr + str_processed, len);
@@ -520,12 +538,9 @@ void zshow_output(zshow_out *out, const mstr *str)
 											gv_cur_region->max_key_size, gv_cur_region);
 				}
 			}
-			ENSURE_STP_FREE_SPACE((int)(out->ptr - out->buff));
-			mv->str.addr = (char *)stringpool.free;
+			mv->str.addr = out->buff;
 			mv->str.len = INTCAST(out->ptr - out->buff);
 			mv->mvtype = MV_STR;
-			memcpy(mv->str.addr, &out->buff[0], mv->str.len);
-			stringpool.free += mv->str.len;
 			op_gvput(mv);
 			out->ptr = out->buff;
 			if (out->line_cont)
@@ -554,7 +569,8 @@ void zshow_output(zshow_out *out, const mstr *str)
 		assertpro(FALSE && out->type);
 		break;
 	}
-	if (!process_exiting)
+	glist_unprotect_str(&mv->str);
+	if (!process_exiting && (mv == &mv_chain->mv_st_cont.mvs_mval))
 		POP_MV_STENT();
 	out->curr_code = out->code;
 	out->flush = FALSE;

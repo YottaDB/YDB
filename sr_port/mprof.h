@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -25,42 +25,44 @@
 					 * are dealing with 32-bit compiles on 64-bit machines */
 #define PROFCALLOC_DSBLKSIZE	8192	/* the size of pcalloc allocation chunks */
 
-#define POPULATE_PROFILING_TABLE()				\
-MBSTART {							\
-	FIX_XFER_ENTRY(xf_linefetch, op_mproflinefetch);	\
-	FIX_XFER_ENTRY(xf_linestart, op_mproflinestart);	\
-	FIX_XFER_ENTRY(xf_extexfun, op_mprofextexfun);		\
-	FIX_XFER_ENTRY(xf_extcall, op_mprofextcall);		\
-	FIX_XFER_ENTRY(xf_exfun, op_mprofexfun);		\
-	FIX_XFER_ENTRY(xf_callb, op_mprofcallb);		\
-	FIX_XFER_ENTRY(xf_calll, op_mprofcalll);		\
-	FIX_XFER_ENTRY(xf_callw, op_mprofcallw);		\
-	FIX_XFER_ENTRY(xf_callspl, op_mprofcallspl);		\
-	FIX_XFER_ENTRY(xf_callspw, op_mprofcallspw);		\
-	FIX_XFER_ENTRY(xf_callspb, op_mprofcallspb);		\
-	FIX_XFER_ENTRY(xf_forlcldob, op_mprofforlcldob);	\
-	FIX_XFER_ENTRY(xf_forlcldow, op_mprofforlcldow);	\
-	FIX_XFER_ENTRY(xf_forlcldol, op_mprofforlcldol);	\
-	FIX_XFER_ENTRY(xf_forchk1, op_mprofforchk1);		\
+#define POPULATE_PROFILING_TABLE()						\
+MBSTART {									\
+	FIX_XFER_ENTRY(xf_linefetch, op_mproflinefetch);			\
+	FIX_XFER_ENTRY(xf_linestart, op_mproflinestart);			\
+	FIX_XFER_ENTRY(xf_extexfun, op_mprofextexfun);				\
+	FIX_XFER_ENTRY(xf_extcall, op_mprofextcall);				\
+	FIX_XFER_ENTRY(xf_exfun, op_mprofexfun);				\
+	FIX_XFER_ENTRY(xf_callb, op_mprofcallb);				\
+	FIX_XFER_ENTRY(xf_calll, op_mprofcalll);				\
+	FIX_XFER_ENTRY(xf_callw, op_mprofcallw);				\
+	FIX_XFER_ENTRY(xf_callspl, op_mprofcallspl);				\
+	FIX_XFER_ENTRY(xf_callspw, op_mprofcallspw);				\
+	FIX_XFER_ENTRY(xf_callspb, op_mprofcallspb);				\
+	FIX_XFER_ENTRY(xf_forlcldob, op_mprofforlcldob);			\
+	FIX_XFER_ENTRY(xf_forlcldow, op_mprofforlcldow);			\
+	FIX_XFER_ENTRY(xf_forlcldol, op_mprofforlcldol);			\
+	FIX_XFER_ENTRY(xf_forchk1, op_mprofforchk1);				\
+	DBGDFRDEVNT((stderr, "%d %s: mprof set\n", __LINE__, __FILE__));	\
 } MBEND
 
-#define CLEAR_PROFILING_TABLE()				\
-MBSTART {						\
-	FIX_XFER_ENTRY(xf_linefetch, op_linefetch);	\
-	FIX_XFER_ENTRY(xf_linestart, op_linestart);	\
-	FIX_XFER_ENTRY(xf_extexfun, op_extexfun);	\
-	FIX_XFER_ENTRY(xf_extcall, op_extcall);		\
-	FIX_XFER_ENTRY(xf_exfun, op_exfun);		\
-	FIX_XFER_ENTRY(xf_callb, op_callb);		\
-	FIX_XFER_ENTRY(xf_callw, op_callw);		\
-	FIX_XFER_ENTRY(xf_calll, op_calll);		\
-	FIX_XFER_ENTRY(xf_callspb, op_callspb);		\
-	FIX_XFER_ENTRY(xf_callspw, op_callspw);		\
-	FIX_XFER_ENTRY(xf_callspl, op_callspl);		\
-	FIX_XFER_ENTRY(xf_forlcldob, op_forlcldob);	\
-	FIX_XFER_ENTRY(xf_forlcldow, op_forlcldow);	\
-	FIX_XFER_ENTRY(xf_forlcldol, op_forlcldol);	\
-	FIX_XFER_ENTRY(xf_forchk1, op_forchk1);		\
+#define CLEAR_PROFILING_TABLE()							\
+MBSTART {									\
+	FIX_XFER_ENTRY(xf_linefetch, op_linefetch);				\
+	FIX_XFER_ENTRY(xf_linestart, op_linestart);				\
+	FIX_XFER_ENTRY(xf_extexfun, op_extexfun);				\
+	FIX_XFER_ENTRY(xf_extcall, op_extcall);					\
+	FIX_XFER_ENTRY(xf_exfun, op_exfun);					\
+	FIX_XFER_ENTRY(xf_callb, op_callb);					\
+	FIX_XFER_ENTRY(xf_callw, op_callw);					\
+	FIX_XFER_ENTRY(xf_calll, op_calll);					\
+	FIX_XFER_ENTRY(xf_callspb, op_callspb);					\
+	FIX_XFER_ENTRY(xf_callspw, op_callspw);					\
+	FIX_XFER_ENTRY(xf_callspl, op_callspl);					\
+	FIX_XFER_ENTRY(xf_forlcldob, op_forlcldob);				\
+	FIX_XFER_ENTRY(xf_forlcldow, op_forlcldow);				\
+	FIX_XFER_ENTRY(xf_forlcldol, op_forlcldol);				\
+	FIX_XFER_ENTRY(xf_forchk1, op_forchk1);					\
+	DBGDFRDEVNT((stderr, "%d %s: mprof clear\n", __LINE__, __FILE__));	\
 } MBEND
 
 typedef struct ext_tms_struct
@@ -117,7 +119,7 @@ typedef struct mprof_wrapper_struct
 	boolean_t		is_tracing_ini;
 	mval			subsc[MAX_GVSUBSCRIPTS];
 	gvargs_t		gvargs;
-	mval			gbl_to_fill;
+	unmanaged_mval		gbl_to_fill;
 } mprof_wrapper;
 
 STATICFNDCL void get_entryref_information(boolean_t, trace_entry *);

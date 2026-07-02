@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2004-2019 Fidelity National Information	*
+ * Copyright (c) 2004-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -16,6 +16,7 @@
 #include "gdsblk.h"		/* needed for gdsfhead.h */
 #include "gtm_facility.h"	/* needed for gdsfhead.h */
 #include "fileinfo.h"		/* needed for gdsfhead.h */
+#include "gcol_list.h"
 #include "gdsbt.h"		/* needed for gdsfhead.h */
 #include "gdsfhead.h"		/* needed for gvcst_protos.h */
 #include "gdsblkops.h"
@@ -50,9 +51,12 @@ void	gvcst_incr(mval *increment, mval *result)
 	 * will not affect this mval so it is safe to read this anytime in gvcst_put. The mval "increment_delta_mval" is also
 	 * used in gvincr_recompute_upd_array.
 	 */
-	increment_delta_mval = *increment;
+	assert(!glist_str_protected(&increment_delta_mval.str));
+	increment_delta_mval.umval = increment->umval;
 	/* Since we should be caring about just the numeric part, nullify the string part of the mval */
+	increment_delta_mval.mvtype &= MV_STR_OFF;
 	increment_delta_mval.str.len = 0;
+	increment_delta_mval.str.addr = NULL;
 	gvcst_put(&increment_delta_mval);
 	assert(!in_gvcst_incr);	/* should have been reset by gvcst_put */
 	in_gvcst_incr = FALSE;	/* just in case it is not reset already by gvcst_put */

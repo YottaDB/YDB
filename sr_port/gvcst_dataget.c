@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2025 Fidelity National Information	*
+ * Copyright (c) 2010-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -41,7 +41,7 @@
 #include "tp_restart.h"
 #include "gtmimagename.h"
 
-LITREF	mstr		nsb_dummy;
+LITREF	unmanaged_mstr		nsb_dummy;
 
 GBLREF	gv_key			*gv_currkey;
 GBLREF	gv_namehead		*gv_target;

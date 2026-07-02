@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -66,7 +66,7 @@ void op_zprevious(mval *v)
 	gvnh_reg_t		*gvnh_reg;
 	int			min_reg_index, reg_index, res;
 	int4			n;
-	mname_entry		gvname;
+	unmanaged_mname_entry	gvname;
 	mval			tmpmval, *datamval;
 	sgm_info		*save_sgm_info_ptr;
 	jnlpool_addrs_ptr_t	save_jnlpool;
@@ -114,6 +114,7 @@ void op_zprevious(mval *v)
 			found = gvusr_zprevious();
 		v->mvtype = 0; /* so stp_gcol (if invoked below) can free up space currently occupied (BYPASSOK)
 				* by this to-be-overwritten mval */
+		v->str.len = 0;
 		if (found)
 		{
 			gv_altkey->prev = gv_currkey->prev;
@@ -299,8 +300,6 @@ void op_zprevious(mval *v)
 			}
 		}
 		change_reg();
-		v->mvtype = 0; /* so stp_gcol (if invoked below) can free up space currently occupied (BYPASSOK)
-				* by this to-be-overwritten mval */
 		if (found)
 		{
 			if (!IS_STP_SPACE_AVAILABLE(gvname.var_name.len + 1))

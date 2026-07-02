@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -92,11 +92,26 @@ typedef gtm_char_t		gtm_jstring_t;
 typedef gtm_char_t		gtm_jbyte_array_t;
 typedef gtm_char_t		gtm_jbig_decimal_t;
 
+/* Flag values for gtm_init_extra */
+
+#define	GTMCI_FLAG_TERMIO_ENABLE		1	/* Allow resetting terminal attributes */
+#define	GTMCI_FLAG_TERMIO_ALWAYS		2	/* Reset terminal attributes after each call */
+#define	GTMCI_FLAG_TERM_ENABLE_AND_ALWAYS	(GTMCI_FLAG_TERMIO_ENABLE | GTMCI_FLAG_TERMIO_ALWAYS)
+#define	GTMCI_FLAG_GTMJI			4	/* Reserved for Call-in from Java with flags */
+
+/* Values to record state kept in high bit of flag word */
+
+#define	GTMCI_STATE_CLEAR	0x0000FFFF	/* Clear state bits */
+#define GTMCI_STATE_TERM_RESET	   0x10000	/* iott_resetterm was called */
+#define GTMCI_STATE_TERM_ENABLE_AND_RESET	(GTMCI_FLAG_TERMIO_ENABLE | GTMCI_STATE_TERM_RESET)
+
 /* Call-in interface. */
 gtm_status_t 	gtm_ci(const char *c_rtn_name, ...);
 gtm_status_t	gtm_ci_filter(const char *c_rtn_name, ...);
 gtm_status_t 	gtm_cip(ci_name_descriptor *ci_info, ...);
 gtm_status_t 	gtm_init(void);
+gtm_status_t 	gtm_init_extra(unsigned int flags, ...);
+gtm_status_t	gtm_terminal_reset(void);	/* Normalize terminal attributes after call to M */
 #ifdef GTM_PTHREAD
 gtm_status_t 	gtm_jinit(void);
 #endif

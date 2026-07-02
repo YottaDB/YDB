@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -28,7 +28,7 @@
 #include "mlkdef.h"
 #include "filestruct.h"
 #include "gbldirnam.h"
-#include "hashtab_mname.h"
+#include "hashtab_umname.h"
 #include "hashtab.h"
 #include "dpgbldir.h"
 
@@ -118,8 +118,8 @@ gd_addr *create_dummy_gbldir(void)
 	GLD_REG_INIT(statsdb_reg, "default", addr);	/* statsdb region */
 	addr->id = (gd_id *)malloc(SIZEOF(gd_id));
 	memset(addr->id, 0, SIZEOF(gd_id));
-	addr->tab_ptr = (hash_table_mname *)malloc(SIZEOF(hash_table_mname));
-	init_hashtab_mname((hash_table_mname *)addr->tab_ptr, 0, HASHTAB_NO_COMPACT, HASHTAB_NO_SPARE_TABLE );
+	addr->tab_ptr = (hash_table_umname *)malloc(SIZEOF(hash_table_umname));
+	init_hashtab_umname(addr->tab_ptr, 0, HASHTAB_NO_COMPACT, HASHTAB_NO_SPARE_TABLE );
 	return addr;
 }
 
@@ -156,10 +156,10 @@ void remap_globals_to_one_region(gd_addr *addr, gd_region *reg)
 	} else
 	{	/* Clean up the exist M-name hash table which points to the previous region */
 		assert(NULL != addr->tab_ptr);
-		free_hashtab_mname(addr->tab_ptr);
+		free_hashtab_umname(addr->tab_ptr);
 		free(addr->tab_ptr);
-		addr->tab_ptr = (hash_table_mname *)malloc(SIZEOF(hash_table_mname));
-		init_hashtab_mname((hash_table_mname *)addr->tab_ptr, 0, HASHTAB_NO_COMPACT, HASHTAB_NO_SPARE_TABLE );
+		addr->tab_ptr = (hash_table_umname *)malloc(SIZEOF(hash_table_umname));
+		init_hashtab_umname(addr->tab_ptr, 0, HASHTAB_NO_COMPACT, HASHTAB_NO_SPARE_TABLE );
 	}
 	/* Repoint all names to the target region */
 	for (i = 0; i < addr->n_maps; i++)

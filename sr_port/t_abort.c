@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2004-2025 Fidelity National Information	*
+ * Copyright (c) 2004-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -58,7 +58,6 @@ void t_abort(gd_region *reg, sgmnt_addrs *csa)
 			assert(!dollar_tlevel);
 		}
 	}
-	ACCUMULATE_LCL_GVSTATS_COUNTER(csa, csa->nl, n_cache_reads);
 	t_abort_cleanup();
 	/* Do not release crit in case of
 	 * 	a) MUPIP RECOVER ONLINE  OR

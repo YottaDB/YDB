@@ -26,7 +26,7 @@
 #include "gdsbt.h"
 #include "gdsfhead.h"
 #include "alias.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "stack_frame.h"
 
 GBLREF symval           *curr_symval;

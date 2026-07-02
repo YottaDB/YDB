@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,14 +32,18 @@
 	var = lv_getslot(LV_GET_SYMVAL(lv));							\
 	assert(var);										\
 	restore_ent = (tp_var *)malloc(SIZEOF(tp_var));						\
+	glist_first_init_str(&restore_ent->key.var_name);					\
 	restore_ent->current_value = (lv);							\
 	restore_ent->save_value = var;								\
-	memcpy(&restore_ent->key, (mnamekey), SIZEOF(mname_entry));				\
+	restore_ent->key.umname = *(mnamekey);							\
+	glist_protect_str(&restore_ent->key.var_name);						\
 	restore_ent->var_cloned = FALSE;							\
 	restore_ent->next = (tf)->vars;								\
 	assert(NULL == (lv)->tp_var);								\
 	(lv)->tp_var = restore_ent;								\
-	*var = *(lv);										\
+	memcpy((ok_to_clobber_mstr_p)var, (ok_to_clobber_mstr_p)lv, SIZEOF(*var));		\
+	var->v.str.in_array = FALSE;								\
+	glist_protect_str(&var->v.str);								\
 	LV_CHILD(var) = NULL;	/* initialize child to NULL until actual cloning occurs.	\
 				 * this is needed so stp_gcol does not DOUBLE count subtree */	\
 	/* Increment refcnts (due to "restore_ent->save_value") to prevent deletion		\

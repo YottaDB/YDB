@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -16,7 +16,7 @@
 #include "gtm_stdio.h"
 
 #include "cache.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "zbreak.h"
 #include "stack_frame.h"
 #include "xfer_enum.h"
@@ -108,7 +108,7 @@ void	op_setzbrk(mval *rtn, mval *lab, int offset, mval *act, int cnt)
 		flush_pio();
 		if (WANT_CURRENT_RTN(rtn))
 			routine = CURRENT_RHEAD_ADR(frame_pointer->rvector);
-		else if (NULL == (routine = find_rtn_hdr(&rtn->str)))	/* Note assignment */
+		else if (NULL == (routine = find_rtn_hdr(&rtn->str.mident)))	/* Note assignment */
 		{
 #			ifdef GTM_TRIGGER
 			/* trigger_source_read_andor_verify may alter the length part of the mstr to remove the +BREG
@@ -116,7 +116,8 @@ void	op_setzbrk(mval *rtn, mval *lab, int offset, mval *act, int cnt)
 			 * struct to avoid modification to routine->str as it affects the caller which relies on this
 			 * variable being untouched.
 			 */
-			tmprtnname = rtn->str;
+			tmprtnname.umstr = rtn->str.umstr;
+			tmprtnname.in_array = FALSE;
 			if (is_trigger)
 			{
 				routine = NULL;				/* Init so garbage value isn't used */
@@ -128,7 +129,7 @@ void	op_setzbrk(mval *rtn, mval *lab, int offset, mval *act, int cnt)
 #			endif
 			{
 				op_zlink(rtn, NULL);
-				routine = find_rtn_hdr(&rtn->str);
+				routine = find_rtn_hdr(&rtn->str.mident);
 				if (NULL == routine)
 					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_ZLINKFILE, 2, rtn->str.len, rtn->str.addr,
 						ERR_ZLMODULE, 2, mid_len(&zlink_mname), &zlink_mname.c[0]);
@@ -160,7 +161,8 @@ void	op_setzbrk(mval *rtn, mval *lab, int offset, mval *act, int cnt)
 			if (!sstatus)				/* sstatus == 0 meaning this is the GTM$DMOD routine - error out */
 				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_INVZBREAK);
 			op_commarg(act, indir_linetail); 	/* This puts entry in stack and also increments refcnt field */
-			indir_src.str = act->str;
+			indir_src.str.umstr = act->str.umstr;
+			indir_src.str.in_array = FALSE;
 			indir_src.code = indir_linetail;
 			obj = cache_get(&indir_src);
 			assert(NULL != obj);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -59,13 +59,13 @@ boolean_t resolve_optimize(triple *curtrip)
 			{	/* this just spits out a warning */
 				if (!(cmd_qlf.qlf & CQ_WARNINGS))
 					break;
-				src_line = TREF(source_buffer);
-				TREF(source_buffer) = cur_line->str;
+				src_line.umstr = (TREF(source_buffer)).umstr;
+				(TREF(source_buffer)).umstr = cur_line->str.umstr;
 				TREF(last_source_column) = curtrip->src.column;
 				show_source_line(TRUE);
 				dec_err(VARLSTCNT(1) ERR_DONOBLOCK);
 				/* not aware of any reason to put the the following 3 back, but should be rare and safe */
-				TREF(source_buffer) = src_line;
+				(TREF(source_buffer)).umstr = src_line.umstr;
 				TREF(last_source_column) = sav_col;
 				TREF(source_line) = (src_head.que.bl->line + 1);
 				break;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -24,7 +24,7 @@
 #include "io.h"
 #include "iotimer.h"
 #include "iosocketdef.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "stack_frame.h"
 #include "mv_stent.h"
 #include "have_crit.h"
@@ -517,65 +517,68 @@ boolean_t iosocket_connect(socket_struct *sockptr, int4 msec_timeout, boolean_t 
 			SOCKET_FREE(sockptr);
 			return FALSE;
 		}
-		if (res < 0 && outofband)	/* if connected delay outofband */
+		if (res < 0)
 		{
-			DBGSOCK((stdout, "socconn: outofband interrupt received (%d) -- "
-				 "queueing mv_stent for wait intr\n", outofband));
-			if (!OUTOFBAND_RESTARTABLE(outofband))
-			{	/* the operation would not be resumed, no need to save socket device states */
-				if (!need_socket)
-				{
-					close(sockptr->sd);
+			if (outofband)
+			{	/* if connected delay outofband */
+				DBGSOCK((stdout, "socconn: outofband interrupt received (%d) -- "
+					 "queueing mv_stent for wait intr\n", outofband));
+				if (!OUTOFBAND_RESTARTABLE(outofband))
+				{	/* the operation would not be resumed, no need to save socket device states */
+					if (!need_socket)
+					{
+						close(sockptr->sd);
+						sockptr->sd = FD_INVALID;
+					}
+					if (NULL != sockptr->remote.ai_head)
+					{
+						DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
+						freeaddrinfo(sockptr->remote.ai_head);
+						ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
+						sockptr->remote.ai_head = NULL;
+					}
+					SOCKET_FREE(sockptr);
+					async_action(FALSE);
+					assertpro(FALSE);
+				}
+				if (need_connect)
+				{	/* no connect in progress */
+					close(sockptr->sd);	/* Don't leave a dangling socket around */
 					sockptr->sd = FD_INVALID;
-				}
-				if (NULL != sockptr->remote.ai_head)
+					sockptr->state = socket_created;
+				} else
+					sockptr->state = socket_connect_inprogress;
+				real_sockintr->who_saved = sockintr->who_saved = sockwhich_connect;
+				if (NO_M_TIMEOUT != msec_timeout)
 				{
-					DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
-					freeaddrinfo(sockptr->remote.ai_head);
-					ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
-					sockptr->remote.ai_head = NULL;
-				}
-				SOCKET_FREE(sockptr);
+					real_sockintr->end_time = sockintr->end_time = end_time;
+					real_sockintr->end_time_valid  = sockintr->end_time_valid = TRUE;
+				} else
+					real_sockintr->end_time_valid = sockintr->end_time_valid = FALSE;
+				real_sockintr->newdsocket = sockintr->newdsocket = newdsocket;
+				real_dsocketptr->mupintr = dsocketptr->mupintr = TRUE;
+				d_socket_struct_len = SIZEOF(d_socket_struct) +
+							(SIZEOF(socket_struct) * (gtm_max_sockets - 1));
+				ENSURE_STP_FREE_SPACE(d_socket_struct_len);
+				PUSH_MV_STENT(MVST_ZINTDEV);
+				mv_chain->mv_st_cont.mvs_zintdev.buffer_valid = FALSE;
+				mv_chain->mv_st_cont.mvs_zintdev.io_ptr = NULL;
+				mv_chain->mv_st_cont.mvs_zintdev.socketptr = sockptr;	/* for sd and to free structure */
+				mv_chain->mv_st_cont.mvs_zintdev.curr_sp_buffer.len = d_socket_struct_len;
+				mv_chain->mv_st_cont.mvs_zintdev.curr_sp_buffer.addr = (char *)stringpool.free;
+				memcpy (stringpool.free, (unsigned char *)newdsocket, d_socket_struct_len);
+				stringpool.free += d_socket_struct_len;
+				mv_chain->mv_st_cont.mvs_zintdev.io_ptr = iod;
+				mv_chain->mv_st_cont.mvs_zintdev.buffer_valid = TRUE;
+				socketus_interruptus++;
+				DBGSOCK((stdout, "socconn: mv_stent queued - endtime: %d/%d  interrupts: %d\n",
+					 end_time.at_sec, end_time.at_usec, socketus_interruptus));
 				async_action(FALSE);
-				assertpro(FALSE);
+				assertpro(FALSE);      /* Should *never* return from async_action */
+				return FALSE;   /* For the compiler.. */
 			}
-			if (need_connect)
-			{	/* no connect in progress */
-				close(sockptr->sd);	/* Don't leave a dangling socket around */
-				sockptr->sd = FD_INVALID;
-				sockptr->state = socket_created;
-			} else
-				sockptr->state = socket_connect_inprogress;
-			real_sockintr->who_saved = sockintr->who_saved = sockwhich_connect;
-			if (NO_M_TIMEOUT != msec_timeout)
-			{
-				real_sockintr->end_time = sockintr->end_time = end_time;
-				real_sockintr->end_time_valid  = sockintr->end_time_valid = TRUE;
-			} else
-				real_sockintr->end_time_valid = sockintr->end_time_valid = FALSE;
-			real_sockintr->newdsocket = sockintr->newdsocket = newdsocket;
-			real_dsocketptr->mupintr = dsocketptr->mupintr = TRUE;
-			d_socket_struct_len = SIZEOF(d_socket_struct) +
-						(SIZEOF(socket_struct) * (gtm_max_sockets - 1));
-			ENSURE_STP_FREE_SPACE(d_socket_struct_len);
-			PUSH_MV_STENT(MVST_ZINTDEV);
-			mv_chain->mv_st_cont.mvs_zintdev.buffer_valid = FALSE;
-			mv_chain->mv_st_cont.mvs_zintdev.io_ptr = NULL;
-			mv_chain->mv_st_cont.mvs_zintdev.socketptr = sockptr;	/* for sd and to free structure */
-			mv_chain->mv_st_cont.mvs_zintdev.curr_sp_buffer.len = d_socket_struct_len;
-			mv_chain->mv_st_cont.mvs_zintdev.curr_sp_buffer.addr = (char *)stringpool.free;
-			memcpy (stringpool.free, (unsigned char *)newdsocket, d_socket_struct_len);
-			stringpool.free += d_socket_struct_len;
-			mv_chain->mv_st_cont.mvs_zintdev.io_ptr = iod;
-			mv_chain->mv_st_cont.mvs_zintdev.buffer_valid = TRUE;
-			socketus_interruptus++;
-			DBGSOCK((stdout, "socconn: mv_stent queued - endtime: %d/%d  interrupts: %d\n",
-				 end_time.at_sec, end_time.at_usec, socketus_interruptus));
-			async_action(FALSE);
-			assertpro(FALSE);      /* Should *never* return from async_action */
-			return FALSE;   /* For the compiler.. */
+			hiber_start(100);	/* wait 100ms only on a connection retry */
 		}
-		hiber_start(100);
 	} while (res < 0);
 	sockptr->state = socket_connected;
 	sockptr->first_read = sockptr->first_write = TRUE;

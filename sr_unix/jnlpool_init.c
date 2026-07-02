@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -311,7 +311,7 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 	}
 	if (0 == seg->fname_len)
 	{	/* Fill in fields only if this is the first time this jnlpool is opening the replication instance file */
-		memcpy((char *)seg->fname, instfilename, full_len);
+		memcpy(seg->fname, instfilename, full_len);
 		udi->fn = (char *)seg->fname;
 		seg->fname_len = full_len;
 		seg->fname[full_len] = '\0';

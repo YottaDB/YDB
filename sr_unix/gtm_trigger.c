@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2025 Fidelity National Information	*
+ * Copyright (c) 2010-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -23,7 +23,7 @@
 #include "cmd_qlf.h"
 #include "compiler.h"
 #include "error.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "stack_frame.h"
 #include "lv_val.h"
 #include "mv_stent.h"
@@ -84,8 +84,9 @@ GBLREF	mval			dollar_zsource;
 GBLREF	unsigned char		*stackbase, *stacktop, *msp, *stackwarn;
 GBLREF	symval			*curr_symval;
 GBLREF	int4			gtm_trigger_depth;
+GBLREF	gv_key			*gv_currkey;
 GBLREF	int4			tstart_trigger_depth;
-GBLREF	mstr			*dollar_ztname;
+GBLREF	mident			*dollar_ztname;
 GBLREF	mval			*dollar_ztdata;
 GBLREF	mval			*dollar_ztdelim;
 GBLREF	mval			*dollar_ztoldval;
@@ -143,33 +144,75 @@ error_def(ERR_CITPNESTED);
 
 /* Macro to re-initialize a symval block that was on a previously-used free chain */
 #define REINIT_SYMVAL_BLK(svb, prev)									\
-{													\
+MBSTART {												\
 	symval	*ptr;											\
-	lv_blk	*lvbp;											\
-	lv_val	*lv_base, *lv_free;									\
+	size_t	clrlen;											\
+	lv_blk	*lp;											\
+	lv_val	*lv_base, *lv_free, *lvval_ptr;								\
+	lvTree	*lvt_base;										\
+	lvTreeNode *lvtn_base, *lvtn_free, *lvtn_ptr;							\
 													\
 	ptr = svb;											\
 	assert(NULL == ptr->xnew_var_list);								\
 	assert(NULL == ptr->xnew_ref_list);								\
 	reinitialize_hashtab_mname(&ptr->h_symtab);							\
 	ptr->lv_flist = NULL;										\
+	ptr->lvtree_flist = NULL;									\
+	ptr->lvtreenode_flist = NULL;									\
 	ptr->tp_save_all = 0;										\
 	ptr->alias_activity = FALSE;									\
 	ptr->last_tab = (prev);										\
 	ptr->symvlvl = prev->symvlvl + 1;								\
 	/* The lv_blk chain can remain as is but need to reinit each block so no elements are "used" */	\
-	for (lvbp = ptr->lv_first_block; lvbp; lvbp = lvbp->next)					\
+	for (lp = ptr->lv_first_block; lp; lp = lp->next)						\
 	{	/* Likely only one of these blocks (some few lvvals) but loop in case.. */		\
-		lv_base = (lv_val *)LV_BLK_GET_BASE(lvbp);						\
-		lv_free = LV_BLK_GET_FREE(lvbp, lv_base);						\
-		clrlen = INTCAST((char *)lv_free - (char *)lv_base);					\
+		lv_base = (lv_val *)LV_BLK_GET_BASE(lp);						\
+		lv_free = LV_BLK_GET_FREE(lp, lv_base);							\
+		for (lvval_ptr = lv_base; lvval_ptr < lv_free; lvval_ptr++)				\
+		{											\
+			assert(!glist_str_protected(&lvval_ptr->v.str) || LV_PARENT(lvval_ptr));	\
+			if (NULL == LV_PARENT(lvval_ptr))						\
+				continue;								\
+			glist_unprotect_str(&lvval_ptr->v.str);						\
+		}											\
+		clrlen = (char *)lv_free - (char *)lv_base;						\
 		if (0 != clrlen)									\
 		{											\
-			memset(lv_base, '\0', clrlen);							\
-			lvbp->numUsed = 0;								\
+			memset(lv_base, 0, clrlen);							\
+			lp->numUsed = 0;								\
 		}											\
 	}												\
-}
+	for (lp = ptr->lvtree_first_block; NULL != lp; lp = lp->next)					\
+	{												\
+		lvt_base = (lvTree *)LV_BLK_GET_BASE(lp);						\
+		if (lp->numUsed)									\
+		{											\
+			memset(lvt_base, 0, lp->numUsed * SIZEOF(*lvt_base));				\
+			lp->numUsed = 0;								\
+		}											\
+	}												\
+	for (lp = ptr->lvtreenode_first_block; NULL != lp; lp = lp->next)				\
+	{												\
+		lvtn_base = (lvTreeNode *)LV_BLK_GET_BASE(lp);						\
+		lvtn_free = (lvTreeNode *)LV_BLK_GET_FREE(lp, lvtn_base);				\
+		for (lvtn_ptr = lvtn_base; lvtn_ptr < lvtn_free; lvtn_ptr++)				\
+		{											\
+			if (NULL == LV_PARENT(lvtn_ptr))						\
+			{										\
+				assert(!glist_str_protected(&lvtn_ptr->v.str));				\
+				assert(!glist_lvTreeNode_key_protected(lvtn_ptr));			\
+				continue;								\
+			}										\
+			glist_unprotect_str(&lvtn_ptr->v.str);						\
+			glist_unprotect_lvTreeNode_key(lvtn_ptr);					\
+		}											\
+		if (lp->numUsed)									\
+		{											\
+			memset(lvtn_base, 0, lp->numUsed * SIZEOF(*lvtn_base));				\
+			lp->numUsed = 0;								\
+		}											\
+	}												\
+} MBEND
 
 /* All other platforms use this much faster direct return */
 void gtm_levl_ret_code(void);
@@ -226,7 +269,12 @@ CONDITION_HANDLER(gtm_trigger_complink_ch)
 	if (((unsigned char *)mv_chain == msp) && (MVST_MSAV == mv_chain->mv_st_type)
 	    && (&dollar_zsource == mv_chain->mv_st_cont.mvs_msav.addr))
 	{	/* Top mv_stent is one we pushed on there - get rid of it */
-		dollar_zsource = mv_chain->mv_st_cont.mvs_msav.v;
+		glist_unprotect_str(&dollar_zsource.str);
+		assert(glist_mval_in_sync(&mv_chain->mv_st_cont.mvs_msav.v));
+		dollar_zsource.umval = mv_chain->mv_st_cont.mvs_msav.v.umval;
+		if (glist_str_protected(&mv_chain->mv_st_cont.mvs_msav.v.str))
+			glist_transfer_protection_to_from(&dollar_zsource.str, &mv_chain->mv_st_cont.mvs_msav.v.str);
+		assert(glist_mval_in_sync(&dollar_zsource));
 		POP_MV_STENT();
 	}
 	if (DUMPABLE)
@@ -448,7 +496,8 @@ int gtm_trigger_complink(gv_trigger_t *trigdsc, boolean_t dolink)
 	zcompprm.str.len = len;
 	/* Backup dollar_zsource so trigger doesn't show */
 	PUSH_MV_STENT(MVST_MSAV);
-	mv_chain->mv_st_cont.mvs_msav.v = dollar_zsource;
+	mv_chain->mv_st_cont.mvs_msav.v.umval = dollar_zsource.umval;
+	glist_sync_mval(&mv_chain->mv_st_cont.mvs_msav.v);
 	mv_chain->mv_st_cont.mvs_msav.addr = &dollar_zsource;
 	TREF(trigger_compile_and_link) = TRUE;	/* Set flag so compiler knows this is a special trigger compile */
 	op_zcompile(&zcompprm, TRUE);		/* Compile but don't use $ZCOMPILE qualifiers */
@@ -500,7 +549,10 @@ int gtm_trigger_complink(gv_trigger_t *trigdsc, boolean_t dolink)
 	}
 	if (MVST_MSAV == mv_chain->mv_st_type && &dollar_zsource == mv_chain->mv_st_cont.mvs_msav.addr)
 	{       /* Top mv_stent is one we pushed on there - restore dollar_zsource and get rid of it */
-		dollar_zsource = mv_chain->mv_st_cont.mvs_msav.v;
+		glist_unprotect_str(&dollar_zsource.str);
+		dollar_zsource.umval = mv_chain->mv_st_cont.mvs_msav.v.umval;
+		if (glist_str_protected(&mv_chain->mv_st_cont.mvs_msav.v.str))
+			glist_transfer_protection_to_from(&dollar_zsource.str, &mv_chain->mv_st_cont.mvs_msav.v.str);
 		POP_MV_STENT();
 	} else
 		assert(FALSE); 	/* This mv_stent should be the one we just pushed */
@@ -528,7 +580,7 @@ int gtm_trigger(gv_trigger_t *trigdsc, gtm_trigger_parms *trigprm)
 	uint4		*indx_p;
 	ht_ent_mname	*tabent;
 	boolean_t	added;
-	int		clrlen, rc, i, unwinds;
+	int		rc, i, unwinds;
 	mval		**lvvalarray;
 	mv_stent	*mv_st_ent;
 	symval		*new_symval;
@@ -605,12 +657,11 @@ int gtm_trigger(gv_trigger_t *trigdsc, gtm_trigger_parms *trigprm)
 		 * by the extnam saving code below. This initialization keeps stp_gcol - should it be called - from attempting
 		 * to process unset fields filled with garbage in them as valid mstr address/length pairs.
 		 */
-		mv_st_ent->mv_st_cont.mvs_trigr.savtarg.str.len = 0;
-		mv_st_ent->mv_st_cont.mvs_trigr.savextref.len = 0;
-		mv_st_ent->mv_st_cont.mvs_trigr.dollar_etrap_save.str.len = 0;
-		mv_st_ent->mv_st_cont.mvs_trigr.dollar_ztrap_save.str.len = 0;
 		mv_st_ent->mv_st_cont.mvs_trigr.saved_dollar_truth = dollar_truth;
 		op_gvsavtarg(&mv_st_ent->mv_st_cont.mvs_trigr.savtarg);
+		glist_sync_str(&mv_st_ent->mv_st_cont.mvs_trigr.savtarg.str);
+		assert(glist_str_in_stringpool(&mv_st_ent->mv_st_cont.mvs_trigr.savtarg.str)
+			|| (NULL == gv_currkey || 0 == gv_currkey->end));
 		if (extnam_str.len)
 		{
 			ENSURE_STP_FREE_SPACE(extnam_str.len);
@@ -618,8 +669,10 @@ int gtm_trigger(gv_trigger_t *trigdsc, gtm_trigger_parms *trigprm)
 			memcpy(mv_st_ent->mv_st_cont.mvs_trigr.savextref.addr, extnam_str.addr, extnam_str.len);
 			stringpool.free += extnam_str.len;
 			assert(stringpool.free <= stringpool.top);
+			mv_st_ent->mv_st_cont.mvs_trigr.savextref.len = extnam_str.len;
+			glist_protect_str(&mv_st_ent->mv_st_cont.mvs_trigr.savextref);
 		}
-		mv_st_ent->mv_st_cont.mvs_trigr.savextref.len = extnam_str.len;
+		assert(glist_str_in_sync(&mv_st_ent->mv_st_cont.mvs_trigr.savextref));
 		mv_st_ent->mv_st_cont.mvs_trigr.ztname_save = dollar_ztname;
 		mv_st_ent->mv_st_cont.mvs_trigr.ztdata_save = dollar_ztdata;
 		mv_st_ent->mv_st_cont.mvs_trigr.ztdelim_save = dollar_ztdelim;
@@ -650,14 +703,21 @@ int gtm_trigger(gv_trigger_t *trigdsc, gtm_trigger_parms *trigprm)
 		mv_st_ent->mv_st_cont.mvs_trigr.gtm_trigger_depth_save = gtm_trigger_depth;
 		if (0 == gtm_trigger_depth)
 		{	/* Only back up $*trap settings when initiating the first trigger level */
-			mv_st_ent->mv_st_cont.mvs_trigr.dollar_etrap_save = TREF(dollar_etrap);
-			mv_st_ent->mv_st_cont.mvs_trigr.dollar_ztrap_save = TREF(dollar_ztrap);
+			mv_st_ent->mv_st_cont.mvs_trigr.dollar_etrap_save.umval = (TREF(dollar_etrap)).umval;
+			if (glist_str_protected(&((TREF(dollar_etrap)).str)))
+				glist_transfer_protection_to_from(&mv_st_ent->mv_st_cont.mvs_trigr.dollar_etrap_save.str,
+					&((TREF(dollar_etrap)).str));
+			mv_st_ent->mv_st_cont.mvs_trigr.dollar_ztrap_save.umval = (TREF(dollar_ztrap)).umval;
+			if (glist_str_protected(&((TREF(dollar_ztrap)).str)))
+				glist_transfer_protection_to_from(&mv_st_ent->mv_st_cont.mvs_trigr.dollar_ztrap_save.str,
+					&((TREF(dollar_ztrap)).str));
 			mv_st_ent->mv_st_cont.mvs_trigr.ztrap_explicit_null_save = ztrap_explicit_null;
-			(TREF(dollar_ztrap)).str.len = 0;
+			NULLIFY_TRAP(TREF(dollar_ztrap));
 			ztrap_explicit_null = FALSE;
 			if (NULL != (TREF(gtm_trigger_etrap)).str.addr)
 				/* An etrap was defined for the trigger environment - Else existing $etrap persists */
-				TREF(dollar_etrap) = TREF(gtm_trigger_etrap);
+				(TREF(dollar_etrap)).umval = (TREF(gtm_trigger_etrap)).umval;
+			glist_sync_mval(TADR(dollar_etrap));
 		}
 		mv_st_ent->mv_st_cont.mvs_trigr.mumps_status_save = mumps_status;
 		mv_st_ent->mv_st_cont.mvs_trigr.run_time_save = run_time;
@@ -725,7 +785,7 @@ int gtm_trigger(gv_trigger_t *trigdsc, gtm_trigger_parms *trigprm)
 		assert(MV_DEFINED(lvvalue));			/* No sense in defining the undefined */
 		lvval = lv_getslot(curr_symval);		/* Allocate an lvval to put into symbol table */
 		LVVAL_INIT(lvval, curr_symval);
-		lvval->v = *lvvalue;				/* Copy mval into lvval */
+		lvval->v.umval = lvvalue->umval;				/* Copy mval into lvval */
 		assert(mne_p->marked != INDIR_MARKED);
 		added = add_hashtab_mname_symval(&curr_symval->h_symtab, mne_p, lvval, &tabent, FALSE);
 		assert(added);

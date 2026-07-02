@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -15,10 +15,11 @@
 #include "gtm_string.h"
 
 #include "cmd_qlf.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "op.h"
 #include "job_addr.h"
 #include "zbreak.h"
+#include "gcol_list.h"
 
 GBLREF mident_fixed     zlink_mname;
 
@@ -34,12 +35,14 @@ boolean_t job_addr(mstr *rtn, mstr *label, int4 offset, char **hdr, char **labad
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	if (NULL == (rt_hdr = find_rtn_hdr(rtn)))
+	rt.str.in_array = FALSE;
+	if (NULL == (rt_hdr = find_rtn_hdr(&rtn->mident)))
 	{
 		rt.mvtype = MV_STR;
-		rt.str = *rtn;
+		rt.str.umstr = rtn->umstr;
+		assert(!glist_str_in_stringpool(&rt.str));
 		op_zlink(&rt, NULL);
-		rt_hdr = find_rtn_hdr(rtn);
+		rt_hdr = find_rtn_hdr(&rtn->mident);
 		if (NULL == rt_hdr)
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_ZLINKFILE, 2, rtn->len, rtn->addr,
 				ERR_ZLMODULE, 2, STRLEN(&zlink_mname.c[0]), &zlink_mname);

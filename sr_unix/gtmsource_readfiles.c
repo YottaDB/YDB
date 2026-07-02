@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2024 Fidelity National Information	*
+ * Copyright (c) 2006-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -491,7 +491,12 @@ static	int open_newer_gener_jnlfiles(gd_region *reg, repl_ctl_element *reg_ctl_e
 		REPL_DPRINT3("Detected name change of %s to %s\n", reg_ctl_end->jnl_fn, jnl_fn);
 		reg_ctl_end->jnl_fn_len = reg_ctl_end->reg->jnl_file_len = jnl_fn_len;
 		memcpy(reg_ctl_end->jnl_fn, jnl_fn, jnl_fn_len);
+		reg_ctl_end->jnl_fn[jnl_fn_len] = '\0';
 		memcpy(reg_ctl_end->reg->jnl_file_name, jnl_fn, jnl_fn_len);
+		reg_ctl_end->reg->jnl_file_name[jnl_fn_len] = '\0';
+		repl_log(gtmsource_log_fp, TRUE, TRUE, "REPL_INFO : Detected journal file rename to %s"
+			" for Database File: %s\n", reg_ctl_end->jnl_fn,
+			reg_ctl_end->reg->dyn.addr->fname);
 	}
 	/* Except the latest generation, mark the newly opened future generations CLOSED, or EMPTY.
 	 * We assume that when a new file is opened, the previous generation has been flushed to disk fully.

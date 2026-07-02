@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,6 +14,7 @@
 
 #include "stringpool.h"
 #include "error_trap.h"
+#include "gcol_list.h"
 
 GBLREF	spdesc			stringpool;
 GBLREF	dollar_stack_type	dollar_stack;			/* structure containing $STACK related information */
@@ -24,17 +26,17 @@ void	get_dollar_stack_info(int level, stack_mode_t mode,  mval *result)
 	switch (mode)
 	{
 		case DOLLAR_STACK_MODE:
-			result->str = dollar_stack.array[level].mode_str;
+			result->str.umstr = dollar_stack.array[level].mode_str.umstr;
 			break;
 		case DOLLAR_STACK_MCODE:
-			result->str = dollar_stack.array[level].mcode_str;
+			result->str.umstr = dollar_stack.array[level].mcode_str.umstr;
 			break;
 		case DOLLAR_STACK_PLACE:
-			result->str = dollar_stack.array[level].place_str;
+			result->str.umstr = dollar_stack.array[level].place_str.umstr;
 			break;
 		case DOLLAR_STACK_ECODE:
 			if (NULL != dollar_stack.array[level].ecode_ptr)
-				result->str = dollar_stack.array[level].ecode_ptr->ecode_str;
+				result->str.umstr = dollar_stack.array[level].ecode_ptr->ecode_str.umstr;
 			else
 			{
 				result->str.len = 0;

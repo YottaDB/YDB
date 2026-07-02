@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2023 Fidelity National Information	*
+ * Copyright (c) 2006-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -81,10 +81,11 @@ int gtmsource_get_opt(void)
 	unsigned short	connect_parms_index, counter;
 	int 		index = 0, port_len, renegotiate_interval, status;
 	int		timeout_status;
-	mstr		log_nam, trans_name;
+	mstr		trans_name;
 	struct hostent	*sec_hostentry;
 	unsigned short	connect_parms_str_len, filter_cmd_len, freeze_comment_len, freeze_val_len, inst_name_len, log_file_len;
 	unsigned short	secondary_len, statslog_val_len, tlsid_len, update_val_len;
+	UMSTR_CONST(log_nam, GTM_REPL_INSTSECONDARY);
 
 	memset((char *)&gtmsource_options, 0, SIZEOF(gtmsource_options));
 	gtmsource_options.start = (CLI_PRESENT == cli_present("START"));
@@ -139,8 +140,6 @@ int gtmsource_get_opt(void)
 			|| gtmsource_options.statslog || gtmsource_options.needrestart
 			|| gtmsource_options.checkhealth || gtmsource_options.showbacklog || gtmsource_options.shut_down)
 		{
-			log_nam.addr = GTM_REPL_INSTSECONDARY;
-			log_nam.len = SIZEOF(GTM_REPL_INSTSECONDARY) - 1;
 			trans_name.addr = &inst_name[0];
 			if (SS_NORMAL == (status = TRANS_LOG_NAME(&log_nam, &trans_name, inst_name, SIZEOF(inst_name),
 									do_sendmsg_on_log2long)))

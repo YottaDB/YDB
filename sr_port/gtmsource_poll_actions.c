@@ -19,9 +19,6 @@
 #include "gtm_fcntl.h"
 
 #include "gtm_inet.h"
-#ifdef VMS
-#include <descrip.h> /* Required for gtmsource.h */
-#endif
 
 #include "gdsroot.h"
 #include "gdsblk.h"
@@ -66,19 +63,15 @@ GBLREF	gtmsource_options_t	gtmsource_options;
 GBLREF	uint4			log_interval;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	sgmnt_addrs		*cs_addrs;
-#ifdef UNIX
 GBLREF	boolean_t		last_seen_freeze_flag;
-#endif
 
 LITREF	char			gtm_release_name[];
 LITREF	int4			gtm_release_name_len;
 
 error_def(ERR_REPLWARN);
-#ifdef UNIX
 error_def(ERR_REPLINSTFREEZECOMMENT);
 error_def(ERR_REPLINSTFROZEN);
 error_def(ERR_REPLINSTUNFROZEN);
-#endif
 
 #define	OUT_LINE	1024 + 1
 
@@ -321,17 +314,14 @@ int gtmsource_poll_actions(boolean_t poll_secondary)
 		}
 		if (gtmsource_local->changelog & REPLIC_CHANGE_LOGFILE)
 		{
-			log_switched = TRUE;
 			repl_log(gtmsource_log_fp, TRUE, TRUE, "Changing log file to %s\n", gtmsource_local->log_file);
-#ifdef UNIX
-			repl_log_init(REPL_GENERAL_LOG, &gtmsource_log_fd, gtmsource_local->log_file);
-			repl_log_fd2fp(&gtmsource_log_fp, gtmsource_log_fd);
-#elif defined(VMS)
-			util_log_open(STR_AND_LEN(gtmsource_local->log_file));
-#else
-#error unsupported platform
-#endif
-			STRCPY(gtmsource_options.log_file, jnlpool->gtmsource_local->log_file);
+			if (SS_NORMAL == repl_log_init(REPL_GENERAL_LOG, &gtmsource_log_fd, gtmsource_local->log_file))
+			{
+				repl_log_fd2fp(&gtmsource_log_fp, gtmsource_log_fd);
+				log_switched = TRUE;
+			}
+			if (log_switched)
+				STRCPY(gtmsource_options.log_file, jnlpool->gtmsource_local->log_file);
 		}
 	        if ( log_switched == TRUE )
         	        repl_log(gtmsource_log_fp, TRUE, TRUE, "Change log to %s successful\n", gtmsource_local->log_file);
@@ -339,13 +329,8 @@ int gtmsource_poll_actions(boolean_t poll_secondary)
 	}
 	if (!gtmsource_logstats && gtmsource_local->statslog)
 	{
-#ifdef UNIX
 		gtmsource_logstats = TRUE;
 		repl_log(gtmsource_log_fp, TRUE, TRUE, "Begin statistics logging\n");
-#else
-		repl_log(gtmsource_log_fp, TRUE, TRUE, "Stats logging not supported on VMS\n");
-#endif
-
 	} else if (gtmsource_logstats && !gtmsource_local->statslog)
 	{
 		gtmsource_logstats = FALSE;

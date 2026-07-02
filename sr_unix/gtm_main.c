@@ -16,7 +16,7 @@
 #include "gtm_string.h"
 
 #include "startup.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "stack_frame.h"
 #include "error.h"
 #include "cli.h"

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2018-2024 Fidelity National Information	*
+ * Copyright (c) 2018-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -22,6 +22,7 @@
 #include "filestruct.h"
 #include "cmidef.h"	/* for cmmdef.h */
 #include "hashtab_mname.h"	/* needed for cmmdef.h */
+#include "hashtab_umname.h"
 #include "cmmdef.h"	/* for gtcmtr_protos.h */
 #include "util.h"
 #include "lke.h"

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2007-2025 Fidelity National Information	*
+ * Copyright (c) 2007-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -1608,7 +1608,6 @@ enum cdb_sc	t_recompute_upd_array(srch_blk_status *bh, struct cw_set_element_str
 	for (kvhead = kv = cse->recompute_list_head; (NULL != kv); kv = kv->next)
 	{
 		pKey = (gv_key *)&kv->keybuf.nobase;
-		value = kv->value;
 		target_key_size = pKey->end + 1;
 		if (kvhead != kv)
 		{
@@ -1651,6 +1650,7 @@ enum cdb_sc	t_recompute_upd_array(srch_blk_status *bh, struct cw_set_element_str
 				return cdb_sc_mkblk;
 			}
 		}
+		value.umstr = kv->value.umstr;
 		if (new_rec)
 		{
 			new_rec_size = SIZEOF(rec_hdr) + target_key_size - bh->prev_rec.match + value.len;
@@ -1716,6 +1716,7 @@ enum cdb_sc	t_recompute_upd_array(srch_blk_status *bh, struct cw_set_element_str
 		BLK_ADDR(cp1, target_key_size - bh->prev_rec.match, unsigned char);
 		memcpy(cp1, pKey->base + bh->prev_rec.match, target_key_size - bh->prev_rec.match);
 		BLK_SEG(bs_ptr, cp1, target_key_size - bh->prev_rec.match);
+		value.umstr = kv->value.umstr;
 		if (0 != value.len)
 		{
 			BLK_ADDR(va, value.len, char);

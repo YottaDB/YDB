@@ -1,6 +1,6 @@
  /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -678,7 +678,8 @@ void	util_out_send_oper(char *addr, unsigned int len)
 	sigset_t		savemask;
 	char			*img_type, *offset;
 	char 			temp_inst_fn[MAX_FN_LEN + 1], fn[MAX_FN_LEN + 1];
-	mstr			log_nam, trans_name;
+	mstr			trans_name;
+	unmanaged_mstr		log_nam;
 	uint4			ustatus;
 	int4			status;
 	unsigned int		bufsize, file_name_len, *fn_len;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2021 Fidelity National Information	*
+ * Copyright (c) 2006-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -125,7 +125,7 @@ void op_setextract(mval *src, mval *expr, int schar, int echar, mval *dst)
 		straddr += sfxlen;
 	}
 	assert(IS_AT_END_OF_STRINGPOOL(straddr, -dstlen));
-	MV_INIT_STRING(dst, straddr - stringpool.free, (char *)stringpool.free);
+	UMV_INIT_STRING(&dst->umval, straddr - stringpool.free, (char *)stringpool.free);
 	if (0 < char_len)
 	{
 		dst->mvtype |= MV_UTF_LEN;

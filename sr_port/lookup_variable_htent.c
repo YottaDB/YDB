@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2009-2025 Fidelity National Information	*
+ * Copyright (c) 2009-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -21,7 +21,7 @@
 #include "fileinfo.h"
 #include "gdsbt.h"
 #include "gdsfhead.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "stack_frame.h"
 #include "lookup_variable_htent.h"
 #include "alias.h"
@@ -34,9 +34,11 @@ ht_ent_mname *lookup_variable_htent(unsigned int x)
 {
 	ht_ent_mname	*tabent = NULL;
 	boolean_t	added;
+	mname_entry	lcl_val = {{{0}}};
 
 	assert(x < frame_pointer->vartab_len);
-	added = add_hashtab_mname_symval(&curr_symval->h_symtab, ((var_tabent *)frame_pointer->vartab_ptr + x), NULL, &tabent,
+	lcl_val.umname = (frame_pointer->vartab_ptr)[x];
+	added = add_hashtab_mname_symval(&curr_symval->h_symtab, &lcl_val, NULL, &tabent,
 			TRUE);
 	assert(tabent);
 	if (NULL == tabent->value)

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -52,8 +52,8 @@ error_def(LP_NOTACQ);			/* bad license 		  */
 error_def(ERR_LOGTOOLONG);
 error_def(ERR_SYSCALL);
 
-LITREF mstr			chset_names[];
-LITREF	unsigned char		io_params_size[];
+LITREF unmanaged_mstr		chset_names[];
+LITREF unsigned char		io_params_size[];
 
 static boolean_t mu_open_try(io_log_name *, io_log_name *, mval *, mval *);
 
@@ -71,7 +71,7 @@ int mu_op_open(mval *v, mval *p, mval *t, mval *mspace)
 	if (mspace)
 		MV_FORCE_STR(mspace);
 	assert((unsigned char)*p->str.addr < n_iops);
-	naml = get_log_name(&v->str, INSERT);
+	naml = get_log_name(&v->str.umstr, INSERT);
 	if (0 != naml->iod)
 		tl = naml;
 	else
@@ -83,10 +83,10 @@ int mu_op_open(mval *v, mval *p, mval *t, mval *mspace)
 		if (!licensed || LP_CONFIRM(lid,lkid)==LP_NOTACQ)
 			licensed= FALSE ;
 #		endif
-		switch (stat = TRANS_LOG_NAME(&v->str, &tn, &buf1[0], SIZEOF(buf1), dont_sendmsg_on_log2long))
+		switch (stat = TRANS_LOG_NAME(&v->str.umstr, &tn, &buf1[0], SIZEOF(buf1), dont_sendmsg_on_log2long))
 		{
 		case SS_NORMAL:
-			tl = get_log_name(&tn, INSERT);
+			tl = get_log_name(&tn.umstr, INSERT);
 			break;
 		case SS_NOLOGNAM:
 			tl = naml;
@@ -112,7 +112,7 @@ static boolean_t mu_open_try(io_log_name *naml, io_log_name *tl, mval *pp, mval 
 	int		char_or_block_special, file_des, fstat_res, oflag, p_offset, save_errno = 0, umask_creat, umask_orig;
 	int4		recordsize, status;
 	io_desc		*iod;
-	mstr		chset_mstr;
+	unmanaged_mstr	chset_mstr;
 	mstr		tn;		/* translated name */
 	struct stat	outbuf;
 	unsigned char	ch;
@@ -137,6 +137,7 @@ static boolean_t mu_open_try(io_log_name *naml, io_log_name *tl, mval *pp, mval 
 			iod->pair.out = iod;
 			iod->trans_name = tl;
 			iod->type = n_io_dev_types;
+			glist_first_init_str(&iod->error_handler);
 			p_offset = 0;
 			while (iop_eol != *(pp->str.addr + p_offset))
 			{

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,5 +28,5 @@ void op_fndata(lv_val *x, mval *y)
 		if (LV_HAS_CHILD(x))
 			s++;
 	}
-	*y = *fndata_table[s][r];
+	y->umval = fndata_table[s][r]->umval;
 }

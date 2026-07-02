@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -41,6 +41,7 @@
 #include "gtm_icu_api.h"
 #include "gtm_utf8.h"
 #endif
+#include "noprincio_if_needed_inline.h"
 
 GBLREF	bool			out_of_time;
 GBLREF	boolean_t		gtm_utf8_mode, hup_on, prin_in_dev_failure, prin_out_dev_failure;
@@ -66,7 +67,7 @@ int	iott_rdone (mint *v, int4 msec_timeout)	/* timeout in milliseconds */
 	boolean_t	ch_set, first_time, ret = FALSE, timed, utf8_active, zint_restart;
 	char		dc1, dc3;
 	d_tt_struct	*tt_ptr;
-	int		inchar_width, msk_in, msk_num, rdlen, selstat, status, utf8_more;
+	int		inchar_width, msk_in, msk_num, rdlen, pollstat, status, utf8_more;
 	io_desc		*io_ptr;
 	mv_stent	*mv_zintdev;
 	short int	i;
@@ -240,8 +241,8 @@ int	iott_rdone (mint *v, int4 msec_timeout)	/* timeout in milliseconds */
 		poll_fdlist[0].fd = tt_ptr->fildes;
 		poll_fdlist[0].events = POLLIN;
 		poll_nfds = 1;
-		selstat = poll(&poll_fdlist[0], poll_nfds, poll_timeout);
-		if (0 > selstat)
+		pollstat = poll(&poll_fdlist[0], poll_nfds, poll_timeout);
+		if (0 > pollstat)
 		{
 			if (EINTR != errno)
 			{
@@ -251,7 +252,7 @@ int	iott_rdone (mint *v, int4 msec_timeout)	/* timeout in milliseconds */
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) errno);
 				break;
 			}
-		} else if (0 == selstat)
+		} else if (0 == pollstat)
 		{
 			if (timed)
 			{

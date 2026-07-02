@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -16,7 +16,7 @@
 #include "gtm_stdio.h"
 #include "gtm_string.h"
 
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "mv_stent.h"
 #include "stack_frame.h"
 #include "tp_frame.h"
@@ -110,6 +110,9 @@ void	tp_unwind(uint4 newlevel, enum tp_unwind_invocation invocation_type, int *t
 	intrpt_state_t	prev_intrpt_state;
 
 	/* We are about to clean up structures. Defer MUPIP STOP/signal handling until function end. */
+	DCL_THREADGBL_ACCESS;
+
+	SETUP_THREADGBL_ACCESS;
 	DEFER_INTERRUPTS(INTRPT_IN_TP_UNWIND, prev_intrpt_state);
 	/* Unwind the requested TP levels */
 #	if defined(DEBUG_REFCNT) || defined(DEBUG_ERRHND)
@@ -171,9 +174,10 @@ void	tp_unwind(uint4 newlevel, enum tp_unwind_invocation invocation_type, int *t
 			{
 				DBGRFCT((stderr, "\ntp_unwind: Need to restore curr_lv which has been copied\n"));
 				rc = tp_unwind_restlv(curr_lv, save_lv, restore_ent, TRUE, tprestart_rc);
-#				ifdef GTM_TRIGGER
 				if (0 != rc)
 				{
+					if (!tl)
+						(TREF(in_xpel)) = FALSE;
 					dollar_tlevel = tl;			/* Record fact if we unwound some tp_frames */
 					ENABLE_INTERRUPTS(INTRPT_IN_TP_UNWIND, prev_intrpt_state);	/* drive any MUPIP STOP
 													 * or signals deferred
@@ -181,7 +185,6 @@ void	tp_unwind(uint4 newlevel, enum tp_unwind_invocation invocation_type, int *t
 					TPUNWND_WBOX_TEST;			/* Debug-only wbox-test to simulate SIGTERM */
 					INVOKE_RESTART;
 				}
-#				endif
 			} else if (restore_ent->var_cloned)
 			{	/* curr_lv has been cloned.
 				 * Note: LV_CHILD(save_lv) can be non-NULL only if restore_ent->var_cloned is TRUE
@@ -215,6 +218,7 @@ void	tp_unwind(uint4 newlevel, enum tp_unwind_invocation invocation_type, int *t
 			curr_lv->tp_var = NULL;
 			curr_lv->stats.tstartcycle = 0;		/* As if had done nothing with var in this sub-transaction */
 			tp_pointer->vars = restore_ent->next;
+			glist_unprotect_str(&restore_ent->key.var_name);
 			free(restore_ent);
 		}
 		if ((tp_pointer->fp == frame_pointer) && (MVST_TPHOLD == mv_chain->mv_st_type)
@@ -228,7 +232,10 @@ void	tp_unwind(uint4 newlevel, enum tp_unwind_invocation invocation_type, int *t
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_STACKUNDERFLO);
 		if (tp_pointer->tp_save_all_flg)
 			--tp_pointer->sym->tp_save_all;
-		if ((NULL != (tp_pointer = tp_pointer->old_tp_frame))	/* Note assignment */
+		glist_unprotect_str(&tp_pointer->trans_id.str);
+		glist_unprotect_str(&tp_pointer->zgbldir.str);
+		tp_pointer = tp_pointer->old_tp_frame;
+		if ((NULL != tp_pointer)
 		    && ((tp_pointer < (tp_frame *)tp_sp) || (tp_pointer > (tp_frame *)tpstackbase)
 			|| (tp_pointer < (tp_frame *)tpstacktop)))
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_STACKUNDERFLO);
@@ -250,16 +257,16 @@ void	tp_unwind(uint4 newlevel, enum tp_unwind_invocation invocation_type, int *t
 			assert(curr_lv->tp_var == restore_ent);
 			assert(0 < curr_lv->stats.trefcnt);
 			rc = tp_unwind_restlv(curr_lv, save_lv, restore_ent, FALSE, tprestart_rc);
-#			ifdef GTM_TRIGGER
 			if (0 != rc)
 			{
+				if (!tl)
+					TREF(in_xpel) = FALSE;
 				dollar_tlevel = tl;			/* Record fact if we unwound some levels */
 				ENABLE_INTERRUPTS(INTRPT_IN_TP_UNWIND, prev_intrpt_state); /* drive any MUPIP STOP/signals
 											    * deferred while in this function */
 				TPUNWND_WBOX_TEST;			/* Debug-only wbox-test to simulate SIGTERM */
 				INVOKE_RESTART;
 			}
-#			endif
 			assert(0 < curr_lv->stats.trefcnt);	/* Should have its own hash table ref plus the extras we added */
 			assert(0 < curr_lv->stats.crefcnt);
 		}
@@ -306,8 +313,12 @@ void	tp_unwind(uint4 newlevel, enum tp_unwind_invocation invocation_type, int *t
 	 * in the exit handler. Added due to the need for a statsDB to kill a record from its DB as part of it being rundown
 	 * and the first need to NOT be in the middle of a TP transaction when that happens.
 	 */
-	if ((0 == newlevel) && (NULL == tp_pointer))
+	if (0 == newlevel)
+	{
+		TREF(in_xpel) = FALSE;
+		if (NULL == tp_pointer)
 		tprestart_state = TPRESTART_STATE_NORMAL;
+	}
 	dollar_tlevel = newlevel;
 	ENABLE_INTERRUPTS(INTRPT_IN_TP_UNWIND, prev_intrpt_state);/* drive any MUPIP STOP/signals deferred while in this function */
 }
@@ -366,6 +377,7 @@ int tp_unwind_restlv(lv_val *curr_lv, lv_val *save_lv, tp_var *restore_ent, bool
 			while((curr_symval != tp_pointer->sym) && (mvc < tp_pointer->mvc))
 			{
 				unw_mv_ent(mvc, UNWIND_NEWVARS);
+				unprotect_mv_ent(mvc);
 				mvc = (mv_stent *)(mvc->mv_st_next + (char *)mvc);
 			}
 			mv_chain = mvc;
@@ -381,7 +393,7 @@ int tp_unwind_restlv(lv_val *curr_lv, lv_val *save_lv, tp_var *restore_ent, bool
 		{	/* Restore data into a named variable (hash table entry)
 			 * Step 1 -- find its hash table address to see what lv_val is there now.
 			 */
-			tabent = lookup_hashtab_mname(&((tp_pointer->sym)->h_symtab), &restore_ent->key);
+			tabent = lookup_hashtab_mname(&((tp_pointer->sym)->h_symtab), &restore_ent->key.umname);
 			assert(tabent);
 			/* Step 2 -- If lv_val is NOT the same as it was, then we must replace the lv_val
 			 * currently in use. Decrement its use count (which will delete it and the tree if
@@ -425,7 +437,7 @@ int tp_unwind_restlv(lv_val *curr_lv, lv_val *save_lv, tp_var *restore_ent, bool
 		assert(OFFSETOF(lv_val, lvmon_mark) + SIZEOF(curr_lv->lvmon_mark) == OFFSETOF(lv_val, tp_var));
 		assert(OFFSETOF(lv_val, tp_var) + SIZEOF(curr_lv->tp_var) == SIZEOF(lv_val));
 		/* save_lv -> curr_lv Copy begin */
-		curr_lv->v = save_lv->v;
+		curr_lv->v.umval = save_lv->v.umval;
 		curr_lv->ptrs = save_lv->ptrs;
 		assert(0 < curr_lv->stats.trefcnt);	/* No need to copy "stats" as curr_lv is more uptodate */
 		assert(0 < curr_lv->stats.crefcnt);
@@ -451,7 +463,7 @@ int tp_unwind_restlv(lv_val *curr_lv, lv_val *save_lv, tp_var *restore_ent, bool
 		 * unsubscripted lv could have changed (have no way of checking if that is the case) so restore it (just its
 		 * value) unconditionally.
 		 */
-		curr_lv->v = save_lv->v;
+		curr_lv->v.umval = save_lv->v.umval;
 		/* No need to copy "save_lv->ptrs" as "ptrs" contains 2 fields both of which are already correct in "curr_lv" */
 		assert(save_lv->ptrs.val_ent.parent.sym == curr_lv->ptrs.val_ent.parent.sym);
 		assert(NULL == save_lv->ptrs.val_ent.children);

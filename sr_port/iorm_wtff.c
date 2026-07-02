@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -21,7 +21,7 @@ GBLREF	io_pair		io_curr_device;
 
 void iorm_wtff(void)
 {
-	mstr		temp;
+	unmanaged_mstr	temp;
 	io_desc		*iod;
 	boolean_t	ch_set;
 

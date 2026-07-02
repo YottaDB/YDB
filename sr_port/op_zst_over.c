@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -13,10 +13,11 @@
 #include "mdef.h"
 #include "xfer_enum.h"
 #include "op.h"
-#include "mprof.h"
+#include "io.h"
+#include "deferred_events.h"
+#include "deferred_events_queue.h"
 #include "fix_xfer_entry.h"
 #include "have_crit.h"
-#include "deferred_events_queue.h"
 
 GBLREF bool 		neterr_pending;
 GBLREF boolean_t	is_tracing_on;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -43,7 +43,7 @@
 /* The define of CHEXPAND below causes error.h to create GBLDEFs */
 #define CHEXPAND
 #include "error.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "gdsroot.h"
 #include "gdskill.h"
 #include "ccp.h"
@@ -217,7 +217,7 @@ GBLDEF	mstr		*comline_base,
 			**stp_array,
 			extnam_str,
 			env_gtm_env_xlate;
-GBLDEF MSTR_CONST(default_sysid, "gtm_sysid");
+GBLDEF UMSTR_CONST(default_sysid, "gtm_sysid");
 GBLDEF	mval		dollar_zgbldir,
 			dollar_zsource = DEFINE_MVAL_STRING(MV_STR, 0, 0, 0, NULL, 0, 0),
 			dollar_zstatus,
@@ -731,11 +731,6 @@ GBLDEF	boolean_t	is_dollar_incr;		/* valid only if gvcst_put is in the call-stac
 GBLDEF	int		indir_cache_mem_size;	/* Amount of memory currently in use by indirect cache */
 GBLDEF	hash_table_objcode cache_table;
 GBLDEF	int		cache_hits, cache_fails;
-/* The alignment feature is disabled due to some issues in stringpool garbage collection.
- * TODO: When we sort out stringpool issues, change mstr_native_align to TRUE below
- */
-GBLDEF	boolean_t	mstr_native_align;
-GBLDEF boolean_t	save_mstr_native_align;
 GBLDEF	mvar		*mvartab;
 GBLDEF	mvax		*mvaxtab,*mvaxtab_end;
 GBLDEF	mlabel		*mlabtab;
@@ -980,7 +975,7 @@ GBLDEF	boolean_t	*ztvalue_changed_ptr;		/* -> boolean in current gtm_trigger_par
 							 *    been updated
 							 */
 GBLDEF	boolean_t	ztwormhole_used;		/* TRUE if $ztwormhole was used by trigger code */
-GBLDEF	mstr		*dollar_ztname;
+GBLDEF	mident		*dollar_ztname;
 GBLDEF	mval		*dollar_ztdata,
 			*dollar_ztdelim,
 			*dollar_ztoldval,
@@ -1196,6 +1191,7 @@ GBLDEF	bool		only_usr_jnlpool_flush;		/* Debug-only marker used by instance-orie
 							 * process has obtained exclusive access to the instance and therefore
 							 * does not need the ordinarily-required locks.
 							 */
+GBLDEF	unsigned int	count_prohibit_longjmp;
 #endif
 GBLDEF	sgm_info	*sgm_info_ptr;
 GBLDEF	tp_region	*tp_reg_free_list;	/* Ptr to list of tp_regions that are unused */
@@ -1220,3 +1216,4 @@ GBLDEF	dm_audit_info	audit_conn[MAX_AUD_CONN];	/* AUdit logging connection infor
 /* For JOURNAL EXTRACT GLOBAL*/
 GBLDEF	boolean_t	in_tstart;	/*keep track of tstart block while printing records with journal extract global*/
 GBLDEF	boolean_t	uupd_tstart;	/*keep track if the record is UUPD and require TSTART record*/
+GBLDEF	unsigned char	*tstart_readdr = NULL; 		/* Address of tstart command used for an XPEL restart */

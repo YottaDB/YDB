@@ -22,7 +22,7 @@
 #include "gdsbt.h"
 #include "gdsfhead.h"
 #include "alias.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "stack_frame.h"
 
 /* Note it is important that callers of this routine make sure that the pointer that is passed as

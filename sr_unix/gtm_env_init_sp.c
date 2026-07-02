@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2004-2023 Fidelity National Information	*
+ * Copyright (c) 2004-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -97,7 +97,7 @@ GBLREF	volatile boolean_t	timer_in_handler;
 GBLREF	char			io_setup_errstr[IO_SETUP_ERRSTR_ARRAYSIZE];
 #endif
 
-LITREF mstr relink_allowed_mstr[];
+LITREF unmanaged_mstr relink_allowed_mstr[];
 
 static readonly nametabent editing_params[] =
 {
@@ -123,7 +123,8 @@ error_def(ERR_ARCTLMAXLOW);
 
 void	gtm_env_init_sp(void)
 {	/* Unix only environment initializations */
-	mstr		val, trans;
+	mstr		trans;
+	unmanaged_mstr	val;
 	int4		status, index, len, hrtbt_cntr_delta, stat_res;
 	size_t		cwdlen;
 	boolean_t	ret, is_defined, novalidate;
@@ -384,7 +385,7 @@ void	gtm_env_init_sp(void)
 				trans.len = SIZEOF(DEFAULT_GTM_TMP) - 1;
 				trans.addr = DEFAULT_GTM_TMP;
 				REMOVE_TRAILING_SLASH_FROM_MSTR(trans); /* Remove trailing '/' from trans.addr */
-				(TREF(gtm_linktmpdir)) = trans;
+				(TREF(gtm_linktmpdir)).umstr = trans.umstr;
 			}
 		}
 	}

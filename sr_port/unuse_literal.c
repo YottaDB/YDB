@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2016-2025 Fidelity National Information	*
+ * Copyright (c) 2016-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -16,6 +16,7 @@
 #include "compiler.h"
 #include "opcode.h"
 #include "mmemory.h"
+#include "gcol_list.h"
 
 GBLREF mliteral 	literal_chain;
 GBLREF hash_table_str	*complits_hashtab;
@@ -23,13 +24,14 @@ GBLREF hash_table_str	*complits_hashtab;
 boolean_t unuse_literal(mval *x)
 {
 	boolean_t	in_hashtab = FALSE;
-	ht_ent_str	*litent;
+	ht_ent_str	*litent = NULL;
 	mliteral	*a = NULL;
 	stringkey	litkey;
 
 	if (complits_hashtab && complits_hashtab->base)
 	{
-		litkey.str = x->str;
+		litkey.str.umstr = x->str.umstr;
+		litkey.str.in_array = FALSE;
 		COMPUTE_HASH_STR(&litkey);
 		if (NULL != (litent = lookup_hashtab_str(complits_hashtab, &litkey)))
 		{
@@ -50,14 +52,19 @@ boolean_t unuse_literal(mval *x)
 			}
 		}
 	}
+	assert(glist_str_in_sync(&a->v.str));
 	/* The first assert here covers the case of no literal in the hashtab, the second in the literal chain */
 	assert(a != NULL); /* ATTEMPT TO REMOVE MVAL NOT IN HASHTABLE; THIS WAS CALLED IN ERROR */
 	assert(a != &literal_chain); /* This probably means you attempted to remove a literal not in the literal chain */
 	if (a->reference_count == 0)
 	{
+		glist_unprotect_str(&a->v.str);
 		/* Remove mval */
 		if (in_hashtab)
+		{
+			assert(a == litent->value);
 			delete_hashtab_ent_str(complits_hashtab, litent);
+		}
 		dqdel(a, que);
 #		ifdef DEBUG
 		x->str.addr = NULL;

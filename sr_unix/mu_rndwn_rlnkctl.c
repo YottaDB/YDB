@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2014-2024 Fidelity National Information	*
+ * Copyright (c) 2014-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -20,7 +20,7 @@
 
 #include "relinkctl.h"
 #include "util.h"
-#include <rtnhdr.h>		/* needed for zroutines.h */
+#include "rtnhdr.h"		/* needed for zroutines.h */
 #include "zroutines.h"
 #include "cli.h"
 #include "cliif.h"
@@ -53,7 +53,7 @@ void mu_rndwn_rlnkctl(void)
 	char			objdir[GTM_PATH_MAX];
 	int			i, j, recnum, n_records, shmid, shm_stat, save_errno, objcnt, stat_res, params_cnt;
 	unsigned short		param_len;
-	mstr			dir;
+	unmanaged_mstr		dir;
 	zro_ent			*op;
 	boolean_t		region, file, relink_dir, file_or_region, is_what;
 	DCL_THREADGBL_ACCESS;

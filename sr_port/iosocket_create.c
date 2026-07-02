@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -70,7 +70,7 @@ socket_struct *iosocket_create(char *sockaddr, uint4 bfsize, int file_des, boole
 	struct addrinfo		*ai_ptr;
 	struct addrinfo		hints, *addr_info_ptr = NULL;
 	struct sockaddr_un	*sa_un_ptr, sa_un_trans;
-	mval			localpath;
+	unmanaged_mval		localpath;
 	mstr			transpath;
 	int			trans_status;
 	enum socket_protocol	protocol;
@@ -224,14 +224,14 @@ socket_struct *iosocket_create(char *sockaddr, uint4 bfsize, int file_des, boole
 			/* protooffset is after colon */
 			SOCKET_ALLOC(socketptr);
 			socketptr->protocol = socket_local;
-			MV_INIT_STRING(&localpath, protooffset - 1, sockaddr);
-			trans_status = TRANS_LOG_NAME(&localpath.str, &transpath, sa_un_trans.sun_path,
+			UMV_INIT_STRING(&localpath, protooffset - 1, sockaddr);
+			trans_status = TRANS_LOG_NAME(&localpath.umstr, &transpath, sa_un_trans.sun_path,
 				(int)SIZEOF(sa_un_trans.sun_path), dont_sendmsg_on_log2long);
 			if (SS_LOG2LONG == trans_status)
 			{	/* if LOG2LONG, returned len not valid so report untranslated length */
 				SOCKET_FREE(socketptr);
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_ADDRTOOLONG, 4, localpath.str.len, localpath.str.addr,
-					localpath.str.len, SIZEOF(sa_un_trans.sun_path));
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_ADDRTOOLONG, 4, localpath.umstr.len,
+					localpath.umstr.addr, localpath.umstr.len, SIZEOF(sa_un_trans.sun_path));
 				return NULL;
 			}
 			sa_un_ptr = malloc(SIZEOF(struct sockaddr_un));

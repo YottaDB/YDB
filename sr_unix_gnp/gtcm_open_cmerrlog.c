@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -42,7 +42,8 @@ error_def(ERR_TEXT);
 void gtcm_open_cmerrlog(void)
 {
 	int		len;
-	mstr		lfn1, lfn2;
+	mstr		lfn2;
+	unmanaged_mstr	lfn1;
 	char		lfn_path[MAX_TRANS_NAME_LEN + 1];
 	char		lfn_path_taint[MAX_TRANS_NAME_LEN + 1]; /* env vars interpolated, need to do some checks */
 	char		new_lfn_path[MAX_TRANS_NAME_LEN + 1];

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -56,7 +56,7 @@ int eval_expr(oprtype *a)
 	tbp		*catbp, *tripbp;
 	triple		*argtrip, *parm, *ref, *ref1, *t1, *t2;
 	mliteral	*m1, *m2;
-	mval		tmp_mval = { 0 };
+	mval		tmp_mval = {{0}};
 	unsigned short	type;
 	DCL_THREADGBL_ACCESS;
 

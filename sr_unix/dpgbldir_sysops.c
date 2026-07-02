@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -37,6 +37,7 @@
 #include "dpgbldir.h"
 #include "dpgbldir_sysops.h"
 #include "gtm_logicals.h"
+#include "gcol_list.h"
 
 char LITDEF gde_labels[GDE_LABEL_NUM][GDE_LABEL_SIZE] =
 {
@@ -57,12 +58,12 @@ error_def(ERR_BADTAG);
 /* 30 millisec is an arbitrarily chosen value yielding a wait that seems sufficient, but not too annoying */
 #define WAIT_OUT_RENAME_GAP	30
 
-mstr *get_name(mstr *ms)
+unmanaged_mstr *get_name(const unmanaged_mstr *ms)
 {
 	int4	status;
 	char	c[MAX_FN_LEN + 1];
 	parse_blk pblk;
-	mstr	*new;
+	unmanaged_mstr	*new;
 
 	memset(&pblk, 0, SIZEOF(pblk));
 	pblk.buffer = c;
@@ -73,14 +74,14 @@ mstr *get_name(mstr *ms)
 	if (!(status & 1))
 		RTS_ERROR_CSA_ABT(NULL,
 			VARLSTCNT(9) ERR_ZGBLDIRACC, 6, ms->len, ms->addr, LEN_AND_LIT(""), LEN_AND_LIT(""), status);
-	new = (mstr *)malloc(SIZEOF(mstr));
+	new = (unmanaged_mstr *)malloc(SIZEOF(*new));
 	new->len = pblk.b_esl;
 	new->addr = (char *)malloc(pblk.b_esl);
 	memcpy(new->addr, pblk.buffer, pblk.b_esl);
 	return new;
 }
 
-void *open_gd_file(mstr *v)
+void *open_gd_file(unmanaged_mstr *v)
 
 {
 	file_pointer	*fp;
@@ -181,7 +182,7 @@ void file_read(file_pointer *file_ptr, int4 size, uchar_ptr_t buff, int4 pos)
 
 void dpzgbini(void)
 {
-	mstr		temp_mstr;
+	unmanaged_mstr	temp_mstr;
 	char		temp_buff[MAX_FN_LEN + 1];
 	uint4		status;
 	parse_blk	pblk;
@@ -194,15 +195,16 @@ void dpzgbini(void)
 	pblk.def1_buf = DEF_GDR_EXT;
 	pblk.def1_size = SIZEOF(DEF_GDR_EXT) - 1;
 	status = parse_file(&temp_mstr, &pblk);
-
 	dollar_zgbldir.mvtype = MV_STR;
 	dollar_zgbldir.str.len = SIZEOF(GTM_GBLDIR) - 1;
 	dollar_zgbldir.str.addr = GTM_GBLDIR;
+	glist_protect_str(&dollar_zgbldir.str);
 	if (status & 1)
 	{
 		dollar_zgbldir.str.len = pblk.b_esl;
 		dollar_zgbldir.str.addr = pblk.buffer;
 	}
 	s2pool(&dollar_zgbldir.str);
+	assert(glist_mval_in_sync(&dollar_zgbldir));
 	gd_header = NULL;
 }

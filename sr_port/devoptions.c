@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2022-2023 Fidelity National Information	*
+ * Copyright (c) 2022-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -115,13 +115,14 @@ void	devoptions(io_desc *iod, void *socketptrarg, mstr *optionstr, char *caller,
 {
 	int			devopt_item, tmpnum, numret, index, index2, keywordend;
 	int4			stat, len, len2;
-	mstr			keyword, options;
+	unmanaged_mstr		keyword, options;
 	boolean_t		valuepresent;
 	int			optionvalue, valuelen, valuestart = -1, local_errno;
 	char			*errortext;
 	io_desc			*socket_iod;
 	d_socket_struct		*dsocketptr;
 	socket_struct		*socketptr;
+	unsigned int		gcols;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -142,7 +143,8 @@ void	devoptions(io_desc *iod, void *socketptrarg, mstr *optionstr, char *caller,
 		dsocketptr = NULL;
 		socket_iod = NULL;
 	}
-	options = *optionstr;	/* option[=value],... */
+	DBG_START_NO_GCOLS(gcols);
+	options = optionstr->umstr;	/* option[=value],... */
 	for (index = 0; 0 < options.len ; options.len -= (index + 1), options.addr += (index + 1))
 	{	/* comma separated options - need quotes if ever allow string values */
 		valuepresent = FALSE;
@@ -266,5 +268,6 @@ void	devoptions(io_desc *iod, void *socketptrarg, mstr *optionstr, char *caller,
 				assert(TRUE || devopt_item);
 		}
 	}
+	DBG_END_NO_GCOLS(gcols);
 	return;
 }

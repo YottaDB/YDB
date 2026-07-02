@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -25,6 +25,7 @@
 #include "gdsbt.h"
 #include "gdsfhead.h"
 #include "alias.h"
+#include "stringpool.h"
 
 GBLREF symval		*curr_symval;
 GBLREF uint4		lvtaskcycle;
@@ -37,9 +38,10 @@ void op_xkill(UNIX_ONLY_COMMA(int n) mval *lvname_arg, ...)
 	DEBUG_ONLY(int	vcnt;)
 	lv_val		*lv;
 	mval		*lvname;
-	mname_entry	lvent;
+	unmanaged_mname_entry	lvent;
 	ht_ent_mname	*tabent, *top;
 	boolean_t	lcl_stdxkill;
+	unsigned int	gcols;
 
 	SET_ACTIVE_LV(NULL, TRUE, actlv_op_xkill);	/* If we get here, subscript set was successful.
 								 * Clear active_lv to avoid later cleanup issues */
@@ -78,11 +80,13 @@ void op_xkill(UNIX_ONLY_COMMA(int n) mval *lvname_arg, ...)
 		{	/* convert mval to var_tabent and see if it is in the symbol table */
 			if (lvname->str.len > MAX_MIDENT_LEN)
 				lvname->str.len = MAX_MIDENT_LEN;
+			DBG_START_NO_GCOLS(gcols);
 			lvent.var_name.len = lvname->str.len;
 			lvent.var_name.addr = lvname->str.addr;
 			COMPUTE_HASH_MNAME(&lvent);
 			if ((tabent = lookup_hashtab_mname(&curr_symval->h_symtab, &lvent)))
 			{	/* save info about the variable */
+				DBG_END_NO_GCOLS(gcols);
 				lv = (lv_val *)tabent->value;
 				assert(lv);
 				assert(LV_IS_BASE_VAR(lv));
@@ -98,6 +102,7 @@ void op_xkill(UNIX_ONLY_COMMA(int n) mval *lvname_arg, ...)
 					lv->stats.lvtaskcycle = lvtaskcycle;
 				}
 			}
+			DBG_END_NO_GCOLS(gcols);
 		}
 		if (0 < --n)
 			lvname = va_arg(var, mval *);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2014-2024 Fidelity National Information	*
+ * Copyright (c) 2014-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -26,7 +26,7 @@
 #include "add_inter.h"
 #include "interlock.h"
 #include "gtmio.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "relinkctl.h"
 #include "mmrhash.h"
 #include "iosp.h"
@@ -101,11 +101,11 @@ CONDITION_HANDLER(relinkctl_handler)
  * Output:
  *   - Found or newly created private structure which points to shared relink control structure
  */
-open_relinkctl_sgm *relinkctl_attach(mstr *obj_container_name, mstr *objpath, int objpath_alloc_len)
+open_relinkctl_sgm *relinkctl_attach(unmanaged_mstr *obj_container_name, unmanaged_mstr *objpath, int objpath_alloc_len)
 {
 	open_relinkctl_sgm 	*linkctl, new_link, *new_link_ptr;
 	int			i, len, save_errno;
-	mstr			objdir;
+	unmanaged_mstr		objdir;
 	char			pathin[GTM_PATH_MAX], resolvedpath[GTM_PATH_MAX];	/* Includes null terminator char */
 	char			*pathptr;
 	boolean_t		obj_dir_found;
@@ -590,7 +590,7 @@ void relinkctl_incr_nattached(void)
  *   key            - Generated as $gtm_linktmpdir/gtm-relinkctl-<hash>. Buffer should be GTM_PATH_MAX bytes (output).
  *   zro_entry_name - Address of mstr containing the fully expanded zroutines entry directory name.
  */
-int relinkctl_get_key(char key[GTM_PATH_MAX], mstr *zro_entry_name)
+int relinkctl_get_key(char key[GTM_PATH_MAX], const unmanaged_mstr *zro_entry_name)
 {
 	gtm_uint16	hash;
 	hash128_state_t	hash_state;
@@ -779,7 +779,7 @@ void relinkctl_unlock_exclu(open_relinkctl_sgm *linkctl)
  * Find rec such that rec->rtnname == rtnname, return offset of rec.
  * Otherwise, return NOMATCH (defined 0xffff..).
  */
-relinkrec_t *relinkctl_find_record(open_relinkctl_sgm *linkctl, mstr *rtnname, uint4 hash, uint4 *prev_hash_index)
+relinkrec_t *relinkctl_find_record(open_relinkctl_sgm *linkctl, mident *rtnname, uint4 hash, uint4 *prev_hash_index)
 {
 	relinkrec_t		*rec, *base;
 	unsigned int		nrec, index;
@@ -814,7 +814,7 @@ relinkrec_t *relinkctl_find_record(open_relinkctl_sgm *linkctl, mstr *rtnname, u
 }
 
 /* Like relinkctl_find_record, but inserts a new entry instead of returning NULL */
-relinkrec_t *relinkctl_insert_record(open_relinkctl_sgm *linkctl, mstr *rtnname)
+relinkrec_t *relinkctl_insert_record(open_relinkctl_sgm *linkctl, mident *rtnname)
 {
 	relinkrec_t	*base, *rec;
 	uint4		hash, prev_hash_index, nrec;

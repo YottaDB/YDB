@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -19,6 +19,7 @@ XFER(xf_sto, op_sto),
 XFER(xf_cat, op_cat),
 XFER(xf_linefetch, op_linefetch),
 XFER(xf_linestart, op_linestart),
+/* XFER(xf_pretstart, op_linestart), would be here but placed at end to minimize disruption to generated code */
 XFER(xf_mval2bool, mval2bool),
 XFER(xf_zbfetch, op_zbfetch),
 XFER(xf_zbstart, op_zbstart),
@@ -314,4 +315,5 @@ XFER(xf_fnztranslate_fast, op_fnztranslate_fast),
 XFER(xf_fntranslate_fast, op_fntranslate_fast),
 XFER(xf_fnzauditlog, op_fnzauditlog),
 XFER(xf_fnreplace, op_fnreplace),
-XFER(xf_fnzreplace, op_fnzreplace)
+XFER(xf_fnzreplace, op_fnzreplace),
+XFER(xf_pretstart, op_linestart)

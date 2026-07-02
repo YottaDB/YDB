@@ -1,5 +1,5 @@
 /****************************************************************
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *                                                              *
  *      This source code contains the intellectual property     *
@@ -59,7 +59,7 @@ void op_fnreverse(mval *src, mval *dst)
 	}
 	assert(dstptr == stringpool.free);
 	stringpool.free += src->str.len;
-	MV_INIT_STRING(dst, src->str.len, dstptr);
+	UMV_INIT_STRING(&dst->umval, src->str.len, dstptr);
 
 	/* set character length of both source and destination mvals */
 	dst->mvtype |= MV_UTF_LEN;

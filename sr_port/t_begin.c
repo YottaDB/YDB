@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -85,9 +85,6 @@ void t_begin(uint4 err, uint4 upd_trans) 	/* err --> error code for current gvcs
 	/* MUPIP REORG -UPGRADE is not standalone. Nevertheless it seems it does not bracket its work with symmetrical
 	 * t_start/end/retry.
 	 */
-	assert(!csa->n_cache_reads || IS_DSE_IMAGE || (MUPIP_REORG_IN_PROG_TRUE == mu_reorg_encrypt_in_prog)
-			|| (MUPIP_UPGRADE_IN_PROGRESS == mu_upgrade_in_prog)
-			|| (MUPIP_REORG_UPGRADE_IN_PROGRESS == mu_upgrade_in_prog));
 	if ((NULL == csa->db_addrs[0]) && (dba_mm == csa->hdr->acc_meth))
 	{
 		RTS_ERROR_CSA_ABT(csa, VARLSTCNT(6) ERR_MMREGNOACCESS, 4, REG_LEN_STR(csa->region),

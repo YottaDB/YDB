@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -321,6 +321,7 @@ boolean_t mu_extr_gblout(glist *gl_ptr, mu_extr_stats *st, int format, boolean_t
 				if (!gvcst_get(val_span))
 				{
 					val_span->mvtype = 0; /* so stp_gcol can free up any space */
+					val_span->str.len = 0;
 					st->recknt--;
 					continue;
 				}
@@ -351,6 +352,7 @@ boolean_t mu_extr_gblout(glist *gl_ptr, mu_extr_stats *st, int format, boolean_t
 			if (found_dummy)
 			{
 				val_span->mvtype = 0; /* so stp_gcol can free up any space */
+				val_span->str.len = 0;
 				found_dummy = FALSE;
 			}
 #			endif

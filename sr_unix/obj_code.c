@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -22,7 +22,7 @@
 
 #include "compiler.h"
 #include "obj_gen.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "cmd_qlf.h"
 #include "cgp.h"
 #include "gtmio.h"
@@ -308,7 +308,7 @@ STATICFNDEF void cg_lab(mtreenode *node, void *do_emit_arg)
 {
 	bool		do_emit = !!do_emit_arg;
 	lab_tabent	lent;
-	mstr		glob_name;
+	mstr		glob_name = {{{0}}}; /* TODO - Does this need protection? */
 
 	if (node->lab.ml && node->lab.gbl)
 	{
@@ -319,13 +319,13 @@ STATICFNDEF void cg_lab(mtreenode *node, void *do_emit_arg)
 				? (char *)(node->lab.mvname.addr - (char *)stringpool.base) : NULL;
 			lent.LABENT_LNR_OFFSET = (lnr_tabent *)(SIZEOF(lnr_tabent) * node->lab.ml->line_number);
 											/* Offset into lnr table */
-			lent.has_parms = (NO_FORMALLIST != node->lab.formalcnt);		/* Flag to indicate any formallist */
+			lent.has_parms = (NO_FORMALLIST != node->lab.formalcnt);	/* Flag to indicate any formallist */
 			GTM64_ONLY(lent.filler = 0);					/* Remove garbage due so hashes well */
 			UTF8_ONLY(lent.lab_name.char_len = 0);			/* .. ditto .. */
 			emit_immed((char *)&lent, SIZEOF(lent));
 		} else
 		{	/* 1st pass, do the definition but no emissions */
-			mlabel2xtern(&glob_name, &int_module_name, &node->lab.mvname);
+			mlabel2xtern(&glob_name, &int_module_name, &node->lab.mvname.mident);
 			define_symbol(GTM_CODE, &glob_name);
 		}
 	}

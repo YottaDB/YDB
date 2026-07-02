@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2025 Fidelity National Information	*
+ * Copyright (c) 2010-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -19,7 +19,7 @@
 #include "gtm_facility.h"
 #include "fileinfo.h"
 #include "gdsfhead.h"
-#include <rtnhdr.h>		/* for rtn_tabent in gv_trigger.h */
+#include "rtnhdr.h"		/* for rtn_tabent in gv_trigger.h */
 #include "gv_trigger.h"
 #include "gtm_trigger.h"
 #include "error.h"
@@ -173,17 +173,21 @@ LITREF	mval	literal_null;
 	TREF(gv_some_subsc_null) = save_gv_some_subsc_null;								\
 }
 
-#define	GVTR_POOL2BUDDYLIST(GVT_TRIGGER, DST_MSTR)									\
+#define	GVTR_POOL2BUDDYLIST(GVT_TRIGGER, DST_MIDENT)									\
 {															\
-	int4	len;													\
-	char	*addr;													\
-	mstr	*dst_mstr;												\
+	int4		len;												\
+	char		*addr;												\
+	mident		*dst_mident;											\
+	unsigned int	gcols;												\
+	/* The logic behind using an mident/unmanaged_mstr here is the backing memory is malloc, not stpool */		\
 															\
-	dst_mstr = DST_MSTR;												\
-	addr = dst_mstr->addr;												\
-	len = dst_mstr->len;												\
-	dst_mstr->addr = (char *)get_new_element(GVT_TRIGGER->gv_trig_list, DIVIDE_ROUND_UP(len, GVTR_LIST_ELE_SIZE));	\
-	memcpy(dst_mstr->addr, addr, len);										\
+	DBG_START_NO_GCOLS(gcols);											\
+	dst_mident = DST_MIDENT;											\
+	addr = dst_mident->addr;											\
+	len = dst_mident->len;												\
+	dst_mident->addr = (char *)get_new_element(GVT_TRIGGER->gv_trig_list, DIVIDE_ROUND_UP(len, GVTR_LIST_ELE_SIZE));\
+	memcpy(dst_mident->addr, addr, len);										\
+	DBG_END_NO_GCOLS(gcols);											\
 }
 
 #define	GVTR_PROCESS_GVSUBS(PTR, END, SUBSDSC, COLON_IMBALANCE, GVT, SUBSCSTRLEN, SUBSCSTR)			\
@@ -318,14 +322,15 @@ LITREF	mval	literal_null;
  * (More memory may be actually be allocated than is used by the "len" in the memcpy(), which is OK
  * Hinting to SCA is done with dynamic typedefs which are only in scope in the macro context */
 #define ASSIGN_GVTR_SUBS_RANGE_KEYS(LEN,KEY_FIELD)										\
-{																\
+MBSTART {															\
 	typedef char new_elem_block[DIVIDE_ROUND_UP(LEN, GVTR_LIST_ELE_SIZE)];							\
 	typedef new_elem_block *new_elem_block_p;										\
 	new_elem_block_p dststart;												\
+																\
 	dststart = (new_elem_block_p) get_new_element(gvt_trigger->gv_trig_list, DIVIDE_ROUND_UP(LEN, GVTR_LIST_ELE_SIZE));	\
-	memcpy((char *) dststart, out_key->base, LEN);										\
-	subsdsc->KEY_FIELD = (char *) dststart;											\
-}
+	memcpy((char *)dststart, out_key->base, LEN);										\
+	subsdsc->KEY_FIELD = (char *)dststart;											\
+} MBEND
 
 /* This code is modeled around "updproc_ch" in updproc.c */
 CONDITION_HANDLER(gvtr_tpwrap_ch)
@@ -634,7 +639,7 @@ void	gvtr_db_read_hasht(sgmnt_addrs *csa)
 	unsigned char		util_buff[MAX_TRIG_UTIL_LEN];
 	gv_key			*save_gv_currkey;
 	gv_key			*save_gv_altkey;
-	mval			tmpmval, *ret_mval;
+	mval			tmpmval = {{0}}, *ret_mval;
 	boolean_t		is_defined, was_null = FALSE, is_null = FALSE, zdelim_defined, delim_defined;
 	boolean_t		save_gv_last_subsc_null, save_gv_some_subsc_null;
 	int4			tmpint4, util_len;
@@ -726,7 +731,7 @@ void	gvtr_db_read_hasht(sgmnt_addrs *csa)
 	gvt = save_gvtarget;	/* use smaller variable name as it is going to be used in lots of places below */
 	/* First add "GBL" subscript to gv_currkey i.e. ^#t("GBL") */
 	tmpmval.mvtype = MV_STR;
-	tmpmval.str = gvt->gvname.var_name;	/* copy gvname from gvt */
+	tmpmval.str.mident = gvt->gvname.var_name;	/* copy gvname from gvt */
 	ret_mval = &tmpmval;
 	COPY_SUBS_TO_GVCURRKEY(ret_mval, gv_cur_region, gv_currkey, was_null, is_null); /* updates gv_currkey */
 	/* At this point, gv_currkey points to ^#t("GBL") */
@@ -825,7 +830,7 @@ void	gvtr_db_read_hasht(sgmnt_addrs *csa)
 		is_defined =  gvtr_get_hasht_gblsubs((mval *)&literal_trigname, ret_mval);
 		if (!is_defined)
 			GVTR_HASHT_GVN_DEFINITION_RETRY_OR_ERROR(trigidx,",\"TRIGNAME\"", csa);
-		trigdsc->rtn_desc.rt_name = ret_mval->str;	/* Copy trigger name mident */
+		trigdsc->rtn_desc.rt_name = ret_mval->str.mident;	/* Copy trigger name mident */
 		trigdsc->gvt_trigger = gvt_trigger;		/* Save ptr to our main gvt_trigger struct for this trigger. With
 								 * this and given a gv_trigger_t, we can get to the gvt_trigger_t
 								 * block containing the gv_target pointer and thus get the trigger
@@ -1044,8 +1049,8 @@ void	gvtr_db_read_hasht(sgmnt_addrs *csa)
 		is_defined = gvtr_get_hasht_gblsubs((mval *)&literal_options, ret_mval);
 		if (is_defined)
 		{
-			trigdsc->options = ret_mval->str;
-			GVTR_POOL2BUDDYLIST(gvt_trigger, &trigdsc->options);
+			trigdsc->options.mident = ret_mval->str.mident;
+			GVTR_POOL2BUDDYLIST(gvt_trigger, &trigdsc->options.mident);
 		}
 		/* Read in ^#t("GBL",1,"DELIM")=<undefined>	*/
 		delim_defined = gvtr_get_hasht_gblsubs((mval *)&literal_delim, ret_mval);
@@ -1063,8 +1068,8 @@ void	gvtr_db_read_hasht(sgmnt_addrs *csa)
 		if (delim_defined || zdelim_defined)	/* order of || is important since latter is set only if former is FALSE */
 		{
 			/* Initialize trigdsc->delimiter */
-			trigdsc->delimiter = *ret_mval;
-			GVTR_POOL2BUDDYLIST(gvt_trigger, &trigdsc->delimiter.str);
+			trigdsc->delimiter.umval = ret_mval->umval;
+			GVTR_POOL2BUDDYLIST(gvt_trigger, &trigdsc->delimiter.str.mident);
 		}
 		/* Read in ^#t("GBL",1,"PIECES")="2:6;8"	*/
 		is_defined = gvtr_get_hasht_gblsubs((mval *)&literal_pieces, ret_mval);
@@ -1679,6 +1684,7 @@ int	gvtr_match_n_invoke(gtm_trigger_parms *trigparms, gvtr_invoke_parms_t *gvtr_
 						assert(ERR_TPRETRY == tfxb_status);
 						ztupd_mval->mvtype = 0;	/* so stp_gcol - if invoked somehow - can free up any space
 									 * currently occupied by this no-longer-necessary mval */
+						ztupd_mval->str.len = 0;
 						gvtr_parms->num_triggers_invoked = num_triggers_invoked;
 						return tfxb_status;
 					}
@@ -1695,6 +1701,7 @@ int	gvtr_match_n_invoke(gtm_trigger_parms *trigparms, gvtr_invoke_parms_t *gvtr_
 				num_triggers_invoked++;
 				ztupd_mval->mvtype = 0;	/* so stp_gcol -if invoked somehow - can free up any space
 							 * currently occupied by this no-longer-necessary mval */
+				ztupd_mval->str.len = 0;
 				assert((0 == gtm_trig_status) || (ERR_TPRETRY == gtm_trig_status));
 				if (0 != gtm_trig_status)
 				{

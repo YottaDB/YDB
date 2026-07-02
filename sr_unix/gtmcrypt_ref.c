@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2009-2025 Fidelity National Information	*
+ * Copyright (c) 2009-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -391,7 +391,7 @@ gtm_status_t gtmcrypt_encrypt_decrypt(gtmcrypt_key_t handle, gtm_char_t *src_blo
 	{
 		case GTMCRYPT_IV_SET:
 			CHECK_IV_LENGTH(iv);
-			memcpy((void *)iv_array, iv.address, iv.length);
+			memcpy(iv_array, iv.address, iv.length);
 			if (GTMCRYPT_IV_LEN != iv.length)
 				memset(iv_array + iv.length, 0, GTMCRYPT_IV_LEN - iv.length);
 		case GTMCRYPT_IV_RESET:	/* CAUTION: Fall-through. */

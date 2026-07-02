@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -9,6 +9,9 @@
  *	the license, please stop and do not read further.	*
  *								*
  ****************************************************************/
+
+#ifndef SV_NAMES_DEF_INCLUDED
+#define SV_NAMES_DEF_INCLUDED
 
 enum
 {
@@ -94,6 +97,8 @@ enum
 	SV_ZMLKHASH,		/* 79 */
 	SV_ZMALLOCLIM,		/* 80 */
 	SV_ZICUVER,		/* 81 */
+	SV_ZINXPEL,             /* 82 */
 	SV_NUM_SV,		/* count - should be next to last SV entry just prior to dummy entry below */
 	SV_DUMMY_TO_FORCE_INT = 0x0FFFFFFF	/* to ensure an int on S390 */
 };
+#endif /* SV_NAMES_DEF_INCLUDED */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -24,7 +24,7 @@
 #include "io_params.h"
 #include "op.h"
 #include "io.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "stack_frame.h"
 #include "jobexam_process.h"
 #ifdef UNIX
@@ -35,6 +35,8 @@
 #include "zshow.h"
 #include "util.h"
 #include "mv_stent.h"
+#include "gdsfhead.h"
+#include "zwrite.h"
 
 #define DEFAULT_DUMP_FILENAME "GTM_JOBEXAM.ZSHOW_DMP"
 /* + 3 below is for for 2 intervening '_' chars and 1 extra */
@@ -96,7 +98,7 @@ void jobexam_process(mval *dump_file_name, mval *dump_file_spec, mval *fmt)
 		PUSH_MV_STENT(MVST_MVAL);
 		new_mv_stent = mv_chain;
 		input_dump_file_name = &mv_chain->mv_st_cont.mvs_mval;
-		*input_dump_file_name = *dump_file_name;
+		input_dump_file_name->umval = dump_file_name->umval;
 		saved_mv_stent = TRUE;
 	} else
 	{	/* Just use input mval as-is */
@@ -121,7 +123,7 @@ void jobexam_process(mval *dump_file_name, mval *dump_file_spec, mval *fmt)
 	sigaction(SIGBUS, &new_action, &prev_action);
 	sigaction(SIGSEGV, &new_action, 0);
 #	endif
-	*dump_file_spec = empty_str_mval;
+	dump_file_spec->umval = empty_str_mval.umval;
 	dev_in_use = io_curr_device;		/* Save current IO device */
 	/* Save text in util_outbuff which can be detrimentally overwritten by ZSHOW.
 	 * NOTE: The following code needs to be eventually moved to jobinterrupt_process.c and replaced with
@@ -146,7 +148,7 @@ void jobexam_process(mval *dump_file_name, mval *dump_file_spec, mval *fmt)
 	{
 		assert(0 <= saved_util_outbuff_len);
 		assert(saved_util_outbuff_len <= SIZEOF(saved_util_outbuff));
-		memcpy((void *)saved_util_outbuff, TREF(util_outbuff_ptr), saved_util_outbuff_len);
+		memcpy(saved_util_outbuff, TREF(util_outbuff_ptr), saved_util_outbuff_len);
 	}
 	jobexam_dump(input_dump_file_name, dump_file_spec, save_dump_file_name_buff, fmt);
 	/* If any errors occur in job_exam_dump, the condition handler will unwind the stack to this point and return.  */
@@ -215,7 +217,7 @@ void jobexam_dump(mval *dump_filename_arg, mval *dump_file_spec, char *fatal_fil
 	if (process_exiting)
 	{
 		assert(GTM_PATH_MAX >= dump_file_spec->str.len);
-		memcpy((void *)fatal_file_name_buff, dump_file_spec->str.addr, dump_file_spec->str.len);
+		memcpy(fatal_file_name_buff, dump_file_spec->str.addr, dump_file_spec->str.len);
 		dump_file_spec->str.addr = fatal_file_name_buff;
 	}
 	/* Parms of file to be created (newversion) */
@@ -265,6 +267,7 @@ CONDITION_HANDLER(jobexam_dump_ch)
 		created_core = save_created_core;
 	}
 #	endif
+	NULLIFY_MERGE_ZWRITE_CONTEXT;
 	UNIX_ONLY(util_out_print(0, OPER));
 	VMS_ONLY(sig->chf$l_sig_args -= 2);
 	VMS_ONLY(callg(send_msg, &sig->chf$l_sig_args));

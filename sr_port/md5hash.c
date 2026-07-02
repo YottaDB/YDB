@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2013-2024 Fidelity National Information	*
+ * Copyright (c) 2013-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -119,10 +119,10 @@ cvs_MD5Update (struct cvs_MD5Context *ctx, unsigned char const *buf, unsigned le
 
 		t = 64-t;
 		if (len < t) {
-			memcpy((void *)p, buf, len);
+			memcpy(p, buf, len);
 			return;
 		}
-		memcpy((void *)p, buf, t);
+		memcpy(p, buf, t);
 		cvs_MD5Transform (ctx->buf, ctx->in);
 		buf += t;
 		len -= t;

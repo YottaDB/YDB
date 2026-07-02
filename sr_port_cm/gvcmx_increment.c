@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2004-2021 Fidelity National Information	*
+ * Copyright (c) 2004-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -22,6 +22,7 @@
 #include "fileinfo.h"
 #include "gdsbt.h"
 #include "gdsfhead.h"
+#include "filestruct.h"
 
 #include "format_targ_key.h"	/* for format_targ_key prototype */
 
@@ -42,7 +43,7 @@ void	gvcmx_increment(mval *increment, mval *result)
 	{
 		assert(dba_cm == gv_cur_region->dyn.addr->acc_meth); /* we should've covered all other access methods elsewhere */
 		end = format_targ_key(buff, MAX_ZWR_KEY_SZ, gv_currkey, TRUE);
-		RTS_ERROR_ABT(VARLSTCNT(14) ERR_UNIMPLOP, 0,
+		RTS_ERROR_CSA_ABT(REG2CSA(gv_cur_region), VARLSTCNT(14) ERR_UNIMPLOP, 0,
 			ERR_TEXT, 2, LEN_AND_LIT("GT.CM server does not support $INCREMENT operation"),
 			ERR_GVIS, 2, end - buff, buff,
 			ERR_TEXT, 2, REG_LEN_STR(gv_cur_region));
@@ -61,6 +62,6 @@ void	gvcmx_increment(mval *increment, mval *result)
 	 */
 	assert(MV_IS_NUMERIC(increment));	/* op_gvincr would have forced it to be a NUMERIC */
 	MV_FORCE_STR(increment);		/* convert it to a string before sending it to gvcmz_doop */
-	*result = *increment;
+	result->umval = increment->umval;
 	gvcmz_doop(CMMS_Q_INCREMENT, CMMS_R_INCREMENT, result);
 }

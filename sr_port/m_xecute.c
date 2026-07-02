@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -79,7 +79,10 @@ int m_xecute(void)
 				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_INDRMAXLEN, 1, MAX_SRCLINE);
 			/* save the parse state, point the compiler at the literal and see what happens */
 			if (NULL == parse_state_ptr)
+			{
 				parse_state_ptr = malloc(SIZEOF(parse_save_block));
+				glist_first_init_str(&parse_state_ptr->director_mval.str);
+			}
 			SAVE_PARSE_STATE(parse_state_ptr);
 			if (NULL == local_source_buffer)
 				local_source_buffer = malloc(MAX_SRCLINE + 1);
@@ -110,7 +113,6 @@ int m_xecute(void)
 				ins_triple(ref0);
 				pending_errtriplecode = 0;	/* forget the error - leave it to runtime */
 				TREF(source_error_found) = 0;
-
 			}
 		} else
 			rval = EXPR_FAIL;

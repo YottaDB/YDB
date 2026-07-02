@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2024 Fidelity National Information	*
+ * Copyright (c) 2006-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -84,6 +84,11 @@
 				|| (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state))			\
 			return SS_NORMAL;								\
 	}												\
+	if (SS_NORMAL == status)									\
+	{												\
+		repl_source_msg_sent += (qw_num)len;							\
+		repl_source_cmp_sent += (qw_num)len;							\
+	}												\
 }
 
 #define PROC_OPS_PRINT_MSG_LEN	1024
@@ -110,6 +115,8 @@ GBLREF	repl_conn_info_t	*this_side, *remote_side;
 GBLREF	repl_ctl_element	*repl_ctl_list;
 GBLREF	repl_msg_ptr_t		gtmsource_cmpmsgp;
 GBLREF	repl_msg_ptr_t		gtmsource_msgp;
+GBLREF	qw_num			repl_source_msg_sent;
+GBLREF	qw_num			repl_source_cmp_sent;
 GBLREF	seq_num			gtmsource_save_read_jnl_seqno;
 GBLREF	seq_num			seq_num_zero;
 GBLREF	uchar_ptr_t		repl_filter_buff;
@@ -676,6 +683,11 @@ int gtmsource_recv_restart(seq_num *recvd_jnl_seqno, int *msg_type, int *start_f
 				if ((GTMSOURCE_CHANGING_MODE == gtmsource_state) || (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state))
 					return (SS_NORMAL);
 			}
+			if (SS_NORMAL == status)
+			{
+				repl_source_msg_sent += (qw_num)xoff_ack.len;
+				repl_source_cmp_sent += (qw_num)xoff_ack.len;
+			}
 			log_waitmsg = TRUE;	/* Wait for REPL_START_JNL_SEQNO or REPL_FETCH_RESYNC */
 		} else
 		{	/* If unknown message is received, close connection. Caller will reopen the same. */
@@ -1104,6 +1116,9 @@ void	gtmsource_repl_send(repl_msg_ptr_t msg, char *msgtypestr, seq_num optional_
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, LEN_AND_STR(err_string));
 		}
 	}
+	/* Count all non-transaction messages in Msg Total to be consistent with the receiver server */
+	repl_source_msg_sent += (qw_num)msg->len;
+	repl_source_cmp_sent += (qw_num)msg->len;
 }
 
 /* This function can be used to only receive fixed-size message types across the replication pipe.

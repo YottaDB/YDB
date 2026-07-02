@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -17,9 +17,10 @@
 #include "zshow.h"
 #include "patcode.h"
 #include "compiler.h"	/* for CHARMAXARGS */
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "stack_frame.h"
 #include "mv_stent.h"	/* for POP_MV_STENT */
+#include "stringpool.h"
 
 #ifdef UTF8_SUPPORTED
 #include "gtm_utf8.h"
@@ -32,10 +33,10 @@ GBLREF	mv_stent	*mv_chain;
 GBLREF	unsigned char	*stackbase, *stacktop, *msp, *stackwarn;
 GBLREF	int		process_exiting;
 
-LITDEF MSTR_CONST(quote, QUOTE);
-LITDEF MSTR_CONST(quote_concat, QUOTE_CONCAT);
-LITDEF MSTR_CONST(close_paren, CLOSE_PAREN);
-LITDEF MSTR_CONST(close_paren_quote, CLOSE_PAREN_QUOTE);
+STATICDEF UMSTR_CONST(quote, QUOTE);
+STATICDEF UMSTR_CONST(quote_concat, QUOTE_CONCAT);
+STATICDEF UMSTR_CONST(close_paren, CLOSE_PAREN);
+STATICDEF UMSTR_CONST(close_paren_quote, CLOSE_PAREN_QUOTE);
 
 error_def(ERR_STACKOFLOW);
 error_def(ERR_STACKCRIT);
@@ -43,12 +44,12 @@ error_def(ERR_STACKCRIT);
 /* The following macro prints the last contiguous sequence of printable (graphic) characters
  * that have been processed so far to the zshow buffer. It also resets the size of the next
  * next sequence that may follow */
-#define ZWR_PRINTABLE						\
-{								\
-	graphic_str->str.len = src_cnt - strstart;		\
-	graphic_str->str.addr = v->str.addr + strstart;		\
-	zshow_output(output, &graphic_str->str);		\
-}
+#define ZWR_PRINTABLE								\
+MBSTART {									\
+	graphic_str->str.len = src_cnt - strstart;				\
+	graphic_str->str.addr = v->str.addr + strstart;				\
+	zshow_output(output, &graphic_str->str.umstr);				\
+} MBEND
 
 /* The routine that does formatting for ZWRITE command.
  * NOTE: this routine does almost the same formatting as format2zwr(). However,
@@ -62,7 +63,8 @@ void mval_write(zshow_out *output, mval *v, boolean_t flush)
 	int		fastate = 0, ncommas = 0, src_len, src_cnt, strstart, chlen;
 	boolean_t	isctl, isill;
 	char		*strnext;
-	mval		*graphic_str, lmv;
+	mval		*graphic_str;
+	mval lmv = {{0}};
 
 	MV_FORCE_STR(v);
 	src_len = v->str.len;
@@ -71,7 +73,7 @@ void mval_write(zshow_out *output, mval *v, boolean_t flush)
 		if (val_iscan(v))
 		{
 			output->flush = flush;
-			zshow_output(output, &v->str);
+			zshow_output(output, &v->str.umstr);
 			return;
 		}
 		fastate = 0;
@@ -82,7 +84,10 @@ void mval_write(zshow_out *output, mval *v, boolean_t flush)
 			PUSH_MV_STENT(MVST_MVAL);
 			graphic_str = &mv_chain->mv_st_cont.mvs_mval;
 		} else
+		{
 			graphic_str = &lmv;
+			/* Not protected for now */
+		}
 		graphic_str->mvtype = MV_STR;
 		graphic_str->str.len = 0; /* initialize len in case stp_gcol gets called before actual set of len occurs below */
 

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2018 Fidelity National Information	*
+ * Copyright (c) 2006-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -60,7 +60,7 @@ void op_fnpiece(mval *src, mval *del, int first, int last, mval *dst)
 		first = 0;
 	if ((piece_cnt = last - first) < 1)
 	{
-		MV_INIT_STRING(dst, 0, NULL);
+		UMV_INIT_STRING(&dst->umval, 0, NULL);
 		return;
 	}
 	MV_FORCE_STR(src);
@@ -83,7 +83,7 @@ void op_fnpiece(mval *src, mval *del, int first, int last, mval *dst)
 		match_start = (char *)matchc(del_len, (uchar_ptr_t)del_str, src_len, (uchar_ptr_t)src_str, &match_res, &first);
 		if (0 == match_res)
 		{
-			MV_INIT_STRING(dst, 0, NULL);
+			UMV_INIT_STRING(&dst->umval, 0, NULL);
 			return;
 		}
 		src_len -= INTCAST(match_start - src_str);
@@ -93,6 +93,6 @@ void op_fnpiece(mval *src, mval *del, int first, int last, mval *dst)
 	src_str = (char *)matchc(del_len, (uchar_ptr_t)del_str, src_len, (uchar_ptr_t)src_str, &match_res, &piece_cnt);
 	if (0 != match_res)
 		src_str -= del_len;
-	MV_INIT_STRING(dst, INTCAST(src_str - match_start), match_start);
+	UMV_INIT_STRING(&dst->umval, INTCAST(src_str - match_start), match_start);
 	return;
 }

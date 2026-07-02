@@ -423,7 +423,7 @@ gd_region *dbfilopn(gd_region *reg)
 {
 	unix_db_info		*tmp_udi, *udi;
 	parse_blk		pblk;
-	mstr			file;
+	unmanaged_mstr		file;
 	char			*fnptr, fbuff[MAX_FN_LEN + 1], tmpbuff[MAX_FN_LEN + 1];
 	char			*errrsn_text;
 	struct stat		buf;
@@ -434,9 +434,9 @@ gd_region *dbfilopn(gd_region *reg)
 	node_local_ptr_t	baseDBnl = NULL;
 	int			status, errrsn_text_len;
 	boolean_t		raw, is_statsDB;
-	boolean_t		open_read_only;
+	boolean_t		open_read_only, can_do_dbinit;
 	boolean_t		init_complete = FALSE;
-	int			stat_res, rc, save_errno = 0;
+	int			stat_res, rc, save_errno = 0, rdwr_open_errno = 0;
 	sgmnt_addrs		*csa;
 	sgmnt_data		tsdbuff;
 	sgmnt_data_ptr_t        tsd = NULL;
@@ -594,11 +594,7 @@ gd_region *dbfilopn(gd_region *reg)
 	if (!(status & 1))
 	{
 		if (!IS_GTCM_GNP_SERVER_IMAGE)
-		{
-			free(seg->file_cntl->file_info);
-			free(seg->file_cntl);
-			seg->file_cntl = NULL;
-		}
+			FILE_CNTL_FREE(seg);
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), status);
 	}
 	assert(((int)pblk.b_esl + 1) <= SIZEOF(seg->fname));
@@ -645,7 +641,7 @@ gd_region *dbfilopn(gd_region *reg)
 			} else
 #endif
 				OPENFILE_DB(fnptr, O_RDWR, udi, seg);
-			save_errno = errno;
+			rdwr_open_errno = save_errno = errno;
 			/* If we didn't open, and we didn't open because it doesn't exist, and we are allowed to create, try to
 			 * create it.
 			 */
@@ -660,6 +656,7 @@ gd_region *dbfilopn(gd_region *reg)
 				if (is_statsDB && TREF(ok_to_leave_statsdb_unopened))
 				{
 					/* Should never create a statsdb file */
+					FILE_CNTL_FREE(reg->dyn.addr);
 					return (gd_region *)NULL;
 				}
 				DBGRDB((stderr, "%s:%d:%s: process id %d decided to perform mu_cre_file of file %s for region %s\n",
@@ -735,7 +732,7 @@ gd_region *dbfilopn(gd_region *reg)
 					OPENFILE_DB(fnptr, O_RDWR, udi, seg);
 					if (FD_INVALID == udi->fd)
 					{
-						save_errno = errno;
+						rdwr_open_errno = save_errno = errno;
 						autodb_rcerr = AUTODB_OPNERR;
 						break;
 					}
@@ -775,15 +772,11 @@ gd_region *dbfilopn(gd_region *reg)
 							__FILE__, __LINE__, __func__, process_id, reg->dyn.addr->fname,
 							reg->rname));
 				save_errno = errno;
-				if (!IS_GTCM_GNP_SERVER_IMAGE)
-				{
-					free(seg->file_cntl->file_info);
-					free(seg->file_cntl);
-					seg->file_cntl = NULL;
-				}
 				if (!IS_AUTODB_REG(reg))
+				{
+					FILE_CNTL_FREE(seg);
 					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), save_errno);
-				else
+				} else
 				{
 					autodb_rcerr = AUTODB_OPNERR;
 					break;
@@ -793,49 +786,30 @@ gd_region *dbfilopn(gd_region *reg)
 				DBGRDB((stderr, "%s:%d:%s: process id %d succeeded in opening read-only file %s for region %s\n",
 							__FILE__, __LINE__, __func__, process_id, reg->dyn.addr->fname,
 							reg->rname));
-				if (IS_AUTODB_REG(reg) && !open_read_only && !did_one_loop)
-				{
-					/* Handle a potential race condition where
-					 * 	- Process A has uid 'A'
-					 * 	- Process B has uid 'B'
-					 * 	- Process A creates the file 0600 perms
-					 * 	- Process B fails the initial OPENFILE RW
-					 * 	- Process A chmods the db file to its eventual perms
-					 * 	- Process B succeeds on the OPENFILE Readonly
-					 * We do not want to ever grab ftok without having the right to move the state
-					 * machine of file initialization forward for fear of livelock. So handle this potential
-					 * case by an ordering logic that means we repeat the attempt to RW-open any AUTODB file
-					 * whose first RW-open attempt fails but subsequent Readonly-attempt succeeds.
-					 */
-					CLOSEFILE_RESET(udi->fd, rc);
-					udi->fd_opened_with_o_direct = FALSE;
-					assert(!TREF(mu_cre_file_openrc));
-					TREF(mu_cre_file_openrc) = 0;
-					did_one_loop = TRUE;
-					continue;
-
-				}
 				reg->read_only = TRUE;		/* maintain csa->read_write simultaneously */
 				csa->read_write = FALSE;	/* maintain reg->read_only simultaneously */
 				csa->orig_read_write = FALSE;
-				if (!open_read_only && !((EPERM == save_errno) || (EACCES == save_errno)))
+				if (!open_read_only && !((EPERM == rdwr_open_errno) || (EACCES == rdwr_open_errno)))
 				{
 					if (!IS_GTM_IMAGE)
 						gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_DBFILERDONLY, 3,
-								DB_LEN_STR(reg), (int)0, save_errno);
+								DB_LEN_STR(reg), (int)0, rdwr_open_errno);
 					send_msg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_DBFILERDONLY, 3, DB_LEN_STR(reg), (int)0,
-							save_errno);
+							rdwr_open_errno);
 				}
 			}
 		}
-		if (!IS_STATSDB_REG(reg) && (!reg->owning_gd->is_dummy_gbldir && (pool_init || !jnlpool_init_needed
-						|| !CUSTOM_ERRORS_AVAILABLE)))
+		assert(AUTODB_NOERR == autodb_rcerr);
+		can_do_dbinit = (!IS_AUTODB_REG(reg) || csa->read_write);
+		if (can_do_dbinit && !IS_STATSDB_REG(reg)
+			&& (!reg->owning_gd->is_dummy_gbldir && (pool_init || !jnlpool_init_needed || !CUSTOM_ERRORS_AVAILABLE)))
 			break;
 		tsd = udi->fd_opened_with_o_direct ? (sgmnt_data_ptr_t)(TREF(dio_buff)).aligned : &tsdbuff;
 		DBGRDB((stderr, "%s:%d:%s: process id %d needs to read_db_file_header after opening file %s for region %s\n",
 					__FILE__, __LINE__, __func__, process_id, reg->dyn.addr->fname, reg->rname));
 		/* If O_DIRECT, use aligned buffer */
 		db_invalid = read_db_file_header(udi, reg, tsd);
+		can_do_dbinit = (can_do_dbinit || (DB_VALID == db_invalid)); /* File init already done */
 		save_errno = errno;
 		if (DB_INVALID_STATSDBNOTSUPP == db_invalid)
 		{
@@ -849,11 +823,8 @@ gd_region *dbfilopn(gd_region *reg)
 		}
 		if (!pool_init && jnlpool_init_needed && CUSTOM_ERRORS_AVAILABLE)
 			csa->repl_state = tsd->repl_state;	/* needed in gvcst_init */
-		if (!reg->owning_gd->is_dummy_gbldir)
+		if (can_do_dbinit && (!reg->owning_gd->is_dummy_gbldir || (db_invalid != DB_VALID_DBGLDMISMATCH)))
 			break;
-		if (db_invalid != DB_VALID_DBGLDMISMATCH)
-			break;
-
 		DBGRDB((stderr, "%s:%d:%s: process id %d closing and reopening file %s for region %s in order to correct aio "
 					"settings\n", __FILE__, __LINE__, __func__, process_id, reg->dyn.addr->fname, reg->rname));
 		CLOSEFILE_RESET(udi->fd, rc);	/* close file and reopen it with correct asyncio setting */
@@ -880,11 +851,12 @@ gd_region *dbfilopn(gd_region *reg)
 			baseDBcsa->reservedDBFlags |= RDBF_NOSTATS;
 		}
 		assert(!reg->file_initialized);
+		FILE_CNTL_FREE(seg);
 		switch (autodb_rcerr)
 		{
 			case AUTODB_OPNERR:
 				assert(save_errno);
-				RTS_ERROR_CSA_ABT(csa, VARLSTCNT(5) ERR_DBOPNERR, 2,
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_DBOPNERR, 2,
 						DB_LEN_STR(reg), save_errno);
 				break;			/* For the compiler */
 			case AUTODB_INITERR:
@@ -898,12 +870,12 @@ gd_region *dbfilopn(gd_region *reg)
 				}
 				if (TREF(mu_cre_file_openrc))
 				{
-					RTS_ERROR_CSA_ABT(csa, VARLSTCNT(5) ERR_DBOPNERR, 2,
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_DBOPNERR, 2,
 							DB_LEN_STR(reg), TREF(mu_cre_file_openrc));
 					break;
 				} else
 				{
-					RTS_ERROR_CSA_ABT(csa, VARLSTCNT(8) ERR_DBFILERR, 2,
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_DBFILERR, 2,
 							DB_LEN_STR(reg), ERR_TEXT, 2,
 							RTS_ERROR_TEXT("See preceding errors written to syserr"
 								" and/or syslog for details"));
@@ -928,6 +900,7 @@ gd_region *dbfilopn(gd_region *reg)
         if (-1 == stat_res)
         {
         	save_errno = errno;
+		FILE_CNTL_FREE(seg);
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), save_errno);
         }
 	set_gdid_from_stat(&udi->fileid, &buf);
@@ -936,9 +909,7 @@ gd_region *dbfilopn(gd_region *reg)
 		DBGRDB((stderr, "%s:%d:%s: process id %d found duplicate reg after dbfilopn of file %s for region %s\n", __FILE__,
 					__LINE__, __func__, process_id, reg->dyn.addr->fname, reg->rname));
 		CLOSEFILE_RESET(udi->fd, rc);	/* resets "udi->fd" to FD_INVALID */
-		free(seg->file_cntl->file_info);
-		free(seg->file_cntl);
-		seg->file_cntl = NULL;
+		FILE_CNTL_FREE(seg);
 		return prev_reg;
 	}
 	SYNC_OWNING_GD(reg);

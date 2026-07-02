@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2014-2021 Fidelity National Information	*
+ * Copyright (c) 2014-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -13,8 +13,9 @@
 #include "mdef.h"
 
 #include "error.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "stack_frame.h"
+#include "xpelerrpre_inline.h"
 
 GBLREF stack_frame	*frame_pointer;
 
@@ -41,8 +42,9 @@ void laberror(int lblindx)
 #	ifdef AUTORELINK_SUPPORTED
 	assertpro(0 <= lblindx);
 	assert(lblindx <= frame_pointer->rvector->linkage_len);
-	lblname = frame_pointer->rvector->linkage_names[lblindx];		/* Make copy of possibly shared mstr */
+	lblname.umstr = frame_pointer->rvector->linkage_names[lblindx].umstr;		/* Make copy of possibly shared mstr */
 	lblname.addr += (INTPTR_T)frame_pointer->rvector->literal_text_adr;	/* Relocate addr appropriately */
+	lblname.in_array = FALSE;
 	/* Label name is in form of "rtnname.labelname" so forward space past routine name and '.' */
 	maxcptr = lblname.addr + lblname.len;
 	for (cptr = lblname.addr; ('.' != *cptr) && (cptr < maxcptr); cptr++)
@@ -52,6 +54,7 @@ void laberror(int lblindx)
 	assert(skiplen < lblname.len);
 	lblname.len -= skiplen;
 	lblname.addr += skiplen;
+	xpelerrorpre();
 	RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_LABELMISSING, 2, RTS_ERROR_MSTR(&lblname));
 #	else
 	assertpro(FALSE);

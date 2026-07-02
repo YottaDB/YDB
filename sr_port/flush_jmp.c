@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -15,7 +15,7 @@
 #include "gtm_stdio.h"
 #include "gtm_string.h"
 
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "mv_stent.h"
 #include "objlabel.h"
 #include "cache.h"
@@ -46,11 +46,14 @@ error_def(ERR_STACKOFLOW);
 
 void flush_jmp(rhdtyp *rtn_base, unsigned char *context, unsigned char *transfer_addr)
 {
-	mv_stent		*mv_st_ent, *mv_st_prev;
+	mv_stent		*mv_st_ent, *mv_st_prev, *mv_st_curr;
 	char			*top;
 	unsigned char		*msp_save;
+	unsigned int		ptemp_cnt;
 	int4			shift, size, mv_st_type;
 	USHBIN_ONLY(rhdtyp	*old_rtnhdr;)
+	mval			*m, *mtop;
+	DEBUG_ONLY(boolean_t	unwound_mv_ent;)
 
 	unwind_nocounts();
 	/* We are going to mutate the current frame from the program it was running to the program we want it to run.
@@ -76,13 +79,24 @@ void flush_jmp(rhdtyp *rtn_base, unsigned char *context, unsigned char *transfer
 	 * and if so that cleanup can be performed now.
 	 */
 	USHBIN_ONLY(CLEANUP_COPIED_RECURSIVE_RTN(old_rtnhdr));	/* cleanup if needed */
-	frame_pointer->vartab_ptr = (char *)VARTAB_ADR(rtn_base);
+	frame_pointer->vartab_ptr = VARTAB_ADR(rtn_base);
 	frame_pointer->vartab_len = frame_pointer->rvector->vartab_len;
 	frame_pointer->mpc = transfer_addr;
 	frame_pointer->ctxt = context;
 #ifdef HAS_LITERAL_SECT
 	frame_pointer->literal_ptr = (int4 *)LITERAL_ADR(rtn_base);
 #endif
+	m = (mval *)frame_pointer->temps_ptr;
+	ptemp_cnt = PTEMP_CNT(frame_pointer);
+	if (ptemp_cnt != INVALID_PTEMP_CNT)
+	{
+		for (mtop = m + frame_pointer->temp_mvals; ptemp_cnt && m < mtop; m++)
+		{
+			ptemp_cnt -= !!m->str.in_array;
+			glist_unprotect_str(&m->str);
+		}
+		assert(0 == ptemp_cnt || PTEMP_CNT(frame_pointer) == ptemp_cnt);
+	}
 	frame_pointer->temp_mvals = frame_pointer->rvector->temp_mvals;
 	size = rtn_base->temp_size;
 	frame_pointer->temps_ptr = (unsigned char *)frame_pointer - size;
@@ -110,6 +124,7 @@ void flush_jmp(rhdtyp *rtn_base, unsigned char *context, unsigned char *transfer
 				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_STACKCRIT);
 	   	}
 		memset(msp, 0, size);
+		SET_PTEMP_CNT(frame_pointer, INVALID_PTEMP_CNT);
 		DBGEHND((stderr, "flush_jmp: Old msp: 0x"lvaddr"  New msp: 0x"lvaddr"\n", msp_save, msp));
 		return;
 	}
@@ -130,6 +145,7 @@ void flush_jmp(rhdtyp *rtn_base, unsigned char *context, unsigned char *transfer
 			DBGEHND((stderr, "flush_jmp: Removing no-save mv_stent addr 0x"lvaddr" and type %d\n",
 				 mv_st_prev, mv_st_type));
 			unw_mv_ent(mv_st_prev, UNWIND_NEWVARS);
+			unprotect_mv_ent(mv_st_prev);
 			mv_st_ent->mv_st_next += mv_st_prev->mv_st_next;
 			mv_st_prev = (mv_stent *)((char *)mv_st_prev + mv_st_prev->mv_st_next);
 			continue;
@@ -145,7 +161,9 @@ void flush_jmp(rhdtyp *rtn_base, unsigned char *context, unsigned char *transfer
 				 * address there too. Else we won't unwind to the correct place on a restart. */
 				fix_tphold_mvc(top, (char *)mv_st_prev, ((char *)mv_st_prev + mvs_size[MVST_TPHOLD]));
 			}
+			prep_mv_stent_for_move(mv_st_prev);
 			memmove(top, mv_st_prev, mvs_size[mv_st_type]);
+			handle_mv_stent_after_move((mv_stent *)top);
 		}
 		DBGEHND((stderr, "flush_jmp: Updating offsets for mv_stent at addr 0x"lvaddr" type %d\n",
 			 mv_st_ent, mv_st_ent->mv_st_type));
@@ -173,13 +191,38 @@ void flush_jmp(rhdtyp *rtn_base, unsigned char *context, unsigned char *transfer
 		 * is usually no more than 1-3 deep.
 		 */
 		fix_tphold_mvc(((char *)mv_chain + shift), (char *)mv_chain, ((char *)mv_chain + (top - (char *)mv_chain)));
+		assert(top > (char *)mv_chain);
+		mv_st_curr = mv_chain;
+		while ((char *)mv_st_curr < top)
+		{
+			prep_mv_stent_for_move(mv_st_curr);
+			if (mv_st_curr == mv_st_ent)
+				break;
+			mv_st_curr = (mv_stent *)((char *)mv_st_curr + mv_st_curr->mv_st_next);
+		}
 		memmove((char *)mv_chain + shift, mv_chain, top - (char *)mv_chain);
+		mv_st_curr = mv_chain;
 		mv_chain = (mv_stent *)((char *)mv_chain + shift);
 		mv_st_ent = (mv_stent *)((char *)mv_st_ent + shift);
 		mv_st_ent->mv_st_next -= shift;
+		assert((char *)mv_st_curr < top);
+		if ((char *)mv_st_curr != top)
+		{
+			/* If the memmove did anything */
+			mv_st_curr = mv_chain;
+			top = (char *)mv_st_ent + mvs_size[mv_st_ent->mv_st_type];
+			while ((char *)mv_st_curr < top)
+			{
+				handle_mv_stent_after_move(mv_st_curr);
+				if (mv_st_curr == mv_st_ent)
+					break;
+				mv_st_curr = (mv_stent *)((char *)mv_st_curr + mv_st_curr->mv_st_next);
+			}
+		}
 		msp = (unsigned char *)mv_chain;
 	}
 	memset(frame_pointer->l_symtab, 0, size);
+	SET_PTEMP_CNT(frame_pointer, INVALID_PTEMP_CNT);
 	DBGEHND((stderr, "flush_jmp: Old msp: 0x"lvaddr"  New msp: 0x"lvaddr"\n", msp_save, msp));
 	return;
 }

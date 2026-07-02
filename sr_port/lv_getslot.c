@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -23,7 +23,7 @@
 #include "gdsfhead.h"
 #include "caller_id.h"
 #include "alias.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "stack_frame.h"
 
 GBLREF stack_frame	*frame_pointer;
@@ -74,6 +74,7 @@ lv_val *lv_getslot(symval *sym)
 	assert(lv);
 	DBGRFCT((stderr, "\n>> lv_getslot(): Allocating new lv_val at 0x"lvaddr" by routine 0x"lvaddr" at mpc 0x"lvaddr
 		 " for symval 0x"lvaddr" (curr_symval: 0x"lvaddr")\n", lv, caller_id(), frame_pointer->mpc, sym, curr_symval));
+	glist_init_str(&lv->v.str);
 	return lv;
 }
 
@@ -157,5 +158,7 @@ lvTreeNode *lvtreenode_getslot(symval *sym)
 	assert(lv);
 	DBGRFCT((stderr, ">> lvtreenode_getslot(): Allocating new lvTreeNode at 0x"lvaddr" by routine 0x"lvaddr"\n",
 			lv, caller_id(0)));
+	glist_init_str(&lv->v.str);
+	glist_init_lvTreeNode_key(lv);
 	return lv;
 }

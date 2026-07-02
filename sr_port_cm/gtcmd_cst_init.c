@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -21,6 +21,7 @@
 #include "filestruct.h"
 #include "cmidef.h"
 #include "hashtab_mname.h"
+#include "hashtab_umname.h"
 #include "hashtab.h"
 #include "cmmdef.h"
 #include "gtcmd.h"
@@ -51,6 +52,6 @@ void gtcmd_cst_init(cm_region_head *ptr)
 			|| (NULL == csa->mlkhash)
 			|| (csa->mlkhash == (mlk_shrhash_ptr_t)R2A(csa->mlkctl->blkhash)));
 #	endif
-	init_hashtab_mname(ptr->reg_hash, 0, HASHTAB_NO_COMPACT, HASHTAB_NO_SPARE_TABLE);
+	init_hashtab_umname(ptr->reg_hash, 0, HASHTAB_NO_COMPACT, HASHTAB_NO_SPARE_TABLE);
 	cm_add_gdr_ptr(reg);
 }

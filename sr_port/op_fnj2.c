@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -39,7 +39,7 @@ void op_fnj2(mval *src, int len, mval *dst)
 	n = len - src->str.char_len;
 	if (n <= 0)
 	{
-		*dst = *src;
+		dst->umval = src->umval;
 		dst->mvtype &= ~MV_ALIASCONT;	/* Make sure alias container property does not pass */
 	} else
 	{
@@ -51,7 +51,7 @@ void op_fnj2(mval *src, int len, mval *dst)
 		stringpool.free += size;
 		memset(cp, SP, n);
 		memcpy(cp + n, src->str.addr, src->str.len);
-		MV_INIT_STRING(dst, size, (char *)cp);
+		UMV_INIT_STRING(&dst->umval, size, (char *)cp);
 	}
 	return;
 }
@@ -71,7 +71,7 @@ void op_fnzj2(mval *src, int len, mval *dst)
 	n = len - src->str.len;
 	if (n <= 0)
 	{
-		*dst = *src;
+		dst->umval = src->umval;
 		dst->mvtype &= ~MV_ALIASCONT;	/* Make sure alias container property does not pass */
 	} else
 	{
@@ -80,7 +80,7 @@ void op_fnzj2(mval *src, int len, mval *dst)
 		stringpool.free += len;
 		memset(cp, SP, n);
 		memcpy(cp + n, src->str.addr, src->str.len);
-		MV_INIT_STRING(dst, len, (char *)cp);
+		UMV_INIT_STRING(&dst->umval, len, (char *)cp);
 	}
 	return;
 }

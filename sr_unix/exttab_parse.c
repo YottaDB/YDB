@@ -23,7 +23,7 @@
 #include "gtm_stat.h"
 #include "copy.h"
 #include "gtmxc_types.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "lv_val.h"	/* needed for "fgncal.h" */
 #include "fgncal.h"
 #include "gtmci.h"
@@ -203,8 +203,9 @@ STATICFNDEF void scan_behavioral_words(char *c, struct extcall_entry_list *entry
 		gtm_ext_call_behavior	bwords;
 		const char		*str;
 	} conversion [] = {
+		{ACIDTP, "ACIDTP"},
 		{SIGSAFE, "SIGSAFE"},
-		{ACIDTP, "ACIDTP"}
+		{TERMIO, "TERMIO"}
 	};
 
 	/* scan until : or null if no list of behavioral words */
@@ -489,7 +490,9 @@ struct extcall_package_list *exttab_parse(mval *package)
 	FILE				*ext_table_file_handle;
 	int				fclose_res, i, keywordlen, len;
 	int				parameter_alloc_values[MAX_ACTUALS], parameter_count, ret_pre_alloc_val;
-	mstr				callnam, clnuprtn, rtnnam, trans, val;
+	mstr				callnam, rtnnam, trans;
+	unmanaged_mstr			val;
+	mident				clnuprtn;
 	struct extcall_entry_list	*entry_ptr;
 	struct extcall_package_list	*pak;
 	void_ptr_t			pakhandle;
@@ -756,7 +759,7 @@ struct extcall_package_list *exttab_parse(mval *package)
 		 * the shared libary, or we fail to locate a routine that is called from the
 		 * application, we issue rts_error message (in extab_parse.c).
 		 */
-		entry_ptr->fcn = fgn_getrtn(pak->package_handle, &entry_ptr->call_name, INFO);
+		entry_ptr->fcn = fgn_getrtn(pak->package_handle, &entry_ptr->call_name.mident, INFO);
 #		ifdef DEBUG_EXTCALL
 		FPRINTF(stderr, "   package entry point: %s, address: %x\n", entry_ptr->entry_name.addr, entry_ptr->fcn);
 #		endif

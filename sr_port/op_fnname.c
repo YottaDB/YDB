@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -22,7 +22,7 @@
 #include "gdsbt.h"
 #include "gdsfhead.h"
 #include "stringpool.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "mv_stent.h"
 #include "fnname.h"
 #include "op.h"
@@ -250,7 +250,8 @@ void op_fnname(UNIX_ONLY_COMMA(int sub_count) mval *finaldst, ...)
 	va_end(var);
 	if (MAX_STRLEN < dst->str.len)
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_MAXSTRLEN);
-	*finaldst = *dst;
-	POP_MV_STENT(); /* don't need no temporary no more */
+	finaldst->umval = dst->umval;
+	if (dst == &mv_chain->mv_st_cont.mvs_mval)
+		POP_MV_STENT(); /* don't need no temporary no more */
 	return;
 }

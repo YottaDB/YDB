@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2009, 2011 Fidelity Information Services, Inc	*
+ * Copyright (c) 2009-2026 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,8 +16,9 @@
 #include "error.h"
 #include "send_msg.h"
 #include "gtmmsg.h"
-#include "hashtab_str.h"
 
 #define STRING_HASH
+#include "hashtab_str.h"
 /* The below include generates the hash table routines for the literal hash type */
 #include "hashtab_implementation.h"
+#undef STRING_HASH

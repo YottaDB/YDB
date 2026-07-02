@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,8 +15,8 @@
 
 oprtype put_mfun(mident *l)
 {
-oprtype a;
-a.oprclass = MFUN_REF;
-a.oprval.lab = get_mladdr(l);
-return a;
+	oprtype a;
+	a.oprclass = MFUN_REF;
+	a.oprval.lab = get_mladdr(l);
+	return a;
 }

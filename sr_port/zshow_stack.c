@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -15,7 +15,7 @@
 #include "gtm_string.h"
 #include "gtm_limits.h"
 
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "stack_frame.h"
 #include "mlkdef.h"
 #include "zshow.h"
@@ -46,7 +46,7 @@ void zshow_stack(zshow_out *output, boolean_t show_checksum)
 	unsigned char	*addr;
 	unsigned short	nocount_frames[MAX_INDR_PER_COUNTED], *nfp;
 	stack_frame	*fp;
-	mstr 		v;
+	unmanaged_mstr 	v;
 	unsigned char	buff[MAX_ENTRYREF_LEN + MAX_ROUTINE_CHECKSUM_DIGITS + SIZEOF(INDR_OVERFLOW)];
 	ptrdiff_t	pdiff;
 

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2025 Fidelity National Information	*
+ * Copyright (c) 2012-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -19,7 +19,7 @@
 #include "indir_enum.h"
 #include "cache.h"
 #include "op.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "valid_mname.h"
 #include "gtm_string.h"
 #include "cachectl.h"
@@ -52,7 +52,8 @@ lv_val *op_rfrshlvn(uint4 indx, opctype oc)
 	SETUP_THREADGBL_ACCESS;
 	slot = &(TREF(glvn_pool_ptr))->slot[indx];
 	assert(OC_SAVLVN == slot->sav_opcode);
-	targ_key.var_name = slot->lvname->str;
+	targ_key.var_name.umstr = slot->lvname->str.umstr;
+	targ_key.var_name.in_array = FALSE;
 	COMPUTE_HASH_MNAME(&targ_key);
 	targ_key.marked = NOT_MARKED;
 	if (add_hashtab_mname_symval(&curr_symval->h_symtab, &targ_key, NULL, &tabent, FALSE))

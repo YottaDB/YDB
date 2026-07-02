@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -21,7 +21,7 @@ GBLREF	boolean_t	gtm_utf8_mode;
 
 void iorm_wtone(int ch)
 {
-	mstr		temp;
+	unmanaged_mstr	temp;
 	char		c;
 #ifdef UTF8_SUPPORTED
 	unsigned char	uni_buf[GTM_MB_LEN_MAX], *endptr;

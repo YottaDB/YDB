@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -17,7 +17,7 @@
 
 #include "gtmio.h"
 #include "lv_val.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "mv_stent.h"
 #include "stack_frame.h"
 #include "tp_frame.h"
@@ -56,7 +56,7 @@ void op_newvar(uint4 arg1)
 	int4		shift_size;
 	DBGRFCT_ONLY(mident_fixed vname;)
 
-	varname = &(((var_tabent *)frame_pointer->vartab_ptr)[arg1]);
+	varname = &((frame_pointer->vartab_ptr)[arg1]);
 #	ifdef DEBUG
 	if ((INDIR_MARKED != varname->marked) && DYNAMIC_VARNAMES_ACTIVE(frame_pointer))
 	{
@@ -93,8 +93,11 @@ void op_newvar(uint4 arg1)
 		mv_st_ent = mv_chain;
 		new = mv_st_ent->mv_st_cont.mvs_nval.mvs_val = lv_getslot(curr_symval);
 		ptab = &mv_st_ent->mv_st_cont.mvs_nval.mvs_ptab;
-		DEBUG_ONLY(mv_st_ent->mv_st_cont.mvs_nval.name = tabent->key;)
-		DEBUG_ONLY(varname = &mv_st_ent->mv_st_cont.mvs_nval.name);
+#		ifdef DEBUG
+		glist_protect_str(&mv_st_ent->mv_st_cont.mvs_nval.name.var_name);
+		mv_st_ent->mv_st_cont.mvs_nval.name.umname = tabent->key.umname;
+		varname = &mv_st_ent->mv_st_cont.mvs_nval.name.umname;
+#		endif
 	}
 	assert((int)arg1 >= 0);
 	/* Initialize new data cell */

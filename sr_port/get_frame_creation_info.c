@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -12,7 +12,7 @@
 
 #include "mdef.h"
 
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "stack_frame.h"
 #include "stringpool.h"
 #include "error_trap.h"
@@ -28,8 +28,8 @@ GBLREF	stack_frame		*frame_pointer;
 GBLREF	spdesc			stringpool;
 
 #ifdef UNIX
-LITDEF 	mstr	createdby_text[6] = {{0, LEN_AND_LIT("DO")}, {0, LEN_AND_LIT("XECUTE")}, {0, LEN_AND_LIT("$$")},
-				     {0, LEN_AND_LIT("ZINTR")}, {0, LEN_AND_LIT("TRIGGER")}, {0, LEN_AND_LIT("ZTIMEOUT")}};
+LITDEF 	unmanaged_mstr	createdby_text[6] = {{0, LEN_AND_LIT("DO")}, {0, LEN_AND_LIT("XECUTE")}, {0, LEN_AND_LIT("$$")},
+	{0, LEN_AND_LIT("ZINTR")}, {0, LEN_AND_LIT("TRIGGER")}, {0, LEN_AND_LIT("ZTIMEOUT")}};
 #endif
 
 #ifdef VMS
@@ -68,17 +68,17 @@ void	get_frame_creation_info(int level, int cur_zlevel, mval *result)
 	}
 	assert(fp && (fp->type & SFT_COUNT));
 	if (fp && (fp->type & SFT_ZINTR))
-		result->str = createdby_text[CREATEDBY_ZINTR];
+		result->str.umstr = createdby_text[CREATEDBY_ZINTR];
 	else if (fp && (fp->flags & SFF_INDCE))
-		result->str = createdby_text[CREATEDBY_XECUTE];
+		result->str.umstr = createdby_text[CREATEDBY_XECUTE];
 	else if (fp && (fp->type & SFT_ZTIMEOUT))
-		result->str = createdby_text[CREATEDBY_ZTIMEOUT];
+		result->str.umstr = createdby_text[CREATEDBY_ZTIMEOUT];
 #	ifdef GTM_TRIGGER
 	else if (fp && (fp->old_frame_pointer->type & SFT_TRIGR))
-		result->str = createdby_text[CREATEDBY_TRIGGER];
+		result->str.umstr = createdby_text[CREATEDBY_TRIGGER];
 #	endif
 	else if (fp && fp->ret_value)
-		result->str = createdby_text[CREATEDBY_FUNCTION];
+		result->str.umstr = createdby_text[CREATEDBY_FUNCTION];
 	else
-		result->str = createdby_text[CREATEDBY_DO];
+		result->str.umstr = createdby_text[CREATEDBY_DO];
 }

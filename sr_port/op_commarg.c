@@ -16,7 +16,7 @@
 #include "compiler.h"
 #include "cmd.h"
 #include "toktyp.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "stack_frame.h"
 #include "opcode.h"
 #include "indir_enum.h"
@@ -29,6 +29,7 @@
 #include "min_max.h"
 #include "is_canonic_name.h"
 #include "lv_val.h"
+#include "xpelerrpre_inline.h"
 
 #define INDIR(a, b, c) b
 GBLDEF int (*indir_fcn[])() = {
@@ -72,14 +73,24 @@ void	op_commarg(mval *v, unsigned char argcode)
 	SETUP_THREADGBL_ACCESS;
 	MV_FORCE_STR(v);
 	assert((3 <= argcode) && (SIZEOF(indir_fcn) / SIZEOF(indir_fcn[0]) > argcode));
-	indir_src.str = v->str;
+	indir_src.str.umstr = v->str.umstr;
 	indir_src.code = argcode;
+	indir_src.str.in_array = FALSE;
 	if (NULL == (obj = cache_get(&indir_src)))	/* NOTE assignment */
 	{
 		obj = &object;
 		switch(argcode)
 		{	/* these characteristics could be 1 or more columns in inter.h, however it's widely used via indir_enum.h */
 		case indir_do:
+			if (TREF(zinxpel_compile))
+			{ /* No offsets for trestart xpel parameters */
+				TREF(zinxpel_compile) = FALSE; /* it is a one-shot */
+				if (NULL != memchr(v->str.addr, '+', v->str.len))
+				{
+					xpelerrorpre();
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_LABELEXPECTED);
+				}
+			}	/* WARNING: possible fallthrough */
 		case indir_goto:
 			if (0 == v->str.len)
 				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_LABELEXPECTED);

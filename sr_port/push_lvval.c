@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2009-2018 Fidelity National Information	*
+ * Copyright (c) 2009-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -11,7 +11,7 @@
  ****************************************************************/
 
 #include "mdef.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "lv_val.h"
 #include "mv_stent.h"
 #include "push_lvval.h"
@@ -43,6 +43,6 @@ lv_val *push_lvval(mval *arg1)
 	PUSH_MV_STENT(MVST_LVAL);
 	mv_chain->mv_st_cont.mvs_lvval = lvp = lv_getslot(curr_symval);
 	LVVAL_INIT(lvp, curr_symval);
-	lvp->v = *arg1;
+	lvp->v.umval = arg1->umval;
 	return lvp;
 }

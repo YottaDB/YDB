@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -36,28 +36,29 @@
 #include "alias.h"
 #include "promodemo.h"	/* for "demote" prototype used in LV_NODE_GET_KEY */
 #include "jobsp.h"
+#include "gcol_list.h"
 
 #define eb_less(u, v)    (numcmp(u, v) < 0)
 
 #define COMMON_STR_PROCESSING(NODE)										\
 {														\
-	mstr		key_mstr;										\
-	mval 		tmp_sbs;										\
+	static mval 		tmp_sbs	= {{0}};								\
 														\
 	assert(MV_STR & mv.mvtype);										\
 	if (TREF(local_collseq))										\
 	{													\
-		key_mstr = mv.str;										\
-		mv.str.len = 0;	/* protect from "stp_gcol", if zwr_sub->subsc_list[n].actual points to mv */	\
-		ALLOC_XFORM_BUFF(key_mstr.len);									\
+		ALLOC_XFORM_BUFF(mv.str.len);									\
 		tmp_sbs.mvtype = MV_STR;									\
 		tmp_sbs.str.len = TREF(max_lcl_coll_xform_bufsiz);						\
 		assert(NULL != TREF(lcl_coll_xform_buff));							\
 		tmp_sbs.str.addr = TREF(lcl_coll_xform_buff);							\
-		do_xform(TREF(local_collseq), XBACK, &key_mstr, &tmp_sbs.str, &length);				\
+		do_xform(TREF(local_collseq), XBACK, &mv.str, &tmp_sbs.str, &length);				\
 		tmp_sbs.str.len = length;									\
+		mv.str.len = 0;											\
+		assert(!glist_str_in_stringpool(&tmp_sbs.str)); /* No need for protection */			\
 		s2pool(&(tmp_sbs.str));										\
-		mv.str = tmp_sbs.str;										\
+		mv.str.umstr = tmp_sbs.str.umstr;								\
+		assert(glist_str_protected(&mv.str));								\
 	}													\
 	do_lev = TRUE;												\
 	if (n < lvzwrite_block->subsc_count)									\
@@ -128,6 +129,9 @@ GBLREF int		merge_args;
 GBLREF volatile int4	outofband;
 GBLREF zshow_out	*zwr_output;
 GBLREF zwr_hash_table	*zwrhtab;			/* How we track aliases during zwrites */
+#ifdef DEBUG
+GBLREF unsigned int	count_prohibit_longjmp;
+#endif
 
 LITREF	mval		literal_null;
 
@@ -161,7 +165,7 @@ error_def(ERR_UNDEF);
  */
 void lvzwr_var(lv_val *lv, int4 n)
 {
-	mval		mv;
+	mval		mv = {{0}};
 	int             length;
 	lv_val		*var;
 	char		*top;
@@ -172,6 +176,7 @@ void lvzwr_var(lv_val *lv, int4 n)
 	zwr_alias_var	*zav, *newzav;
 	lvTree		*lvt;
 	lvTreeNode	*node, *nullsubsnode, *parent;
+	unsigned int	gcols, prev_mv_top, start_count_prohibit;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -180,14 +185,13 @@ void lvzwr_var(lv_val *lv, int4 n)
 		return;
 	if (outofband && (sighup != outofband))
 	{	/* if there is no output, sighup doesn't matter - must deal with that case at the point of output */
-		assert(TREF(in_zwrite));        /* in_zwrite indicates properly set up for zwrite: should clear */
-		TREF(in_zwrite) = FALSE;        /* along with below 2 because async_action may not return */
-		lvzwrite_block->curr_subsc = lvzwrite_block->subsc_count = 0;
 		async_action(FALSE);
-		TREF(in_zwrite) = TRUE;         /* in case we're back because async_action turns out to be ctrlc */
+		assert(FALSE);
 	}
+	assert(n >= lvzwrite_block->curr_subsc);
 	lvzwrite_block->curr_subsc = n;
-	zwr_sub = (zwr_sub_lst *)lvzwrite_block->sub;
+	zwr_sub = lvzwrite_block->sub;
+	assert(!zwr_sub->subsc_list[n].actual || !glist_str_protected(&zwr_sub->subsc_list[n].actual->str));
 	zwr_sub->subsc_list[n].actual = (mval *)NULL;
 	/* Before we process this var, there are some special cases to check for first when
 	 * this is a base var (0 == lvzwrite_block->subsc_count) and the var is an alias.
@@ -219,6 +223,8 @@ void lvzwr_var(lv_val *lv, int4 n)
 			{
 				lvzwr_out(lv);
 				ZWRITE_OUTPUT_HOOK();
+				assert(lvzwrite_block->curr_subsc <= n + 1);
+				assert(!lvzwrite_block->mv_sub_top);
 				lvzwrite_block->curr_subsc = lvzwrite_block->subsc_count = 0;
 				return;
 			} else
@@ -240,7 +246,7 @@ void lvzwr_var(lv_val *lv, int4 n)
 		 * recognize it as a "dealt with" alias when/if it is encountered later.
 		 */
 		newzav = als_getzavslot();
-		newzav->zwr_var = *lvzwrite_block->curr_name;
+		newzav->zwr_var.umstr = lvzwrite_block->curr_name->umstr;
 		newzav->value_printed = TRUE;
 		htent_added = add_hashtab_addr(&zwrhtab->h_zwrtab, (char **)&lv, newzav, &tabent_addr);
 		assert(htent_added);
@@ -263,9 +269,13 @@ void lvzwr_var(lv_val *lv, int4 n)
 	{
 		var = op_srchindx(VARLSTCNT(2) lv, zwr_sub->subsc_list[n].first);
 		zwr_sub->subsc_list[n].actual = zwr_sub->subsc_list[n].first;
-		if (var && (LV_IS_VAL_DEFINED(var) || n < lvzwrite_block->subsc_count -1))
+		/* The actual mval can be directly from the literal table, so assert not in stringpool if unprotected */
+		assert(glist_str_protected(&zwr_sub->subsc_list[n].first->str)
+			|| !glist_str_in_stringpool(&zwr_sub->subsc_list[n].first->str));
+		if (var && (LV_IS_VAL_DEFINED(var) || n < lvzwrite_block->subsc_count - 1))
 		{
 			lvzwr_var(var, n + 1);
+			assert(lvzwrite_block->curr_subsc <= n + 1);
 			zwr_sub->subsc_list[n].actual = (mval *)NULL;
 			lvzwrite_block->curr_subsc = n;
 		} else
@@ -276,15 +286,25 @@ void lvzwr_var(lv_val *lv, int4 n)
 
 				lvzwrite_block->curr_subsc++;
 				end = lvzwr_key(buff, SIZEOF(buff));
+				assert(lvzwrite_block->curr_subsc <= n + 1);
+				assert(!lvzwrite_block->mv_sub_top);
 				zwr_sub->subsc_list[n].actual = (mval *)NULL;
 				lvzwrite_block->curr_subsc = lvzwrite_block->subsc_count = 0;
 				if (!undef_inhibit)
 					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_UNDEF, 2, end - buff, buff);
 			}
 		}
-	} else  if ((lvt = LV_GET_CHILD(lv)))
+	} else if ((lvt = LV_GET_CHILD(lv)))
 	{	/* If node has children, process them now */
+		assert(n >= lvzwrite_block->mv_sub_top);
+		glist_protect_str(&mv.str);
 		zwr_sub->subsc_list[n].actual = &mv;
+		prev_mv_top = lvzwrite_block->mv_sub_top;
+		lvzwrite_block->mv_sub_top = n + 1;
+#		ifdef DEBUG
+		start_count_prohibit = count_prohibit_longjmp;
+		count_prohibit_longjmp = 1 + active_ch - chnd;
+#		endif
 		/* In case of standard null collation, first process null subscript if it exists */
 		if (TREF(local_collseq_stdnull))
 		{
@@ -313,8 +333,16 @@ void lvzwr_var(lv_val *lv, int4 n)
 			{	/* "node" is of type "lvTreeNode *" */
 				COMMON_STR_PROCESSING(node);
 			}
+			assert(lvzwrite_block->curr_subsc <= n + 1);
+			mv.str.len = 0;	/* No need to protect now */
 		}
+		assert(lvzwrite_block->curr_subsc <= n + 1);
+		assert(zwr_sub->subsc_list[n].actual == &mv);
+		glist_unprotect_str(&mv.str);
 		zwr_sub->subsc_list[n].actual = (mval *)NULL;
+		lvzwrite_block->mv_sub_top = prev_mv_top;
 		lvzwrite_block->curr_subsc = n;
+		DEBUG_ONLY(count_prohibit_longjmp = start_count_prohibit;)
 	}
+	assert(!glist_str_protected(&mv.str));
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -49,11 +49,13 @@ int do_patsplit(mval *str, mval *pat)
 	mval		fixed_pat, fixed_str, left_pat, left_str, right_pat, right_str;
 	ptstr		fixed_ptstr, left_ptstr, right_ptstr;
 	uint4		cnt[2], tot_min[2], tot_max[2];		/* index 0 is for left, index 1 is for right */
-	uint4		code, *fixed_patptr, flags, *patptr, *patptr_end, *patptr_start, *right_patptr, tempuint, *tmp_patptr;
+	uint4		code, flags, tempuint;
+	uint4		*aligned_patptr;
+	ua_patatom	*fixed_patptr, *patptr, *patptr_end, *patptr_start, *right_patptr, *tmp_patptr;
 	unsigned char	*fixednext, *fixedptr, *maxfixedptr, *rightnext, *rightptr, *strptr, *strtop;
 
 	MV_FORCE_STR(str);
-	patptr = (uint4 *)pat->str.addr;
+	patptr = (ua_patatom *)pat->str.addr;
 #	ifdef DEBUG
 		GET_ULONG(tempuint, patptr);
 		assert(!tempuint);
@@ -181,66 +183,66 @@ int do_patsplit(mval *str, mval *pat)
 	cnt[0] = fixed_index;
 	if (cnt[0])
 	{	/* left section has at least one pattern atom. create its compilation string */
-		patptr = left_ptstr.buff;
-		*patptr++ = fixed[0];
-		*patptr++ = (uint4)(fixed_patptr - patptr_start + 1);
-		memcpy(patptr, patptr_start, (char *)fixed_patptr - (char *)patptr_start);
-		patptr += fixed_patptr - patptr_start;
-		*patptr++ = cnt[0];
-		*patptr++ = tot_min[0];
-		*patptr++ = tot_max[0];
+		aligned_patptr = left_ptstr.buff;
+		*aligned_patptr++ = fixed[0];
+		*aligned_patptr++ = (uint4)(fixed_patptr - patptr_start + 1);
+		memcpy(aligned_patptr, patptr_start, (char *)fixed_patptr - (char *)patptr_start);
+		aligned_patptr += fixed_patptr - patptr_start;
+		*aligned_patptr++ = cnt[0];
+		*aligned_patptr++ = tot_min[0];
+		*aligned_patptr++ = tot_max[0];
 		for (index = 0; index < cnt[0]; index++)
-			*patptr++ = min[index];
+			*aligned_patptr++ = min[index];
 		if (!fixed[0])
 		{
 			for (index = 0; index < cnt[0]; index++)
-				*patptr++ = max[index];
+				*aligned_patptr++ = max[index];
 		}
 		for (index = 0; index < cnt[0]; index++)
-			*patptr++ = size[index];
+			*aligned_patptr++ = size[index];
 		left_pat.mvtype = MV_STR;
-		left_pat.str.len = INTCAST((char *)patptr - (char *)&left_ptstr.buff[0]);
+		left_pat.str.len = INTCAST((char *)aligned_patptr - (char *)&left_ptstr.buff[0]);
 		left_pat.str.addr = (char *)&left_ptstr.buff[0];
 	}
 
 	/* create fixed length pattern atom's compilation string */
-	patptr = fixed_ptstr.buff;
-	*patptr++ = TRUE;	/* fixed length pattern */
-	*patptr++ = (uint4)(right_patptr - fixed_patptr + 1);
-	memcpy(patptr, fixed_patptr, (char *)right_patptr - (char *)fixed_patptr);
-	patptr += right_patptr - fixed_patptr;
-	*patptr++ = 1;						/* count */
+	aligned_patptr = fixed_ptstr.buff;
+	*aligned_patptr++ = TRUE;	/* fixed length pattern */
+	*aligned_patptr++ = (uint4)(right_patptr - fixed_patptr + 1);
+	memcpy(aligned_patptr, fixed_patptr, (char *)right_patptr - (char *)fixed_patptr);
+	aligned_patptr += right_patptr - fixed_patptr;
+	*aligned_patptr++ = 1;						/* count */
 	fixedcharlen = min[fixed_index] * size[fixed_index];	/* tot_min and tot_max */
-	*patptr++ = fixedcharlen;
-	*patptr++ = fixedcharlen;
-	*patptr++ = min[fixed_index];				/* min[0] */
-	*patptr++ = size[fixed_index];				/* size[0] */
+	*aligned_patptr++ = fixedcharlen;
+	*aligned_patptr++ = fixedcharlen;
+	*aligned_patptr++ = min[fixed_index];				/* min[0] */
+	*aligned_patptr++ = size[fixed_index];				/* size[0] */
 	fixed_pat.mvtype = MV_STR;
-	fixed_pat.str.len = INTCAST((char *)patptr - (char *)&fixed_ptstr.buff[0]);
+	fixed_pat.str.len = INTCAST((char *)aligned_patptr - (char *)&fixed_ptstr.buff[0]);
 	fixed_pat.str.addr = (char *)&fixed_ptstr.buff[0];
 
 	cnt[1] = count - fixed_index - 1;
 	if (cnt[1])
 	{	/* right section has at least one pattern atom. create its compilation string */
-		patptr = right_ptstr.buff;
-		*patptr++ = fixed[1];
-		*patptr++ = (uint4)(patptr_end - right_patptr + 1);
-		memcpy(patptr, right_patptr, (char *)patptr_end - (char *)right_patptr);
-		patptr += patptr_end - right_patptr;
-		*patptr++ = cnt[1];
-		*patptr++ = tot_min[1];
-		*patptr++ = tot_max[1];
+		aligned_patptr = right_ptstr.buff;
+		*aligned_patptr++ = fixed[1];
+		*aligned_patptr++ = (uint4)(patptr_end - right_patptr + 1);
+		memcpy(aligned_patptr, right_patptr, (char *)patptr_end - (char *)right_patptr);
+		aligned_patptr += patptr_end - right_patptr;
+		*aligned_patptr++ = cnt[1];
+		*aligned_patptr++ = tot_min[1];
+		*aligned_patptr++ = tot_max[1];
 		for (index = fixed_index + 1; index < count; index++)
-			*patptr++ = min[index];
+			*aligned_patptr++ = min[index];
 		if (!fixed[1])
 		{
 			for (index = fixed_index + 1; index < count; index++)
-				*patptr++ = max[index];
+				*aligned_patptr++ = max[index];
 		}
 		for (index = fixed_index + 1; index < count; index++)
-			*patptr++ = size[index];
+			*aligned_patptr++ = size[index];
 		right_pat.mvtype = MV_STR;
-		right_pat.str.len = INTCAST((char *)patptr - (char *)&right_ptstr.buff[0]);
+		right_pat.str.len = INTCAST((char *)aligned_patptr - (char *)&right_ptstr.buff[0]);
 		right_pat.str.addr = (char *)&right_ptstr.buff[0];
 	}
 	strbytelen = str->str.len;

@@ -1,6 +1,7 @@
 #################################################################
 #								#
-#	Copyright 2001, 2008 Fidelity Information Services, Inc	#
+# Copyright (c) 2001-2026 Fidelity National Information		#
+# Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -46,10 +47,12 @@ numer:	mv_if_notint %edx, float
 	movl	mval_l_m1(%edx),%edx
 	negl	%edx
 	movl	%edx,mval_l_m1(%eax)
+	movl	$0,mval_l_strlen(%eax)
 	ret
 
 float:	pushl	%ebx		# need a temp register
 	movw	$mval_m_nm,mval_w_mvtype(%eax)
+	movl	$0,mval_l_strlen(%eax)
 	movb	mval_b_exp(%edx),%bl
 	xorb	$mval_esign_mask,%bl		# flip the sign bit
 	movb	%bl,mval_b_exp(%eax)

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -213,7 +213,7 @@ void gtm_fork_n_core(void)
  */
 int main(int argc, char_ptr_t argv[])
 {
-	int			selstat;
+	int			pollstat;
 	int			save_errno;
 	int			recv_complete, send_complete;
 	int			num_chars_recd, num_chars_sent, rundir_len;
@@ -242,17 +242,17 @@ int main(int argc, char_ptr_t argv[])
 		poll_timeout = MAX_TIMEOUT_VALUE * MILLISECS_IN_SEC; 	/* Restart timeout each interation for platforms that save
 									 * unexpired time when select exits.
 									 */
-		selstat = poll(&poll_fdlist[0], poll_nfds, poll_timeout);
-		if (0 > selstat)
+		pollstat = poll(&poll_fdlist[0], poll_nfds, poll_timeout);
+		if (0 > pollstat)
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_GTMSECSHR, 1, process_id, ERR_GTMSECSHRSCKSEL, 0, errno);
-		else if (0 == selstat)
+		else if (0 == pollstat)
 		{
 			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_GTMSECSHRTMOUT);
 			gtmsecshr_exit(0, 0);	/* Doesn't return */
 		}
 		recv_ptr = (char *)&mesg;
 		client_addr_len = SIZEOF(struct sockaddr_un);
-		DBGGSSHR((LOGFLAGS, "gtmsecshr: Select rc = %d  message timeout = %d\n", selstat, GTMSECSHR_MESG_TIMEOUT));
+		DBGGSSHR((LOGFLAGS, "gtmsecshr: Select rc = %d  message timeout = %d\n", pollstat, GTMSECSHR_MESG_TIMEOUT));
 		start_timer(timer_id, GTMSECSHR_MESG_TIMEOUT, gtmsecshr_timer_handler, 0, NULL);
 		recv_complete = FALSE;
 		do

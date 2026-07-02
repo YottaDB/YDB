@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -91,7 +91,7 @@ void		zshow_stack(zshow_out *output, boolean_t show_checksum);
 void		zshow_devices(zshow_out *output);
 void		zshow_format_lock(zshow_out *output, mlk_pvtblk *temp);
 void		zshow_locks(zshow_out *output, boolean_t total_only);
-void		zshow_output(zshow_out *out, const mstr *str);
+void		zshow_output(zshow_out *out, const unmanaged_mstr *str);
 void		zshow_svn(zshow_out *output, int svn);
 void		zshow_zbreaks(zshow_out *output);
 void		zshow_zcalls(zshow_out *output);

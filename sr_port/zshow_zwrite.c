@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -32,7 +32,7 @@ void zshow_zwrite(zshow_out *output)
 {
 	mval pat;
 
-	zshow_output(output,0);
+	zshow_output(output, 0);
 	pat.mvtype = MV_STR;
 	pat.str.addr = (char *)&pat_everything[0];
 	pat.str.len = INTCAST(sizeof_pat_everything - 1);

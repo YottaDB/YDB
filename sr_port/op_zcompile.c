@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -52,6 +52,7 @@ void op_zcompile(mval *v, boolean_t ignore_dollar_zcompile)
 	else
 		assert(MAX_FN_LEN == cmd_qlf.object_file.str.len);
 	zl_cmd_qlf(&v->str, &cmd_qlf, source_file_string, &len, TRUE);		/* command args override $ZCOMPILE */
+	SYNC_CMD_QLF_STRINGS(cmd_qlf);
 	ce_init();	/* initialize compiler escape processing */
 	do {
 		compile_source_file(len, source_file_string, FALSE);

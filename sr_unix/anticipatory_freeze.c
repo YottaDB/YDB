@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2023 Fidelity National Information	*
+ * Copyright (c) 2012-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -227,9 +227,9 @@ void		set_anticipatory_freeze(sgmnt_addrs *csa, int msg_id)
 	}
 	/* Now that we hold necessary locks, set the freeze and the comment field */
 	jnlpool->jnlpool_ctl->freeze = TRUE;
+        /* TODO : Do we need a SHM_WRITE_MEMORY_BARRIER ? */
 	GENERATE_INST_FROZEN_COMMENT(jnlpool->jnlpool_ctl->freeze_comment,
 			SIZEOF(jnlpool->jnlpool_ctl->freeze_comment), msg_id);
-	/* TODO : Do we need a SHM_WRITE_MEMORY_BARRIER ? */
 	if (!was_crit)
 		rel_lock(jnlpool->jnlpool_dummy_reg);
 	if (save_jnlpool != jnlpool)
@@ -244,7 +244,6 @@ boolean_t		init_anticipatory_freeze_errors()
 	char				*fgets_rc;
 	char				buff[MAX_READ_SZ], mnemonic_buf[MAX_TAG_LEN];
 	char				*buffptr, *buff_top, *errptr, *errptr_top;
-	mstr				custom_err_file;
 	hash_table_str			*err_hashtab = NULL;
 	DCL_THREADGBL_ACCESS;
 
@@ -257,15 +256,14 @@ boolean_t		init_anticipatory_freeze_errors()
 	assert(jnlpool && jnlpool->jnlpool_ctl && !jnlpool->jnlpool_ctl->instfreeze_environ_inited);
 	assert(holds_sem[SOURCE][JNL_POOL_ACCESS_SEM]);		/* should hold journal pool access control semaphore */
 	/* Now, read the custom errors file and populate the journal pool */
-	custom_err_file = TREF(gtm_custom_errors);
-	Fopen(handle, custom_err_file.addr, "r");
+	Fopen(handle, (TREF(gtm_custom_errors)).addr, "r");
 	if (NULL == handle)
 	{
 		save_errno = errno;
-		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_CUSTOMFILOPERR, 4, LEN_AND_LIT("fopen"), custom_err_file.len,
-				custom_err_file.addr, save_errno);
-		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_CUSTOMFILOPERR, 4, LEN_AND_LIT("fopen"), custom_err_file.len,
-				custom_err_file.addr, save_errno);
+		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_CUSTOMFILOPERR, 4, LEN_AND_LIT("fopen"), (TREF(gtm_custom_errors)).len,
+				(TREF(gtm_custom_errors)).addr, save_errno);
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_CUSTOMFILOPERR, 4, LEN_AND_LIT("fopen"),
+			(TREF(gtm_custom_errors)).len, (TREF(gtm_custom_errors)).addr, save_errno);
 		return FALSE;
 	}
 	line_no = 0;
@@ -305,12 +303,12 @@ boolean_t		init_anticipatory_freeze_errors()
 		/* The first character has to be alpha-numeric or a comment */
 		if (!ISALNUM_ASCII(*buffptr) && (COMMENT_DELIMITER != *buffptr))
 		{
-			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_CUSTERRSYNTAX, 3, custom_err_file.len, custom_err_file.addr,
-					line_no, ERR_TEXT, 2,
-					LEN_AND_LIT("First character should be comment (;) or alpha numeric"));
-			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_CUSTERRSYNTAX, 3, custom_err_file.len, custom_err_file.addr,
-					line_no, ERR_TEXT, 2,
-					LEN_AND_LIT("First character should be comment (;) or alpha numeric"));
+			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_CUSTERRSYNTAX, 3, (TREF(gtm_custom_errors)).len,
+				(TREF(gtm_custom_errors)).addr, line_no, ERR_TEXT, 2,
+				LEN_AND_LIT("First character should be comment (;) or alpha numeric"));
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_CUSTERRSYNTAX, 3, (TREF(gtm_custom_errors)).len,
+				(TREF(gtm_custom_errors)).addr, line_no, ERR_TEXT, 2,
+				LEN_AND_LIT("First character should be comment (;) or alpha numeric"));
 			return FALSE;
 		}
 		while (ISALNUM_ASCII(*buffptr))
@@ -318,10 +316,10 @@ boolean_t		init_anticipatory_freeze_errors()
 			*errptr++ = *buffptr++;
 			if (errptr > errptr_top)
 			{
-				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_CUSTERRSYNTAX, 3, custom_err_file.len,
-						custom_err_file.addr, line_no, ERR_TEXT, 2, LEN_AND_LIT("Mnemonic too long"));
-				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_CUSTERRSYNTAX, 3, custom_err_file.len,
-						custom_err_file.addr, line_no, ERR_TEXT, 2, LEN_AND_LIT("Mnemonic too long"));
+				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_CUSTERRSYNTAX, 3, (TREF(gtm_custom_errors)).len,
+					(TREF(gtm_custom_errors)).addr, line_no, ERR_TEXT, 2, LEN_AND_LIT("Mnemonic too long"));
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_CUSTERRSYNTAX, 3, (TREF(gtm_custom_errors)).len,
+					(TREF(gtm_custom_errors)).addr, line_no, ERR_TEXT, 2, LEN_AND_LIT("Mnemonic too long"));
 				return FALSE;
 			}
 			assert(buffptr < buff_top); /* errptr > errptr_top should fail before this */
@@ -346,10 +344,12 @@ boolean_t		init_anticipatory_freeze_errors()
 		assert(buffptr < buff_top);
 		if (COMMENT_DELIMITER != *buffptr)
 		{
-			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_CUSTERRSYNTAX, 3, custom_err_file.len, custom_err_file.addr,
-					line_no, ERR_TEXT, 2, LEN_AND_LIT("Unexpected character found after mnemonic"));
-			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_CUSTERRSYNTAX, 3, custom_err_file.len, custom_err_file.addr,
-					line_no, ERR_TEXT, 2, LEN_AND_LIT("Unexpected character found after mnemonic"));
+			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_CUSTERRSYNTAX, 3, (TREF(gtm_custom_errors)).len,
+				(TREF(gtm_custom_errors)).addr, line_no, ERR_TEXT, 2,
+				LEN_AND_LIT("Unexpected character found after mnemonic"));
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_CUSTERRSYNTAX, 3, (TREF(gtm_custom_errors)).len,
+				(TREF(gtm_custom_errors)).addr, line_no, ERR_TEXT, 2,
+				LEN_AND_LIT("Unexpected character found after mnemonic"));
 			return FALSE;
 		}
 		/* Need to ignore the rest of the current buffer and exhaust the current line */
@@ -364,20 +364,20 @@ boolean_t		init_anticipatory_freeze_errors()
 	if (!feof(handle))
 	{
 		save_errno = errno;
-		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_CUSTOMFILOPERR, 4, LEN_AND_LIT("fgets"), custom_err_file.len,
-				custom_err_file.addr, save_errno);
-		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_CUSTOMFILOPERR, 4, LEN_AND_LIT("fgets"), custom_err_file.len,
-				custom_err_file.addr, save_errno);
+		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_CUSTOMFILOPERR, 4, LEN_AND_LIT("fgets"), (TREF(gtm_custom_errors)).len,
+				(TREF(gtm_custom_errors)).addr, save_errno);
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_CUSTOMFILOPERR, 4, LEN_AND_LIT("fgets"),
+			(TREF(gtm_custom_errors)).len, (TREF(gtm_custom_errors)).addr, save_errno);
 		return FALSE;
 	}
 	FCLOSE(handle, status);
 	if (SS_NORMAL != status)
 	{
 		save_errno = errno;
-		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_CUSTOMFILOPERR, 4, LEN_AND_LIT("fclose"), custom_err_file.len,
-				custom_err_file.addr, save_errno);
-		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_CUSTOMFILOPERR, 4, LEN_AND_LIT("fclose"), custom_err_file.len,
-				custom_err_file.addr, save_errno);
+		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_CUSTOMFILOPERR, 4, LEN_AND_LIT("fclose"), (TREF(gtm_custom_errors)).len,
+				(TREF(gtm_custom_errors)).addr, save_errno);
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_CUSTOMFILOPERR, 4, LEN_AND_LIT("fclose"),
+			(TREF(gtm_custom_errors)).len, (TREF(gtm_custom_errors)).addr, save_errno);
 		return FALSE;
 	}
 	jnlpool->jnlpool_ctl->instfreeze_environ_inited = TRUE;

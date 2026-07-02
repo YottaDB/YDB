@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -991,7 +991,7 @@ boolean_t cli_get_parm(char *entry, char val_buf[])
 {
 	char		*gets_res, local_str[MAX_LINE], *sp;
 	int		eof, ind, match_ind, parm_len, res;
-	mval		prompt, dummy, *input_line;
+	mval		prompt = {{0}}, dummy = {{0}}, *input_line;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -1023,7 +1023,6 @@ boolean_t cli_get_parm(char *entry, char val_buf[])
 			if (!((gpcmd_parm_vals + match_ind)->parm_required)) /* Value not required */
 				return FALSE;
 			/* If no value and required, prompt for it */
-			dummy.mvtype = dummy.str.len = 0;
 			input_line = push_mval(&dummy);
 			prompt.mvtype = MV_STR;
 			prompt.str.addr = (gpcmd_parm_vals + match_ind)->prompt;

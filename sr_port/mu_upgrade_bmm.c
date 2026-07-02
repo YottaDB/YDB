@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2021-2025 Fidelity National Information	*
+ * Copyright (c) 2021-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -31,7 +31,7 @@
 #include "memcoherency.h"
 #include "sleep_cnt.h"
 #include "interlock.h"
-#include "hashtab_mname.h"
+#include "hashtab_umname.h"
 #include "wcs_flu.h"
 #include "jnl.h"
 
@@ -142,7 +142,7 @@ int4	mu_upgrade_bmm(gd_region *reg, size_t blocks_needed)
 	int4			blk_size, blks_in_bml, bml_index, bml_status, bmls_to_work, index, num_blks_mv,
 				new_bmm_size, status;
 	kill_set		kill_set_list;
-	mname_entry		gvname;
+	unmanaged_mname_entry	gvname = { 0 };
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
 	sm_uc_ptr_t		blkBase, blkBase2, bmm_base, bml_buff, recBase;
@@ -594,7 +594,7 @@ int4	mu_upgrade_bmm(gd_region *reg, size_t blocks_needed)
 	offset = csd->offset = blks_in_way;					/* offset to pointers in pre-upgrade blks */
 	csd->trans_hist.total_blks -= blks_in_way;
 	csd->trans_hist.free_blocks -= (blks_in_way - bmls_to_work);		/* lost space less bmls which remain busy */
-	reinitialize_hashtab_mname(gd_header->tab_ptr);
+	reinitialize_hashtab_umname(gd_header->tab_ptr);
 	csd->blks_to_upgrd = csd->trans_hist.total_blks - csd->trans_hist.free_blocks
 		- DIVIDE_ROUND_UP(csd->trans_hist.total_blks, BLKS_PER_LMAP);	/* Total blocks to upgrade */
 	/* Use the following functions to forcefully clear the entire array */
@@ -836,19 +836,19 @@ int4 upgrade_extend(gtm_int8 extension, gd_region *reg)
  *	blkhist points to a structure containing the history from the search
  *	(enum cdb_sc) returns a code containing cdb_sc_normal or a "retry" code
  ******************************************************************************************/
-enum cdb_sc gen_hist_for_blk(srch_blk_status *blkhist, sm_uc_ptr_t blkBase2, sm_uc_ptr_t recBase, mname_entry *gvname,
+enum cdb_sc gen_hist_for_blk(srch_blk_status *blkhist, sm_uc_ptr_t blkBase2, sm_uc_ptr_t recBase, unmanaged_mname_entry *gvname,
 				gvnh_reg_t *gvnh_reg)
 {	/* given a block, find a useful key */
 	block_id	blk_temp, curr_blk;
 	boolean_t	long_blk_id;
 	gv_namehead	*save_targ = NULL;
-	ht_ent_mname	*tabent;
+	ht_ent_umname	*tabent;
 	int		curr_level, i, key_cmpc, key_len, rec_sz;
 	int4		status;
 	mstr 		global_collation_mstr;
 	unsigned char	*c, *cp, key_buff[MAX_KEY_SZ + 3];
 	unsigned short	rlen, rec_no_coll_sz;
-	hash_table_mname *tab_ptr;
+	hash_table_umname *tab_ptr;
 
 	long_blk_id = IS_64_BLK_ID(blkBase2);
 	curr_blk = blkhist->blk_num;
@@ -957,7 +957,7 @@ enum cdb_sc gen_hist_for_blk(srch_blk_status *blkhist, sm_uc_ptr_t blkBase2, sm_
 		{	/* This code is similar to code in sr_port/mur_forward_play_cur_jrec.c */
 			COMPUTE_HASH_MNAME(gvname);
 			tab_ptr = gv_cur_region->owning_gd->tab_ptr;
-			if (NULL != (tabent = lookup_hashtab_mname(tab_ptr, gvname)))	/* WARNING assignment */
+			if (NULL != (tabent = lookup_hashtab_umname(tab_ptr, gvname)))	/* WARNING assignment */
 			{
 				gvnh_reg = (gvnh_reg_t *)tabent->value;
 				assert(NULL != gvnh_reg);
@@ -1110,7 +1110,7 @@ enum cdb_sc ditch_dead_globals(block_id curr_blk, block_id offset, cache_rec_ptr
 	gvnh_reg_t		*gvnh_reg = NULL;
 	int			blk_kill_cnt, blk_seg_cnt, blk_size, blk_sz, key_cmpc, key_len, rec_sz, rec_offset;
 	int4			i, status;
-	mname_entry		gvname;
+	unmanaged_mname_entry	gvname;
 	sm_uc_ptr_t		blkBase, blkEnd, recBase;
 	srch_blk_status		dirHist, leafHist, rootHist;
 	trans_num		ret_tn;
@@ -1431,7 +1431,7 @@ enum cdb_sc upgrade_dir_tree(block_id curr_blk, block_id offset, gd_region *reg,
 				space_need, v7_rec_sz, max_rightblk_lvl;
 	int4			blk_size, status;
 	kill_set		kill_set_list;
-	mname_entry		gvname;
+	unmanaged_mname_entry	gvname;
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
 	sm_uc_ptr_t		blkBase, blkEnd, recBase, recBaseN, recBaseP, v7bp, v7recBase, v7end;
@@ -1460,6 +1460,7 @@ enum cdb_sc upgrade_dir_tree(block_id curr_blk, block_id offset, gd_region *reg,
 	dirHist.level = level = ((blk_hdr_ptr_t)blkBase)->levl;
 	blk_ver = ((blk_hdr_ptr_t)blkBase)->bver;
 	gvname.var_name.addr = (char *)gname;
+	gvname.var_name.len = 0;
 	if (debug_mupip)
 		util_out_print("starting upgrade of directory block 0x!@XQ with version !UL.", TRUE, &curr_blk, (char)blk_ver);
 	/* the directory tree needs its index pointers upgraded to V7 format */

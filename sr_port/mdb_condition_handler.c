@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -38,7 +38,7 @@
 #include "io_params.h"
 #include "jnl.h"
 #include "lv_val.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "mv_stent.h"
 #include "have_crit.h"
 #include "deferred_events_queue.h"
@@ -94,7 +94,7 @@ GBLREF	gd_region		*gv_cur_region;
 GBLREF	gv_key			*gv_currkey;
 GBLREF	gv_namehead		*gv_target;
 GBLREF	inctn_opcode_t		inctn_opcode;
-GBLREF	int			mumps_status, pool_init;
+GBLREF	int			mumps_status, pool_init, merge_args;
 GBLREF	int4			exi_condition;
 GBLREF	io_desc			*active_device, *gtm_err_dev;
 GBLREF	io_pair			io_std_device, io_curr_device;
@@ -259,6 +259,21 @@ CONDITION_HANDLER(mdb_condition_handler)
 
 	START_CH(FALSE);
 	DBGEHND((stderr, "mdb_condition_handler: Entered with SIGNAL=%d frame_pointer=0x"lvaddr"\n", SIGNAL, frame_pointer));
+	if (stringpool.pending_moves)
+	{
+		glist_fixup_sort_list();
+		if (stringpool.base == rts_stringpool.base)
+		{
+			rts_stringpool.pending_moves = FALSE;
+		} else if (stringpool.base == indr_stringpool.base)
+		{
+			indr_stringpool.pending_moves = FALSE;
+		} else
+			assert(FALSE);
+	}
+	if (frame_pointer->flags & SFF_PARM_IN_PROG)
+			op_unwind();
+	assert(!(frame_pointer->flags & SFF_PARM_IN_PROG));
 	if (NULL != gtm_err_dev)
 	{
 		/* It is possible that we entered here from a bad compile of the OPEN exception handler
@@ -302,8 +317,9 @@ CONDITION_HANDLER(mdb_condition_handler)
 		 * during MERGE command (MERGE command invokes multiple op-codes depending on source vs target). So it is not
 		 * easy to establish a condition handler there. Easy solution is following one line code.
 		 */
-		NULLIFY_MERGE_ZWRITE_CONTEXT;
 	}
+	if (TREF(in_zwrite) || merge_args)
+		NULLIFY_MERGE_ZWRITE_CONTEXT;
 	if ((int)ERR_TPRETRY == SIGNAL)
 	{
 		lcl_error_frame = error_frame;

@@ -44,6 +44,7 @@ lv_val	*op_srchindx(UNIX_ONLY_COMMA(int argcnt) lv_val *lv, ...)
 	SETUP_THREADGBL_ACCESS;
 	VAR_START(var, lv);
 	VMS_ONLY(va_count(argcnt);)
+	tmp_sbs.str.in_array = FALSE;
 	while (lv && (0 < --argcnt))
 	{
 		key = va_arg(var, mval *);
@@ -73,7 +74,6 @@ lv_val	*op_srchindx(UNIX_ONLY_COMMA(int argcnt) lv_val *lv, ...)
 				tmp_sbs.str.addr = TREF(lcl_coll_xform_buff);
 				do_xform(TREF(local_collseq), XFORM, &key->str, &tmp_sbs.str, &length);
 				tmp_sbs.str.len = length;
-				s2pool(&(tmp_sbs.str));
 				key = &tmp_sbs;
 			}
 			lv = (lv_val *)lvAvlTreeLookupStr(lvt, key, &parent);
@@ -82,10 +82,13 @@ lv_val	*op_srchindx(UNIX_ONLY_COMMA(int argcnt) lv_val *lv, ...)
 			 * But input mval could be read-only so cannot modify that even if temporarily.
 			 * So take a copy of the mval and modify that instead.
 			 */
-			tmp_sbs = *key;
+			tmp_sbs.umval = key->umval;
 			key = &tmp_sbs;
 			MV_FORCE_NUM(key);
 			TREE_KEY_SUBSCR_SET_MV_CANONICAL_BIT(key);	/* used by the lvAvlTreeLookup* functions below */
+			tmp_sbs.mvtype &= (MV_STR_OFF & MV_UTF_LEN_OFF);
+			tmp_sbs.str.addr = NULL;
+			tmp_sbs.str.len = 0;
 			if (MVTYPE_IS_INT(tmp_sbs.mvtype))
 				lv = (lv_val *)lvAvlTreeLookupInt(lvt, key, &parent);
 			else
@@ -105,7 +108,7 @@ lv_val	*op_srchindx_runtime(mval *src, int subscripts, int *start, int *stop, lv
 	mval                    tmp_sbs;
 	lvTree			*lvt;
 	lvTreeNode		*parent;
-	mname_entry             lvent;
+	unmanaged_mname_entry	lvent;
 	mval                    *val, *varname, lvname_mval, subs_mval;
 	ht_ent_mname            *tabent;
 	DCL_THREADGBL_ACCESS;
@@ -124,6 +127,7 @@ lv_val	*op_srchindx_runtime(mval *src, int subscripts, int *start, int *stop, lv
 		assert(lv);
 	} else
 		return NULL;
+	tmp_sbs.str.in_array = FALSE;
 	for (i = 1; lv && (i <= subscripts); i++)
 	{
 		key = &subs_mval;	/* reinitialize each iteration to avoid tmp_sbs corruption */
@@ -153,16 +157,18 @@ lv_val	*op_srchindx_runtime(mval *src, int subscripts, int *start, int *stop, lv
 				tmp_sbs.str.addr = TREF(lcl_coll_xform_buff);
 				do_xform(TREF(local_collseq), XFORM, &key->str, &tmp_sbs.str, &length);
 				tmp_sbs.str.len = length;
-				s2pool(&(tmp_sbs.str));
 				key = &tmp_sbs;
 			}
 			lv = (lv_val *)lvAvlTreeLookupStr(lvt, key, &parent);
 		} else
 		{
-			tmp_sbs = *key;
+			tmp_sbs.umval = key->umval;
 			key = &tmp_sbs;
 			MV_FORCE_NUM(key);
 			TREE_KEY_SUBSCR_SET_MV_CANONICAL_BIT(key);	/* used by the lvAvlTreeLookup* functions below */
+			tmp_sbs.mvtype &= (MV_STR_OFF & MV_UTF_LEN_OFF);
+			tmp_sbs.str.addr = NULL;
+			tmp_sbs.str.len = 0;
 			if (MVTYPE_IS_INT(tmp_sbs.mvtype))
 				lv = (lv_val *)lvAvlTreeLookupInt(lvt, key, &parent);
 			else

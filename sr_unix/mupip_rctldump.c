@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2014-2021 Fidelity National Information	*
+ * Copyright (c) 2014-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -18,7 +18,7 @@
 
 #include "relinkctl.h"
 #include "util.h"
-#include <rtnhdr.h>		/* needed for zroutines.h */
+#include "rtnhdr.h"		/* needed for zroutines.h */
 #include "zroutines.h"
 #include "cli.h"
 #include "cliif.h"
@@ -36,7 +36,7 @@ void mupip_rctldump(void)
 {
 #	ifdef AUTORELINK_SUPPORTED
 	unsigned short		max_len;
-	mstr			dir;
+	unmanaged_mstr		dir;
 	char			objdir[GTM_PATH_MAX];
 	open_relinkctl_sgm	*linkctl;
 	DCL_THREADGBL_ACCESS;

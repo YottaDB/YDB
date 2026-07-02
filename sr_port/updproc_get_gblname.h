@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2005-2026 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,7 +12,8 @@
 
 #ifndef UPDPROC_GET_GBLNAME_INCLUDED
 #define UPDPROC_GET_GBLNAME_INCLUDED
+#include "mdef.h"
 
-enum upd_bad_trans_type updproc_get_gblname(char *src_ptr, int key_len, char *gv_mname, mname_entry *gvname);
+enum upd_bad_trans_type updproc_get_gblname(char *src_ptr, int key_len, char *gv_mname, unmanaged_mname_entry *gvname);
 
 #endif /* UPDPROC_GET_GBLNAME_INCLUDED */

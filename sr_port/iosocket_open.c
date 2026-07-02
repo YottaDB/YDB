@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2022 Fidelity National Information	*
+ * Copyright (c) 2012-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -48,7 +48,7 @@ GBLREF	UConverter		*chset_desc[];
 GBLREF	volatile boolean_t	dollar_zininterrupt;
 
 LITREF 	unsigned char		io_params_size[];
-LITREF	mstr			chset_names[];
+LITREF	unmanaged_mstr		chset_names[];
 
 error_def(ERR_ABNCOMPTINC);
 error_def(ERR_ADDRTOOLONG);
@@ -87,7 +87,8 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 	mv_stent		*mv_zintdev;
 	boolean_t		zint_conn_restart = FALSE;
 	socket_interrupt	*sockintr;
-	mstr			chset_mstr, optionstr;
+	mstr			optionstr;
+	unmanaged_mstr		chset_mstr;
 	gtm_chset_t		default_chset, temp_ichset, temp_ochset;
 	boolean_t		attach_specified = FALSE,
 				listen_specified = FALSE,
@@ -465,7 +466,7 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 			}
 			if (attach_specified)
 			{	 /* socket handle -- also check for duplication */
-				if (iosocket_handle(sock_handle, &handle_len, FALSE, newdsocket) >= 0)
+				if (iosocket_get_handle(sock_handle, handle_len, newdsocket) >= 0)
 				{
 					if (FD_INVALID != socketptr->temp_sd)
 						close(socketptr->temp_sd);
@@ -475,7 +476,7 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 					return FALSE;
 				}
 			} else
-				iosocket_handle(sock_handle, &handle_len, TRUE, dsocketptr);
+				iosocket_new_handle(sock_handle, &handle_len, dsocketptr);
 			assert(MAX_HANDLE_LEN > handle_len);
 			if (MAX_HANDLE_LEN < handle_len)
 				handle_len = MAX_HANDLE_LEN;

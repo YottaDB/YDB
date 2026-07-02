@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2021 Fidelity National Information	*
+ * Copyright (c) 2012-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -22,7 +22,7 @@ GBLREF UConverter	*chset_desc[CHSET_MAX_IDX];
 GBLREF casemap_t	casemaps[MAX_CASE_IDX];
 GBLREF u_casemap_t	gtm_strToTitle_ptr;		/* Function pointer for gtm_strToTitle */
 
-LITREF mstr		chset_names[CHSET_MAX_IDX_ALL];
+LITREF unmanaged_mstr	chset_names[CHSET_MAX_IDX_ALL];
 
 /* Note these routines are separated from gtm_conv.c to avoid pulling into gtmsecshr all the stuff the conversion modules use */
 
@@ -41,7 +41,7 @@ void gtm_conv_init(void)
 	casemaps[2].u = gtm_strToTitle_ptr;
 }
 
-UConverter* get_chset_desc(const mstr* chset)
+UConverter* get_chset_desc(const unmanaged_mstr* chset)
 {
 	int 			chset_indx;
 	UErrorCode		status;
@@ -53,13 +53,13 @@ UConverter* get_chset_desc(const mstr* chset)
 		status = U_ZERO_ERROR;
 		chset_desc[chset_indx] = ucnv_open(chset_names[chset_indx].addr, &status);
 		if (U_FAILURE(status))
-			RTS_ERROR_ABT(VARLSTCNT(3) ERR_ICUERROR, 1, status);	/* strange and unexpected ICU unhappiness */
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_ICUERROR, 1, status);	/* strange and unexpected ICU unhappiness */
 		/* Initialize the callback for illegal/invalid characters, so that conversion
 		 * stops at the first illegal character rather than continuing with replacement */
 		status = U_ZERO_ERROR;
 		ucnv_setToUCallBack(chset_desc[chset_indx], &callback_stop, NULL, NULL, NULL, &status);
 		if (U_FAILURE(status))
-			RTS_ERROR_ABT(VARLSTCNT(3) ERR_ICUERROR, 1, status);	/* strange and unexpected ICU unhappiness */
+			RTS_ERROR_CSA_ABT(NULL,VARLSTCNT(3) ERR_ICUERROR, 1, status);	/* strange and unexpected ICU unhappiness */
 	}
 	return chset_desc[chset_indx];
 }
@@ -72,10 +72,10 @@ UConverter* get_chset_desc(const mstr* chset)
  *	0  (if "M") or
  *	non-zero index to an entry of chset_names[] (if valid)
  */
-int verify_chset(const mstr *parm)
+int verify_chset(const unmanaged_mstr *parm)
 {
-	const mstr	*vptr, *vptr_top;
-	char		mode[MAX_CHSET_LEN];
+	const unmanaged_mstr	*vptr, *vptr_top;
+	char			mode[MAX_CHSET_LEN];
 
 	if ((MIN_CHSET_LEN > parm->len) || (MAX_CHSET_LEN < parm->len))
 		return -1; /* Parameter is smaller or larger than any possible CHSET */

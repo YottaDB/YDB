@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2009, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2009-2026 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,7 +16,7 @@
 #include "gtm_stdio.h"
 
 #include "gtmio.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "stack_frame.h"
 #include "op.h"
 #include "hashtab_mname.h"
@@ -94,7 +95,7 @@ void op_clralsvars(lv_val *rslt)
 							done = TRUE;
 							break;
 						}
-						if (HTENT_MARK_DELETED(tabent))
+						if (!HTENT_VALID_MNAME(tabent, lv_val, lvp))
 							*htep = NULL;		/* Clear l_symtab value for deleted hash entry */
 						DEBUG_ONLY(first_sym = FALSE);
 					}

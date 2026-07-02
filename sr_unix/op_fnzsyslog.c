@@ -1,6 +1,6 @@
  /****************************************************************
  *								*
- * Copyright (c) 2014-2022 Fidelity National Information	*
+ * Copyright (c) 2014-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -46,5 +46,5 @@ void op_fnzsyslog(mval* src, mval* dst)
 		util_out_print_args(rebuff, 0, OPER);
 		RESTORE_UTIL_OUT_BUFFER(save_util_outptr, save_last_va_list_ptr, util_copy_saved);
 	}
-	memcpy(dst, &literal_one, SIZEOF(mval));
+	dst->umval = literal_one.umval;
 }

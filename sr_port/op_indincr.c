@@ -42,7 +42,8 @@ void	op_indincr(mval *dst, mval *increment, mval *target)
 
 	SETUP_THREADGBL_ACCESS;
 	MV_FORCE_STR(target);
-	indir_src.str = target->str;
+	indir_src.str.umstr = target->str.umstr;
+	indir_src.str.in_array = FALSE;
 	indir_src.code = indir_increment;
 	if (NULL == (obj = cache_get(&indir_src)))
 	{

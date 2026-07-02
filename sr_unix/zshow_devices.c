@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -39,17 +39,17 @@
 #include <_Ccsid.h>
 #endif
 
-#define ZS_ONE_OUT(V,TEXT) ((V)->str.len = 1, (V)->str.addr = (TEXT), zshow_output(output,&(V)->str))
-#define ZS_STR_OUT(V,TEXT) ((V)->str.len = SIZEOF((TEXT)) - 1, (V)->str.addr = (TEXT), zshow_output(output,&(V)->str))
-#define ZS_VAR_STR_OUT(V,TEXT) ((V)->str.len = STRLEN((TEXT)), (V)->str.addr = (TEXT), zshow_output(output,&(V)->str))
+#define ZS_ONE_OUT(V,TEXT) ((V)->str.len = 1, (V)->str.addr = (TEXT), zshow_output(output,&(V)->str.umstr))
+#define ZS_STR_OUT(V,TEXT) ((V)->str.len = SIZEOF((TEXT)) - 1, (V)->str.addr = (TEXT), zshow_output(output,&(V)->str.umstr))
+#define ZS_VAR_STR_OUT(V,TEXT) ((V)->str.len = STRLEN((TEXT)), (V)->str.addr = (TEXT), zshow_output(output,&(V)->str.umstr))
 #define ZS_PARM_SP(V,TEXT) ((V)->str.len = dev_param_names[dev_param_index[zshow_param_index[(TEXT)].letter] + \
 			zshow_param_index[(TEXT)].offset ].len, \
 			(V)->str.addr = (char *)dev_param_names[dev_param_index[zshow_param_index[(TEXT)].letter] + \
-			zshow_param_index[(TEXT)].offset ].name, zshow_output(output,&(V)->str), ZS_ONE_OUT((V),space_text))
+			zshow_param_index[(TEXT)].offset ].name, zshow_output(output,&(V)->str.umstr), ZS_ONE_OUT((V),space_text))
 #define ZS_PARM_EQU(V,TEXT) ((V)->str.len = dev_param_names[dev_param_index[zshow_param_index[(TEXT)].letter] + \
 			zshow_param_index[(TEXT)].offset ].len, \
 			(V)->str.addr = (char *)dev_param_names[dev_param_index[zshow_param_index[(TEXT)].letter] + \
-			zshow_param_index[(TEXT)].offset ].name, zshow_output(output,&(V)->str), ZS_ONE_OUT((V),equal_text))
+			zshow_param_index[(TEXT)].offset ].name, zshow_output(output,&(V)->str.umstr), ZS_ONE_OUT((V),equal_text))
 
 static readonly char	space_text[] = {' '};
 
@@ -62,7 +62,7 @@ GBLREF mstr		dollar_zpin;			/* contains "< /" */
 GBLREF mstr		dollar_zpout;			/* contains "> /" */
 GBLREF int		process_exiting;
 
-LITREF mstr		chset_names[];
+LITREF unmanaged_mstr	chset_names[];
 LITREF nametabent	dev_param_names[];
 LITREF uint4		dev_param_index[];
 LITREF zshow_index	zshow_param_index[];
@@ -80,8 +80,8 @@ void zshow_devices(zshow_out *output)
 {
 	io_log_name	*l;		/* logical name pointer		*/
 	io_log_name	*savel;		/* logical name pointer		*/
-	mval		v;
-	mval		m;
+	mval		v = {{0}};
+	mval		m = {{0}};
 	io_desc 	*tiod;
 	d_rm_struct	*rm_ptr;
 	d_tt_struct	*temp_ptr, *tt_ptr;
@@ -206,7 +206,7 @@ void zshow_devices(zshow_out *output)
 						ZS_ONE_OUT(&v, space_text);
 						v.str.addr = &tiod->trans_name->dollar_io[0];
 						v.str.len = tiod->trans_name->len;
-						zshow_output(output,&v.str);
+						zshow_output(output,&v.str.umstr);
 					}
 				} else
 				{	/* plan to process the output side of $principal if it is std out */
@@ -215,14 +215,14 @@ void zshow_devices(zshow_out *output)
 					tiod = l->iod;
 					v.str.addr = &l->dollar_io[0];
 					v.str.len = l->len;
-					zshow_output(output,&v.str);
+					zshow_output(output,&v.str.umstr);
 				}
 			} else
 			{
 				tiod = l->iod;
 				v.str.addr = &l->dollar_io[0];
 				v.str.len = l->len;
-				zshow_output(output,&v.str);
+				zshow_output(output,&v.str.umstr);
 			}
 			ZS_ONE_OUT(&v, space_text);
 			if (tiod->state == dev_open)
@@ -581,7 +581,7 @@ void zshow_devices(zshow_out *output)
 						{
 							v.str.addr = rm_ptr->input_key.addr;
 							v.str.len = rm_ptr->input_key.len;
-							zshow_output(output, &v.str);
+							zshow_output(output, &v.str.umstr);
 						}
 						ZS_ONE_OUT(&v, space_text);
 						if (same_encr_settings)
@@ -592,7 +592,7 @@ void zshow_devices(zshow_out *output)
 						{
 							v.str.addr = rm_ptr->input_iv.addr;
 							v.str.len = rm_ptr->input_iv.len;
-							zshow_output(output, &v.str);
+							zshow_output(output, &v.str.umstr);
 						}
 						ZS_ONE_OUT(&v, space_text);
 					}
@@ -603,7 +603,7 @@ void zshow_devices(zshow_out *output)
 						{
 							v.str.addr = rm_ptr->output_key.addr;
 							v.str.len = rm_ptr->output_key.len;
-							zshow_output(output, &v.str);
+							zshow_output(output, &v.str.umstr);
 						}
 						ZS_ONE_OUT(&v, space_text);
 						ZS_STR_OUT(&v, output_iv);
@@ -611,7 +611,7 @@ void zshow_devices(zshow_out *output)
 						{
 							v.str.addr = rm_ptr->output_iv.addr;
 							v.str.len = rm_ptr->output_iv.len;
-							zshow_output(output, &v.str);
+							zshow_output(output, &v.str.umstr);
 						}
 						ZS_ONE_OUT(&v, space_text);
 					}
@@ -654,7 +654,7 @@ void zshow_devices(zshow_out *output)
 						ZS_ONE_OUT(&v, equal_text);
 						v.str.addr = socketptr->handle;
 						v.str.len = socketptr->handle_len;
-						zshow_output(output, &v.str);
+						zshow_output(output, &v.str.umstr);
 						ZS_ONE_OUT(&v, space_text);
 						/* socket descriptor */
 						ZS_STR_OUT(&v, descriptor_text);
@@ -749,7 +749,7 @@ void zshow_devices(zshow_out *output)
 								v.str.addr = "";
 								v.str.len = 0;
 							}
-							zshow_output(output, &v.str);
+							zshow_output(output, &v.str.umstr);
 							if (socket_local != socketptr->protocol)
 							{
 								ZS_ONE_OUT(&v, at_text);
@@ -777,7 +777,7 @@ void zshow_devices(zshow_out *output)
 								ZS_STR_OUT(&v, local_text);
 								v.str.addr = socketptr->local.saddr_ip;
 								v.str.len = STRLEN(socketptr->local.saddr_ip);
-								zshow_output(output, &v.str);
+								zshow_output(output, &v.str.umstr);
 								ZS_ONE_OUT(&v, at_text);
 								tmpport = (int)socketptr->local.port;
 								MV_FORCE_MVAL(&m, tmpport);
@@ -823,14 +823,13 @@ void zshow_devices(zshow_out *output)
 							for (jj = 0; jj < socketptr->n_delimiter; jj++)
 							{
 								delim_len_sm = socketptr->delimiter[jj].len;
-								memcpy((void *)delim_buff_sm,
-								       socketptr->delimiter[jj].addr, delim_len_sm);
+								memcpy(delim_buff_sm, socketptr->delimiter[jj].addr, delim_len_sm);
 								delim_len = (MAX_DELIM_LEN * MAX_ZWR_EXP_RATIO) + 11;
 								format2zwr(delim_buff_sm, delim_len_sm,
 									   (uchar_ptr_t)delim.addr, &delim_len);
 								delim.len = (unsigned short)delim_len;
 								assert(SIZEOF(delim_mstr_buff) >= delim_len);
-								zshow_output(output, &delim);
+								zshow_output(output, &delim.umstr);
 								ZS_ONE_OUT(&v, space_text);
 							}
 						} else
@@ -855,8 +854,9 @@ void zshow_devices(zshow_out *output)
 				{
 					ZS_PARM_EQU(&v, zshow_exce);
 					ZS_ONE_OUT(&v, quote_text);
-					v.str = tiod->error_handler;
-					zshow_output(output, &v.str);
+					assert(!glist_str_protected(&v.str));
+					v.str.umstr = tiod->error_handler.umstr;
+					zshow_output(output, &v.str.umstr);
 					output->flush = TRUE;
 					ZS_ONE_OUT(&v, quote_text);
 				} else
@@ -915,15 +915,15 @@ int view_device(mstr *device_name, unsigned char *device, int device_len)
 		}
 	}
 	if (0 == nldone)
-		nlog = get_log_name(device_name, NO_INSERT);
+		nlog = get_log_name(&device_name->umstr, NO_INSERT);
 	else
-		nlog = get_log_name(&dollar_prin_log, NO_INSERT);
+		nlog = get_log_name(&dollar_prin_log.umstr, NO_INSERT);
 	if (NULL == nlog)
 	{
-		stat = TRANS_LOG_NAME(device_name, &tn, buf1, SIZEOF(buf1), dont_sendmsg_on_log2long);
+		stat = TRANS_LOG_NAME(&device_name->umstr, &tn, buf1, SIZEOF(buf1), dont_sendmsg_on_log2long);
 		if (SS_NORMAL == stat)
 		{
-			if (0 != (tl = get_log_name(&tn, NO_INSERT)))
+			if (0 != (tl = get_log_name(&tn.umstr, NO_INSERT)))
 				nlog = tl;
 		}
 	}

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -33,9 +33,10 @@ STATICDEF char		*trans_log_name_buff = &trans_log_name_startbuff[0];
 
 error_def(ERR_LOGTOOLONG);
 
-int4 trans_log_name(mstr *log, mstr *trans, char *buffer, int4 buffer_len, translog_act do_sendmsg)
+int4 trans_log_name(const unmanaged_mstr *log, mstr *trans, char *buffer, int4 buffer_len, translog_act do_sendmsg)
 {
-	char		*s_start, *s_ptr, *s_top, *tran_buff, *b_ptr, *b_top, ch;
+	char		*tran_buff, *b_ptr, *b_top, ch;
+	const char	*s_start, *s_top, *s_ptr;
 	unsigned int	s_len;
 	int4		ret;
 

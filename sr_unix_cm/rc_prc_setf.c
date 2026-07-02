@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -26,6 +26,8 @@
 #include "gtcm.h"
 #include "gvcst_protos.h"	/* for gvcst_put prototype */
 #include "hashtab_mname.h"	/* for COMPUTE_HASH_MNAME prototype */
+#include "stringpool.h"
+#include "mdq.h"
 
 GBLREF gv_key 		*gv_currkey;
 GBLREF gv_namehead 	*gv_target;
@@ -40,7 +42,7 @@ int rc_prc_setf(rc_q_hdr *qhdr)
     char	*cp1;
     int		 i;
     mval	 v;
-    mname_entry	gvname;
+    unmanaged_mname_entry	gvname;
     gvnh_reg_t	*gvnh_reg;
 
     ESTABLISH_RET(rc_dbms_ch, RC_SUCCESS);
@@ -66,7 +68,9 @@ int rc_prc_setf(rc_q_hdr *qhdr)
 #endif
 		return -1;
 	}
-	gvname.var_name = v.str;
+	/* gvname.var_name will not be protected against stringpool garbage collection, but since this is a common
+	 * pattern we assert in GV_BIND_NAME_AND_ROOT_SEARCH that no garbage collection occurs*/
+	gvname.var_name = v.str.mident;
 	COMPUTE_HASH_MNAME(&gvname);
 	GV_BIND_NAME_AND_ROOT_SEARCH(gd_header, &gvname, gvnh_reg);
 	assert(NULL == gvnh_reg->gvspan); /* so GV_BIND_SUBSNAME_IF_GVSPAN is not needed */

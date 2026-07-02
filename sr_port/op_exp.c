@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -51,8 +51,8 @@ void op_exp(mval *u, mval* v, mval *p)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	u1.umval = u->umval;
 	u1_p = &u1;
-	memcpy(u1_p, u, SIZEOF(mval));
 	MV_FORCE_NUM(u1_p);
 	MV_FORCE_NUM(v);
 	n = v->m[1];
@@ -60,7 +60,7 @@ void op_exp(mval *u, mval* v, mval *p)
 	{	/* Integer-ish exponent (could have up to 3 digits to right of decimal pt) */
 		if (0 == n)
 		{	/* anything**0 = 1 */
-			*p = literal_one;
+			p->umval = literal_one.umval;
 			return;
 		}
 		if (0 != (u1_p->mvtype & MV_INT))
@@ -68,10 +68,10 @@ void op_exp(mval *u, mval* v, mval *p)
 			if (0 == u1_p->m[1])
 			{
 				if (0 <= n)
-					*p = literal_zero;	/* 0**anything non-negative = 0 */
+					p->umval = literal_zero.umval;	/* 0**anything non-negative = 0 */
 				else if (TREF(compile_time))
 				{	/* create "impossible" value flag for compiler */
-					*p = literal_zero;
+					p->umval = literal_zero.umval;
 					p->sgn = 1;		/* negative zero == oxymoron */
 				} else
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DIVZERO);
@@ -87,8 +87,8 @@ void op_exp(mval *u, mval* v, mval *p)
 				op_div((mval *)&literal_one, u1_p, &w);
 				n1 = -n1;
 			} else
-				w = *u1_p;
-			zmv = literal_one;
+				w.umval = u1_p->umval;
+			zmv.umval = literal_one.umval;
 			for ( ; ; )
 			{	/* Compute integer exponent */
 				if (n1 & 1)
@@ -98,7 +98,7 @@ void op_exp(mval *u, mval* v, mval *p)
 					break;
 				op_mul(&w, &w, &w);
 			}
-			*p = zmv;
+			p->umval = zmv.umval;
 			return;
 		} else
 		{	/* Have non-integer exponent (has fractional component) */
@@ -126,10 +126,10 @@ void op_exp(mval *u, mval* v, mval *p)
 			if (0 == u1_p->m[1])
 			{
 				if (!v->sgn)
-					*p = literal_zero;	/* 0**anything non-negative = 0 */
+					p->umval = literal_zero.umval;	/* 0**anything non-negative = 0 */
 				else if (TREF(compile_time))
 				{	/* create "impossible" value flag for compiler */
-					*p = literal_zero;
+					p->umval = literal_zero.umval;
 					p->sgn = 1;		/* negative zero == oxymoron */
 				} else
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DIVZERO);
@@ -224,7 +224,7 @@ void op_exp(mval *u, mval* v, mval *p)
 	p->sgn = (neg && !even);	/* Positive numbers only from here on out */
 	if (0 == z)
 	{
-		*p = literal_zero;
+		p->umval = literal_zero.umval;
 		return;
 	}
 	/* Remaining code's main purpose is to convert the double float value to our internal format taking care that
@@ -240,7 +240,7 @@ void op_exp(mval *u, mval* v, mval *p)
 	{	/* Zero equivalency test - some small chance pow() could return a very small negative number. Any
 		 * possible negative numbers must have whole number exponent which is handled earlier via op_mul().
 		 */
-		*p = literal_zero;
+		p->umval = literal_zero.umval;
 		return;
 	}
 	/* Integer check - GT.M pseudo int MV_INT check - must be decimal form 999999.999 */
@@ -253,6 +253,7 @@ void op_exp(mval *u, mval* v, mval *p)
 		{	/* We can treat this as a GT.M int */
 			p->e = 0;
 			p->mvtype = (MV_NM | MV_INT);
+			p->str.len = 0;
 			p->m[0] = 0;
 			p->m[1] = (p->sgn) ? -n1 : n1;
 			return;
@@ -299,6 +300,7 @@ void op_exp(mval *u, mval* v, mval *p)
 			 z1_rnd /= ten_pwr[idx];
 			 p->e = 0;
 			 p->mvtype = (MV_NM | MV_INT);
+			 p->str.len = 0;
 			 p->m[1] = z1_rnd;
 			 return;
 		}
@@ -312,10 +314,11 @@ void op_exp(mval *u, mval* v, mval *p)
 	}
 	if (exponent < EXPLO)
 	{
-		*p = literal_zero;
+		p->umval = literal_zero.umval;
 		return;
 	}
 	p->mvtype = MV_NM;
+	p->str.len = 0;
 	p->e = exponent;
 	p->m[1] = z1_rnd;
 	p->m[0] = z2_rnd;

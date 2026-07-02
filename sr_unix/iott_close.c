@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -24,6 +24,7 @@
 #include "error.h"
 #include "op.h"
 #include "indir_enum.h"
+#include "device_cleanup.h"
 
 GBLREF io_pair		io_std_device;
 LITREF unsigned char	io_params_size[];
@@ -52,6 +53,7 @@ void iott_close(io_desc *v, mval *pp)
 		assert(v->pair.in == v);
 	v->state = dev_closed;
 	iott_resetterm(v);
+	cleanup_device_stp_residents(v);
 
 	p_offset = 0;
 	while (*(pp->str.addr + p_offset) != iop_eol)

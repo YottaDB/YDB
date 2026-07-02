@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2011-2015 Fidelity National Information	*
+ * Copyright (c) 2011-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -20,9 +20,8 @@
 #include "hashtab.h"
 #include "hashtab_objcode.h"
 #include "hashtab_mname.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "stack_frame.h"
-#include "mprof.h"
 #include "gtm_unlink_all.h"
 #include "zbreak.h"
 #include "gtm_text_alloc.h"
@@ -41,6 +40,7 @@
 #include "urx.h"
 #include "stringpool.h"
 #include "zr_unlink_rtn.h"
+#include "op.h"
 #ifdef GTM_TRIGGER
 #include "gv_trigger.h"
 #include "gtm_trigger.h"
@@ -58,15 +58,14 @@ GBLREF	gv_namehead		*gv_target_list;
 
 /* Routine to do the following:
  *
- * 1. Stop M-Profiling.
- * 2. Unwind the M stack back to level 1
- * 3. (re)Initialize $ECODE, $REFERENCE and $TEST.
- * 4. Remove all triggers. This includes not only the trigger routines but the trigger definitions and
+ * 1. Unwind the M stack back to level 1
+ * 2. (re)Initialize $ECODE, $REFERENCE and $TEST.
+ * 3. Remove all triggers. This includes not only the trigger routines but the trigger definitions and
  *    linkages in the gvt_trigger struct anchored off of the gv_target.
- * 5. Unlink all M routines. This includes getting rid of their linkage entries, breakpoints,
+ * 4. Unlink all M routines. This includes getting rid of their linkage entries, breakpoints,
  *    and $TEXT() caches and re-initializing the routine table.
- * 6. Empty the indirect cache.
- * 7. Close the shared libraries associated with M programs and reopen them after the unroll if any
+ * 5. Empty the indirect cache.
+ * 6. Close the shared libraries associated with M programs and reopen them after the unroll if any
  *    are present in $ZROUTINES.
  *
  * Currently called from op_zgoto() but could be called from elsewhere if needed in the future.
@@ -89,13 +88,10 @@ void gtm_unlink_all(void)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	/* Step 1: Stop M-Profiling */
-	if (is_tracing_on)
-		turn_tracing_off(NULL);
-	/* Step 2: Unwind M stack back to level 0 */
+	/* Step 1: Unwind M stack back to level 0 */
 	GOLEVEL(0, TRUE);
 	assert(0 == dollar_zlevel());
-	/* Step 3: re-Initialize $ECODE, $REFERENCE, and $TEST */
+	/* Step 2: re-Initialize $ECODE, $REFERENCE, and $TEST */
 	NULLIFY_DOLLAR_ECODE;		/* Clears $ECODE and results returned for $STACK */
 	if (NULL != gv_currkey)
 	{	/* Clears $REFERENCE */
@@ -103,12 +99,12 @@ void gtm_unlink_all(void)
 		gv_currkey->base[0] = KEY_DELIMITER;
 	}
 	dollar_truth = FALSE;		/* aka $TEST */
-	/* Step 4: Remove all triggers */
+	/* Step 3: Remove all triggers */
 #	ifdef GTM_TRIGGER
 	for (gvt = gv_target_list; gvt; gvt = gvt->next_gvnh)
 		gvtr_free(gvt);
 #	endif
-	/* Step 5: Unlink all routines, remove $TEXT cache and remove breakpoints. Note that for the purposes of this section,
+	/* Step 4: Unlink all routines, remove $TEXT cache and remove breakpoints. Note that for the purposes of this section,
 	 * there is no difference between normal routines and trigger routines. Both are being removed completely so the code
 	 * below is a hodgepodge of code from zlput_rname and gtm_trigger_cleanup(). Note process in reverse order so we can
 	 * move rtn_names_end up leaving processed entries (whose keys no longer work) off the end of the table without moving
@@ -144,7 +140,9 @@ void gtm_unlink_all(void)
 		 */
 		if (HTENT_VALID_OBJCODE(tabent_obj, cache_entry, csp))
 		{
+			unprotect_obj_cache_entry(csp);
 			GTM_TEXT_FREE(csp);
+			delete_hashtab_ent_objcode(&cache_table, tabent_obj);
 		}
 	}
 	reinitialize_hashtab_objcode(&cache_table);	/* Completely re-initialize the hash table */

@@ -167,7 +167,7 @@ int4 gds_rundown(boolean_t cleanup_udi, boolean_t delete_statsdb)
 	sgmnt_addrs		*baseDBcsa;
 	node_local_ptr_t	baseDBnl;
 	sgm_info		*si;
-	int			save_ftok_semid;
+	int			save_ftok_semid, save_semid;
 	DEBUG_ONLY(boolean_t	orig_we_are_last_writer = FALSE);
 	DCL_THREADGBL_ACCESS;
 
@@ -197,6 +197,7 @@ int4 gds_rundown(boolean_t cleanup_udi, boolean_t delete_statsdb)
 		gvusr_rundown();
 		return EXIT_NRM;
 	}
+        ACCUMULATE_HEAVYWEIGHT_GVSTATS_COUNTERS(csa, cnl);
 	/* If this region has a corresponding statsdb region that is open, close that first. This is needed to ensure
 	 * that the statsdb can safely be deleted at basedb rundown time if we happen to be the last one to rundown the basedb.
 	 */
@@ -236,9 +237,9 @@ int4 gds_rundown(boolean_t cleanup_udi, boolean_t delete_statsdb)
 	{
 		if (INVALID_SEMID != udi->semid)
 		{
-			save_ftok_semid = udi->semid;
-			udi->semid = udi->ftok_semid = INVALID_SEMID;
-			semctl(save_ftok_semid, 0, IPC_RMID);
+			save_semid = udi->semid;
+			udi->semid = INVALID_SEMID;
+			semctl(save_semid, 0, IPC_RMID);
 		}
 		udi->sem_deleted = TRUE;		/* Note that we deleted the semaphore */
 		udi->grabbed_access_sem = FALSE;
@@ -246,8 +247,8 @@ int4 gds_rundown(boolean_t cleanup_udi, boolean_t delete_statsdb)
 		assert(FALSE == udi->grabbed_ftok_sem);
 		if (INVALID_SEMID != udi->ftok_semid)
 		{
-			save_ftok_semid = udi->semid;
-			udi->semid = udi->ftok_semid = INVALID_SEMID;
+			save_ftok_semid = udi->ftok_semid;
+			udi->ftok_semid = INVALID_SEMID;
 			semctl(save_ftok_semid, 0, IPC_RMID);
 		}
 		udi->counter_ftok_incremented = FALSE;

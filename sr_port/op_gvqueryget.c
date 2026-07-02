@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -78,8 +78,8 @@ boolean_t op_gvqueryget(mval *key, mval *val)
 		s2pool(&key->str);
 	} else
 	{
-		*key = literal_null;
-		*val = literal_null;
+		key->umval = literal_null.umval;
+		val->umval = literal_null.umval;
 	}
 	return gotit;
 }

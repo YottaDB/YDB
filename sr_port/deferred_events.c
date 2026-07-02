@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -13,7 +13,7 @@
 #include "mdef.h"
 #include "gtm_stdio.h"
 #include "io.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "xfer_enum.h"
 #include "tp_timeout.h"
 #include "deferred_events.h"
@@ -253,8 +253,9 @@ boolean_t real_xfer_reset(int4 event_type)
 	DBGDFRDEVNT((stderr, "%d %s: real_xfer_reset - event: %d\n", __LINE__, __FILE__, event_type));
 	assertpro(DEFERRED_EVENTS > event_type);
 	assert(pending <= TAREF1(save_xfer_root, event_type).event_state);
-	if ((pending == TAREF1(save_xfer_root, zstep_pending).event_state) && (TREF(zstep_action)).str.len)
+	if ((TREF(zstep_action)).str.len && (pending == TAREF1(save_xfer_root, zstep_pending).event_state))
 	{
+		/* TODO - ask roger what's going on here */
 		(TREF(zstep_action)).mvtype = MV_STR;
 		DEBUG_ONLY(cur_outofband = outofband);
 		op_zstep(TAREF1(save_xfer_root, zstep_pending).param_val, &(TREF(zstep_action)));	/* reinstate ZSTEP */
@@ -289,7 +290,7 @@ boolean_t real_xfer_reset(int4 event_type)
  */
 /* This function can be invoked by op_*intrrpt* transfer table functions or by long-running functions that check for pending events.
  * The transfer table adjustments should be active only for a short duration between the occurrence of an outofband event
- * and the handling of it at a logical boundary where we have a captured mpc to allow and appropriate return to normal execution.
+ * and the handling of it at a logical boundary where we have a captured mpc to allow an appropriate return to normal execution.
  * We don't expect to be running with those transfer table adjustmentss for more than one M-line. If "outofband" is set to 0, a
  * call to async_action below will do nothing and we will end up running with the op_*intrrpt* transfer table functions
  * indefinitely. In this case M-FOR loops are known to return incorrect results which might lead to application integrity issues.
@@ -332,7 +333,7 @@ void async_action(bool lnfetch_or_start)
 	switch (outofband)
 	{
 		case jobinterrupt:
-			dollar_zininterrupt = TRUE;	/* do this at every point to minimize nesting */
+			dollar_zininterrupt = TRUE;				/* do this at every point to minimize nesting */
 			TAREF1(save_xfer_root, outofband).event_state = active;
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_JOBINTRRQST);
 			break;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -140,7 +140,7 @@ boolean_t	gvcst_spr_queryget(mval *result_val)
 					assert(gv_altkey->end);
 					assert(KEY_DELIMITER == gv_altkey->base[gv_altkey->end]);
 					result_found = TRUE;
-					*result_val = *val;
+					result_val->umval = val->umval;
 					break;
 				}
 			}

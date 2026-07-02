@@ -1,6 +1,7 @@
 #################################################################
 #								#
-#	Copyright 2001, 2009 Fidelity Information Services, Inc	#
+# Copyright (c) 2001-2026 Fidelity National Information		#
+# Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -32,7 +33,7 @@ ENTRY op_sto
 	mv_if_notdefined %edx, b
 a:	pushl	%edi
 	pushl	%esi
-	movl	$mval_byte_len,%ecx
+	movl	$umval_byte_len,%ecx
 	movl	%edx,%esi
 	movl	%eax,%edi
 	REP

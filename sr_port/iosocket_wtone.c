@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -24,7 +24,7 @@ GBLREF io_pair	io_curr_device;
 
 void iosocket_wtone(int ch)
 {
-	mstr	temp;
+	unmanaged_mstr	temp;
 	char	c, uni_c[4], *endptr;
 	io_desc	*iod;
 
@@ -33,6 +33,7 @@ void iosocket_wtone(int ch)
 		c = (char)ch;
 		temp.len = 1;
 		temp.addr = (char *)&c;
+		/* Self-evidently not in stringpool, assert unnecessary */
 	} else
 	{
 		switch(io_curr_device.out->ochset)
@@ -47,6 +48,7 @@ void iosocket_wtone(int ch)
 				assertpro(io_curr_device.out->ochset != io_curr_device.out->ochset);
 		}
 		temp.addr = uni_c;
+		/* Self-evidently not in stringpool, assert unnecessary */
 		temp.len = INTCAST(endptr - uni_c);
 		assert(0 < temp.len); /* we validated the code point already in op_wtone() */
 	}

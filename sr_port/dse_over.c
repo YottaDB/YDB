@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -59,7 +59,7 @@ GBLREF uint4		update_array_size;
 GBLREF iconv_t		dse_over_cvtcd;
 #endif
 
-LITREF mstr		chset_names[];
+LITREF unmanaged_mstr	chset_names[];
 
 error_def(ERR_AIMGBLKFAIL);
 error_def(ERR_DBRDONLY);
@@ -76,7 +76,8 @@ void dse_over(void)
 	char		chset_name[MAX_CHSET_NAME + 1];
 	int		cvt_len, data_len, size;
 	int4		blk_seg_cnt, blk_size;
-	mstr		chset_mstr, cvt_src;
+	unmanaged_mstr	cvt_src;
+	unmanaged_mstr	chset_mstr;
 	srch_blk_status	blkhist;
 	uchar_ptr_t	lbp;
 	uint4		offset;
@@ -175,6 +176,7 @@ void dse_over(void)
 #	else
 	cvt_src.len = (unsigned int)data_len;
 	cvt_src.addr = data;
+	assert(!glist_umstr_in_stringpool(&cvt_src));
 	if (CHSET_M != dse_over_chset)
 	{
 		cvt_len = gtm_conv(chset_desc[dse_over_chset], chset_desc[CHSET_UTF8], &cvt_src, NULL, NULL);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -13,6 +13,7 @@
 #define RTNHDR_H_INCLUDED
 
 #include "mdef.h"
+#include "mdefsp.h"
 #include "srcline.h"
 #include "cmd_qlf.h"
 
@@ -28,7 +29,7 @@
  */
 
 /* Variable table entry */
-typedef mname_entry var_tabent; /* the actual variable name is stored in the literal text pool */
+typedef unmanaged_mname_entry var_tabent; /* the actual variable name is stored in the literal text pool */
 
 /* Linenumber table entry */
 typedef int4 lnr_tabent;
@@ -83,18 +84,21 @@ typedef struct
  * a process-private version of this header that is modified as necessary and
  * always points to the current version.
  *
+ * Offsets in g_msf.si for every supported platform MUST be modified if this structure changes or
+ * if the size of any member structures changes.
+ *
  * The routine header is initialized when a module is first linked into
  * an executable. The fields marked with "(#)" are updated when the routine
  * is replaced by a newer version via explicit zlink.
  */
-typedef struct	rhead_struct
+typedef struct rhead_struct
 {
 	char			jsb[RHEAD_JSB_SIZE];	/* GTM_CODE object marker */
 	void_ptr_t		shlib_handle;		/* Null if header not for shared object. Non-zero means header is
 							 * describing shared library resident routine and this is its handle.
 							 * Note this is an 8 byte field on Tru64 (hence its position near top).
 							 */
-	mstr			src_full_name;		/* (#) Fully qualified path of routine source code */
+	unmanaged_mstr		src_full_name;		/* (#) Fully qualified path of routine source code */
 	uint4			compiler_qlf;		/* Bit flags of compiler qualifiers used (see cmd_qlf.h) */
 	uint4			objlabel;		/* Object code level/label (see objlable.h).
 							 * Note: this field must be the 10th word (11th on Tru64) on 32-bit
@@ -293,12 +297,12 @@ struct	sym_table
 #define NOVERIFY	FALSE
 
 /* Prototypes */
-int get_src_line(mval *routine, mval *label, int offset, mstr **srcret, rhdtyp **rtn_vec);
+int get_src_line(mval *routine, mval *label, int offset, unmanaged_mstr **srcret, rhdtyp **rtn_vec);
 void free_src_tbl(rhdtyp *rtn_vector);
 unsigned char *find_line_start(unsigned char *in_addr, rhdtyp *routine);
 int4 *find_line_addr(rhdtyp *routine, mstr *label, int4 offset, mident **lent_name);
-rhdtyp *find_rtn_hdr(mstr *name);
-boolean_t find_rtn_tabent(rtn_tabent **res, mstr *name);
+rhdtyp *find_rtn_hdr(const mident *name);
+boolean_t find_rtn_tabent(rtn_tabent **res, const mident *name);
 bool zlput_rname(rhdtyp *hdr);
 void zlmov_lnames(rhdtyp *hdr);
 rhdtyp *make_dmode(void);
@@ -315,7 +319,7 @@ void zr_cleanup_recursive_rtn(rhdtyp *rtnhdr);
 #include "zroutinessp.h"	/* Needed for zro_ent type for zro_record_zhist declaration */
 boolean_t need_relink(rhdtyp *rtnhdr, zro_hist *zhist);
 zro_hist *zro_zhist_saverecent(zro_search_hist_ent *zhist_valent, zro_search_hist_ent *zhist_valent_base);
-void zro_record_zhist(zro_search_hist_ent *zhist_valent, zro_ent *obj_container, mstr *rtnname);
+void zro_record_zhist(zro_search_hist_ent *zhist_valent, zro_ent *obj_container, mident *rtnname);
 #endif /* AUTORELINK_DEFINED */
 
 #endif /* RTNHDR_H_INCLUDED */

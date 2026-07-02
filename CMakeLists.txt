@@ -28,7 +28,7 @@ foreach(lang ${languages})
 endforeach()
 
 # Defaults
-set(version ${V7.1-011})
+set(version V7.2-000)
 if("${version}" STREQUAL "")
         set(version V9.9-0)
 endif()

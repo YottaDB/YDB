@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2009, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2009-2026 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,7 +23,7 @@
 #include "gdsbt.h"
 #include "gdsfhead.h"
 #include "alias.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "stack_frame.h"
 
 GBLREF uint4		dollar_tlevel;
@@ -72,11 +73,13 @@ void	lv_kill(lv_val *lv, boolean_t dotpsave, boolean_t do_subtree)
 					 * lv_val for the non-existing base local variable pointed to by the curr_symval
 					 * hash table entry. Just clear mvtype to mark the lv_val undefined.
 					 */
-					lv->v.mvtype = 0;	/* Base node */
+					LV_VAL_CLEAR_MVTYPE(lv);
 					break;
 				}
 			}
 		} else
-			lv->v.mvtype = 0;	/* Base node */
+		{
+			LV_VAL_CLEAR_MVTYPE(lv);
+		}
 	}
 }

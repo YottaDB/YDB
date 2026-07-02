@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -99,7 +99,7 @@ int op_open(mval *device, mval *devparms, mval *timeout, mval *mspace)
 		if (!TREF(is_socketpool))
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_DEVNAMERESERVED, 2, device->str.len, device->str.addr);
 	}
-	naml = get_log_name(&device->str, INSERT);
+	naml = get_log_name(&device->str.umstr, INSERT);
 	if (naml->iod != 0)
 		tl = naml;
 	else
@@ -111,10 +111,10 @@ int op_open(mval *device, mval *devparms, mval *timeout, mval *mspace)
 		if (!licensed || LP_CONFIRM(lid, lkid)==LP_NOTACQ)
 			licensed= FALSE;
 #		endif
-		switch(stat = TRANS_LOG_NAME(&device->str, &tn, &buf1[0], SIZEOF(buf1), dont_sendmsg_on_log2long))
+		switch(stat = TRANS_LOG_NAME(&device->str.umstr, &tn, &buf1[0], SIZEOF(buf1), dont_sendmsg_on_log2long))
 		{
 		case SS_NORMAL:
-			tl = get_log_name(&tn, INSERT);
+			tl = get_log_name(&tn.umstr, INSERT);
 			break;
 		case SS_NOLOGNAM:
 			tl = naml;

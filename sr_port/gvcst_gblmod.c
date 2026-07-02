@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -38,7 +38,7 @@ GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF gd_region	*gv_cur_region;
 GBLREF uint4		dollar_tlevel;
 GBLREF unsigned int	t_tries;
-LITREF mstr			nsb_dummy;
+LITREF unmanaged_mstr	nsb_dummy;
 
 error_def(ERR_GBLMODFAIL);
 

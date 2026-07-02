@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2007-2016 Fidelity National Information		#
+# Copyright (c) 2007-2026 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -36,7 +36,7 @@ ENTRY	op_fnget
 	cmpq	$0, REG64_RET1
 	je	l5				# Source mval does not exist
 	mv_if_notdefined REG64_RET1, l5		# Branch if source mval is not defined
-	movl	$mval_qword_len, REG32_ARG3	# Size of mval
+	movl	$umval_qword_len, REG32_ARG3	# Size of mval
 	movq	REG64_RET1, REG64_ARG1		# Set source
 	movq	REG64_RET0, REG64_ARG0		# Set destination
 	REP					# Repeat until count is zero

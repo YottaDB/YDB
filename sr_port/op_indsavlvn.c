@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2020 Fidelity National Information	*
+ * Copyright (c) 2012-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -19,7 +19,7 @@
 #include "indir_enum.h"
 #include "cache.h"
 #include "op.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "valid_mname.h"
 #include "gtm_string.h"
 #include "cachectl.h"
@@ -46,7 +46,8 @@ void op_indsavlvn(mval *target, uint4 slot)
 
 	SETUP_THREADGBL_ACCESS;
 	MV_FORCE_STR(target);
-	indir_src.str = target->str;
+	indir_src.str.umstr = target->str.umstr;
+	indir_src.str.in_array = FALSE;
 	indir_src.code = indir_savlvn;
 	if (NULL == (obj = cache_get(&indir_src)))
 	{

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -76,6 +76,7 @@ void i2usmval(mval *v, unsigned int i)
 {
 	v->mvtype = MV_NM;
 	v->sgn = 0;
+	v->str.len = 0;
 
 	xi2mval(v, i);
 }
@@ -84,6 +85,7 @@ void i2mval(mval *v, int i)
 {
 	int4	n;
 
+	v->str.len = 0;
 	v->mvtype = MV_NM;
 	if (i < 0)
 	{
@@ -134,6 +136,7 @@ void xi82mval(mval *v, gtm_uint64_t i);
 
 void ui82mval(mval *v, gtm_uint64_t i)
 {
+	v->str.len = 0;
 	v->mvtype = MV_NM;
 	v->sgn = 0;
 
@@ -144,6 +147,7 @@ void i82mval(mval *v, gtm_int64_t i)
 {
 	gtm_uint64_t	absi;
 
+	v->str.len = 0;
 	v->mvtype = MV_NM;
 	if (i < 0)
 	{
@@ -274,6 +278,7 @@ void float2mval(mval *dst, float src)
 	dst->str.addr = buf;
 	s2n(dst);
 	dst->mvtype &= ~MV_STR;
+	dst->str.len = 0;
 	return;
 }
 
@@ -293,6 +298,7 @@ void double2mval(mval *dst, double src)
 	dst->str.addr = buf;
 	s2n(dst);
 	dst->mvtype &= ~MV_STR;
+	dst->str.len = 0;
 	return;
 }
 

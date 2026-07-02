@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -21,7 +21,7 @@
 #include "min_max.h"
 #include "mlk_region_lookup.h"
 #include "targ_alloc.h"
-#include "hashtab_mname.h"
+#include "hashtab_umname.h"
 #include "gvnh_spanreg.h"
 #include "gtmimagename.h"
 #include "gv_trigger_common.h"	/* for *HASHT* macros used inside GVNH_REG_INIT macro */
@@ -33,8 +33,8 @@
 
 gd_region *mlk_region_lookup(mval *ptr, gd_addr *addr)
 {
-	ht_ent_mname		*tabent;
-	mname_entry		 gvent;
+	ht_ent_umname		*tabent;
+	unmanaged_mname_entry	gvent;
 	char			mname_buf[MAX_MIDENT_LEN + 1];
 	gd_binding		*map;
 	gv_namehead		*targ;
@@ -42,6 +42,7 @@ gd_region *mlk_region_lookup(mval *ptr, gd_addr *addr)
 	register char		*p;
 	int			plen;
 	gvnh_reg_t		*gvnh_reg;
+	unsigned int		gcols;
 
 	p = ptr->str.addr;
 	plen = ptr->str.len;
@@ -59,7 +60,7 @@ gd_region *mlk_region_lookup(mval *ptr, gd_addr *addr)
 		memcpy(mname_buf, p, gvent.var_name.len);
 		mname_buf[gvent.var_name.len] = '\0';
 		COMPUTE_HASH_MNAME(&gvent);
-		if (NULL != (tabent = lookup_hashtab_mname(addr->tab_ptr, &gvent)))
+		if (NULL != (tabent = lookup_hashtab_umname(addr->tab_ptr, &gvent)))
 		{
 			gvnh_reg = (gvnh_reg_t *)tabent->value;
 			assert(NULL != gvnh_reg);
@@ -84,7 +85,7 @@ gd_region *mlk_region_lookup(mval *ptr, gd_addr *addr)
 				INVOKE_STP_GCOL(stringpool.top - stringpool.base + 1);
 			}
 #endif
-			targ = (gv_namehead *)targ_alloc(reg->max_key_size, &gvent, reg);
+			targ = targ_alloc(reg->max_key_size, &gvent, reg);
 			GVNH_REG_INIT(addr, addr->tab_ptr, map, targ, reg, gvnh_reg, tabent);
 		}
 	}

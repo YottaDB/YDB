@@ -13,7 +13,7 @@
 #include "mdef.h"
 
 #include "op.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "stack_frame.h"
 #include "linktrc.h"
 

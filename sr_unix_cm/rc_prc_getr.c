@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -31,6 +31,7 @@
 #include "t_begin.h"
 #include "gvcst_protos.h"	/* for gvcst_search,gvcst_rtsib,gvcst_lftsib prototype */
 #include "hashtab_mname.h"
+#include "stringpool.h"
 
 GBLREF int		rc_size_return;
 GBLREF gd_addr		*gd_header;
@@ -50,7 +51,7 @@ int rc_prc_getr(rc_q_hdr *qhdr)
 	int		key_size, data_len, i;
 	bool		dollar_order, two_histories;
 	char		*cp2, *cp1;
-	mname_entry	gvname;
+	unmanaged_mname_entry	gvname;
 	short		rsiz, bsiz, fmode, size_return;
 	rec_hdr		*rp;
 	blk_hdr		*bp;

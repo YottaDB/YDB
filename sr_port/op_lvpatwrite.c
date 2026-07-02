@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -35,7 +35,7 @@ GBLREF	int		merge_args;
 GBLREF	symval		*curr_symval;
 GBLREF	zwr_hash_table	*zwrhtab;
 
-LITREF	mstr		dzwrtac_clean;
+LITREF	unmanaged_mstr	dzwrtac_clean;
 
 void op_lvpatwrite(UNIX_ONLY_COMMA(int4 count) UINTPTR_T arg1, ...)
 {

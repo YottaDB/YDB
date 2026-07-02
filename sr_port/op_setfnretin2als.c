@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2025 Fidelity National Information	*
+ * Copyright (c) 2010-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -16,7 +16,7 @@
 #include "gtm_string.h"
 
 #include "gtmio.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "stack_frame.h"
 #include "op.h"
 #include "lv_val.h"
@@ -27,6 +27,7 @@
 #include "gdsfhead.h"
 #include "alias.h"
 #include "min_max.h"
+#include "stringpool.h"
 
 GBLREF stack_frame	*frame_pointer;
 GBLREF symval		*curr_symval;
@@ -56,7 +57,7 @@ GBLREF mval		*alias_retarg;
 void op_setfnretin2als(mval *srcmv, int destindx)
 {
 	ht_ent_mname	*tabent;
-	mname_entry	*varname = NULL;
+	mname_entry	*varname = NULL, lcl_mname = {{{0}}};
 	lv_val		*srclvc, *dstlv;
 	int4		srcsymvlvl;
 	boolean_t	added;
@@ -73,12 +74,12 @@ void op_setfnretin2als(mval *srcmv, int destindx)
 	assert(srclvc->stats.trefcnt >= srclvc->stats.crefcnt);
 	assert(1 <= srclvc->stats.crefcnt);		/* Verify we have an existing container reference */
 	srcsymvlvl = LV_SYMVAL(srclvc)->symvlvl;	/* lv_val may go away below so record symlvl */
-	varname = &(((mname_entry *)frame_pointer->vartab_ptr)[destindx]);
+	lcl_mname.umname = ((frame_pointer->vartab_ptr)[destindx]);
 	DEBUG_ONLY(added = FALSE);
 	/* Find hash table entry */
 	/* If no fast path to hash table entry -- look it up the hard(er) way */
-	if (NULL == (tabent = (ht_ent_mname *)frame_pointer->l_symtab[destindx]))	/* note tabent assignment */
-		added = add_hashtab_mname_symval(&curr_symval->h_symtab, varname, NULL, &tabent, TRUE);
+	if (NULL == (tabent = frame_pointer->l_symtab[destindx]))	/* note tabent assignment */
+		added = add_hashtab_mname_symval(&curr_symval->h_symtab, &lcl_mname, NULL, &tabent, TRUE);
 	varname = NULL;
 	assert(tabent);
 	assert(tabent || added);

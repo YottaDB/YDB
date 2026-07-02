@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -45,7 +45,8 @@ void get_command_line(mval *result, boolean_t zcmd_line)
 		result->str.len = result->str.char_len = 0;
 		return;
 	}
-	result->mvtype = 0; /* so stp_gcol, if invoked below, can free up space currently occupied by this to-be-overwritten mval */
+	/* so stp_gcol, if invoked below, can free up space currently occupied by this to-be-overwritten mval */
+	result->mvtype = result->str.len = 0;
 	len = -1;							/* to compensate for no space at the end */
 	if (cmd_cnt > 1)
 	{

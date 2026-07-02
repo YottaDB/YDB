@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2022 Fidelity National Information	*
+ * Copyright (c) 2010-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -17,7 +17,7 @@
 #include "gdsbt.h"			/* for gdsfhead.h */
 #include "gdsfhead.h"
 #include "gvcst_protos.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "gv_trigger.h"
 #include "mv_stent.h"			/* for COPY_SUBS_TO_GVCURRKEY macro (within BUILD_HASHT_...) */
 #include "gvsub2str.h"			/* for COPY_SUBS_TO_GVCURRKEY */
@@ -94,7 +94,8 @@ char *trigger_gbl_fill_xecute_buffer(char *trigvn, int trigvn_len, mval *trig_in
 	assert(0 < dollar_tlevel); /* Too be added later when it stops breaking MUPIP SELECT & $ZTRIGGER("SELECT"..) */
 	xecute_buff = NULL;
 	ESTABLISH_RET(trigger_gbl_fill_xecute_buffer_ch, NULL);
-	index = *trig_index;
+	index.umval = trig_index->umval;
+	index.str.in_array = FALSE;
 	DBGTRIGR((stderr, "trigger_gbl_fill_xecute_buffer: entry $tlevel:%d\tindex:%d\t:crit:%d\tkv:%d\n",
 				dollar_tlevel, mval2i(&index), have_crit(CRIT_HAVE_ANY_REG), key_val.str.len));
 	if (NULL != first_rec)

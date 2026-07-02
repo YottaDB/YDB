@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -49,7 +49,8 @@ static readonly unsigned char init_break[1] = {'B'};
 void trap_env_init(void)
 {
 	int4		status;
-	mstr		val, trans;
+	mstr		trans;
+	unmanaged_mstr	val;
 	char		buf[MAX_SRCLINE + 1], *buf_ptr = &buf[0];
 	DCL_THREADGBL_ACCESS;
 
@@ -90,7 +91,7 @@ void trap_env_init(void)
 		op_commarg(TREF(ind_source), indir_linetail);
 		op_unwind();
 	} else if (IS_MUPIP_IMAGE)
-		(TREF(gtm_trigger_etrap))= default_etrap;
+		(TREF(gtm_trigger_etrap)).umval = default_etrap.umval;
 #	endif
 	/* Initialize $ZSTEP from $gtm_zstep enviroment variable. */
 	val.addr = GTM_ZSTEP;

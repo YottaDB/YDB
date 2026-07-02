@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -133,17 +133,17 @@ error_def(ERR_TLSCONNINFO);
 {													\
 	if (IO_SIZE > MAX_TRACE_SIZE)									\
 	{												\
-		memcpy((void *)TRACE_BUFF, IO_BUFF + IO_SIZE - MAX_TRACE_SIZE, MAX_TRACE_SIZE);		\
+		memcpy(TRACE_BUFF, IO_BUFF + IO_SIZE - MAX_TRACE_SIZE, MAX_TRACE_SIZE);			\
 		TRACE_BUFF_POS = 0;									\
 	} else												\
 	{												\
 		int space_to_end = MAX_TRACE_SIZE - TRACE_BUFF_POS;					\
 		if (IO_SIZE > space_to_end)								\
 		{											\
-			memcpy((void *)TRACE_BUFF + TRACE_BUFF_POS, IO_BUFF, space_to_end);		\
-			memcpy((void *)TRACE_BUFF, IO_BUFF + space_to_end, IO_SIZE - space_to_end);	\
+			memcpy(TRACE_BUFF + TRACE_BUFF_POS, IO_BUFF, space_to_end);			\
+			memcpy(TRACE_BUFF, IO_BUFF + space_to_end, IO_SIZE - space_to_end);		\
 		} else											\
-			memcpy((void *)TRACE_BUFF + TRACE_BUFF_POS, IO_BUFF, IO_SIZE);			\
+			memcpy(TRACE_BUFF + TRACE_BUFF_POS, IO_BUFF, IO_SIZE);				\
 		TRACE_BUFF_POS = (TRACE_BUFF_POS + IO_SIZE) % MAX_TRACE_SIZE;				\
 	}												\
 }

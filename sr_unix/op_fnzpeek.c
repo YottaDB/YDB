@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2013-2025 Fidelity National Information	*
+ * Copyright (c) 2013-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -246,7 +246,7 @@ STATICFNDEF int op_fnzpeek_stpcopy(char *zpeekadr, int len, mval *ret, char fmtc
 	uint4		days;
 
 	ESTABLISH_RET(op_fnzpeek_ch, ERR_BADZPEEKRANGE);		/* If get an exception, likely due to bad range */
-	ret->mvtype = 0;						/* Prevent GC of incomplete field */
+	ret->mvtype = ret->str.len = 0;						/* Prevent GC of incomplete field */
 	switch(fmtcode)
 	{
 		case 'S':						/* Null terminated string processing */

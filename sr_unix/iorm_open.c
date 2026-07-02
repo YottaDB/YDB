@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -47,7 +47,7 @@ error_def(ERR_DEVOPENFAIL);
 error_def(ERR_TEXT);
 error_def(ERR_IOERROR);
 
-LITREF	mstr		chset_names[];
+LITREF unmanaged_mstr	chset_names[];
 LITREF unsigned char	io_params_size[];
 
 /* WARNING, this routine is called from ioff_open as well as from the dispatch table. */

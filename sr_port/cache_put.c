@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -17,9 +17,10 @@
 #include "hashtab_objcode.h"
 #include "cachectl.h"
 #include "cacheflush.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "gtm_text_alloc.h"
 #include "io.h"
+#include "gcol_list.h"
 
 GBLREF	hash_table_objcode	cache_table;
 GBLREF	int			indir_cache_mem_size;
@@ -39,9 +40,12 @@ void cache_put(icode_str *src, mstr *object)
 	if (indir_cache_mem_size > max_cache_memsize || cache_table.count > max_cache_entries)
 		cache_table_rebuild();
 	csp = (cache_entry *)GTM_TEXT_ALLOC(ICACHE_SIZE + object->len);
+	glist_first_init_str(&csp->src.str);
 	csp->obj.addr = (char *)csp + ICACHE_SIZE;
 	csp->refcnt = csp->zb_refcnt = 0;
-	csp->src = *src;
+	csp->src.code = src->code;
+	csp->src.str.umstr = src->str.umstr;
+	glist_protect_str(&csp->src.str);
 	csp->obj.len = object->len;
 	memcpy(csp->obj.addr, object->addr, object->len);
 	((ihdtyp *)(csp->obj.addr))->indce = csp;	/* Set backward link to this cache entry */
@@ -70,7 +74,16 @@ void cache_put(icode_str *src, mstr *object)
 		for (fix = fix_base, i = 0 ;  i < fixup_cnt ;  i++, fix++)
 		{
 			if (MV_IS_STRING(fix))		/* if string, place in string pool */
-				fix->str.addr = (INTPTR_T)fix->str.addr + object->addr;
+			{
+				assert(!fix->str.in_array); /* We guarantee this in emit_code */
+				if (!fix->str.len)
+					fix->str.addr = NULL;
+				else
+				{
+					fix->str.addr = (INTPTR_T)fix->str.addr + object->addr;
+					glist_protect_str(&fix->str);
+				}
+			}
 		}
 	}
 	fixup_cnt = ((ihdtyp *)(csp->obj.addr))->vartab_len;
@@ -84,6 +97,6 @@ void cache_put(icode_str *src, mstr *object)
 			varent->marked = INDIR_MARKED;	/* Mark to copy to stringpool on first gtm_fetch */
 		}
 	}
-	*object = csp->obj;				/* Update location of object code for comp_indr */
+	object->umstr = csp->obj.umstr;				/* Update location of object code for comp_indr */
 	cacheflush(csp->obj.addr, csp->obj.len, BCACHE);
 }

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2012, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2012-2026 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -51,10 +52,11 @@
 #define SLOT_NEEDS_REWIND(INDX)		(((TREF(glvn_pool_ptr))->top <= (INDX)) && (GLVN_POOL_EMPTY != (INDX)))
 #define SLOT_OPCODE(INDX)		((TREF(glvn_pool_ptr))->slot[INDX].sav_opcode)
 
-#define SET_GLVN_INDX(FP, VALUE)					\
-{									\
-	(FP)->for_ctrl_stack = (unsigned char *)(UINTPTR_T)(VALUE);	\
-}
+#define SET_GLVN_INDX(FP, VALUE)											\
+MBSTART {														\
+	(FP)->for_ctrl_stack = (unsigned char *)									\
+	(((UINTPTR_T)(FP)->for_ctrl_stack & ~(UINTPTR_T)UINT_MAX) | ((UINTPTR_T)(VALUE) & (UINTPTR_T)UINT_MAX));	\
+} MBEND
 
 #define GLVN_POOL_EXPAND_IF_NEEDED				\
 {								\

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -61,7 +61,7 @@ int gtm_file_stat(mstr *file, mstr *def, mstr *ret, boolean_t check_prv, uint4 *
 			pblk.def1_buf = def->addr;
 			pblk.def1_size = def->len;
 		}
-		*status = parse_file(file, &pblk);
+		*status = parse_file(&file->umstr, &pblk);
 		if (!(*status & 1))
 		{
 			file_not_found = TRUE;

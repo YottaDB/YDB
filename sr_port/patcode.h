@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -152,6 +152,11 @@ static inline gtm_int64_t bound_multiply(gtm_int64_t x, gtm_int64_t y, gtm_int64
 #define	PAT_MIN_BEGIN_OFFSET(fixed,len,count)	(1 + len + 3)					/* offset of min[0] */
 #define	PAT_MAX_BEGIN_OFFSET(fixed,len,count)	(1 + len + 3 + (count * (1 - fixed)))		/* offset of max[0] */
 #define	PAT_SIZE_BEGIN_OFFSET(fixed,len,count)	(PAT_MAX_BEGIN_OFFSET(fixed,len,count) + count)	/* offset of size[0] */
+
+struct ua_patatom { uint4 v; } __attribute__((packed)); /* used to read pattern atoms without assuming alignment */
+typedef struct ua_patatom ua_patatom;
+static_assert(SIZEOF(ua_patatom) == SIZEOF(uint4), "ua_patatom must be same size as uint4");
+static_assert(1 == __alignof__(ua_patatom), "ua_patatom must be byte-aligned");
 
 typedef struct pattern_struct
 {
@@ -306,7 +311,7 @@ MBSTART {												\
 } MBEND
 
 int	do_patalt(
-		uint4		*firstalt,
+		ua_patatom	*firstalt,
 		unsigned char	*strptr,
 		unsigned char	*strtop,
 		int4		repmin,
@@ -324,7 +329,7 @@ int	getpattabnam(mstr *outname);
 int	initialize_pattern_table(void);
 int	load_pattern_table(int name_len, char *file_name);
 int	patmaskseq(uint4 number);
-int	setpattab(mstr *table_name);
+int	setpattab(const mstr *table_name);
 
 int	patstr(mstr *instr, ptstr *obj, unsigned char **relay);
 

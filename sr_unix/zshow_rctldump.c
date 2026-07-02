@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2014-2022 Fidelity National Information	*
+ * Copyright (c) 2014-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -22,7 +22,7 @@
 
 #define	DUMP_ONE_LINE(OUTPUT, BUFF, NBYTES)						\
 {											\
-	mstr	line;									\
+	unmanaged_mstr	line;								\
 											\
 	if (NBYTES >= SIZEOF(BUFF))							\
 		NBYTES = SIZEOF(BUFF); /* Output from SNPRINTF was truncated. */	\

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -43,6 +43,7 @@
 #include "gtm_icu_api.h"
 #include "gtm_utf8.h"
 #endif
+#include "noprincio_if_needed_inline.h"
 
 GBLREF	boolean_t		gtm_utf8_mode, hup_on, prin_in_dev_failure, prin_out_dev_failure;
 GBLREF	char			*KEY_BACKSPACE, *KEY_DC, *KEY_DOWN, *KEY_INSERT, *KEY_LEFT, *KEYPAD_LOCAL, *KEYPAD_XMIT, *KEY_RIGHT,
@@ -139,7 +140,7 @@ int	iott_readfl(mval *v, int4 length, int4 msec_timeout)	/* timeout in milliseco
 				zint_restart;
 	d_tt_struct	*tt_ptr;
 	int		backspace, delete, down, i, insert_key, ioptr_width, exp_length, keypad_len, left, msk_in, msk_num,
-				rdlen, right, save_errno, selstat, status, up, utf8_more;
+				rdlen, right, save_errno, pollstat, status, up, utf8_more;
 	int		delchar_width;		/* display width of deleted char */
 	int		delta_width;		/* display width change for replaced char */
 	int		dx, dx_start;		/* local dollar X, starting value */
@@ -345,6 +346,7 @@ int	iott_readfl(mval *v, int4 length, int4 msec_timeout)	/* timeout in milliseco
 				tt_state->length = length;
 				tt_state->buffer_start = buffer_start;
 				PUSH_MV_STENT(MVST_ZINTDEV);
+				glist_protect_str(&mv_chain->mv_st_cont.mvs_zintdev.curr_sp_buffer);
 				mv_chain->mv_st_cont.mvs_zintdev.curr_sp_buffer.addr = (char *)buffer_start;
 				mv_chain->mv_st_cont.mvs_zintdev.curr_sp_buffer.len = exp_length;
 				mv_chain->mv_st_cont.mvs_zintdev.buffer_valid = TRUE;
@@ -389,15 +391,15 @@ int	iott_readfl(mval *v, int4 length, int4 msec_timeout)	/* timeout in milliseco
 		poll_fdlist[0].events = POLLIN;
 		poll_nfds = 1;
 		save_poll_timeout = poll_timeout;	/* take a copy and pass it because poll() below might change it */
-		selstat = poll(&poll_fdlist[0], poll_nfds, save_poll_timeout);
-		if (selstat < 0)
+		pollstat = poll(&poll_fdlist[0], poll_nfds, save_poll_timeout);
+		if (pollstat < 0)
 		{
 			if (EINTR != errno)
 			{
 				term_error_line = __LINE__;
 				goto term_error;
 			}
-		} else if (0 == selstat)
+		} else if (0 == pollstat)
 		{
 			if (timed)
 			{
@@ -903,7 +905,7 @@ int	iott_readfl(mval *v, int4 length, int4 msec_timeout)	/* timeout in milliseco
 			assert(!edit_mode || dx_outlen == compute_dx(BUFF_ADDR(0), outlen, ioptr_width, dx_start));
 		} else if (0 == rdlen)
 		{
-			if (0 < selstat)
+			if (0 < pollstat)
 			{	/* this should be the only possibility */
 				io_ptr->dollar.zeof = TRUE;
 				io_ptr->dollar.x = 0;

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2013-2026 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,9 +19,10 @@
 #include "gdsfhead.h"
 #include "dpgbldir.h"
 #include "process_gvt_pending_list.h"
-#include "hashtab_mname.h"
+#include "hashtab_umname.h"
 #include "targ_alloc.h"
 #include "gvt_hashtab.h"
+#include "stringpool.h"
 
 GBLREF	gv_namehead	*gv_target_list;
 
@@ -28,7 +30,7 @@ void gvt_hashtab_init(sgmnt_addrs *csa)
 {
 	gv_namehead	*gvtarg;
 	boolean_t	added;
-	ht_ent_mname	*stayent;
+	ht_ent_umname	*stayent;
 
 	assert(NULL == csa->gvt_hashtab);
 	/* This is the first time a duplicate region for the same database file is being opened.
@@ -37,8 +39,8 @@ void gvt_hashtab_init(sgmnt_addrs *csa)
 	 * the region that is currently being opened for which gvt->gd_csa will still be NULL).
 	 * Future targ_allocs will check this list before they allocate (to avoid duplicate allocations).
 	 */
-	csa->gvt_hashtab = (hash_table_mname *)malloc(SIZEOF(hash_table_mname));
-	init_hashtab_mname(csa->gvt_hashtab, 0, HASHTAB_NO_COMPACT, HASHTAB_NO_SPARE_TABLE);
+	csa->gvt_hashtab = (hash_table_umname *)malloc(SIZEOF(hash_table_umname));
+	init_hashtab_umname(csa->gvt_hashtab, 0, HASHTAB_NO_COMPACT, HASHTAB_NO_SPARE_TABLE);
 	assert(1 == csa->regcnt);
 	for (gvtarg = gv_target_list; NULL != gvtarg; gvtarg = gvtarg->next_gvnh)
 	{	/* There is one region that is "open" and has gv_targets allocated for this "csa".
@@ -48,7 +50,7 @@ void gvt_hashtab_init(sgmnt_addrs *csa)
 			continue;
 		if (DIR_ROOT == gvtarg->root)
 			continue;	/* gvt is csa->dir_tree and does not correspond to a global name */
-		added = add_hashtab_mname(csa->gvt_hashtab, &gvtarg->gvname, gvtarg, &stayent);
+		added = add_hashtab_umname(csa->gvt_hashtab, &gvtarg->gvname, gvtarg, &stayent);
 		assert(added && (1 == gvtarg->regcnt));
 	}
 }

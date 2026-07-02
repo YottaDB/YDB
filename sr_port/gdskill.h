@@ -13,7 +13,7 @@
 #ifndef GDSKILL_H_INCLUDED
 #define GDSKILL_H_INCLUDED
 
-#include <mdefsp.h>
+#include "mdefsp.h"
 
 /* Since small memory is allocated in powers of two, keep the kill_set
  * structure size about 8 bytes under 1k mark (current size of

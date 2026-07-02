@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2019 Fidelity National Information	*
+ * Copyright (c) 2003-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -15,12 +15,13 @@
 #include "gtm_string.h"
 
 #include "urx.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "stack_frame.h"
 #include "op.h"
-#include <auto_zlink.h>
+#include "auto_zlink.h"
 #include "arlinkdbg.h"
 #include "linktrc.h"
+#include "gcol_list.h"
 
 #ifndef AUTORELINK_SUPPORTED
 # error "Routine should not be built by non-autorelink-enabled platforms"
@@ -45,21 +46,22 @@ void auto_zlink(int rtnhdridx)
 	assert(0 <= rtnhdridx);			/* rtnhdridx must never be negative */
 	assert(rtnhdridx <= frame_pointer->rvector->linkage_len);
 	assert(NULL == frame_pointer->rvector->linkage_adr[rtnhdridx].ext_ref);
-	rname = frame_pointer->rvector->linkage_names[rtnhdridx];
+	rname.umstr = frame_pointer->rvector->linkage_names[rtnhdridx].umstr; /* TODO could linkage_names be umstrs? */
 	rname.addr += (INTPTR_T)frame_pointer->rvector->literal_text_adr;	/* Perform relocation on name */
 	memcpy(rname_buff.c, rname.addr, rname.len);
 	memset(rname_buff.c + rname.len, 0, SIZEOF(rname_buff) - rname.len);	/* Clear rest of mident_fixed */
 	rname.addr = rname_buff.c;
+	rname.in_array = FALSE;
 	assert(rname.len <= MAX_MIDENT_LEN);
-	assert(NULL == find_rtn_hdr(&rname));
+	assert(NULL == find_rtn_hdr(&rname.mident));
 	rtn.mvtype = MV_STR;
 	rtn.str.len = rname.len;
 	rtn.str.addr = rname.addr;
 	op_zlink(&rtn, NULL);			/* op_zlink() takes care of '%' -> '_' translation of routine name */
 	if ('_' == rname_buff.c[0]) rname_buff.c[0] = '%';
-	if ((NULL == (rhd = find_rtn_hdr(&rname))) && (op_rhdaddr(&rtn, -1)))
+	if ((NULL == (rhd = find_rtn_hdr(&rname.mident))) && (op_rhdaddr(&rtn, -1)))
 		assert(FALSE && rname.addr); 	/* if the routine is not found, op_rhdaddr should give and error & return FALSE */
-	DBGARLNK((stderr, "auto_zlink: Linked in rtn %.*s to "lvaddr"\n", rname.len, rname.addr, find_rtn_hdr(&rname)));
+	DBGARLNK((stderr, "auto_zlink: Linked in rtn %.*s to "lvaddr"\n", rname.len, rname.addr, find_rtn_hdr(&rname.mident)));
 	return;
 }
 
@@ -131,7 +133,7 @@ void auto_relink_check(int rtnhdridx, int lbltblidx)
  */
 void explicit_relink_check(rhdtyp *rhd, boolean_t setproxy)
 {
-	mval		rtnname;
+	mval			rtnname = {{0}};
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -166,7 +168,8 @@ void explicit_relink_check(rhdtyp *rhd, boolean_t setproxy)
 			 * only debug builds fetch/compare it against the expected value from the name table.
 			 */
 			rtnname.mvtype = MV_STR;
-			rtnname.str = rhd->routine_name;
+			rtnname.str.umstr = rhd->routine_name;
+			assert(!glist_str_in_stringpool(&rtnname.str));
 			DBGARLNK((stderr,"explicit_relink_check: Routine needs relinking: %.*s\n",
 				  rtnname.str.len, rtnname.str.addr));
 			op_zlink(&rtnname, NULL);	/* op_zlink() takes care of '%' -> '_' translation of routine name */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2021 Fidelity National Information	*
+ * Copyright (c) 2006-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -48,6 +48,8 @@ GBLREF	boolean_t		gtmsource_logstats;
 GBLREF	int			gtmsource_log_fd;
 GBLREF 	FILE			*gtmsource_log_fp;
 GBLREF  gtmsource_state_t       gtmsource_state;
+GBLREF	qw_num			repl_source_msg_sent;
+GBLREF	qw_num			repl_source_cmp_sent;
 
 GBLDEF	boolean_t			heartbeat_stalled = TRUE;
 GBLDEF	repl_heartbeat_que_entry_t	*repl_heartbeat_que_head = NULL;
@@ -189,6 +191,8 @@ int gtmsource_send_heartbeat(time_t *now)
 	}
 	if (SS_NORMAL == status)
 	{
+		repl_source_msg_sent += (qw_num)MIN_REPL_MSGLEN;
+		repl_source_cmp_sent += (qw_num)MIN_REPL_MSGLEN;
 		insqt((que_ent_ptr_t)heartbeat_element, (que_ent_ptr_t)repl_heartbeat_que_head);
 		last_sent_time = *now;
 		if (0 == earliest_sent_time)

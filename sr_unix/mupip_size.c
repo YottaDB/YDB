@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2025 Fidelity National Information	*
+ * Copyright (c) 2012-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -124,7 +124,7 @@ void mupip_size(void)
 	if (CLI_PRESENT == cli_present("SUBSCRIPT"))
 	{
 		if (NULL == gv_target)
-			gv_target = (gv_namehead *)targ_alloc(DUMMY_GLOBAL_VARIABLE_LEN, NULL, NULL);
+			gv_target = targ_alloc(DUMMY_GLOBAL_VARIABLE_LEN, NULL, NULL);
 		subscr = TRUE;
 		keylen = SIZEOF(key_buff);
 		if (0 == cli_get_str("SUBSCRIPT", (char *)key_buff, &keylen))

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -31,7 +31,7 @@
 #include "lv_val.h"
 #include "jnl.h"
 #include "mlkdef.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "mv_stent.h"
 #include "stack_frame.h"
 #include "tp_frame.h"
@@ -63,6 +63,8 @@ error_def(ERR_STACKCRIT);
 error_def(ERR_STACKOFLOW);
 error_def(ERR_TPMIXUP);
 error_def(ERR_TPTOODEEP);
+error_def(ERR_XPELNOTP);
+error_def(ERR_TRIGNOXPEL);
 
 GBLREF	jnl_fence_control	jnl_fence_ctl;
 GBLREF	uint4			dollar_tlevel;
@@ -112,6 +114,7 @@ GBLREF	boolean_t		tp_has_kill_t_cse; /* cse->mode of kill_t_write or kill_t_crea
 GBLREF	sgmnt_addrs		*reorg_encrypt_restart_csa;
 GBLREF	uint4			update_trans;
 #endif
+GBLREF	unsigned char		*tstart_readdr;
 
 #define NORESTART -1
 #define ALLLOCAL  -2
@@ -128,11 +131,13 @@ void	op_tstart(int implicit_flag, ...) /* value of $T when TSTART */
 	mlk_tp			*lck_tp;
 	mval			*preserve,		/* list of names to save */
 				*tid,			/* transaction id */
-				*mvname;
+				*mvname,
+				*m, *mtop;
 	mv_stent		*mv_st_ent, *mvst_tmp, *mvst_prev;
 	stack_frame		*fp, *fp_fix;
 	tp_frame		*tf;
 	unsigned char		*old_sp, *top, *tstack_ptr, *ptrstart, *ptrend, *ptrinvalidbegin;
+	unsigned int 	ptemp_cnt;
 	va_list			varlst, lvname;
 	tp_region		*tr, *tr_next;
 	sgm_info		*si;
@@ -161,7 +166,7 @@ void	op_tstart(int implicit_flag, ...) /* value of $T when TSTART */
 	DBGFPF((stderr, "\n\nop_tstart: Entered - dollar_tlevel: %d, implicit_flag: %d, mpc: 0x"lvaddr"\n", dollar_tlevel,
 		implicit_flag, frame_pointer->mpc));
 #	endif
-	assert(dollar_tlevel || implicit_tstart || !update_trans);
+	assert(dollar_tlevel || implicit_tstart || !update_trans || TREF(in_xpel));
 	if (implicit_tstart)
 		/* An implicit op_tstart is being done. In this case, even if we are in direct mode, we want to do
 		 * regular TPHOLD processing (no setting of tphold in the parent frame and shifting of all mv_stents).
@@ -173,6 +178,11 @@ void	op_tstart(int implicit_flag, ...) /* value of $T when TSTART */
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_TPMIXUP, 2, "An M", "a fenced logical");
 	if (dollar_tlevel + 1 >= TP_MAX_NEST)
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_TPTOODEEP);
+	if ((!dollar_tlevel) && TREF(zinxpel_no_tp_or_trig))
+	{
+		TREF(dollar_zinxpel_roll) = FALSE;
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) (implicit_flag & IMPLICIT_TRIGGER_TSTART) ? ERR_TRIGNOXPEL : ERR_XPELNOTP);
+	}
 	va_start(varlst, implicit_flag);	/* no argument count first */
 	serial = va_arg(varlst, int);
 	tid = va_arg(varlst, mval *);
@@ -190,7 +200,8 @@ void	op_tstart(int implicit_flag, ...) /* value of $T when TSTART */
 		TREF(tp_restart_dont_counts) = 0;
 #		endif
 		assert(0 == jgbl.cu_jnl_index);
-		GTMTRIG_ONLY(memcpy(&dollar_ztslate, &literal_null, SIZEOF(mval)));	/* Zap $ZTSLate at start of lvl 1 trans */
+		GTMTRIG_ONLY(dollar_ztslate.umval = literal_null.umval;)	/* Zap $ZTSLate at start of lvl 1 trans */
+		GTMTRIG_ONLY(glist_unprotect_str(&dollar_ztslate.str);)
 		GTMTRIG_ONLY(if (!implicit_tstart || !implicit_trigger))
 		{	/* This is the path for all non-implicit-trigger type TP fences including the implicit fences
 			 * created by the update process and by mupip recover forward.
@@ -306,6 +317,24 @@ void	op_tstart(int implicit_flag, ...) /* value of $T when TSTART */
 		top = (unsigned char *)(frame_pointer->old_frame_pointer + 1);
 		old_sp = msp;
 		shift_size = mvs_size[MVST_TPHOLD];
+		for (fp_fix = frame_pointer;  fp_fix != fp;  fp_fix = fp_fix->old_frame_pointer)
+		{
+			m = (mval *)fp_fix->temps_ptr;
+			ptemp_cnt = PTEMP_CNT(fp_fix);
+			assert((unsigned char *)m > stacktop);
+			if (ptemp_cnt != INVALID_PTEMP_CNT)
+			{
+				for (mtop = m + fp_fix->temp_mvals; ptemp_cnt && m < mtop; m++)
+				{
+					if (m->str.in_array)
+					{
+						ptemp_cnt--;
+						glist_str_before_move(&m->str);
+					}
+				}
+				assert(0 == ptemp_cnt || PTEMP_CNT(fp_fix) == ptemp_cnt);
+			}
+		}
 		msp -= shift_size;
 		if (msp <= stackwarn)
 		{
@@ -317,6 +346,12 @@ void	op_tstart(int implicit_flag, ...) /* value of $T when TSTART */
 			} else
 				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_STACKCRIT);
 		}
+		mvst_tmp = mv_chain;
+		while ((unsigned char *)mvst_tmp < top)
+		{
+			prep_mv_stent_for_move(mvst_tmp);
+			mvst_tmp = (mv_stent *)((char *)mvst_tmp + mvst_tmp->mv_st_next);
+		}
 		memmove(msp, old_sp, top - (unsigned char *)old_sp);	/* Shift stack w/possible overlapping ranges */
 		mv_st_ent = (mv_stent *)(top - shift_size);
 		mv_st_ent->mv_st_type = MVST_TPHOLD;
@@ -326,9 +361,26 @@ void	op_tstart(int implicit_flag, ...) /* value of $T when TSTART */
 			if ((unsigned char *)fp_fix->l_symtab < top  &&  (unsigned char *)fp_fix->l_symtab > stacktop)
 				fp_fix->l_symtab = (ht_ent_mname **)((char *)fp_fix->l_symtab - shift_size);
 			if (fp_fix->temps_ptr < top  &&  fp_fix->temps_ptr > stacktop)
+			{
 				fp_fix->temps_ptr -= shift_size;
-			if (fp_fix->vartab_ptr < (char *)top  &&  fp_fix->vartab_ptr > (char *)stacktop)
-				fp_fix->vartab_ptr -= shift_size;
+				m = (mval *)fp_fix->temps_ptr;
+				ptemp_cnt = PTEMP_CNT(fp_fix);
+				assert((unsigned char *)m > stacktop);
+				if (ptemp_cnt != INVALID_PTEMP_CNT)
+				{
+					for (mtop = m + fp_fix->temp_mvals; ptemp_cnt && m < mtop; m++)
+					{
+						if (m->str.in_array)
+						{
+							ptemp_cnt--;
+							glist_str_after_move(&m->str);
+						}
+					}
+					assert(0 == ptemp_cnt || PTEMP_CNT(fp_fix) == ptemp_cnt);
+				}
+			}
+			if ((char *)fp_fix->vartab_ptr < (char *)top  &&  (char *)fp_fix->vartab_ptr > (char *)stacktop)
+				fp_fix->vartab_ptr = (var_tabent *)(((char *)fp_fix->vartab_ptr) - shift_size);
 			if ((unsigned char *)fp_fix->old_frame_pointer < top  &&
 			   (char *)fp_fix->old_frame_pointer > (char *)stacktop)
 			{
@@ -347,9 +399,11 @@ void	op_tstart(int implicit_flag, ...) /* value of $T when TSTART */
 			mvst_prev = (mv_stent *)((char *)mvst_tmp + mvst_tmp->mv_st_next);
 			while (mvst_prev < (mv_stent *)top)
 			{
+				handle_mv_stent_after_move(mvst_tmp);
 				mvst_tmp = mvst_prev;
 				mvst_prev = (mv_stent *)((char *)mvst_tmp + mvst_tmp->mv_st_next);
 			}
+			handle_mv_stent_after_move(mvst_tmp);
 			mvst_tmp->mv_st_next = (unsigned int)((char *)mv_st_ent - (char *)mvst_tmp);
 			mv_st_ent->mv_st_next = (unsigned int)((char *)mvst_prev - (char *)mv_st_ent + shift_size);
 		}
@@ -362,19 +416,27 @@ void	op_tstart(int implicit_flag, ...) /* value of $T when TSTART */
 	mv_st_ent->mv_st_cont.mvs_tp_holder.tphold_tlevel = dollar_tlevel;
 #	ifdef GTM_TRIGGER
 	if (!dollar_tlevel)
+	{
 		/* We only save this on level 0 - Note if this is made further conditional, be sure to visit
 		 * stp_gcol_src.h where it is GC'd and tp_restart() to adjust the conditions there as well.
 		 */
-		memcpy(&mv_st_ent->mv_st_cont.mvs_tp_holder.ztwormhole_save, &dollar_ztwormhole, SIZEOF(mval));
+		mv_st_ent->mv_st_cont.mvs_tp_holder.ztwormhole_save.umval = dollar_ztwormhole.umval;
+		if (glist_str_protected(&dollar_ztwormhole.str))
+		{
+			glist_transfer_protection_to_from(&mv_st_ent->mv_st_cont.mvs_tp_holder.ztwormhole_save.str,
+				&dollar_ztwormhole.str);
+			glist_protect_str(&dollar_ztwormhole.str);
+		}
+	}
 #	endif
 	if (NULL == tpstackbase)
 	{
 		tstack_ptr = (unsigned char *)malloc(TP_STACK_SIZE);
+		memset(tstack_ptr, 0, TP_STACK_SIZE);
 		tp_sp = tpstackbase = tstack_ptr + TP_STACK_SIZE;
 		tpstacktop = tstack_ptr;
 		tp_pointer = NULL;
 	}
-
 	/* Add a new tp_frame in the TP stack */
 	DBGRFCT((stderr, "\n\n********* op_tstart: *** Entering $TLEVEL = %d\n", dollar_tlevel + 1));
 	tf = (tp_frame *)(tp_sp -= SIZEOF(tp_frame));
@@ -383,7 +445,10 @@ void	op_tstart(int implicit_flag, ...) /* value of $T when TSTART */
 	tf->restart_ctxt = fp->ctxt;
 	tf->fp = fp;
 	tf->serial = serial;
-	tf->trans_id = *tid;
+	tf->trans_id.umval = tid->umval;
+	assert(!glist_str_protected(&tf->trans_id.str));
+	assert(!glist_str_protected(&tf->zgbldir.str));
+	glist_protect_str(&tf->trans_id.str);
 	tf->restartable = (NORESTART != prescnt);
 	tf->old_locks = (NULL != mlk_pvt_root);
 #	ifdef DEBUG
@@ -413,7 +478,14 @@ void	op_tstart(int implicit_flag, ...) /* value of $T when TSTART */
 		tf->gd_header = gd_header;
 		tf->gd_reg = gv_cur_region;
 		tf->orig_gv_target = gv_target;
-		tf->zgbldir = dollar_zgbldir;
+		tf->zgbldir.umval = dollar_zgbldir.umval;
+		if (glist_str_protected(&dollar_zgbldir.str))
+		{
+			glist_transfer_protection_to_from(&tf->zgbldir.str, &dollar_zgbldir.str);
+			glist_protect_str(&dollar_zgbldir.str);
+		}
+		assert(glist_mval_in_sync(&dollar_zgbldir));
+		assert(glist_mval_in_sync(&tf->zgbldir));
 		tf->dlr_t = dollar_truth;
 		len = extnam_str.len;
 		tf->extnam_str.len = len;
@@ -456,6 +528,7 @@ void	op_tstart(int implicit_flag, ...) /* value of $T when TSTART */
 		 * cannot be stored here. We therefore skip initializing this one.
 		 */
 		tf->zgbldir.mvtype = 0;	/* impossible value */
+		tf->zgbldir.str.addr = NULL;
 		tf->extnam_str.len = -1; /* impossible value */
 		tf->active_lv = NULL;
 	}
@@ -514,7 +587,7 @@ void	op_tstart(int implicit_flag, ...) /* value of $T when TSTART */
 				 */
 				if (NULL == lv->tp_var)
 				{
-					TP_SAVE_RESTART_VAR(lv, tf, &tabent->key);
+					TP_SAVE_RESTART_VAR(lv, tf, &tabent->key.umname);
 					if (LV_HAS_CHILD(lv))
 					{
 						ADD_TO_STPARRAY(lv, lvarray, lvarraycur, lvarraytop, lv_val);
@@ -542,7 +615,7 @@ void	op_tstart(int implicit_flag, ...) /* value of $T when TSTART */
 					DBGRFCT((stderr, "\nop_tstart: Creating save point for var '%.*s' at lv_val 0x"lvaddr
 						 " and processing any alias containers found in it\n", curent->key.var_name.len,
 						 curent->key.var_name.addr, lv));
-					TP_SAVE_RESTART_VAR(lv, tf, &curent->key);
+					TP_SAVE_RESTART_VAR(lv, tf, &curent->key.umname);
 					if (LV_HAS_CHILD(lv))
 					{
 						ADD_TO_STPARRAY(lv, lvarray, lvarraycur, lvarraytop, lv_val);

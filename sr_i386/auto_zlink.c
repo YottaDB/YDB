@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,9 +16,9 @@
 
 #include "i386.h"
 #include "urx.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "op.h"
-#include <auto_zlink.h>
+#include "auto_zlink.h"
 
 #define PEA_SZ		5
 #define XFER_BYTE_SZ	3
@@ -60,7 +61,7 @@ rhdtyp *auto_zlink (unsigned char *pc, int4 **line)
 		assert(*(pc - XFER_LONG_SZ - PEA_SZ) == I386_INS_PUSH_Iv);
 		adj_pc = (char *)pc - XFER_LONG_SZ - PEA_SZ;
 	} else
-		GTMASSERT;
+		assertpro(FALSE);
 	if (azl_geturxrtn(adj_pc + INST_SZ, &rname, &rtnurx))
 	{
 		assert((0 <= rname.len) && (MAX_MIDENT_LEN >= rname.len));
@@ -73,19 +74,19 @@ rhdtyp *auto_zlink (unsigned char *pc, int4 **line)
 		assert(rtnurx);
 		assert(*(adj_pc - PEA_SZ) == I386_INS_PUSH_Iv);
 		assert(azl_geturxlab(adj_pc - PEA_SZ + INST_SZ, rtnurx));
-		assert(!find_rtn_hdr(&rname));
+		assert(!find_rtn_hdr(&rname.umstr));
 		rtn.mvtype = MV_STR;
 		rtn.str.len = rname.len;
 		rtn.str.addr = rname.addr;
 		op_zlink (&rtn, 0);
-		if (0 != (rhead = find_rtn_hdr(&rname)))	/* note the assignment */
+		if (0 != (rhead = find_rtn_hdr(&rname.umstr)))	/* note the assignment */
 		{
 			*line = *(int4 **)(adj_pc - PEA_SZ + INST_SZ);
 			if (!(*line))
-				rts_error(VARLSTCNT(1) ERR_LABELUNKNOWN);
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_LABELUNKNOWN);
 			return rhead;
 		}
 	}
-	rts_error(VARLSTCNT(1) ERR_ROUTINEUNKNOWN);
+	RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_ROUTINEUNKNOWN);
 	return NULL;
 }

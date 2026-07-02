@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -89,7 +89,7 @@ void	compile_source_file(unsigned short flen, char *faddr, boolean_t MFtIsReqd)
 {
 	boolean_t	wildcarded, dm_action;
 	int		ci, i, rc;
-	mval		fstr, ret;
+	mval		fstr = {{0}}, ret;
 	plength		plen;
 	unsigned char	*p, source_file_string[MAX_FN_LEN + 1];
 	DCL_THREADGBL_ACCESS;
@@ -115,6 +115,7 @@ void	compile_source_file(unsigned short flen, char *faddr, boolean_t MFtIsReqd)
 		fstr.str.addr = (char *)source_file_string;
 		fstr.str.len = flen + SIZEOF(DOTM) - 1;
 	}
+	assert(!glist_str_in_stringpool(&fstr.str));
 	ESTABLISH(source_ch);
 	tt_so_do_once = FALSE;
 	zsrch_clr(STRM_COMP_SRC);	/* Clear any existing search cache */
@@ -199,7 +200,7 @@ CONDITION_HANDLER(source_ch)
 
 void open_source_file(void)
 {
-	mstr		fstr;
+	unmanaged_mstr	fstr;
 	int		status, n;
 	parse_blk	pblk;
 	char		*p, buff[MAX_FN_LEN + 1];
@@ -217,6 +218,7 @@ void open_source_file(void)
 	pblk.fop = F_SYNTAXO;
 	fstr.addr = (char *)source_file_name;
 	fstr.len = source_name_len;
+	assert(!glist_umstr_in_stringpool(&fstr));
 	status = parse_file(&fstr, &pblk);
 	if (!(status & 1))
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_FILEPARSE, 2, fstr.len, fstr.addr, status);
@@ -226,6 +228,7 @@ void open_source_file(void)
 	val.mvtype = MV_STR;
 	val.str.len = source_name_len;
 	val.str.addr = (char *)source_file_name;
+	val.str.in_array = FALSE;
 	p = pblk.l_name;
 	n = (pblk.b_name > MAX_MIDENT_LEN) ? MAX_MIDENT_LEN : pblk.b_name;
 	if (!module_name.len)

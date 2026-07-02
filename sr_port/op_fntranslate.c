@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -216,7 +216,7 @@ void op_fntranslate_common(mval *src, mval *dst, mval *rplc, int4 *xlate, hash_t
 				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_MAXSTRLEN);
 		}
 	}
-	MV_INIT_STRING(dst, dstlen, stringpool.free);
+	UMV_INIT_STRING(&dst->umval, dstlen, stringpool.free);
 	dst->mvtype &= ~MV_UTF_LEN;	/* character length unknown because translation may modify effective UTF representation */
 	stringpool.free = (unsigned char *)dstptr;
 }
@@ -227,8 +227,8 @@ void op_fntranslate(mval *src, mval *srch, mval *rplc, mval *dir, mval *dst)
 	mstr			m_xlate;
 	static hash_table_int4	*xlate_hash = NULL;
 	static int4		xlate_array[NUM_CHARS];
-	static unsigned int 	prev_gcols = -1;
-	static mstr		prev_srch = {0, 0}, prev_rplc = {0, 0};
+	static unsigned int 	prev_gcols = ~0x0;
+	static unmanaged_mstr	prev_srch = {0, 0, 0}, prev_rplc = {0, 0, 0};
 	translate_direction	direction;
 	DCL_THREADGBL_ACCESS;
 
@@ -285,8 +285,8 @@ void op_fntranslate(mval *src, mval *srch, mval *rplc, mval *dir, mval *dst)
 		}
 		xlate_hash = create_utf8_xlate_table(srch, rplc, &m_xlate);
 		prev_gcols = stringpool.gcols;
-		prev_srch = srch->str;
-		prev_rplc = rplc->str;
+		prev_srch = srch->str.umstr;
+		prev_rplc = rplc->str.umstr;
 	}
 	GET_DIRERCTION(dir, &direction)
 	op_fntranslate_common(src, dst, rplc, (int4 *)m_xlate.addr, xlate_hash, direction);
@@ -337,7 +337,7 @@ void op_fntranslate_fast(mval *src, mval *rplc, mval *m_xlate, mval *dir, mval *
 void op_fnztranslate(mval *src, mval *srch, mval *rplc, mval *dir, mval *dst)
 {
 	static int		xlate[NUM_CHARS];		/* not STATICDEF to prevent conflict with op_fn */
-	static mstr		prev_srch = {0, 0}, prev_rplc = {0, 0};
+	static unmanaged_mstr	prev_srch = {0, 0, 0}, prev_rplc = {0, 0, 0};
 	static unsigned int	prev_gcols = ~0x0;
 	translate_direction	direction;
 
@@ -352,8 +352,8 @@ void op_fnztranslate(mval *src, mval *srch, mval *rplc, mval *dir, mval *dst)
 	{
 		create_byte_xlate_table(srch, rplc, xlate);
 		prev_gcols = stringpool.gcols;
-		prev_srch = srch->str;
-		prev_rplc = rplc->str;
+		prev_srch = srch->str.umstr;
+		prev_rplc = rplc->str.umstr;
 	}
 	ENSURE_STP_FREE_SPACE(src->str.len);
 	GET_DIRERCTION(dir, &direction)
@@ -369,7 +369,6 @@ void op_fnztranslate_common(mval *src, mval *dst, int *xlate, translate_directio
 	/* Callers are responsible for making sure there is space in the stringpool for the result,
 	 * with byte operation dst len cannot exceed src len secured by caller */
 	assert(IS_STP_SPACE_AVAILABLE(src->str.len));
-	dst->mvtype = 0;
 	dstptr = stringpool.free;
 	if (NO_DIR != dir)
 	{

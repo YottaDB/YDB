@@ -1,6 +1,6 @@
 /****************************************************************
  *                                                              *
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *                                                              *
  *    This source code contains the intellectual property       *
@@ -10,14 +10,14 @@
  *                                                              *
  ****************************************************************/
 
-#ifndef MDESP_included
-#define MDESP_included
+#ifndef MDEFSP_included
+#define MDEFSP_included
 
 #include <sys/types.h>
 
 /* All current Unix platforms support {u,}int64_t, so set these up regardless of GTM64 setting. */
 #ifndef int8
-typedef	int64_t		int8;		/* 8-byte signed integer */
+typedef int64_t		int8;		/* 8-byte signed integer */
 typedef uint64_t	uint8;	  	/* 8-byte unsigned integer */
 #endif
 typedef uint64_t 	gtm_uint8;	/* these two datatypes are defined because */
@@ -33,63 +33,14 @@ typedef uint2 mach_inst;
 #endif
 
 #define INT8_SUPPORTED
-#define	INT8_FMT		"%llu"
-#define	INT8_FMTX		"[0x%llx]"
+#define	INT8_FMT	"%llu"
+#define	INT8_FMTX	"[0x%llx]"
 #define UTF8_SUPPORTED
 
 #define UNIX 1
 #undef VMS
 #define BIGENDIAN 1
 #define CNTR_WORD_32
-
-#ifdef __sparc
-#define CACHELINE_SIZE	256
-#define USHBIN_SUPPORTED
-#define AUTORELINK_SUPPORTED
-#define LINKAGE_PSECT_BOUNDARY	8
-#define OFF_T_LONG
-#define INO_T_LONG
-#define MUTEX_MSEM_WAKE
-#define POSIX_MSEM
-#undef sssize_t
-#define sssize_t ssize_t
-#undef SHMDT
-#define SHMDT(X) shmdt((char *)(X))
-typedef uint4 mach_inst;
-
-/* Use rc_mval2subsc only for sun until every DTM client (that needs 16-bit precision as opposed to 18-bit for GT.M) is gone */
-#define	mval2subsc	rc_mval2subsc
-#ifndef VAR_COPY
-#define VAR_COPY	va_copy
-#endif
-#endif /* __sparc */
-
-#if defined(__ia64)
-#define CACHELINE_SIZE	128
-#define INO_T_LONG		/* define this for both Linux ia64 and HPUX ia64 as these are 64-bit builds */
-#elif defined(__hppa)
-#define CACHELINE_SIZE	64
-#endif /* __ia64 */
-
-#ifdef __hpux
-#define MUTEX_MSEM_WAKE
-#define POSIX_MSEM
-#define USHBIN_SUPPORTED
-/* #define AUTORELINK_SUPPORTED -- not yet due to issues with replacing mapped object files - revisit if/when support objects in
- * shared memory.
- */
-#define OFF_T_LONG
-/* Make sure linkage Psect is aligned on appropriate boundary. */
-#ifdef __ia64
-#define LINKAGE_PSECT_BOUNDARY	8
-#else /* parisc */
-#define LINKAGE_PSECT_BOUNDARY	4
-#ifdef __GNUC__
-typedef unsigned short	in_port_t; /* GCC needs this on PARISC */
-#endif
-#endif
-typedef uint4 mach_inst;	/* machine instruction */
-#endif /* __hpux */
 
 #if defined(__linux__) || defined(__CYGWIN__)
 #define OFF_T_LONG
@@ -113,46 +64,6 @@ typedef unsigned short	in_port_t;
 #define POSIX_MSEM
 #endif
 
-#ifdef __CYGWIN__
-#ifdef UTF8_SUPPORTED_OBEYED
-#undef UTF8_SUPPORTED
-#endif
-#define MUTEX_MSEM_WAKE
-#define POSIX_MSEM
-#define KEY_T_LONG			/* 8 bytes */
-#define SYS_ERRLIST_INCLUDE	<errno.h>
-#endif
-
-#ifdef __s390__
-#define CACHELINE_SIZE	256
-#define	GTM_CONTEXT(func)	(unsigned char *)func
-#define SSM_SIZE		256*1024*1024	/* Segments on 256M boundary */
-#define SHMAT_ADDR_INCS 	SSM_SIZE
-#define USHBIN_SUPPORTED
-#endif /* __s390__ */
-
-#ifdef __ia64
-#  ifdef __linux__
-#    undef BIGENDIAN
-#    define USHBIN_SUPPORTED
-#    define AUTORELINK_SUPPORTED /* If this ever comes back */
-     /* Make sure linkage Psect is aligned on appropriate boundary */
-#    define LINKAGE_PSECT_BOUNDARY  8
-typedef uint4 mach_inst;	/* machine instruction */
-#  elif defined(__hpux)
-void call_runtime();
-void opp_dmode();
-void dyncall();
-#  endif
-#endif /* __ia64 */
-
-#ifdef __i386
-/* Through Pentium Pro/II/III, should use CPUID to get real value perhaps */
-#define CACHELINE_SIZE	32
-#undef BIGENDIAN
-typedef char  mach_inst;	/* machine instruction */
-#endif /* __i386 */
-
 #ifdef __x86_64__
 #define CACHELINE_SIZE	64
 #define USHBIN_SUPPORTED
@@ -167,9 +78,6 @@ typedef char  mach_inst;	/* machine instruction */
 typedef unsigned char  mach_inst;	/* machine instruction */
 #endif
 
-#ifdef Linux390
-#  define INTERLOCK_ADD(X,Y,Z)	(interlock_add(Z, (sm_int_ptr_t)(X)))
-#else
 #  ifdef __linux__
 #    ifdef __atomic_add_fetch
 #      define INTERLOCK_ADD(X,Y,Z)	(__atomic_add_fetch(X, Z, __ATOMIC_SEQ_CST))
@@ -179,7 +87,6 @@ typedef unsigned char  mach_inst;	/* machine instruction */
 #  else
 #    define INTERLOCK_ADD(X,Y,Z) (add_inter(Z, (sm_int_ptr_t)(X), (sm_global_latch_ptr_t)(Y)))
 #  endif
-#endif
 
 /* On NON_USHBIN_ONLY platforms, reserve enough space in routine header for the dummy
  * string "GTM_CODE". On USHBIN_ONLY platforms, reserve space of 16 bytes that holds
@@ -209,9 +116,9 @@ typedef struct
 	NON_GTM64_ONLY(unsigned int filler2;) /* To 8 byte align mval on 32 bit platforms */
 #	endif
 	int4	m[2];
-	mstr	str;
-} mval;
-/* Another version of mval struct with byte fields instead of bit fields */
+	unmanaged_mstr	umstr;
+} unmanaged_mval;
+
 typedef struct
 {
 	unsigned short	mvtype;
@@ -222,14 +129,34 @@ typedef struct
 	NON_GTM64_ONLY(unsigned int filler2;) /* To 8 byte align mval on 32 bit platforms */
 #	endif
 	int4	m[2];
-	mstr	str;
+	unmanaged_mstr	umstr;
 } mval_b;
 
-typedef union mval_gen_union
+
+typedef union
 {
-	mval	bits;
-	mval_b	byte;
-} mval_gen;
+	struct
+	{
+		unsigned short	mvtype;
+#		ifdef	BIGENDIAN
+		unsigned char	sgn	: 1;
+		unsigned char	e	: 7;
+#		else
+		unsigned char	e	: 7;
+		unsigned char	sgn	: 1;
+#		endif
+		unsigned char	fnpc_indx;	/* Index to fnpc_work area this mval is using */
+#		ifdef UTF8_SUPPORTED
+		unsigned int	utfcgr_indx;	/* Index to utfcgr_work area this mval is using */
+		NON_GTM64_ONLY(unsigned int filler2;) /* To 8 byte align mval on 32 bit platforms */
+#		endif
+		int4	m[2];
+		mstr	str;
+	};
+	unmanaged_mval umval;
+} mval;
+
+#define SGNE_OFFSET (OFFSETOF(mval, mvtype) + SIZEOF(unsigned short)) /* Depends on no padding static_asserts in mdef */
 
 #define VAR_START(a, b)	va_start(a, b)
 #define VARLSTCNT(a)	a,		/* push count of arguments*/
@@ -284,4 +211,4 @@ typedef volatile	uint4	ulatch_t;
 #define NATIVE_SP		0x20
 #define DEFAULT_CODE_SET	ascii	/* enum ascii defined in io.h */
 
-#endif /* MDESP_included */
+#endif /* MDEFSP_included */

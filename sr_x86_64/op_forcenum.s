@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2007-2016 Fidelity National Information		#
+# Copyright (c) 2007-2026 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -47,6 +47,7 @@ l20:
 	movw	$mval_m_int, mval_w_mvtype(REG64_RET0)
 	movl	mval_l_m1(REG64_RET1), REG32_ARG2
 	movl	REG32_ARG2, mval_l_m1(REG64_RET0)
+	movl	$0,mval_l_strlen(REG64_RET0)
 	jmp	done
 
 l30:
@@ -60,6 +61,7 @@ l30:
 	movl	REG32_ARG2, mval_l_m0(REG64_RET0)
 	movl	mval_l_m1(REG64_RET1), REG32_ARG2
 	movl	REG32_ARG2, mval_l_m1(REG64_RET0)
+	movl	$0,mval_l_strlen(REG64_RET0)
 	jmp	done
 l40:
 	#
@@ -67,7 +69,7 @@ l40:
 	#
 	movq	REG64_RET0, REG64_ARG0
 	movq	REG64_RET1, REG64_ARG1
-	movl	$mval_qword_len, REG32_ARG3
+	movl	$umval_qword_len, REG32_ARG3
 	REP
 	movsq
 done:

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -56,7 +56,10 @@ void	op_fngvget1(mval *dst)
 			break;
 	}
 	if (!gotit)
+	{
 		dst->mvtype = 0;
+		dst->str.len = 0;
+	}
 	assert(0 == (dst->mvtype & MV_ALIASCONT));	/* Should be no alias container flag */
 	return;
 }

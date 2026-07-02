@@ -89,10 +89,13 @@ void op_fnqsubscript_fast(mval *src, int seq, mval *dst, int subs_count, int isr
 	int		odst;
 	mval		srcmval;
 	unsigned char	*temp_cp;
+	unsigned int 	gcols;
 
 	assert((isrc >= 0) && (stop <= src->str.len) && (isrc <= stop));
 	ENSURE_STP_FREE_SPACE(stop - isrc + 1);		/* Before we reference stingpool.free; + 1 for possible ^ */
-	srcmval = *src;		/* Copy of source mval in case same as dst mval */
+	srcmval.umval = src->umval;		/* Copy of source mval in case same as dst mval */
+	srcmval.str.in_array = FALSE;
+	DBG_START_NO_GCOLS(gcols);
 	src = &srcmval;
 	dst->str.addr = (char *)stringpool.free;
 	dst->mvtype = MV_STR;
@@ -220,6 +223,7 @@ void op_fnqsubscript_fast(mval *src, int seq, mval *dst, int subs_count, int isr
 	}
 	dst->str.len = odst;
 	stringpool.free += odst;
+	DBG_END_NO_GCOLS(gcols);
 #	ifdef UTF8_SUPPORTED
 	assert((char_len <= odst) && (gtm_utf8_mode || (char_len == odst)));
 	dst->str.char_len = char_len;

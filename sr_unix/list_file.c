@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -71,7 +71,7 @@ void open_list_file(void)
 {
 	char		charspace, fname[MAX_FN_LEN + 1], list_name[MAX_MIDENT_LEN + STR_LIT_LEN(LISTEXT)], *p;
 	unsigned char	cp;
-	mstr		fstr;
+	unmanaged_mstr	fstr;
 	mval		file, parms;
 	parse_blk	pblk;
 	time_t		clock;
@@ -86,7 +86,7 @@ void open_list_file(void)
 	cp += cp ? 1 : 0;
 	pblk.def1_size = source_name_len - cp - SIZEOF(DOTM) + 1;
 	assert(pblk.def1_size <= MAX_MIDENT_LEN);
-	memcpy((void *)list_name, &source_file_name[cp], pblk.def1_size);
+	memcpy(list_name, &source_file_name[cp], pblk.def1_size);
 	MEMCPY_LIT(&list_name[pblk.def1_size], LISTEXT);
 	pblk.def1_size += STR_LIT_LEN(LISTEXT);
 	pblk.def1_buf = list_name;
@@ -95,9 +95,9 @@ void open_list_file(void)
 	pblk.fop = F_SYNTAXO;
 	fstr.len = (MV_DEFINED(&cmd_qlf.list_file) ? cmd_qlf.list_file.str.len : 0);
 	fstr.addr = cmd_qlf.list_file.str.addr;
+	assert(!IS_IN_STRINGPOOL(fstr.addr, fstr.len));
 	if (!(status = parse_file(&fstr, &pblk)))
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
-
 	file.mvtype = parms.mvtype = MV_STR;
 	file.str.len = pblk.b_esl;
 	file.str.addr = &fname[0];
@@ -111,7 +111,7 @@ void open_list_file(void)
 	op_use(&file,&parms);
 	clock = time(0);
 	GTM_CTIME(p, &clock);
-	memcpy ((void *)print_time_buf, p + 4, SIZEOF(print_time_buf));
+	memcpy(print_time_buf, p + 4, SIZEOF(print_time_buf));
 	list_head(0);
 	return;
 }

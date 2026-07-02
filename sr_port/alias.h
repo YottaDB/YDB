@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2009-2020 Fidelity National Information	*
+ * Copyright (c) 2009-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -310,6 +310,7 @@
 		DECR_BASE_REF_NOSYM(lvptr, FALSE);							\
 	}												\
 	alias_retarg->mvtype = 0;	/* Kill the temp var (no longer a container) */			\
+	alias_retarg->str.len = 0;									\
 	alias_retarg = NULL;		/* And no more in-flight return argument */			\
 }
 

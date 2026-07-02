@@ -23,8 +23,8 @@
 ; unusability.
 ;
 	Set TRUE=1,FALSE=0
-	Set (debug,debugtoken,keepfiles)=FALSE				; could separated
-	Set gtmsdver="1.2.0"	; Set version id
+	Set (debug,debugtoken,keepfiles)=FALSE					; debugging options grouped but could be split
+	Set gtmsdver="1.3.0"	; Set version id
 	Set $ETrap="Goto ErrorTrap^scantypedefs"
 	Set TAB=$ZChar(9)
 	Set entrylvl=$ZLevel
@@ -654,7 +654,7 @@
 	;
 	Set infile=cfile_"exp.smine"
 	Open infile:Readonly
-	Use infile
+	Use $P
 	Set scstate=0		; Initial scan state (nothing pending)
 	Set (inbuf,token,dirtoken,tokenval,dirtokenval)=""
 	Set inlines=0,tokcnt=0
@@ -927,11 +927,29 @@
 	Write "#ifndef SIZEOF",!
 	Write "#  define SIZEOF(x) sizeof(x)",!
 	Write "#endif",!
+	Write "static inline int get_padding(unsigned char *sp, size_t struct_size)",!
+	Write "{",!
+	Write "    int padding = 0;",!
+	Write "    for (; struct_size ; struct_size--, sp++)",!
+	Write "    {",!
+	Write "        padding += (*sp & 1) + ((*sp & 2) >> 1) + ((*sp & 4) >> 2) + ((*sp & 8) >> 3);",!
+	Write "        padding += ((*sp & 16) >> 4) + ((*sp & 32) >> 5) + ((*sp & 64) >> 6) + ((*sp & 128) >> 7);",!
+	Write "    }",!
+	Write "    return padding;",!
+	Write "}",!
+	Write "#define CLEAR_STRUCT(Struct)"
+	Write " memset((void *)&temp_##Struct, ~0, SIZEOF(Struct))",!
+	Write "#define SET_FIELD(Struct, Member)"
+	Write " memset((void *)&temp_##Struct.Member, 0, SIZEOF(temp_##Struct.Member))",!
+	Write "#define SET_BITFIELD(Struct, Member)"
+	Write " ( temp_##Struct.Member = 0 )",!
 	Write "#define PRINT_OFFSET(FieldDesignation, Struct, Member, Dimension)"
 	Write " printf(""field ""FieldDesignation""%d|%d|%d\n"", (int)offsetof(Struct, Member),"
 	Write " (int)sizeof(temp_##Struct.Member), (Dimension))",!
 	Write "#define PRINT_FLEXBASE(FieldDesignation, Struct, Member, Dimension)"
 	Write " printf(""field ""FieldDesignation""%d|%d|%d\n"", (int)offsetof(Struct, Member), (int)0, (int)0)",!
+	Write "#define PRINT_PADDING(Type)"
+	Write " printf(""padding ""#Type""|%d\n"", get_padding((unsigned char *)&temp_##Type, SIZEOF(Type)))",!
 	Write "#define PRINT_SUSIZE(Type) printf(""susize ""#Type""|%d\n"", (int)SIZEOF(Type))",!
 	Write !
 	Write "int main(void)",!
@@ -951,20 +969,28 @@
 	For  Set type=$Order(types(type)) Quit:(type="")  Do
 	. Quit:(0=$Data(types(type,"isuidx",1,0)))		; Bypass is not a structure
 	. Write TAB,"PRINT_SUSIZE(",types(type,"newtype"),");",!
-	. Set lincnt=lincnt+1
+	. Write TAB,"CLEAR_STRUCT(",types(type,"newtype"),");",!
+	. Set lincnt=lincnt+2
 	. For fldidx=1:1:types(type,"isuidx",1,0) Do	; Loop through the lvl 1 fields
-	. . Quit:(0<$Data(types(type,"isuidx",1,fldidx,"nofield")))    ; Ignore bit and void fields
-	. . Set fieldname=types(type,"isuidx",1,fldidx,"newtype")
+	. . Set fieldname=$get(types(type,"isuidx",1,fldidx,"newtype"))
 	. . If (0<$Data(types(type,"isuidx",1,fldidx,"suptr"))) Do
+	. . . Quit:(0<$Data(types(type,"isuidx",1,fldidx,"nofield")))    ; Ignore bit and void fields
 	. . . ;
 	. . . ; Have a pointer to a secondary structure. Output the high(er) level structure first, then its fields
 	. . . ;
-	. . . Do ExtractFieldInfo(type,1,fldidx,types(type,"newtype"),fieldname)
+	. . . Do:""'=fieldname ExtractFieldInfo(type,1,fldidx,types(type,"newtype"),fieldname,0)
 	. . . If (0<$Data(types(type,"isuidx",1,fldidx,"dim"))) Do
-	. . . . Do ProcessNestedStructUnion(type,types(type,"isuidx",1,fldidx,"suptr"),fldidx,types(type,"newtype"),fieldname_"[0]")
+	. . . . Do:""=fieldname Error("ASSERTFAIL","F","Anonymous array detected")
+	. . . . Set vla='$length(types(type,"isuidx",1,fldidx,"dim"))
+	. . . . Set tmpfn=fieldname_"[0]"
+	. . . . Do ProcessNestedStructUnion(type,types(type,"isuidx",1,fldidx,"suptr"),fldidx,types(type,"newtype"),tmpfn,vla)
 	. . . Else  Do
-	. . . . Do ProcessNestedStructUnion(type,types(type,"isuidx",1,fldidx,"suptr"),fldidx,types(type,"newtype"),fieldname)
-	. . Else  Do ExtractFieldInfo(type,1,fldidx,types(type,"newtype"),fieldname)
+	. . . . Do ProcessNestedStructUnion(type,types(type,"isuidx",1,fldidx,"suptr"),fldidx,types(type,"newtype"),fieldname,0)
+	. . Else  Do
+	. . . Do:""=fieldname Error("ASSERTFAIL","F","Anonymous scalar detected")
+	. . . Do ExtractFieldInfo(type,1,fldidx,types(type,"newtype"),fieldname,0)
+	. Write TAB,"PRINT_PADDING(",types(type,"newtype"),");",!
+	. Set lincnt=lincnt+1
 	Write TAB,"return 0;",!
 	Write "}",!
 	Set lincnt=lincnt+2
@@ -995,14 +1021,16 @@
 	; Execute the program we just built under a pipe and process the output
 	;
 	Kill linkresults	; Not needed
-	Set pipe="offpipe",lincnt=0,nextoffset=0
+	Set pipe="offpipe",lincnt=0,lastoffset=0
 	Open pipe:(Shell="/bin/sh":Command="./"_outfile)::"PIPE"
 	Use pipe
 	Set pipeopen=TRUE
+	Set type=""
 	For  Quit:$ZEof  Do
 	. Read line
 	. Quit:$ZEof							;!(""=line) should empty lines be a problem
 	. Set lincnt=lincnt+1
+	. Set prevtype=type
 	. Set type=$ZPiece(line," ",1)
 	. Set input=$ZPiece(line," ",2,999)
 	. If "field"=type Do			; Get info on structure fields
@@ -1025,14 +1053,15 @@
 	. . Set types(type,"fullexp",fullidx,"fldlen")=fldlen
 	. . Set types(type,"fullexp",fullidx,"type")=fldotyp
 	. . Set:debug types(type,"fullexp",fullidx,"basic")=(0<$Data(basetype(fldotyp)))	; Only need this when debugging
-	. . ; A very simple check to see if the structure has unnecessary implicit padding
-	. . ; current offset + size should be next offset. If the next offset is greater than that, flag it.
-	. . Set:fldoff>nextoffset padding(type)=1
-	. . Set nextoffset=fldoff+fldlen
 	. Else  If "susize"=type Do		; Define size for entire structure/union
 	. . Set type=$ZPiece(input,"|",1)
 	. . Set typlen=$ZPiece(input,"|",2)
 	. . Set types(type,"typlen")=typlen
+	. . Set lastoffset=0
+	. Else  If "padding"=type Do
+	. . Set type=$ZPiece(input,"|",1)
+	. . Set lclpad=+$Zpiece(input,"|",2)
+	. . Set:lclpad padding(type)=lclpad
 	. Else  Do
 	. . Use $Principal
 	. . ZWrite lincnt,line
@@ -1190,7 +1219,7 @@ copyrightend	;
 ; we recurse, a new level is created at the insert point.
 ;
 ParseUnionStructDef(typdf)
-	New newidx,fldidx,bracecnt,newfldidx,isstructuniondef,createdisuidx,typdeftype
+	New newidx,fldidx,bracecnt,newfldidx,isstructuniondef,createdisuidx,typdeftype,anon
 	Set newidx=$Increment(typdf("idxcnt"))
 	Do GetToken(FALSE)		; Get past first bracket
 	Set bracecnt=1			; Will be done (with this level) when this goes back to zero
@@ -1262,8 +1291,8 @@ ParseUnionStructDef(typdf)
 	. ; case the given type is morphed into an address type instead. Note if the preceeding type was a struct or union
 	. ; definition, there cannot be an address.
 	. ;
-	. Do:((0=$Data(TypdfTypes(token)))&(TKASTERISK'=token)&(TKLPAREN'=token))
-	. . Do Error("ASSERTFAIL","F","Expecting typedef target type")
+	. set anon=0
+	. set:((0=$Data(TypdfTypes(token)))&(TKASTERISK'=token)&(TKLPAREN'=token)) anon=1
 	. ;
 	. ; We always record internal types - only thrown away when/if outer typedef is tossed. If this new type was
 	. ; a union or struct, we need to record a pointer to the just created type (whatever typdf("idxcnt") is).
@@ -1292,8 +1321,8 @@ ParseUnionStructDef(typdf)
 	. . Set typdf("isuidx",newidx,fldidx,"type")="addr"	; function pointers are address so use that as type
 	. . 							; instead of return val type from func
 	. Else  Set typdeftype=tokenval
-	. Set typdf("isuidx",newidx,fldidx,"newtype")=typdeftype
-	. Do GetToken(FALSE)
+	. Set:'anon typdf("isuidx",newidx,fldidx,"newtype")=typdeftype
+	. Do:'anon GetToken(FALSE)
 	. Do:(TKLBRACKET=token)	; Dimension specification (for field)
 	. . Set expr=""
 	. . Do GetToken(FALSE)
@@ -1351,41 +1380,57 @@ ParseUnionStructDef(typdf)
 ;
 ; Routine to generate nested queries for nested structures or unions
 ;
-ProcessNestedStructUnion(type,isuidx,pfldidx,structname,fieldnameTD)
+ProcessNestedStructUnion(type,isuidx,pfldidx,structname,fieldnameTD,vla)
 	New fieldname,fldidx
 	For fldidx=1:1:types(type,"isuidx",isuidx,0) Do	; Loop thru the fields in this structure
-	. Quit:(0<$Data(types(type,"isuidx",isuidx,fldidx,"nofield")))	    ; ignore bitfield or void fields
-	. Set fieldname=types(type,"isuidx",isuidx,fldidx,"newtype")
+	. Set fieldname=$get(types(type,"isuidx",isuidx,fldidx,"newtype"))
+	. ; fldTDparm is "" if both the parent and child fields are null, is only the parent or only the child if
+	. ; only one is non-null. and is parent.child if both are non-null
+	. Set fldTDparm=$select(""=fieldnameTD:fieldname,""=fieldname:fieldnameTD,1:fieldnameTD_"."_fieldname)
 	. If (0<$Data(types(type,"isuidx",isuidx,fldidx,"suptr"))) Do
+	. . Quit:(0<$Data(types(type,"isuidx",isuidx,fldidx,"nofield")))	    ; ignore bitfield or void fields
 	. . ;
-	. . ; Have a pointer to a secondary structure. Output the high(er) level structure first, then its fields
+	. . ; Have a pointer to a secondary structure. Output the high(er) level structure first, then its fields,
+	. . ; but only extract the higher level structure if not already extracted by caller, which can occur
+	. . ; if the current substruct/union is anonymous and therefore does not add to the fldTDparm
 	. . ;
-	. . Do ExtractFieldInfo(type,isuidx,fldidx,structname,fieldnameTD_"."_fieldname)
+	. . Do:fldTDparm&(fldTDparm'=fieldnameTD) ExtractFieldInfo(type,isuidx,fldidx,structname,fldTDparm,vla)
 	. . If (0<$Data(types(type,"isuidx",isuidx,fldidx,"dim"))) Do
-	. . . Set fldTDparm=fieldnameTD_"."_fieldname_"[0]"
-	. . Else  Do
-	. . . Set fldTDparm=fieldnameTD_"."_fieldname
-	. . Do ProcessNestedStructUnion(type,types(type,"isuidx",isuidx,fldidx,"suptr"),fldidx,structname,fldTDparm)
-	. Else  Do ExtractFieldInfo(type,isuidx,fldidx,structname,fieldnameTD_"."_fieldname)
+	. . . Do:""=fieldname Error("ASSERTFAIL","F","Anonymous array detected") ; No anonmymous arrays, so trigger error
+	. . . Set fldTDparm=fldTDparm_"[0]"
+	. . . Set vla=vla!'$length(types(type,"isuidx",isuidx,fldidx,"dim"))
+	. . Do ProcessNestedStructUnion(type,types(type,"isuidx",isuidx,fldidx,"suptr"),fldidx,structname,fldTDparm,vla)
+	. Else  Do
+	. . Do:""=fieldname Error("ASSERTFAIL","F","Anonymous scalar detected")
+	. . Do ExtractFieldInfo(type,isuidx,fldidx,structname,fldTDparm,vla)
 	Quit
 
 ;
 ; Routine to generate the query line into the C program for a given element
 ;
-ExtractFieldInfo(type,isuidx,fldidx,structname,fieldname)
-	New fldsgn,dim,fldtyp
-	Set fldsgn=type_"|"_isuidx_"|"_fldidx_"|"_types(type,"isuidx",isuidx,fldidx,"type")_"|"_structname_"."_fieldname_"|"
-	Set fldtyp=types(type,"isuidx",isuidx,fldidx,"type")
-	; Flexible arrays have no dimension, so dim is just "". Structures without dimension are given an invalid value to let
-	; us process them differently
-	Set dim=$Get(types(type,"isuidx",isuidx,fldidx,"dim"),-1)
-	Do:'$length(dim) 	; Flexible array definition
-	. Write TAB,"PRINT_FLEXBASE(""",fldsgn,""", ",structname,", ",fieldname,", (int)(",dim,"));",!
-	Do:$length(dim)		; Dimension defined
-	. ; Dimension for dimension-less definitions and [unsigned] char types forced to 1
-	. Set:(dim<0)!(("char"=fldtyp)!("unsigned-char"=fldtyp)) dim=1
-	. Write TAB,"PRINT_OFFSET(""",fldsgn,""", ",structname,", ",fieldname,", (int)(",dim,"));",!
-	Set lincnt=lincnt+1
+ExtractFieldInfo(type,isuidx,fldidx,structname,fieldname,vla)
+	New fldsgn,dim,fldtyp,isbitfield
+	Set isbitfield=0<$data(types(type,"isuidx",isuidx,fldidx,"nofield"))
+	if isbitfield Do
+	. Set:'vla fldtyp=types(type,"isuidx",isuidx,fldidx,"type")
+	. Write:'vla TAB,"SET_BITFIELD(",structname,", ",fieldname,");",!
+	. Set:'vla lincnt=lincnt+1
+	Else  Do
+	. Set fldsgn=type_"|"_isuidx_"|"_fldidx_"|"_types(type,"isuidx",isuidx,fldidx,"type")_"|"_structname_"."_fieldname_"|"
+	. Set fldtyp=types(type,"isuidx",isuidx,fldidx,"type")
+	. ; Flexible arrays have no dimension, so dim is just "". Structures without dimension are given an invalid value to let
+	. ; us process them differently
+	. Set dim=$Get(types(type,"isuidx",isuidx,fldidx,"dim"),-1)
+	. Do:'$length(dim) 	; Flexible array definition
+	. . Write TAB,"PRINT_FLEXBASE(""",fldsgn,""", ",structname,", ",fieldname,", (int)(",dim,"));",!
+	. . Set lincnt=lincnt+1
+	. Do:$length(dim)		; Dimension defined
+	. . ; Dimension for dimension-less definitions and [unsigned] char types forced to 1
+	. . Set:(dim<0)!(("char"=fldtyp)!("unsigned-char"=fldtyp)) dim=1
+	. . Write TAB,"PRINT_OFFSET(""",fldsgn,""", ",structname,", ",fieldname,", (int)(",dim,"));",!
+	. . Set lincnt=lincnt+1
+	. . Write:'vla TAB,"SET_FIELD(",structname,", ",fieldname,");",!
+	. . Set:'vla lincnt=lincnt+1
 	Quit
 
 ;
@@ -1462,7 +1507,8 @@ ExclInclude(incl)
 ;   4. First token on a line has no preceeding white space.
 ;
 GetToken(EofOk)
-	New done
+	New done,saveio
+	set saveio=$IO
 	Set done=FALSE
 	If TKEOF=dirtoken Do
 	. ;
@@ -1486,6 +1532,7 @@ GetToken(EofOk)
 	; Scan to create next director token/val
 	;
 	Set dirtokenval=""
+	use infile
 	For  Quit:((""'=inbuf)!done)  Do
 	. If $ZEof Do			; Oops, at EOF with nothing read
 	. . Set dirtoken=TKEOF
@@ -1494,6 +1541,7 @@ GetToken(EofOk)
 	. . Read inbuf
 	. . Set lastreadline=inbuf	; Save original line to parse for debuggingg
 	. . Set:'$ZEof inlines=inlines+1
+	use saveio
 	Quit:done			; Processing already complete - bypass parse scan
 	;
 	; Compute the director token

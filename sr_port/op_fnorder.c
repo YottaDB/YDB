@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -35,6 +35,7 @@ void op_fnorder(lv_val *src, mval *key, mval *dst)
 	uint4		mvt;	/* Local copy of mvtype, bit ands use a int4, so do conversion once */
 	mstr		*str;
 	int4		intval;
+	mval		*p_key;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -56,7 +57,7 @@ void op_fnorder(lv_val *src, mval *key, mval *dst)
 			{	/* Not currently in numeric form.  Is it cannonical? */
 				if (val_iscan(key))
 				{	/* Yes, convert it to numeric */
-					(void)s2n(key);
+					s2n(key);
 					mvt = key->mvtype;
 					if (!(mvt & MV_NM))
 					{
@@ -84,9 +85,9 @@ void op_fnorder(lv_val *src, mval *key, mval *dst)
 					tmp_sbs.str.len = TREF(max_lcl_coll_xform_bufsiz);
 					assert(NULL != TREF(lcl_coll_xform_buff));
 					tmp_sbs.str.addr = TREF(lcl_coll_xform_buff);
+					tmp_sbs.str.in_array = FALSE;
 					do_xform(TREF(local_collseq), XFORM, &key->str, &tmp_sbs.str, &length);
 					tmp_sbs.str.len = length;
-					s2pool(&(tmp_sbs.str));
 					key = &tmp_sbs;
 				}
 			} else
@@ -94,10 +95,15 @@ void op_fnorder(lv_val *src, mval *key, mval *dst)
 				 * But input mval could be read-only so cannot modify that even if temporarily.
 				 * So take a copy of the mval and modify that instead.
 				 */
-				tmp_sbs = *key;
+
+				tmp_sbs.str.in_array = FALSE;
+				tmp_sbs.umval = key->umval;
 				key = &tmp_sbs;
 				MV_FORCE_NUM(key);
 				TREE_KEY_SUBSCR_SET_MV_CANONICAL_BIT(key);	/* used by the lvTreeKeyNext function */
+				tmp_sbs.mvtype &= (MV_STR_OFF & MV_UTF_LEN_OFF);
+				tmp_sbs.str.addr = NULL;
+				tmp_sbs.str.len = 0;
 			}
 			node = lvAvlTreeKeyNext(lvt, key);
 		}
@@ -128,12 +134,13 @@ void op_fnorder(lv_val *src, mval *key, mval *dst)
 		{
 			ALLOC_XFORM_BUFF(dst->str.len);
 			assert(NULL != TREF(lcl_coll_xform_buff));
+			tmp_sbs.str.in_array = FALSE;
 			tmp_sbs.str.addr = TREF(lcl_coll_xform_buff);
 			tmp_sbs.str.len = TREF(max_lcl_coll_xform_bufsiz);
 			do_xform(TREF(local_collseq), XBACK, &dst->str, &tmp_sbs.str, &length);
 			tmp_sbs.str.len = length;
 			s2pool(&(tmp_sbs.str));
-			dst->str = tmp_sbs.str;
+			dst->str.umstr = tmp_sbs.str.umstr;
 		}
 	}
 }

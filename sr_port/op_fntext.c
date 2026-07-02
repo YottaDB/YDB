@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,7 +16,7 @@
 #include "gtm_stdio.h"
 
 #include "error.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "srcline.h"
 #include "op.h"
 #include "stringpool.h"
@@ -45,8 +46,8 @@ void op_fntext(mval *label, int int_exp, mval *rtn, mval *ret)
 {
 	char			*cp;
 	int			i, lbl, letter;
-	mval			*temp_rtn, temp_mval;
-	mstr			*sld;
+	mval			*temp_rtn, temp_mval = {{0}};
+	unmanaged_mstr			*sld;
 	uint4			stat;
 	rhdtyp			*rtn_vector;
 	boolean_t		current_rtn = FALSE;
@@ -57,12 +58,12 @@ void op_fntext(mval *label, int int_exp, mval *rtn, mval *ret)
 	MV_FORCE_STR(label);
 	MV_FORCE_STR(rtn);
 	temp_rtn = &temp_mval;
-	*temp_rtn = *rtn;	/* make a copy of the routine in case the caller used the same mval for rtn and ret */
+	temp_rtn->umval = rtn->umval;	/* make a copy of the routine in case the caller used the same mval for rtn and ret */
 	if (WANT_CURRENT_RTN(temp_rtn)) /* we want $TEXT for the routine currently executing. */
 		current_rtn = TRUE;
 	ret->str.len = 0;	/* make ret an emptystring in case the return is by way of the condition handler */
 	ret->mvtype = MV_STR;
-	sld = (mstr *)NULL;
+	sld = (unmanaged_mstr *)NULL;
 	ESTABLISH(fntext_ch);	/* to swallow errors and permit an emptystring result */
 	GTMTRIG_ONLY(IS_TRIGGER_RTN(&temp_rtn->str, is_trigger));
 	DBGIFTRIGR((stderr, "op_fntext: entering $tlevel=%d $t_tries=%d\n", dollar_tlevel, t_tries));
@@ -89,11 +90,11 @@ void op_fntext(mval *label, int int_exp, mval *rtn, mval *ret)
 				rtn_vector = frame_pointer->rvector;
 			else
 			{
-				rtn_vector = find_rtn_hdr(&temp_rtn->str);
+				rtn_vector = find_rtn_hdr(&temp_rtn->str.umstr);
 				if ((NULL == rtn_vector) GTMTRIG_ONLY(&& !is_trigger))
 				{	/* not here, so try to bring it in... Triggers cannot be loaded in this fashion */
 					op_zlink(temp_rtn, 0);
-					rtn_vector = find_rtn_hdr(&temp_rtn->str);
+					rtn_vector = find_rtn_hdr(&temp_rtn->str.umstr);
 				}
 			}
 			if (NULL != rtn_vector)
@@ -102,7 +103,7 @@ void op_fntext(mval *label, int int_exp, mval *rtn, mval *ret)
 				ret->str.len = rtn_vector->routine_name.len;
 			}
 		} else  if (NULL != sld)
-			ret->str = *sld;
+			ret->str.umstr = *sld;
 	}
 	REVERT;
 	/* If non-empty, copy result to stringpool and

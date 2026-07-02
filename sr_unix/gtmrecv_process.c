@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2025 Fidelity National Information	*
+ * Copyright (c) 2006-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -2339,7 +2339,8 @@ STATICFNDEF void	gtmrecv_process_need_strminfo_msg(repl_needstrminfo_msg_ptr_t n
 {
 	int4			status;
 	int			idx;
-	repl_histinfo		histinfo, *previously_rcvd_histinfo;
+	boolean_t		need_instfile_check;
+	repl_histinfo		histinfo, instfile_histinfo, *previously_rcvd_histinfo;
 	repl_strminfo_msg_t	strminfo_msg;
 	seq_num			need_strminfo_seqno, last_valid_histinfo_seqno;
 
@@ -2363,16 +2364,40 @@ STATICFNDEF void	gtmrecv_process_need_strminfo_msg(repl_needstrminfo_msg_ptr_t n
 		assert(recvpool.recvpool_ctl->insert_strm_histinfo);
 	} else
 	{	/* The history record needs to be found in the receiver side instance file or in the receive pool.
-		 * If last_valid_strm_histinfo[0] has non-default content, then because this is a supplementary instance
-		 * and a propagating primary, we can rest assured that last_valid_strm_histinfo[1] thru [15] reflect
-		 * the latest history records for each stream if the stream exists on this instance. And so no need
-		 * to go to the instance file at all. If [0] does not have any content, then it means the cached history
-		 * is empty for not just the 0th stream but for every other stream as well i.e. the receive pool is empty
-		 * and the receiver is connecting with a source for the first time. So go to the instance file in that case.
+		 * If last_valid_strm_histinfo[0] has non-default content, then the receive pool cache may have
+		 * information about the history records for each stream. However, after consecutive connection
+		 * resets (e.g., back-to-back online rollbacks on the root primary), the cache may be incomplete
+		 * for streams whose HISTREC was not re-sent on the most recent connection. In that case, streams
+		 * with null lms_group in the cache are validated against the instance file to distinguish truly
+		 * non-existent streams from stale cache entries. If [0] does not have any content, then it means
+		 * the cached history is empty for not just the 0th stream but for every other stream as well
+		 * i.e. the receive pool is empty and the receiver is connecting with a source for the first time.
+		 * So go to the instance file in that case.
 		 */
+#		ifdef DEBUG
+		/* Force stale stream cache on the 2nd STRMINFO exchange (count == 0) to reproduce
+		 * STRMNUMMISMTCH2 from back-to-back online rollbacks on the root primary.
+		 */
+		if (WBTEST_ENABLED(WBTEST_RCVR_STALE_STRMCACHE))
+		{
+			if (0 < gtm_white_box_test_case_count)
+				gtm_white_box_test_case_count--;
+			else if (0 == gtm_white_box_test_case_count)
+			{
+				gtm_white_box_test_case_count--;	/* Set to -1 so this fires only once */
+				recvpool.recvpool_ctl->last_valid_strm_histinfo[0].start_seqno = need_strminfo_seqno - 1;
+				for (idx = 1; idx < MAX_SUPPL_STRMS; idx++)
+					memset(&recvpool.recvpool_ctl->last_valid_strm_histinfo[idx], 0, SIZEOF(repl_histinfo));
+				repl_log(gtmrecv_log_fp, TRUE, TRUE, "WBTEST_RCVR_STALE_STRMCACHE : Forced stale stream history"
+					" cache in the receive pool for seqno "INT8_FMT" "INT8_FMTX"\n",
+					need_strminfo_seqno, need_strminfo_seqno);
+			}
+		}
+#		endif
 		last_valid_histinfo_seqno = recvpool.recvpool_ctl->last_valid_strm_histinfo[0].start_seqno;
 		if (last_valid_histinfo_seqno)
 		{
+			need_instfile_check = FALSE;
 			assert(need_strminfo_seqno > last_valid_histinfo_seqno);
 			assert(!recvpool.gtmrecv_local->updateresync);
 			assert(!recvpool.gtmrecv_local->noresync);
@@ -2387,6 +2412,49 @@ STATICFNDEF void	gtmrecv_process_need_strminfo_msg(repl_needstrminfo_msg_ptr_t n
 				{
 					assert(0 != idx);
 					strminfo_msg.last_histinfo_num[idx] = INVALID_HISTINFO_NUM;
+					need_instfile_check = TRUE;
+				}
+			}
+			if (need_instfile_check)
+			{	/* Some streams were marked INVALID from cache due to null lms_group.
+				 * Validate against the instance file to avoid reporting a stale INVALID
+				 * to the source (which would trigger STRMNUMMISMTCH2).
+				 */
+				repl_log(gtmrecv_log_fp, TRUE, TRUE, "Receive pool stream cache may be stale;"
+					" validating against the replication instance file\n");
+				grab_lock(jnlpool->jnlpool_dummy_reg, TRUE, GRAB_LOCK_ONLY);
+				GTMRECV_ONLN_RLBK_CLNUP_IF_NEEDED;
+					/* above macro will "return" if repl_connection_reset
+					 * OR gtmrecv_wait_for_jnl_seqno is set */
+				status = repl_inst_wrapper_histinfo_find_seqno(need_strminfo_seqno,
+								INVALID_SUPPL_STRM, &instfile_histinfo);
+				rel_lock(jnlpool->jnlpool_dummy_reg);
+				if (0 == status)
+				{
+					/* Patch the found record's own stream entry in last_histinfo_num[]
+					 * (same adjustment as in gtmsource_check_remote_strm_histinfo()
+					 * and the "receive pool empty" else branch below).
+					 */
+					if (0 < instfile_histinfo.strm_index)
+					{
+						assert(instfile_histinfo.last_histinfo_num[instfile_histinfo.strm_index]
+							< instfile_histinfo.histinfo_num);
+						instfile_histinfo.last_histinfo_num[instfile_histinfo.strm_index]
+							= instfile_histinfo.histinfo_num;
+					}
+					for (idx = 1; idx < MAX_SUPPL_STRMS; idx++)
+					{
+						if ((INVALID_HISTINFO_NUM == strminfo_msg.last_histinfo_num[idx])
+						    && (INVALID_HISTINFO_NUM != instfile_histinfo.last_histinfo_num[idx]))
+						{	/* Cache was stale; use histinfo_num from instance file */
+							repl_log(gtmrecv_log_fp, TRUE, TRUE,
+								"Stream %d: receive pool cache was stale;"
+								" found valid history in instance file (histinfo_num=%d)\n",
+								idx, instfile_histinfo.last_histinfo_num[idx]);
+							strminfo_msg.last_histinfo_num[idx]
+								= instfile_histinfo.last_histinfo_num[idx];
+						}
+					}
 				}
 			}
 			assert(!recvpool.recvpool_ctl->insert_strm_histinfo);

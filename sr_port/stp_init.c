@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -68,7 +68,6 @@ void stp_init(size_t size)
 	stringpool.lastallocbytes = allocbytes;
 	napage = (unsigned char *)((((UINTPTR_T)stringpool.base + stringpool.lastallocbytes) & ~(OS_PAGE_SIZE - 1)) - OS_PAGE_SIZE);
 	stringpool.top = stringpool.invokestpgcollevel = napage - SIZEOF(char *);
-	stringpool.gcols = 0;
 	return;
 }
 

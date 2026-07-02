@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -97,6 +98,9 @@ long numcmp(mval *u, mval *v)
 
 	MV_FORCE_NUM(u);
 	MV_FORCE_NUM(v);
+	/* promote() only really needs the umval but would require a lot of code changes, so permit uninitialized w.str.in_array
+	 * for now.
+	 */
 
 	/* If both are integer representations, just compare m[1]'s.  */
 	u_mvtype = u->mvtype & MV_INT;
@@ -111,12 +115,12 @@ long numcmp(mval *u, mval *v)
 	/* If not both integer, promote either one that might be. */
 	if (u_mvtype)
 	{
-		w = *u ;
+		w.umval = u->umval ;
 		promote(&w) ;
 		u = &w ;
 	} else if (v->mvtype & MV_INT)
 	{
-		w = *v ;
+		w.umval = v->umval;
 		promote(&w) ;
 		v = &w ;
 	}

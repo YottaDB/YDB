@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2013-2017 Fidelity National Information	*
+ * Copyright (c) 2013-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -16,7 +16,7 @@
 #include "gtm_string.h"
 #include "gtmlink.h"
 
-LITDEF mstr relink_allowed_mstr[] = {
+LITDEF unmanaged_mstr relink_allowed_mstr[] = {
 	{0, LEN_AND_LIT("NORECURSIVE")},
 	{0, LEN_AND_LIT("RECURSIVE")},		/* if env var $gtm_link = "RECURSIVE", then recursive relink is enabled */
 	{0, LEN_AND_LIT("")}

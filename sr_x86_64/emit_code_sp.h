@@ -1,6 +1,6 @@
 /****************************************************************
  *                                                              *
- * Copyright (c) 2007-2022 Fidelity National Information	*
+ * Copyright (c) 2007-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *                                                              *
  *      This source code contains the intellectual property     *
@@ -18,7 +18,7 @@
  * 1.  Code generation is a fairly simple subset of what is possible with X86-64. For example, GT.M never
  *     generates memory-to-memory instructions. Where necessary, values are loaded to a register, then stored.
  * 2.  Only one use of the REP prefix is with the MOVSQ instructions (MOVSXD with REX bit to make it MOVSQ) used
- *     for copying MVALs inline in generatede code.
+ *     for copying inline in generated code.
  * 3.  As noted below, there are several constructs building offsets that come up with different sized offsets
  *     between some of the compiler phases. Consequently, we force offsets to be 32bit for certain classes of memory
  *     references. This should be looked at again so we can eliminate the 4 byte "override" as it were which would
@@ -54,9 +54,6 @@ void emit_base_offset(int base, int offset);
 #define REX_X	0x02
 #define REX_R 	0x04
 #define REX_W	0x08
-
-/* Size of the MVAL in quadwords (64 bits on x86_64) - used when copying mval */
-#define MVAL_QWORD_SIZE	(SIZEOF(mval) / SIZEOF(long))
 
 /* Macro used to clear the flags in emit_base_info.flags. Using this method rather than declaring a union and complicating
  * the reference we make (and gendefinedtypesinit.csh doesn't like unnamed unions/structs at this point 7/2016). Note since
@@ -434,7 +431,7 @@ MBSTART {								\
 	CODE_BUF_GEN(I386_INS_POP_eAX + (GTM_REG_CODEGEN_TEMP & 0x7));	\
 } MBEND
 
-#define GEN_MVAL_COPY(SRC_REG, TRG_REG, QWSIZE)										\
+#define GEN_COPY(SRC_REG, TRG_REG, QWSIZE)										\
 MBSTART {														\
 	GEN_LOAD_IMMED(I386_REG_ECX, QWSIZE);										\
 	/* Do this brute force instead of using SET_REX_PREFIX/CODE_BUF_GEN() macros since we'd have to add a new	\

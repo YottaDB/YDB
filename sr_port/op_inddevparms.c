@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,8 +35,9 @@ void	op_inddevparms(mval *devpsrc, int4 ok_iop_parms,  mval *devpiopl)
 
 	SETUP_THREADGBL_ACCESS;
 	MV_FORCE_STR(devpsrc);
-	indir_src.str = devpsrc->str;
+	indir_src.str.umstr = devpsrc->str.umstr;
 	indir_src.code = indir_devparms;
+	indir_src.str.in_array = FALSE;
 	if (NULL == (obj = cache_get(&indir_src)))				/* NOTE assignment */
 	{	/* No cached version, compile it now */
 		obj = &object;

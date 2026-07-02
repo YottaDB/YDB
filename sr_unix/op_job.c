@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -297,24 +297,24 @@ int	op_job(int4 argcnt, ...)
 		if (IS_JOB_SOCKET(job_params.params.input.buffer, job_params.params.input.len))
 		{
 			handle_len = JOB_SOCKET_HANDLE_LEN(job_params.params.input.len);
-			index = iosocket_handle(JOB_SOCKET_HANDLE(job_params.params.input.buffer),
-						&handle_len, FALSE, socket_pool);
+			index = iosocket_get_handle(JOB_SOCKET_HANDLE(job_params.params.input.buffer),
+						handle_len, socket_pool);
 			if (-1 != index)
 				iosocket_close_one(socket_pool, index);
 		}
 		if (IS_JOB_SOCKET(job_params.params.output.buffer, job_params.params.output.len))
 		{
 			handle_len = JOB_SOCKET_HANDLE_LEN(job_params.params.output.len);
-			index = iosocket_handle(JOB_SOCKET_HANDLE(job_params.params.output.buffer),
-						&handle_len, FALSE, socket_pool);
+			index = iosocket_get_handle(JOB_SOCKET_HANDLE(job_params.params.output.buffer),
+						handle_len, socket_pool);
 			if (-1 != index)
 				iosocket_close_one(socket_pool, index);
 		}
 		if (IS_JOB_SOCKET(job_params.params.error.buffer, job_params.params.error.len))
 		{
 			handle_len = JOB_SOCKET_HANDLE_LEN(job_params.params.error.len);
-			index = iosocket_handle(JOB_SOCKET_HANDLE(job_params.params.error.buffer),
-						&handle_len, FALSE, socket_pool);
+			index = iosocket_get_handle(JOB_SOCKET_HANDLE(job_params.params.error.buffer),
+						handle_len, socket_pool);
 			if (-1 != index)
 				iosocket_close_one(socket_pool, index);
 		}

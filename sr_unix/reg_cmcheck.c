@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -19,6 +19,7 @@
 #include "gdsfhead.h"
 #include "parse_file.h"
 #include "is_raw_dev.h"
+#include "gcol_list.h"
 
 #define MAX_NODE_NAME 32
 
@@ -29,7 +30,7 @@ bool reg_cmcheck(gd_region *reg)
 	gd_segment	*seg;
 	char		fbuff[MAX_FN_LEN + 1];
 	parse_blk	pblk;
-	mstr		file;
+	unmanaged_mstr	file;
 	int		status;
 
 	seg = reg->dyn.addr;
@@ -37,6 +38,7 @@ bool reg_cmcheck(gd_region *reg)
 		return TRUE;	/* if access method has already been set to dba_cm, return right away (avoid recomputation) */
 	file.addr = (char *)seg->fname;
 	file.len = seg->fname_len;
+	assert(!glist_umstr_in_stringpool(&file));
 	memset(&pblk, 0, SIZEOF(pblk));
 	pblk.buffer = fbuff;
 	pblk.buff_size = MAX_FN_LEN;

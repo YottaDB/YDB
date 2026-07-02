@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -118,7 +118,10 @@ void tptimeout_set(int4 dummy_param)
 	{	/* Error handling or job interrupt is in effect - defer tp timeout until $ECODE is cleared and/or we have unrolled
 		* the job interrupt frame.
 		*/
-		outofband = no_event;
+		if (tptimeout == outofband)
+			outofband = no_event;
+		else
+			assert(FALSE || outofband);
 		TAREF1(save_xfer_root, tptimeout).event_state = queued;
 		SAVE_XFER_QUEUE_ENTRY(tptimeout, 0);
 		SHOWTIME(asccurtime);

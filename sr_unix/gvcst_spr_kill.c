@@ -27,7 +27,7 @@
 #include "buddy_list.h"		/* needed for tp.h */
 #include "tp.h"			/* needed for T_BEGIN_READ_NONTP_OR_TP macro */
 #ifdef GTM_TRIGGER
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "gv_trigger.h"		/* for IS_EXPLICIT_UPDATE_NOASSERT macro used by IS_OK_TO_INVOKE_GVCST_KILL macro */
 #endif
 #include "io.h"

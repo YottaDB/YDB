@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -11,17 +11,17 @@
  ****************************************************************/
 
 #include "mdef.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "stack_frame.h"
 #include "xfer_enum.h"
 #include "indir_enum.h"
 #include "op.h"
 #include "io.h"
-#include "mprof.h"
+#include "deferred_events.h"
+#include "deferred_events_queue.h"
 #include "fix_xfer_entry.h"
 #include "restrict.h"
 #include "have_crit.h"
-#include "deferred_events_queue.h"
 
 GBLREF boolean_t	is_tracing_on;
 GBLREF int4		gtm_trigger_depth;
@@ -31,7 +31,8 @@ GBLREF xfer_entry_t	xfer_table[];
 
 void op_zst_break(void)
 {
-	intrpt_state_t		prev_intrpt_state;
+	boolean_t	step_trace;
+	intrpt_state_t	prev_intrpt_state;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -44,7 +45,9 @@ void op_zst_break(void)
 	FIX_XFER_ENTRY(xf_retarg, op_retarg);
 	ENABLE_EVENT_INTERRUPTS(prev_intrpt_state);
 	flush_pio();
+	step_trace = is_tracing_on;
+	is_tracing_on = FALSE;
 	op_commarg(&(TREF(zstep_action)), indir_linetail);
-	(TREF(zstep_action)).mvtype = 0;	/* allow stp_gcol to abandon the zstep action, apparently because it's cached */
+	is_tracing_on = step_trace;
 	frame_pointer->type = SFT_ZSTEP_ACT;
 }

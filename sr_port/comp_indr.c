@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -15,7 +15,7 @@
 #include "gtm_stdio.h"
 #include "gtm_string.h"
 
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "stack_frame.h"
 #include "mv_stent.h"
 #include "copy.h"
@@ -41,6 +41,7 @@ void comp_indr(mstr *obj)
 	int		tempsz, vartabsz, fixup_cnt, zapsz;
 	INTPTR_T	*vp;
 	ihdtyp		*rtnhdr;
+	mval		*m, *mtop;
 
 	assert((frame_pointer < frame_pointer->old_frame_pointer) || (NULL == frame_pointer->old_frame_pointer));
 	save_msp = msp;
@@ -71,8 +72,9 @@ void comp_indr(mstr *obj)
 	sf->vartab_len = rtnhdr->vartab_len;
 	if ((zapsz = (vartabsz + tempsz)))	/* Note assignment */
 		memset(syms, 0, zapsz);		/* Zap temps and symtab together */
-	sf->vartab_ptr = (char *)rtnhdr + rtnhdr->vartab_off;
+	sf->vartab_ptr = (var_tabent *)((char *)rtnhdr + rtnhdr->vartab_off);
 	sf->temp_mvals = rtnhdr->temp_mvals;
+	SET_PTEMP_CNT(sf, INVALID_PTEMP_CNT);
 	/* Code starts just past the literals that were fixed up and past the validation and hdr offset fields */
 	sf->mpc = (unsigned char *)rtnhdr + rtnhdr->fixup_vals_off + (rtnhdr->fixup_vals_num * SIZEOF(mval));
 	/* IA64 required SECTION_ALIGN_BOUNDARY alignment (16 bytes). ABS 2008/12

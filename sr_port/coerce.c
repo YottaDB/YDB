@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -17,6 +17,7 @@
 #include "mdq.h"
 #include "mvalconv.h"
 #include "hashtab_str.h"
+#include "gcol_list.h"
 
 GBLREF hash_table_str	*complits_hashtab;
 
@@ -32,6 +33,7 @@ void coerce(oprtype *a, unsigned short new_type)
 	opctype		conv, old_op;
 	stringkey	litkey;
 	triple		*coerc, *ref;
+	int4		ilit;
 	assert ((OCT_MVAL == new_type) || (OCT_MINT == new_type) || (OCT_BOOL == new_type));
 	assert (TRIP_REF == a->oprclass);
 	ref = a->oprval.tref;
@@ -61,23 +63,11 @@ void coerce(oprtype *a, unsigned short new_type)
 			if (OCT_MINT != new_type)
 				break;
 			lit = ref->operand[0].oprval.mlit;
-			if (!(++lit->rt_addr))
-			{	/* completely removing this otherwise unused literal as needs to be an ILIT instead */
-				if (NULL != complits_hashtab && NULL != complits_hashtab->base)
-				{	/* Deleted entry is in the hash table .. remove it */
-					litkey.str = lit->v.str;
-					COMPUTE_HASH_STR(&litkey);
-					DEBUG_ONLY(litent = lookup_hashtab_str(complits_hashtab, &litkey));
-					assert(litent);	/* Literal is there .. better be found */
-					assert(litent->value == (void *)lit);
-					litdltd = delete_hashtab_str(complits_hashtab, &litkey);
-					assert(litdltd);
-				}
-				dqdel(lit, que);
-			}
+			ilit = MV_FORCE_INTD(&(lit->v));
+			unuse_literal(&(lit->v));
 			ref->opcode = OC_ILIT;
 			ref->operand[0].oprclass = ILIT_REF;
-			ref->operand[0].oprval.ilit = MV_FORCE_INTD(&(lit->v)); /* All literals, neg/pos, are allowed */
+			ref->operand[0].oprval.ilit = ilit;
 			return;
 		default:
 			break;

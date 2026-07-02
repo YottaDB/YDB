@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2009-2021 Fidelity National Information	*
+ * Copyright (c) 2009-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -139,7 +139,8 @@ int4 gtmcrypt_entry()
 #	endif
 	char			libpath[GTM_PATH_MAX], buf[MAX_GTMCRYPT_PLUGIN_STR_LEN], plugin_dir_path[GTM_PATH_MAX];
 	char			resolved_libpath[GTM_PATH_MAX], resolved_plugin_dir_path[GTM_PATH_MAX];
-	mstr			trans, env_var = {0, LEN_AND_LIT(GTM_CRYPT_PLUGIN)};
+	mstr			trans;
+	UMSTR_CONST(env_var, GTM_CRYPT_PLUGIN);
 
 	if(!gtm_dist_ok_to_use)
 	{

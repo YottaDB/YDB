@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2014-2022 Fidelity National Information	*
+ * Copyright (c) 2014-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -23,7 +23,7 @@
 #include "gtmio.h"
 #include "io.h"
 #include "iosp.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "relinkctl.h"
 #include "parse_file.h"
 #include "eintr_wrappers.h"
@@ -80,7 +80,8 @@ void op_zrupdate(int argcnt, ...)
 	char			pblkbuf[MAX_FN_LEN + 1], statbuf[MAX_FN_LEN + 1], namebuf[MAX_FN_LEN + 1];
 	char			*chptr, chr;
 	int			status, fextlen, fnamlen, object_count;
-	mstr			objdir, rtnname;
+	unmanaged_mstr		objdir;
+	mident			rtnname;
 	mval			*objfilespec, objpath;
 	open_relinkctl_sgm 	*linkctl;
 	parse_blk		pblk;
@@ -89,10 +90,12 @@ void op_zrupdate(int argcnt, ...)
 	struct stat		outbuf;
 	uint4			hash, prev_hash_index;
 	va_list			var;
+	unsigned int		gcols;
 
 	if (RESTRICTED(zrupdate_op))
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_RESTRICTEDOP, 1, "ZRUPDATE");
 	/* Currently only expecting one value per invocation right now. That will change in phase 2, hence the stdarg setup. */
+	objpath.str.in_array = FALSE;
 	va_start(var, argcnt);
 	assert(1 == argcnt);
 	objfilespec = va_arg(var, mval *);
@@ -105,7 +108,7 @@ void op_zrupdate(int argcnt, ...)
 	pblk.def1_buf = DOTOBJEXT;			/* Default .o file type if not specified. */
 	pblk.def1_size = SIZEOF(DOTOBJEXT) - 1;
 	pblk.fop = F_SYNTAXO;				/* Syntax check only - bypass directory / file existence check. */
-	status = parse_file(&objfilespec->str, &pblk);
+	status = parse_file(&objfilespec->str.umstr, &pblk);
 	if (ERR_PARNORMAL != status)
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_FILEPARSE, 2, objfilespec->str.len, objfilespec->str.addr, status);
 	wildcarded = (pblk.fnb & F_WILD);		/* Our error logic is different depending on the presence of wildcards. */
@@ -233,12 +236,20 @@ void op_zrupdate(int argcnt, ...)
 		{
 			objdir.addr = pblk.l_dir;
 			objdir.len = pblk.b_dir;
+			assert(!glist_umstr_in_stringpool(&objdir));
 		} else
 		{
+			DBG_START_NO_GCOLS(gcols);
 			objdir.addr = objpath.str.addr;
 			objdir.len = plen.p.pblk.b_dir;
 		}
-		linkctl = relinkctl_attach(&objdir, &objpath.str, 0);	/* Create/attach/open relinkctl file. */
+		linkctl = relinkctl_attach(&objdir, &objpath.str.umstr, 0);	/* Create/attach/open relinkctl file. */
+#		ifdef DEBUG
+		if (!noresult)
+		{
+			DBG_END_NO_GCOLS(gcols);
+		}
+#		endif
 		if (NULL == linkctl)
 		{
 			if (wildcarded)

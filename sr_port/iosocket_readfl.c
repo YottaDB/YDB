@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -34,7 +34,7 @@
 #include "wake_alarm.h"
 #include "gtm_conv.h"
 #include "gtm_utf8.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "stack_frame.h"
 #include "mv_stent.h"
 #include "send_msg.h"
@@ -43,6 +43,7 @@
 #include "svnames.h"
 #include "op.h"
 #include "util.h"
+#include "noprincio_if_needed_inline.h"
 #ifdef GTM_TLS
 #include "gtm_tls.h"
 #endif
@@ -52,7 +53,7 @@ GBLREF	boolean_t		gtm_utf8_mode, hup_on, prin_dm_io, prin_in_dev_failure, prin_o
 GBLREF	int			socketus_interruptus;
 GBLREF	int4			exi_condition;
 GBLREF	io_pair 		io_curr_device, io_std_device;
-GBLREF	mstr			chset_names[];
+LITREF	unmanaged_mstr		chset_names[];
 GBLREF	mv_stent		*mv_chain;
 GBLREF	mval			dollar_zstatus;
 GBLREF	spdesc 			stringpool;
@@ -83,6 +84,7 @@ void iosocket_readfl_badchar(mval *vmvalptr, int datalen, int delimlen, unsigned
 	unsigned char	*delimend;
 	io_desc		*iod;
 	d_socket_struct	*dsocketptr;
+	/* TODO where is the guarantee of not overflowing the stringpool here?? */
 
 	iod = io_curr_device.in;
 	dsocketptr = (d_socket_struct *)(iod->dev_sp);
@@ -93,7 +95,8 @@ void iosocket_readfl_badchar(mval *vmvalptr, int datalen, int delimlen, unsigned
 		if ((CHSET_M != iod->ichset) && (CHSET_UTF8 != iod->ichset))
 		{
 			DBGSOCK2((stdout, "socrflbc: Converting UTF16xx data back to UTF8 for internal use\n"));
-			vmvalptr->str.len = gtm_conv(chset_desc[iod->ichset], chset_desc[CHSET_UTF8], &vmvalptr->str, NULL, NULL);
+			vmvalptr->str.len = gtm_conv(chset_desc[iod->ichset], chset_desc[CHSET_UTF8], &vmvalptr->str.umstr, NULL,
+				NULL);
 			vmvalptr->str.addr = (char *)stringpool.free;
 		}
 		stringpool.free += vmvalptr->str.len;
@@ -241,6 +244,7 @@ int	iosocket_readfl(mval *v, int4 width, int4 msec_timeout)
 				POP_MV_STENT();         /* pop if top of stack */
 			else
 			{	/* Else mark it unused */
+				glist_unprotect_str(&mv_zintdev->mv_st_cont.mvs_zintdev.curr_sp_buffer);
 				mv_zintdev->mv_st_cont.mvs_zintdev.buffer_valid = FALSE;
 				mv_zintdev->mv_st_cont.mvs_zintdev.curr_sp_buffer.len = 0;
 				mv_zintdev->mv_st_cont.mvs_zintdev.curr_sp_buffer.addr = NULL;
@@ -845,6 +849,7 @@ int	iosocket_readfl(mval *v, int4 width, int4 msec_timeout)
 		mv_chain->mv_st_cont.mvs_zintdev.buffer_valid = TRUE;
 		mv_chain->mv_st_cont.mvs_zintdev.curr_sp_buffer.addr = (char *)stringpool.free;
 		mv_chain->mv_st_cont.mvs_zintdev.curr_sp_buffer.len = bytes_read;
+		glist_protect_str(&mv_chain->mv_st_cont.mvs_zintdev.curr_sp_buffer);
 		sockintr->who_saved = sockwhich_readfl;
 		if ((0 < msec_timeout) && (NO_M_TIMEOUT != msec_timeout))
 		{
@@ -890,7 +895,7 @@ int	iosocket_readfl(mval *v, int4 width, int4 msec_timeout)
 		if ((CHSET_M != ichset) && (CHSET_UTF8 != ichset))
 		{
 			DBGSOCK((stdout, "socrfl: Converting UTF16xx data back to UTF8 for internal use\n"));
-			v->str.len = gtm_conv(chset_desc[ichset], chset_desc[CHSET_UTF8], &v->str, NULL, NULL);
+			v->str.len = gtm_conv(chset_desc[ichset], chset_desc[CHSET_UTF8], &v->str.umstr, NULL, NULL);
 			v->str.addr = (char *)stringpool.free;
 			stringpool.free += v->str.len;
 		}

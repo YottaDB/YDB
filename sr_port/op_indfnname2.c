@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2021 Fidelity National Information	*
+ * Copyright (c) 2012-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -38,7 +38,7 @@ void op_indfnname2(mval *finaldst, mval *depthval, mval *prechomp)
 	if (depth < 0)
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_FNNAMENEG);
 	subscripts = depth + 1;
-	*finaldst = *prechomp;
+	finaldst->umval = prechomp->umval;
 	if (subscripts > MAX_LVSUBSCRIPTS)
 		return;
 	if (!is_canonic_name(prechomp, &subscripts, &start, &dummy))

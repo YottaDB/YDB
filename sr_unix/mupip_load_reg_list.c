@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2018 Fidelity National Information		*
+ * Copyright (c) 2018-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -14,6 +14,7 @@
 #include "gtm_facility.h"
 #include "fileinfo.h"
 #include "gdsbt.h"
+#include "hashtab_umname.h"
 #include "gdsfhead.h"
 #include "muextr.h"
 #include "mupip_load_reg_list.h"
@@ -50,19 +51,19 @@ boolean_t search_reg_list(gd_region **reg_list, gd_region *r_ptr, uint4 num_of_r
 	return FALSE;
 }
 
-boolean_t check_db_status_for_global(mname_entry *gvname, int fmt, gtm_uint64_t *failed_record_count, gtm_uint64_t iter,
+boolean_t check_db_status_for_global(unmanaged_mname_entry *gvname, int fmt, gtm_uint64_t *failed_record_count, gtm_uint64_t iter,
 		gtm_uint64_t *first_failed_rec_count, gd_region **reg_list, uint4 num_of_reg)
 {
 	gd_binding		*map;
-	ht_ent_mname		*tabent;
-	hash_table_mname	*tab_ptr;
+	ht_ent_umname		*tabent;
+	hash_table_umname	*tab_ptr;
 	char			msg_buff[128];
 	gd_region		*reg_ptr = NULL;
 	gvnh_reg_t		*gvnh_reg;
 	gtm_uint64_t		tmp_rec_count;
 
 	tab_ptr = gd_header->tab_ptr;
-	if (NULL == (tabent = lookup_hashtab_mname((hash_table_mname *)tab_ptr, gvname)))
+	if (NULL == (tabent = lookup_hashtab_umname(tab_ptr, gvname)))
 	{
 		map = gv_srch_map(gd_header, gvname->var_name.addr,
 					gvname->var_name.len, SKIP_BASEDB_OPEN_TRUE);
@@ -89,4 +90,3 @@ boolean_t check_db_status_for_global(mname_entry *gvname, int fmt, gtm_uint64_t 
 	}
 	return TRUE;
 }
-

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -15,6 +15,7 @@
 #include "cmd_qlf.h"
 #include "cli.h"
 #include "min_max.h"
+#include "gcol_list.h"
 
 GBLDEF list_params 		lst_param;
 

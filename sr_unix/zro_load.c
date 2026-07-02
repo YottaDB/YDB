@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -50,7 +50,7 @@ void zro_load(mstr *str)
 {
 	unsigned		toktyp, status;
 	boolean_t		arlink_thisdir_enable, arlink_enabled;
-	mstr			tok, transtr;
+	unmanaged_mstr		tok, transtr;
 	char			*lp, *top;
 	zro_ent			array[ZRO_MAX_ENTS], *op, *zro_root_ptr;
 	int			oi, si, total_ents;
@@ -59,9 +59,11 @@ void zro_load(mstr *str)
 	char			tranbuf[MAX_FN_LEN + 1];
 	parse_blk		pblk;
 	size_t			root_alloc_size;	/* For SCI */
+	unsigned int		gcols;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	DBG_START_NO_GCOLS(gcols);
 	arlink_enabled = FALSE;
 	memset(array, 0, SIZEOF(array));
 	lp = str->addr;

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2010 Fidelity Information Services, Inc	*
+ * Copyright (c) 2010-2026 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,6 +35,6 @@ void op_zwritesvn(int svn)
 	zshow_svn(&output, svn);
 	output.code = 0;
 	output.flush = TRUE;
-	zshow_output(&output,0);
+	zshow_output(&output, 0);
 	MAXSTR_BUFF_FINI;
 }

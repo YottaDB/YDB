@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -30,6 +30,7 @@
 #include "op.h"
 #include "gtmio.h"
 #include "util.h"
+#include "noprincio_if_needed_inline.h"
 
 GBLREF	boolean_t	hup_on, prin_in_dev_failure, prin_out_dev_failure;
 GBLREF	io_pair		io_std_device;

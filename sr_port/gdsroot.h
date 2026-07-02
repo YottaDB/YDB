@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -82,20 +82,17 @@ typedef ublock_id_64	ublock_id;	/* unsigned type of the same length as the defau
 #define PUT_BLK_ID_32(X,Y)			\
 {						\
 	assert((block_id_32)(Y) == (Y));	\
-	PUT_LONG(X,(block_id_32)Y);		\
+	PUT_LONG(X,(block_id_32)(Y));		\
 }
 #define GET_BLK_ID_32(X,Y)	GET_LONG(X,Y)
-#define GET_BLK_ID_32P(X,Y)	GET_LONGP(X,Y)
 #define PUT_BLK_ID_64(X,Y)	PUT_LLONG(X,Y)
 #define GET_BLK_ID_64(X,Y)	GET_LLONG(X,Y)
-#define GET_BLK_ID_64P(X,Y)	GET_LLONGP(X,Y)
 
 /* These are memory access macros for general case block_id references
  * instead of a specific block_id width
  */
 #define PUT_BLK_ID(X,Y)		PUT_BLK_ID_64(X,Y)
 #define GET_BLK_ID(X,Y)		GET_BLK_ID_64(X,Y)
-#define GET_BLK_IDP(X,Y)	GET_BLK_ID_64P(X,Y)
 
 static inline void WRITE_BLK_ID(boolean_t long_blk_id, block_id blkid, sm_uc_ptr_t ptr)
 {

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2018 Fidelity National Information	*
+ * Copyright (c) 2010-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -23,7 +23,7 @@ void op_fnzsubstr(mval* src, int first, int byte_width, mval* dest)
 	boolean_t	src_is_singlebyte;
 
 	MV_FORCE_STR(src);
-	MV_INIT(dest);
+	UMV_INIT(&dest->umval);
 	dest->mvtype = MV_STR;
 	if (first <= 0)
 		first = 1;

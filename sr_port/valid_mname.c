@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -14,7 +14,7 @@
 #include "toktyp.h"
 #include "valid_mname.h"
 
-boolean_t valid_mname(mstr *targ)
+boolean_t valid_mname(mident *targ)
 {
 	char	*src, *src_top;
 

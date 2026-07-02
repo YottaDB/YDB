@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -46,7 +46,7 @@ static readonly unsigned char open_params_list[] =
  */
 void jnlext_write(jnl_ctl_list *jctl, jnl_record *rec, enum broken_type recstat, char *buffer, int length)
 {
-	mval			op_val, op_pars;
+	mval			op_val = {{0}}, op_pars = {{0}};
 	io_pair			dev_in_use;
 	fi_type			*file_info;
 	reg_ctl_list		*rctl;
@@ -65,7 +65,7 @@ void jnlext_write(jnl_ctl_list *jctl, jnl_record *rec, enum broken_type recstat,
 		assert(1 == murgbl.reg_total);
 		assert(sys_output.len > 0);
 		assert(sys_output.addr);
-		op_val.str = sys_output;
+		op_val.str.umstr = sys_output.umstr;
 	}
 	op_pars.str.len = SIZEOF(open_params_list);
 	op_pars.str.addr = (char *)open_params_list;

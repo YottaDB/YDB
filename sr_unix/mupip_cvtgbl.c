@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -91,7 +91,7 @@ void mupip_cvtgbl(void)
 		}
 		/* User wants to load from standard input */
 		assert(SIZEOF(fn) > sys_input.len);
-		memcpy((void *)fn, sys_input.addr, sys_input.len);
+		memcpy(fn, sys_input.addr, sys_input.len);
 		fn_len = sys_input.len;
 		assert(-1 != fcntl(fileno(stdin), F_GETFD));
 	} else if (!cli_get_str("FILE", fn, &fn_len))  /* User wants to read from a file. */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -38,7 +38,7 @@
 #include "iosocketdef.h"
 #include "min_max.h"
 #include "deferred_events_queue.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "stack_frame.h"
 #include "mv_stent.h"
 #include "gtm_netdb.h"
@@ -138,7 +138,7 @@ boolean_t iosocket_wait(io_desc *iod, int4 msec_timeout, mval *whatop, mval *han
 		{
 			MV_FORCE_STR(handle);
 			/* WARNING inline assignment below */
-			if (0 > (handle_index = iosocket_handle(handle->str.addr, &handle->str.len, FALSE, dsocketptr)))
+			if (0 > (handle_index = iosocket_get_handle(handle->str.addr, handle->str.len, dsocketptr)))
 			{
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SOCKNOTFND, 2, handle->str.len, handle->str.addr);
 				return FALSE;		/* for compiler and analyzers */
@@ -718,7 +718,7 @@ int iosocket_accept(d_socket_struct *dsocketptr, socket_struct *socketptr, boole
 	newsocketptr->howcreated = creator_accept;
 	newsocketptr->first_read = newsocketptr->first_write = TRUE;
 	/* put the new-born socket to the list and create a handle for it */
-	iosocket_handle(newsocketptr->handle, &newsocketptr->handle_len, TRUE, dsocketptr);
+	iosocket_new_handle(newsocketptr->handle, &newsocketptr->handle_len, dsocketptr);
 	STRNDUP(socketptr->handle, socketptr->handle_len, newsocketptr->parenthandle);
 	socketptr->lastaction = dsocketptr->waitcycle;	/* record cycle for last connect */
 	dsocketptr->socket[dsocketptr->n_socket++] = newsocketptr;

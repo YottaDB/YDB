@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2001-2022 Fidelity National Information		#
+# Copyright (c) 2001-2026 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -72,6 +72,7 @@ ENTRY op_forloop
 	jle	L67
 	movw	$mval_m_int,mval_w_mvtype(%esi)
 	movl	%eax,mval_l_m1(%esi)
+	movl	$0,mval_l_strlen(%esi)
 	jmp	L63
 
 L67:	movb	$mval_esign_mask,mval_b_exp(%esi)	# set sign bit
@@ -80,6 +81,7 @@ L67:	movb	$mval_esign_mask,mval_b_exp(%esi)	# set sign bit
 
 L68:	movb	$0,mval_b_exp(%esi)			# clear sign bit
 L69:	movw	$mval_m_nm,mval_w_mvtype(%esi)
+	movl	$0,mval_l_strlen(%esi)
 	orb	$69,mval_b_exp(%esi)			# set exponent field
 	movl	%eax,%ebx
 	movl	$0,%edx
@@ -142,6 +144,7 @@ tcmp:	jle	d
 	cmpl	$-MANT_HI,%eax
 	jle	l67
 	movw	$mval_m_int,mval_w_mvtype(%esi)
+	movl	$0,mval_l_strlen(%esi)
 	movl	%eax,mval_l_m1(%esi)
 	jmp	l63
 
@@ -151,6 +154,7 @@ l67:	movb	$mval_esign_mask,mval_b_exp(%esi)	# set sign bit
 
 l68:	movb	$0,mval_b_exp(%esi)			# clear sign bit
 l69:	movw	$mval_m_nm,mval_w_mvtype(%esi)
+	movl	$0,mval_l_strlen(%esi)
 	orb	$69,mval_b_exp(%esi)			# set exponent field
 	movl	%eax,%ebx
 	movl	$0,%edx

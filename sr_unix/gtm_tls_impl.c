@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2013-2025 Fidelity National Information	*
+ * Copyright (c) 2013-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -185,7 +185,7 @@ STATICFNDEF char *parse_SSL_options(struct gtm_ssl_options *opt_table, size_t op
 		if (OPTIONEND == *charptr)
 			if ('\0' == *++charptr)
 				break;
-		optionend = strstr((const char *)charptr, OPTIONENDSTR);
+		optionend = (char *)strstr((const char *)charptr, OPTIONENDSTR);
 		if (NULL == optionend)
 			optionend = charptr + strlen(charptr);
 		if (OPTIONNOT == *charptr)
@@ -672,7 +672,7 @@ gtm_tls_ctx_t *gtm_tls_init(int version, int flags)
 					verify_mode_string, &verify_long, NULL);
 		if (NULL != parse_ptr)
 		{
-			optionendptr = strstr((const char *)parse_ptr, OPTIONENDSTR);
+			optionendptr = (char *)strstr((const char *)parse_ptr, OPTIONENDSTR);
 			if (NULL == optionendptr)
 				parse_len = strlen(parse_ptr);
 			else
@@ -709,7 +709,7 @@ gtm_tls_ctx_t *gtm_tls_init(int version, int flags)
 					verify_level_string, &level_long, &level_clear);
 		if (NULL != parse_ptr)
 		{
-			optionendptr = strstr((const char *)parse_ptr, OPTIONENDSTR);
+			optionendptr = (char *)strstr((const char *)parse_ptr, OPTIONENDSTR);
 			if (NULL == optionendptr)
 				parse_len = strlen(parse_ptr);
 			else
@@ -816,7 +816,7 @@ gtm_tls_ctx_t *gtm_tls_init(int version, int flags)
 					&options_mask, &options_clear);
 		if (NULL != parse_ptr)
 		{
-			optionendptr = strstr((const char *)parse_ptr, OPTIONENDSTR);
+			optionendptr = (char *)strstr((const char *)parse_ptr, OPTIONENDSTR);
 			if (NULL == optionendptr)
 				parse_len = strlen(parse_ptr);
 			else
@@ -1116,7 +1116,7 @@ gtm_tls_socket_t *gtm_tls_socket(gtm_tls_ctx_t *tls_ctx, gtm_tls_socket_t *prev_
 						verify_mode_string, &verify_long, NULL);
 			if (NULL != parse_ptr)
 			{
-				optionendptr = strstr((const char *)parse_ptr, OPTIONENDSTR);
+				optionendptr = (char *)strstr((const char *)parse_ptr, OPTIONENDSTR);
 				if (NULL == optionendptr)
 					parse_len = strlen(parse_ptr);
 				else
@@ -1162,7 +1162,7 @@ gtm_tls_socket_t *gtm_tls_socket(gtm_tls_ctx_t *tls_ctx, gtm_tls_socket_t *prev_
 						verify_level_string, &level_long, &level_clear);
 			if (NULL != parse_ptr)
 			{
-				optionendptr = strstr((const char *)parse_ptr, OPTIONENDSTR);
+				optionendptr = (char *)strstr((const char *)parse_ptr, OPTIONENDSTR);
 				if (NULL == optionendptr)
 					parse_len = strlen(parse_ptr);
 				else
@@ -1443,7 +1443,7 @@ gtm_tls_socket_t *gtm_tls_socket(gtm_tls_ctx_t *tls_ctx, gtm_tls_socket_t *prev_
 					&options_mask, &options_clear);
 			if (NULL != parse_ptr)
 			{
-				optionendptr = strstr((const char *)parse_ptr, OPTIONENDSTR);
+				optionendptr = (char *)strstr((const char *)parse_ptr, OPTIONENDSTR);
 				if (NULL == optionendptr)
 					parse_len = strlen(parse_ptr);
 				else
@@ -1494,7 +1494,7 @@ gtm_tls_socket_t *gtm_tls_socket(gtm_tls_ctx_t *tls_ctx, gtm_tls_socket_t *prev_
 		{
 			session_id_len = (int)strnlen(id, (size_t)(SSL_MAX_SSL_SESSION_ID_LENGTH - 1));
 			assert((0 < session_id_len) && (SSL_MAX_SSL_SESSION_ID_LENGTH > session_id_len));
-			memcpy((char *)session_id_string, id, (size_t)session_id_len);		/* default to tlsid */
+			memcpy(session_id_string, id, (size_t)session_id_len);		/* default to tlsid */
 			session_id_string[session_id_len] = '\0';
 		}
 		if (0 >= SSL_set_session_id_context(ssl, (const unsigned char *)session_id_string, (unsigned int)session_id_len))
@@ -1771,7 +1771,7 @@ STATICFNDEF int gtm_tls_renegotiate_options_config(gtm_tls_socket_t *socket, cha
 				verify_mode_string, &verify_long, NULL);
 		if (NULL != parse_ptr)
 		{
-			optionendptr = strstr((const char *)parse_ptr, OPTIONENDSTR);
+			optionendptr = (char *)strstr((const char *)parse_ptr, OPTIONENDSTR);
 			if (NULL == optionendptr)
 				parse_len = strlen(parse_ptr);
 			else
@@ -1793,7 +1793,7 @@ STATICFNDEF int gtm_tls_renegotiate_options_config(gtm_tls_socket_t *socket, cha
 				verify_level_string, &level_long, &level_clear);
 		if (NULL != parse_ptr)
 		{
-			optionendptr = strstr((const char *)parse_ptr, OPTIONENDSTR);
+			optionendptr = (char *)strstr((const char *)parse_ptr, OPTIONENDSTR);
 			if (NULL == optionendptr)
 				parse_len = strlen(parse_ptr);
 			else

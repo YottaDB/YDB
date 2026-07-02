@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -25,7 +25,7 @@
 #include "gdsbt.h"
 #include "gdsfhead.h"
 #include "op.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "stack_frame.h"
 #include "alias.h"
 #include "error.h"
@@ -68,7 +68,7 @@ void op_xnew(unsigned int argcnt_arg, mval *s_arg, ...)
 	mval			*s;
 	stack_frame		*fp;
 	va_list			var;
-	var_tabent		lvent;
+	mname_entry		lvent = {{{0}}};
 
 	argcnt = argcnt_arg;
 	htold = &curr_symval->h_symtab;
@@ -112,12 +112,19 @@ void op_xnew(unsigned int argcnt_arg, mval *s_arg, ...)
 			{	/* Reuse entry from list */
 				xnewvar = xnewvar_anchor;
 				xnewvar_anchor = xnewvar->next;
+				assert(!glist_str_protected(&xnewvar->key.var_name));
 			} else
+			{
 				xnewvar = (lv_xnew_var *)malloc(SIZEOF(lv_xnew_var));
-			xnewvar->key = tabent1->key;	/* Note "value" in this key is not used since it is not sync'd */
+				glist_first_init_str(&xnewvar->key.var_name);
+			}
+			xnewvar->key.umname = tabent1->key.umname;	/* Note "value" in this key is not
+									 * used since it is not sync'd
+									 */
 			xnewvar->lvval = lvtab1;
 			xnewvar->next = curr_symval->xnew_var_list;
 			curr_symval->xnew_var_list = xnewvar;
+			glist_protect_str(&xnewvar->key.var_name); /* TODO/UNKNOWN: some kind of sync? */
 			INCR_CREFCNT(lvtab1);
 			INCR_TREFCNT(lvtab1);
 			/* Note that there is no attempt to prevent double processing an lvval that has been indicated

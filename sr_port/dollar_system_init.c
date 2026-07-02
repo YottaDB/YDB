@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2002-2021 Fidelity National Information	*
+ * Copyright (c) 2002-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -23,7 +23,6 @@
 #include "trans_log_name.h"
 
 GBLREF	mval	dollar_system, dollar_system_initial;
-GBLREF spdesc	stringpool;
 
 error_def(ERR_LOGTOOLONG);
 error_def(ERR_TRNLOGFAIL);
@@ -31,17 +30,18 @@ error_def(ERR_TRNLOGFAIL);
 void dollar_system_init(struct startup_vector *svec)
 {
 	int4		status;
-	mstr		val, tn;
+	mstr		tn;
 	char		buf[MAX_TRANS_NAME_LEN];
+	UMSTR_CONST(val, SYSID);
 
+	assert(!glist_str_protected(&dollar_system.str)); /* No double-initialization */
+	glist_protect_str(&dollar_system.str);
 	dollar_system.mvtype = MV_STR;
 	dollar_system.str.len = STR_LIT_LEN("47,");
 	ENSURE_STP_FREE_SPACE(dollar_system.str.len);
 	dollar_system.str.addr = (char *)stringpool.free;
 	memcpy(stringpool.free, "47,", dollar_system.str.len);
 	stringpool.free += dollar_system.str.len;
-	val.addr = SYSID;
-	val.len = STR_LIT_LEN(SYSID);
 	if (SS_NORMAL == (status = TRANS_LOG_NAME(&val, &tn, buf, SIZEOF(buf), dont_sendmsg_on_log2long)))
 	{
 		dollar_system.str.len += tn.len;
@@ -59,7 +59,6 @@ void dollar_system_init(struct startup_vector *svec)
 #	endif
 	else
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_TRNLOGFAIL, 2, LEN_AND_LIT(SYSID), status);
-	dollar_system_initial = dollar_system;
+	dollar_system_initial.umval = dollar_system.umval;
 	assert(stringpool.free < stringpool.top);	/* it's process initialization after all */
-	return;
 }

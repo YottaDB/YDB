@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -28,8 +28,8 @@
 
 static readonly char definput[] = DEVNULL;
 
-MSTR_CONST(defoutext, ".mjo");
-MSTR_CONST(deferrext, ".mje");
+UMSTR_CONST(defoutext, ".mjo");
+UMSTR_CONST(deferrext, ".mje");
 
 LITREF jp_datatype	job_param_datatypes[];
 
@@ -182,8 +182,8 @@ void ojparams (char *p, job_params_type *job_params)
 	else if (IS_JOB_SOCKET(job_params->params.input.buffer, job_params->params.input.len))
 	{
 		handle_len = JOB_SOCKET_HANDLE_LEN(job_params->params.input.len);
-		if ((NULL == socket_pool) || (-1 == iosocket_handle(JOB_SOCKET_HANDLE(job_params->params.input.buffer),
-									&handle_len, FALSE, socket_pool)))
+		if ((NULL == socket_pool) || (-1 == iosocket_get_handle(JOB_SOCKET_HANDLE(job_params->params.input.buffer),
+									handle_len, socket_pool)))
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_PARFILSPC, 4, 5, "INPUT",
 				job_params->params.input.len, job_params->params.input.buffer);
 	}
@@ -207,8 +207,8 @@ void ojparams (char *p, job_params_type *job_params)
 	else if (IS_JOB_SOCKET(job_params->params.output.buffer, job_params->params.output.len))
 	{
 		handle_len = JOB_SOCKET_HANDLE_LEN(job_params->params.output.len);
-		if ((NULL == socket_pool) || (-1 == iosocket_handle(JOB_SOCKET_HANDLE(job_params->params.output.buffer),
-									&handle_len, FALSE, socket_pool)))
+		if ((NULL == socket_pool) || (-1 == iosocket_get_handle(JOB_SOCKET_HANDLE(job_params->params.output.buffer),
+									handle_len, socket_pool)))
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_PARFILSPC, 4, 5, "OUTPUT",
 				job_params->params.output.len, job_params->params.output.buffer);
 	}
@@ -231,8 +231,8 @@ void ojparams (char *p, job_params_type *job_params)
 	else if (IS_JOB_SOCKET(job_params->params.error.buffer, job_params->params.error.len))
 	{
 		handle_len = JOB_SOCKET_HANDLE_LEN(job_params->params.error.len);
-		if ((NULL == socket_pool) || (-1 == iosocket_handle(JOB_SOCKET_HANDLE(job_params->params.error.buffer),
-									&handle_len, FALSE, socket_pool)))
+		if ((NULL == socket_pool) || (-1 == iosocket_get_handle(JOB_SOCKET_HANDLE(job_params->params.error.buffer),
+									handle_len, socket_pool)))
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_PARFILSPC, 4, 5, "ERROR",
 				job_params->params.error.len, job_params->params.error.buffer);
 	}

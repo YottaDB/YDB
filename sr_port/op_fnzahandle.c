@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2009, 2011 Fidelity Information Services, Inc	*
+ * Copyright (c) 2009-2026 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -51,5 +52,5 @@ void op_fnzahandle(lv_val *srclv, mval *dst)
 		stringpool.free += dst->str.len;
 		dst->mvtype = MV_STR;
 	} else
-		memcpy(dst, &literal_null, SIZEOF(mval));
+		dst->umval = literal_null.umval;
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2018-2024 Fidelity National Information	*
+ * Copyright (c) 2018-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -91,6 +91,7 @@ void check_and_set_ztimeout(mval *inp_val)
 	mval		*zt_sec_ptr, ztimeout_seconds, ztimeout_vector;
 	sigset_t	savemask;
 	ABS_TIME	cur_time, end_time;
+	unsigned int	gcols;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -102,11 +103,12 @@ void check_and_set_ztimeout(mval *inp_val)
 	for (colon_ptr = local_str_val; (colon_ptr < local_str_end) && (':' != *colon_ptr); colon_ptr++)
 		;
 	only_timeout = (colon_ptr >= local_str_end);
-	ztimeout_vector = (TREF(dollar_ztimeout)).ztimeout_vector;
+	ztimeout_vector.umval = (TREF(dollar_ztimeout)).ztimeout_vector.umval;
+	DBG_START_NO_GCOLS(gcols);
 	if (!only_timeout && (colon_ptr >= local_str_val))
 	{	/* vector change */
 		if (ztimeout_vector.str.len && ztimeout_vector.str.addr)
-			memcpy(&(TREF(dollar_ztimeout)).ztimeout_vector, &literal_null, SIZEOF(mval));
+			(TREF(dollar_ztimeout)).ztimeout_vector.umval = literal_null.umval;
 		if (local_str_end > colon_ptr)
 		{	/* there's a vector to process */
 			read_len = local_str_end - colon_ptr - 1;
@@ -135,7 +137,8 @@ void check_and_set_ztimeout(mval *inp_val)
 			ztimeout_vector.str.len = 0;
 		}
 	}
-	(TREF(dollar_ztimeout)).ztimeout_vector = ztimeout_vector;
+	DBG_END_NO_GCOLS(gcols);
+	(TREF(dollar_ztimeout)).ztimeout_vector.umval = ztimeout_vector.umval;
 	if (colon_ptr > local_str_val)
 	{	/* some form of timeout specified */
 		if (0 > inp_val->m[1]) /* Negative timeout specified, cancel the timer */
@@ -155,13 +158,13 @@ void check_and_set_ztimeout(mval *inp_val)
 			DBGDFRDEVNT((stderr, "%d %s: check_and_set_ztimeout - canceling ID : %lX\n",
 				__LINE__, __FILE__ , ZTIMEOUT_TIMER_ID));
 			/* All negative values transformed to -1 */
-			memcpy(&((TREF(dollar_ztimeout)).ztimeout_seconds), &literal_minusone, SIZEOF(mval));
+			(TREF(dollar_ztimeout)).ztimeout_seconds.umval = literal_minusone.umval;
 		} else
 		{
 			ztimeout_seconds.str.addr = local_str_val;
 			ztimeout_seconds.str.len = only_timeout ? read_len : colon_ptr - local_str_val;
 			ztimeout_seconds.mvtype = MV_STR;
-			(TREF(dollar_ztimeout)).ztimeout_seconds = ztimeout_seconds;
+			(TREF(dollar_ztimeout)).ztimeout_seconds.umval = ztimeout_seconds.umval;
 			zt_sec_ptr = &ztimeout_seconds;				/* compile of below macro requires explicit ptr */
 			MV_FORCE_MSTIMEOUT(zt_sec_ptr, &msec_timeout, NOTPNOTACID);
 			assert(INTRPT_IN_EVENT_HANDLING != intrpt_ok_state);
@@ -214,7 +217,10 @@ void ztimeout_set(int4 dummy_param)
 		|| (jobinterrupt == (TREF(save_xfer_root_ptr))->ev_que.fl->outofband)
 		|| ((0 == gtm_trigger_depth) && dollar_tlevel))
 	{	/* not a good time, so save it */
-		outofband = no_event;
+		if (ztimeout == outofband)
+			outofband = no_event;
+		else
+			assert(FALSE || outofband);
 		TAREF1(save_xfer_root, ztimeout).event_state = queued;
 		SAVE_XFER_QUEUE_ENTRY(ztimeout, 0);
 		DBGDFRDEVNT((stderr, "%d %s: ztimeout_set - ZTIMEOUT queued; dec_indx %d, et: %d intrpt: %d, crit: %d\n",

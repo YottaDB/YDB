@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2023 Fidelity National Information	*
+ * Copyright (c) 2010-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -53,7 +53,7 @@ GBLREF	gv_key			*gv_currkey;
 GBLREF	gv_namehead		*gv_target;
 GBLREF	int4			gtm_trigger_depth;
 GBLREF	jnlpool_addrs_ptr_t	jnlpool;
-GBLREF	mstr			*dollar_ztname;
+GBLREF	mident			*dollar_ztname;
 GBLREF	sgmnt_data_ptr_t 	cs_data;
 GBLREF spdesc			rts_stringpool, stringpool;
 GBLREF	uint4			dollar_tlevel;
@@ -262,7 +262,7 @@ void op_fnztrigger(mval *func, mval *arg1, mval *arg2, mval *dst)
 	}
 	REVERT;
 	RESTORE_ZTRIGGER_ENTRY_STATE;
-	memcpy(dst, (failed ? &literal_zero : &literal_one), SIZEOF(mval));
+	dst->umval = failed ? literal_zero.umval : literal_one.umval;
 	return;
 }
 #else /* !GTM_TRIGGER */

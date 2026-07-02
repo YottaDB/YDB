@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2014-2022 Fidelity National Information	*
+ * Copyright (c) 2014-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -21,7 +21,7 @@
 #include "gdsblk.h"
 #include "filestruct.h"
 #include "trigger.h"
-#include <rtnhdr.h>			/* needed for gv_trigger.h */
+#include "rtnhdr.h"			/* needed for gv_trigger.h */
 #include "gv_trigger.h"
 #include "gtm_trigger.h"
 #include "gv_trigger_protos.h"
@@ -558,7 +558,8 @@ void	trigger_upgrade(gd_region *reg)
 			 * might have been tampered with. Restore it to proper value first.
 			 */
 			 gv_currkey->prev = gvname_prev;
-			gvname->mvtype = 0; /* can now be garbage collected in the next iteration */
+			 gvname->mvtype = 0; /* can now be garbage collected in the next iteration */
+			 gvname->str.len = 0;
 		} while (TRUE);
 	}
 	op_tcommit();

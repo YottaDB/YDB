@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2009, 2011 Fidelity Information Services, Inc	*
+ * Copyright (c) 2009-2026 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -48,5 +49,5 @@ void op_fnzdata(lv_val *srclv, mval *dst)
 			isalias = (0 != (MV_ALIASCONT & srclv->v.mvtype));
 		}
 	}
-	*dst = isalias ? *fnzdata_table[hasdesc][isdefd] : *fndata_table[hasdesc][isdefd];
+	dst->umval = isalias ? fnzdata_table[hasdesc][isdefd]->umval : fndata_table[hasdesc][isdefd]->umval;
 }

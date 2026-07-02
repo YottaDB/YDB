@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -29,7 +29,7 @@
 #include "filestruct.h"
 #include "jnl.h"
 #include "buddy_list.h"		/* needed for tp.h */
-#include "hashtab_mname.h"
+#include "hashtab_umname.h"
 #include "tp.h"
 #include "change_reg.h"
 #include "targ_alloc.h"
@@ -48,21 +48,28 @@ error_def(ERR_KEY2BIG);
 error_def(ERR_GVIS);
 
 /* Map an unsubscripted global name to its corresponding region in the gld file */
-gvnh_reg_t *gv_bind_name(gd_addr *addr, mname_entry *gvname)
+gvnh_reg_t *gv_bind_name(gd_addr *addr, unmanaged_mname_entry *gvname)
 {
 	gd_binding		*map;
-	ht_ent_mname		*tabent, *tabent1;
+	ht_ent_umname		*tabent, *tabent1;
 	gd_region		*reg;
 	gvnh_reg_t		*gvnh_reg;
-	int			keylen, count;
+	int			keylen;
+	unsigned int		count;
 	char			format_key[MAX_MIDENT_LEN + 1];	/* max key length + 1 byte for '^' */
 	gv_namehead		*tmp_gvt;
 	sgmnt_addrs		*csa;
-	hash_table_mname	*tab_ptr;
+	hash_table_umname	*tab_ptr;
+#	ifdef DEBUG
+	boolean_t		was_in_stringpool;
+	char			lcl_name[MAX_MIDENT_LEN];
 
-	assert(MAX_MIDENT_LEN >= gvname->var_name.len);
+	was_in_stringpool = glist_umstr_in_stringpool(&gvname->var_name);
+	memcpy(lcl_name, gvname->var_name.addr, MIN(gvname->var_name.len, MAX_MIDENT_LEN));
+#	endif
+
 	tab_ptr = addr->tab_ptr;
-	if (NULL == (tabent = lookup_hashtab_mname((hash_table_mname *)tab_ptr, gvname)))
+	if (NULL == (tabent = lookup_hashtab_umname(tab_ptr, gvname)))
 	{
 		count = tab_ptr->count;	/* Note down current # of valid entries in hash table */
 		map = gv_srch_map(addr, gvname->var_name.addr, gvname->var_name.len, SKIP_BASEDB_OPEN_FALSE);
@@ -74,7 +81,7 @@ gvnh_reg_t *gv_bind_name(gd_addr *addr, mname_entry *gvname)
 			 * a "op_gvname/gv_bind_name" if they in turn invoke "gvcst_init_statsDB". In that case, the hash table
 			 * could have been updated since we did the "lookup_hashtab_mname" call above. So redo the lookup.
 			 */
-			tabent = lookup_hashtab_mname((hash_table_mname *)tab_ptr, gvname);
+			tabent = lookup_hashtab_umname(tab_ptr, gvname);
 		} else
 		{	/* If not a statsDB, then the above calls to "gv_srch_map" or "gv_init_reg" should not have changed
 			 * the hashtable status of "gvname". There is an exception in that if gvname is "%YGS" (STATSDB_GBLNAME),
@@ -85,14 +92,14 @@ gvnh_reg_t *gv_bind_name(gd_addr *addr, mname_entry *gvname)
 			 * happen in this particular hashtable, it is enough to check for "count < tab_ptr->count".
 			 */
 #			ifdef DEBUG
-			tabent1 = lookup_hashtab_mname((hash_table_mname *)tab_ptr, gvname);
+			tabent1 = lookup_hashtab_umname(tab_ptr, gvname);
 			assert((tabent1 == tabent)
 				|| ((gvname->var_name.len == STATSDB_GBLNAME_LEN)
 					&& (0 == memcmp(gvname->var_name.addr, STATSDB_GBLNAME, STATSDB_GBLNAME_LEN))
 					&& (count < tab_ptr->count)));
 #			endif
 			if (count < tab_ptr->count)
-				tabent = lookup_hashtab_mname((hash_table_mname *)tab_ptr, gvname);
+				tabent = lookup_hashtab_umname(tab_ptr, gvname);
 		}
 	}
 	if (NULL == tabent)
@@ -118,6 +125,8 @@ gvnh_reg_t *gv_bind_name(gd_addr *addr, mname_entry *gvname)
 		memcpy(&format_key[1], gvname->var_name.addr, gvname->var_name.len);
 		csa = &FILE_INFO(reg)->s_addrs;
 		gv_currkey->end = 0;
+		assert((!was_in_stringpool || glist_umstr_in_stringpool(&gvname->var_name))
+				&& !memcmp(lcl_name, gvname->var_name.addr, MIN(gvname->var_name.len, MAX_MIDENT_LEN)));
 		RTS_ERROR_CSA_ABT(csa, VARLSTCNT(10) ERR_KEY2BIG, 4, keylen + 2, (int4)reg->max_key_size,
 			REG_LEN_STR(reg), ERR_GVIS, 2, 1 + gvname->var_name.len, format_key);
 	}
@@ -126,6 +135,8 @@ gvnh_reg_t *gv_bind_name(gd_addr *addr, mname_entry *gvname)
 				 * an error condition and fail asserts in mdb_condition_handler (for example).
 				 */
 	memcpy(gv_currkey->base, gvname->var_name.addr, keylen);
+	assert((!was_in_stringpool || glist_umstr_in_stringpool(&gvname->var_name))
+			&& !memcmp(lcl_name, gvname->var_name.addr, MIN(gvname->var_name.len, MAX_MIDENT_LEN)));
 	gv_currkey->base[keylen] = KEY_DELIMITER;
 	keylen++;
 	gv_currkey->base[keylen] = KEY_DELIMITER;

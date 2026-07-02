@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -14,7 +14,7 @@
 #include "gtm_string.h"
 #include "stringpool.h"
 #include "op.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "stack_frame.h"
 #include "mv_stent.h"
 
@@ -44,7 +44,7 @@ void op_fnfnumber(mval *src, mval *fmt, boolean_t use_fract, int fract, mval *ds
 	/* if the dst will be different than the src we'll build the new value in the string pool and repoint dst there,
 	 * otherwise, dst will anyway become the same as src, therefore we can safely use dst as a "temporary" copy of src
 	 */
-	*dst = *src;
+	dst->umval = src->umval;
 	if (use_fract)
 		op_fnj3(dst, 0, fract, dst);
 	else

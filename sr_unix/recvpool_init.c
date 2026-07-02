@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -143,7 +143,7 @@ void recvpool_init(recvpool_user pool_user, boolean_t gtmrecv_startup)
 			|| ((reg->dyn.addr->fname_len == full_len) && !STRCMP(reg->dyn.addr->fname, instfilename))));
 	if ((NULL == tmp_jnlpool) || (recvpool.recvpool_dummy_reg != tmp_jnlpool->jnlpool_dummy_reg))
 	{	/* Fill in fields only if this is the first time this process is opening the replication instance file */
-		memcpy((char *)reg->dyn.addr->fname, instfilename, full_len);
+		memcpy(reg->dyn.addr->fname, instfilename, full_len);
 		reg->dyn.addr->fname_len = full_len;
 		udi->fn = (char *)reg->dyn.addr->fname;
 	}
@@ -382,7 +382,7 @@ void recvpool_init(recvpool_user pool_user, boolean_t gtmrecv_startup)
 		recvpool.recvpool_ctl->write = 0;
 		recvpool.recvpool_ctl->write_wrap = recvpool.recvpool_ctl->recvpool_size;
 		recvpool.recvpool_ctl->wrapped = FALSE;
-		memcpy( (char *)recvpool.recvpool_ctl->recvpool_id.instfilename, instfilename, full_len);
+		memcpy(recvpool.recvpool_ctl->recvpool_id.instfilename, instfilename, full_len);
 		memcpy(recvpool.recvpool_ctl->recvpool_id.label, GDS_RPL_LABEL, GDS_LABEL_SZ);
 		memcpy(recvpool.recvpool_ctl->recvpool_id.now_running, gtm_release_name, gtm_release_name_len + 1);
 		assert(0 == offsetof(recvpool_ctl_struct, recvpool_id));

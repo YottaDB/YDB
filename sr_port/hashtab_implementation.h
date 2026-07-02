@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -43,8 +43,14 @@ Restrictions :
 #include "gtmio.h"
 #include "have_crit.h"
 #include "caller_id.h"
+#include "stringpool.h"
+#include "gcol_list.h"
 
 GBLREF	int		*ht_sizes;
+
+#ifdef	DEBUG_GCOL
+GBLREF unsigned int gcol_stack_lvl;
+#endif
 
 #define DEBUGHASHTABLE 0
 
@@ -85,6 +91,11 @@ GBLREF	int		*ht_sizes;
 #	define COMPACT_HASHTAB			compact_hashtab_int4
 #	define COPY_HASHTAB_TO_BUFFER		copy_hashtab_to_buffer_int4
 #	define ACTIVATE_HASHTAB_IN_BUFFER	activate_hashtab_in_buffer_int4
+#	define PROTECT_KEY(KEY)
+#	define UNPROTECT_KEY(KEY)
+#	define ASSERT_KEY_NOT_IN_LIST(KEY)
+#	define ASSERT_KEY_PROTECTED(KEY)
+#	define ASSIGN_KEY(KEY1, KEY2_P)		(KEY1) = *(KEY2_P)
 
 #elif defined(INT8_HASH)
 
@@ -109,6 +120,11 @@ GBLREF	int		*ht_sizes;
 #	define COMPACT_HASHTAB			compact_hashtab_int8
 #	define COPY_HASHTAB_TO_BUFFER		copy_hashtab_to_buffer_int8
 #	define ACTIVATE_HASHTAB_IN_BUFFER	activate_hashtab_in_buffer_int8
+#	define PROTECT_KEY(KEY)
+#	define UNPROTECT_KEY(KEY)
+#	define ASSERT_KEY_NOT_IN_LIST(KEY)
+#	define ASSERT_KEY_PROTECTED(KEY)
+#	define ASSIGN_KEY(KEY1, KEY2_P)		(KEY1) = *(KEY2_P)
 
 #elif defined(ADDR_HASH)
 
@@ -133,10 +149,16 @@ GBLREF	int		*ht_sizes;
 #	define COMPACT_HASHTAB			compact_hashtab_addr
 #	define COPY_HASHTAB_TO_BUFFER		copy_hashtab_to_buffer_addr
 #	define ACTIVATE_HASHTAB_IN_BUFFER	activate_hashtab_in_buffer_addr
+#	define PROTECT_KEY(KEY)
+#	define UNPROTECT_KEY(KEY)
+#	define ASSERT_KEY_NOT_IN_LIST(KEY)
+#	define ASSERT_KEY_PROTECTED(KEY)
+#	define ASSIGN_KEY(KEY1, KEY2_P)		(KEY1) = *(KEY2_P)
 
 #elif defined(MNAME_HASH)
 
 #	define HT_KEY_T				mname_entry
+#	define HT_ALTKEY_T			unmanaged_mname_entry
 #	define HT_ENT				ht_ent_mname
 #	define HASH_TABLE			hash_table_mname
 #	define HTENT_KEY_MATCH(tabent, hkey)									\
@@ -158,12 +180,55 @@ GBLREF	int		*ht_sizes;
 #	define ADD_HASHTAB_INTL			add_hashtab_intl_mname
 #	define LOOKUP_HASHTAB			lookup_hashtab_mname
 #	define DELETE_HASHTAB_ENT		delete_hashtab_ent_mname
-#	define DELETE_HASHTAB			delete_hashtab_mnamen
+#	define DELETE_HASHTAB			delete_hashtab_mname
 #	define FREE_HASHTAB			free_hashtab_mname
 #	define REINITIALIZE_HASHTAB		reinitialize_hashtab_mname
 #	define COMPACT_HASHTAB			compact_hashtab_mname
 #	define COPY_HASHTAB_TO_BUFFER		copy_hashtab_to_buffer_mname
 #	define ACTIVATE_HASHTAB_IN_BUFFER	activate_hashtab_in_buffer_mname
+#	define PROTECT_KEY(KEY)			glist_sync_static_str(&(KEY).var_name)
+#	define ASSIGN_KEY(KEY1, KEY2_P)		(KEY1).umname = (KEY2_P)->umname
+#	define UNPROTECT_KEY(KEY)		glist_unprotect_str(&(KEY).var_name)
+#	define ASSERT_KEY_NOT_IN_LIST(KEY) 	assert(!glist_str_protected(&(KEY).var_name))
+#	define ASSERT_KEY_PROTECTED(KEY)	assert(glist_static_str_in_sync(&(KEY).var_name))
+#	define PROTECT_KEYS
+
+#elif defined(UMNAME_HASH)
+
+#	define HT_KEY_T				unmanaged_mname_entry
+#	define HT_ENT				ht_ent_umname
+#	define HASH_TABLE			hash_table_umname
+#	define HTENT_KEY_MATCH(tabent, hkey)									\
+	(    ((tabent)->key.hash_code == (hkey)->hash_code)							\
+	     && ((tabent)->key.var_name.len == (hkey)->var_name.len)						\
+	     && (0 == memcmp((tabent)->key.var_name.addr, (hkey)->var_name.addr, (hkey)->var_name.len))		\
+	)
+#	define FIND_HASH(hkey, hash)		{assert((hkey)->hash_code); hash = (hkey)->hash_code;}
+	/* Note: FIND_HASH for mname does not compute hash_code. Callers must make sure it is already computed.
+	 *	 FIND_HASH for objcode or int4 or int8 computes hash code
+	 *		for every function call of add or lookup or delete. */
+#	define HTENT_EMPTY			HTENT_EMPTY_UMNAME
+#	define HTENT_MARK_EMPTY			HTENT_MARK_EMPTY_UMNAME
+#	define HTENT_VALID			HTENT_VALID_UMNAME
+#	define INIT_HASHTAB			init_hashtab_umname
+#	define INIT_HASHTAB_INTL		init_hashtab_intl_umname
+#	define EXPAND_HASHTAB			expand_hashtab_umname
+#	define ADD_HASHTAB			add_hashtab_umname
+#	define ADD_HASHTAB_INTL			add_hashtab_intl_umname
+#	define LOOKUP_HASHTAB			lookup_hashtab_umname
+#	define DELETE_HASHTAB_ENT		delete_hashtab_ent_umname
+#	define DELETE_HASHTAB			delete_hashtab_umname
+#	define FREE_HASHTAB			free_hashtab_umname
+#	define REINITIALIZE_HASHTAB		reinitialize_hashtab_umname
+#	define COMPACT_HASHTAB			compact_hashtab_umname
+#	define COPY_HASHTAB_TO_BUFFER		copy_hashtab_to_buffer_umname
+#	define ACTIVATE_HASHTAB_IN_BUFFER	activate_hashtab_in_buffer_umname
+#	define PROTECT_KEY(KEY)
+#	define ASSIGN_KEY(KEY1, KEY2_P)		(KEY1) = *(KEY2_P)
+#	define UNPROTECT_KEY(KEY)
+#	define ASSERT_KEY_NOT_IN_LIST(KEY)
+#	define ASSERT_KEY_PROTECTED(KEY)
+
 
 #elif defined(STRING_HASH)
 
@@ -193,6 +258,12 @@ GBLREF	int		*ht_sizes;
 #	define COMPACT_HASHTAB			compact_hashtab_str
 #	define COPY_HASHTAB_TO_BUFFER		copy_hashtab_to_buffer_str
 #	define ACTIVATE_HASHTAB_IN_BUFFER	activate_hashtab_in_buffer_str
+#	define PROTECT_KEY(KEY)			glist_sync_static_str(&(KEY).str)
+#	define ASSIGN_KEY(KEY1, KEY2_P)		(KEY1).hash_code = (KEY2_P)->hash_code, (KEY1).str.umstr = (KEY2_P)->str.umstr
+#	define UNPROTECT_KEY(KEY)		glist_unprotect_str(&(KEY).str)
+#	define ASSERT_KEY_NOT_IN_LIST(KEY) 	assert(!glist_str_protected(&(KEY).str))
+#	define ASSERT_KEY_PROTECTED(KEY) 	assert(glist_static_str_in_sync(&(KEY).str))
+#	define PROTECT_KEYS
 
 #elif defined (OBJCODE_HASH)
 
@@ -221,6 +292,12 @@ GBLREF	int		*ht_sizes;
 #	define COMPACT_HASHTAB			compact_hashtab_objcode
 #	define COPY_HASHTAB_TO_BUFFER		copy_hashtab_to_buffer_objcode
 #	define ACTIVATE_HASHTAB_IN_BUFFER	activate_hashtab_in_buffer_objcode
+#	define ASSIGN_KEY(KEY1, KEY2_P)		(KEY1).code = (KEY2_P)->code, (KEY1).str.umstr = (KEY2_P)->str.umstr
+#	define PROTECT_KEY(KEY)			glist_sync_static_str(&(KEY).str)
+#	define UNPROTECT_KEY(KEY)		glist_unprotect_str(&(KEY).str)
+#	define ASSERT_KEY_NOT_IN_LIST(KEY) 	assert(!glist_str_protected(&(KEY).str))
+#	define ASSERT_KEY_PROTECTED(KEY) 	assert(glist_static_str_in_sync(&(KEY).str))
+#	define PROTECT_KEYS
 
 #else
 #error undefined hash
@@ -280,14 +357,17 @@ GBLREF	int		*ht_sizes;
 	sm_uc_ptr_t ptr;							\
 										\
 	entry_num = (uint4)((tabent) - (table)->base); 				\
-	/* Compute offset into bitmap for this entry */ \
-	ptr = (table)->entry_passed_thru + (entry_num / BITS_PER_UCHAR);			\
+	/* Compute offset into bitmap for this entry */ 			\
+	ptr = (table)->entry_passed_thru + (entry_num / BITS_PER_UCHAR);	\
+	UNPROTECT_KEY((tabent)->key);						\
 	if ((1 << (entry_num & 7)) & *ptr) 					\
 	{									\
 		(tabent)->value = HT_DELETED_ENTRY; 				\
 		(table)->del_count++;						\
-	} else											\
+	} else									\
+	{									\
 		HTENT_MARK_EMPTY(tabent);					\
+	}									\
 	(table)->count--;							\
 	assert(((table)->count + (table)->del_count) <= (table)->size);		\
 }
@@ -319,7 +399,11 @@ void EXPAND_HASHTAB(HASH_TABLE *table, int minsize);
 boolean_t ADD_HASHTAB(HASH_TABLE *table, HT_KEY_T *key, void *value,  HT_ENT **tabentptr);
 STATICFNDCL boolean_t ADD_HASHTAB_INTL(HASH_TABLE *table, HT_KEY_T *key, void *value,  HT_ENT **tabentptr,
 		boolean_t changing_table_size);
-void *LOOKUP_HASHTAB(HASH_TABLE *table, HT_KEY_T *key);
+#ifdef MNAME_HASH
+HT_ENT *LOOKUP_HASHTAB(HASH_TABLE *table, const HT_ALTKEY_T *key);
+#else
+HT_ENT *LOOKUP_HASHTAB(HASH_TABLE *table, HT_KEY_T *key);
+#endif
 void DELETE_HASHTAB_ENT(HASH_TABLE *table, HT_ENT *tabent);
 boolean_t DELETE_HASHTAB(HASH_TABLE *table, HT_KEY_T *key);
 void FREE_HASHTAB(HASH_TABLE *table);
@@ -456,6 +540,7 @@ void EXPAND_HASHTAB(HASH_TABLE *table, int minsize)
 	HT_ENT 		*tabent, *topent, *dummy;
 	boolean_t	added;
 	void		*htval;
+	unsigned int	gcols;
 
 	assert(TRUE == table->active);
 	CONDITION_HANDLER(hashtab_rehash_ch);
@@ -469,15 +554,20 @@ void EXPAND_HASHTAB(HASH_TABLE *table, int minsize)
 	INIT_HASHTAB_INTL(&newtable, minsize, table);
 	REVERT;
 	if (0 < table->count) /* if no active entries then nothing to move */
+	{
 		for (tabent = table->base, topent = table->top; tabent < topent; tabent++)
 		{
 			if (HTENT_VALID(tabent, void, htval))
 			{
 				/* Place location of new ht_ent entry into value location of existing ht entry */
+				UNPROTECT_KEY((tabent)->key);
+				DBG_START_NO_GCOLS(gcols);
 				added = ADD_HASHTAB_INTL(&newtable, &tabent->key, htval, (HT_ENT **)&tabent->value, TRUE);
 				assert(added);
+				DBG_END_NO_GCOLS(gcols);
 			}
 		}
+	}
 	if (!table->defer_base_release && table->dont_keep_spare_table)
 	{
 		DBGHASHTAB((stderr, "EXPAND_HASHTAB:free base (%lx) \n", table->base));
@@ -517,7 +607,11 @@ void EXPAND_HASHTAB(HASH_TABLE *table, int minsize)
 /* This flavor is used by external caller (outside of the hash table implementation */
 boolean_t ADD_HASHTAB(HASH_TABLE *table, HT_KEY_T *key, void *value,  HT_ENT **tabentptr)
 {
-	return ADD_HASHTAB_INTL(table, key, value, tabentptr, FALSE);
+	boolean_t result;
+	DEBUG_GCOL_ONLY(gcol_stack_lvl++;)
+	result = ADD_HASHTAB_INTL(table, key, value, tabentptr, FALSE);
+	DEBUG_GCOL_ONLY(gcol_stack_lvl--;)
+	return result;
 }
 
 /* This flavor is used by internal callers, for example when adding entries during a change of hash table size. */
@@ -534,7 +628,9 @@ STATICFNDEF boolean_t ADD_HASHTAB_INTL(HASH_TABLE *table, HT_KEY_T *key, void *v
 	if (!changing_table_size && (table->count >= table->exp_trigger_size))
 	{
 		oldbase = table->base;
+		DEBUG_GCOL_ONLY(gcol_stack_lvl++;)
 		EXPAND_HASHTAB(table, table->size + 1);
+		DEBUG_GCOL_ONLY(gcol_stack_lvl--;)
 		if (oldbase == table->base) /* expansion failed */
 		{
 			if (table->exp_trigger_size >= table->size)
@@ -586,7 +682,11 @@ STATICFNDEF boolean_t ADD_HASHTAB_INTL(HASH_TABLE *table, HT_KEY_T *key, void *v
  *	Returns pointer to the value corresponding to key, if found.
  *	Otherwise, it returns null.
  */
-void *LOOKUP_HASHTAB(HASH_TABLE *table, HT_KEY_T *key)
+#ifdef MNAME_HASH
+HT_ENT *LOOKUP_HASHTAB(HASH_TABLE *table, const HT_ALTKEY_T *key)
+#else
+HT_ENT *LOOKUP_HASHTAB(HASH_TABLE *table, HT_KEY_T *key)
+#endif
 {
 #	ifdef INT8_HASH
 	gtm_uint64_t 	hash, ht_index, save_ht_index, prime, rhfact;
@@ -612,7 +712,7 @@ void *LOOKUP_HASHTAB(HASH_TABLE *table, HT_KEY_T *key)
 		RETURN_IF_LOOKUP_DONE(tabent, key);
 		SET_REHASH_INDEX(ht_index, rhfact, prime);
 	} while(ht_index != save_ht_index);
-	return (void *)NULL;
+	return NULL;
 }
 /* 	Description:
 	Deletes hash table entry from hash table (whether it was active or not).
@@ -667,7 +767,22 @@ boolean_t DELETE_HASHTAB(HASH_TABLE *table, HT_KEY_T *key)
  */
 void FREE_HASHTAB(HASH_TABLE *table)
 {
+	HT_ENT 		*tabent, *topent;
+	void		*htval;
+
 	assert(TRUE == table->active);
+#	ifdef PROTECT_KEYS
+	if (0 < table->count) /* if no active entries then nothing to move */
+	{
+		for (tabent = table->base, topent = table->top; tabent < topent; tabent++)
+		{
+			if (HTENT_VALID(tabent, void, htval))
+			{
+				DELETE_HTENT(table, tabent);
+			}
+		}
+	}
+#	endif
 	if (table->base)
 	{
 		DBGHASHTAB((stderr, "FREE_HASHTAB:free table(%lx): base (%lx)\n", table, table->base));
@@ -688,7 +803,22 @@ void FREE_HASHTAB(HASH_TABLE *table)
  */
 void REINITIALIZE_HASHTAB(HASH_TABLE *table)
 {
+	HT_ENT 		*tabent, *topent;
+	void		*htval;
+
 	assert(TRUE == table->active);
+#	ifdef PROTECT_KEYS
+	if (0 < table->count) /* if no active entries then nothing to move */
+	{
+		for (tabent = table->base, topent = table->top; tabent < topent; tabent++)
+		{
+			if (HTENT_VALID(tabent, void, htval))
+			{
+				DELETE_HTENT(table, tabent);
+			}
+		}
+	}
+#	endif
 	memset((char *)table->base, 0, (table->size * SIZEOF(HT_ENT)) + ((table->size / BITS_PER_UCHAR) + 1));
 	HT_FIELDS_COMMON_INIT(table);
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -26,7 +26,8 @@ error_def(ERR_TRNLOGFAIL);
 void zyerror_init(void)
 {
 	int4		status;
-	mstr		val, tn;
+	mstr		tn;
+	unmanaged_mstr	val; /* Points to static ZYERROR */
 	char		buf[1024];
 
 	val.addr = ZYERROR;
@@ -47,5 +48,6 @@ void zyerror_init(void)
 	dollar_zyerror.str.len = tn.len;
 	dollar_zyerror.str.addr = buf;
 	s2pool(&dollar_zyerror.str);
+	glist_protect_str(&dollar_zyerror.str);
 	return;
 }

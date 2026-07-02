@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -37,6 +37,7 @@
 #include "gtm_icu_api.h"
 #include "gtm_utf8.h"
 #endif
+#include "noprincio_if_needed_inline.h"
 
 GBLREF boolean_t	gtm_utf8_mode, hup_on, prin_in_dev_failure, prin_out_dev_failure;
 GBLREF int		exi_condition, process_exiting;
@@ -76,7 +77,7 @@ void  iott_write_buffered_text(io_desc *io_ptr, char *text, int textlen)
         }
 	if (textlen <= buff_left)
         {
-		memcpy((void *)tt_ptr->tbuffp, text, textlen);
+		memcpy((char *)tt_ptr->tbuffp, text, textlen);
 		tt_ptr->tbuffp += textlen;
 		buff_left -= textlen;
 		if (buff_left <= IOTT_BUFF_MIN)
@@ -103,7 +104,7 @@ void  iott_write_buffered_text(io_desc *io_ptr, char *text, int textlen)
 	REVERT_GTMIO_CH(&io_ptr->pair, ch_set);
 }
 
-void iott_write(mstr *v)
+void iott_write(const unmanaged_mstr *v)
 {
 	unsigned	str_len;
 	unsigned	len;

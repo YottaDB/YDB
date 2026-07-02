@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2009-2018 Fidelity National Information	*
+ * Copyright (c) 2009-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -61,7 +61,7 @@ typedef struct hash_table_addr_struct
 void init_hashtab_addr(hash_table_addr *table, int minsize, boolean_t dont_compact, boolean_t dont_keep_spare_table);
 void expand_hashtab_addr(hash_table_addr *table, int minsize);
 boolean_t add_hashtab_addr(hash_table_addr *table, char **key, void *value,  ht_ent_addr **tabentptr);
-void *lookup_hashtab_addr(hash_table_addr *table, char **key);
+ht_ent_addr *lookup_hashtab_addr(hash_table_addr *table, char **key);
 void delete_hashtab_ent_addr(hash_table_addr *table, ht_ent_addr *tabent);
 boolean_t delete_hashtab_addr(hash_table_addr *table, char **key);
 void free_hashtab_addr(hash_table_addr *table);

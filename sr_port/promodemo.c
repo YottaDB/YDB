@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,7 +32,7 @@ void	promote(mval *v)
 		m1 = -m1;
 	} else
 	{
-		*v = literal_zero ;
+		v->umval = literal_zero.umval;
 		return ;
 	}
 	v->m[0] = exp = 0 ;
@@ -43,7 +44,8 @@ void	promote(mval *v)
 		assert(pwr < ARRAYTOP(ten_pwr));
 	}
 	v->m[1] = m1 * ten_pwr[NUM_DEC_DG_1L - exp] ;
-	v->mvtype = MV_NM ;
+	v->mvtype = MV_NM;
+	v->str.len = 0;
 	v->e = EXP_INT_UNDERF + exp ;
 }
 
@@ -57,4 +59,5 @@ void	demote(mval *v, int exp, int sign)
 	else
 		v->m[1] /= -ten_pwr[EXP_INT_OVERF - 1 - exp] ;
 	v->mvtype = MV_NM | MV_INT ;
+	v->str.len = 0;
 }

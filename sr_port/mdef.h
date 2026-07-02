@@ -100,18 +100,117 @@
 #define CRIT_USE_PTHREAD_MUTEX
 #endif
 
+#include <sys/types.h>
+
+typedef int 		int4;		/* 4-byte signed integer */
+typedef unsigned int 	uint4;		/* 4-byte unsigned integer */
+
+/* If ever the following macro (SHMDT) is expanded to a multi-line macro, care should be taken to save the errno immediately after
+ * the "shmdt" system call invocation to avoid errno from being mutated by subsequent system calls.
+ */
+#define SHMDT(X)	shmdt((void *)(X))
+
+/* Because shmget and semget returns -1 to indicate error, -1 can never be a valid shmid or semid */
+#define INVALID_SEMID			-1
+#define INVALID_SHMID 			-1L
+
+/* For use in the SHMHUGETLB syslog warning message */
+enum shmget_caller
+{
+	LOCK_FILE,
+	SNAPSHOT_FILE,
+	RELINK,
+	JOURNAL_POOL,
+	DATABASE_FILE,
+	RC_CPT,
+	GTM_MULTI_PROC_FREEZE,
+	GTM_MULTI_PROC_RECOVER,
+	N_SHMGET_CALLERS
+};
+
+/* constant needed for FIFO - OS390 redefines in mdefsp.h */
+#define FIFO_PERMISSION		010666 /* fifo with RW permissions for owner, group, other */
+
+#include <inttypes.h>
+#include <stdarg.h>
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+
+
+
 /* mstr needs to be defined before including "mdefsp.h".  */
 #define MSTR_LEN_MAX INT_MAX
 typedef int mstr_len_t;		/* Change MSTR_LEN_MAX if this changes */
-typedef struct
-{
+
+/* Mstr which does/cannot point into stringpool. 'risky' because the user is
+ * responsible for tracking the lifetime of of the memory to which
+ * 'addr' points.
+ */
+typedef struct unmanaged_mstr {
 	unsigned int	char_len;	/* Character length */
 	mstr_len_t	len;
 	char		*addr;
+} unmanaged_mstr;
+typedef unmanaged_mstr mident;
+/* The following structure allows us to continue accessing str.addr while being able to pass a pointer-to-mident
+ * using &str.mident whenever necessary
+ */
+
+typedef struct mstr_array_coordinates
+{
+	uint_least64_t arraytype : 16;
+	uint_least64_t index	: 48;
+} mstr_array_coordinates;
+
+typedef void * ok_to_clobber_mstr_p;
+
+typedef struct mstr
+{
+	union {
+		struct {
+			unsigned int	char_len;	/* Character length */
+			mstr_len_t	len;
+			char		*addr;
+		};
+		mident 		mident;
+		unmanaged_mstr 	umstr;
+	};
+	union {
+		uint_least64_t 		in_array;
+		const uint_least64_t 	noassign; /* This should never be directly interacted with but helps us catch
+						   * improper overwriting of in_array.
+						   */
+	};
 } mstr;
-#define MSTR_CONST(name, string)		mstr name = {0, LEN_AND_LIT(string)}
-#define MSTR_DEF(name, length, string)		mstr name = {0, length, string}
-#define MIDENT_CONST(name, string)		mident name = {0, LEN_AND_LIT(string)}
+
+typedef struct mstr_sort_array_element {
+	union {
+		mstr *str_p;
+		unmanaged_mstr *lvstr_p;
+	};
+#	ifdef DEBUG_GCOL
+	char *callerid;
+#	endif
+	unsigned int	char_len;	/* Character length */
+	mstr_len_t	len;
+	char		*addr;
+} mstr_sort_array_element;
+
+typedef struct mstr_protect_array_element {
+	union	{
+		mstr *str_p;
+		struct mstr_protect_array_element *next_ele_p;
+	};
+#	ifdef DEBUG_GCOL
+	char *callerid;
+#	endif
+} mstr_protect_array_element;
+
+#define MSTR_DEF(name, length, string)		mstr name = {{{0, length, string}}, {FALSE}}
+#define UMSTR_CONST(name, string)		const unmanaged_mstr name = { 0, LEN_AND_LIT(string) }
+#define UMSTR_DEF(name, length, string)		unmanaged_mstr name = {0, length, string}
+#define MIDENT_CONST(name, string)		const mident name = {0, LEN_AND_LIT(string)}
 #define MIDENT_DEF(name, length, string)	mident name = {0, length, string}
 
 #define GET_MSTR_LEN(X, Y)	GET_ULONG(X, Y)
@@ -146,46 +245,11 @@ typedef struct
 #define MSTRP_CMP(x, y, result)	MEMVCMP((x)->addr, (x)->len, (y)->addr, (y)->len, result)
 #define MSTR_CMP(x, y, result)	MEMVCMP((x).addr, (x).len, (y).addr, (y).len, result)
 #define MSTR_EQ(x, y)		(((x)->len == (y)->len) && !memcmp((x)->addr, (y)->addr, (x)->len))
+#define MSTR_IDENTICAL(x, y)	(((x)->len == (y)->len) && ((x)->addr == (y)->addr))
 
-#include <sys/types.h>
-
-typedef int 		int4;		/* 4-byte signed integer */
-typedef unsigned int 	uint4;		/* 4-byte unsigned integer */
-
-#define sssize_t	size_t
-
-/* If ever the following macro (SHMDT) is expanded to a multi-line macro, care should be taken to save the errno immediately after
- * the "shmdt" system call invocation to avoid errno from being mutated by subsequent system calls.
- */
-#define SHMDT(X)	shmdt((void *)(X))
-
-/* Because shmget and semget returns -1 to indicate error, -1 can never be a valid shmid or semid */
-#define INVALID_SEMID			-1
-#define INVALID_SHMID 			-1L
-
-/* For use in the SHMHUGETLB syslog warning message */
-enum shmget_caller
-{
-	LOCK_FILE,
-	SNAPSHOT_FILE,
-	RELINK,
-	JOURNAL_POOL,
-	DATABASE_FILE,
-	RC_CPT,
-	GTM_MULTI_PROC_FREEZE,
-	GTM_MULTI_PROC_RECOVER,
-	N_SHMGET_CALLERS
-};
-
-/* constant needed for FIFO - OS390 redefines in mdefsp.h */
-#define FIFO_PERMISSION		010666 /* fifo with RW permissions for owner, group, other */
-
-#include <inttypes.h>
-#include <stdarg.h>
-#include <stdbool.h>
 #include "mdefsa.h"
 #include "gtm_common_defs.h"
-#include <mdefsp.h>
+#include "mdefsp.h"
 #include "gtm_sizeof.h"
 #include "gtmxc_types.h"
 #include "gtm_threadgbl.h"
@@ -327,7 +391,6 @@ typedef struct
 } pre_v5_mident;
 
 #define MAX_MIDENT_LEN		31	/* Maximum length of an mident/mname */
-typedef mstr		mident;
 typedef struct
 { /* Although we use 31 chars, the extra byte is to keep things aligned AND to keep a null terminator byte for places that care */
 	char	c[MAX_MIDENT_LEN + 1];
@@ -341,6 +404,12 @@ typedef struct
 #	define NATIVE_WSIZE	8
 #else
 #	define NATIVE_WSIZE	4
+#endif
+
+#ifdef MSTR_ALIGN_ENABLED
+#	define MSTR_ALIGN_ONLY(X)	X
+#else
+#	define MSTR_ALIGN_ONLY(X)
 #endif
 
 /* Maximum length of entry reference of the form "label+offset^routine" */
@@ -357,9 +426,21 @@ typedef enum mark_status
 
 typedef struct
 {
-	mident		var_name;	/* var_name.addr points to the actual variable name */
-	uint4		hash_code;	/* hash (scrambled) value of the variable name text */
-	mark_status	marked;		/* Used when in hashtable entry for xkill (at least) */
+	uint4			hash_code;	/* hash (scrambled) value of the variable name text */
+	mark_status		marked;		/* Used when in hashtable entry for xkill (at least) */
+	mident 			var_name;	/* var_name.addr points to the actual variable name */
+} unmanaged_mname_entry;
+
+typedef struct
+{
+	union {
+		struct {
+			uint4			hash_code;	/* hash (scrambled) value of the variable name text */
+			mark_status		marked;		/* Used when in hashtable entry for xkill (at least) */
+			mstr 			var_name;	/* var_name.addr points to the actual variable name */
+		};
+		unmanaged_mname_entry umname;
+	};
 } mname_entry;
 
 /* The M stack frame on all platforms that follow pv-based linkage model (alpha model)
@@ -505,14 +586,14 @@ mval *underr_overwrite(mval *start, ...);
 #define MV_FORCE_ULONG(M)	(MV_FORCE_DEFINED(M), MV_FORCE_ULONGD(M))
 #define MV_FORCE_ULONGD(M)	(DBG_ASSERT(MV_DEFINED(M)) (M)->mvtype & MV_INT ? (M)->m[1]/MV_BIAS : mval2ui8(M))
 #define MV_FORCE_UMVAL(M,I)	(((I) >= 1000000) ? i2usmval((M),(int)(I)) : \
-				(void)( (M)->mvtype = MV_NM | MV_INT , (M)->m[1] = (int)(I)*MV_BIAS ))
+				(void)( (M)->mvtype = MV_NM | MV_INT , (M)->m[1] = (int)(I)*MV_BIAS, (M)->str.len = 0 ))
 #define MV_FORCE_MVAL(M,I)	(((I) >= 1000000 || (I) <= -1000000) ? i2mval((M),(int)(I)) : \
-				(void)( (M)->mvtype = MV_NM | MV_INT , (M)->m[1] = (int)(I)*MV_BIAS ))
+				(void)( (M)->mvtype = MV_NM | MV_INT , (M)->m[1] = (int)(I)*MV_BIAS, (M)->str.len = 0 ))
 #ifdef GTM64
 #define MV_FORCE_ULMVAL(M,L)	(((L) >= 1000000) ? ui82mval((M),(gtm_uint64_t)(L)) : \
-				(void)( (M)->mvtype = MV_NM | MV_INT , (M)->m[1] = (int)(L)*MV_BIAS ))
+				(void)( (M)->mvtype = MV_NM | MV_INT , (M)->m[1] = (int)(L)*MV_BIAS, (M)->str.len = 0 ))
 #define MV_FORCE_LMVAL(M,L)	(((L) >= 1000000 || (L) <= -1000000) ? i82mval((M),(gtm_int64_t)(L)) : \
-				(void)( (M)->mvtype = MV_NM | MV_INT , (M)->m[1] = (int)(L)*MV_BIAS ))
+				(void)( (M)->mvtype = MV_NM | MV_INT , (M)->m[1] = (int)(L)*MV_BIAS, (M)->str.len = 0 ))
 #else
 #define MV_FORCE_ULMVAL		MV_FORCE_UMVAL
 #define MV_FORCE_LMVAL		MV_FORCE_MVAL
@@ -522,16 +603,16 @@ mval *underr_overwrite(mval *start, ...);
    macro has been added. If uses are added, this needs to be revisited. 01/2008 se
 */
 #define MV_FORCE_CANONICAL(X)	((((X)->mvtype & MV_NM) == 0 ? s2n(X) : 0 ) \
-				 ,((X)->mvtype & MV_NUM_APPROX ? (X)->mvtype &= MV_NUM_MASK : 0 ))
+				 ,((X)->mvtype & MV_NUM_APPROX ? ((X)->str.len = 0, (X)->mvtype &= MV_NUM_MASK) : 0 ))
 #define MV_IS_NUMERIC(X)	(((X)->mvtype & MV_NM) != 0)
 #define MV_IS_INT(X)		(((X)->mvtype & MV_INT) != 0)	/* returns TRUE if input has MV_INT bit set */
 #define MV_IS_TRUEINT(X, INTVAL_P)	(isint(X, INTVAL_P))	/* returns TRUE if input is a true integer (no fractions) */
 #define MV_IS_STRING(X)		(((X)->mvtype & MV_STR) != 0)
 #define MV_DEFINED(X)		(((X)->mvtype & (MV_STR | MV_NM)) != 0)
 #define MV_IS_CANONICAL(X)	(((X)->mvtype & MV_NM) ? (((X)->mvtype & MV_NUM_APPROX) == 0) : (boolean_t)val_iscan(X))
-#define MV_INIT(X)		((X)->mvtype = 0, (X)->fnpc_indx = UTF8_ONLY((X)->utfcgr_indx =) 0xff)
-#define MV_INIT_STRING(X, LEN, ADDR) ((X)->mvtype = MV_STR, (X)->fnpc_indx = UTF8_ONLY((X)->utfcgr_indx =) 0xff,	\
-				      (X)->str.len = INTCAST(LEN), (X)->str.addr = (char *)ADDR)
+#define UMV_INIT(X)		((X)->mvtype = 0, (X)->umstr.len = 0, (X)->fnpc_indx = UTF8_ONLY((X)->utfcgr_indx =) 0xff)
+#define UMV_INIT_STRING(X, LEN, ADDR) ((X)->mvtype = MV_STR, (X)->fnpc_indx = UTF8_ONLY((X)->utfcgr_indx =) 0xff,	\
+				      (X)->umstr.len = INTCAST(LEN), (X)->umstr.addr = (char *)ADDR)
 
 /* The MVTYPE_IS_* macros are similar to the MV_IS_* macros except that the input is an mvtype instead of an "mval *".
  * In the caller, use appropriate macro depending on available input. Preferable to use the MVTYPE_IS_* variant to avoid
@@ -556,27 +637,27 @@ mval *underr_overwrite(mval *start, ...);
 # ifdef UTF8_SUPPORTED
 #  ifdef GTM64
 #   define DEFINE_MVAL_COMMON(TYPE, EXPONENT, SIGN, UTF_LEN, LENGTH, ADDRESS, MANT_LOW, MANT_HIGH) \
-	{TYPE, SIGN, EXPONENT, 0xff, 0xff, {MANT_LOW, MANT_HIGH}, {UTF_LEN, LENGTH, ADDRESS}}
+	{{TYPE, SIGN, EXPONENT, 0xff, 0xff, {MANT_LOW, MANT_HIGH}, {{{UTF_LEN, LENGTH, ADDRESS}}, {FALSE}}}}
 #  else
 #   define DEFINE_MVAL_COMMON(TYPE, EXPONENT, SIGN, UTF_LEN, LENGTH, ADDRESS, MANT_LOW, MANT_HIGH) \
-	{TYPE, SIGN, EXPONENT, 0xff, 0xff, 0, {MANT_LOW, MANT_HIGH}, {UTF_LEN, LENGTH, ADDRESS}}
+	{{TYPE, SIGN, EXPONENT, 0xff, 0xff, 0, {MANT_LOW, MANT_HIGH}, {{{UTF_LEN, LENGTH, ADDRESS}}, {FALSE}}}}
 #  endif /* GTM64 */
 # else
 #  define DEFINE_MVAL_COMMON(TYPE, EXPONENT, SIGN, UTF_LEN, LENGTH, ADDRESS, MANT_LOW, MANT_HIGH) \
-	{TYPE, SIGN, EXPONENT, 0xff, {MANT_LOW, MANT_HIGH}, {LENGTH, ADDRESS}}
+	{{TYPE, SIGN, EXPONENT, 0xff, {MANT_LOW, MANT_HIGH}, {{{LENGTH, ADDRESS}}, {FALSE}}}}
 # endif	/* UTF8 */
 #else	/* end BIGENDIAN -- start LITTLEENDIAN */
 # ifdef UTF8_SUPPORTED
 #  ifdef GTM64
 #    define DEFINE_MVAL_COMMON(TYPE, EXPONENT, SIGN, UTF_LEN, LENGTH, ADDRESS, MANT_LOW, MANT_HIGH) \
-	{TYPE, EXPONENT, SIGN, 0xff, 0xff, {MANT_LOW, MANT_HIGH}, {UTF_LEN, LENGTH, ADDRESS}}
+	{{TYPE, EXPONENT, SIGN, 0xff, 0xff, {MANT_LOW, MANT_HIGH}, {{{UTF_LEN, LENGTH, ADDRESS}}, {FALSE}}}}
 #  else
 #    define DEFINE_MVAL_COMMON(TYPE, EXPONENT, SIGN, UTF_LEN, LENGTH, ADDRESS, MANT_LOW, MANT_HIGH) \
-	{TYPE, EXPONENT, SIGN, 0xff, 0xff, 0, {MANT_LOW, MANT_HIGH}, {UTF_LEN, LENGTH, ADDRESS}}
+	{{TYPE, EXPONENT, SIGN, 0xff, 0xff, 0, {MANT_LOW, MANT_HIGH}, {{{UTF_LEN, LENGTH, ADDRESS}}, {FALSE}}}}
 #  endif /* GTM64 */
 # else
 #  define DEFINE_MVAL_COMMON(TYPE, EXPONENT, SIGN, UTF_LEN, LENGTH, ADDRESS, MANT_LOW, MANT_HIGH) \
-	{TYPE, EXPONENT, SIGN, 0xff, MANT_LOW, MANT_HIGH, LENGTH, ADDRESS}
+	{{TYPE, EXPONENT, SIGN, 0xff, {MANT_LOW, MANT_HIGH}, {{{LENGTH, ADDRESS}}, {FALSE}}}}
 # endif	/* UTF8 */
 #endif	/* BIGENDIAN/LITTLEENDIAN */
 
@@ -1368,10 +1449,18 @@ void double2s(double *dp, mval *v); /* double conversion */
 int skpc(char c, int length, char *string);
 
 /* If the below declaration changes, corresponding changes in gtmxc_types.h needs to be done. */
+#define ICU_MEM_CONTEXT ((const void *) 0xadecafabadc0ffee)
 void *gtm_malloc(size_t size);
+void *gtm_malloc_icu(const void *context, size_t size);
 void *system_malloc(size_t size);
+void *gtm_realloc(void *ptr, size_t size);
+void *gtm_realloc_icu(const void *context, void *ptr, size_t size);
+boolean_t gtm_icu_setmemfunc(void);
+boolean_t icu_symbols_renamed(void *handle, char *icusymver, int *icusymver_lenp);
+void *system_realloc(void *ptr, size_t size);
 /* If the below declaration changes, corresponding changes in gtmxc_types.h needs to be done. */
 void gtm_free(void *addr);
+void gtm_free_icu(const void *context, void *addr);
 void system_free(void *addr);
 int gtm_memcmp (const void *, const void *, size_t);
 DEBUG_ONLY(void printMallocInfo(void);)
@@ -1906,4 +1995,21 @@ enum
 #define RLBKACTIVE	1	/* Performing a rollback */
 #define RLBKEXITING	2	/* Performing a rollback and about to finish */
 
+static_assert(OFFSETOF(mstr_sort_array_element, str_p) == OFFSETOF(mstr_protect_array_element, str_p),
+	"Str_p must overlay to facilitate array deletion\n");
+static_assert(OFFSETOF(unmanaged_mval, umstr) == OFFSETOF(mval, str), "Writes to mval umstrs may not overlap mstrs\n");
+static_assert(OFFSETOF(mval, umval) == 0, "umval not first-n-fields-identical to mval\n");
+static_assert(SIZEOF(unmanaged_mstr) < SIZEOF(mstr), "unmanaged mstr has unexpected padding\n");
+static_assert((SIZEOF(unmanaged_mstr) + 8 == SIZEOF(mstr)), "unmanaged mstr has unexpected padding\n");
+static_assert(SIZEOF(unmanaged_mval) == (SIZEOF(mval) - (SIZEOF(mstr) - SIZEOF(unmanaged_mstr))),
+	"Unmanaged mval has unexpected padding\n");
+static_assert(!(SIZEOF(unmanaged_mval) % SIZEOF(void *)), "mval-minus-str-p must be evenly divisible by pointer size\n");
+static_assert(OFFSETOF(mval, fnpc_indx) == SIZEOF(unsigned short) + SIZEOF(unsigned char), "Excess padding in mval\n");
+static_assert(SIZEOF(unmanaged_mname_entry) == (OFFSETOF(mname_entry, var_name) + OFFSETOF(mstr, in_array)),
+	"Writes to umname will overwrite string queue\n");
+static_assert(SIZEOF(unmanaged_mval) == (OFFSETOF(mval, str) + OFFSETOF(mstr, in_array)),
+	"Writes to umval will overwrite string queue\n");
+static_assert(16 == OFFSETOF(mval, str), "Unexpected offset for mval str field\n");
+static_assert(16 == OFFSETOF(mstr, in_array), "Unexpected offset for mstr in_array field\n");
+static_assert(40 == SIZEOF(mval), "Unexpected size for mval\n");
 #endif /* MDEF_included */

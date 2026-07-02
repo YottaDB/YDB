@@ -20,9 +20,10 @@
 #include "toktyp.h"
 #include "cache.h"
 #include "op.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "valid_mname.h"
 #include "is_canonic_name.h"
+#include "stringpool.h"
 
 GBLREF	bool			undef_inhibit;
 GBLREF	symval			*curr_symval;
@@ -42,30 +43,34 @@ void	op_indglvn(mval *v, mval *dst)
 	int			subs, *start, *stop;
 	gv_name_and_subscripts	start_buff, stop_buff;
 	lv_val			*ret_lv, tmp_lv;
+	unsigned int	gcols;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	MV_FORCE_STR(v);
-	indir_src.str = v->str;
+	indir_src.str.umstr = v->str.umstr;
+	indir_src.str.in_array = FALSE;
 	indir_src.code = indir_glvn;
 	if (NULL == (obj = cache_get(&indir_src)))
 	{
-		if (valid_mname(&v->str))
+		if (valid_mname(&v->str.mident))
 		{
-			targ_key.var_name = v->str;
+			DBG_START_NO_GCOLS(gcols);
+			targ_key.var_name = v->str.mident;
 			COMPUTE_HASH_MNAME(&targ_key);
 			tabent = lookup_hashtab_mname(&curr_symval->h_symtab, &targ_key);
+			DBG_END_NO_GCOLS(gcols);
 			assert(NULL == tabent ||  NULL != tabent->value);
 			if (!tabent || !LV_IS_VAL_DEFINED(tabent->value))
 			{
 				if (undef_inhibit)
 				{
-					*dst = literal_null;
+					dst->umval = literal_null.umval;
 					return;
 				} else
 					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_UNDEF, 2, v->str.len, v->str.addr);
 			}
-			*dst = ((lv_val *)tabent->value)->v;
+			dst->umval = ((lv_val *)tabent->value)->v.umval;
 			dst->mvtype &= ~MV_ALIASCONT;	/* Make sure alias container property does not pass */
 			return;
 		} else
@@ -77,7 +82,7 @@ void	op_indglvn(mval *v, mval *dst)
 				return;
 			} else if ((LV_NAME == glvname) && (NULL != (ret_lv = op_getindx_runtime(v, subs, start, stop, &tmp_lv))))
 			{
-				*dst = ret_lv->v;
+				dst->umval = ret_lv->v.umval;
 				dst->mvtype &= ~MV_ALIASCONT;
 				return;
 			}

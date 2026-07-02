@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -58,11 +58,12 @@ typedef union
 
 typedef struct fnpc_struct
 {
-	mstr		last_str;			/* The last string (addr/len) we used in cache */
+	unmanaged_mstr	last_str;			/* The last string (addr/len) we used in cache */
 	int		delim;				/* delimiter used in $[z]piece */
 	int		npcs;				/* Number of pieces for which values are filled in */
 	int		indx;				/* The index of this piece */
 	boolean_t	byte_oriented;			/* True if byte oriented; False if (UTF) char oriented */
+	unsigned int 	gcols;			/* Gcol generation for which this cache entry is valid */
 	unsigned int	pstart[FNPC_ELEM_MAX + 1];	/* Where each piece starts (last elem holds end of last piece) */
 } fnpc;
 

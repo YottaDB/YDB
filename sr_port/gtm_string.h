@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -40,7 +40,25 @@
 #  ifdef memcpy
 #    undef memcpy	/* Some platforms like AIX create memcpy as a #define which needs removing before re-define */
 #  endif
-#  define memcpy(TARGET, SRC, LEN) gtm_memcpy_validate_and_execute((void *)(TARGET), (const void *)(SRC), (LEN))
+#  ifdef EXTRA_MEMCHECKS
+#  ifdef memmove
+#    undef memmove
+#  endif
+#  define GET_P(T) _Generic((T), void *: (char *)(T), const void *: (char *)(T), default: T)
+#  define memcpy(TARGET, SRC, LEN) ({								\
+		__typeof__(*GET_P(TARGET)) dummy;						\
+		dummy = (__typeof__(*GET_P(TARGET))){ 0 };					\
+		gtm_memcpy_validate_and_execute((void *)(TARGET), (const void *)(SRC), (LEN));	\
+		})
+#  define memmove(TARGET, SRC, LEN) ({								\
+		__typeof__(*GET_P(TARGET)) dummy;						\
+		dummy = (__typeof__(*GET_P(TARGET))){ 0 };					\
+		gtm_memmove(TARGET, SRC, LEN);							\
+		})
+# else
+#define memcpy(TARGET, SRC, LEN) gtm_memcpy_validate_and_execute((void *)(TARGET), (const void *)(SRC), (LEN))
+#endif
+
 #endif
 /* The strnlen() function is POSIX-2008 */
 #define STRNLEN(STR, MAXLEN, RSLT) RSLT = strnlen(STR, (size_t)MAXLEN)

@@ -19,10 +19,11 @@
 #include "indir_enum.h"
 #include "cache.h"
 #include "op.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "valid_mname.h"
 #include "stack_frame.h"
 #include "is_canonic_name.h"
+#include "stringpool.h"
 
 GBLREF	symval		*curr_symval;
 GBLREF	stack_frame	*frame_pointer;
@@ -31,35 +32,41 @@ error_def(ERR_VAREXPECTED);
 
 void	op_indset(mval *target, mval *value)
 {
-	char 			new;
-	ht_ent_mname 		*tabent;
-	icode_str		indir_src;
-	int			rval;
-	mstr			*obj, object;
-	oprtype			v;
-	triple			*s, *src;
-	var_tabent		targ_key;
+	lv_val			*ret_lv, tmp_lv;
 	lv_gv_name		glvname;
 	int			subs, *start, *stop;
 	gv_name_and_subscripts	start_buff, stop_buff;
-	lv_val			*ret_lv, tmp_lv;
+	ht_ent_mname 	*tabent;
+	icode_str	indir_src;
+	int		rval;
+	mstr		*obj, object;
+	oprtype		v;
+	triple		*s, *src;
+	mname_entry	targ_key = {{{0}}};
+	unsigned int	gcols;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	MV_FORCE_DEFINED(value);
 	MV_FORCE_STR(target);
-	indir_src.str = target->str;
+	indir_src.str.umstr = target->str.umstr;
+	indir_src.str.in_array = FALSE;
 	indir_src.code = indir_set;
 	if (NULL == (obj = cache_get(&indir_src)))
 	{
-		if (valid_mname(&target->str))
+		if (valid_mname(&target->str.mident))
 		{
-			targ_key.var_name = target->str;
+			DBG_START_NO_GCOLS(gcols);
+			targ_key.var_name.umstr = target->str.umstr;
 			COMPUTE_HASH_MNAME(&targ_key);
 			targ_key.marked = NOT_MARKED;
 			if (add_hashtab_mname_symval(&curr_symval->h_symtab, &targ_key, NULL, &tabent, FALSE))
+			{
+				DBG_END_NO_GCOLS(gcols);
 				lv_newname(tabent, curr_symval);
-			((lv_val *)tabent->value)->v = *value;
+			}
+			DBG_END_NO_GCOLS(gcols);
+			((lv_val *)tabent->value)->v.umval = value->umval;
 			return;
 		} else
 		{
@@ -71,7 +78,7 @@ void	op_indset(mval *target, mval *value)
 			} else if ((LV_NAME == glvname)
 					&& (NULL != (ret_lv = op_putindx_runtime(target, subs, start, stop, &tmp_lv))))
 			{
-				ret_lv->v = *value;
+				ret_lv->v.umval = value->umval;
 				return;
 			}
 		}

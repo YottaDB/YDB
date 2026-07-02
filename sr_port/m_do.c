@@ -199,7 +199,7 @@ int m_do(void)
 			if (OC_EXCAL == calltrip->opcode)
 			{	/* this code is the same as below for no condition */
 				triptr = newtriple(OC_JMP);
-				triptr->operand[0] = put_mfun(&calltrip->operand[0].oprval.lab->mvname);
+				triptr->operand[0] = put_mfun(&calltrip->operand[0].oprval.lab->mvname.mident);
 				calltrip->operand[0].oprclass = ILIT_REF;	/* dummy placeholder */
 #				ifndef __i386
 				assert(tripsize);
@@ -218,7 +218,7 @@ int m_do(void)
 		if (OC_EXCAL == calltrip->opcode)
 		{
 			triptr = newtriple(OC_JMP);
-			triptr->operand[0] = put_mfun(&calltrip->operand[0].oprval.lab->mvname);
+			triptr->operand[0] = put_mfun(&calltrip->operand[0].oprval.lab->mvname.mident);
 			calltrip->operand[0].oprclass = ILIT_REF;	/* dummy placeholder */
 #			ifndef __i386
 			assert(tripsize);
@@ -241,7 +241,7 @@ int m_do(void)
 		if (OC_EXCAL == calltrip->opcode)
 		{
 			triptr = newtriple(OC_JMP);
-			triptr->operand[0] = put_mfun(&calltrip->operand[0].oprval.lab->mvname);
+			triptr->operand[0] = put_mfun(&calltrip->operand[0].oprval.lab->mvname.mident);
 			calltrip->operand[0].oprclass = ILIT_REF;	/* dummy placeholder */
 #			ifndef __i386
 			assert(tripsize);

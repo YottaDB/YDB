@@ -729,7 +729,7 @@ LITDEF	err_msg merrors[] = {
 	{ "GTMSECSHRSSIDF", "gtmsecshr server setsid failed", 0, 0 },
 	{ "GTMSECSHRFORKF", "gtmsecshr server unable to fork off a child process", 0, 0 },
 	{ "DBFSYNCERR", "Error synchronizing database file !AD to disk", 2, 0 },
-	{ "UNUSEDMSG898", "EXCEEDRCTLRNDWN removed from code after V7.1-002 Sep 2023", 0, 0 },
+	{ "XPELNOTP", "TP not allowed in an XPEL routine", 0, 0 },
 	{ "SCNDDBNOUPD", "Database Updates not allowed on the secondary", 0, 0 },
 	{ "MUINFOUINT4", "!AD : !UL [0x!XL]", 4, 0 },
 	{ "NLMISMATCHCALC", "Location of !AD expected at 0x!XL, but found at 0x!XL", 4, 0 },
@@ -1048,7 +1048,7 @@ LITDEF	err_msg merrors[] = {
 	{ "SEMUNDOOVERFLOW", "The operating system per-process SEM_UNDO table is full and region !AD cannot be opened.", 2, 0 },
 	{ "ENCODING", "M or W-1252 code designation for character set encoding, might return unexpected results when \"UTF-8\"=$ZCHSET", 0, 0 },
 	{ "DBMINRESBYTES", "Minimum RESERVED BYTES value required for certification/upgrade is !UL - Currently is !UL", 2, 0 },
-	{ "UNUSEDMSG1217", "DBCNOTSAMEDB removed from code in V7.0-000 Nov 2020", 0, 0 },
+	{ "TRIGNOXPEL", "Triggers are not allowed in an XPEL routine", 0, 0 },
 	{ "UNUSEDMSG1218", "DBCDBCERTIFIED removed from code in V7.0-000 Nov 2020", 0, 0 },
 	{ "UNUSEDMSG1219", "DBCMODBLK2BIG removed from code in V7.0-000 Nov 2020", 0, 0 },
 	{ "UNUSEDMSG1220", "DBCREC2BIG removed from code in V7.0-000 Nov 2020", 0, 0 },
@@ -2283,7 +2283,7 @@ LITDEF	int ERR_GTMSECSHRSGIDF = 150378056;
 LITDEF	int ERR_GTMSECSHRSSIDF = 150378064;
 LITDEF	int ERR_GTMSECSHRFORKF = 150378076;
 LITDEF	int ERR_DBFSYNCERR = 150378082;
-LITDEF	int ERR_UNUSEDMSG898 = 150378090;
+LITDEF	int ERR_XPELNOTP = 150378090;
 LITDEF	int ERR_SCNDDBNOUPD = 150378098;
 LITDEF	int ERR_MUINFOUINT4 = 150378107;
 LITDEF	int ERR_NLMISMATCHCALC = 150378114;
@@ -2602,7 +2602,7 @@ LITDEF	int ERR_REPLINSTRECR = 150380610;
 LITDEF	int ERR_SEMUNDOOVERFLOW = 418816074;
 LITDEF	int ERR_ENCODING = 150380624;
 LITDEF	int ERR_DBMINRESBYTES = 150380634;
-LITDEF	int ERR_UNUSEDMSG1217 = 150380642;
+LITDEF	int ERR_TRIGNOXPEL = 150380642;
 LITDEF	int ERR_UNUSEDMSG1218 = 150380651;
 LITDEF	int ERR_UNUSEDMSG1219 = 150380658;
 LITDEF	int ERR_UNUSEDMSG1220 = 150380666;

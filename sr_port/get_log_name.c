@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -23,7 +23,7 @@ error_def(ERR_INVSTRLEN);
 
 #define LOGNAME_LEN 255
 
-io_log_name *get_log_name(mstr *v, bool insert)
+io_log_name *get_log_name(const unmanaged_mstr *v, bool insert)
 {
 	io_log_name	*l, *prev, *new;
 	int4		index, stat, v_len;

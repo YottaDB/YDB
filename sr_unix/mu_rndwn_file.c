@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -456,7 +456,14 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone, boolean_t delete_s
 		DB_LSEEKREAD(udi, udi->fd, 0, buff, tsd_size, status);
 		if (0 != status)
 		{
-			RNDWN_ERR("!AD -> Error reading from file.", reg);
+			if (-1 == status)
+			{
+				gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_DBNOTGDS, 2, DB_LEN_STR(reg));
+			} else
+			{
+				RNDWN_ERR("!AD -> Error reading from file.", reg);
+			}
+			udi->counter_ftok_incremented = !ftok_counter_halted;
 			MU_RNDWN_FILE_CLNUP(reg, udi, tsd, sem_created, udi->counter_acc_incremented);
 			return FALSE;
 		}
@@ -464,6 +471,17 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone, boolean_t delete_s
 			memcpy(tsd, buff, tsd_size);
 		if (0 == memcmp(tsd->label, V6_GDS_LABEL, GDS_LABEL_SZ - 1))
 			db_header_upconv(tsd);
+		if (memcmp(tsd->label, GDS_LABEL, GDS_LABEL_SZ - 1) && memcmp(tsd->label, V6_GDS_LABEL, GDS_LABEL_SZ - 1))
+		{
+			if (memcmp(tsd->label, GDS_LABEL, GDS_LABEL_SZ - 3))
+				gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_DBNOTGDS, 2, DB_LEN_STR(reg));
+			else
+				gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_BADDBVER, 2, DB_LEN_STR(reg));
+			udi->counter_ftok_incremented = !ftok_counter_halted;
+			MU_RNDWN_FILE_CLNUP(reg, udi, tsd, sem_created, udi->counter_acc_incremented);
+			return FALSE;
+		}
+
 		if (standalone && IS_RDBF_STATSDB(tsd))
 		{	/* Only MUPIP RUNDOWN (which has "standalone" set to FALSE) is supported for statsdb files.
 			 * All other MUPIP commands which require standalone access cannot directly operate on statsdb files.
@@ -939,16 +957,6 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone, boolean_t delete_s
 		return FALSE;
 	}
 	/* Now we have a pre-existing shared memory section. Do some setup */
-	/* memcmp returns 0 on a match, so use && to see if both return a non-0 value meaning it isn't one of the expected labels */
-	if (memcmp(tsd->label, GDS_LABEL, GDS_LABEL_SZ - 1) && memcmp(tsd->label, V6_GDS_LABEL, GDS_LABEL_SZ - 1))
-	{
-		if (memcmp(tsd->label, GDS_LABEL, GDS_LABEL_SZ - 3))
-			gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_DBNOTGDS, 2, DB_LEN_STR(reg));
-		else
-			gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_BADDBVER, 2, DB_LEN_STR(reg));
-		MU_RNDWN_FILE_CLNUP(reg, udi, tsd, sem_created, udi->counter_acc_incremented);
-		return FALSE;
-	}
 	seg->acc_meth = acc_meth = tsd->acc_meth;
 	dbsecspc(reg, tsd, &sec_size);
 #	ifdef __MVS__

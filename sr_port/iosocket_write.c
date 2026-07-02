@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -40,13 +40,14 @@
 #include "gtmio.h"
 #include "wbox_test_init.h"
 #include "util.h"
+#include "noprincio_if_needed_inline.h"
 #ifdef GTM_TLS
 #include "gtm_tls.h"
 #endif
 
 GBLREF boolean_t		hup_on, prin_dm_io, prin_in_dev_failure, prin_out_dev_failure;
 GBLREF io_pair			io_curr_device, io_std_device;
-GBLREF mstr			chset_names[];
+LITREF unmanaged_mstr		chset_names[];
 GBLREF mval			dollar_zstatus;
 GBLREF spdesc			stringpool;
 GBLREF UConverter		*chset_desc[];
@@ -150,7 +151,7 @@ error_def(ERR_SETSOCKOPTERR);
 		socketptr->output_blocked = TRUE;									\
 }
 
-void	iosocket_write(mstr *v)
+void	iosocket_write(const unmanaged_mstr *v)
 {
 	iosocket_write_real(v, TRUE);
 }
@@ -442,7 +443,7 @@ ssize_t	iosocket_write_buffered(socket_struct *socketptr, char *buffer, size_t l
 		status = iosocket_output(socketptr, buffer, length, FALSE, FALSE, written);
 	} else if (0 == status)
 	{	/* put in buffer since room is available */
-		memcpy((void *)(socketptr->obuffer + socketptr->obuffer_offset), buffer, length);
+		memcpy((socketptr->obuffer + socketptr->obuffer_offset), buffer, length);
 		socketptr->obuffer_offset += length;
 		socketptr->obuffer_length += length;
 		/* start timer if not active */
@@ -469,10 +470,11 @@ ssize_t	iosocket_write_buffered(socket_struct *socketptr, char *buffer, size_t l
 	return status;
 }
 
-void	iosocket_write_real(mstr *v, boolean_t convert_output)
+void	iosocket_write_real(const unmanaged_mstr *v, boolean_t convert_output)
 {	/* convert_output is FALSE when called from wteol or wtff */
 	io_desc		*iod;
-	mstr		tempv;
+	unmanaged_mstr	tempv;
+	unsigned int	gcols;
 	char		*out, *c_ptr, *c_top, *errptr, *errortext;
 	int		in_b_len, b_len, status, new_len, c_len, mb_len;
 	int		flags, fcntl_flags, fcntl_res, save_errno;
@@ -628,6 +630,7 @@ void	iosocket_write_real(mstr *v, boolean_t convert_output)
 			tempv = socketptr->odelimiter0;	/* from iosocket_wteol so use converted form */
 	}
 	memcpy(iod->dollar.device, "0", SIZEOF("0"));
+	DBG_START_NO_GCOLS(gcols);
 	if (CHSET_M != iod->ochset)
 	{ /* For ochset == UTF-8, validate the output,
 	   * For ochset == UTF-16[B|L]E, convert the output (and validate during conversion)
@@ -644,7 +647,9 @@ void	iosocket_write_real(mstr *v, boolean_t convert_output)
 			*/
 			if (convert_output)
 			{
+				DBG_END_NO_GCOLS(gcols);
 				new_len = gtm_conv(chset_desc[CHSET_UTF8], chset_desc[iod->ochset], v, NULL, NULL);
+				DBG_START_NO_GCOLS(gcols);
 				tempv.addr = (char *)stringpool.free;
 				tempv.len = new_len;
 				/* Since there is no dependence on string pool between now and when we send the data,
@@ -778,6 +783,7 @@ void	iosocket_write_real(mstr *v, boolean_t convert_output)
 		}
 		iod->dollar.za = 0;
 	}
+	DBG_END_NO_GCOLS(gcols);
 	if (socketptr->nonblocked_output)
 	{
 		socketptr->args_written++;

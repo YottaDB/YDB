@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2002-2018 Fidelity National Information	*
+ * Copyright (c) 2002-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -15,7 +15,7 @@
 
 #define MSTACK_MIN_SIZE 25
 #define MSTACK_MAX_SIZE 10000
-#define MSTACK_DEF_SIZE 272
+#define MSTACK_DEF_SIZE 340
 
 #define MSTACK_CRIT_MIN_RANGE 15
 #define MSTACK_CRIT_MAX_RANGE 95

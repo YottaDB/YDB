@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2009-2025 Fidelity National Information	*
+ * Copyright (c) 2009-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -35,7 +35,7 @@ void cenable(void)
 		(unsigned char)iop_eol
 	};
 	boolean_t	is_defined, dosetattr = FALSE;
-	mstr		valstr;
+	UMSTR_DEF(valstr, SIZEOF(GTM_NOCENABLE) - 1, GTM_NOCENABLE); /* BYPASSOK */
 	mval		pars, val;
 	int		status, local_errno;
 	d_tt_struct	*tt_ptr;
@@ -43,8 +43,6 @@ void cenable(void)
 
 	if (io_std_device.in->type == tt)
 	{
-		valstr.len = SIZEOF(GTM_NOCENABLE) - 1;
-		valstr.addr = GTM_NOCENABLE;
 		if (!logical_truth_value(&valstr, FALSE, &is_defined))
 		{	/* if they don't ask for nocenable, the default is enable */
 			pars.str.len = SIZEOF(cenable_params_list);

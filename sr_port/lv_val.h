@@ -115,7 +115,12 @@
 /* Mark mval held by lv_ptr to be undefined. Also lets stp_gcol and lv_gcol know to NOT protect
  * (from garbage collection) any strings this lv_val was pointing to at the time of the free.
  */
-#define	LV_VAL_CLEAR_MVTYPE(LVPTR)	(LVPTR)->v.mvtype = 0;	/* note: also clears any use as MV_ALIASCONT */
+#define	LV_VAL_CLEAR_MVTYPE(LVPTR)								\
+MBSTART {											\
+	(LVPTR)->v.mvtype = 0;	/* note: also clears any use as MV_ALIASCONT */			\
+	(LVPTR)->v.str.len = 0;									\
+	assert(glist_str_protected(&(LVPTR)->v.str));						\
+} MBEND
 
 /* Queue an lv_val block back on the lv_val free list at the given anchor.
  * Operations:
@@ -135,7 +140,9 @@
 	/* assert that any subtree underneath this lv_ptr has already been freed up */		\
 	assert(NULL == LV_CHILD(lv_ptr));							\
 	LV_VAL_CLEAR_MVTYPE(lv_ptr);								\
+	glist_unprotect_str(&lv_ptr->v.str);							\
 	DEBUG_ONLY(memset((lv_ptr), 0xfd, SIZEOF(lv_val)));					\
+	DEBUG_ONLY(lv_ptr->v.str.in_array = FALSE;)						\
 	(lv_ptr)->ptrs.free_ent.next_free = *savflist_ptr;					\
 	*savflist_ptr = (lv_ptr);								\
 	LV_SYMVAL(lv_ptr) = NULL;								\
@@ -193,6 +200,8 @@
 	DBGALS_ONLY(GBLREF stack_frame *frame_pointer;)									\
 	assert(MV_SYM == symvalarg->ident); /* ensure above macro is never used to initialize a "lvTreeNode *" */	\
 	(lv)->v.mvtype = 0;												\
+	(lv)->v.str.len	= 0;												\
+	glist_protect_str(&(lv)->v.str);										\
 	(lv)->stats.trefcnt = 1;											\
 	(lv)->stats.crefcnt = 0;											\
 	(lv)->stats.tstartcycle = 0;											\
@@ -489,6 +498,8 @@ void	set_active_lv(lv_val *newlv, boolean_t do_assert, int type);
 	base_lv = LV_GET_BASE_VAR(LV);							\
 	sym = LV_GET_SYMVAL(base_lv);							\
 	LV_AVLNODE_PARENT(LV) = NULL;	/* indicates to stp_gcol this is free */	\
+	glist_unprotect_str(&(LV)->v.str);						\
+	glist_unprotect_lvTreeNode_key((LV));						\
 	/* sbs_child is overloaded to store linked list in free state */		\
 	(LV)->sbs_child = (lvTree *)sym->lvtreenode_flist;				\
 	sym->lvtreenode_flist = LV;							\

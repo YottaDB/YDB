@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -38,6 +38,7 @@
 #include "toktyp.h"		/* Needed for "valid_mname.h" */
 #include "valid_mname.h"
 #include "restrict.h"
+#include "xpelerrpre_inline.h"
 
 typedef enum
 {
@@ -162,7 +163,7 @@ void op_zlink (mval *v, mval *quals)
 				srcnamebuf[MAX_FN_LEN + 1];
 	int			initial_object_file_des, qlf, save_errno, status, tslash = 0;
 	linktyp			type;
-	mstr			srcstr, objstr, file;
+	unmanaged_mstr		srcstr, objstr, file;
 	parse_blk		pblk;
 	struct stat		obj_stat, src_stat;
 	unsigned short		objnamelen, srcnamelen;
@@ -193,7 +194,7 @@ void op_zlink (mval *v, mval *quals)
 	pblk.buff_size = MAX_FN_LEN;
 	pblk.buffer = inputf;
 	pblk.fop = F_SYNTAXO;
-	status = parse_file(&v->str, &pblk);
+	status = parse_file(&v->str.umstr, &pblk);
 	if (!(status & 1))
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_FILEPARSE, 2, v->str.len, v->str.addr, status);
 	if (pblk.fnb & F_WILD)
@@ -202,6 +203,7 @@ void op_zlink (mval *v, mval *quals)
 	/* 4SCA: file.len is bounded by MAX_FN_LEN in parse_file() */
 	file.addr = pblk.buffer;
 	file.len = pblk.b_esl;
+	assert(!glist_umstr_in_stringpool(&file));
 	type = NOTYPE;
 	if (pblk.b_ext)
 	{	/* 4SCA: file.len is decremented by the extension length pblk.b_ext */
@@ -217,6 +219,7 @@ void op_zlink (mval *v, mval *quals)
 		zl_cmd_qlf(&(TREF(dollar_zcompile)), &cmd_qlf, srcnamebuf, &srcnamelen, !quals);
 	if (NULL != quals)	/* after initization w default quals, override with any actual quals */
 		zl_cmd_qlf(&quals->str, &cmd_qlf, srcnamebuf, &srcnamelen, TRUE);
+	SYNC_CMD_QLF_STRINGS(cmd_qlf);
 	objnamelen = MIN(pblk.b_name, MAX_MIDENT_LEN);
 	memcpy(objnamebuf, pblk.l_name, objnamelen);
 	if ((!TREF(trigger_compile_and_link) && (objnamelen - object_name_len))
@@ -233,6 +236,7 @@ void op_zlink (mval *v, mval *quals)
 		{	/* if the directory was not explicit, skip past it */
 			file.addr = pblk.l_name;
 			file.len = pblk.b_name;
+			assert(!glist_umstr_in_stringpool(&file));
 		} else if (SRC != type)
 		{	/* if we have an explicit, directory shift the object name to make room and fill in the directory */
 			assert((OBJ == type) || (NOTYPE == type));
@@ -259,9 +263,11 @@ void op_zlink (mval *v, mval *quals)
 		{	/* maintain $ZSOURCE */
 			ENSURE_STP_FREE_SPACE(file.len);
 			memcpy(stringpool.free, file.addr, file.len);
+			assert(MV_IS_STRING(&dollar_zsource));
 			dollar_zsource.str.addr = (char *)stringpool.free;
 			dollar_zsource.str.len = file.len;
 			stringpool.free += file.len;
+			glist_sync_mval(&dollar_zsource);
 			if (OBJ == type)
 				memcpy(&srcnamebuf[srcnamelen], DOTM, SIZEOF(DOTM));	/* Copies null terminator */
 		}
@@ -288,6 +294,8 @@ void op_zlink (mval *v, mval *quals)
 			srcstr.len = srcnamelen;
 			objstr.addr = objnamebuf;
 			objstr.len = objnamelen;
+			assert(!glist_umstr_in_stringpool(&srcstr));
+			assert(!glist_umstr_in_stringpool(&objstr));
 			if (OBJ == type)
 			{	/* Explicit ZLINK of object - don't locate source */
 				zro_search(&objstr, &objdir, NULL, NULL, SKIP_SHLIBS);
@@ -329,12 +337,17 @@ void op_zlink (mval *v, mval *quals)
 		srcstr.len = srcnamelen;
 		objstr.addr = objnamebuf;
 		objstr.len = objnamelen;
+		assert(!glist_umstr_in_stringpool(&srcstr));
+		assert(!glist_umstr_in_stringpool(&objstr));
 		zro_search(&objstr, &objdir, &srcstr, &srcdir, PROBE_SHLIBS);
 		if (NULL == srcdir)
 		{
 			if (NULL == objdir)
+			{
+				xpelerrorpre();
 				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(12) ERR_ZLINKFILE, 2, v->str.len, v->str.addr,
 					ERR_FILENOTFND, 2, srcnamelen, srcnamebuf, ERR_FILENOTFND, 2, objnamelen, objnamebuf);
+			}
 		} else if (NULL == objdir)
 			type = SRC;
 	}

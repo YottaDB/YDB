@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,9 +30,9 @@
 GBLREF spdesc		stringpool;
 GBLREF io_pair		io_curr_device;
 
-LITDEF MSTR_CONST(literal_accept, "ACCEPT");
-LITDEF MSTR_CONST(literal_listen, "LISTEN");
-LITDEF MSTR_CONST(literal_wait, "WAIT");
+LITDEF UMSTR_CONST(literal_accept, "ACCEPT");
+LITDEF UMSTR_CONST(literal_listen, "LISTEN");
+LITDEF UMSTR_CONST(literal_wait, "WAIT");
 
 #define MSTR_CASE_EQ(x, y)	(((x)->len == (y)->len) && !STRNCASECMP((x)->addr, (y)->addr, (x)->len))
 

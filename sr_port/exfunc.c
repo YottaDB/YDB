@@ -120,7 +120,7 @@ int exfunc(oprtype *a, boolean_t alias_target)
 	{
 		assert(MLAB_REF == calltrip->operand[0].oprclass);
 		triptr = newtriple(OC_JMP);
-		triptr->operand[0] = put_mfun(&calltrip->operand[0].oprval.lab->mvname);
+		triptr->operand[0] = put_mfun(&calltrip->operand[0].oprval.lab->mvname.mident);
 		calltrip->operand[0].oprclass = ILIT_REF;	/* dummy placeholder */
 #		if defined(USHBIN_SUPPORTED) || defined(VMS)
 		assert(tripsize);

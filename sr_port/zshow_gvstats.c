@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2008-2018 Fidelity National Information	*
+ * Copyright (c) 2008-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -32,20 +32,22 @@
 #define	STAR_GLD		"*"
 #define	STAR_REG		"*"
 
-MSTR_CONST(stargldname, STAR_GLD);
-MSTR_CONST(starregname, STAR_REG);
-MSTR_CONST(gldkeyword, GLD_KEYWORD);
-MSTR_CONST(regkeyword, REG_KEYWORD);
-MSTR_CONST(keywordseparator, KEYWORD_SEPARATOR);
-MSTR_CONST(keywordterminator, KEYWORD_TERMINATOR);
+STATICDEF UMSTR_CONST(stargldname, STAR_GLD);
+STATICDEF UMSTR_CONST(starregname, STAR_REG);
+STATICDEF UMSTR_CONST(gldkeyword, GLD_KEYWORD);
+STATICDEF UMSTR_CONST(regkeyword, REG_KEYWORD);
+STATICDEF UMSTR_CONST(keywordseparator, KEYWORD_SEPARATOR);
+STATICDEF UMSTR_CONST(keywordterminator, KEYWORD_TERMINATOR);
 
-STATICFNDCL void zshow_gvstats_output(zshow_out *output, mstr *gldname, mstr *regname, gvstats_rec_t *gvstats, boolean_t current);
+STATICFNDCL void zshow_gvstats_output(zshow_out *output, const unmanaged_mstr *gldname, const unmanaged_mstr *regname,
+	gvstats_rec_t *gvstats, boolean_t current);
 
-STATICFNDEF void zshow_gvstats_output(zshow_out *output, mstr *gldname, mstr *regname, gvstats_rec_t *gvstats, boolean_t current)
+STATICFNDEF void zshow_gvstats_output(zshow_out *output, const unmanaged_mstr *gldname, const unmanaged_mstr *regname,
+	gvstats_rec_t *gvstats, boolean_t current)
 {
 	unsigned char	valstr[MAX_DIGITS_IN_INT8];
 	uchar_ptr_t	ptr;
-	mstr		valmstr;
+	unmanaged_mstr	valmstr;
 
 	output->flush = FALSE;
 	zshow_output(output, &gldkeyword);
@@ -55,7 +57,7 @@ STATICFNDEF void zshow_gvstats_output(zshow_out *output, mstr *gldname, mstr *re
 	zshow_output(output, regname);
 #	define TAB_GVSTATS_REC(COUNTER,TEXT1,TEXT2)		\
 {								\
-	MSTR_CONST(strcounter, TEXT1);				\
+	UMSTR_CONST(strcounter, TEXT1);				\
 	zshow_output(output, &keywordterminator);		\
 	zshow_output(output, &strcounter);			\
 	zshow_output(output, &keywordseparator);		\
@@ -84,7 +86,8 @@ void zshow_gvstats(zshow_out *output, boolean_t total_only)
 	gd_addr			*addr_ptr;
 	gd_region		*reg, *r_top;
 	gvstats_rec_t		cumul_gvstats;	/* statistics for ("*","*") */
-	mstr			gldname, regname;
+	mstr			regname;
+	unmanaged_mstr		gldname;
 	sgmnt_addrs             *csa;
 
 	memset(&cumul_gvstats, 0, SIZEOF(gvstats_rec_t));
@@ -125,7 +128,7 @@ void zshow_gvstats(zshow_out *output, boolean_t total_only)
 				regname.len = reg->rname_len;
 				regname.addr = (char *)&reg->rname[0];
 				current = !((RDBF_NOSTATS & csa->reservedDBFlags) && !(RDBF_NOSTATS & csa->hdr->reservedDBFlags));
-				zshow_gvstats_output(output, &gldname, &regname, csa->gvstats_rec_p, current);
+				zshow_gvstats_output(output, &gldname, &regname.umstr, csa->gvstats_rec_p, current);
 			}
 		}
 	}

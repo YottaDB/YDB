@@ -17,12 +17,11 @@
 #include "compiler.h"
 #include "opcode.h"
 #include "mmemory.h"
-#include "stringpool.h"
+#include "gcol_list.h"
 
 GBLREF hash_table_str	*complits_hashtab;
 GBLREF int		mlitmax;
 GBLREF mliteral 	literal_chain;
-GBLREF spdesc		stringpool;
 oprtype put_lit(mval *x)
 {
 	return put_lit_s(x, NULL);
@@ -30,30 +29,18 @@ oprtype put_lit(mval *x)
 
 oprtype put_lit_s(mval *x, triple *dst_triple)
 {
-	boolean_t	usehtab, added;
-	ht_ent_str	*litent;
 	mliteral	*a;
-	mstr		*mstr_ptr;
-	mval		mval_lcl, *x1;
-	stringkey	litkey;
 	triple		*ref;
+	boolean_t	usehtab, added;
+	stringkey	litkey = {{{{0}}}};
+	ht_ent_str	*litent;
+	unsigned int	gcols;
+	mval		lcl_mval = {{0}};
 
 	assert(MV_DEFINED(x));
 	MV_FORCE_STR(x);
 	if (MV_IS_CANONICAL(x))
 		MV_FORCE_NUM(x);
-	x1 = x;									/* local copy in case of below modification */
-	if (x->str.len && (x->mvtype & MV_STR))
-	{
-		if (((mstr_ptr = &(x->str))->addr < (char *)stringpool.base)	/* BYPASSOK */
-			|| (mstr_ptr->addr >= (char *)stringpool.free))		/* BYPASSOK */
-		{	/* ensure any string is in heap, not e.g. in mtable localpool - repoint x1 to local copy for modification */
-			assert(NULL != x->str.addr);
-			x1 = &mval_lcl;
-			*x1 = *x;
-			s2pool(&x1->str);
-		}
-	}
 	DEBUG_ONLY(litent = NULL);
 	if (dst_triple == NULL)
 		ref = newtriple(OC_LIT);
@@ -65,17 +52,27 @@ oprtype put_lit_s(mval *x, triple *dst_triple)
 	 * then have that literal and/or some others yanked to pull us back under the count as that would
 	 * confuse things mightily.
 	 */
+	assert(x->mvtype & MV_STR);
+	if (x->str.len && !glist_str_in_stringpool(&(x->str)))
+	{
+		lcl_mval.umval = x->umval;
+		x = &lcl_mval;
+		s2pool(&x->str);
+	}
 	usehtab = (LIT_HASH_CUTOVER < mlitmax) || (complits_hashtab && complits_hashtab->base);
 	if (!usehtab)
 	{	/* Brute force scan up to cutover to hash .. should include all intrinsics */
 		dqloop(&literal_chain, que, a)
-			if (is_equ(x1, &(a->v)))
+		{
+			assert(glist_str_in_sync(&a->v.str));
+			if (is_equ(x, &(a->v)))
 			{
 				a->rt_addr--;
 				ref->operand[0].oprval.mlit = a;
 				a->reference_count += 1;
 				return put_tref(ref);
 			}
+		}
 	} else
 	{	/* Use hash table -- load it up if haven't created it yet */
 		if (!complits_hashtab)
@@ -89,16 +86,23 @@ oprtype put_lit_s(mval *x, triple *dst_triple)
 			assert(complits_hashtab->base);
 			dqloop(&literal_chain, que, a)
 			{
-				litkey.str = a->v.str;
+				assert(glist_str_in_sync(&a->v.str));
+				DBG_START_NO_GCOLS(gcols);
+				/* No need to protect since litkey is copied and protected if necessary into internally-held
+				 * key in the complits_hashtab, and there can be no garbage collection before the add_hashtab
+				 * succeeds.
+				 */
+				litkey.str.umstr = a->v.str.umstr;
 				COMPUTE_HASH_STR(&litkey);
 				added = add_hashtab_str(complits_hashtab, &litkey, a, &litent);
 				assert(added);
 				assert(litent->value);
 				assert(litent->key.str.addr == ((mliteral *)litent->value)->v.str.addr);
+				DBG_END_NO_GCOLS(gcols);
 			}
 		}
 		/* Set the hash value in this element */
-		litkey.str = x1->str;
+		litkey.str.umstr = x->str.umstr;
 		COMPUTE_HASH_STR(&litkey);
 		added = add_hashtab_str(complits_hashtab, &litkey, NULL, &litent);
 		if (!added)
@@ -106,7 +110,7 @@ oprtype put_lit_s(mval *x, triple *dst_triple)
 			a = (mliteral *)litent->value;
 			assert(a);
 			assert(MV_DEFINED(&(a->v)));
-			assert(is_equ(x1, &(a->v)));
+			assert(is_equ(x, &(a->v)));
 			assert(a->reference_count);
 			a->rt_addr--;
 			ref->operand[0].oprval.mlit = a;
@@ -115,10 +119,12 @@ oprtype put_lit_s(mval *x, triple *dst_triple)
 		}
 	}
 	ref->operand[0].oprval.mlit = a = (mliteral *)mcalloc(SIZEOF(mliteral));
+	glist_first_init_str(&a->v.str);
 	a->reference_count = 1;
 	dqins(&literal_chain, que, a);
 	a->rt_addr = -1;
-	a->v = *x1;
+	a->v.umval = x->umval;
+	glist_sync_str(&a->v.str);
 	if (usehtab)
 	{	/* Now that new mlit is created, place it in created hashtab entry */
 		assert(litent);

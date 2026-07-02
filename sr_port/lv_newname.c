@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -16,7 +16,7 @@
 #include "gtm_string.h"
 
 #include "gtmio.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "stack_frame.h"
 #include "mv_stent.h"
 #include "lv_val.h"
@@ -39,6 +39,7 @@ void lv_newname(ht_ent_mname *hte, symval *sym)
 	lv_val		*lv, *var;
 	tp_frame	*tf, *first_tf_saveall;
 	tp_var		*restore_ent;
+	mstr		save_mstr;
 
 	assert(hte);
 	assert(sym);
@@ -70,15 +71,20 @@ void lv_newname(ht_ent_mname *hte, symval *sym)
 	DBGRFCT((stderr, "lv_newname: Varname '%.*s' being saved into save_lv 0x"lvaddr" due to located TSTART *\n",
 		 hte->key.var_name.len, hte->key.var_name.addr, var));
 	restore_ent = (tp_var *)malloc(SIZEOF(*restore_ent));
+	glist_first_init_str(&restore_ent->key.var_name);
+	glist_protect_str(&restore_ent->key.var_name);
 	restore_ent->current_value = lv;
 	restore_ent->save_value = var;
-	restore_ent->key = hte->key;
+	restore_ent->key.umname = hte->key.umname;
 	restore_ent->var_cloned = TRUE;
 	restore_ent->next = first_tf_saveall->vars;
 	first_tf_saveall->vars = restore_ent;
 	assert(NULL == lv->tp_var);
 	lv->tp_var = restore_ent;
-	*var = *lv;
+	save_mstr.in_array = var->v.str.in_array;
+	memcpy((ok_to_clobber_mstr_p)var, (ok_to_clobber_mstr_p)lv, SIZEOF(*var));
+	var->v.str.in_array = save_mstr.in_array;
+	glist_protect_str(&var->v.str);
 	INCR_CREFCNT(lv);		/* With a copy made, bump the refcnt to keep lvval from being deleted */
 	INCR_TREFCNT(lv);
 	assert(1 < lv->stats.trefcnt);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -52,5 +52,5 @@ void op_gvdata(mval *v)
 		x = gvcmx_data();
 	else
 		x = gvusr_data();
-	*v = *fndata_table[x / 10][x & 1];
+	v->umval = fndata_table[x / 10][x & 1]->umval;
 }

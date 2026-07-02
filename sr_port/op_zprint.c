@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -15,7 +15,7 @@
 #include "gtm_string.h"
 #include "gtm_stdio.h"
 
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "srcline.h"
 #include "error.h"
 #include "op.h"
@@ -53,7 +53,7 @@ void op_zprint(mval *rtn, mval *start_label, int start_int_exp, mval *end_label,
 /*	 of the first. (not so vice versa)		*/
 {
 	mval			print_line, null_str;
-	mstr			*src1, *src2;
+	unmanaged_mstr		*src1, *src2;
 	uint4			stat1, stat2;
 	rhdtyp			*rtn_vector, *rtn_vector2;
 	DBGTRIGR_ONLY(boolean_t	is_trigger;)

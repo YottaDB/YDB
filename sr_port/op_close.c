@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -39,10 +39,10 @@ void op_close(mval *v, mval *p)
 
 	MV_FORCE_STR(v);
 	MV_FORCE_STR(p);
-	stat = TRANS_LOG_NAME(&v->str, &tn, buf, SIZEOF(buf), dont_sendmsg_on_log2long);
+	stat = TRANS_LOG_NAME(&v->str.umstr, &tn, buf, SIZEOF(buf), dont_sendmsg_on_log2long);
 	if (SS_NORMAL == stat)
 	{
-		if (0 == (tl = get_log_name(&tn, NO_INSERT)))
+		if (0 == (tl = get_log_name(&tn.umstr, NO_INSERT)))
 			return;
 		ciod = tl->iod;
 		if ((NULL == ciod) || (TRUE == ciod->perm) || (dev_open != ciod->state))
@@ -69,7 +69,7 @@ void op_close(mval *v, mval *p)
 		}
 	} else if (SS_NOLOGNAM == stat)
 	{
-		if (0 == (l = get_log_name(&v->str, NO_INSERT)))
+		if (0 == (l = get_log_name(&v->str.umstr, NO_INSERT)))
 			return;
 		ciod = l->iod;
 		if ((NULL == ciod) || (TRUE == ciod->perm) || (dev_open != ciod->state))

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -36,7 +36,7 @@
 #include "gtmio.h"
 #include "min_max.h"
 #include "lv_val.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "mv_stent.h"
 #include "find_mvstent.h"
 #include "gdsroot.h"
@@ -129,6 +129,7 @@ void op_merge(void)
 	PUSH_MV_STENT(MVST_MVAL);
 	value = &mv_chain->mv_st_cont.mvs_mval;
 	value->mvtype = 0; /* initialize mval in the M-stack in case stp_gcol gets called before value gets initialized below */
+	assert(value->str.len == 0);
 	gblp1 = mglvnp->gblp[IND1];
 	gblp2 = mglvnp->gblp[IND2];
 	DEBUG_ONLY(orig_active_lv = active_lv;)
@@ -137,6 +138,7 @@ void op_merge(void)
 		PUSH_MV_STENT(MVST_MVAL);
 		mkey = &mv_chain->mv_st_cont.mvs_mval;
 		mkey->mvtype = 0; /* initialize mval in M-stack in case stp_gcol gets called before mkey gets initialized below */
+		assert(mkey->str.len == 0);
 		gvname_env_restore(gblp2);
 		gbl2_gd_addr = TREF(gd_targ_addr);
 		/* now $DATA will be done for gvn2. op_gvdata input parameters are set in the form of some GBLREF */
@@ -380,12 +382,13 @@ void op_merge(void)
 			PUSH_MV_STENT(MVST_MVAL);
 			subsc = &mv_chain->mv_st_cont.mvs_mval;
 			subsc->mvtype = 0; /* initialize mval in the M-stack in case stp_gcol gets called before it is set below */
+			assert(subsc->str.len == 0);
 			/* At this time gv_currkey already points to gblp2 */
 			if (1 == dollardata_src || 11 == dollardata_src)
 			{	/* SET lvn1=^gvn2 */
 				found = op_gvget(value);
 				if (found)
-					mglvnp->lclp[IND1]->v = *value;
+					mglvnp->lclp[IND1]->v.umval = value->umval;
 			}
 			gvnh_reg2 = gblp2->s_gd_targ_gvnh_reg;
 			gbl2_gd_addr = TREF(gd_targ_addr);
@@ -446,7 +449,7 @@ void op_merge(void)
 				 * propagation since the source in this case is a global var.
 				 */
 				DECR_AC_REF(dst_lv, TRUE);
-				dst_lv->v = *value;
+				dst_lv->v.umval = value->umval;
 			}
 			gvname_env_restore(gblp2);	 /* naked indicator is restored into gv_currkey */
 			/* If it so happens $data(^gvn2) was non-zero at start of op_merge but after the check it became zero,

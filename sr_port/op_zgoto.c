@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2011-2024 Fidelity National Information	*
+ * Copyright (c) 2011-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -15,13 +15,13 @@
 #include "gtm_stdio.h"
 #include "gtm_string.h"
 
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "stack_frame.h"
 #include "op.h"
 #include "flush_jmp.h"
 #include "dollar_zlevel.h"
 #include "golevel.h"
-#include <auto_zlink.h>
+#include "auto_zlink.h"
 #include "error.h"
 #include "gtmimagename.h"
 #include "linktrc.h"
@@ -80,8 +80,10 @@ void op_zgoto(mval *rtn_name, mval *lbl_name, int offset, int level)
 	/* Migrate mval parm contents to private buffers since the mvals could die as we unwind things */
 	MV_FORCE_STR(rtn_name);
 	MV_FORCE_STR(lbl_name);
-	rtnname = *rtn_name;
-	lblname = *lbl_name;
+	rtnname.umval = rtn_name->umval;
+	lblname.umval = lbl_name->umval;
+	rtnname.str.in_array = FALSE;
+	lblname.str.in_array = FALSE;
 	memcpy(rtnname_buff, rtnname.str.addr, rtnname.str.len);
 	rtnname.str.addr = rtnname_buff;
 	memcpy(lblname_buff, lblname.str.addr, lblname.str.len);

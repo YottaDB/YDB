@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,7 +32,8 @@ void	op_indpat(mval *v, mval *dst)
 
 	SETUP_THREADGBL_ACCESS;
 	MV_FORCE_STR(v);
-	indir_src.str = v->str;
+	indir_src.str.umstr = v->str.umstr;
+	indir_src.str.in_array = FALSE;
 	indir_src.code = indir_pattern;
 	if (NULL == (obj = cache_get(&indir_src)))
 	{

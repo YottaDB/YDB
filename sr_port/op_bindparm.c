@@ -18,7 +18,7 @@
 
 #include "gtmio.h"
 #include "lv_val.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "mv_stent.h"
 #include "stack_frame.h"
 #include "op.h"
@@ -30,6 +30,7 @@
 #include "alias.h"
 #include "compiler.h"
 #include "parm_pool.h"
+#include "stringpool.h"
 
 GBLREF mv_stent			*mv_chain;
 GBLREF unsigned char		*stackbase, *stacktop, *msp, *stackwarn;
@@ -46,6 +47,7 @@ void op_bindparm(UNIX_ONLY_COMMA(int frmc) int frmp_arg, ...)
 	gtm_uint8	mask;
 	register lv_val *a;
 	var_tabent	*parm_name;
+	mname_entry	lcl_mname = {{{0}}};
 	int		i;
 	int		frmp;	/* formal argument pointer */
 	VMS_ONLY(int	frmc;)	/* formal argument count */
@@ -129,10 +131,11 @@ void op_bindparm(UNIX_ONLY_COMMA(int frmc) int frmp_arg, ...)
 			assert(0 < new_var->stats.trefcnt);
 			INCR_TREFCNT(new_var);
 		}
-		htepp = (ht_ent_mname **)&frame_pointer->l_symtab[frmp];	/* address of l_symtab entry */
-		parm_name = &(((var_tabent *)frame_pointer->vartab_ptr)[frmp]);
+		htepp = &frame_pointer->l_symtab[frmp];	/* address of l_symtab entry */
+		parm_name = &((frame_pointer->vartab_ptr)[frmp]);
+		lcl_mname.umname = *parm_name;
 		assert(0 <= frmp && frmp < frame_pointer->vartab_len);
-		if (add_hashtab_mname_symval(&curr_symval->h_symtab, parm_name, NULL, &tabent, TRUE))
+		if (add_hashtab_mname_symval(&curr_symval->h_symtab, &lcl_mname, NULL, &tabent, TRUE))
 			lv_newname(tabent, curr_symval);
 		assert(tabent->value);
 #ifdef		DEBUG

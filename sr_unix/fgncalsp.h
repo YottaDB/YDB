@@ -101,7 +101,7 @@ enum gtm_types
 	gtm_jbig_decimal
 };
 
-typedef enum {SIGSAFE, ACIDTP, XCBEHAVIORTAILENTRY} gtm_ext_call_behavior;
+typedef enum {ACIDTP, SIGSAFE, TERMIO, XCBEHAVIORTAILENTRY} gtm_ext_call_behavior;
 
 enum callintogtm_fncs
 {
@@ -156,11 +156,11 @@ typedef struct parmblk_struct
 	lv_val	*args[MAX_ACTUALS];
 } parmblk_struct;
 
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 
 /* function prototypes */
 void_ptr_t	fgn_getpak(char *pak_name, int msgtype);
-fgnfnc 		fgn_getrtn(void_ptr_t pak_handle, mstr *sym_name, int msgtype);
+fgnfnc 		fgn_getrtn(void_ptr_t pak_handle, const mident *sym_name, int msgtype);
 void		fgn_closepak(void_ptr_t pak_handle, int msgtype);
 int 		fgncal_getint(mstr *inp);
 int 		fgncal_read_args(mstr *inp);

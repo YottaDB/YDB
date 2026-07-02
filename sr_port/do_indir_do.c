@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -16,7 +16,7 @@
 #include "gtm_string.h"
 
 #include "toktyp.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "stack_frame.h"
 #include "indir_enum.h"
 #include "cmd_qlf.h"
@@ -39,7 +39,7 @@ int do_indir_do(mval *v, unsigned char argcode)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	if (valid_labname(&v->str))
+	if (valid_labname(&v->str.mident))
 	{
 		memcpy(ident.c, v->str.addr, v->str.len);
 		if (!(cmd_qlf.qlf & CQ_LOWER_LABELS))

@@ -841,14 +841,17 @@ MBSTART {															\
 							__FILE__, __LINE__, __func__, process_id, base_reg->dyn.addr->fname,	\
 							base_reg->rname));							\
 				grab_latch(&base_cnl->statsdb_field_latch, GRAB_LATCH_INDEFINITE_WAIT, NOT_APPLICABLE, NULL);	\
-				assert(base_cnl->statsdb_fname_len == (REG)->dyn.addr->fname_len);				\
-				assert('\0' == base_cnl->statsdb_fname[base_cnl->statsdb_fname_len]);				\
-				assert(!memcmp(base_cnl->statsdb_fname, (REG)->dyn.addr->fname,					\
+				if (base_cnl->statsdb_created && 								\
+					((REG)->statsdb_init_cycle == base_cnl->statsdb_init_cycle))				\
+				{												\
+					assert(base_cnl->statsdb_fname_len == (REG)->dyn.addr->fname_len);			\
+					assert(!memcmp(base_cnl->statsdb_fname, (REG)->dyn.addr->fname,				\
 							(REG)->dyn.addr->fname_len));						\
-				assert((REG)->statsdb_init_cycle == base_cnl->statsdb_init_cycle);				\
-				base_cnl->statsdb_fname_len = 0;								\
-				base_cnl->statsdb_created = FALSE;								\
-				base_cnl->statsdb_init_cycle++;									\
+					base_cnl->statsdb_fname_len = 0;							\
+					base_cnl->statsdb_created = FALSE;							\
+					base_cnl->statsdb_init_cycle++;								\
+					(REG)->statsdb_init_cycle = base_cnl->statsdb_init_cycle;				\
+				}												\
 				rel_latch(&base_cnl->statsdb_field_latch);							\
 			}													\
 			rc = UNLINK((char *)(REG)->dyn.addr->fname);								\
@@ -996,7 +999,7 @@ MBSTART {								\
 	lockidx = ++lcknl->lockhist_idx;				\
 	if (LOCKHIST_ARRAY_SIZE <= lockidx)				\
 		lcknl->lockhist_idx = lockidx = 0;			\
-	GET_LONGP(&lcknl->lockhists[lockidx].lock_op[0], (OP));		\
+	memcpy(lcknl->lockhists[lockidx].lock_op, (OP), OP_LOCK_SIZE);	\
 	lcknl->lockhists[lockidx].lock_addr = (sm_int_ptr_t)(LOC);	\
 	lcknl->lockhists[lockidx].lock_callr = (caddr_t)caller_id(0);	\
 	lcknl->lockhists[lockidx].lock_pid = (int4)(ID);		\

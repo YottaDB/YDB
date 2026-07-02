@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2024 Fidelity National Information	*
+ * Copyright (c) 2010-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -29,7 +29,7 @@
 #include "buddy_list.h"
 #include "hashtab_int4.h"	/* needed for muprec.h */
 #include "hashtab_int8.h"	/* needed for muprec.h */
-#include "hashtab_mname.h"	/* needed for muprec.h */
+#include "hashtab_umname.h"	/* needed for muprec.h */
 #include "muprec.h"
 #include "mur_jnl_ext.h"
 #include "iosp.h"
@@ -87,8 +87,8 @@ uint4	mur_forward_play_cur_jrec(reg_ctl_list *rctl)
 	jnl_string		*keystr = NULL;
 	multi_struct 		*multi;
 	jnl_ctl_list		*jctl;
-	ht_ent_mname		*tabent;
-	mname_entry	 	gvent;
+	ht_ent_umname		*tabent;
+	unmanaged_mname_entry	 gvent;		/* Points to gv_currkey buffer  */
 	gvnh_reg_t		*gvnh_reg;
 	pini_list_struct	*plst;
 	int4			gtmcrypt_errno;
@@ -297,7 +297,7 @@ uint4	mur_forward_play_cur_jrec(reg_ctl_list *rctl)
 			gvent.var_name.addr = (char *)gv_currkey->base;
 			gvent.var_name.len = STRLEN((char *)gv_currkey->base);
 			COMPUTE_HASH_MNAME(&gvent);
-			if (NULL != (tabent = lookup_hashtab_mname(&rctl->gvntab, &gvent)))	/* WARNING ASSIGNMENT */
+			if (NULL != (tabent = lookup_hashtab_umname(&rctl->gvntab, &gvent)))	/* WARNING ASSIGNMENT */
 			{
 				gvnh_reg = (gvnh_reg_t *)tabent->value;
 				assert(NULL != gvnh_reg);
@@ -307,7 +307,7 @@ uint4	mur_forward_play_cur_jrec(reg_ctl_list *rctl)
 			} else
 			{
 				assert(IS_REG_BG_OR_MM(gv_cur_region));
-				gv_target = (gv_namehead *)targ_alloc(gv_cur_region->max_key_size, &gvent, gv_cur_region);
+				gv_target = targ_alloc(gv_cur_region->max_key_size, &gvent, gv_cur_region);
 				GVNH_REG_INIT(gd_header, &rctl->gvntab, NULL, gv_target, gv_cur_region, gvnh_reg, tabent);
 			}
 			if (!TREF(jnl_extract_nocol))

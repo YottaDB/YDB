@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -34,16 +34,17 @@ void	op_indlvarg(mval *v, mval *dst)
 	SETUP_THREADGBL_ACCESS;
 	MV_FORCE_STR(v);
 	if (v->str.len < 1)
-		RTS_ERROR_ABT(VARLSTCNT(1) ERR_VAREXPECTED);
-	if (valid_mname(&v->str))
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_VAREXPECTED);
+	if (valid_mname(&v->str.mident))
 	{
-		*dst = *v;
+		dst->umval = v->umval;
 		dst->mvtype &= ~MV_ALIASCONT;	/* Make sure alias container property does not pass */
 		return;
 	}
 	if (*v->str.addr != '@')
-		RTS_ERROR_ABT(VARLSTCNT(1) ERR_VAREXPECTED);
-	indir_src.str = v->str;
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_VAREXPECTED);
+	indir_src.str.umstr = v->str.umstr;
+	indir_src.str.in_array = FALSE;
 	indir_src.code = indir_lvarg;
 	if (NULL == (obj = cache_get(&indir_src)))
 	{

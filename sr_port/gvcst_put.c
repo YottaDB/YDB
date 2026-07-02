@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -39,7 +39,7 @@
 #include "rc_oflow.h"
 #include "repl_msg.h"
 #include "gtmsource.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "stack_frame.h"
 #include "mv_stent.h"
 #include "gv_trigger.h"
@@ -81,12 +81,12 @@
 #include "gtm_repl_multi_inst.h" /* for DISALLOW_MULTIINST_UPDATE_IN_TP */
 #include "gvt_inline.h"
 
-LITREF	mval	literal_batch;
-LITREF	mstr	nsb_dummy;
+LITREF	mval		literal_batch;
+LITREF	unmanaged_mstr	nsb_dummy;
 #ifdef GTM_TRIGGER
-LITREF	mval	literal_null;
-LITREF	mval	literal_one;
-LITREF	mval	literal_zero;
+LITREF	mval		literal_null;
+LITREF	mval		literal_one;
+LITREF	mval		literal_zero;
 #endif
 
 /* Globals that will not change in value across nested trigger calls of gvcst_put OR even if they might change in value,
@@ -294,7 +294,7 @@ void	gvcst_put(mval *val)
 	block_id			lcl_root;
 	boolean_t			est_first_pass, fits, found, save_in_gvcst_incr, sn_tpwrapped;
 	int				chunk_size, gblsize, i, oldend, rc, save_dollar_tlevel;
-	mval				*pre_incr_mval, *save_val, val_ctrl, val_dummy, val_piece;
+	mval				*pre_incr_mval, *save_val, val_ctrl, val_dummy = {{0}}, val_piece;
 	span_parms			parms;
 	unsigned char			mychars[MAX_NSBCTRL_SZ];
 	unsigned short			numsubs;
@@ -326,7 +326,8 @@ void	gvcst_put(mval *val)
 	GTMTRIG_ONLY(parms.ztold_mval = NULL);
 	cs_data->span_node_absent = FALSE;
 	oldend = gv_currkey->end;
-	val_dummy.str = nsb_dummy;
+	val_dummy.str.umstr = nsb_dummy;
+	assert(!IS_IN_STRINGPOOL(val_dummy.str.addr, val_dummy.str.len));
 	if (!dollar_tlevel)
 	{
 		sn_tpwrapped = TRUE;
@@ -383,9 +384,10 @@ test_incr_numoflow:
 			pre_incr_mval->mvtype = MV_STR;
 		}
 		else
-			*pre_incr_mval = literal_null;
+			pre_incr_mval->umval = literal_null.umval;
 		op_add(pre_incr_mval, &increment_delta_mval, post_incr_mval);
-		POP_MV_STENT();			/* pre_incr_mval */
+		if (pre_incr_mval == &mv_chain->mv_st_cont.mvs_mval)
+			POP_MV_STENT();			/* pre_incr_mval */
 		DEBUG_ONLY(if (!TREF(gvcst_incr_numoflow)))
 			assert(MV_IS_NUMERIC(post_incr_mval));
 		MV_FORCE_STR(post_incr_mval);
@@ -495,7 +497,7 @@ void	gvcst_put2(mval *val, span_parms *parms)
 	jnl_action		*ja;
 	jnl_format_buffer	*jfb = NULL, *ztworm_jfb;
 	key_cum_value		*tempkv;
-	mstr			value;
+	unmanaged_mstr		value;
 	mval			*ja_val;
 	mval			*set_val;	/* actual right-hand-side value of the SET or $INCR command */
 	mval			*val_forjnl;
@@ -530,7 +532,7 @@ void	gvcst_put2(mval *val, span_parms *parms)
 	int			gtm_trig_status = -1;
 	mint			dlr_data;
 	mv_stent		*save_mv_chain = NULL;
-	mval			lcl_increment_delta_mval;	/* local copy of "increment_delta_mval" */
+	unmanaged_mval		lcl_increment_delta_umval;	/* local copy of "increment_delta_mval" */
 	mval			*lcl_post_incr_mval = NULL;	/* local copy of "post_incr_mval" at function entry.
 								 * used to restore "post_incr_mval" in case of TP restarts */
 	mval			*lcl_val = NULL;		/* local copy of "val" at function entry.
@@ -718,7 +720,8 @@ tn_restart:
 			lcl_val = val;
 			lcl_val_forjnl = val_forjnl;
 			lcl_post_incr_mval = post_incr_mval;
-			lcl_increment_delta_mval = increment_delta_mval;
+			assert(!MV_IS_STRING(&increment_delta_mval));
+			lcl_increment_delta_umval = increment_delta_mval.umval; /* Not in stringpool */
 			jnl_format_done = FALSE;
 		}
 		if (NULL != gvt_trigger)
@@ -856,19 +859,19 @@ tn_restart:
 			 * $INCREMENT() should not signal UNDEF error but proceed with an implicit $GET().
 			 */
 			assert(dollar_tlevel ? si->update_trans : update_trans);
-			*post_incr_mval = *val;
+			post_incr_mval->umval = val->umval;
 			MV_FORCE_NUM(post_incr_mval);
 			post_incr_mval->mvtype &= ~MV_STR;	/* needed to force any alphanumeric string to numeric */
 			MV_FORCE_STR(post_incr_mval);
 			assert(post_incr_mval->str.len);
-			value = post_incr_mval->str;
+			value = post_incr_mval->str.umstr;
 			/* The MAX_REC_SIZE check could not be done in op_gvincr (like is done in op_gvput) because
 			 * the post-increment value is not known until here. so do the check here.
 			 */
 			assert(dir_tree);
 			ENSURE_VALUE_WITHIN_MAX_REC_SIZE(value, dir_tree);
 		} else
-			value = val->str;
+			value = val->str.umstr;
 		/* Potential size of a GVT leaf block containing just the new/updated record */
 		new_blk_size_single = SIZEOF(blk_hdr) + SIZEOF(rec_hdr) + temp_key->end + 1 + value.len;
 		if (new_blk_size_single > blk_reserved_size)
@@ -1080,7 +1083,7 @@ tn_restart:
 			} else
 			{	/* The global variable that is being $INCREMENTed does not exist.  $INCREMENT() should not
 				 * signal UNDEF error but proceed with an implicit $GET() */
-				*post_incr_mval = *val;
+				post_incr_mval->umval = val->umval;
 				MV_FORCE_NUM(post_incr_mval);
 				post_incr_mval->mvtype &= ~MV_STR;	/* needed to force any alphanumeric string to numeric */
 				MV_FORCE_STR(post_incr_mval);
@@ -1088,14 +1091,14 @@ tn_restart:
 			}
 			assert(MV_IS_STRING(post_incr_mval));
 			assert(dollar_tlevel ? si->update_trans : update_trans);
-			value = post_incr_mval->str;
+			value = post_incr_mval->str.umstr;
 			/* The MAX_REC_SIZE check could not be done in op_gvincr (like is done in op_gvput) because
 			 * the post-increment value is not known until here. so do the check here.
 			 */
 			ENSURE_VALUE_WITHIN_MAX_REC_SIZE(value, gv_target);
 
 		} else
-			value = val->str;
+			value = val->str.umstr;
 	}
 	/* --------------------------------------------------------------------------------------------
 	 * The code for the non-block-split case is very similar to the code in recompute_upd_array.
@@ -1208,10 +1211,10 @@ tn_restart:
 					{
 						PUSH_MV_STENT(MVST_MVAL);	/* protect "value" mstr from stp gcol */
 						pval = &mv_chain->mv_st_cont.mvs_mval;
-						pval->str = value;
+						pval->str.umstr = value;
 						pval->mvtype = MV_STR;
 						ENSURE_STP_FREE_SPACE(data_len);
-						value = pval->str;
+						value = pval->str.umstr;
 						POP_MV_STENT();			/* pval */
 					}
 					ztold_mval->str.addr = (char *)stringpool.free;
@@ -2865,10 +2868,10 @@ tn_restart:
 					PUSH_MV_STENT(MVST_MVAL);	/* protect $ztval from stp_gcol */
 					ztval_mval = &mv_chain->mv_st_cont.mvs_mval;
 					if (!is_dollar_incr)
-						*ztval_mval = *val_forjnl;
+						ztval_mval->umval = val_forjnl->umval;
 					else
 					{
-						*ztval_mval = *post_incr_mval;
+						ztval_mval->umval = post_incr_mval->umval;
 						/* Since this is pointing to malloced buffer, we need to repoint it to stringpool
 						 * to avoid a nested trigger call (that does a $INCR) from overwriting this buffer.
 						 * This way buffers corresponding to $ztvals of nested triggers can coexist.
@@ -3011,7 +3014,7 @@ retry:
 		/* $increment related fields need to be restored */
 		is_dollar_incr = lcl_is_dollar_incr;
 		post_incr_mval = lcl_post_incr_mval;
-		increment_delta_mval = lcl_increment_delta_mval;
+		increment_delta_mval.umval = lcl_increment_delta_umval;
 	}
 #	endif
 	assert((cdb_sc_normal != status) GTMTRIG_ONLY(|| lcl_implicit_tstart || lcl_span_status));

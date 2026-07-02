@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -31,12 +31,13 @@
 #include "gtm_ctype.h"
 #include "gtm_string.h"
 #include "error.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "stack_frame.h"
 #include "subscript.h"
 #include "svnames.h"
-#include "mprof.h"
+#include "deferred_events.h"
 #include "deferred_events_queue.h"
+#include "mprof.h"
 #include "op.h"
 #include "lv_val.h"		/* Needed for callg.h. */
 #include "callg.h"
@@ -60,7 +61,7 @@ STATICDEF mstr			mprof_mstr;			/* Area to hold global and subscripts. */
 STATICDEF struct rusage		last_usage = {0, 0};		/* Contains the last value obtained via getrusage() on Tru64. */
 #endif
 
-LITDEF  MIDENT_CONST(above_routine, "*above*");
+MIDENT_CONST(above_routine, "*above*");
 
 #ifdef DEBUG
 #  define RUNTIME_LIMIT		604800000000.0	/* Not a long because on 32-bit platforms longs are only 4 bytes. */
@@ -234,9 +235,9 @@ void turn_tracing_on(mval *gvn, boolean_t from_env, boolean_t save_gbl)
 	if (save_gbl && (0 < gvn->str.len))
 	{
 		parse_gvn(gvn);
-		(TREF(mprof_ptr))->gbl_to_fill = *gvn;
-		(TREF(mprof_ptr))->gbl_to_fill.str.addr = (char *)malloc(gvn->str.len); /* Since len was already set up. */
-		memcpy((TREF(mprof_ptr))->gbl_to_fill.str.addr, gvn->str.addr, gvn->str.len);
+		(TREF(mprof_ptr))->gbl_to_fill = gvn->umval;
+		(TREF(mprof_ptr))->gbl_to_fill.umstr.addr = (char *)malloc(gvn->str.len); /* Since len was already set up. */
+		memcpy((TREF(mprof_ptr))->gbl_to_fill.umstr.addr, gvn->str.addr, gvn->str.len);
 	}
 	/* Preallocate some space. */
 	if (!(TREF(mprof_ptr))->pcavailbase)
@@ -302,7 +303,7 @@ void turn_tracing_off(mval *gvn)
 	}
 	if (NULL != gvn)
 		parse_gvn(gvn);
-	assert(!save_to_gbl || (0 != (TREF(mprof_ptr))->gbl_to_fill.str.addr));
+	assert(!save_to_gbl || (0 != (TREF(mprof_ptr))->gbl_to_fill.umstr.addr));
 	/* If tracing was initialized from an environment variable, and it had a proper global name, save results
 	 * to that global; otherwise, just toss the collected data.
 	 */
@@ -314,8 +315,8 @@ void turn_tracing_off(mval *gvn)
 			insert_total_times(TRUE);
 			mprof_tree_walk((TREF(mprof_ptr))->head_tblnd);
 		}
-		free((TREF(mprof_ptr))->gbl_to_fill.str.addr);
-		(TREF(mprof_ptr))->gbl_to_fill.str.addr = NULL;
+		free((TREF(mprof_ptr))->gbl_to_fill.umstr.addr);
+		(TREF(mprof_ptr))->gbl_to_fill.umstr.addr = NULL;
 	}
 	is_tracing_on = (TREF(mprof_ptr))->is_tracing_ini = FALSE;
 	mprof_stack_free();

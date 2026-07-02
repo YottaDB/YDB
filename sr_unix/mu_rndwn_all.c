@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -447,7 +447,7 @@ boolean_t validate_replpool_shm_entry(shm_parms *parm_buff, replpool_id_ptr_t re
 	 */
 	if (-1 == (sm_long_t)(start_addr = (sm_uc_ptr_t) do_shmat(shmid, 0, SHM_RND)))
 		return FALSE;
-	memcpy((void *)replpool_id, (void *)start_addr, SIZEOF(replpool_identifier));
+	memcpy(replpool_id, (void *)start_addr, SIZEOF(replpool_identifier));
 	instfilename = replpool_id->instfilename;
 	/* Even though we could be looking at a replication pool structure that has been created by an older version
 	 * or newer version of GT.M, the format of the "replpool_identifier" structure is expected to be the same

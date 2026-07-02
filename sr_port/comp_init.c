@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -16,7 +16,7 @@
 #include "stp_parms.h"
 #include "compiler.h"
 #include "stringpool.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "mv_stent.h"
 #include "opcode.h"
 #include "cgp.h"
@@ -41,8 +41,12 @@ void comp_init(mstr *src, oprtype *dst)
 
 	SETUP_THREADGBL_ACCESS;
 	if ((MAX_SRCLINE < (unsigned)src->len) && ((TREF(source_buffer)).addr == (char *)&aligned_source_buffer))
-		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_INDRMAXLEN, 1, MAX_SRCLINE);	/* no error for ojchildparms / other long */
-	memcpy((TREF(source_buffer)).addr,src->addr,src->len);
+	{	/* no length check here if using SET @ on ZWR output (JOB -PASS and %ZSHOWVTOLCL,) - check length,
+		 * & use MAX_STRLEN buff
+		 */
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_INDRMAXLEN, 1, MAX_SRCLINE);
+	}
+	memcpy((TREF(source_buffer)).addr, src->addr, src->len);
 	(TREF(source_buffer)).len = src->len + 1;
 	*((TREF(source_buffer)).addr + src->len) = *((TREF(source_buffer)).addr + src->len + 1) = '\0';
 	TREF(compile_time) = TRUE;
@@ -56,6 +60,8 @@ void comp_init(mstr *src, oprtype *dst)
 	if (!indr_stringpool.base)
 	{
 		stp_init(STP_INITSIZE);
+		stringpool.sort_array_pp = TADR(indr_sort_array_p);
+		stringpool.protect_array_pp = TADR(indr_protect_array_p);
 		indr_stringpool = stringpool;
 	} else
 		stringpool = indr_stringpool;

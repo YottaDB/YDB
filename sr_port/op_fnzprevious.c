@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -50,11 +51,11 @@ void op_fnzprevious(lv_val *src, mval *key, mval *dst)
 					ALLOC_XFORM_BUFF(key->str.len);
 					tmp_sbs.mvtype = MV_STR;
 					tmp_sbs.str.len = TREF(max_lcl_coll_xform_bufsiz);
+					tmp_sbs.str.in_array = FALSE;
 					assert(NULL != TREF(lcl_coll_xform_buff));
 					tmp_sbs.str.addr = TREF(lcl_coll_xform_buff);
 					do_xform(TREF(local_collseq), XFORM, &key->str, &tmp_sbs.str, &length);
 					tmp_sbs.str.len = length;
-					s2pool(&(tmp_sbs.str));
 					key = &tmp_sbs;
 				}
 			} else
@@ -62,10 +63,13 @@ void op_fnzprevious(lv_val *src, mval *key, mval *dst)
 				 * But input mval could be read-only so cannot modify that even if temporarily.
 				 * So take a copy of the mval and modify that instead.
 				 */
-				tmp_sbs = *key;
+				tmp_sbs.umval = key->umval;
 				key = &tmp_sbs;
 				MV_FORCE_NUM(key);
 				TREE_KEY_SUBSCR_SET_MV_CANONICAL_BIT(key);	/* used by the lvAvlTreeKeyPrev function */
+				tmp_sbs.mvtype &= (MV_STR_OFF & MV_UTF_LEN_OFF);
+				tmp_sbs.str.addr = NULL;
+				tmp_sbs.str.len = 0;
 			}
 			node = lvAvlTreeKeyPrev(lvt, key);
 		}
@@ -94,10 +98,11 @@ void op_fnzprevious(lv_val *src, mval *key, mval *dst)
 			assert(NULL != TREF(lcl_coll_xform_buff));
 			tmp_sbs.str.addr = TREF(lcl_coll_xform_buff);
 			tmp_sbs.str.len = TREF(max_lcl_coll_xform_bufsiz);
+			tmp_sbs.str.in_array = FALSE;
 			do_xform(TREF(local_collseq), XBACK, &dst->str, &tmp_sbs.str, &length);
 			tmp_sbs.str.len = length;
 			s2pool(&(tmp_sbs.str));
-			dst->str = tmp_sbs.str;
+			dst->str.umstr = tmp_sbs.str.umstr;
 		}
 	}
 	return;

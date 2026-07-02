@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2025 Fidelity National Information	*
+ * Copyright (c) 2006-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -24,7 +24,7 @@ GBLREF spdesc 		stringpool;
 GBLREF UConverter	*chset_desc[CHSET_MAX_IDX];
 GBLREF casemap_t	casemaps[MAX_CASE_IDX];
 
-LITREF mstr		chset_names[CHSET_MAX_IDX_ALL];
+LITREF unmanaged_mstr	chset_names[CHSET_MAX_IDX_ALL];
 LITREF unsigned char 	lower_to_upper_table[];
 
 error_def(ERR_MAXSTRLEN);
@@ -43,7 +43,7 @@ error_def(ERR_MAXSTRLEN);
  * 	-1 (if invalid argument) or
  * 	index to an entry of casemaps[] (if valid)
  */
-int verify_case(const mstr *parm)
+int verify_case(const unmanaged_mstr *parm)
 {
 	unsigned char	c;
 	int		index;
@@ -73,7 +73,7 @@ int32_t gtm_strToTitle(UChar *dst, int32_t dstlen, const UChar *src, int32_t src
 	return u_strToTitle(dst, dstlen, src, srclen, NULL, locale, status);
 }
 
-int gtm_conv(UConverter* from, UConverter* to, mstr *src, char* dstbuff, int* bufflen)
+int gtm_conv(UConverter* from, UConverter* to, const unmanaged_mstr *src, char* dstbuff, int* bufflen)
 {
 	char		*dstptr, *dstbase, *srcptr;
 	const char	*ichset;
@@ -128,7 +128,7 @@ int gtm_conv(UConverter* from, UConverter* to, mstr *src, char* dstbuff, int* bu
 }
 
 /* Routine to verify given parameter against "W-1252" */
-gtm_chset_t check_w1252(const mstr *parm)
+gtm_chset_t check_w1252(const unmanaged_mstr *parm)
 {
 	char		tmp_w1252[MAX_CHSET_LEN];
 
@@ -143,7 +143,7 @@ gtm_chset_t check_w1252(const mstr *parm)
 }
 
 /* Routine to verify given parameter against "UTF-8/UTF-16" */
-gtm_chset_t check_valid_utf(const mstr *parm)
+gtm_chset_t check_valid_utf(const unmanaged_mstr *parm)
 {
 	char		tmp_utf[MAX_CHSET_LEN];
 

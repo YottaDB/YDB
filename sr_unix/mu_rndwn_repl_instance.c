@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -142,7 +142,7 @@ boolean_t mu_rndwn_repl_instance(replpool_identifier *replpool_id, boolean_t imm
 	instfilename = replpool_id->instfilename;
 	reg->dyn.addr->fname_len = strlen(instfilename);
 	assert(0 == instfilename[reg->dyn.addr->fname_len]);
-	memcpy((char *)reg->dyn.addr->fname, instfilename, reg->dyn.addr->fname_len + 1);
+	memcpy(reg->dyn.addr->fname, instfilename, reg->dyn.addr->fname_len + 1);
 	udi = FILE_INFO(reg);
 	udi->fn = (char *)reg->dyn.addr->fname;
 	ftok_sem_reg = NULL;	/* clean any residue from region work as we have now moved on to an instance */
