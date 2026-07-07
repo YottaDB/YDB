@@ -364,3 +364,20 @@ U252	;"-F-LINKFAIL unable to create link "_env(gtmvar)_" to "_env(ydbvar)
 U253	;"-F-CREATEFAIL unable to create directory "_env(ydbvar)
 U254	;"-F-REQLINKORDIR type of "_envvar_"="_env(envvar,"path")_" - """_env(envvar,"type")_""" is neither a directory nor a symbolic link"
 U255	;"-F-BADINVOCATION Must invoke as mumps -run set^"_$text(+0)_" or mumps -run unset^"_$text(+0)
+
+ExportEnv(var,value)
+	; Write an export statement to set the environment var to value
+	; If var has an existing value, write an export statement to save the old value
+	;   unless one already exists (since invoking the set label is idempotent)
+	; Else add to the list of variables to be unset when the unset label is invoked
+	; currenv and ppid should have been set prior to calling this label
+	new envsav,envval
+	write setcmd,var,setsep,"'",value,"'",!	; write even if already in the environment because it may not have been exported
+	if $data(currenv(var)) do
+	. set envsav="ydb_sav_"_ppid_"_"_var
+	. do:'$zfind(unset," "_envsav_" ")	; variables in unset have spaces on both sides to avoid substring matches
+	. . write setcmd,envsav,setsep,"'",currenv(var),"'",!
+	. . set unset=unset_envsav_" "
+	else  set unset=unset_var_" "
+	quit
+

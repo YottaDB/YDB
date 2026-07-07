@@ -60,7 +60,7 @@ GBLREF	boolean_t		exit_handler_active;
 GBLREF	boolean_t		exit_handler_complete;
 GBLREF	sem_info		*sem_inf;
 
-STATICFNDCL void mupip_downgrade_cleanup(void);
+static void mupip_downgrade_cleanup(void);
 
 error_def(ERR_BADDBVER);
 error_def(ERR_DBFILOPERR);

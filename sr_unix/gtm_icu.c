@@ -342,56 +342,6 @@ void gtm_icu_init(void)
 		libname = icu_libname;
 	} else
 		libname = ICU_LIBNAME;  /* go with default name */
-	DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
-	if (RESTRICTED(library_load_path))
-	{
-		/* Try the version named symlink */
-		if (ydb_icu_ver_defined)
-		{
-			SNPRINTF(librarypath, LIBRARY_PATH_MAX, GTM_PLUGIN_FMT_FULL, ydb_dist, libname);
-			if (0 != Stat(librarypath, &libpath_stat)) /* Try the default named symlink */
-				SNPRINTF(librarypath, LIBRARY_PATH_MAX, GTM_PLUGIN_FMT_SHORT ICU_LIBNAME, ydb_dist);
-		} else	/* Try the default named symlink */
-			SNPRINTF(librarypath, LIBRARY_PATH_MAX, GTM_PLUGIN_FMT_SHORT ICU_LIBNAME, ydb_dist);
-#		ifdef _AIX
-		STRNCAT(librarypath, AIX_SHR_64, SIZEOF(AIX_SHR_64)); /* Append "(shr_64.o)" to library path */
-#		endif
-		libname = librarypath;
-		if (NULL == (handle = dlopen(libname, iculdflags)))
-		{
-			ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
-			SNPRINTF(err_msg, MAX_ERRSTR_LEN, "dlopen(%s)", libname);
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_RESTRICTEDOP, 1, err_msg);
-		}
-#		ifndef _AIX
-		if (NULL == realpath(librarypath, real_path))
-			assert(FALSE); /* Just opened that library */
-		pieceptr = STRTOK_R(real_path, DOT_CHAR, &strtokptr);
-		while (NULL != pieceptr)
-		{
-			if ((2 == STRLEN(pieceptr)) && (('0' <= pieceptr[0]) && ('9' >= pieceptr[0]))
-					&& (('0' <= pieceptr[1]) && ('9' >= pieceptr[1])))
-			{
-				int ver;
-
-				icusymver_len = 0;
-				cptr = pieceptr;
-				A2I(cptr, pieceptr+2, ver);
-				assert(0 <= ver);	/* Already validated above */
-				/* Generate the ICU symbol renaming string */
-				icusymver[icusymver_len++] = '_';
-				icusymver[icusymver_len++] = pieceptr[0];
-				if (44 > ver)
-					icusymver[icusymver_len++] = '_';
-				icusymver[icusymver_len++] = pieceptr[1];
-				icusymver[icusymver_len++] = '\0';
-				ydb_icu_ver_defined = TRUE;
-				break;
-			}
-			pieceptr = STRTOK_R(NULL, DOT_CHAR, &strtokptr);
-		}
-#		endif
-	} else	/* Note: the "else" clause spans an ifdef which calls dlopen() twice on AIX */
 #	ifdef _AIX
 	if (gtm_icu_ver_defined || /* Use the AIX system default when no ICU version specified */
 			NULL == (handle = dlopen(ICU_LIBNAME_DEF, ICU_LIBFLAGS | RTLD_MEMBER)))

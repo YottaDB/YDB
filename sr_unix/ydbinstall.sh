@@ -407,6 +407,12 @@ while [ $# -gt 0 ] ; do
             fi
             shift ;;
         --dry-run) gtm_dryrun="Y" ; shift ;;
+	--encplugin) ydb_encplugin="Y" ; shift ;;
+	--nocopyenv) unset gtm_copyenv ; shift ;;
+	--nocopyexec) unset gtm_copyexec ; shift ;;
+	--nolinkenv) unset gtm_linkenv ; shift ;;
+	--nolinkexec) unset gtm_linkexec ; shift ;;
+	--nopkg-config) shift ;;
 	--force-install) ydb_force_install="Y" ; shift ;;
         --gtm)
             gtm_gtm="Y"
@@ -1088,10 +1094,6 @@ echo y >>$gtm_configure_in			# Response to one of two possible questions
 						#	"Directory $ydb_dist does not exist. Do you wish to create it as part of this installation? (y or n)"
 if [ -z "$ydb_icu_version" ] ; then echo n  >>$gtm_configure_in	# Response to : "Should UTF-8 support be installed?"
 else echo y  >>$gtm_configure_in		# Response to : "Should UTF-8 support be installed?"
-    if [ "default" = $ydb_icu_version ] ; then echo n  >>$gtm_configure_in	# Response to : "Should an ICU version other than the default be used?"
-    else echo y >>$gtm_configure_in		# Response to : "Should an ICU version other than the default be used?"
-        echo $ydb_icu_version >>$gtm_configure_in	# Response to : "Enter ICU version"
-    fi
 fi
 echo $gtm_lcase_utils >>$gtm_configure_in	# Response to : "Do you want uppercase and lowercase versions of the MUMPS routines?"
 if [ "Y" = $gtm_shlib_support ] ; then echo $gtm_keep_obj >>$gtm_configure_in ; fi	# Response to : "Object files of M routines placed in shared library $ydb_dist/libyottadbutil$ext. Keep original .o object files (y or n)?"
@@ -1169,7 +1171,7 @@ EOF
 # Now place it where the system can find it
 # We strip the "r" and "." to perform a numeric comparision between the versions
 # YottaDB will only ever increment versions, so a larger number indicates a newer version
-if [ ! -f ${pcfilepath}/yottadb.pc ] || [ $(grep -oP "^Version: \K.*" ${pcfilepath}/yottadb.pc | cut -c 2- | tr -d .) -lt $(echo $ydb_version | cut -c 2- | tr -d .) ] ; then
+if [ ! -f ${pcfilepath}/yottadb.pc ] || [ $(grep -oP "^Version: \K.*" ${pcfilepath}/yottadb.pc | cut -c 2- | tr -d '[A-Za-z_.]') -lt $(echo $ydb_version | cut -c 2- | tr -d '[A-Za-z_.]') ] ; then
     cp ${ydb_installdir}/yottadb.pc ${pcfilepath}/yottadb.pc
     echo $product_name pkg-config file installed successfully at ${pcfilepath}/yottadb.pc
 else

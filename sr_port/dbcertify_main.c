@@ -59,7 +59,7 @@
 
 GBLREF	uint4			process_id;
 GBLREF	boolean_t		ydb_dist_ok_to_use;
-GBLREF	CLI_ENTRY		*cmd_ary;
+GBLREF	CLI_ENTRY		dbcertify_cmd_ary[];
 
 GBLDEF	phase_static_area	*psa_gbl;				/* Global anchor for static area */
 

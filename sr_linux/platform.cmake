@@ -132,7 +132,7 @@ else()
       # Use -flto=N where N is number of available CPUs to speed up the link time.
       include(ProcessorCount)
       ProcessorCount(NUMCPUS)
-      set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -flto=${NUMCPUS} -fuse-ld=gold")
+      set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -flto=${NUMCPUS}")
       set(CMAKE_AR "gcc-ar")		# needed on some versions of gcc to get -flto working
       set(CMAKE_RANLIB "gcc-ranlib")	# needed on some versions of gcc to get -flto working
       message("*** Production build using LTO")
