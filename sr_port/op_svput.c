@@ -77,6 +77,9 @@ GBLREF stack_frame		*error_frame;
 GBLREF volatile int4		outofband;
 GBLREF volatile boolean_t	dollar_zininterrupt;
 GBLREF	size_t			totalRmalloc, totalRallocGta, zmalloclim;
+GBLREF	gd_region		*gv_cur_region;
+GBLREF	sgmnt_addrs		*cs_addrs;
+GBLREF	sgmnt_data_ptr_t	cs_data;
 #ifdef GTM_TRIGGER
 GBLREF mval		*dollar_ztvalue;
 GBLREF boolean_t	*ztvalue_changed_ptr;
@@ -190,8 +193,25 @@ void op_svput(int varnum, mval *v)
 					gv_currkey->prev = gv_currkey->end = 0;
 				} else if (NULL != gd_header)
 					gvinit();
-				if (NULL != gv_target)
-					gv_target->clue.end = 0;
+				/* The global directory changed, so the current region binding is no longer valid: a
+				 * region name in the new gld can map to a different gd_region than it did in the old one.
+				 * SET $ZGBLDIR is otherwise lazy (it binds no region; the next global reference does that
+				 * via gv_bind_name()), so declare "no current region" here by clearing gv_cur_region,
+				 * cs_addrs, and cs_data, along with the current target gv_target. The next global
+				 * reference then rebinds all of these from scratch. gv_target is cleared with the region
+				 * globals to preserve the "gv_target->gd_csa == cs_addrs" invariant that op_tstart() and
+				 * others assert; this also subsumes the former gv_target->clue.end reset, since there is
+				 * no longer a target whose clue could be stale. GT.M V7.1-003 (GTM-F235505) also moves
+				 * the global jnlpool earlier in this case (for $ZPEEK/%PEEKBYNAME) without binding a
+				 * region, which can leave jnlpool out of sync with the current region's
+				 * cs_addrs->jnlpool. Clearing the region forces that next reference to rebind, and the
+				 * rebind re-syncs jnlpool, so a following TCOMMIT cannot consult a stale jnlpool (see
+				 * bm_getfree(), gdsfilext()).
+				 */
+				gv_cur_region = NULL;
+				cs_addrs = NULL;
+				cs_data = NULL;
+				gv_target = NULL;
 				/* Reset any cached region-name for $zpeek since gbldir is changing and any same region name
 				 * in the new gbldir should point to a different gd_region structure (and not the cached one).
 				 */
