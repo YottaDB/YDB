@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -240,6 +240,18 @@ int4 gds_rundown(boolean_t cleanup_udi)
 		 */
 		assert((MUPIP_REORG_UPGRADE_IN_PROGRESS != mu_upgrade_in_prog) || (process_id == reorg_upgrade_pid));
 		csa->nl->reorg_upgrade_pid = 0;
+	}
+	if (process_id == csa->nl->reorg_trunc_pid)
+	{	/* We are a MUPIP REORG -TRUNCATE that noted its pid down in "mu_reorg" (to make concurrent updates allocate
+		 * blocks from the start of the database file; see comment in "bm_getfree") but terminated without clearing
+		 * it in "mupip_reorg". Clear it now so block allocation goes back to normal. "mupip_reorg" clears the pid
+		 * only near the end of its truncate loop whereas "mu_reorg" sets it (per region) much earlier, so every
+		 * exit in between lands here with the pid still set, e.g. REORGCTRLY (Ctrl-C/Ctrl-Y), REORGUPCNFLCT,
+		 * REORGINC, MUTRUNCPERCENT, MUTRUNCFAIL, or any runtime error during the reorg/root-swap/sweep phases.
+		 * Even a clean run can land here: the MUTRUNC1ATIME "continue" skips both the truncate of a region and
+		 * the clearing of the pid in it. So do NOT assert here that the pid cannot be ours.
+		 */
+		csa->nl->reorg_trunc_pid = 0;
 	}
 	csa->regcnt--;
 	if (csa->regcnt)

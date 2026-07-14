@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2023-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2023-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -66,6 +66,7 @@ mu_swap_blk.c:
 #include "gvcst_protos.h"	/* for gvcst_search prototype */
 #include "jnl_get_checksum.h"
 
+GBLREF boolean_t	mu_trunc_sweep_in_prog;
 GBLREF gv_namehead	*gv_target;
 GBLREF gv_namehead	*reset_gv_target;
 GBLREF gv_namehead	*reorg_gv_target;
@@ -219,6 +220,17 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 		{
 			assert(CDB_STAGNATE > t_tries);
 			return cdb_sc_badbitmap;
+		}
+		if (mu_trunc_sweep_in_prog && (BLK_BUSY == x_blk_lmap))
+		{	/* This swap is part of a MUPIP REORG -TRUNCATE tail sweep (see mu_trunc_tail_sweep.c). Using a busy
+			 * block as the destination would exchange the contents of the two blocks, displacing the destination
+			 * block's contents to the (high block number) working block position, thereby creating a new tail
+			 * block for the sweep to move down and preventing the sweep from converging. And a busy<->busy
+			 * exchange does not help compaction anyway (the busy/free state of both positions is unchanged).
+			 * So restrict the sweep to FREE/RECYCLED destinations.
+			 */
+			assert(0 == upg_mv_block);
+			continue;
 		}
 		if ((BLK_FREE != x_blk_lmap) || (0 != upg_mv_block))
 		{	/* x_blk_lmap is either BLK_BUSY or BLK_RECYCLED. In either case, we need to read destination block

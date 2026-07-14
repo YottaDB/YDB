@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -95,6 +95,7 @@ GBLREF	boolean_t		debug_mupip;
 GBLREF	boolean_t		jnlpool_init_needed;
 GBLREF	boolean_t		mu_reorg_more_tries;
 GBLREF	boolean_t		mu_reorg_process;
+GBLREF	boolean_t		mu_reorg_truncate_in_prog;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	gv_key			*gv_currkey_next_reorg, *gv_currkey, *gv_altkey;
 GBLREF	gv_namehead		*reorg_gv_target;
@@ -139,7 +140,16 @@ void mupip_reorg(void)
 	/* DBG qualifier prints extra debug messages where applicable */
 	debug_mupip = (CLI_PRESENT == cli_present("DBG"));
 	if (CLI_PRESENT == cli_present("TRUNCATE"))
+	{
 		truncate = TRUE;
+		/* Have "mu_reorg" set cnl->reorg_trunc_pid in each region it processes so concurrent updates in that region
+		 * allocate blocks from the start of the database file for the entire duration of this REORG -TRUNCATE
+		 * (see comment in "bm_getfree"). Setting cnl->trunc_pid only for the duration of the "mu_truncate" call is
+		 * not enough since blocks allocated at the end of the file during the (usually much longer) reorg phase
+		 * would prevent the truncate (a MUTRUNCALREADY message even though the file has lots of free space).
+		 */
+		mu_reorg_truncate_in_prog = TRUE;
+	}
 	if (CLI_PRESENT == cli_present("KEEP"))
 	{
 		keep_mval.str.addr = keep_value_buffer;
@@ -485,6 +495,15 @@ void mupip_reorg(void)
 			csd = cs_data;
 			csa = cs_addrs;
 			cnl = csa->nl;
+			/* Sweep the tail of the database file for busy blocks and reorg the globals they belong to so
+			 * they move to the front of the file before "mu_truncate" runs. Without this, blocks created by
+			 * updates that ran concurrently with the reorg phase above (e.g. blocks of globals created after
+			 * that phase built its list of global names) as well as blocks displaced to the end of the file
+			 * by the block swaps that phase did (see mu_swap_blk.c) would prevent "mu_truncate" from freeing
+			 * up space at the end of the file (a MUTRUNCALREADY message even though the file has lots of
+			 * free space). See comment at top of mu_trunc_tail_sweep.c for details.
+			 */
+			mu_trunc_tail_sweep(&exclude_gl_head, index_fill_factor, data_fill_factor, reorg_op, truncate_percent);
 			/* Ensure only one truncate process at a time operates on given region */
 			grab_crit(gv_cur_region, WS_69);
 			lcl_pid = cnl->trunc_pid;
@@ -516,6 +535,13 @@ void mupip_reorg(void)
 			grab_crit(gv_cur_region, WS_70);
 			assert(cnl->trunc_pid == process_id);
 			cnl->trunc_pid = 0;
+			if (process_id == cnl->reorg_trunc_pid)
+			{	/* Truncate of this region is done. Stop biasing concurrent block allocations towards the start
+				 * of the database file. Compare-and-clear so we do not clobber the pid of a concurrently
+				 * running REORG -TRUNCATE (in its reorg phase) that overwrote our pid.
+				 */
+				cnl->reorg_trunc_pid = 0;
+			}
 			rel_crit(gv_cur_region);
 			if (mu_ctrlc_occurred || mu_ctrly_occurred)
 			{

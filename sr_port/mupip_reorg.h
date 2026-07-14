@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2023-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -29,6 +29,8 @@ block_id	mu_swap_root_blk(glist *gl_ptr, srch_hist *gvt_hist_ptr, srch_hist  *di
 			trans_num curr_tn, block_id upg_mv_block);
 block_id	swap_root_or_directory_block(int parent_blk_lvl, int level, srch_hist *dir_hist_ptr, block_id child_blk_id,
 		sm_uc_ptr_t child_blk_ptr, kill_set *kill_set_list, trans_num curr_tn, block_id upg_mv_block);
+void		mu_trunc_tail_sweep(glist *exclude_glist_ptr, int index_fill_factor, int data_fill_factor, int reorg_op,
+			int4 truncate_percent);
 # endif
 enum cdb_sc	mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_set_ptr, int *pending_levels);
 enum cdb_sc	mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_created, int *lvls_increased,

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -730,6 +730,17 @@ typedef struct node_local_struct
 	uint4		reorg_encrypt_pid;	/* indicates whether a MUPIP REORG -ENCRYPT is in progress */
 	uint4		reorg_encrypt_cycle;	/* reflects the cycle of database encryption status in a series of
 						 * MUPIP REORG -ENCRYPTs
+						 */
+	uint4		reorg_trunc_pid;	/* Set to the pid of a MUPIP REORG -TRUNCATE for the duration of its entire
+						 * run (reorg phase included), unlike "trunc_pid" which is set only for the
+						 * duration of the "mu_truncate" call at the end of the run. Used by
+						 * "bm_getfree" to bias concurrent block allocations towards the start of the
+						 * database file so they do not land in (and prevent truncation of) the space
+						 * at the end of the file that the REORG -TRUNCATE is trying to free up.
+						 * Advisory only (affects block placement, not correctness) so it is set and
+						 * cleared without crit and, like "trunc_pid", can be stale if the reorg is
+						 * killed (worst case is front-biased allocation until the next REORG
+						 * -TRUNCATE or shared memory rundown).
 						 */
 	uint4		mupip_extract_count;	/* count of currently running MUPIP EXTRACTs; to be improved with GTM-8488 */
 	/* Below 4 values are cached from the original DB file header that created the shared memory segment. Used by DSE only */

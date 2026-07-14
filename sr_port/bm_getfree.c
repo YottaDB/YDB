@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -101,6 +101,17 @@ block_id bm_getfree(block_id hint_arg, boolean_t *blk_used, unsigned int cw_work
 	SETUP_THREADGBL_ACCESS;
 	total_blks = (dba_mm == cs_data->acc_meth) ? cs_addrs->total_blks : cs_addrs->ti->total_blks;
 	hint = (((ublock_id)hint_arg >= total_blks) ? 1 : hint_arg);	/* avoid any chance of treating TP chain.flag as signed */
+	if (cs_addrs->nl->reorg_trunc_pid || cs_addrs->nl->trunc_pid)
+	{	/* A MUPIP REORG -TRUNCATE is concurrently active in this region ("reorg_trunc_pid" covers its reorg phase,
+		 * "trunc_pid" its final "mu_truncate" call). Allocate blocks from the start of the database file so we
+		 * neither place busy blocks in the space at the end of the file that the reorg phase is freeing up nor
+		 * raise cnl->highest_lbm_with_busy_blk (see DETERMINE_BML_FUNC macro) and make "mu_truncate" pull back
+		 * (possibly all the way, resulting in a MUTRUNCALREADY error even though the file has truncatable free
+		 * space at the end). The hint only affects block placement, not correctness, so it is safe to override
+		 * it here.
+		 */
+		hint = 1;
+	}
 #	ifdef DEBUG
 	if ((0 != ydb_skip_bml_num) && (BLKS_PER_LMAP <= hint) && (hint < ydb_skip_bml_num))
 		hint = ydb_skip_bml_num;
