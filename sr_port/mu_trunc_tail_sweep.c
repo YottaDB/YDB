@@ -152,6 +152,19 @@ STATICFNDEF int4 mu_trunc_tail_scan(trunc_sweep_name *names, int4 max_names, gli
 		t_begin(ERR_MUREORGFAIL, 0);
 		for (;;)
 		{	/* transaction retry loop for scanning this local bitmap */
+			/* Re-read total_blks each (re)try: a MUPIP REORG -TRUNCATE in another process can truncate the
+			 * file while this scan runs (cnl->trunc_pid only serializes the "mu_truncate" phase, which this
+			 * process has not reached yet). Reading a block at/above the shrunken total_blks would make
+			 * "t_qread" return NULL (cdb_sc_blknumerr) no matter how often it is retried and, once "t_retry"
+			 * escalates to the final retry (which grabs crit), fail an assert in "t_qread" (an out-of-range
+			 * read while holding crit is otherwise a logic error). The re-read is racy without crit but
+			 * converges: every retry re-reads it and in the final retry (crit held) it cannot change.
+			 */
+			total_blks = csa->ti->total_blks;
+			if (lmap_blk_num >= total_blks)
+				break;	/* bitmap truncated away; the blocks it covered are past the new end of the file */
+			if (blks_in_lmap > (total_blks - lmap_blk_num))
+				blks_in_lmap = (int)(total_blks - lmap_blk_num);	/* file now ends inside this bitmap */
 			bmp_base = t_qread(lmap_blk_num, (sm_int_ptr_t)&cycle, &cr);
 			if (NULL == bmp_base)
 			{
@@ -326,10 +339,18 @@ void mu_trunc_tail_sweep(glist *exclude_glist_ptr, int index_fill_factor, int da
 				gbl_name_mval.str.len = names[i].len;
 				op_gvname(VARLSTCNT(1) &gbl_name_mval);
 				if (gv_cur_region != sweep_reg)
-				{	/* The global directory maps this name to a different region even though this
-					 * region's file has blocks with its name (possible only with an unusual gld
-					 * change). Leave those blocks alone.
+				{	/* The global directory maps this (unsubscripted) name to a different region even
+					 * though this region's file has blocks with its name (e.g. a global that spans
+					 * multiple regions, or a gld that changed since the blocks were created). Leave
+					 * those blocks alone. "op_gvname" pointed gv_target/gv_currkey at the other
+					 * region so reset them BEFORE restoring cs_addrs to this region or else they
+					 * would be out of sync with cs_addrs and fail the DBG_CHECK_GVTARGET_CSADDRS_IN_SYNC
+					 * check (in "dbg_check_gvtarget_gvcurrkey_in_sync") done e.g. at the start of the
+					 * "op_gvname" call for the next name.
 					 */
+					gv_target = NULL;
+					gv_currkey->end = 0;
+					gv_currkey->base[0] = KEY_DELIMITER;
 					gv_cur_region = sweep_reg;
 					tp_change_reg();
 					continue;
@@ -363,6 +384,14 @@ void mu_trunc_tail_sweep(glist *exclude_glist_ptr, int index_fill_factor, int da
 	}
 	mu_trunc_sweep_in_prog = FALSE;
 	mu_reorg_more_tries = mu_reorg_process = FALSE;
+	/* Do not leave gv_target/gv_currkey pointing to this region's last swept global. The mupip_reorg caller is
+	 * about to switch to other regions ("tp_change_reg" changes cs_addrs but not gv_target/gv_currkey), which
+	 * would leave gv_target out of sync with cs_addrs and fail the DBG_CHECK_GVTARGET_CSADDRS_IN_SYNC check
+	 * (in "dbg_check_gvtarget_gvcurrkey_in_sync" in gvt_inline.h) in whatever global reference happens next.
+	 */
+	gv_target = NULL;
+	gv_currkey->end = 0;
+	gv_currkey->base[0] = KEY_DELIMITER;
 	if (gv_cur_region != sweep_reg)
 	{	/* restore the caller's region */
 		gv_cur_region = sweep_reg;
