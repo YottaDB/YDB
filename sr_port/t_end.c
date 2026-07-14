@@ -325,6 +325,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 	assert((inctn_invalid_op == inctn_opcode) || mu_upgrade_in_prog || mu_reorg_encrypt_in_prog || update_trans);
 	assert(!need_kip_incr || update_trans || TREF(in_gvcst_redo_root_search));
 	assert(!DEFER_FREEZE_OBSERVATION(TREF(defer_instance_freeze)));
+	SET_CUR_CMT_STEP_IF(TRUE, TREF(cur_cmt_step), CMT00);
 	cti = csa->ti;
 	pvt_total_blks = csa->total_blks;	/* Note down csa->total_blks BEFORE we grab crit for MM. This is because as part
 						 * of "grab_crit()" we could call "wcs_mm_recover()" and update "csa->total_blks"
@@ -679,7 +680,6 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 	}
 	block_saved = FALSE;
 	ESTABLISH_NOUNWIND(t_ch);	/* avoid hefty setjmp call, which is ok since we never unwind t_ch */
-	SET_CUR_CMT_STEP_IF(TRUE, TREF(cur_cmt_step), CMT00);
 	assert(!csa->hold_onto_crit || csa->now_crit);
 	if (!csa->now_crit)
 	{

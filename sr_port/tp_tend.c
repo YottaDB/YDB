@@ -296,6 +296,7 @@ boolean_t	tp_tend()
 	assert(dollar_tlevel);
 	assert(0 == jnl_fence_ctl.level);
 	assert(!DEFER_FREEZE_OBSERVATION(TREF(defer_instance_freeze)));
+	SET_CUR_CMT_STEP_IF(TRUE, TREF(cur_cmt_step), CMT00);
 	status = cdb_sc_normal;
 	save_jnlpool = jnlpool;
 	update_jnlpool = NULL;
@@ -1289,7 +1290,6 @@ boolean_t	tp_tend()
 			if (!si->tp_csa->hold_onto_crit)
 				rel_crit(si->gv_cur_region);
 		}
-		SET_CUR_CMT_STEP_IF(TRUE, TREF(cur_cmt_step), CMT00);
 		/* Check that we DON'T own crit/commit on ANY region. The only exception is online mupip journal rollback/recovery
 		 * which holds crit for the entire process lifetime.
 		 */
