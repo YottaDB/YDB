@@ -125,13 +125,19 @@ STATICFNDEF int4 mu_trunc_tail_scan(trunc_sweep_name *names, int4 max_names, gli
 	csa = cs_addrs;
 	csd = cs_data;
 	total_blks = csa->ti->total_blks;
-	/* Any BUSY block below "target_blks" cannot limit the truncate (there are not enough free blocks below it for
-	 * the truncate point to go under it), so only scan the local bitmaps at or above it. Note that this is a
-	 * heuristic bound computed without crit; it only affects how much gets scanned, not correctness.
+	/* "target_blks" is the number of blocks a maximally compacted database would occupy. "mu_truncate" frees space
+	 * at local bitmap granularity (it truncates everything above the highest local bitmap containing a BUSY block),
+	 * and the local bitmap containing "target_blks" retains BUSY blocks even under perfect compaction (the blocks
+	 * just below "target_blks" have nowhere lower to go). Therefore BUSY blocks in that bitmap (or below) can never
+	 * limit the achievable truncation and moving them gains nothing: only scan the local bitmaps lying ENTIRELY
+	 * above "target_blks" (i.e. round up, not down). This also means that when the preceding reorg phase compacted
+	 * the file without concurrent-update interference, the scan finds nothing and the sweep does no work (and
+	 * produces no output). Note that this is a heuristic bound computed without crit; it only affects how much gets
+	 * scanned, not correctness.
 	 */
 	assert(total_blks >= csa->ti->free_blocks);
 	target_blks = total_blks - csa->ti->free_blocks;
-	start_lmap = target_blks / BLKS_PER_LMAP;
+	start_lmap = DIVIDE_ROUND_UP(target_blks, BLKS_PER_LMAP);
 	num_local_maps = DIVIDE_ROUND_UP(total_blks, BLKS_PER_LMAP);
 	/* (total_blks % BLKS_PER_LMAP) can be cast because it should never be larger than BLKS_PER_LMAP */
 	end_blocks = (int4)(total_blks % BLKS_PER_LMAP);
