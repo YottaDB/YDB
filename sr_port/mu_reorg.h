@@ -111,8 +111,12 @@ enum reorg_options {	DEFAULT = 0,
 			NOSPLIT = 0x0004,
 			NOSWAP = 0x0008,
 			DETAIL = 0x0010,
-			TRUNCATE_IN_PROG = 0x0020};	/* this reorg is part of a MUPIP REORG -TRUNCATE run (the name
+			TRUNCATE_IN_PROG = 0x0020,	/* this reorg is part of a MUPIP REORG -TRUNCATE run (the name
 							 * TRUNCATE is taken by a #define in gtm_unistd.h)
+							 */
+			TRUNC_SWEEP_IN_PROG = 0x0040};	/* this reorg is done by "mu_trunc_tail_sweep" (which also implies
+							 * TRUNCATE_IN_PROG); makes "mu_swap_blk" only use FREE/RECYCLED
+							 * blocks as swap destinations (see comment there)
 							 */
 
 int		get_gblname_len(sm_uc_ptr_t blk_base, sm_uc_ptr_t key_base);

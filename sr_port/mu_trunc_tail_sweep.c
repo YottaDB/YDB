@@ -27,9 +27,10 @@
  *	for those global names. That moves all of the blocks of those globals (data/index blocks via block
  *	swaps, root blocks and directory tree blocks via "mu_swap_root") towards the front of the file. Since
  *	concurrent updates can create new tail blocks while the sweep runs, the scan+reorg is repeated a few
- *	(bounded number of) times. While a sweep is in progress, "mu_trunc_sweep_in_prog" is TRUE, which makes
- *	"mu_swap_blk" only use FREE/RECYCLED blocks as swap destinations (a busy<->busy exchange does not help
- *	compaction and would displace yet another block towards the end of the file, preventing convergence).
+ *	(bounded number of) times. The sweep sets the TRUNC_SWEEP_IN_PROG bit in the reorg_op it passes to
+ *	"mu_reorg", which makes "mu_swap_blk" only use FREE/RECYCLED blocks as swap destinations (a busy<->busy
+ *	exchange does not help compaction and would displace yet another block towards the end of the file,
+ *	preventing convergence).
  *
  *	The sweep is best effort. Blocks it cannot move (e.g. globals in the -EXCLUDE list, blocks of a global
  *	that is concurrently being killed) are left alone; "mu_truncate" then truncates whatever it can.
@@ -75,7 +76,6 @@ GBLREF	bool			mu_ctrlc_occurred;
 GBLREF	bool			mu_ctrly_occurred;
 GBLREF	boolean_t		mu_reorg_more_tries;
 GBLREF	boolean_t		mu_reorg_process;
-GBLREF	boolean_t		mu_trunc_sweep_in_prog;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	gv_key			*gv_currkey, *gv_altkey;
 GBLREF	gv_namehead		*gv_target;
@@ -333,7 +333,10 @@ void mu_trunc_tail_sweep(glist *exclude_glist_ptr, int index_fill_factor, int da
 	 * t_qread calls done by the scan) expect REORG semantics; restore them for the duration of the sweep.
 	 */
 	mu_reorg_more_tries = mu_reorg_process = TRUE;
-	mu_trunc_sweep_in_prog = TRUE;	/* makes "mu_swap_blk" only use FREE/RECYCLED destinations; see comment there */
+	/* Note down that the "mu_reorg" calls below are done by a tail sweep. This makes "mu_swap_blk" only use
+	 * FREE/RECYCLED destinations; see comment there.
+	 */
+	reorg_op |= TRUNC_SWEEP_IN_PROG;
 	prev_max_busy = 0;
 	for (iter = 1; MU_TRUNC_SWEEP_MAX_ITERS >= iter; iter++)
 	{
@@ -425,7 +428,6 @@ void mu_trunc_tail_sweep(glist *exclude_glist_ptr, int index_fill_factor, int da
 		if (!progress)
 			break;	/* avoid spinning if nothing can be moved (e.g. concurrent kills in progress) */
 	}
-	mu_trunc_sweep_in_prog = FALSE;
 	mu_reorg_more_tries = mu_reorg_process = FALSE;
 	/* Do not leave gv_target/gv_currkey pointing to this region's last swept global. The mupip_reorg caller is
 	 * about to switch to other regions ("tp_change_reg" changes cs_addrs but not gv_target/gv_currkey), which

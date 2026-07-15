@@ -66,7 +66,6 @@ mu_swap_blk.c:
 #include "gvcst_protos.h"	/* for gvcst_search prototype */
 #include "jnl_get_checksum.h"
 
-GBLREF boolean_t	mu_trunc_sweep_in_prog;
 GBLREF gv_namehead	*gv_target;
 GBLREF gv_namehead	*reset_gv_target;
 GBLREF gv_namehead	*reorg_gv_target;
@@ -91,6 +90,8 @@ GBLREF	block_id	ydb_skip_bml_num;
 Input Parameters:
 	level: level of working block
 	dest_blk_id: last destination used for swap
+	reorg_op: caller's "enum reorg_options" bit flags (TRUNC_SWEEP_IN_PROG restricts the
+		destination search to FREE/RECYCLED blocks; see comment in the search loop)
 Output Parameters:
 	kill_set_ptr: Kill set to be freed
 	*exclude_glist_ptr: List of globals not to be moved for a swap destination
@@ -98,7 +99,8 @@ Input/Output Parameters:
 	gv_target : as working block's history
 	reorg_gv_target->hist : as destination block's history
  ******************************************************************************************/
-enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_ptr, glist *exclude_glist_ptr, block_id upg_mv_block)
+enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_ptr, glist *exclude_glist_ptr, int reorg_op,
+				block_id upg_mv_block)
 {
 	blk_segment		*bs1, *bs_ptr;
 	block_id		child1, child2, dest_blk_id, work_blk_id;
@@ -221,7 +223,7 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 			assert(CDB_STAGNATE > t_tries);
 			return cdb_sc_badbitmap;
 		}
-		if (mu_trunc_sweep_in_prog && (BLK_BUSY == x_blk_lmap))
+		if ((reorg_op & TRUNC_SWEEP_IN_PROG) && (BLK_BUSY == x_blk_lmap))
 		{	/* This swap is part of a MUPIP REORG -TRUNCATE tail sweep (see mu_trunc_tail_sweep.c). Using a busy
 			 * block as the destination would exchange the contents of the two blocks, displacing the destination
 			 * block's contents to the (high block number) working block position, thereby creating a new tail

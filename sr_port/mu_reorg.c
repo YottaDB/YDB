@@ -710,7 +710,8 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 				 * Histories are sent as gv_target->hist and reorg_gv_target->hist.
 				 */
 				mu_reorg_in_swap_blk = TRUE;
-				status = mu_swap_blk(level, &dest_blk_id, &kill_set_list, exclude_glist_ptr, 0); /* not upgrade */
+				status = mu_swap_blk(level, &dest_blk_id, &kill_set_list, exclude_glist_ptr, reorg_op, 0);
+											/* 0 => not upgrade */
 				mu_reorg_in_swap_blk = FALSE;
 				if (cdb_sc_oprnotneeded == status)
 				{

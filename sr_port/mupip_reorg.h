@@ -35,7 +35,7 @@ void		mu_trunc_tail_sweep(glist *exclude_glist_ptr, int index_fill_factor, int d
 enum cdb_sc	mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_set_ptr, int *pending_levels);
 enum cdb_sc	mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_created, int *lvls_increased,
 			int *max_rightblk_lvl);
-enum cdb_sc	mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_ptr, glist *exclude_glist_ptr,
+enum cdb_sc	mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_ptr, glist *exclude_glist_ptr, int reorg_op,
 			block_id upg_mv_block);
 enum cdb_sc	mu_reduce_level(kill_set *kill_set_ptr);
 enum cdb_sc	gvcst_expand_any_key(srch_blk_status *blk_stat, sm_uc_ptr_t rec_top, sm_uc_ptr_t expanded_key,

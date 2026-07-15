@@ -3,7 +3,7 @@
  * Copyright (c) 2021-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2025-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -457,7 +457,7 @@ int4	mu_upgrade_bmm(gd_region *reg, size_t blocks_needed)
 				 * of new_blk_num location selected a ways above into a "hint" landing us on the desired block
 				 */
 				mu_reorg_in_swap_blk = TRUE;
-				status = mu_swap_blk(blkHdr.levl, &new_blk_num, &kill_set_list, NULL, old_blk_num);
+				status = mu_swap_blk(blkHdr.levl, &new_blk_num, &kill_set_list, NULL, DEFAULT, old_blk_num);
 				mu_reorg_in_swap_blk = FALSE;
 				if (cdb_sc_normal != status)
 				{	/* swap to get the block out of the blks_in_way zone failed */
