@@ -95,7 +95,6 @@ GBLREF	boolean_t		debug_mupip;
 GBLREF	boolean_t		jnlpool_init_needed;
 GBLREF	boolean_t		mu_reorg_more_tries;
 GBLREF	boolean_t		mu_reorg_process;
-GBLREF	boolean_t		mu_reorg_truncate_in_prog;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	gv_key			*gv_currkey_next_reorg, *gv_currkey, *gv_altkey;
 GBLREF	gv_namehead		*reorg_gv_target;
@@ -140,16 +139,7 @@ void mupip_reorg(void)
 	/* DBG qualifier prints extra debug messages where applicable */
 	debug_mupip = (CLI_PRESENT == cli_present("DBG"));
 	if (CLI_PRESENT == cli_present("TRUNCATE"))
-	{
 		truncate = TRUE;
-		/* Have "mu_reorg" set cnl->reorg_trunc_pid in each region it processes so concurrent updates in that region
-		 * allocate blocks from the start of the database file for the entire duration of this REORG -TRUNCATE
-		 * (see comment in "bm_getfree"). Setting cnl->trunc_pid only for the duration of the "mu_truncate" call is
-		 * not enough since blocks allocated at the end of the file during the (usually much longer) reorg phase
-		 * would prevent the truncate (a MUTRUNCALREADY message even though the file has lots of free space).
-		 */
-		mu_reorg_truncate_in_prog = TRUE;
-	}
 	if (CLI_PRESENT == cli_present("KEEP"))
 	{
 		keep_mval.str.addr = keep_value_buffer;
@@ -257,6 +247,15 @@ void mupip_reorg(void)
 		reorg_op |= NOSPLIT;
 	if (CLI_PRESENT == cli_present("NOSWAP"))
 		reorg_op |= NOSWAP;
+	if (truncate)
+	{	/* Have "mu_reorg" set cnl->reorg_trunc_pid in each region it processes so concurrent updates in that region
+		 * allocate blocks from the start of the database file for the entire duration of this REORG -TRUNCATE
+		 * (see comment in "bm_getfree"). Setting cnl->trunc_pid only for the duration of the "mu_truncate" call is
+		 * not enough since blocks allocated at the end of the file during the (usually much longer) reorg phase
+		 * would prevent the truncate (a MUTRUNCALREADY message even though the file has lots of free space).
+		 */
+		reorg_op |= TRUNCATE_IN_PROG;
+	}
 	if ((cli_status = cli_present("FILL_FACTOR")) == CLI_PRESENT)
 	{
 		assert(SIZEOF(data_fill_factor) == SIZEOF(int4));

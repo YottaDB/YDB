@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2026 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -107,7 +110,10 @@ enum reorg_options {	DEFAULT = 0,
 			NOCOALESCE = 0x0002,
 			NOSPLIT = 0x0004,
 			NOSWAP = 0x0008,
-			DETAIL = 0x0010};
+			DETAIL = 0x0010,
+			TRUNCATE_IN_PROG = 0x0020};	/* this reorg is part of a MUPIP REORG -TRUNCATE run (the name
+							 * TRUNCATE is taken by a #define in gtm_unistd.h)
+							 */
 
 int		get_gblname_len(sm_uc_ptr_t blk_base, sm_uc_ptr_t key_base);
 int		get_key_len(sm_uc_ptr_t blk_base, sm_uc_ptr_t key_base);

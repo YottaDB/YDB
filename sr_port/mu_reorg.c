@@ -99,7 +99,6 @@ GBLREF	sgmnt_addrs		*kip_csa;
 GBLREF	boolean_t		need_kip_incr;
 GBLREF	uint4			update_trans;
 GBLREF	boolean_t		mu_reorg_in_swap_blk;
-GBLREF	boolean_t		mu_reorg_truncate_in_prog;
 GBLREF	uint4			process_id;
 
 error_def(ERR_DBRDONLY);
@@ -273,7 +272,7 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 		gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
 		return FALSE;
 	}
-	if (mu_reorg_truncate_in_prog && (dba_bg == cs_data->acc_meth) && (process_id != cs_addrs->nl->reorg_trunc_pid))
+	if ((reorg_op & TRUNCATE_IN_PROG) && (dba_bg == cs_data->acc_meth) && (process_id != cs_addrs->nl->reorg_trunc_pid))
 	{	/* This is a REORG -TRUNCATE. Note our pid down in this region's shared memory so concurrent updates in this
 		 * region allocate blocks from the start of the database file (see comment in "bm_getfree") and do not get in
 		 * the way of the truncate that will happen at the end of the REORG. This is advisory (affects only block

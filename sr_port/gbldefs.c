@@ -346,7 +346,6 @@ GBLDEF	void			(*simple_timeout_timer_ptr)(TID tid, int4 hd_len, boolean_t **time
 GBLDEF	u_casemap_t 		gtm_strToTitle_ptr;		/* Function pointer for gtm_strToTitle */
 #endif
 GBLDEF	boolean_t		mu_reorg_process;		/* set to TRUE by MUPIP REORG */
-GBLDEF	boolean_t		mu_reorg_truncate_in_prog;	/* set to TRUE by MUPIP REORG -TRUNCATE for its entire run */
 GBLDEF	boolean_t		mu_trunc_sweep_in_prog;		/* set to TRUE for the duration of a "mu_trunc_tail_sweep" */
 GBLDEF	boolean_t		mu_reorg_more_tries;		/* set to TRUE by MUPIP REORG / REORG -UPGRADE */
 GBLDEF	boolean_t		mu_reorg_in_swap_blk;		/* set to TRUE for the duration of the call to "mu_swap_blk" */
