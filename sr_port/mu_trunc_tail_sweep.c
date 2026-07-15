@@ -100,18 +100,23 @@ typedef struct
 	int		len;
 } trunc_sweep_name;
 
-STATICFNDCL int4 mu_trunc_tail_scan(trunc_sweep_name *names, int4 max_names, glist *exclude_glist_ptr);
+STATICFNDCL int4 mu_trunc_tail_scan(trunc_sweep_name *names, int4 max_names, glist *exclude_glist_ptr,
+			block_id *max_busy_blk_ptr);
 
 /* Scan the local bitmaps covering the tail of the database file for BUSY blocks and record the (deduplicated)
  * global names those blocks belong to. Returns the number of names found. The scan is advisory: it is fine for
  * it to see (transiently) stale bitmap/block contents since the "mu_reorg"/"mu_swap_root" calls that act on the
  * returned names revalidate everything transactionally. Blocks whose name cannot be determined (e.g. blocks of
  * a killed GVT with just a block header, bad-looking keys from a concurrent update) are skipped.
+ * "*max_busy_blk_ptr" is set to the highest BUSY block the scan saw (0 if none), INCLUDING blocks it skipped or
+ * whose global is in the exclude list: the highest busy block is what caps the achievable truncate point, so the
+ * caller uses this to tell whether an iteration made progress (see comment there).
  */
-STATICFNDEF int4 mu_trunc_tail_scan(trunc_sweep_name *names, int4 max_names, glist *exclude_glist_ptr)
+STATICFNDEF int4 mu_trunc_tail_scan(trunc_sweep_name *names, int4 max_names, glist *exclude_glist_ptr,
+			block_id *max_busy_blk_ptr)
 {
-	block_id		child, free_blks, lmap_blk_num, lmap_num, num_local_maps, start_lmap, target_blks;
-	block_id		total_blks;
+	block_id		child, free_blks, lmap_blk_num, lmap_num, max_busy_blk, num_local_maps, start_lmap;
+	block_id		target_blks, total_blks;
 	boolean_t		long_blk_id, names_full, read_failed, skip_block;
 	blk_hdr_ptr_t		blk_hdr_ptr;
 	cache_rec_ptr_t		cr, cr1;
@@ -155,6 +160,7 @@ STATICFNDEF int4 mu_trunc_tail_scan(trunc_sweep_name *names, int4 max_names, gli
 		end_blocks = BLKS_PER_LMAP;
 	n_names = 0;
 	names_full = FALSE;
+	max_busy_blk = 0;
 	for (lmap_num = num_local_maps - 1; (lmap_num >= start_lmap) && (0 < lmap_num) && !names_full; lmap_num--)
 	{
 		if (mu_ctrly_occurred || mu_ctrlc_occurred)
@@ -199,6 +205,8 @@ STATICFNDEF int4 mu_trunc_tail_scan(trunc_sweep_name *names, int4 max_names, gli
 				GET_STATUS(*(lmap_addr + (blk / BML_BLKS_PER_UCHAR)), (blk % BML_BLKS_PER_UCHAR), bml_status);
 				if (BLK_BUSY != bml_status)
 					continue;
+				if ((lmap_blk_num + blk) > max_busy_blk)
+					max_busy_blk = lmap_blk_num + blk;
 				blk_base = t_qread(lmap_blk_num + blk, (sm_int_ptr_t)&cycle1, &cr1);
 				if (NULL == blk_base)
 				{
@@ -276,6 +284,7 @@ STATICFNDEF int4 mu_trunc_tail_scan(trunc_sweep_name *names, int4 max_names, gli
 		}
 		t_abort(gv_cur_region, csa);
 	}
+	*max_busy_blk_ptr = max_busy_blk;
 	return n_names;
 }
 
@@ -289,6 +298,7 @@ void mu_trunc_tail_sweep(glist *exclude_glist_ptr, int index_fill_factor, int da
 				int4 truncate_percent)
 {
 	static trunc_sweep_name	names[MU_TRUNC_SWEEP_MAX_NAMES];
+	block_id		max_busy_blk, prev_max_busy;
 	boolean_t		lcl_resume, progress;
 	gd_region		*sweep_reg;
 	glist			gl;
@@ -302,6 +312,14 @@ void mu_trunc_tail_sweep(glist *exclude_glist_ptr, int index_fill_factor, int da
 		return;	/* "mu_truncate" is going to issue a MUTRUNCNOTBG message; nothing for the sweep to do */
 	if (csa->ti->free_blocks < (truncate_percent * csa->ti->total_blks / 100))
 		return;	/* "mu_truncate" is going to issue a MUTRUNCNOSPACE message; nothing for the sweep to do */
+	if (SNAPSHOTS_IN_PROG(csa->nl) || (BACKUP_NOT_IN_PROGRESS != csa->nl->nbb))
+		return;	/* "mu_truncate" refuses to truncate while an online INTEG (snapshot) or an online BACKUP is in
+			 * progress on the region (it issues a MUTRUNCSSINPROG/MUTRUNCBACKINPROG message), so a sweep
+			 * would be all cost and no benefit (the block moves it does are extra work for the INTEG/BACKUP
+			 * too). Both checks are crit-free reads (like the ones above): a snapshot/backup starting right
+			 * after them does not get the sweep skipped, it just means the sweep's work goes unused this
+			 * time around.
+			 */
 	sweep_reg = gv_cur_region;
 	gv_target = NULL;	/* do not let "t_retry" (if invoked during the scan) act on a stale/wrong-region target;
 				 * "op_gvname"/SET_GVTARGET_TO_HASHT_GBL set it before it is actually needed.
@@ -316,13 +334,22 @@ void mu_trunc_tail_sweep(glist *exclude_glist_ptr, int index_fill_factor, int da
 	 */
 	mu_reorg_more_tries = mu_reorg_process = TRUE;
 	mu_trunc_sweep_in_prog = TRUE;	/* makes "mu_swap_blk" only use FREE/RECYCLED destinations; see comment there */
+	prev_max_busy = 0;
 	for (iter = 1; MU_TRUNC_SWEEP_MAX_ITERS >= iter; iter++)
 	{
 		if (mu_ctrly_occurred || mu_ctrlc_occurred)
 			break;
-		n_names = mu_trunc_tail_scan(names, MU_TRUNC_SWEEP_MAX_NAMES, exclude_glist_ptr);
+		n_names = mu_trunc_tail_scan(names, MU_TRUNC_SWEEP_MAX_NAMES, exclude_glist_ptr, &max_busy_blk);
 		if (0 == n_names)
 			break;	/* tail has no movable busy blocks; nothing (more) to sweep */
+		if ((0 != prev_max_busy) && (max_busy_blk >= prev_max_busy))
+			break;	/* The highest BUSY block did not move down since the previous iteration. Since the highest
+				 * busy block is what caps the achievable truncate point, iterating further cannot improve
+				 * the truncate even if lower blocks are movable. This covers both blocks a previous
+				 * iteration tried and failed to move (e.g. block swaps found no usable destination) and
+				 * blocks the sweep will never move (e.g. a global in the -EXCLUDE list).
+				 */
+		prev_max_busy = max_busy_blk;
 		progress = FALSE;
 		for (i = 0; i < n_names; i++)
 		{
