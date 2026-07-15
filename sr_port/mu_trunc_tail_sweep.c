@@ -110,7 +110,8 @@ STATICFNDCL int4 mu_trunc_tail_scan(trunc_sweep_name *names, int4 max_names, gli
  */
 STATICFNDEF int4 mu_trunc_tail_scan(trunc_sweep_name *names, int4 max_names, glist *exclude_glist_ptr)
 {
-	block_id		child, lmap_blk_num, lmap_num, num_local_maps, start_lmap, target_blks, total_blks;
+	block_id		child, free_blks, lmap_blk_num, lmap_num, num_local_maps, start_lmap, target_blks;
+	block_id		total_blks;
 	boolean_t		long_blk_id, names_full, read_failed, skip_block;
 	blk_hdr_ptr_t		blk_hdr_ptr;
 	cache_rec_ptr_t		cr, cr1;
@@ -125,6 +126,16 @@ STATICFNDEF int4 mu_trunc_tail_scan(trunc_sweep_name *names, int4 max_names, gli
 	csa = cs_addrs;
 	csd = cs_data;
 	total_blks = csa->ti->total_blks;
+	free_blks = csa->ti->free_blocks;
+	/* The two crit-free reads above are not atomic. A concurrent file extension (or a truncate done by a MUPIP
+	 * REORG -TRUNCATE in another process) between them can make the two values mutually inconsistent, e.g. a
+	 * free_blks (read after an extension) greater than total_blks (read before it). In that case skip this scan:
+	 * the file is visibly in flux, the sweep is best effort, and the next sweep iteration and/or the following
+	 * "mu_truncate" reread fresh values. free_blks equal to total_blks (only possible through the same race, since
+	 * bitmap blocks are always BUSY) means nothing is busy, so there is nothing to sweep either way.
+	 */
+	if (free_blks >= total_blks)
+		return 0;
 	/* "target_blks" is the number of blocks a maximally compacted database would occupy. "mu_truncate" frees space
 	 * at local bitmap granularity (it truncates everything above the highest local bitmap containing a BUSY block),
 	 * and the local bitmap containing "target_blks" retains BUSY blocks even under perfect compaction (the blocks
@@ -135,8 +146,7 @@ STATICFNDEF int4 mu_trunc_tail_scan(trunc_sweep_name *names, int4 max_names, gli
 	 * produces no output). Note that this is a heuristic bound computed without crit; it only affects how much gets
 	 * scanned, not correctness.
 	 */
-	assert(total_blks >= csa->ti->free_blocks);
-	target_blks = total_blks - csa->ti->free_blocks;
+	target_blks = total_blks - free_blks;
 	start_lmap = DIVIDE_ROUND_UP(target_blks, BLKS_PER_LMAP);
 	num_local_maps = DIVIDE_ROUND_UP(total_blks, BLKS_PER_LMAP);
 	/* (total_blks % BLKS_PER_LMAP) can be cast because it should never be larger than BLKS_PER_LMAP */
