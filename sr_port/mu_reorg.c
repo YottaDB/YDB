@@ -243,7 +243,7 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 	static block_id		dest_blk_id = 0;
 	int			tkeysize, altkeylen, tkeylen, tkeycmpc;
 	block_id		blks_killed, blks_processed, blks_reused, blks_coalesced, blks_split, blks_swapped,
-				file_extended, lvls_reduced;
+				file_extended, lvls_reduced, work_blk_id;
 	int			d_max_fill, i_max_fill, blk_size, cur_blk_size, max_fill, toler, d_clsce_toler, i_clsce_toler,
 				i_rsrvbytes_maxsz, d_rsrvbytes_maxsz, d_split_toler, i_split_toler, i_rsrv_bytes, d_rsrv_bytes;
 	int			cnt1, cnt2, max_rightblk_lvl, count, rtsib_bstar_rec_sz = -1;
@@ -710,14 +710,31 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 				}
 				if (gv_target->hist.depth <= level)
 					break;
-				if ((0 != sweep_start_blk) && (sweep_start_blk > gv_target->hist.h[level].blk_num))
-					break;	/* Caller ("mu_trunc_tail_sweep") is only interested in moving blocks that lie
-						 * past the truncate point. This working block is below it, so swapping it can
-						 * not improve the truncate. Skip the swap (the traversal continues as usual).
-						 * Note that "dest_blk_id" only ever moves forward, so a swap of this block could
-						 * even move it FURTHER UP (i.e. towards the end of the file) in case dest_blk_id
-						 * has already advanced past it, creating a new tail block for the sweep to move.
-						 */
+				if (0 != sweep_start_blk)
+				{	/* Caller is "mu_trunc_tail_sweep". Skip this working block unless swapping it can
+					 * improve the truncate the sweep is preparing for. Two ways it cannot:
+					 * 1) The block lies below the truncate point ("sweep_start_blk" is the lowest block
+					 *    number the sweep's scan considers worth moving). The block is in the part of the
+					 *    file that survives the truncate, so relocating it gains nothing. This is the
+					 *    common case: a global occupying a gigabyte typically has just a handful of blocks
+					 *    past the truncate point and swapping all the rest would be a lot of database
+					 *    updates (each swap is a transaction, with journal records and before-images) for
+					 *    no truncate benefit.
+					 * 2) The destination search pointer "dest_blk_id" has reached or passed the block. That
+					 *    search only moves forward (see INCR_BLK_NUM; the DECR_BLK_NUM calls below only
+					 *    re-attempt the same working block) so every destination "mu_swap_blk" could still
+					 *    find lies ABOVE this block: the swap would move it towards the END of the file,
+					 *    creating a new tail block for the sweep to chase.
+					 * Note a normal (non-sweep) MUPIP REORG must NOT do this, hence the "sweep_start_blk"
+					 * check above (it is 0 for every non-sweep caller): assigning block numbers
+					 * sequentially in pre-order is the very purpose of its swaps (see comment at the top of
+					 * this file) and legitimately moves blocks towards the end of the file.
+					 * The traversal continues as usual in either case.
+					 */
+					work_blk_id = gv_target->hist.h[level].blk_num;
+					if ((sweep_start_blk > work_blk_id) || (work_blk_id <= dest_blk_id))
+						break;
+				}
 				/* Swap working block with appropriate dest_blk_id block.
 				 * Histories are sent as gv_target->hist and reorg_gv_target->hist.
 				 */
