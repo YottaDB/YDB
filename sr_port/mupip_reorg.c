@@ -455,7 +455,7 @@ void mupip_reorg(void)
 		 */
 		root_swap_statistic = 0;
 		for (gl_ptr = gl_head.next; gl_ptr; gl_ptr = gl_ptr->next)
-			mu_swap_root(gl_ptr, &root_swap_statistic, 0);
+			mu_swap_root(gl_ptr, &root_swap_statistic, 0, 0);	/* 0 => no tail sweep restriction */
 		hasht_gl.next = NULL;
 		for (reg_iter = reg_list; reg_iter; reg_iter = reg_iter->next)
 		{
@@ -473,7 +473,7 @@ void mupip_reorg(void)
 				continue;
 			hasht_gl.reg = gv_cur_region;
 			hasht_gl.gvt = gv_target;
-			mu_swap_root(&hasht_gl, &root_swap_statistic, 0);
+			mu_swap_root(&hasht_gl, &root_swap_statistic, 0, 0);	/* 0 => no tail sweep restriction */
 		}
 		util_out_print("Total root blocks moved: !UL", FLUSH, root_swap_statistic);
 		mu_reorg_more_tries = mu_reorg_process = FALSE;

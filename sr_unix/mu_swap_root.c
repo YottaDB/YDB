@@ -98,7 +98,11 @@ error_def(ERR_REORGUPCNFLCT);
 #define RETRY_SWAP		(0)
 #define ABORT_SWAP		(-1)
 
-void	mu_swap_root(glist *gl_ptr, int *root_swap_statistic_ptr, block_id upg_mv_block)
+/* "sweep_start_blk", when non-zero, means the caller is "mu_trunc_tail_sweep" and that only blocks at or above that
+ * block number are worth moving (see comment in "swap_root_or_directory_block" where it is used). 0 means no such
+ * restriction i.e. move the root/directory tree blocks wherever they are, the normal MUPIP REORG behavior.
+ */
+void	mu_swap_root(glist *gl_ptr, int *root_swap_statistic_ptr, block_id upg_mv_block, block_id sweep_start_blk)
 {
 	block_id		child_blk_id, free_blk_id;
 	block_id		save_root;
@@ -198,7 +202,8 @@ void	mu_swap_root(glist *gl_ptr, int *root_swap_statistic_ptr, block_id upg_mv_b
 		 * Should restart with gvtrootmod2 if they don't agree. gvcst_root_search is the final arbiter.
 		 * Really need that for debug info and also should assert(gv_currkey is global name).
 		 */
-		free_blk_id = mu_swap_root_blk(gl_ptr, gvt_hist_ptr, dir_hist_ptr, &kill_set_list, curr_tn, upg_mv_block);
+		free_blk_id = mu_swap_root_blk(gl_ptr, gvt_hist_ptr, dir_hist_ptr, &kill_set_list, curr_tn, upg_mv_block,
+						sweep_start_blk);
 		if (RETRY_SWAP == free_blk_id)
 			continue;
 		else if (ABORT_SWAP == free_blk_id)
@@ -241,7 +246,7 @@ void	mu_swap_root(glist *gl_ptr, int *root_swap_statistic_ptr, block_id upg_mv_b
 			child_blk_id = dir_hist_ptr->h[level].blk_num;
 			assert(csa->dir_tree->root != child_blk_id);
 			free_blk_id = swap_root_or_directory_block(level + 1, level, dir_hist_ptr, child_blk_id,
-					child_blk_ptr, &kill_set_list, curr_tn, 0);
+					child_blk_ptr, &kill_set_list, curr_tn, 0, sweep_start_blk);
 			if (RETRY_SWAP == free_blk_id)
 				continue;
 			else if (ABORT_SWAP == free_blk_id)
@@ -285,7 +290,7 @@ void	mu_swap_root(glist *gl_ptr, int *root_swap_statistic_ptr, block_id upg_mv_b
 }
 
 block_id mu_swap_root_blk(glist *gl_ptr, srch_hist *gvt_hist_ptr, srch_hist *dir_hist_ptr, kill_set *kill_set_list,
-		trans_num curr_tn, block_id upg_mv_block)
+		trans_num curr_tn, block_id upg_mv_block, block_id sweep_start_blk)
 {
 	block_id		free_blk_id, root_blk_id;
 	boolean_t		tn_aborted;
@@ -302,7 +307,7 @@ block_id mu_swap_root_blk(glist *gl_ptr, srch_hist *gvt_hist_ptr, srch_hist *dir
 	root_blk_id = gvt_hist_ptr->h[root_blk_lvl].blk_num;
 	assert((CDB_STAGNATE > t_tries) || (gv_target->root == gvt_hist_ptr->h[root_blk_lvl].blk_num));
 	free_blk_id = swap_root_or_directory_block(0, root_blk_lvl, dir_hist_ptr, root_blk_id,
-						   root_blk_ptr, kill_set_list, curr_tn, upg_mv_block);
+						   root_blk_ptr, kill_set_list, curr_tn, upg_mv_block, sweep_start_blk);
 	if ((RETRY_SWAP == free_blk_id) || (ABORT_SWAP == free_blk_id))
 		return free_blk_id;
 	assert(ABORT_SWAP < free_blk_id);
@@ -343,7 +348,8 @@ block_id mu_swap_root_blk(glist *gl_ptr, srch_hist *gvt_hist_ptr, srch_hist *dir
 
 /* Finds a free block and adds information to update array and cw_set */
 block_id swap_root_or_directory_block(int parent_blk_lvl, int child_blk_lvl, srch_hist *dir_hist_ptr, block_id child_blk_id,
-		sm_uc_ptr_t child_blk_ptr, kill_set *kill_set_list, trans_num curr_tn, block_id upg_mv_block)
+		sm_uc_ptr_t child_blk_ptr, kill_set *kill_set_list, trans_num curr_tn, block_id upg_mv_block,
+		block_id sweep_start_blk)
 {
 	blk_segment		*bs1, *bs_ptr;
 	block_id		hint_blk_num, free_blk_id, total_blks, num_local_maps, master_bit,
@@ -368,6 +374,18 @@ block_id swap_root_or_directory_block(int parent_blk_lvl, int child_blk_lvl, src
 	csd = cs_data;
 	csa = cs_addrs;
 	blk_size = csd->blk_size;
+	if ((0 != sweep_start_blk) && (sweep_start_blk > child_blk_id))
+	{	/* Caller is "mu_trunc_tail_sweep" and this root/directory tree block lies below the truncate point
+		 * ("sweep_start_blk" is the lowest block number the sweep's scan considers worth moving). The block is in
+		 * the part of the file that survives the truncate, so relocating it gains nothing while still costing a
+		 * transaction (with journal records and before-images). Note this is the same idea as the "child_blk_id <=
+		 * free_blk_id" heuristic below ("stop swapping ... once the database is truncated well enough"), just with
+		 * the sweep's precise bound instead of a heuristic one. A normal MUPIP REORG passes 0 and is unaffected.
+		 */
+		assert(0 == upg_mv_block);
+		t_abort(gv_cur_region, csa);
+		return ABORT_SWAP;
+	}
 	/* Find a free/recycled block for new block location. */
 	hint_blk_num = upg_mv_block;
 	total_blks = csa->ti->total_blks;

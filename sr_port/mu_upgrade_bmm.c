@@ -1076,7 +1076,7 @@ int4	move_root_block(block_id new_blk_num, block_id old_blk_num, gvnh_reg_t *gvn
 	memcpy(gv_target->alt_hist, &(gv_target->hist), SIZEOF(srch_hist));
 	if (DIR_ROOT != old_blk_num)
 	{	/* global tree root */
-		mu_swap_root(&root_tag, &root_swap_stat, new_blk_num++);
+		mu_swap_root(&root_tag, &root_swap_stat, new_blk_num++, 0);	/* 0 => no tail sweep restriction */
 	} else
 	{	/* directory tree root */
 		assert(0 == csd->kill_in_prog);
@@ -1092,7 +1092,7 @@ int4	move_root_block(block_id new_blk_num, block_id old_blk_num, gvnh_reg_t *gvn
 			GVT_HIST_CWS_INSERT(gv_target->alt_hist);
 		}
 		did_block = mu_swap_root_blk(&root_tag, &(gv_target->hist), gv_target->alt_hist, kill_set_list,
-				csa->ti->curr_tn, new_blk_num++);
+				csa->ti->curr_tn, new_blk_num++, 0);	/* 0 => no tail sweep restriction */
 		if (did_block != new_blk_num)
 		{	/* swap of DIR_ROOT failed */
 			util_out_print("Region !AD : Move of global tree root failed;", FALSE, REG_LEN_STR(gv_cur_region));

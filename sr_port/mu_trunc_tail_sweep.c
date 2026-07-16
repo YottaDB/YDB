@@ -31,8 +31,9 @@
  *	"mu_reorg", which makes "mu_swap_blk" only use FREE/RECYCLED blocks as swap destinations (a busy<->busy
  *	exchange does not help compaction and would displace yet another block towards the end of the file,
  *	preventing convergence). It also sets the NOSPLIT/NOCOALESCE bits so those "mu_reorg" calls do block
- *	swaps only, and passes them the lowest block number worth moving so they swap only those blocks of the
- *	global that lie past the truncate point (see comments in "mu_trunc_tail_sweep" below).
+ *	swaps only, and passes both "mu_reorg" and "mu_swap_root" the lowest block number worth moving so they
+ *	move only those blocks of the global that lie past the truncate point (see comments in
+ *	"mu_trunc_tail_sweep" below).
  *
  *	The sweep is best effort. Blocks it cannot move (e.g. globals in the -EXCLUDE list, blocks of a global
  *	that is concurrently being killed) are left alone; "mu_truncate" then truncates whatever it can.
@@ -476,7 +477,11 @@ void mu_trunc_tail_sweep(glist *exclude_glist_ptr, int index_fill_factor, int da
 				progress = TRUE;
 			SET_GV_CURRKEY_FROM_GVT(reorg_gv_target);
 			root_swap_statistic = 0;
-			mu_swap_root(&gl, &root_swap_statistic, 0);
+			/* Pass "sweep_start_blk" here too so the root block of this global and its directory tree
+			 * blocks get moved only if they lie past the truncate point (same reasoning as the "mu_reorg"
+			 * call above).
+			 */
+			mu_swap_root(&gl, &root_swap_statistic, 0, sweep_start_blk);
 		}
 		if (!progress)
 			break;	/* avoid spinning if nothing can be moved (e.g. concurrent kills in progress) */
