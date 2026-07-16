@@ -356,7 +356,8 @@ void mupip_reorg(void)
 		 */
 		reorg_gv_target->gvname.var_name = GNAME(gl_ptr);
 		GTMTRIG_ONLY(assert(!IS_MNAME_HASHT_GBLNAME(reorg_gv_target->gvname.var_name));)
-		cur_success = mu_reorg(gl_ptr, &exclude_gl_head, &resume, index_fill_factor, data_fill_factor, reorg_op, min_level);
+		cur_success = mu_reorg(gl_ptr, &exclude_gl_head, &resume, index_fill_factor, data_fill_factor, reorg_op, min_level,
+					0);	/* 0 => swap every working block (no "mu_trunc_tail_sweep" restriction) */
 		reorg_success &= cur_success;
 		SET_GV_CURRKEY_FROM_GVT(reorg_gv_target);
 		if (truncate)
@@ -396,7 +397,7 @@ void mupip_reorg(void)
 						reorg_gv_target->gvname.var_name = gv_target->gvname.var_name;
 						cur_success = mu_reorg(&hasht_gl, &exclude_gl_head, &resume,
 									index_fill_factor, data_fill_factor, reorg_op,
-									min_level);
+									min_level, 0);	/* 0 => swap every working block */
 						reorg_success &= cur_success;
 					}
 #					endif

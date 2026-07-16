@@ -213,6 +213,9 @@ Input Parameter:
 	exclude_glist_ptr = list of globals in EXCLUDE option
 	index_fill_factor = index blocks' fill factor
 	data_fill_factor = data blocks' fill factor
+	sweep_start_blk = if non-zero, swap ONLY those working blocks whose block number is at or above this.
+			  Used by "mu_trunc_tail_sweep" (see comment before its "mu_reorg" call). 0 means no
+			  such restriction i.e. swap every working block (the normal MUPIP REORG behavior).
 Input/Output Parameter:
 	resume = resume flag
 	          (Note: this is overloaded in case of a "mupip reorg -upgrade" to store whether at least one block got split)
@@ -220,7 +223,8 @@ Input/Output Parameter:
 			[Only for debugging]
  ****************************************************************/
 boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
-				int index_fill_factor, int data_fill_factor, int reorg_op, const int min_level)
+				int index_fill_factor, int data_fill_factor, int reorg_op, const int min_level,
+				block_id sweep_start_blk)
 {
 	boolean_t		end_of_tree = FALSE, detailed_log;
 	int			rec_size, pending_levels, prev_pending_levels;
@@ -706,6 +710,14 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 				}
 				if (gv_target->hist.depth <= level)
 					break;
+				if ((0 != sweep_start_blk) && (sweep_start_blk > gv_target->hist.h[level].blk_num))
+					break;	/* Caller ("mu_trunc_tail_sweep") is only interested in moving blocks that lie
+						 * past the truncate point. This working block is below it, so swapping it can
+						 * not improve the truncate. Skip the swap (the traversal continues as usual).
+						 * Note that "dest_blk_id" only ever moves forward, so a swap of this block could
+						 * even move it FURTHER UP (i.e. towards the end of the file) in case dest_blk_id
+						 * has already advanced past it, creating a new tail block for the sweep to move.
+						 */
 				/* Swap working block with appropriate dest_blk_id block.
 				 * Histories are sent as gv_target->hist and reorg_gv_target->hist.
 				 */

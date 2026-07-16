@@ -22,7 +22,8 @@
 /* prototypes */
 
 boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
-			int index_fill_factor, int data_fill_factor, int reorg_op, int min_level);
+			int index_fill_factor, int data_fill_factor, int reorg_op, int min_level,
+			block_id sweep_start_blk);
 # ifdef UNIX
 void		mu_swap_root(glist *gl_ptr, int *root_swap_statistic_ptr, block_id upg_mv_block);
 block_id	mu_swap_root_blk(glist *gl_ptr, srch_hist *gvt_hist_ptr, srch_hist  *dir_hist_ptr, kill_set *kill_set_list,

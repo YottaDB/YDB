@@ -635,7 +635,10 @@ enum cdb_sc find_gvt_roots(block_id *curr_blk, gd_region *reg, cache_rec_ptr_t *
 							index_fill_factor, REG_LEN_STR(reg));
 						resume = FALSE;
 						reorg_ret = mu_reorg(&reorg_upgrade_gl, NULL, &resume,
-									index_fill_factor, data_fill_factor, reorg_op, min_level);
+									index_fill_factor, data_fill_factor, reorg_op, min_level,
+									0);	/* 0 => swap every working block (this is not a
+										 * "mu_trunc_tail_sweep" caller)
+										 */
 						/* Switch process global variables back to "mupip reorg -upgrade" now that
 						 * the "mupip reorg" invocation is done.
 						 */

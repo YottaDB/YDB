@@ -31,7 +31,8 @@
  *	"mu_reorg", which makes "mu_swap_blk" only use FREE/RECYCLED blocks as swap destinations (a busy<->busy
  *	exchange does not help compaction and would displace yet another block towards the end of the file,
  *	preventing convergence). It also sets the NOSPLIT/NOCOALESCE bits so those "mu_reorg" calls do block
- *	swaps only (see comment in "mu_trunc_tail_sweep" below).
+ *	swaps only, and passes them the lowest block number worth moving so they swap only those blocks of the
+ *	global that lie past the truncate point (see comments in "mu_trunc_tail_sweep" below).
  *
  *	The sweep is best effort. Blocks it cannot move (e.g. globals in the -EXCLUDE list, blocks of a global
  *	that is concurrently being killed) are left alone; "mu_truncate" then truncates whatever it can.
@@ -104,7 +105,7 @@ typedef struct
 } trunc_sweep_name;
 
 STATICFNDCL int4 mu_trunc_tail_scan(trunc_sweep_name *names, int4 max_names, glist *exclude_glist_ptr,
-			block_id *max_busy_blk_ptr);
+			block_id *max_busy_blk_ptr, block_id *sweep_start_blk_ptr);
 
 /* Scan the local bitmaps covering the tail of the database file for BUSY blocks and record the (deduplicated)
  * global names those blocks belong to. Returns the number of names found. The scan is advisory: it is fine for
@@ -114,9 +115,11 @@ STATICFNDCL int4 mu_trunc_tail_scan(trunc_sweep_name *names, int4 max_names, gli
  * "*max_busy_blk_ptr" is set to the highest BUSY block the scan saw (0 if none), INCLUDING blocks it skipped or
  * whose global is in the exclude list: the highest busy block is what caps the achievable truncate point, so the
  * caller uses this to tell whether an iteration made progress (see comment there).
+ * "*sweep_start_blk_ptr" is set to the lowest block number this scan considered worth moving (0 if the scan did
+ * not run); the caller passes it to "mu_reorg" so only those blocks get swapped (see comment there).
  */
 STATICFNDEF int4 mu_trunc_tail_scan(trunc_sweep_name *names, int4 max_names, glist *exclude_glist_ptr,
-			block_id *max_busy_blk_ptr)
+			block_id *max_busy_blk_ptr, block_id *sweep_start_blk_ptr)
 {
 	block_id		child, free_blks, lmap_blk_num, lmap_num, max_busy_blk, num_local_maps, start_lmap;
 	block_id		target_blks, total_blks;
@@ -134,6 +137,7 @@ STATICFNDEF int4 mu_trunc_tail_scan(trunc_sweep_name *names, int4 max_names, gli
 
 	csa = cs_addrs;
 	csd = cs_data;
+	*sweep_start_blk_ptr = 0;
 	total_blks = csa->ti->total_blks;
 	free_blks = csa->ti->free_blocks;
 	/* The two crit-free reads above are not atomic. A concurrent file extension (or a truncate done by a MUPIP
@@ -157,6 +161,12 @@ STATICFNDEF int4 mu_trunc_tail_scan(trunc_sweep_name *names, int4 max_names, gli
 	 */
 	target_blks = total_blks - free_blks;
 	start_lmap = DIVIDE_ROUND_UP(target_blks, BLKS_PER_LMAP);
+	/* Blocks below the first scanned local bitmap are not worth moving (see comment above). Hand that bound to the
+	 * caller so the "mu_reorg" calls it does restrict their block swaps to the same set of blocks this scan looked
+	 * at. Note that "start_lmap" is >= 1 here (since "target_blks" is >= 1 given the "free_blks >= total_blks"
+	 * check above), so "*sweep_start_blk_ptr" is non-zero i.e. never confused with the "no restriction" value.
+	 */
+	*sweep_start_blk_ptr = start_lmap * BLKS_PER_LMAP;
 	num_local_maps = DIVIDE_ROUND_UP(total_blks, BLKS_PER_LMAP);
 	/* (total_blks % BLKS_PER_LMAP) can be cast because it should never be larger than BLKS_PER_LMAP */
 	end_blocks = (int4)(total_blks % BLKS_PER_LMAP);
@@ -322,7 +332,7 @@ void mu_trunc_tail_sweep(glist *exclude_glist_ptr, int index_fill_factor, int da
 				int4 truncate_percent)
 {
 	static trunc_sweep_name	names[MU_TRUNC_SWEEP_MAX_NAMES];
-	block_id		max_busy_blk, prev_max_busy;
+	block_id		max_busy_blk, prev_max_busy, sweep_start_blk;
 	boolean_t		lcl_resume, progress;
 	gd_region		*sweep_reg;
 	glist			gl;
@@ -375,7 +385,8 @@ void mu_trunc_tail_sweep(glist *exclude_glist_ptr, int index_fill_factor, int da
 	{
 		if (mu_ctrly_occurred || mu_ctrlc_occurred)
 			break;
-		n_names = mu_trunc_tail_scan(names, MU_TRUNC_SWEEP_MAX_NAMES, exclude_glist_ptr, &max_busy_blk);
+		n_names = mu_trunc_tail_scan(names, MU_TRUNC_SWEEP_MAX_NAMES, exclude_glist_ptr, &max_busy_blk,
+						&sweep_start_blk);
 		if (0 == n_names)
 			break;	/* tail has no movable busy blocks; nothing (more) to sweep */
 		if ((0 != prev_max_busy) && (max_busy_blk >= prev_max_busy))
@@ -451,8 +462,17 @@ void mu_trunc_tail_sweep(glist *exclude_glist_ptr, int index_fill_factor, int da
 			/* Save the global name in reorg_gv_target (see comment in mupip_reorg.c before its mu_reorg call) */
 			reorg_gv_target->gvname.var_name = GNAME(&gl);
 			lcl_resume = FALSE;
+			/* Pass "sweep_start_blk" so "mu_reorg" swaps ONLY those blocks of this global that lie past the
+			 * truncate point. Without this, a global with just a few blocks in the tail (the norm: user
+			 * databases routinely have globals occupying a gigabyte or more, of which the preceding reorg
+			 * phase or a concurrent update displaced only a handful of blocks to the tail) would have ALL of
+			 * its blocks swapped, which is a lot of needless database updates (each swap is a transaction,
+			 * with journal records and before-images) that do nothing for the truncate. "mu_reorg" still walks
+			 * the entire global (the traversal is how it finds the tail blocks transactionally) but that is a
+			 * read-only cost. See also the comment before the "sweep_start_blk" check in "mu_reorg".
+			 */
 			if (mu_reorg(&gl, exclude_glist_ptr, &lcl_resume, index_fill_factor, data_fill_factor,
-					reorg_op, 0))
+					reorg_op, 0, sweep_start_blk))
 				progress = TRUE;
 			SET_GV_CURRKEY_FROM_GVT(reorg_gv_target);
 			root_swap_statistic = 0;
