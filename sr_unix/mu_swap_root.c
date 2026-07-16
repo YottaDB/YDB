@@ -242,16 +242,19 @@ void	mu_swap_root(glist *gl_ptr, int *root_swap_statistic_ptr, block_id upg_mv_b
 			assert(csa->dir_tree->root != child_blk_id);
 			free_blk_id = swap_root_or_directory_block(level + 1, level, dir_hist_ptr, child_blk_id,
 					child_blk_ptr, &kill_set_list, curr_tn, 0);
-			if (level == 0)
-				/* set level as 1 to mark this kill set is for level-0 block in directory tree.
-				 * The kill-set level later will be used in gvcst_bmp_markfree to assign a special value to
-				 * cw_set_element, which will be eventually used by t_end to write the block to snapshot
-				 */
-				kill_set_list.blk[kill_set_list.used - 1].level = 1;
 			if (RETRY_SWAP == free_blk_id)
 				continue;
 			else if (ABORT_SWAP == free_blk_id)
 				break;
+			if (level == 0)
+				/* set level as 1 to mark this kill set is for level-0 block in directory tree.
+				 * The kill-set level later will be used in gvcst_bmp_markfree to assign a special value to
+				 * cw_set_element, which will be eventually used by t_end to write the block to snapshot.
+				 * Note this has to be done AFTER the RETRY_SWAP/ABORT_SWAP checks above: those returns happen
+				 * BEFORE "swap_root_or_directory_block" adds this block to the kill set, so "used" is still 0
+				 * (it is reset at the top of this loop) and the "used - 1" below would index blk[-1].
+				 */
+				kill_set_list.blk[kill_set_list.used - 1].level = 1;
 			update_trans = UPDTRNS_DB_UPDATED_MASK;
 			inctn_opcode = inctn_mu_reorg;
 			assert(1 == kill_set_list.used);
