@@ -30,7 +30,8 @@
  *	(bounded number of) times. The sweep sets the TRUNC_SWEEP_IN_PROG bit in the reorg_op it passes to
  *	"mu_reorg", which makes "mu_swap_blk" only use FREE/RECYCLED blocks as swap destinations (a busy<->busy
  *	exchange does not help compaction and would displace yet another block towards the end of the file,
- *	preventing convergence).
+ *	preventing convergence). It also sets the NOSPLIT/NOCOALESCE bits so those "mu_reorg" calls do block
+ *	swaps only (see comment in "mu_trunc_tail_sweep" below).
  *
  *	The sweep is best effort. Blocks it cannot move (e.g. globals in the -EXCLUDE list, blocks of a global
  *	that is concurrently being killed) are left alone; "mu_truncate" then truncates whatever it can.
@@ -312,9 +313,10 @@ STATICFNDEF int4 mu_trunc_tail_scan(trunc_sweep_name *names, int4 max_names, gli
 
 /* Sweep the tail of the current region (gv_cur_region/cs_addrs/cs_data must be set up by the caller) so that a
  * following "mu_truncate" call can free up as much space as possible. See comment at the top of this file.
- * The index/data fill factors and reorg_op are passed through to "mu_reorg" so the sweep reorgs stragglers the
- * same way the main reorg phase would have. "truncate_percent" is used to skip the sweep in case "mu_truncate"
- * would not attempt a truncate anyway.
+ * The reorg_op flags are passed through to "mu_reorg" (with sweep-specific bits added below). The index/data
+ * fill factors are passed through too, though they only matter to the split/coalesce operations the sweep
+ * disables. "truncate_percent" is used to skip the sweep in case "mu_truncate" would not attempt a truncate
+ * anyway.
  */
 void mu_trunc_tail_sweep(glist *exclude_glist_ptr, int index_fill_factor, int data_fill_factor, int reorg_op,
 				int4 truncate_percent)
@@ -330,6 +332,10 @@ void mu_trunc_tail_sweep(glist *exclude_glist_ptr, int index_fill_factor, int da
 	sgmnt_addrs		*csa;
 
 	csa = cs_addrs;
+	if (reorg_op & NOSWAP)
+		return;	/* A block swap is the only operation the sweep does (see NOSPLIT/NOCOALESCE comment below), so
+			 * with -NOSWAP the sweep could move nothing; skip even the scan.
+			 */
 	if (dba_mm == cs_data->acc_meth)
 		return;	/* "mu_truncate" is going to issue a MUTRUNCNOTBG message; nothing for the sweep to do */
 	if (csa->ti->free_blocks < (truncate_percent * csa->ti->total_blks / 100))
@@ -356,9 +362,14 @@ void mu_trunc_tail_sweep(glist *exclude_glist_ptr, int index_fill_factor, int da
 	 */
 	mu_reorg_more_tries = mu_reorg_process = TRUE;
 	/* Note down that the "mu_reorg" calls below are done by a tail sweep. This makes "mu_swap_blk" only use
-	 * FREE/RECYCLED destinations; see comment there.
+	 * FREE/RECYCLED destinations; see comment there. Also disable splits and coalesces: a block swap is the only
+	 * reorg operation that moves a block towards the front of the file, which is all the sweep is after, whereas
+	 * splits/coalesces are block-fill quality operations that would just make the sweep more expensive. (In theory
+	 * a coalesce can free a tail block that a swap cannot move -- an under-filled block with no FREE/RECYCLED
+	 * destination below it -- but that means the file is packed solid below that block, so there is next to nothing
+	 * for "mu_truncate" to reclaim anyway; the sweep is best effort, see comment at the top of this file.)
 	 */
-	reorg_op |= TRUNC_SWEEP_IN_PROG;
+	reorg_op |= (TRUNC_SWEEP_IN_PROG | NOSPLIT | NOCOALESCE);
 	prev_max_busy = 0;
 	for (iter = 1; MU_TRUNC_SWEEP_MAX_ITERS >= iter; iter++)
 	{
