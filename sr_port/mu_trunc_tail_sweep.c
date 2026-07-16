@@ -56,6 +56,7 @@
 #include "muextr.h"
 #include "mu_reorg.h"
 #include "min_max.h"
+#include "toktyp.h"	/* needed by valid_mname.h */
 /* Include prototypes */
 #include "gvcst_protos.h"	/* for GVCST_ROOT_SEARCH */
 #include "gvt_inline.h"
@@ -71,6 +72,7 @@
 #include "targ_alloc.h"	/* for the "targ_alloc" call in the SET_GVTARGET_TO_HASHT_GBL macro */
 #include "tp_change_reg.h"
 #include "util.h"
+#include "valid_mname.h"
 
 GBLREF	bool			mu_ctrlc_occurred;
 GBLREF	bool			mu_ctrly_occurred;
@@ -123,6 +125,7 @@ STATICFNDEF int4 mu_trunc_tail_scan(trunc_sweep_name *names, int4 max_names, gli
 	int			bml_status, blk, blks_in_lmap, end_blocks, key_len_dir, name_len, nslevel;
 	int			rec_size1;
 	int4			cycle, cycle1, i, n_names;
+	mstr			name_mstr;
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
 	sm_uc_ptr_t		blk_base, bmp_base, lmap_addr, name_ptr, rec_base, tblk_ptr;
@@ -258,8 +261,29 @@ STATICFNDEF int4 mu_trunc_tail_scan(trunc_sweep_name *names, int4 max_names, gli
 				key_len_dir = get_gblname_len(tblk_ptr, rec_base + SIZEOF(rec_hdr));
 				if ((1 >= key_len_dir) || ((MAX_MIDENT_LEN + 1) < key_len_dir))
 					continue;	/* likely a just-killed block still marked busy; skip */
-				name_ptr = rec_base + SIZEOF(rec_hdr);
 				name_len = key_len_dir - 1;
+				memcpy(names[n_names].name, rec_base + SIZEOF(rec_hdr), name_len);
+				names[n_names].name[name_len] = '\0';
+				name_ptr = names[n_names].name;
+				/* The reads above are done from a shared memory buffer without crit, so a concurrent
+				 * update can rewrite the buffer between the "get_gblname_len" call and the "memcpy"
+				 * (a torn read). Validate the PRIVATE copy before using it: every global name is a
+				 * valid M identifier (the trigger global ^#t being the sole exception), whereas a torn
+				 * read can produce garbage, e.g. a "name" with an embedded KEY_DELIMITER, which
+				 * "op_gvname" (in the sweep loop) must never see.
+				 */
+				if ('#' == name_ptr[0])
+				{	/* a block of the trigger global ^#t (or a torn read) */
+					if ((HASHT_GBLNAME_LEN != name_len)
+							|| (0 != memcmp(name_ptr, HASHT_GBLNAME, HASHT_GBLNAME_LEN)))
+						continue;
+				} else
+				{
+					name_mstr.addr = (char *)name_ptr;
+					name_mstr.len = name_len;
+					if (!valid_mname(&name_mstr))
+						continue;	/* torn read; a later scan sees the settled contents */
+				}
 				if ((NULL != exclude_glist_ptr) && (NULL != exclude_glist_ptr->next)
 						&& in_exclude_list(name_ptr, name_len, exclude_glist_ptr))
 					continue;	/* honor -EXCLUDE: do not move this global's blocks */
@@ -268,8 +292,6 @@ STATICFNDEF int4 mu_trunc_tail_scan(trunc_sweep_name *names, int4 max_names, gli
 						break;
 				if (i < n_names)
 					continue;	/* already have this name */
-				memcpy(names[n_names].name, name_ptr, name_len);
-				names[n_names].name[name_len] = '\0';
 				names[n_names].len = name_len;
 				n_names++;
 				if (max_names == n_names)
