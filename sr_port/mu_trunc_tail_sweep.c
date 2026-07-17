@@ -59,6 +59,7 @@
 #include "muextr.h"
 #include "mu_reorg.h"
 #include "min_max.h"
+#include "hashtab_mname.h"	/* for COMPUTE_HASH_MNAME */
 #include "toktyp.h"	/* needed by valid_mname.h */
 /* Include prototypes */
 #include "gvcst_protos.h"	/* for GVCST_ROOT_SEARCH */
@@ -367,6 +368,7 @@ void mu_trunc_tail_sweep(glist *exclude_glist_ptr, int index_fill_factor, int da
 	glist			gl;
 	int			root_swap_statistic;
 	int4			iter, i, n_names;
+	mname_entry		gvname;
 	mval			gbl_name_mval;
 	sgmnt_addrs		*csa;
 
@@ -467,11 +469,12 @@ void mu_trunc_tail_sweep(glist *exclude_glist_ptr, int index_fill_factor, int da
 				if (gv_cur_region != sweep_reg)
 				{	/* The global directory maps this (unsubscripted) name to a different region even
 					 * though this region's file has blocks with its name (e.g. a global that spans
-					 * multiple regions, or a gld that changed since the blocks were created). Leave
-					 * those blocks alone. "op_gvname" pointed gv_target/gv_currkey at the other
-					 * region so reset them BEFORE restoring cs_addrs to this region or else they
-					 * would be out of sync with cs_addrs and fail the DBG_CHECK_GVTARGET_CSADDRS_IN_SYNC
-					 * check (in "dbg_check_gvtarget_gvcurrkey_in_sync") done e.g. at the start of the
+					 * multiple regions, or a gld that changed since the blocks were created -- a
+					 * hidden global, see YDB#1240). "op_gvname" pointed gv_target/gv_currkey at the
+					 * other region so reset them BEFORE restoring cs_addrs to this region or else
+					 * they would be out of sync with cs_addrs and fail the
+					 * DBG_CHECK_GVTARGET_CSADDRS_IN_SYNC check (in
+					 * "dbg_check_gvtarget_gvcurrkey_in_sync") done e.g. at the start of the
 					 * "op_gvname" call for the next name.
 					 */
 					gv_target = NULL;
@@ -479,9 +482,25 @@ void mu_trunc_tail_sweep(glist *exclude_glist_ptr, int index_fill_factor, int da
 					gv_currkey->base[0] = KEY_DELIMITER;
 					gv_cur_region = sweep_reg;
 					tp_change_reg();
-					continue;
-				}
-				if (0 == gv_target->root)
+					/* Now bind the name DIRECTLY to this region (the same region-local binding that
+					 * "mu_reorg_hidden_gbl_select" does when REORG -TRUNCATE starts): if the name is
+					 * in this region's own directory tree, its blocks belong to a GVT rooted here and
+					 * are movable by a reorg of <name, this region> no matter what the gld says.
+					 * Note that a later sweep iteration can "targ_alloc" a gv_target for the same
+					 * name again (unless csa->gvt_hashtab exists and dedups it); that little bit of
+					 * memory is not worth tracking given the sweep's bounded iteration count.
+					 */
+					gvname.var_name.addr = (char *)names[i].name;
+					gvname.var_name.len = names[i].len;
+					COMPUTE_HASH_MNAME(&gvname);
+					gv_target = targ_alloc(sweep_reg->max_key_size, &gvname, sweep_reg);
+					SET_GV_CURRKEY_FROM_GVT(gv_target);
+					GVCST_ROOT_SEARCH;
+					if (0 == gv_target->root)
+						continue;	/* name is not (or no longer) in this region's directory
+								 * tree (e.g. stale scan result); nothing to move
+								 */
+				} else if (0 == gv_target->root)
 					continue;	/* global was killed since the scan; its blocks will turn recycled */
 			}
 			gl.next = NULL;
