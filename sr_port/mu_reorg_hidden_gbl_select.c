@@ -106,6 +106,14 @@ void mu_reorg_hidden_gbl_select(glist *gl_head, boolean_t restrict_reg)
 		}
 		if (IS_STATSDB_REGNAME(reg))
 			continue;	/* statsDB regions hold only ^%YGS; nothing hidden to select */
+		if (reg_cmcheck(reg))
+			continue;	/* GT.CM (remote) region: it cannot be reorged from here (and "gv_init_reg" below
+					 * would issue an UNIMPLOP error trying to open it). "reg_cmcheck" is what detects
+					 * a remote region and sets its acc_meth to dba_cm; without this call the region
+					 * still looks like BG here (its acc_meth stays BG until the region is opened) so
+					 * the "IS_REG_BG_OR_MM" check below would not catch it. Same skip that other MUPIP
+					 * utilities (e.g. "region_init", "mu_int_reg") do for remote regions.
+					 */
 		if (!IS_REG_BG_OR_MM(reg))
 			continue;
 		if (!reg->open && IS_AUTODB_REG(reg))
