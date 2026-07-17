@@ -96,7 +96,9 @@ GBLREF	block_id		ydb_skip_bml_num;
 
 error_def(ERR_MUREORGFAIL);
 
-#define	MU_TRUNC_SWEEP_MAX_NAMES	256	/* names found in one scan; an overflow is caught by the next iteration */
+#define	MU_TRUNC_SWEEP_INIT_NAMES	256	/* initial size of the names array; "mu_trunc_tail_scan" grows it as
+						 * needed so one scan can return however many names the tail holds
+						 */
 #define	MU_TRUNC_SWEEP_MAX_ITERS	3	/* bounded so sustained concurrent updates cannot make the sweep spin */
 
 typedef struct
@@ -105,7 +107,7 @@ typedef struct
 	int		len;
 } trunc_sweep_name;
 
-STATICFNDCL int4 mu_trunc_tail_scan(trunc_sweep_name *names, int4 max_names, glist *exclude_glist_ptr,
+STATICFNDCL int4 mu_trunc_tail_scan(trunc_sweep_name **names_ptr, int4 *names_alloc_ptr, glist *exclude_glist_ptr,
 			block_id *max_busy_blk_ptr, block_id *sweep_start_blk_ptr);
 
 /* Scan the local bitmaps covering the tail of the database file for BUSY blocks and record the (deduplicated)
@@ -118,24 +120,31 @@ STATICFNDCL int4 mu_trunc_tail_scan(trunc_sweep_name *names, int4 max_names, gli
  * caller uses this to tell whether an iteration made progress (see comment there).
  * "*sweep_start_blk_ptr" is set to the lowest block number this scan considered worth moving (0 if the scan did
  * not run); the caller passes it to "mu_reorg" so only those blocks get swapped (see comment there).
+ * "*names_ptr"/"*names_alloc_ptr" are the names array and how many entries it holds. The array is grown here (and
+ * both are updated) if the tail turns out to hold more global names than it has room for, so that ONE scan always
+ * returns every name: rescanning the whole tail just because it holds a lot of globals would cost far more than
+ * the array ever does.
  */
-STATICFNDEF int4 mu_trunc_tail_scan(trunc_sweep_name *names, int4 max_names, glist *exclude_glist_ptr,
+STATICFNDEF int4 mu_trunc_tail_scan(trunc_sweep_name **names_ptr, int4 *names_alloc_ptr, glist *exclude_glist_ptr,
 			block_id *max_busy_blk_ptr, block_id *sweep_start_blk_ptr)
 {
 	block_id		child, free_blks, lmap_blk_num, lmap_num, max_busy_blk, num_local_maps, start_lmap;
 	block_id		target_blks, total_blks;
-	boolean_t		long_blk_id, names_full, read_failed, skip_block;
+	boolean_t		long_blk_id, read_failed, skip_block;
 	blk_hdr_ptr_t		blk_hdr_ptr;
 	cache_rec_ptr_t		cr, cr1;
 	int			bml_status, blk, blks_in_lmap, end_blocks, key_len_dir, name_len, nslevel;
 	int			rec_size1;
-	int4			cycle, cycle1, i, n_names;
+	int4			cycle, cycle1, i, n_names, names_alloc;
 	mstr			name_mstr;
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
 	sm_uc_ptr_t		blk_base, bmp_base, lmap_addr, name_ptr, rec_base, tblk_ptr;
+	trunc_sweep_name	*names, *tmp_names;
 	unsigned short		temp_ushort;	/* needed by the GET_RSIZ macro */
 
+	names = *names_ptr;
+	names_alloc = *names_alloc_ptr;
 	csa = cs_addrs;
 	csd = cs_data;
 	*sweep_start_blk_ptr = 0;
@@ -174,9 +183,8 @@ STATICFNDEF int4 mu_trunc_tail_scan(trunc_sweep_name *names, int4 max_names, gli
 	if (0 == end_blocks)
 		end_blocks = BLKS_PER_LMAP;
 	n_names = 0;
-	names_full = FALSE;
 	max_busy_blk = 0;
-	for (lmap_num = num_local_maps - 1; (lmap_num >= start_lmap) && (0 < lmap_num) && !names_full; lmap_num--)
+	for (lmap_num = num_local_maps - 1; (lmap_num >= start_lmap) && (0 < lmap_num); lmap_num--)
 	{
 		if (mu_ctrly_occurred || mu_ctrlc_occurred)
 			break;
@@ -215,7 +223,7 @@ STATICFNDEF int4 mu_trunc_tail_scan(trunc_sweep_name *names, int4 max_names, gli
 			}
 			lmap_addr = bmp_base + SIZEOF(blk_hdr);
 			read_failed = FALSE;
-			for (blk = 1; (blk < blks_in_lmap) && !names_full; blk++)
+			for (blk = 1; blk < blks_in_lmap; blk++)
 			{
 				GET_STATUS(*(lmap_addr + (blk / BML_BLKS_PER_UCHAR)), (blk % BML_BLKS_PER_UCHAR), bml_status);
 				if (BLK_BUSY != bml_status)
@@ -274,6 +282,24 @@ STATICFNDEF int4 mu_trunc_tail_scan(trunc_sweep_name *names, int4 max_names, gli
 				if ((1 >= key_len_dir) || ((MAX_MIDENT_LEN + 1) < key_len_dir))
 					continue;	/* likely a just-killed block still marked busy; skip */
 				name_len = key_len_dir - 1;
+				if (n_names == names_alloc)
+				{	/* The tail holds more global names than the array has room for. Grow it (rather
+					 * than stop the scan and have the next sweep iteration rescan the whole tail just
+					 * because this database has a lot of globals). Note "gtm_malloc" does not support
+					 * "realloc" (see the comment in "op_zydecode" where it uses the system allocator
+					 * for exactly that reason) so grow the way "dlopen_handle_array_add" does: allocate
+					 * double, copy, free the old.
+					 */
+					names_alloc *= 2;
+					tmp_names = (trunc_sweep_name *)malloc(names_alloc * SIZEOF(trunc_sweep_name));
+					memcpy(tmp_names, names, n_names * SIZEOF(trunc_sweep_name));
+					free(names);
+					names = tmp_names;
+					*names_ptr = names;		/* keep the caller's copy in step: it owns the array
+									 * across scans (and across regions)
+									 */
+					*names_alloc_ptr = names_alloc;
+				}
 				memcpy(names[n_names].name, rec_base + SIZEOF(rec_hdr), name_len);
 				names[n_names].name[name_len] = '\0';
 				name_ptr = names[n_names].name;
@@ -306,8 +332,6 @@ STATICFNDEF int4 mu_trunc_tail_scan(trunc_sweep_name *names, int4 max_names, gli
 					continue;	/* already have this name */
 				names[n_names].len = name_len;
 				n_names++;
-				if (max_names == n_names)
-					names_full = TRUE;	/* stop scanning; next sweep iteration picks up the rest */
 			}
 			if (read_failed)
 			{
@@ -332,7 +356,11 @@ STATICFNDEF int4 mu_trunc_tail_scan(trunc_sweep_name *names, int4 max_names, gli
 void mu_trunc_tail_sweep(glist *exclude_glist_ptr, int index_fill_factor, int data_fill_factor, int reorg_op,
 				int4 truncate_percent)
 {
-	static trunc_sweep_name	names[MU_TRUNC_SWEEP_MAX_NAMES];
+	static trunc_sweep_name	*names;		/* allocated on the first sweep and retained (and grown by
+						 * "mu_trunc_tail_scan" as needed) for the ones that follow, since
+						 * every region and every iteration wants the same array
+						 */
+	static int4		names_alloc;	/* entries "names" has room for */
 	block_id		max_busy_blk, prev_max_busy, sweep_start_blk;
 	boolean_t		lcl_resume, progress;
 	gd_region		*sweep_reg;
@@ -381,12 +409,19 @@ void mu_trunc_tail_sweep(glist *exclude_glist_ptr, int index_fill_factor, int da
 	 * for "mu_truncate" to reclaim anyway; the sweep is best effort, see comment at the top of this file.)
 	 */
 	reorg_op |= (TRUNC_SWEEP_IN_PROG | NOSPLIT | NOCOALESCE);
+	if (NULL == names)
+	{	/* First sweep of this process. Allocate the names array below rather than above the early returns so a
+		 * process whose sweeps all turn out to be no-ops never allocates it at all.
+		 */
+		names_alloc = MU_TRUNC_SWEEP_INIT_NAMES;
+		names = (trunc_sweep_name *)malloc(names_alloc * SIZEOF(trunc_sweep_name));
+	}
 	prev_max_busy = 0;
 	for (iter = 1; MU_TRUNC_SWEEP_MAX_ITERS >= iter; iter++)
 	{
 		if (mu_ctrly_occurred || mu_ctrlc_occurred)
 			break;
-		n_names = mu_trunc_tail_scan(names, MU_TRUNC_SWEEP_MAX_NAMES, exclude_glist_ptr, &max_busy_blk,
+		n_names = mu_trunc_tail_scan(&names, &names_alloc, exclude_glist_ptr, &max_busy_blk,
 						&sweep_start_blk);
 		if (0 == n_names)
 			break;	/* tail has no movable busy blocks; nothing (more) to sweep */
