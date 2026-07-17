@@ -118,7 +118,7 @@ void mupip_reorg(void)
 	uint4			cli_status;
 	mval			reg_nam_mval = DEFINE_MVAL_STRING(MV_STR, 0 , 0 , SIZEOF(MAX_RN_LEN), 0, 0, 0);
 	unsigned short		n_len;
-	boolean_t		truncate, cur_success, restrict_reg, arg_present;
+	boolean_t		truncate, cur_success, restrict_reg, arg_present, select_specified;
 	int			root_swap_statistic;
 	int4			truncate_percent;
 	boolean_t		gotlock;
@@ -300,24 +300,38 @@ void mupip_reorg(void)
 	}
 	n_len = SIZEOF(cli_buff);
 	memset(cli_buff, 0, n_len);
+	select_specified = TRUE;
 	if (CLI_PRESENT != cli_present("SELECT"))
 	{
 		n_len = 1;
                 cli_buff[0] = '*';
+		select_specified = FALSE;
 	} else if (FALSE == CLI_GET_STR_ALL("SELECT", cli_buff, &n_len))
 	{
 		n_len = 1;
                 cli_buff[0] = '*';
+		select_specified = FALSE;
 	}
 	/* gv_select will select globals for this clause */
 	TREF(want_empty_gvts) = TRUE; /* Allow killed globals to be selected and processed by mu_reorg */
 	gv_select(cli_buff, n_len, FALSE, "SELECT", &gl_head, &reg_max_rec, &reg_max_key, &reg_max_blk, restrict_reg);
+	TREF(want_empty_gvts) = FALSE;
+	if (truncate && !select_specified)
+	{	/* "gv_select" above enumerated global names through the gld, so globals that exist in a processed
+		 * region's database file but are not mapped to that region by the current gld (hidden globals) got
+		 * no glist entry and their blocks (e.g. the leftover root block of a killed global) would never be
+		 * moved towards the front of the file, which can make the truncate free up nothing (an unexpected
+		 * MUTRUNCALREADY message). Walk the directory tree of each processed region and append entries for
+		 * such globals so this REORG -TRUNCATE processes them too (see YDB#1240). Skipped when -SELECT is
+		 * explicitly specified since the user then decides the exact set of globals to process.
+		 */
+		mu_reorg_hidden_gbl_select(&gl_head, restrict_reg);
+	}
 	if (!gl_head.next)
 	{
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOSELECT);
 		mupip_exit(ERR_NOSELECT);
 	}
-	TREF(want_empty_gvts) = FALSE;
 
 	mu_reorg_more_tries = mu_reorg_process = TRUE;
 	assert(NULL == gv_currkey_next_reorg);
