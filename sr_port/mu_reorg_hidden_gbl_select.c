@@ -12,19 +12,20 @@
 
 /***************************************************************************************************************
  * mu_reorg_hidden_gbl_select.c:
- *	Helper for MUPIP REORG -TRUNCATE (see YDB#1240). The list of global names a REORG operates on is built
+ *	Helper for MUPIP REORG (see YDB#1240). The list of global names a REORG operates on is built
  *	by "gv_select", which enumerates names THROUGH the global directory: a name is bound via the gld name
  *	map ("op_gvname_fast"/"op_gvorder") and selected for the region(s) the gld maps it to. A global whose
  *	name exists in a region's directory tree but which the current gld maps to a DIFFERENT region (e.g. the
  *	global was moved to a new region in the gld and killed in the original region, or the region's database
  *	file predates a gld reorganization) is a "hidden" global: "gv_select" never yields a glist entry for
- *	the region that physically holds its blocks. REORG -TRUNCATE therefore never moves those blocks (root
- *	block included) towards the front of the file, and a single hidden global whose blocks lie at the end
- *	of the file makes "mu_truncate" truncate nothing (a MUTRUNCALREADY message even though the file has
- *	lots of free space).
+ *	the region that physically holds its blocks. A plain REORG therefore leaves those globals unreorged,
+ *	and a REORG -TRUNCATE additionally never moves their blocks (root block included) towards the front of
+ *	the file, so a single hidden global whose blocks lie at the end of the file makes "mu_truncate"
+ *	truncate nothing (a MUTRUNCALREADY message even though the file has lots of free space).
  *
- *	"mu_reorg_hidden_gbl_select" runs right after "gv_select" when MUPIP REORG -TRUNCATE is invoked without
- *	an explicit -SELECT. For each region being processed it walks the region's directory tree at name level
+ *	"mu_reorg_hidden_gbl_select" runs right after "gv_select" when MUPIP REORG (with or without -TRUNCATE)
+ *	is invoked without an explicit -SELECT. For each region being processed it walks the region's directory
+ *	tree at name level
  *	(the same "gv_target = cs_addrs->dir_tree; gvcst_order()" walk that "op_gvorder" does, minus the gld
  *	name-map filtering) and appends, for every name that "gv_select" did not select for this region, a
  *	glist entry whose gv_target is bound DIRECTLY to the region ("targ_alloc"). Everything downstream of
