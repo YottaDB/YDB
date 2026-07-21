@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -216,7 +216,12 @@ void lvzwr_out(lv_val *lvp)
 				 */
 				newzwrb = (lvzwrite_datablk *)malloc(SIZEOF(lvzwrite_datablk));
 				memset(newzwrb, 0, SIZEOF(lvzwrite_datablk));
-				newzwrb->sub = (zwr_sub_lst *)malloc(SIZEOF(zwr_sub_lst) * MAX_LVSUBSCRIPTS);
+				/* Note the "+ 1" below. A node at the maximum depth of MAX_LVSUBSCRIPTS subscripts is
+				 * visited by lvzwr_var() as level MAX_LVSUBSCRIPTS and writes subsc_list[MAX_LVSUBSCRIPTS]
+				 * so the array needs MAX_LVSUBSCRIPTS + 1 elements. This matches the sizing done at the
+				 * other allocation sites of this array (lvzwr_init.c and gvzwr_init.c).
+				 */
+				newzwrb->sub = (zwr_sub_lst *)malloc(SIZEOF(zwr_sub_lst) * (MAX_LVSUBSCRIPTS + 1));
 				newzwrb->curr_name = &newzav->zwr_var;
 				newzwrb->prev = lvzwrite_block;
 				lvzwrite_block = newzwrb;

@@ -3,7 +3,7 @@
  * Copyright (c) 2008-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -86,7 +86,7 @@ MBSTART {					\
 		free(command2);			\
 } MBEND
 
-int parse_pipe(char *cmd_string, char *ret_token);
+int parse_pipe(char *cmd_string, char *ret_token, int ret_token_size);
 
 /* The parse_pipe routine is to used to determine if all the commands in a pipe string are valid commands so
  * the iopi_open() routine can detect the problem prior to a fork.
@@ -133,8 +133,13 @@ int parse_pipe(char *cmd_string, char *ret_token);
  * is used as the command looked up in $PATH.  In the sixth example the default directory is moved up a level and
  * pwd is executed with the output piped to the tr command.  The pwd command is not checked for existence, but the
  * "tr" command after the "|" is checked.
+ *
+ * "ret_token" is where the first command word that could not be resolved is returned for the caller's error
+ * message; "ret_token_size" is the size of that buffer in bytes. The word is bounded only by the length of the
+ * COMMAND deviceparameter (up to MAX_STRLEN), so the caller has to say how much room it has rather than have
+ * this routine assume it.
  */
-int parse_pipe(char *cmd_string, char *ret_token)
+int parse_pipe(char *cmd_string, char *ret_token, int ret_token_size)
 {
 	char *str1, *str2, *str3;
 	char *saveptr1, *saveptr2, *saveptr3;
@@ -154,14 +159,21 @@ int parse_pipe(char *cmd_string, char *ret_token)
 	int ret_stat;
 	int pathsize, path_len = -1;
 	int cmd_string_size;
+	int toklen;
 
 	path = ydb_getenv(YDBENVINDX_GENERIC_PATH, NULL_SUFFIX, NULL_IS_YDB_ENV_MATCH);
 	if (NULL != path)
 	{
 		path_len = STRLEN(path);
 		if (YDB_PATH_MAX <= path_len)
-			path_len = YDB_PATH_MAX - 1;
-		memcpy(path_buff, path, path_len + 1);	/* + 1 for null */
+			path_len = YDB_PATH_MAX - 1;	/* an over-long $PATH is truncated to what fits */
+		/* Terminate explicitly rather than copying "path_len + 1" bytes. In the truncated case the byte at
+		 * "path_len" is not the null (it is the next byte of $PATH) which would leave "path_buff" (and the
+		 * copy of it made into "dir_in_path" below) unterminated, and the STRTOK_R that walks it would then
+		 * run off the end of the buffer.
+		 */
+		memcpy(path_buff, path, path_len);
+		path_buff[path_len] = '\0';
 		path = path_buff;
 		dir_in_path = (char *)malloc(YDB_PATH_MAX);
 	}
@@ -261,9 +273,18 @@ int parse_pipe(char *cmd_string, char *ret_token)
 			}
 		}
 		if (TRUE == notfound)
-		{
-			assert(YDB_PATH_MAX > (STRLEN(token2) + 1));
-			memcpy(ret_token, token2, STRLEN(token2) + 1);
+		{	/* Copy the unresolvable command word into the caller's buffer for the error message.
+			 * "token2" is bounded only by the length of the COMMAND device parameter (which can be
+			 * up to MAX_STRLEN) so the copy has to be bounded by the size of the caller's buffer,
+			 * which the caller passes in. Truncation loses nothing since the caller displays at most
+			 * MAX_DISPLAYED_DEVPARLEN bytes.
+			 */
+			assert(0 < ret_token_size);
+			toklen = STRLEN(token2);
+			if (ret_token_size <= toklen)
+				toklen = ret_token_size - 1;
+			memcpy(ret_token, token2, toklen);
+			ret_token[toklen] = '\0';
 			FREE_ALL;
 			if (NULL != path)
 				return(PARSE_FAIL);
@@ -395,7 +416,7 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, uint8 tim
 		pcommand[slen[PCOMMAND]] = '\0';
 		if (TRUE == parse)
 		{
-			if (PARSE_OK != (parse_result = parse_pipe(pcommand, ret_token)))
+			if (PARSE_OK != (parse_result = parse_pipe(pcommand, ret_token, SIZEOF(ret_token))))
 			{
 				PIPE_ERROR_INIT();
 				if (PARSE_FAIL == parse_result)
