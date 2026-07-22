@@ -104,7 +104,7 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 {
 	blk_segment		*bs1, *bs_ptr;
 	block_id		child1, child2, dest_blk_id, work_blk_id;
-	boolean_t		blk_was_free, deleted, gbl_target_was_set, temp_long_blk_id;
+	boolean_t		blk_was_free, deleted, gbl_target_was_set, temp_long_blk_id, skip_dest_blk;
 	boolean_t		dest_long_blk_id = FALSE, dest_long_parent_id, work_long_blk_id, work_long_parent_id;
 	cache_rec_ptr_t		dest_child_cr;
 	cw_set_element		*tmpcse;
@@ -162,6 +162,7 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 	do
 	{
 		blk_was_free = FALSE;
+		skip_dest_blk = FALSE;
 		INCR_BLK_NUM(dest_blk_id);
 #		ifdef DEBUG
 		if ((0 != ydb_skip_bml_num) && (BLKS_PER_LMAP < dest_blk_id) && (dest_blk_id < ydb_skip_bml_num))
@@ -279,9 +280,24 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 		{
 			READ_BLK_ID(temp_long_blk_id, &child1, rec_base + SIZEOF(rec_hdr));
 			if (0 == child1 || child1 > cs_data->trans_hist.total_blks - 1)
-			{
-				assert(CDB_STAGNATE > t_tries);
-				return cdb_sc_rdfail;
+			{	/* "dest_blk_id" is marked BUSY in the bitmap, yet a pointer in it leads outside the file.
+				 * This happens with no database integrity issue at all if "dest_blk_id" is in the middle of
+				 * a two phase free: another process has already delinked it from the tree (phase 1, the
+				 * "t_end" done by the caller of "gvcst_bmp_mark_free") but has not yet marked it free in the
+				 * bitmap (phase 2, the "t_end" inside "gvcst_bmp_mark_free"), so the bitmap still says BUSY
+				 * while the block itself holds stale contents. If a concurrent MUPIP REORG -TRUNCATE has
+				 * since lowered "total_blks", a stale child pointer in those contents now points past the
+				 * end of the file, which is what we just read.
+				 *
+				 * Do not treat this as an error. A swap destination is discretionary, so simply move on and
+				 * try a different block. Returning "cdb_sc_rdfail" here instead used to kill the entire
+				 * REORG with a MUREORGFAIL (failure code IIII) once "t_tries" reached CDB_STAGNATE: at that
+				 * point we hold crit, and the process that would complete phase 2 needs crit to do so, so
+				 * the condition could never clear however many times we retried. That is, holding crit is
+				 * itself what made this look like a permanent inconsistency (YDB#1245).
+				 */
+				skip_dest_blk = TRUE;
+				break;
 			}
 			if (!(tblk_ptr = t_qread(child1, (sm_int_ptr_t)&dest_child_cycle, &dest_child_cr)))
 			{
@@ -296,6 +312,8 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 			rec_base = tblk_ptr + SIZEOF(blk_hdr);
 			GET_RSIZ(rec_size1, rec_base);
 		}
+		if (skip_dest_blk)
+			continue;	/* "dest_blk_id" is being freed concurrently; try a different destination block */
 		/* leaf of a killed GVT can have block header only.   Skip those blocks */
 		if (SIZEOF(blk_hdr) >= ((blk_hdr_ptr_t)tblk_ptr)->bsiz)
 		{
