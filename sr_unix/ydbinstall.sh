@@ -161,7 +161,7 @@ dump_info()
 	if [ -n "$gtm_linkexec" ] ; then echo gtm_linkexec " : " $gtm_linkexec ; fi
 	if [ -n "$gtm_overwrite_existing" ] ; then echo gtm_overwrite_existing " : " $gtm_overwrite_existing ; fi
 	if [ -n "$gtm_prompt_for_group" ] ; then echo gtm_prompt_for_group " : " $gtm_prompt_for_group ; fi
-	if [ -n "$gtm_sf_dirname" ] ; then echo gtm_sf_dirname " : " $gtm_sf_dirname ; fi
+	if [ -n "$gtm_sf_dirnames" ] ; then echo gtm_sf_dirnames " : " $gtm_sf_dirnames ; fi
 	if [ -n "$gtm_tmpdir" ] ; then echo gtm_tmpdir " : " $gtm_tmpdir ; fi
 	if [ -n "$gtm_user" ] ; then echo gtm_user " : " $gtm_user ; fi
 	if [ -n "$gtm_verbose" ] ; then echo gtm_verbose " : " $gtm_verbose ; fi
@@ -232,11 +232,11 @@ help_exit()
         echo "Version is defaulted from yottadb file if one exists in the same directory as the installer."
         echo "This version must run as root."
         echo ""
-        echo "Example usages are (assumes latest YottaDB release is r2.06 and latest GT.M version is V7.1-011)"
+        echo "Example usages are (assumes latest YottaDB release is r2.06 and latest GT.M version is V7.2-000)"
         echo "  $0                              # installs latest YottaDB release (r2.06) at /usr/local/lib/yottadb/r206"
         echo "  $0 --utf8                       # installs YottaDB release r2.06 with added support for UTF-8"
         echo "  $0 --installdir /r202 r2.02     # installs YottaDB r2.02 at /r202"
-        echo "  $0 --gtm                        # installs latest GT.M version (V7.1-011) at /usr/local/lib/fis-gtm/V7.1-011_x86_64"
+        echo "  $0 --gtm                        # installs latest GT.M version (V7.2-000) at /usr/local/lib/fis-gtm/V7.2-000_x86_64"
         echo "  $0 --from-source --branch r2.06 # builds YottaDB r2.06 and installs it at /usr/local/lib/yottadb/r206"
         echo ""
         echo "As options are processed left to right, later options can override earlier options."
@@ -1034,7 +1034,10 @@ esac
 gtm_shlib_support="Y"
 case ${gtm_hostos}_${gtm_arch} in
 	linux_x8664)
-		gtm_sf_dirname="GT.M-amd64-Linux"
+		# FIS publishes GT.M tarballs under more than one SourceForge folder. Releases up to V7.1-011 are only in
+		# "GT.M-amd64-Linux" and V7.2-000 onwards are only in "GT.M-x8664-Linux", so record every folder we know of
+		# (newest first) and let the download step below try each in turn.
+		gtm_sf_dirnames="GT.M-x8664-Linux GT.M-amd64-Linux"
 		gtm_ftp_dirname="linux_x8664"
 		ydb_flavor="x8664"
 		gtm_install_flavor="x86_64" ;;
@@ -1261,13 +1264,24 @@ if [ -z "$ydb_version" ] || [ "latest" = "$latest" ] ; then
 	case $ydb_distrib in
 		https://sourceforge.net/projects/fis-gtm)
 			gtm_gtm="Y"
+			# Do not use the "latest" file inside the SourceForge folders. FIS stopped maintaining it when they
+			# moved GT.M downloads to a new folder in V7.2-000, so "GT.M-amd64-Linux/latest" still reads V7.1-011
+			# and "GT.M-x8664-Linux" has no "latest" file at all. Ask SourceForge for the project's best release
+			# instead; that is the same data that backs ${ydb_distrib}/files/latest/download. The "filename" it
+			# reports has the form /<folder>/<version>/<tarball> so the version is its third "/" separated piece.
 			if [ "Y" = "$gtm_verbose" ] ; then
-				echo wget ${ydb_distrib}/files/${gtm_sf_dirname}/latest to determine latest version
+				echo wget ${ydb_distrib}/best_release.json to determine latest version
 				echo Check proxy settings if wget hangs
 			fi
-			if { wget $wget_flags $gtm_tmpdir ${ydb_distrib}/files/${gtm_sf_dirname}/latest 1>${gtm_tmpdir}/wget_latest.log 2>&1; } ; then
-				ydb_version=`cat ${gtm_tmpdir}/latest`
-			else echo Unable to determine YottaDB/GT.M version ; err_exit
+			if { wget $wget_flags $gtm_tmpdir ${ydb_distrib}/best_release.json 1>${gtm_tmpdir}/wget_latest.log 2>&1; } ; then
+				ydb_version=`sed 's/,/\n/g' ${gtm_tmpdir}/best_release.json | grep '"filename"' \
+						| head -1 | cut -d'"' -f4 | cut -d/ -f3`
+			fi
+			# Verify we got something that looks like a GT.M version rather than installing whatever we parsed
+			# in case SourceForge ever changes the format of the above response. The trailing [A-Z]* allows an
+			# alphabetic suffix such as V7.2-000A, which FIS uses for a release carrying timely bug fixes.
+			if ! echo "$ydb_version" | grep -qE '^V[0-9]+\.[0-9]+-[0-9]+[A-Z]*$' ; then
+				echo Unable to determine YottaDB/GT.M version ; err_exit
 			fi ;;
 		ftp://*)
 			if [ "Y" = "$gtm_verbose" ] ; then
@@ -1321,12 +1335,20 @@ else
 	fi
 	case $ydb_distrib in
 		https://sourceforge.net/projects/fis-gtm)
-			if [ "Y" = "$gtm_verbose" ] ; then
-				echo wget ${ydb_distrib}/files/${gtm_sf_dirname}/${ydb_version}/${ydb_filename} to download tarball
-				echo Check proxy settings if wget hangs
-			fi
-			if { ! wget $wget_flags $gtm_tmpdir ${ydb_distrib}/files/${gtm_sf_dirname}/${ydb_version}/${ydb_filename} \
-					1>${gtm_tmpdir}/wget_dist.log 2>&1; } ; then
+			# A given GT.M version lives in exactly one of the folders in "gtm_sf_dirnames" (see above) and there
+			# is no way to tell which one without asking, so try each in turn and stop at the first that has it.
+			gtm_sf_downloaded="N"
+			for gtm_sf_dirname in $gtm_sf_dirnames ; do
+				if [ "Y" = "$gtm_verbose" ] ; then
+					echo wget ${ydb_distrib}/files/${gtm_sf_dirname}/${ydb_version}/${ydb_filename} to download tarball
+					echo Check proxy settings if wget hangs
+				fi
+				if { wget $wget_flags $gtm_tmpdir ${ydb_distrib}/files/${gtm_sf_dirname}/${ydb_version}/${ydb_filename} \
+						1>>${gtm_tmpdir}/wget_dist.log 2>&1; } ; then
+					gtm_sf_downloaded="Y" ; break
+				fi
+			done
+			if [ "Y" != "$gtm_sf_downloaded" ] ; then
 				echo Unable to download GT.M distribution $ydb_filename ; err_exit
 			fi ;;
 		https://gitlab.com/api/*)
