@@ -3,7 +3,7 @@
  * Copyright (c) 2009-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -152,6 +152,60 @@ boolean_t gtm_member_group_id(uid_t uid, gid_t gid, struct perm_diag_data *pdd)
 	return(FALSE);
 }
 
+/* Return the "overflow" uid/gid this platform substitutes for a real id that has no mapping in the calling
+ * process's id-mapped namespace (e.g. a container or restricted sandbox); see user_namespaces(7). Read from
+ * /proc/sys/kernel/overflowuid|gid on Linux (where this is occasionally reconfigured), falling back to the
+ * conventional default of 65534 used by every mainstream platform, including when the /proc file is absent
+ * (e.g. this process is not namespaced, or is on a non-Linux Unix).
+ */
+uid_t	namespace_overflow_uid(void)
+{
+	FILE			*fp;
+	unsigned long		val;
+	static boolean_t	initialized = FALSE;
+	static uid_t		overflow_uid = (uid_t)65534;
+
+	if (!initialized)
+	{
+#		ifdef __linux__
+		Fopen(fp, "/proc/sys/kernel/overflowuid", "r");
+		if (NULL != fp)
+		{
+			if (1 == fscanf(fp, "%lu", &val))
+				overflow_uid = (uid_t)val;
+			int status;
+			FCLOSE(fp, status);
+		}
+#		endif
+		initialized = TRUE;
+	}
+	return overflow_uid;
+}
+
+static gid_t	namespace_overflow_gid(void)
+{
+	FILE			*fp;
+	unsigned long		val;
+	static boolean_t	initialized = FALSE;
+	static gid_t		overflow_gid = (gid_t)65534;
+
+	if (!initialized)
+	{
+#		ifdef __linux__
+		Fopen(fp, "/proc/sys/kernel/overflowgid", "r");
+		if (NULL != fp)
+		{
+			if (1 == fscanf(fp, "%lu", &val))
+				overflow_gid = (gid_t)val;
+			int status;
+			FCLOSE(fp, status);
+		}
+#		endif
+		initialized = TRUE;
+	}
+	return overflow_gid;
+}
+
 /* Based on security rules in this routine, set
  *	a) *group_id to the group to be used for shared resources (journals, temp files etc.).
  *		If no change, will be set to INVALID_GID.
@@ -170,6 +224,8 @@ boolean_t gtm_permissions(struct stat *stat_buff, int *user_id, int *group_id, i
 	int		this_uid_is_root;
 	int		this_uid_in_file_group;
 	int		owner_in_file_group;
+	int		file_uid_unmappable;
+	int		file_gid_unmappable;
 	int		ydb_group_restricted;
 	int		file_owner_perms, file_group_perms, file_other_perms;
 	int		new_owner_perms, new_group_perms, new_other_perms;
@@ -182,11 +238,30 @@ boolean_t gtm_permissions(struct stat *stat_buff, int *user_id, int *group_id, i
 	this_gid = GETEGID();
 	file_uid = stat_buff->st_uid;	/* get owning file uid */
 	file_gid = stat_buff->st_gid;	/* get owning file gid */
+	/* If this process is running inside an id-mapped namespace (e.g. a container or restricted sandbox) that
+	 * only maps a subset of uids/gids, the kernel substitutes the "overflow" id (user_namespaces(7)) for any
+	 * real file owner/group with no mapping. Two unrelated real ids can then collide on that same placeholder,
+	 * which would otherwise cause the owner/group-membership checks below to match purely by coincidence (e.g.
+	 * "the file's group happens to also be one of my own supplementary groups") and go on to try to propagate
+	 * that id onto a semaphore/shared memory segment -- which, being itself unmappable in this namespace, then
+	 * fails IPC_SET with EINVAL. Since the true owner/group is unknowable in that situation, treat the file as
+	 * neither owned by, nor group-matched with, this process, and fall through to the same defaults used for
+	 * an ordinary file we don't own and aren't in the group of. (Edge case: if this process's own uid/gid is
+	 * itself genuinely the overflow id -- i.e. it is actually running as "nobody" -- a real owner/group match
+	 * will also be treated as unknown; that's an acceptable trade-off for avoiding the far more common
+	 * false-positive collision.)
+	 * Restrict this workaround to IPC targets (semaphores/shared memory), since that's where the EINVAL
+	 * symptom actually occurs. Ordinary file ownership/permissions aren't affected by this bug, so leave them
+	 * governed by the real (possibly-overflow) file_uid/file_gid as before, to keep this fix's blast radius
+	 * limited to the semctl/shmctl IPC_SET failure it's meant to address.
+	 */
+	file_uid_unmappable = (PERM_IPC & target_type) && (file_uid == namespace_overflow_uid());
+	file_gid_unmappable = (PERM_IPC & target_type) && (file_gid == namespace_overflow_gid());
 	/* set variables for permission logic */
-	this_uid_is_file_owner = (this_uid == file_uid);
+	this_uid_is_file_owner = !file_uid_unmappable && (this_uid == file_uid);
 	this_uid_is_root = (0 == this_uid);
-	this_uid_in_file_group = gtm_member_group_id(this_uid, file_gid, pdd);
-	owner_in_file_group = gtm_member_group_id(file_uid, file_gid, pdd);
+	this_uid_in_file_group = !file_gid_unmappable && gtm_member_group_id(this_uid, file_gid, pdd);
+	owner_in_file_group = !file_uid_unmappable && !file_gid_unmappable && gtm_member_group_id(file_uid, file_gid, pdd);
 	*user_id = INVALID_UID;		/* set default uid */
 	*group_id = INVALID_GID;	/* set default gid */
 	assert((PERM_FILE & target_type) || (PERM_IPC & target_type));	/* code below relies on this */
@@ -205,8 +280,10 @@ boolean_t gtm_permissions(struct stat *stat_buff, int *user_id, int *group_id, i
 		assert(this_uid_is_file_owner || this_uid_is_root);
 		if (this_uid_is_root)
 		{
-			*user_id = file_uid;
-			*group_id = file_gid;
+			if (!file_uid_unmappable)
+				*user_id = file_uid;
+			if (!file_gid_unmappable)
+				*group_id = file_gid;
 		}
 		/* Else: use default uid/gid */
 		new_owner_perms = ((PERM_FILE & target_type) ? file_owner_perms : 0600);
@@ -215,7 +292,8 @@ boolean_t gtm_permissions(struct stat *stat_buff, int *user_id, int *group_id, i
 	{	/* File is only group accessible */
 		if (this_uid_is_root)
 		{
-			*user_id = file_uid;
+			if (!file_uid_unmappable)
+				*user_id = file_uid;
 			new_group_perms = ((PERM_FILE & target_type)) ? file_group_perms : 0060;
 			*perm = new_group_perms;
 		} else
@@ -232,7 +310,8 @@ boolean_t gtm_permissions(struct stat *stat_buff, int *user_id, int *group_id, i
 			}
 			*perm = new_owner_perms | new_group_perms;
 		}
-		*group_id = file_gid;			/* use file group */
+		if (!file_gid_unmappable)
+			*group_id = file_gid;			/* use file group */
 	} else
 	{	/* File is other accessible OR accessible to user and group but not other */
 		file_other_perms = (0006 & st_mode);
@@ -253,9 +332,10 @@ boolean_t gtm_permissions(struct stat *stat_buff, int *user_id, int *group_id, i
 		ydb_group_restricted = ((INVALID_GID != ydb_dist_gid) && !(dir_mode & 01)); /* not other executable */
 		if ((this_uid_is_file_owner && this_uid_in_file_group) || this_uid_is_root)
 		{
-			if (this_uid_is_root)		/* otherwise, use default uid */
+			if (this_uid_is_root && !file_uid_unmappable)		/* otherwise, use default uid */
 				*user_id = file_uid;
-			*group_id = file_gid;		/* use file group */
+			if (!file_gid_unmappable)
+				*group_id = file_gid;		/* use file group */
 			*perm = new_owner_perms | new_group_perms | new_other_perms;
 		} else if (this_uid_is_file_owner)
 		{	/* This uid has access via file owner membership but is not a member of the file group */
@@ -291,7 +371,8 @@ boolean_t gtm_permissions(struct stat *stat_buff, int *user_id, int *group_id, i
 			/* Use default uid in all cases below */
 			if ((this_uid_in_file_group && owner_in_file_group) || this_uid_is_root)
 			{
-				*group_id = file_gid;		/* use file group */
+				if (!file_gid_unmappable)
+					*group_id = file_gid;		/* use file group */
 				assert(file_group_perms);
 				new_owner_perms = new_group_perms << 3;
 				*perm = new_owner_perms | new_group_perms | new_other_perms;

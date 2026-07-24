@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -299,7 +299,10 @@ int ydb_init()
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
 				      LEN_AND_LIT("stat for $ydb_dist/gtmsecshr"), CALLFROM, errno);
 		/* Ensure that the call-in can execute $ydb_dist/gtmsecshr. This not sufficient for security purposes */
-		if ((ROOTUID != stat_buf.st_uid) || !(stat_buf.st_mode & S_ISUID))
+		/* See the matching check/comment in secshr_client.c for why the overflow uid is accepted here too, */
+		/* and why the code gets here (though in this case the startup path begins via a call-in which calls ydb_init()). */
+		if (((ROOTUID != stat_buf.st_uid) && (namespace_overflow_uid() != stat_buf.st_uid))
+				|| !(stat_buf.st_mode & S_ISUID))
 		{
 			SNPRINTF(file_perm, SIZEOF(file_perm), "%04o", stat_buf.st_mode & PERMALL);
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_GTMSECSHRPERM, 5,

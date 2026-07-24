@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -206,7 +206,30 @@ int send_mesg2gtmsecshr(unsigned int code, unsigned int id, char *path, int path
 		if (-1 == Stat(gtmsecshr_pathname.addr, &stat_buf))
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_SYSCALL, 5,
 				LEN_AND_LIT("stat"), CALLFROM, errno);
-		if ((ROOTUID != stat_buf.st_uid) || !(stat_buf.st_mode & S_ISUID))
+		/* Check that gtmsecshr is owned by root and thus reports either root or overflow UID:
+		 * gtmsecshr must be owned by root, since it exists to perform operations (chown, IPC_SET)
+		 * that require root privilege. But in a sandbox with no root available it may instead appear
+		 * to be installed with the platform's overflow uid even though it is really root.
+		 * For example, in the sandbox case, the call path is:
+		 *	1. ydb_env_set runs yottadb -run set^%YDBENV to set up environment variables.
+		 *	2. %YDBENV calls %PEEKBYNAME to look up global directory offsets in gtmhelp.dat -- needed
+		 *	   to open another gbldir.
+		 *	3. Access to those offsets triggers region open, landing in db_init().
+		 *	4. gtmhelp.dat is owned by root/the installer, so db_init opens it read_only, cf
+		 *	   gvcst_init_sysops.c
+		 *	5. Since this is a brand-new sandbox, no other process has created the region's shared
+		 *	   memory/semaphore yet (new_shm_ipc == TRUE).
+		 *	6. A read-only opener must still record the new semid/shmid/creation-time into the db file
+		 *	   header, but can't write the file itself, which hits the
+		 *	   `else if (read_only && new_shm_ipc)` branch in gvcst_init_sysops.c calling here.
+		 *	7. Here we locate $ydb_dist/gtmsecshr and sanity-check its ownership (and in a sandbox root
+		 *	   ownership looks like overflow UID). Then, below, we will start the gtmsecshr helper to
+		 *	   write that header info on the process's behalf.
+		 * This way, at least it won't fail prematurely on a sanity check just because gtmsecshr ownership
+		 * looks like the overflow UID.
+		 */
+		if (((ROOTUID != stat_buf.st_uid) && (namespace_overflow_uid() != stat_buf.st_uid))
+				|| !(stat_buf.st_mode & S_ISUID))
 		{
 			SNPRINTF(file_perm, SIZEOF(file_perm), "%04o", stat_buf.st_mode & PERMALL);
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(7) ERR_GTMSECSHRPERM, 5,

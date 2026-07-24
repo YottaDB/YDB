@@ -3,7 +3,7 @@
  * Copyright (c) 2009-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2025-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -61,6 +61,7 @@ GBLREF	int		gid_list_len;
 /* Returns TRUE if GID is in the supplementary GID list of calling process, otherwise FALSE */
 #define GID_IN_GID_LIST(GID)	((0 > gid_list_len) ? (gtm_init_gid_list(), gtm_gid_in_gid_list(GID)) : gtm_gid_in_gid_list(GID))
 
+uid_t		namespace_overflow_uid(void);
 void		gtm_init_gid_list(void);
 boolean_t	gtm_gid_in_gid_list(gid_t);
 gid_t		gtm_get_group_id(struct stat *stat_buff);
