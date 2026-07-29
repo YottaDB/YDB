@@ -3,7 +3,7 @@
 ; Copyright (c) 2006-2023 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
-; Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	;
+; Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	;
 ; All rights reserved.						;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -136,6 +136,7 @@ gblstatmap:
 	. s regs(ysr,"AUTODB")=1
 	. s regs(ysr,"BEFORE_IMAGE")=0
 	. s regs(ysr,"DYNAMIC_SEGMENT")=ysr
+	. s regs(ysr,"INST_FREEZE_ON_ERROR")=0
 	. s regs(ysr,"JOURNAL")=0
 	. s regs(ysr,"KEY_SIZE")=dflreg("KEY_SIZE")
 	. s regs(ysr,"QDBRUNDOWN")=1	; have it always enabled on statsdbs as MUPIP SET can enable this only on basedb later
@@ -150,7 +151,6 @@ gblstatmap:
 	. s segs(ysr,"DEFER_ALLOCATE")=1
 	. s segs(ysr,"ENCRYPTION_FLAG")=0
 	. s segs(ysr,"EXTENSION_COUNT")=2050		; and a 2000 more at a time
-	. s segs(ysr,"INST_FREEZE_ON_ERROR")=0
 	. ; Corresponding unique .gst file name for statsdb is determined at runtime when basedb is first opened.
 	. ; For now just keep the name as the basedb name + ".gst"
 	. s segs(ysr,"FILE_NAME")=segs(ysr,"FILE_NAME")_".gst"
