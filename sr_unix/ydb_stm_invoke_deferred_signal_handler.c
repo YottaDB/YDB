@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2019-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -59,11 +59,11 @@ void ydb_stm_invoke_deferred_signal_handler()
 		 */
 	ESTABLISH(ydb_stm_invoke_deferred_signal_handler_ch);
 	ydb_stm_invoke_deferred_signal_handler_type = sig_hndlr_none;
-	/* Below code assumes there are only 11 signal handler types in "enum sig_handler_t". Assert that.
+	/* Below code assumes there are only 12 signal handler types in "enum sig_handler_t". Assert that.
 	 * Fix below assert and following code if/when assert fails to take any new handler types into account.
 	 */
 	assert(0 == sig_hndlr_none);
-	assert(10 == sig_hndlr_num_entries);
+	assert(11 == sig_hndlr_num_entries);
 	/* Note: The STAPI_CLEAR_SIGNAL_HANDLER_DEFERRED call for each of the deferred signal handler
 	 * invocation done below is taken care of by the FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED invocation
 	 * done inside each of these signal handlers at function entry.
@@ -146,6 +146,14 @@ void ydb_stm_invoke_deferred_signal_handler()
 		       || USING_ALTERNATE_SIGHANDLING);
 		ydb_stm_invoke_deferred_signal_handler_type = sig_hndlr_timer_handler;
 		timer_handler(DUMMY_SIG_NUM, NULL, NULL, IS_OS_SIGNAL_HANDLER_FALSE);
+		ydb_stm_invoke_deferred_signal_handler_type = sig_hndlr_none;
+	}
+	if (STAPI_IS_SIGNAL_HANDLER_DEFERRED(sig_hndlr_tt_sigwinch_event))
+	{
+		assert((SIGWINCH == stapi_signal_handler_oscontext[sig_hndlr_tt_sigwinch_event].sig_num)
+		       || USING_ALTERNATE_SIGHANDLING);
+		ydb_stm_invoke_deferred_signal_handler_type = sig_hndlr_tt_sigwinch_event;
+		tt_sigwinch_event(DUMMY_SIG_NUM, NULL, NULL);
 		ydb_stm_invoke_deferred_signal_handler_type = sig_hndlr_none;
 	}
 	CLEAR_DEFERRED_STAPI_CHECK_NEEDED;

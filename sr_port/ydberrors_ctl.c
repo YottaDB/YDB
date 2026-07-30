@@ -84,6 +84,8 @@ LITDEF	err_msg ydberrors[] = {
 	{ "ZYENCODESRCUNDEF", "Error encountered during ZYENCODE; source variable must not be undefined", 0, 0 },
 	{ "BADZYENZYDENEST", "Unsupported nesting of ZYENCODE or ZYDECODE command", 0, 0 },
 	{ "DUPLICATENEW", "Variable !AD appears twice in the same NEW command", 2, 0 },
+	{ "SIGWINCHRQST", "SIGWINCH interrupt requested", 0, 0 },
+	{ "ERRWSIGWINCH", "Error while processing SIGWINCH deviceparameter handler", 0, 0 },
 };
 
 
@@ -97,7 +99,7 @@ GBLDEF	err_ctl ydberrors_ctl = {
 	256,
 	"YDB",
 	&ydberrors[0],
-	67,
+	69,
 	&ydberrors_undocarr[0],
 	0
 };

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -20,6 +20,8 @@
 #include "io.h"
 #include "iottdef.h"
 
+GBLREF volatile boolean_t	sigwinch_inprog;
+
 UNIX_ONLY(error_def(ERR_ZINTRECURSEIO);)
 
 /* essentially the same as ionl_wteol */
@@ -34,8 +36,10 @@ void iott_wteol(int4 val, io_desc *io_ptr)
 	SETUP_THREADGBL_ACCESS;
 	assert(val);
 	tt_ptr = (d_tt_struct *)io_ptr->dev_sp;
-	if (tt_ptr->mupintr)
+	if (tt_ptr->mupintr && !sigwinch_inprog)
+	{	/* see comment in iott_write.c about the sigwinch_inprog check */
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_ZINTRECURSEIO);
+	}
 	ESTABLISH_GTMIO_CH(&io_ptr->pair, ch_set);
 	io_ptr->esc_state = START;
 	eol.len = STRLEN(NATIVE_TTEOL);

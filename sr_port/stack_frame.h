@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -96,6 +96,7 @@ typedef struct stack_frame_struct	/* contents of the GT.M MUMPS stack frame */
 #define SFT_TRIGR	(1 << 9)	/* 0x0200 Trigger base frame */
 #define SFT_ZTIMEOUT	(1 << 10)	/* 0x0400 ZTIMEOUT frame */
 #define SFT_CI		(1 << 11)	/* 0x0800 Call-in base frame */
+#define SFT_SIGWINCH	(1 << 12)	/* 0x1000 SIGWINCH deviceparameter handler frame */
 
 #define SFT_ZINTR_OFF	~(SFT_ZINTR)	/* Mask to turn off SFF_ZINTR */
 

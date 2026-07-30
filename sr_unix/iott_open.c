@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -92,6 +92,15 @@ short iott_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, uint8 tim
 		{
 		case iop_exception:
 			DEF_EXCEPTION(pp, p_offset, ioptr);
+			break;
+		case iop_sigwinch:
+			/* Ignored (inside the below call) unless this device is $PRINCIPAL */
+			tt_sigwinch_devparam(ioptr, (char *)(pp->str.addr + p_offset + 1),
+				(int)((unsigned char)*(pp->str.addr + p_offset)), TRUE);
+			break;
+		case iop_nosigwinch:
+			/* Ignored (inside the below call) unless this device is $PRINCIPAL */
+			tt_sigwinch_devparam(ioptr, NULL, 0, FALSE);
 			break;
 		case iop_canonical:
 			tt_ptr->canonical = TRUE;

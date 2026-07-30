@@ -93,6 +93,8 @@ ZYENCODEINCOMPL	<Error encountered during ZYENCODE; operation may be incomplete>
 ZYENCODESRCUNDEF	<Error encountered during ZYENCODE; source variable must not be undefined>/error/fao=0
 BADZYENZYDENEST	<Unsupported nesting of ZYENCODE or ZYDECODE command>/error/fao=0
 DUPLICATENEW	<Variable !AD appears twice in the same NEW command>/warning/fao=2
+SIGWINCHRQST	<SIGWINCH interrupt requested>/error/fao=0
+ERRWSIGWINCH	<Error while processing SIGWINCH deviceparameter handler>/error/fao=0
 !
 ! If there are UNUSEDMSG* lines unused for more than one year and at least two non-patch releases, use them before adding new lines.
 !

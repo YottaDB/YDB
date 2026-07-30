@@ -61,6 +61,7 @@ GBLREF	spdesc			stringpool;
 GBLREF	stack_frame		*frame_pointer;
 GBLREF	unsigned char		*msp, *stackbase, *stacktop, *stackwarn;
 GBLREF	volatile boolean_t	dollar_zininterrupt;
+GBLREF	volatile boolean_t	sigwinch_inprog;
 GBLREF	volatile int4		outofband;
 GBLREF	char			*KEY_HOME, *KEY_END;
 
@@ -256,7 +257,7 @@ int	iott_readfl(mval *v, int4 length, uint8 nsec_timeout)	/* timeout in millisec
 	{	/* restore state to before job interrupt */
 		tt_state = &tt_ptr->tt_state_save;
 		assertpro(ttwhichinvalid != tt_state->who_saved);
-		if (dollar_zininterrupt)
+		if (dollar_zininterrupt || sigwinch_inprog)
 		{
 			tt_ptr->mupintr = FALSE;
 			tt_state->who_saved = ttwhichinvalid;
@@ -423,8 +424,8 @@ int	iott_readfl(mval *v, int4 length, uint8 nsec_timeout)	/* timeout in millisec
 	{
 		if (outofband)
 		{
-			if (jobinterrupt == outofband)
-			{	/* save state if jobinterrupt */
+			if (OUTOFBAND_RESTARTABLE(outofband))
+			{	/* save state if jobinterrupt or sigwinch (the read resumes after the interrupt) */
 				tt_state = &tt_ptr->tt_state_save;
 				tt_state->who_saved = ttread;
 				tt_state->length = length;
@@ -1209,7 +1210,7 @@ int	iott_readfl(mval *v, int4 length, uint8 nsec_timeout)	/* timeout in millisec
 		}
 	}
 	SEND_KEYPAD_LOCAL;	/* to turn keypad off if possible */
-	if (outofband && (jobinterrupt != outofband))
+	if (outofband && !OUTOFBAND_RESTARTABLE(outofband))
 	{
 		v->str.len = 0;
 		io_ptr->dollar.za = ZA_IO_ERR;

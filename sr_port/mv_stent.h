@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -75,7 +75,10 @@ typedef struct
 	stack_frame		*error_frame_save;	/* Save/restore error_frame over $ZINTERRUPT processor */
 	dollar_ecode_type	dollar_ecode_save;	/* Save $ECODE array results */
 	dollar_stack_type	dollar_stack_save;	/* Save $STACK(...) array results */
-	boolean_t		ztimeout;		/* for debugging - differentiates between ztimeout and zinterrupt */
+	int4			intrpt_type;		/* outofband event (jobinterrupt/ztimeout/sigwinch) whose processing
+							 * pushed this mv_stent; unw_mv_ent uses it to clean up the right
+							 * event's state
+							 */
 } mvs_zintr_struct;
 
 typedef struct

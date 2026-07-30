@@ -401,6 +401,21 @@ void zshow_devices(zshow_out *output)
 					/* CONVERT is like HUPENABLE which only show up when enable it */
 					if (tt_ptr->term_ctrl & TRM_CONVERT)
 						ZS_PARM_SP(&v, zshow_conv);
+					/* SIGWINCH is like HUPENABLE in that it only shows up when it is in effect */
+					if (tt_ptr->sigwinch_on)
+					{
+						if (!tt_ptr->sigwinch_handler.len)
+							ZS_PARM_SP(&v, zshow_sigwinch);	/* SIGWINCH with no code to XECUTE */
+						else
+						{	/* display the code XECUTEd on a terminal window resize */
+							ZS_PARM_EQU(&v, zshow_sigwinch);
+							ZS_ONE_OUT(&v, quote_text);
+							v.str = tt_ptr->sigwinch_handler;
+							zshow_output(output, &v.str);
+							ZS_ONE_OUT(&v, quote_text);
+							ZS_ONE_OUT(&v, space_text);
+						}
+					}
 					break;
 				case rm:
 					/* we go to rm_ptr above for the rm type */

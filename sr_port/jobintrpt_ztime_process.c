@@ -42,6 +42,9 @@
 #include "zwrite.h"
 #include "zshow.h"
 #include "ztimeout_routines.h"
+#include "have_crit.h"
+#include "deferred_events_queue.h"
+#include "io.h"
 
 GBLREF dollar_ecode_type	dollar_ecode;
 GBLREF dollar_stack_type	dollar_stack;
@@ -54,22 +57,35 @@ GBLREF stack_frame		*frame_pointer, *error_frame;
 GBLREF unsigned short		proc_act_type;
 GBLREF unsigned char		*msp, *restart_ctxt, *restart_pc, *stackbase, *stacktop, *stackwarn;
 GBLREF volatile boolean_t	dollar_zininterrupt;
+GBLREF volatile boolean_t	sigwinch_inprog;
 
 error_def(ERR_STACKOFLOW);
 error_def(ERR_STACKCRIT);
 
-void jobintrpt_ztime_process(boolean_t ztime)
+void jobintrpt_ztime_process(int4 intrpt_type)
 {
+	mval		sigwinch_code;
+	mstr		*sigwinch_hdlr;
 	mv_stent	*mv_st_ent;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	assert(ztime || dollar_zininterrupt);
-	/* Compile and push new (counted) frame onto the stack to drive the $zinterrupt handler */
-	assert(((ztime ? SFT_ZTIMEOUT : SFT_ZINTR) | SFT_COUNT) == proc_act_type);
-	if (ztime)
+	assert((jobinterrupt == intrpt_type) || (ztimeout == intrpt_type) || (sigwinch == intrpt_type));
+	assert((jobinterrupt != intrpt_type) || dollar_zininterrupt);
+	/* Compile and push new (counted) frame onto the stack to drive the interrupt handler */
+	assert((((ztimeout == intrpt_type) ? SFT_ZTIMEOUT : ((sigwinch == intrpt_type) ? SFT_SIGWINCH : SFT_ZINTR))
+		| SFT_COUNT) == proc_act_type);
+	if (ztimeout == intrpt_type)
 	{
 		OP_COMMARG_S2POOL(&((TREF(dollar_ztimeout)).ztimeout_vector));
+	} else if (sigwinch == intrpt_type)
+	{	/* The handler code is a malloc'd copy (see sigwinch_routines.c) so needs the s2pool flavor of op_commarg */
+		sigwinch_hdlr = tt_sigwinch_handler();
+		assertpro(NULL != sigwinch_hdlr);	/* mdb_condition_handler only dispatches here if a handler exists */
+		sigwinch_code.mvtype = MV_STR;
+		sigwinch_code.str = *sigwinch_hdlr;
+		OP_COMMARG_S2POOL(&sigwinch_code);
+		sigwinch_inprog = TRUE;			/* cleared when the MVST_ZINTR mv_stent below is unwound */
 	} else
 		op_commarg(&dollar_zinterrupt, indir_linetail);
 	SET_GV_NAMENAKED_STATE(NAMENAKED_ININTERRUPT); /* $ZTIMEOUT or $ZINTERRUPT interrupt */
@@ -87,7 +103,7 @@ void jobintrpt_ztime_process(boolean_t ztime)
 	mv_st_ent->mv_st_cont.mvs_zintr.savtarg.str.len = 0;
 	mv_st_ent->mv_st_cont.mvs_zintr.savextref.len = 0;
 	mv_st_ent->mv_st_cont.mvs_zintr.saved_dollar_truth = dollar_truth;
-	mv_st_ent->mv_st_cont.mvs_zintr.ztimeout = FALSE;
+	mv_st_ent->mv_st_cont.mvs_zintr.intrpt_type = intrpt_type;
 	op_gvsavtarg(&mv_st_ent->mv_st_cont.mvs_zintr.savtarg);
 	if (extnam_str.len)
 	{

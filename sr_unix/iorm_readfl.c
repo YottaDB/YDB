@@ -51,6 +51,7 @@ GBLREF	mv_stent      		*mv_chain;
 GBLREF	spdesc			stringpool;
 GBLREF	volatile bool		out_of_time;
 GBLREF	volatile boolean_t      dollar_zininterrupt;
+GBLREF	volatile boolean_t	sigwinch_inprog;
 GBLREF	volatile int4		outofband;
 #ifdef UTF8_SUPPORTED
 GBLREF	UConverter	*chset_desc[];
@@ -339,7 +340,7 @@ int	iorm_readfl (mval *v, int4 width, uint8 nsec_timeout) /* timeout in nanoseco
 	{	/* We have a pending read restart of some sort */
 		assertpro(pipewhich_invalid != pipeintr->who_saved);      /* Interrupt should never have an invalid save state */
 		/* check we aren't recursing on this device */
-		if (dollar_zininterrupt)
+		if (dollar_zininterrupt || sigwinch_inprog)
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_ZINTRECURSEIO);
 		if (pipewhich_readfl != pipeintr->who_saved)
 			assertpro(FALSE);      /* ZINTRECURSEIO should have caught */

@@ -54,6 +54,7 @@ GBLREF	mv_stent		*mv_chain;
 GBLREF	stack_frame		*frame_pointer;
 GBLREF	unsigned char		*msp, *stackbase, *stacktop, *stackwarn;
 GBLREF	volatile boolean_t	dollar_zininterrupt;
+GBLREF	volatile boolean_t	sigwinch_inprog;
 GBLREF	volatile int4		outofband;
 
 LITREF	unsigned char	lower_to_upper_table[];
@@ -112,7 +113,7 @@ int	iott_rdone (mint *v, uint8 nsec_timeout)	/* timeout in nanoseconds */
 	{	/* restore state to before job interrupt */
 		tt_state = &tt_ptr->tt_state_save;
 		assertpro(ttwhichinvalid != tt_state->who_saved);
-		if (dollar_zininterrupt)
+		if (dollar_zininterrupt || sigwinch_inprog)
 		{
 			tt_ptr->mupintr = FALSE;
 			tt_state->who_saved = ttwhichinvalid;
@@ -204,8 +205,8 @@ int	iott_rdone (mint *v, uint8 nsec_timeout)	/* timeout in nanoseconds */
 	{
 		if (outofband)
 		{
-			if (jobinterrupt == outofband)
-			{	/* save state if jobinterrupt */
+			if (OUTOFBAND_RESTARTABLE(outofband))
+			{	/* save state if jobinterrupt or sigwinch (the read resumes after the interrupt) */
 				tt_state = &tt_ptr->tt_state_save;
 				tt_state->exp_length = 0;
 				tt_state->who_saved = ttrdone;

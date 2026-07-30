@@ -3,7 +3,7 @@
  * Copyright (c) 2018-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2024 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2024-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -32,7 +32,7 @@ GBLREF  sigset_t			block_sigsent;
 #define CTRLY	  25
 #define MAXOUTOFBAND 31
 
-#define OUTOFBAND_RESTARTABLE(event)	(jobinterrupt == (event))
+#define OUTOFBAND_RESTARTABLE(event)	((jobinterrupt == (event)) || (sigwinch == (event)))
 
 void	outofband_action(boolean_t line_fetch_or_start);
 
@@ -44,6 +44,7 @@ void	outofband_action(boolean_t line_fetch_or_start);
 void ctrap_set(int4);
 void ctrlc_set(int4);
 void jobinterrupt_set(int4 dummy);
+void sigwinch_set(int4 dummy_param);		/* Used to drive the terminal SIGWINCH deviceparameter handler */
 void tptimeout_set(int4 dummy_param);		/* Used to setup tptimeout error via out-of-band */
 void ztimeout_set(int4 dummy_param);
 void defer_error_set(int4);

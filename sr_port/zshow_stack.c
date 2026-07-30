@@ -4,7 +4,7 @@
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -36,6 +36,7 @@
 #define INDR_OVERFLOW		"        (Max indirect frames per counted frame exceeded for ZSHOW ""S"" -"	\
                                 " some indirect frames not processed)"
 #define	ZTIMEOUT_FRAME		"	($ZTIMEOUT) "
+#define	SIGWINCH_FRAME		"	(SIGWINCH) "
 
 #define MAX_FRAME_MESS_LEN	20	/* Maximum length of any of the frame messages above */
 #define MAX_INDR_PER_COUNTED	64	/* Maximum number of indirect frames printed per counted frame */
@@ -73,7 +74,8 @@ void zshow_stack(zshow_out *output, boolean_t show_checksum)
 		SKIP_BASE_FRAMES(fp, (SFT_CI | SFT_TRIGR));	/* Can update fp if fp is a call-in or trigger base frame */
 		if (NULL == fp->old_frame_pointer)
 			break; /* Endpoint.. */
-		if (!(fp->type & SFT_COUNT) || (((fp->type & SFT_ZINTR) || (fp->type & SFT_ZTIMEOUT))
+		if (!(fp->type & SFT_COUNT) || (((fp->type & SFT_ZINTR) || (fp->type & SFT_ZTIMEOUT)
+										|| (fp->type & SFT_SIGWINCH))
 										&& (fp->flags & SFF_INDCE)))
 		{	/* SFT_ZINTR is normally indirect but if the frame has been replaced by non-indirect frame via ZGOTO or GOTO
 			 * then do not include it in the indirect list here.
@@ -141,6 +143,10 @@ void zshow_stack(zshow_out *output, boolean_t show_checksum)
 						case (SFT_COUNT | SFT_ZTIMEOUT):
 							MEMCPY_LIT(&buff[v.len], ZTIMEOUT_FRAME);
 							v.len += SIZEOF(ZTIMEOUT_FRAME) - 1;
+							break;
+						case (SFT_COUNT | SFT_SIGWINCH):
+							MEMCPY_LIT(&buff[v.len], SIGWINCH_FRAME);
+							v.len += SIZEOF(SIGWINCH_FRAME) - 1;
 							break;
 						case 0xffff:
 							MEMCPY_LIT(&buff[v.len], INDR_OVERFLOW);

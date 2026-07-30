@@ -169,6 +169,7 @@ error_def(ERR_TPTIMEOUT);
 error_def(ERR_UNSOLCNTERR);
 error_def(ERR_ZINTRECURSEIO);
 error_def(ERR_ZTIMEOUT);
+error_def(ERR_SIGWINCHRQST);
 
 boolean_t clean_mum_tstart(void);
 
@@ -240,6 +241,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 	char			src_line[MAX_ENTRYREF_LEN];
 	int			src_line_max = MAX_ENTRYREF_LEN;
 	mstr			src_line_d;
+	mstr			*sigwinch_hdlr;
 	io_desc			*err_dev;
 	gd_region		*reg_top, *reg_local;
 	gd_addr			*addr_ptr;
@@ -332,7 +334,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 	 * routine is going to echo the same keystroke(s) once it gets control back from the job interrupt. This would
 	 * cause duplication of those keystrokes and confuse the user.
 	 */
-	if ((NULL != active_device) && ((int)ERR_JOBINTRRQST != SIGNAL))
+	if ((NULL != active_device) && ((int)ERR_JOBINTRRQST != SIGNAL) && ((int)ERR_SIGWINCHRQST != SIGNAL))
 		RESETTERM_IF_NEEDED(active_device, EXPECT_SETTERM_DONE_FALSE);
 	if ((int)ERR_TPRETRY == SIGNAL)
 	{
@@ -654,8 +656,8 @@ CONDITION_HANDLER(mdb_condition_handler)
 		for (fp = frame_pointer; ; fp = fp->old_frame_pointer)
 		{
 			assert(!(fp->type & SFT_COUNT) || !(fp->type & SFT_DM));
-			if (!(fp->type & SFT_ZTIMEOUT) && !(fp->type & SFT_ZINTR))
-			{	/* Not a ztimeout or zinterrupt frame so do our checks for other types */
+			if (!(fp->type & SFT_ZTIMEOUT) && !(fp->type & SFT_ZINTR) && !(fp->type & SFT_SIGWINCH))
+			{	/* Not a ztimeout, zinterrupt or sigwinch frame so do our checks for other types */
 				if (fp->type & SFT_COUNT)
 					break;
 				if (fp->type & SFT_DM)
@@ -907,6 +909,23 @@ CONDITION_HANDLER(mdb_condition_handler)
 			assert(!dollar_zininterrupt);
 			proc_act_type = SFT_ZTIMEOUT | SFT_COUNT;/* | SFT_COUNT;*/
 			err_act = &((TREF(dollar_ztimeout)).ztimeout_vector.str);
+			MUM_TSTART; /* This will take us to trans_code */
+		}
+	} else if ((int)ERR_SIGWINCHRQST == SIGNAL)
+	{	/* Terminal window size changed - drive the SIGWINCH deviceparameter handler (modeled on ZTIMEOUT above) */
+		sigwinch_hdlr = tt_sigwinch_handler();
+		if (NULL != sigwinch_hdlr)
+		{
+			assert(NULL != frame_pointer->restart_pc);
+			assert((!(SFF_INDCE & frame_pointer->flags)) || (frame_pointer->restart_ctxt == frame_pointer->ctxt));
+			DBGEHND((stderr, "mdb_condition_handler(6): Resetting frame 0x"lvaddr" mpc/context with restart_pc/ctxt "
+				 "0x"lvaddr"/0x"lvaddr" - frame has type 0x%04lx\n", frame_pointer, frame_pointer->restart_pc,
+				 frame_pointer->restart_ctxt, frame_pointer->type));
+			frame_pointer->mpc = frame_pointer->restart_pc;
+			frame_pointer->ctxt = frame_pointer->restart_ctxt;
+			assert(!dollar_zininterrupt);
+			proc_act_type = SFT_SIGWINCH | SFT_COUNT;
+			err_act = sigwinch_hdlr;
 			MUM_TSTART; /* This will take us to trans_code */
 		}
 	}
@@ -1198,10 +1217,10 @@ CONDITION_HANDLER(mdb_condition_handler)
 		 */
 		DBGEHND((stderr, "mdb_condition_handler: trans_code_cleanup() or jobinterrupt_process_cleanup being "
 			 "dispatched\n"));
-		if (!(SFT_ZINTR & proc_act_type) && !(SFT_ZTIMEOUT & proc_act_type))  	/* ztimeout vector precompiled */
-		{
+		if (!(SFT_ZINTR & proc_act_type) && !(SFT_ZTIMEOUT & proc_act_type) && !(SFT_SIGWINCH & proc_act_type))
+		{	/* ztimeout and sigwinch vectors are precompiled */
 			trans_code_cleanup();
-		} else if (!(SFT_ZTIMEOUT & proc_act_type))
+		} else if (!(SFT_ZTIMEOUT & proc_act_type) && !(SFT_SIGWINCH & proc_act_type))
 		{
 			assert(dollar_zininterrupt);
 			jobinterrupt_process_cleanup();

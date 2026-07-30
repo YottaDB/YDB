@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2026 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -22,6 +25,7 @@ error_def(ERR_ERRWZBRK);
 error_def(ERR_ERRWZINTR);
 error_def(ERR_ERRWZTRAP);
 error_def(ERR_ERRWZTIMEOUT);
+error_def(ERR_ERRWSIGWINCH);
 
 /* Note assertpro() checks have extra text in them to identify which assertpro tripped */
 #define SET_ERR_CODE(fp, errmsg)					\
@@ -50,6 +54,9 @@ error_def(ERR_ERRWZTIMEOUT);
 			break;						\
 		case (SFT_ZTIMEOUT | SFT_COUNT):			\
 			errmsg = ERR_ERRWZTIMEOUT;			\
+			break;						\
+		case (SFT_SIGWINCH | SFT_COUNT):			\
+			errmsg = ERR_ERRWSIGWINCH;			\
 			break;						\
 		default:						\
 			assertpro(FALSE && fp->type);			\

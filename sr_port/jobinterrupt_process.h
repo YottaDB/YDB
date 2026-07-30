@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2026 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -25,6 +28,6 @@
 }
 void jobinterrupt_event(int sig, siginfo_t *info, void *context);
 void jobinterrupt_init(void);
-void jobintrpt_ztime_process(boolean_t ztimeo);
+void jobintrpt_ztime_process(int4 intrpt_type);	/* jobinterrupt, ztimeout or sigwinch (see enum outofbands) */
 
 #endif

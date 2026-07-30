@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -61,6 +61,8 @@ void trans_code_cleanup(void)
 		errmsg = ERR_ERRWIOEXC;
 	else if (SFT_ZTIMEOUT == proc_act_type)
 		errmsg = ERR_ERRWZTIMEOUT;
+	else if (SFT_SIGWINCH == proc_act_type)
+		errmsg = ERR_ERRWSIGWINCH;
 	else
 		errmsg = 0;
 	proc_act_type = 0;

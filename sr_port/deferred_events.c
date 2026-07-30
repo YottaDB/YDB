@@ -187,6 +187,7 @@ boolean_t xfer_reset_if_setter(int4 event_type)
 			break;
 		case ctrlc:
 		case sighup:
+		case sigwinch:
 		case tptimeout:				/* the caller sets event_state to active */
 		case ztimeout:
 			res = TRUE;
@@ -345,7 +346,8 @@ void async_action(bool lnfetch_or_start)
 		case ctrap:
 		case defer_error:
 			TAREF1(save_xfer_root, outofband).event_state = active;			/*WARNING: fallthrough */
-		case tptimeout:					/* these have their own action routines that do pending -> active */
+		case sigwinch:					/* these have their own action routines that do pending -> active */
+		case tptimeout:
 		case ztimeout:
 		case deferred_signal:
 			outofband_action(lnfetch_or_start);	/* which effectively does assertpro(no_event == outofband) */

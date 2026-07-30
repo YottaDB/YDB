@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2023-2024 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2023-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -85,6 +85,7 @@ GBLREF int			*vhistory_max_entries;
 GBLREF int			*vhistory_length;
 GBLREF int			*vhistory_base;
 GBLREF int                      *vrl_catch_signals;
+GBLREF int                      *vrl_catch_sigwinch;
 GBLREF rl_hook_func_t		**vrl_startup_hook;
 GBLREF int			*vrl_already_prompted;
 GBLREF rl_voidfunc_t 		**vrl_redisplay_function;

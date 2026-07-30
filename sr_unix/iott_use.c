@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -73,6 +73,7 @@ GBLREF io_pair			io_curr_device, io_std_device;
 GBLREF mval			dollar_zstatus;
 GBLREF void			(*ctrlc_handler_ptr)();
 GBLREF volatile boolean_t	dollar_zininterrupt;
+GBLREF volatile boolean_t	sigwinch_inprog;
 
 LITREF unsigned char	io_params_size[];
 
@@ -116,12 +117,16 @@ void iott_use(io_desc *iod, mval *pp)
 		{
 			if (dollar_zininterrupt)
 				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_ZINTRECURSEIO);
-			else
+			else if (!sigwinch_inprog)
 			{	/* The interrupted read was not properly resumed so clear it now */
 				tt_ptr->mupintr = FALSE;
 				tt_ptr->tt_state_save.who_saved = ttwhichinvalid;
 				io_find_mvstent(iod, TRUE);
 			}
+			/* else: a SIGWINCH deviceparameter handler is running and the interrupted read will resume
+			 * once it is done, so leave the saved read state alone (a USE of the terminal, e.g. to
+			 * adjust WIDTH, is legitimate in such a handler).
+			 */
 		}
 		status = tcgetattr(tt_ptr->fildes, &t);
 		if (0 != status)
@@ -346,6 +351,15 @@ void iott_use(io_desc *iod, mval *pp)
 						}
 					}
 					break;
+				case iop_sigwinch:
+					/* Ignored (inside the below call) unless this device is $PRINCIPAL */
+					tt_sigwinch_devparam(iod, (char *)(pp->str.addr + p_offset + 1),
+						(int)((unsigned char)*(pp->str.addr + p_offset)), TRUE);
+					break;
+				case iop_nosigwinch:
+					/* Ignored (inside the below call) unless this device is $PRINCIPAL */
+					tt_sigwinch_devparam(iod, NULL, 0, FALSE);
+					break;
 				case iop_insert:
 					if (io_curr_device.in == io_std_device.in)
 						tt_ptr->ext_cap &= ~TT_NOINSERT;	/* $PRINCIPAL only */
@@ -564,7 +578,7 @@ void iott_use(io_desc *iod, mval *pp)
 					      CALLFROM, errno);
 			}
 		}
-	} else if (tt_ptr->mupintr && !dollar_zininterrupt)
+	} else if (tt_ptr->mupintr && !dollar_zininterrupt && !sigwinch_inprog)
 	{	/* The interrupted read was not properly resumed so clear it now */
 		tt_ptr->mupintr = FALSE;
 		tt_ptr->tt_state_save.who_saved = ttwhichinvalid;

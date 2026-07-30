@@ -90,6 +90,7 @@ int ydb_altcont_sighandler(int signum);
 int ydb_altmain_sighandler(int signum);
 int ydb_altsusp_sighandler(int signum);		/* Alternate handler for various suspend/resume signal handlers */
 int ydb_altusr1_sighandler(int signum);
+int ydb_altwinch_sighandler(int signum);	/* Alternate handler for SIGWINCH (SIGWINCH deviceparameter) */
 void process_pending_signals(void);
 void sig_init_lang_altmain(void);
 

@@ -3,7 +3,7 @@
  * Copyright (c) 2012-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -49,6 +49,7 @@ GBLREF	uint4			ydb_max_sockets;
 GBLREF	io_pair			io_std_device;	/* standard device */
 GBLREF	UConverter		*chset_desc[];
 GBLREF	volatile boolean_t	dollar_zininterrupt;
+GBLREF	volatile boolean_t	sigwinch_inprog;
 
 LITREF 	unsigned char		io_params_size[];
 LITREF	mstr			chset_names[];
@@ -160,7 +161,7 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, uint
 	{	/* check if connect was interrupted */
 		sockintr = &dsocketptr->sock_save_state;
 		assertpro(sockwhich_invalid != sockintr->who_saved);	/* Interrupt should never have an invalid save state */
-		if (dollar_zininterrupt)
+		if (dollar_zininterrupt || sigwinch_inprog)
 		{
 			dsocketptr->mupintr = FALSE;
 			sockintr->who_saved = sockwhich_invalid;

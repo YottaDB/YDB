@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -25,12 +25,14 @@
 #define CREATEDBY_ZINTR		3
 #define CREATEDBY_TRIGGER	4
 #define	CREATEDBY_ZTIMEOUT	5
+#define	CREATEDBY_SIGWINCH	6
 
 GBLREF	stack_frame		*frame_pointer;
 GBLREF	spdesc			stringpool;
 
-LITDEF 	mstr	createdby_text[6] = {{0, LEN_AND_LIT("DO")}, {0, LEN_AND_LIT("XECUTE")}, {0, LEN_AND_LIT("$$")},
-				     {0, LEN_AND_LIT("ZINTR")}, {0, LEN_AND_LIT("TRIGGER")}, {0, LEN_AND_LIT("ZTIMEOUT")}};
+LITDEF 	mstr	createdby_text[7] = {{0, LEN_AND_LIT("DO")}, {0, LEN_AND_LIT("XECUTE")}, {0, LEN_AND_LIT("$$")},
+				     {0, LEN_AND_LIT("ZINTR")}, {0, LEN_AND_LIT("TRIGGER")}, {0, LEN_AND_LIT("ZTIMEOUT")},
+				     {0, LEN_AND_LIT("SIGWINCH")}};
 
 void	get_frame_creation_info(int level, int cur_zlevel, mval *result)
 {
@@ -68,6 +70,8 @@ void	get_frame_creation_info(int level, int cur_zlevel, mval *result)
 		result->str = createdby_text[CREATEDBY_XECUTE];
 	else if (fp && (fp->type & SFT_ZTIMEOUT))
 		result->str = createdby_text[CREATEDBY_ZTIMEOUT];
+	else if (fp && (fp->type & SFT_SIGWINCH))
+		result->str = createdby_text[CREATEDBY_SIGWINCH];
 #	ifdef GTM_TRIGGER
 	else if (fp && (fp->old_frame_pointer->type & SFT_TRIGR))
 		result->str = createdby_text[CREATEDBY_TRIGGER];

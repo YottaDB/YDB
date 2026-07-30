@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -179,6 +179,14 @@ typedef struct
 	boolean_t		done_1st_read;		/* UTF8 mode - check for BOM if not */
 	pid_t			setterm_done_by;	/* if non-zero, points to pid that did "iott_setterm";
 							 * used to later invoke "iott_resetterm" if needed.
+							 */
+	boolean_t		sigwinch_on;		/* SIGWINCH deviceparameter is in effect on $PRINCIPAL i.e. a
+							 * terminal window resize refreshes WIDTH and LENGTH (turned off
+							 * by NOSIGWINCH, the default)
+							 */
+	mstr			sigwinch_handler;	/* code XECUTEd after the above refresh (set by SIGWINCH=expr on
+							 * $PRINCIPAL; empty for a valueless SIGWINCH). "addr" is a malloc'd
+							 * copy (not stringpool) so it needs no stp_gcol protection.
 							 */
 }d_tt_struct;
 

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -81,6 +81,7 @@ GBLREF stack_frame		*error_frame, *frame_pointer;
 GBLREF unsigned char		*restart_pc, *restart_ctxt;
 GBLREF uint4			zwrtacindx;
 GBLREF volatile boolean_t	dollar_zininterrupt;
+GBLREF volatile boolean_t	sigwinch_inprog;
 GBLREF volatile int4		outofband;
 GBLREF zshow_out		*zwr_output;
 GBLREF zwr_hash_table		*zwrhtab;
@@ -428,8 +429,15 @@ void unw_mv_ent(mv_stent *mv_st_ent)
 			/* Restore environment to pre-$zinterrupt evocation. Note the first few elements of MVST_ZINTR
 			 * and MVST_TRIGR are the same, so the processing of those elements is commonized.
 			 */
-			dollar_zininterrupt = FALSE;
-			TAREF1(save_xfer_root, jobinterrupt).event_state = not_in_play;
+			if (sigwinch == mv_st_ent->mv_st_cont.mvs_zintr.intrpt_type)
+			{	/* this mv_stent belongs to a SIGWINCH deviceparameter handler frame */
+				sigwinch_inprog = FALSE;
+				TAREF1(save_xfer_root, sigwinch).event_state = not_in_play;
+			} else
+			{
+				dollar_zininterrupt = FALSE;
+				TAREF1(save_xfer_root, jobinterrupt).event_state = not_in_play;
+			}
 			/* Get rid of old values that may exist */
 			if (dollar_ecode.begin)
 				free(dollar_ecode.begin);

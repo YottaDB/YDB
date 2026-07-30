@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -44,6 +44,7 @@ enum sig_handler_t
 	sig_hndlr_op_fnzpeek_signal_handler,
 	sig_hndlr_suspsigs_handler,
 	sig_hndlr_timer_handler,
+	sig_hndlr_tt_sigwinch_event,
 	sig_hndlr_num_entries
 };
 
@@ -508,6 +509,7 @@ GBLREF	void			(*ydb_stm_thread_exit_fnptr)(void);
 int drain_signal_queues(ydb_buffer_t *errstr);
 void sig_init(void (*signal_handler)(), void (*ctrlc_handler)(), void (*suspsig_handler)(), void (*continue_handler)());
 void null_handler(int sig, siginfo_t *info, void *context);
+void tt_sigwinch_event(int sig, siginfo_t *info, void *context);	/* SIGWINCH deviceparameter (see io.h) */
 void ydb_stm_invoke_deferred_signal_handler(void);
 void setup_altstack(void);
 

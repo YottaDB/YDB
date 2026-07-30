@@ -119,6 +119,12 @@ void outofband_action(boolean_t lnfetch_or_start)
 				else
 					outofband_clear();
 				break;
+			case sigwinch: /* Following is basically rts_error (ignored for simpleAPI) */
+				if (!(IS_SIMPLEAPI_MODE))
+					sigwinch_action();
+				else
+					outofband_clear();
+				break;
 			case defer_error:
 				ours = xfer_reset_if_setter(defer_error);
 				assert(ours);

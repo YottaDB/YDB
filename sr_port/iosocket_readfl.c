@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -63,6 +63,7 @@ GBLREF	stack_frame		*frame_pointer;
 GBLREF	UConverter		*chset_desc[];
 GBLREF	unsigned char		*stackbase, *stacktop, *msp, *stackwarn;
 GBLREF	volatile boolean_t	dollar_zininterrupt;
+GBLREF	volatile boolean_t	sigwinch_inprog;
 GBLREF	volatile int4		outofband;
 
 error_def(ERR_BOMMISMATCH);
@@ -210,7 +211,7 @@ int	iosocket_readfl(mval *v, int4 width, uint8 nsec_timeout)
 	{	/* We have a pending read restart of some sort */
 		assertpro(sockwhich_invalid != sockintr->who_saved);	/* Interrupt should never have an invalid save state */
 		/* Check we aren't recursing on this device */
-		if (dollar_zininterrupt)
+		if (dollar_zininterrupt || sigwinch_inprog)
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZINTRECURSEIO);
                 assertpro(sockwhich_readfl == sockintr->who_saved);	/* ZINTRECURSEIO should have caught */
 		DBGSOCK((stdout, "socrfl: *#*#*#*#*#*#*#  Restarted interrupted read\n"));

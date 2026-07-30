@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2020-2024 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2020-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -20,10 +20,11 @@ D_EVENT(jobinterrupt, jobinterrupt_set),	/* 3 */
 D_EVENT(tptimeout, tptimeout_set),		/* 4 */
 D_EVENT(ztimeout, ztimeout_set),		/* 5 */
 D_EVENT(sighup, ctrap_set),			/* 6 */
-D_EVENT(neterr_action, gvcmz_neterr),		/* 7 - from here rest of the list are deferred but not outofband */
-D_EVENT(zstep_pending, op_zstep),		/* 8 */
-D_EVENT(zbreak_pending, op_setzbrk),		/* 9 */
-D_EVENT(defer_error, defer_error_set),		/* 10 */
-D_EVENT(deferred_signal, deferred_signal_set),	/* 11 */
+D_EVENT(sigwinch, sigwinch_set),		/* 7 - drives the terminal SIGWINCH deviceparameter handler */
+D_EVENT(neterr_action, gvcmz_neterr),		/* 8 - from here rest of the list are deferred but not outofband */
+D_EVENT(zstep_pending, op_zstep),		/* 9 */
+D_EVENT(zbreak_pending, op_setzbrk),		/* 10 */
+D_EVENT(defer_error, defer_error_set),		/* 11 */
+D_EVENT(deferred_signal, deferred_signal_set),	/* 12 */
 D_EVENT(DEFERRED_EVENTS, ctrlc_set)		/* count; ctrlc_set is just a place holder here */
 

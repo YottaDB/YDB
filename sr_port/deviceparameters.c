@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2022-2024 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2022-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -129,6 +129,7 @@ LITDEF nametabent dev_param_names[] =
 	,{6,"NOREAD"}	,{10,"NOREADONLY"}
 	,{7,"NOREADS*"}	,{10,"NOREADSYNC"}
 	,{4,"NOSE*"}	,{12,"NOSEQUENTAIL"}
+	,{6,"NOSIGW*"}	,{10,"NOSIGWINCH"}
 	,{4,"NOST*"}	,{8,"NOSTREAM*"}
 	,{4,"NOTE"}
 	,{5,"NOTER*"}	,{12,"NOTERMINATOR"}
@@ -183,6 +184,7 @@ LITDEF nametabent dev_param_names[] =
 	,{3,"SEQ*"}	,{10,"SEQUENTIAL"}
 	,{2,"SH"}	,{4,"SHAR*"}		/*{6,"SHARED"}*/
 	,{4,"SHEL*"}	,{5,"SHELL"}
+	,{4,"SIGW*"}	,{8,"SIGWINCH"}
 	,{2,"SO*"}	,{6,"SOCKET"}
 	,{3,"SPA*"}				/* dead VMS placeholder */
 	,{3,"SPO*"}				/* dead VMS placeholder */
@@ -246,7 +248,7 @@ LITDEF	uint4 dev_param_index[27] =
 	0,   5,   9,   27,  35,  50,  66,  68,  73,  82,  82,  83,  91,  94,
 
 /*	O    P    Q    R    S    T    U    V    W    X    Y    Z    end	     */
-	164, 173, 192, 193, 208, 228, 238, 244, 245, 260, 261, 263, 285
+	166, 175, 194, 195, 210, 232, 242, 248, 249, 264, 265, 267, 289
 };
 
 /* Offset of string within letter in dev_param_names */
@@ -261,11 +263,11 @@ LITDEF zshow_index zshow_param_index[] =
 /*	NOCENE   NODEST    NOECHO    NOEDIT    NOEMPTERM NOESCA    NOFOLLOW  NOHOST     NOINSE */
 	{6,13},  {11,13},  {16,13},  {18,13},  {20,13},  {22,13},  {31,13},  {34,13},  {38,13},
 /*	NOPAST   NOREADS  NOTTSY    NOTYPE   NOWRAP */
-	{41,13}, {44,13}, {60,13},  {61,13}, {66,13},
+	{41,13}, {44,13}, {62,13},  {63,13}, {68,13},
 /*	OCHSET   PAD      PARSE     PAST      PRMMBX    RCHK     READ     READS    REC */
 	{1,14},  {8,15},  {12,15},  {13,15},  {17,15},  {0,17},  {1,17},  {3,17},  {5,17},
-/*      SHAR     SHELL    STDERR    STREAM    TERM      TTSY     TYPE     UIC */
-	{6,18},  {8,18},  {16,18},  {18,18},  {1,19},  {7,19},  {8,19},  {1,20},
+/*      SHAR     SHELL    SIGWINCH  STDERR    STREAM    TERM      TTSY     TYPE     UIC */
+	{6,18},  {8,18},  {10,18},  {18,18},  {20,18},  {1,19},  {7,19},  {8,19},  {1,20},
 /*      WAIT     WCHK     WIDTH    WRITE */
         {2,22},  {4,22},  {6,22},  {10,22}
 };
@@ -380,6 +382,7 @@ int deviceparameters(oprtype *c, char who_calls)
 		,iop_noreadonly ,iop_noreadonly
 		,iop_noreadsync ,iop_noreadsync
 		,iop_nosequential ,iop_nosequential
+		,iop_nosigwinch ,iop_nosigwinch
 		,iop_nostream ,iop_nostream
 		,iop_note
 		,iop_noterminator, iop_noterminator
@@ -434,6 +437,7 @@ int deviceparameters(oprtype *c, char who_calls)
 		,iop_sequential ,iop_sequential
 		,iop_shared ,iop_shared
 		,iop_shell ,iop_shell
+		,iop_sigwinch ,iop_sigwinch
 		,iop_socket ,iop_socket
 		,iop_space
 		,iop_spool
@@ -522,7 +526,13 @@ int deviceparameters(oprtype *c, char who_calls)
 		}
 		advancewindow();
 		*parptr++ = n;
-		if (io_params_size[n])
+		if (io_params_size[n] && (iop_sigwinch == n) && (TK_EQUAL != TREF(window_token)))
+		{	/* SIGWINCH is usable without a value in which case it is equivalent to SIGWINCH="" i.e. a
+			 * terminal window resize refreshes the device WIDTH and LENGTH but no code is XECUTEd
+			 * (see YDB#1247). Store a zero length value to convey that.
+			 */
+			*parptr++ = 0;
+		} else if (io_params_size[n])
 		{
 			if (TK_EQUAL != TREF(window_token))
 			{

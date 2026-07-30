@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -66,6 +66,7 @@ GBLREF stack_frame		*frame_pointer;
 GBLREF unsigned char		*msp, *stackbase, *stacktop, *stackwarn;
 GBLREF volatile int4		outofband;
 GBLREF volatile boolean_t	dollar_zininterrupt, timer_in_handler;
+GBLREF	volatile boolean_t	sigwinch_inprog;
 
 LITREF unsigned char	lower_to_upper_table[];
 #ifdef UTF8_SUPPORTED
@@ -259,7 +260,7 @@ void	dm_read (mval *v)
 	{	/* restore state to before job interrupt */
 		tt_state = &tt_ptr->tt_state_save;
 		assertpro(ttwhichinvalid != tt_state->who_saved);
-		if (dollar_zininterrupt)
+		if (dollar_zininterrupt || sigwinch_inprog)
 		{
 			tt_ptr->mupintr = FALSE;
 			tt_state->who_saved = ttwhichinvalid;
@@ -358,8 +359,8 @@ void	dm_read (mval *v)
 	{
 		if (outofband)
 		{
-			if (jobinterrupt == outofband)
-			{	/* save state if jobinterrupt */
+			if (OUTOFBAND_RESTARTABLE(outofband))
+			{	/* save state if jobinterrupt or sigwinch (the read resumes after the interrupt) */
 				tt_state = &tt_ptr->tt_state_save;
 				tt_state->who_saved = dmread;
 				tt_state->length = length;

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2022-2024 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2022-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -234,4 +234,6 @@ IOP_DESC(212, iop_hupenable,      0,                      IOP_USE_OK,           
 IOP_DESC(213, iop_nohupenable,    0,                      IOP_USE_OK,                          0),
 IOP_DESC(214, iop_replace,        IOP_VAR_SIZE,           IOP_CLOSE_OK,                        IOP_SRC_STR),
 IOP_DESC(215, iop_options,        IOP_VAR_SIZE,           IOP_OPEN_OK | IOP_USE_OK,            IOP_SRC_STR),
-IOP_DESC(216, n_iops,             0,                      0,                                   0),
+IOP_DESC(216, iop_sigwinch,       IOP_VAR_SIZE,           IOP_OPEN_OK | IOP_USE_OK,            IOP_SRC_STR),
+IOP_DESC(217, iop_nosigwinch,     0,                      IOP_OPEN_OK | IOP_USE_OK,            0),
+IOP_DESC(218, n_iops,             0,                      0,                                   0),

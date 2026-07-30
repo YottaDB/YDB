@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -46,6 +46,7 @@ GBLREF int		exi_condition, process_exiting;
 GBLREF int4		error_condition;
 GBLREF io_pair		io_curr_device, io_std_device;
 GBLREF mval		dollar_zstatus;
+GBLREF volatile boolean_t	sigwinch_inprog;
 GBLREF volatile int4	outofband;
 
 error_def(ERR_NOPRINCIO);
@@ -132,8 +133,13 @@ void iott_write(mstr *v)
 		str = v->addr;
 		io_ptr = io_curr_device.out;
 		tt_ptr = (d_tt_struct *)io_ptr->dev_sp;
-		if (tt_ptr->mupintr)
+		if (tt_ptr->mupintr && !sigwinch_inprog)
+		{	/* Disallow IO to a device with an interrupted (and resumable) read except from a SIGWINCH
+			 * deviceparameter handler, whose typical job (redrawing the screen after a terminal resize)
+			 * requires writing to the terminal; the interrupted read resumes after the handler is done.
+			 */
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_ZINTRECURSEIO);
+		}
 		ESTABLISH_GTMIO_CH(&io_curr_device, ch_set);
 		UTF8_ONLY(utf8_active = gtm_utf8_mode ? (CHSET_M != io_ptr->ochset) : FALSE;)
 		for (; ;)

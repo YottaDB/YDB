@@ -45,6 +45,9 @@
 # include "gtm_trigger.h"
 #endif
 #include "ztimeout_routines.h"
+#include "have_crit.h"
+#include "deferred_events_queue.h"
+#include "io.h"
 
 #define POP_SPECIFIED 	(ZTRAP_POP & (TREF(ztrap_form)) && (level2go = MV_FORCE_INTD(&ztrap_pop2level))) /* note: assignment */
 
@@ -190,12 +193,17 @@ void trans_code(void)
 	SETUP_THREADGBL_ACCESS;
 	if (SFT_ZINTR & proc_act_type)
 	{	/* Need different translator EP */
-		jobintrpt_ztime_process(FALSE);	/* FALSE indicates jobinterrupt - NOT ztimeout */
+		jobintrpt_ztime_process(jobinterrupt);
 		return;
 	}
 	if ((SFT_ZTIMEOUT & proc_act_type) && ((TREF(dollar_ztimeout)).ztimeout_vector.str.len))
 	{	/* Else current ETRAP or ZTRAP is the vector */
-		jobintrpt_ztime_process(TRUE);	/* TRUE indicates ztimeout */
+		jobintrpt_ztime_process(ztimeout);
+		return;
+	}
+	if ((SFT_SIGWINCH & proc_act_type) && (NULL != tt_sigwinch_handler()))
+	{	/* Else current ETRAP or ZTRAP is the vector */
+		jobintrpt_ztime_process(sigwinch);
 		return;
 	}
 	assert(err_act);

@@ -245,6 +245,7 @@ GBLDEF	uint4		dollar_zyjobparent = 0; /* PID of process that JOBed current invoc
 GBLDEF	mstr		dollar_zicuver;
 GBLDEF	mval		dollar_zinterrupt;
 GBLDEF	volatile boolean_t	dollar_zininterrupt;
+GBLDEF	volatile boolean_t	sigwinch_inprog;	/* TRUE while a SIGWINCH deviceparameter handler frame is active */
 GBLDEF	boolean_t	dollar_ztexit_bool; /* Truth value of dollar_ztexit when coerced to boolean */
 GBLDEF	boolean_t	dollar_zquit_anyway;
 GBLDEF	mv_stent	*mv_chain;
@@ -1463,6 +1464,7 @@ GBLDEF int			*vhistory_max_entries;
 GBLDEF int			*vhistory_length;
 GBLDEF int			*vhistory_base;
 GBLDEF int			*vrl_catch_signals;
+GBLDEF int			*vrl_catch_sigwinch;
 GBLDEF rl_hook_func_t		**vrl_startup_hook;
 GBLDEF int			*vrl_already_prompted;
 GBLDEF rl_voidfunc_t 		**vrl_redisplay_function;

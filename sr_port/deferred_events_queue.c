@@ -3,7 +3,7 @@
  * Copyright (c) 2018-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -26,6 +26,7 @@
 GBLREF	boolean_t		ztrap_explicit_null;
 GBLREF	dollar_ecode_type	dollar_ecode;
 GBLREF	volatile boolean_t	dollar_zininterrupt;
+GBLREF	volatile boolean_t	sigwinch_inprog;
 
 void set_events_from_signals(intrpt_state_t prev_intrpt_state)
 {	/* act on signaled events stored in their event record while the event mechanism had a lock on the intrpt_ok state */
@@ -38,7 +39,8 @@ void set_events_from_signals(intrpt_state_t prev_intrpt_state)
 	for (event_type=1; event_type < DEFERRED_EVENTS; event_type++)
 	{
 		entry = &TAREF1(save_xfer_root, event_type);
-		if ((signaled == entry->event_state) && (!dollar_zininterrupt || (jobinterrupt != event_type)))
+		if ((signaled == entry->event_state) && (!dollar_zininterrupt || (jobinterrupt != event_type))
+			&& (!sigwinch_inprog || (sigwinch != event_type)))
 		{
 			xfer_set_handlers(event_type, entry->param_val, FALSE);
 			DBGDFRDEVNT((stderr, "%d %s: set_events_from_signals - event type: %d, signaled: %d\n",
@@ -78,7 +80,8 @@ void save_xfer_queue_entry(int4 event_type, int4 param_val)
 
 	DBGDFRDEVNT((stderr, "%d %s: save_xfer_queue_entry adding new node for %d.\n", __LINE__, __FILE__, event_type));
 	if ((jobinterrupt == event_type) || ((tptimeout == event_type)
-		&& (ztimeout == (TREF(save_xfer_root_ptr))->ev_que.fl->outofband)))
+		&& ((ztimeout == (TREF(save_xfer_root_ptr))->ev_que.fl->outofband)
+			|| (sigwinch == (TREF(save_xfer_root_ptr))->ev_que.fl->outofband))))
 		dqins((TREF(save_xfer_root_ptr)), ev_que, entry);
 	else
 		dqrins((TREF(save_xfer_root_ptr)), ev_que, entry);
@@ -118,7 +121,7 @@ void pop_real_xfer_queue_entry(int4* event_type, int4* param_val)
 
 void pop_xfer_queue_entry(int4* event_type, int4* param_val)
 {	/* wrapper for pop_real_xfer_queue_entry that deals with the juggling of timeouts with respect to jobinterrupts*/
-	boolean_t	defer_tptimeout, defer_ztimeout;
+	boolean_t	defer_sigwinch, defer_tptimeout, defer_ztimeout;
 	int4		next_event;
 	save_xfer_entry	*entry;
 	DCL_THREADGBL_ACCESS;
@@ -132,8 +135,9 @@ void pop_xfer_queue_entry(int4* event_type, int4* param_val)
 	*event_type = no_event;
 	if (dollar_zininterrupt || ((0 != dollar_ecode.index) && (ETRAP_IN_EFFECT)))
 	{	/* conditions indicate tptimeout and ztimeout should remain deferred */
-		for (next_event = no_event, defer_tptimeout = defer_ztimeout = FALSE; DEFERRED_EVENTS > next_event; next_event++)
-		{	/* don't pend tptimeout or ztimeout it they should remain deferred */
+		for (next_event = no_event, defer_sigwinch = defer_tptimeout = defer_ztimeout = FALSE;
+			DEFERRED_EVENTS > next_event; next_event++)
+		{	/* don't pend sigwinch, tptimeout or ztimeout if they should remain deferred */
 			pop_real_xfer_queue_entry(event_type, param_val);
 			DBGDFRDEVNT((stderr, "%d %s: pop_reset_xfer returned event %d\n", __LINE__, __FILE__, *event_type));
 			switch (*event_type)
@@ -145,6 +149,10 @@ void pop_xfer_queue_entry(int4* event_type, int4* param_val)
 			case ztimeout:
 				defer_ztimeout = TRUE;
 				TAREF1(save_xfer_root, ztimeout).event_state = queued;
+				continue;
+			case sigwinch:
+				defer_sigwinch = TRUE;
+				TAREF1(save_xfer_root, sigwinch).event_state = queued;
 				continue;
 			case jobinterrupt:
 				if (dollar_zininterrupt)
@@ -165,6 +173,11 @@ void pop_xfer_queue_entry(int4* event_type, int4* param_val)
 		{
 			SAVE_XFER_QUEUE_ENTRY(ztimeout, (TAREF1(save_xfer_root, ztimeout)).param_val);
 			DBGDFRDEVNT((stderr, "%d %s: requeued event %d\n", __LINE__, __FILE__, ztimeout));
+		}
+		if (defer_sigwinch)					/* should be behind any timeouts */
+		{
+			SAVE_XFER_QUEUE_ENTRY(sigwinch, (TAREF1(save_xfer_root, sigwinch)).param_val);
+			DBGDFRDEVNT((stderr, "%d %s: requeued event %d\n", __LINE__, __FILE__, sigwinch));
 		}
 	} else
 	{	/* things are straightforward */

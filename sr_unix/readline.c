@@ -101,6 +101,7 @@ GBLREF io_pair 			io_curr_device;
 GBLREF spdesc			stringpool;
 GBLREF volatile int4		outofband;
 GBLREF volatile boolean_t	dollar_zininterrupt;
+GBLREF	volatile boolean_t	sigwinch_inprog;
 GBLREF int4			exi_condition;
 GBLREF enum			gtmImageTypes image_type;
 
@@ -227,6 +228,7 @@ void readline_init(void* handle) {
 	vhistory_length			= dlsym(handle, "history_length");
 	vhistory_base			= dlsym(handle, "history_base");
 	vrl_catch_signals		= dlsym(handle, "rl_catch_signals");
+	vrl_catch_sigwinch		= dlsym(handle, "rl_catch_sigwinch");	/* optional - not in the mandatory list below */
 	vrl_startup_hook		= dlsym(handle, "rl_startup_hook");
 	vrl_already_prompted		= dlsym(handle, "rl_already_prompted");
 	vrl_redisplay_function		= dlsym(handle, "rl_redisplay_function");
@@ -274,6 +276,8 @@ void readline_init(void* handle) {
 		return;
 
 	*vrl_catch_signals = 0; /* disable readline signal handling for Direct Mode and MUPIP/LKE/DSE */
+	if (NULL != vrl_catch_sigwinch)
+		*vrl_catch_sigwinch = 0; /* let YottaDB's SIGWINCH handler (SIGWINCH deviceparameter) see resizes directly */
 
 	/* Allow conditional parsing of the ~/.inputrc file. */
 	*vrl_readline_name = "YottaDB";
@@ -388,10 +392,10 @@ void readline_read_mval(mval *v) {
 			assert(0 == readline_signal_count);
 			/* Handle signals */
 			if (outofband) {
-				if ((jobinterrupt == outofband)) {
+				if (OUTOFBAND_RESTARTABLE(outofband)) {
 					unsigned char *readline_text_before_interrupt;
 
-					/* SIGUSR1/mupip intrpt: save state if jobinterrupt *
+					/* SIGUSR1/mupip intrpt (or SIGWINCH): save state if jobinterrupt/sigwinch *
 					 * See my message to the maintainer on how to do this. *
 					 * https://lists.gnu.org/archive/html/bug-readline/2023-09/msg00002.html *
 					 */
@@ -467,7 +471,7 @@ void readline_read_mval(mval *v) {
 			RESETTERM_IF_NEEDED(io_ptr, EXPECT_SETTERM_DONE_TRUE);
 
 			/* Interrupt happened outside of direct mode; or we overflowed the stack - Call unwinder */
-			if (dollar_zininterrupt) {
+			if (dollar_zininterrupt || sigwinch_inprog) {
 				if (NULL != ydb_readline_state) {
 					/* Don't do a free on ydb_readline_state->buffer, as the memory location will be reused
 					 * by readline again.
