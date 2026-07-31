@@ -2,7 +2,7 @@
 #
 #################################################################
 #                                                               #
-# Copyright (c) 2020-2025 YottaDB LLC and/or its subsidiaries.  #
+# Copyright (c) 2020-2026 YottaDB LLC and/or its subsidiaries.  #
 # All rights reserved.                                          #
 #                                                               #
 #       This source code contains the intellectual property     #
@@ -199,6 +199,28 @@ if ("" != "$fixlist") then
 	end
 	@ exitstatus = 1
 endif
+
+# -----------------------------------------------------------
+# 7) Verify no UTF characters are present in source code
+# -----------------------------------------------------------
+
+foreach file ($filelist)
+	# If file is being deleted as part of this commit, skip ASCII check
+	if ( ! -e $file ) continue
+	# Do not assert ASCII in non-source files
+	file -b "$1" | grep -qE " source,| script,"
+	if ( $status == 0 ) continue
+	# Do not check certain files even if `file` discovers that they contain source
+	set extension = $file:e
+	if ( "$extension" == "md" || "$extension" == "rst" ) continue
+	grep -qP "[^\x00-\x7F]" $file
+	if ( $status != 0 ) continue
+
+	# Show file:line where the non-ASCII characters are within the file
+	echo "--> HOOK $0 : File contains non-ASCII characters:"
+	grep --color=auto --with-filename --line-number --perl-regexp "[^\x00-\x7F]" $file
+	@ exitstatus = 1
+end
 
 # -----------------------------------------------------------------
 # 3) Remove trailing white space
