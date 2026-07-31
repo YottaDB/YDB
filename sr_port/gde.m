@@ -3,7 +3,7 @@
 ; Copyright (c) 2001-2022 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
-; Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	;
+; Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	;
 ; All rights reserved.						;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -20,7 +20,7 @@ DBG:	;transfer point for DEBUG and "runtime" %gde
 	; Most of it is stored in the "gdeEntryState" local variable in subscripted nodes.
 	; Exceptions are local collation related act,ncol,nct values which have to be stored in in unsubscripted variables
 	;	to prevent COLLDATAEXISTS error as part of the $$set^%LCLCOL below.
-	n gdeEditFlag,gdeDev,gdeEntryState,gdeEntryStateAct,gdeEntryStateNcol,gdeEntryStateNct,gdeIOPat,gdeLoopI
+	n gdeEditFlag,gdeDev,gdeEntryState,gdeEntryStateAct,gdeEntryStateNcol,gdeEntryStateNct,gdeIOPat,gdeLoopI,gdeWinchFlag
 	s gdeEntryStateAct=$$get^%LCLCOL
 	s gdeEntryStateNcol=$$getncol^%LCLCOL
 	s gdeEntryStateNct=$$getnct^%LCLCOL
@@ -44,10 +44,21 @@ DBG:	;transfer point for DEBUG and "runtime" %gde
 	zsh "d":gdeDev
 	s gdeEditFlag=""
 	f gdeLoopI=1:1 q:'$d(gdeDev("D",gdeLoopI))  i gdeDev("D",gdeLoopI)?@gdeIOPat s gdeEditFlag="editing:" q
+	; If GDE is using a terminal on which the caller has not already turned on SIGWINCH, arrange for terminal
+	; window resizes to refresh the device WIDTH/LENGTH (see the SIGWINCH deviceparameter - YDB#1247), so the
+	; output of subsequent GDE commands wraps at the new terminal width rather than the width at GDE startup.
+	; No code needs to be XECUTEd on a resize (the width refresh is all GDE needs) hence the valueless SIGWINCH.
+	; GETOUT^GDEEXIT turns it back off at exit, driven by the gdeEntryState("winch") node set here.
+	; Note the search below for an already turned on SIGWINCH looks at every ZSH "D" line, not just the one
+	; for the current io device, since a long deviceparameter list can spill onto a continuation line and only
+	; $PRINCIPAL (which is the current io device whenever GDE is using a terminal) can have SIGWINCH.
+	s gdeWinchFlag=$select($l(gdeEditFlag):"sigwinch:",1:"")
+	i $l(gdeWinchFlag) f gdeLoopI=1:1 q:'$d(gdeDev("D",gdeLoopI))  i gdeDev("D",gdeLoopI)["SIGWINCH" s gdeWinchFlag="" q
+	s gdeEntryState("winch")=gdeWinchFlag
 	i debug s prompt="DEBUGDE>",uself="logfile"
 	e  d
 	. s prompt="GDE>",uself="logfile:(ctrap=$c(3,25,26):exception=""d CTRL^GDE"")"
-	. s useio="io:(ctrap=$c(3,25,26):"_gdeEditFlag_"exception=""d CTRL^GDE"")"
+	. s useio="io:(ctrap=$c(3,25,26):"_gdeEditFlag_gdeWinchFlag_"exception=""d CTRL^GDE"")"
 	u @useio
 	; comline is set to $ZCMDLINE on entry. If the entry zlevel is 0, set the resume point to exit
 	i $l(comline) s:'gdeEntryState("zlevel") resume(comlevel)=$zl_":EXIT^GDEEXIT" d comline,EXIT^GDEEXIT
