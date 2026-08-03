@@ -131,6 +131,8 @@ STATICFNDEF int4 mu_trunc_tail_scan(trunc_sweep_name **names_ptr, int4 *names_al
 {
 	block_id		child, free_blks, lmap_blk_num, lmap_num, max_busy_blk, num_local_maps, start_lmap;
 	block_id		target_blks, total_blks;
+	DEBUG_ONLY(block_id	hole_blks;)
+	DEBUG_ONLY(block_id	hole_free_blks;)
 	boolean_t		long_blk_id, read_failed, skip_block;
 	blk_hdr_ptr_t		blk_hdr_ptr;
 	cache_rec_ptr_t		cr, cr1;
@@ -160,6 +162,23 @@ STATICFNDEF int4 mu_trunc_tail_scan(trunc_sweep_name **names_ptr, int4 *names_al
 	 */
 	if (free_blks >= total_blks)
 		return 0;
+#	ifdef DEBUG
+	if (0 != ydb_skip_bml_num)
+	{	/* The ydb_test_4g_db_blks environment variable is in effect: local bitmaps 1 thru
+		 * (ydb_skip_bml_num/BLKS_PER_LMAP - 1) map blocks that are not allocated in the database file at all
+		 * (see "mucregini") yet are counted as free in "free_blocks" (the same accounting "mur_blocks_free"
+		 * does). Leaving them in would place "target_blks" (computed below) inside that hole, i.e. below every
+		 * block the database actually uses, which would make the scan treat the entire in-use portion of the
+		 * file as the tail (and the "*sweep_start_blk_ptr" restriction a no-op) even for a database that is
+		 * already maximally compacted. Discount them so that "target_blks" reflects the blocks that a
+		 * maximally compacted database would really occupy. Note the MIN: a truncate could have shrunk the
+		 * file into the hole, in which case only the hole local bitmaps still in the file are to be counted.
+		 */
+		hole_blks = MIN(ydb_skip_bml_num, total_blks);
+		hole_free_blks = (hole_blks - BLKS_PER_LMAP) / BLKS_PER_LMAP * (BLKS_PER_LMAP - 1);
+		free_blks = (free_blks > hole_free_blks) ? (free_blks - hole_free_blks) : 0;
+	}
+#	endif
 	/* "target_blks" is the number of blocks a maximally compacted database would occupy. "mu_truncate" frees space
 	 * at local bitmap granularity (it truncates everything above the highest local bitmap containing a BUSY block),
 	 * and the local bitmap containing "target_blks" retains BUSY blocks even under perfect compaction (the blocks
