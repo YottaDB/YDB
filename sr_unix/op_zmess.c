@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2026 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -22,7 +25,7 @@
 #include "send_msg.h"
 #include "wbox_test_init.h"
 
-#define ZMESS_DISALLWD_LIST_SIZE		10
+#define ZMESS_DISALLWD_LIST_SIZE		11
 #define FAO_BUFFER_SPACE			2048
 #define MAX_ERR_MSG_LEN				256
 
@@ -34,6 +37,7 @@ error_def(ERR_REPEATERROR);
 error_def(ERR_TPRETRY);
 error_def(ERR_JOBINTRRQST);
 error_def(ERR_JOBINTRRETHROW);
+error_def(ERR_SIGWINCHRQST);
 error_def(ERR_UNSOLCNTERR);
 error_def(ERR_CTRLY);
 error_def(ERR_CTRLC);
@@ -56,6 +60,7 @@ STATICFNDEF boolean_t is_disallowed(unsigned int errnum)
 		zmess_disallowed_list[i++] = ERR_TPRETRY;
 		zmess_disallowed_list[i++] = ERR_JOBINTRRQST;
 		zmess_disallowed_list[i++] = ERR_JOBINTRRETHROW;
+		zmess_disallowed_list[i++] = ERR_SIGWINCHRQST;
 		zmess_disallowed_list[i++] = ERR_UNSOLCNTERR;
 		zmess_disallowed_list[i++] = ERR_CTRLY;
 		zmess_disallowed_list[i++] = ERR_CTRLC;

@@ -91,7 +91,7 @@ LITDEF	err_msg ydberrors[] = {
 
 
 LITDEF	int ydberrors_undocarr[] = {
-	0	/* Placeholder to prevent empty array */
+	67,	/* SIGWINCHRQST */
 };
 
 
@@ -101,6 +101,6 @@ GBLDEF	err_ctl ydberrors_ctl = {
 	&ydberrors[0],
 	69,
 	&ydberrors_undocarr[0],
-	0
+	1
 };
 

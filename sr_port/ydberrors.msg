@@ -20,6 +20,7 @@
 	.TITLE		YDBERRORS Error Messages for YottaDB
 !
 !  List of known undocumented messages follows (along with a comment) (do not change "known undocumented" phrase)
+!	ERR_SIGWINCHRQST		internal error (not displayed to users - drives the SIGWINCH deviceparameter handler)
 ! ----- Buffer to introduce new undocumented error messages without affecting UNUSEDMSGnnn match with corresponding line numbers.
 !
 ! NEW MESSAGES NEED TO BE ADDED AT THE END TO KEEP THE NUMBERING FOR THE CURRENT MESSAGES
