@@ -3,7 +3,7 @@
  * Copyright (c) 2010-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -459,7 +459,11 @@ STATICFNDEF uint4	gvtr_process_range(gv_namehead *gvt, gvtr_subs_t *subsdsc, int
 	DEBUG_ONLY(len = (uint4)(end - start));
 	assert(IS_IN_STRINGPOOL(start, len));
 	DBG_MARK_STRINGPOOL_UNUSABLE;
-	if ('"' == *start)
+	/* An empty specification is the open side of a range (e.g. "2:" or ":2"), or a null subscript. It has no
+	 * surrounding double-quotes to remove, and "start" points one byte past the end of the specification, so
+	 * the check below has to establish a non-zero length before it looks at that byte.
+	 */
+	if ((start < end) && ('"' == *start))
 	{	/* Remove surrounding double-quotes as well as transform TWO CONSECUTIVE intermediate double-quotes into ONE.
 		 * We need to construct the transformed string. Since we cannot modify the input string and yet want to avoid
 		 * malloc/frees within this routine, we use the buddy_list allocate/free functions for this purpose.
@@ -617,12 +621,16 @@ STATICFNDEF uint4 gvtr_process_gvsubs(char *start, char *end, gvtr_subs_t *subsd
 {
 	uint4		status;
 
-	if ('?' == start[0])
+	/* As in gvtr_process_range(), an empty specification is the open side of a range or a null subscript. It is
+	 * neither a pattern nor a "*", and start[0] is one byte past the end of the specification, so both checks
+	 * below establish a non-zero length first.
+	 */
+	if ((start < end) && ('?' == start[0]))
 	{
 		assert(!colon_imbalance);
 		if ((status = gvtr_process_pattern(start, UINTCAST(end - start), subsdsc, gvt->gvt_trigger)))
 			return status;
-	} else if ('*' == start[0])
+	} else if ((start < end) && ('*' == start[0]))
 	{	/* subscript is a "*" */
 		assert(end == start + 1);
 		assert(&subsdsc->gvtr_subs_type == &subsdsc->gvtr_subs_star.gvtr_subs_type);
