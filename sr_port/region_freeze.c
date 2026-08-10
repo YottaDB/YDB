@@ -190,11 +190,25 @@ freeze_status	region_freeze_main(gd_region *region, boolean_t freeze, boolean_t 
 			do
 			{
 				/* Note: We don't hold crit here so one might wonder if "csd->kill_in_prog" can become
-				 * non-zero after we find it zero below and do a "break". That is not possible because
-				 * we have already inhibited the start of new kills (INCR_INHIBIT_KILLS call above).
+				 * non-zero after we find it to be zero below. One might think that is not possible
+				 * because we have already inhibited the start of new kills (INCR_INHIBIT_KILLS call
+				 * above). But that is not true. A KILL that is in its final retry (i.e. "t_tries" is
+				 * CDB_STAGNATE) goes ahead with the kill in spite of "cnl->inhibit_kills" being
+				 * non-zero (see "cdb_sc_inhibitkills" usages in "t_end.c" and "tp_tend.c") and so
+				 * can do an INCR_KIP after we find "csd->kill_in_prog" to be zero. Since that INCR_KIP
+				 * happens while holding crit, we grab crit and recheck "csd->kill_in_prog" below and
+				 * go back to waiting in case it is non-zero. Note that "mupip_backup.c" does a similar
+				 * recheck of "cs_data->kill_in_prog" after grabbing crit for the same reason.
 				 */
 				if (!csd->kill_in_prog)
-					break;
+				{
+					if (was_crit)
+						break;
+					grab_crit(region, WS_80);
+					if (!csd->kill_in_prog)
+						break;	/* Found it to be zero while holding crit. Safe to proceed. */
+					rel_crit(region);	/* A final-retry KILL slipped in. Wait some more. */
+				}
 				wcs_sleep(sleep_counter);
 			} while (MAX_CRIT_TRY > sleep_counter++);
 			if (debug_mupip)
@@ -203,13 +217,13 @@ freeze_status	region_freeze_main(gd_region *region, boolean_t freeze, boolean_t 
 				util_out_print("!/MUPIP INFO: !AD : Done with kill-in-prog wait on region", TRUE,
 					       CTIME_BEFORE_NL, time_str);
 			}
-			if (!was_crit)
-			{
-				grab_crit(region, WS_80);
-				/* Assert that "csd->kill_in_prog" did not change since we found it to be 0 in the
-				 * do/while loop above outside of crit (see INCR_INHIBIT_KILLS comment above for why).
+			if (!csa->now_crit)
+			{	/* We get here without crit only if the above do/while loop timed out (in which case
+				 * the "MAX_CRIT_TRY <= sleep_counter" check below returns REG_HAS_KIP). Grab crit like
+				 * the rest of the code below expects.
 				 */
-				assert(!csd->kill_in_prog || (MAX_CRIT_TRY <= sleep_counter));
+				assert(!was_crit && (MAX_CRIT_TRY <= sleep_counter));
+				grab_crit(region, WS_80);
 			}
 		}
 		if (pfrms)

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -983,7 +983,7 @@ repl_inst_bkup_done1:
 	for (crit_counter = 1; online && kip_count; )
 	{	/* The purpose of this loop is to wait for kip to clear on all regions, waiting for a maximum of about a minute.
 		 * This is complicated by the fact that in spite of setting INCR_INHIBIT_KILLS above, a process in crit for a
-		 * "fourth" retry may ignote that, and set the kip flag while we are waiting
+		 * "fourth" retry may ignore that, and set the kip flag while we are waiting
 		 */
 		DEBUG_ONLY(nocritrptr = NULL;)
 		for (rptr = (backup_reg_list *)(grlist); NULL != rptr; rptr = rptr->fPtr)
