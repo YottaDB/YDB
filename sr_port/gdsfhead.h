@@ -1837,10 +1837,34 @@ MBSTART {												\
  * the macro to return FALSE (e.g. t_end.c, tp_tend.c). Such callers will just go one more iteration than necessary in this
  * rare incorrect TRUE return case but there is no correctness issue. Some callers check if it returns TRUE and if so restart
  * the transaction. In that case, we would restart unnecessarily in rare cases so it is still okay. But there are a few callers
- * of this macro in asserts which will fail in the incorrect return value case. Such asserts have to be modified to invoke this
- * macro twice to ensure the edge case is handled (in the edge case, the second invocation will return a correct value of FALSE).
+ * of this macro in asserts which will fail in the incorrect return value case. Such asserts have to be modified to use the
+ * DBG_SET_FROZEN_HARD_CONFIRMED macro below (a second invocation of this macro alone is not enough, see that macro for why).
  */
 #define FROZEN_HARD(CSA)			((CSA)->hdr->freeze && !(CSA)->nl->freeze_online)
+/* Sets BOOL to a value of FROZEN_HARD(CSA) that is free of the spurious TRUE described in the comment above. Note that a
+ * plain second invocation of FROZEN_HARD is NOT enough on a weak memory model (e.g. aarch64). MUPIP FREEZE -OFF stores 0
+ * into CSA->hdr->freeze and then into CSA->nl->freeze_online with a SHM_WRITE_MEMORY_BARRIER in between (see
+ * "sr_port/region_freeze.c") so the two stores are observed in that order by other processors. But without a read memory
+ * barrier on this side, the processor is free to reorder our two loads, so a re-read of CSA->hdr->freeze can still return
+ * the stale non-zero value even after we have seen CSA->nl->freeze_online as 0. In that case the spurious TRUE is stable
+ * across any number of re-invocations. The SHM_READ_MEMORY_BARRIER below is what makes the recheck reliable, and it pairs
+ * with the SHM_WRITE_MEMORY_BARRIER in "region_freeze.c". Note that the callers (asserts) hold crit, so they never race
+ * with the MUPIP FREEZE -ON code path (which holds crit while setting these two fields), only with MUPIP FREEZE -OFF
+ * (which holds only the freeze latch). That is a precondition of the above reasoning, not an incidental property, so the
+ * macro asserts it below. Note also that DO_CHILLED_AUTORELEASE needs no barrier since it stores a NON-ZERO
+ * value into CSA->nl->freeze_online and so can never produce a spurious TRUE whatever order its stores are observed in.
+ * Note: users of this macro need to include "memcoherency.h".
+ */
+#define	DBG_SET_FROZEN_HARD_CONFIRMED(BOOL, CSA)				\
+MBSTART {									\
+	assert((CSA)->now_crit);	/* see comment above for why */		\
+	BOOL = FROZEN_HARD(CSA);						\
+	if (BOOL)								\
+	{									\
+		SHM_READ_MEMORY_BARRIER;					\
+		BOOL = FROZEN_HARD(CSA);					\
+	}									\
+} MBEND
 #define FROZEN_CHILLED(CSA)			((CSA)->hdr->freeze && (CSA)->nl->freeze_online)
 #define FREEZE_LATCH_HELD(CSA)			(process_id == (CSA)->nl->freeze_latch.u.parts.latch_pid)
 #define CHILLED_AUTORELEASE_MASK		0x02

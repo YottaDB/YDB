@@ -243,6 +243,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 	boolean_t		ready2signal_gvundef_lcl;
 	enum cdb_sc		prev_status;
 	cw_set_element		*last_p1_cs = NULL, *last_p2_cs = NULL;
+	boolean_t		frozen_hard;	/* used only by asserts, see DBG_SET_FROZEN_HARD_CONFIRMED */
 #	endif
 	int			n_blks_validated;
 	boolean_t		before_image_needed, lcl_ss_in_prog = FALSE, reorg_ss_in_prog = FALSE;
@@ -744,9 +745,10 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 	}
 	CHECK_TN(csa, csd, cti->curr_tn);	/* macro might issue rts_error TNTOOLARGE */
 	/* We should never proceed to update a frozen database. Only exception is DSE.
-	 * See comment in FROZEN_HARD macro definition for why it needs to be invoked twice in the assert.
+	 * See comment in FROZEN_HARD macro definition for why the assert cannot use it directly.
 	 */
-	assert(!FROZEN_HARD(csa) || !FROZEN_HARD(csa) || IS_DSE_IMAGE);
+	DEBUG_ONLY(DBG_SET_FROZEN_HARD_CONFIRMED(frozen_hard, csa);)
+	assert(!frozen_hard || IS_DSE_IMAGE);
 	/* We never expect to come here with file_corrupt set to TRUE (in case of an online rollback) because
 	 * grab_crit done above will make sure of that. The only exception is RECOVER/ROLLBACK itself coming
 	 * here in the forward phase
@@ -1898,11 +1900,11 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 	SET_CUR_CMT_STEP_IF(TRUE, TREF(cur_cmt_step), CMT12);
 	assert(cdb_sc_normal == status);
 	/* Should never increment curr_tn on a frozen database except if DSE.
-         * See comment in FROZEN_HARD macro definition for why it needs to be invoked twice in the assert.
-         */
-        assert(!(FROZEN_HARD(csa) || (replication && IS_REPL_INST_FROZEN_JPL(jnlpool, TREF(defer_instance_freeze))))
-                || !(FROZEN_HARD(csa) || (replication && IS_REPL_INST_FROZEN_JPL(jnlpool, TREF(defer_instance_freeze))))
-                || IS_DSE_IMAGE);
+	 * See comment in FROZEN_HARD macro definition for why the assert cannot use it directly.
+	 */
+	DEBUG_ONLY(DBG_SET_FROZEN_HARD_CONFIRMED(frozen_hard, csa);)
+	assert(!(frozen_hard || (replication && IS_REPL_INST_FROZEN_JPL(jnlpool, TREF(defer_instance_freeze))))
+		|| IS_DSE_IMAGE);
 	/* To avoid confusing concurrent processes, MM requires a barrier before incrementing db TN. For BG, cr->in_tend
 	 * serves this purpose so no barrier is needed. See comment in tp_tend.
 	 */

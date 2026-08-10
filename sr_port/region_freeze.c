@@ -44,6 +44,7 @@
 #include "anticipatory_freeze.h"
 #include "gtmio.h"
 #include "region_freeze_multiproc.h"
+#include "memcoherency.h"
 
 #ifdef DEBUG_FREEZE
 GBLREF	boolean_t	caller_id_flag;
@@ -343,6 +344,15 @@ freeze_status	region_freeze_main(gd_region *region, boolean_t freeze, boolean_t 
 		was_online = cnl->freeze_online;
 		csd->image_count = 0;		/* the order of this line and the next is important */
 		csd->freeze = 0;
+		/* The order of the "csd->freeze" store above and the "cnl->freeze_online" store below matters to concurrent
+		 * users of the FROZEN_HARD macro, which computes "csd->freeze && !cnl->freeze_online". Note that we hold only
+		 * the freeze latch here (not crit) so those users can and do run concurrently with us. If they were to observe
+		 * the "cnl->freeze_online" store below without also observing the "csd->freeze" store above, FROZEN_HARD would
+		 * incorrectly report a hard freeze on a database that is being unfrozen. On a weak memory model (e.g. aarch64)
+		 * the two plain stores can be observed by another processor in either order, so a memory barrier is needed to
+		 * guarantee that ordering. It pairs with the SHM_READ_MEMORY_BARRIER in the DBG_SET_FROZEN_HARD_CONFIRMED macro.
+		 */
+		SHM_WRITE_MEMORY_BARRIER;
 		cnl->freeze_online = FALSE;
 		csa->freeze = FALSE;
 		rel_latch(&cnl->freeze_latch);

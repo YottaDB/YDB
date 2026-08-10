@@ -285,6 +285,7 @@ boolean_t	tp_tend()
 	cw_set_element		*last_p1_cse = NULL, *last_p2_cse = NULL, *sgm_last_p1_cse = NULL, *sgm_last_p2_cse = NULL,
 				*dbg_cse = NULL;
 	sgmnt_addrs		*last_6a_csa = NULL, *last_jnld_csa;
+	boolean_t		frozen_hard;	/* used only by asserts, see DBG_SET_FROZEN_HARD_CONFIRMED */
 #	endif
 	int4			tprestart_syslog_delta;
 	block_id		pvt_total_blks;
@@ -1949,10 +1950,11 @@ boolean_t	tp_tend()
 			SET_CUR_CMT_STEP_IF(TRUE, csa->nl->cur_cmt_step, CMT12);
 			SET_CUR_CMT_STEP_IF((si == last_upd_tp_si_by_ftok), TREF(cur_cmt_step), CMT12);
 			/* Should never increment curr_tn on a frozen database.
-			 * See comment in FROZEN_HARD macro definition for why it needs to be invoked twice in the assert.
+			 * See comment in FROZEN_HARD macro definition for why the assert cannot use it directly.
 			 */
-			assert(!(FROZEN_HARD(csa) || (replication && IS_REPL_INST_FROZEN_JPL(update_jnlpool, TREF(defer_instance_freeze))))
-				|| !(FROZEN_HARD(csa) || (replication && IS_REPL_INST_FROZEN_JPL(update_jnlpool, TREF(defer_instance_freeze)))));
+			DEBUG_ONLY(DBG_SET_FROZEN_HARD_CONFIRMED(frozen_hard, csa);)
+			assert(!(frozen_hard
+				|| (replication && IS_REPL_INST_FROZEN_JPL(update_jnlpool, TREF(defer_instance_freeze)))));
 			/* For MM, barrier ensures blocks updates complete before incrementing db TN. Otherwise concurrent
 			 * processes could note a premature db TN value in gvcst_search and later fail to detect a block
 			 * modification.
