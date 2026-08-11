@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -51,6 +51,12 @@ void gv_init_reg(gd_region *reg)
 #	endif
 	if (!reg->open)
 		gvcst_init(reg);
-	assert(reg->open);
+	/* A statsDB region can legitimately come back unopened, for instance when its base db carries
+	 * NOSTATS and so has no statistics database to open. Callers that ask for one directly expect
+	 * that and cope: "op_fnzpeek" tests "reg->open" right after calling here and issues BADZPEEKARG
+	 * when it is not set. Asserting the region is open makes that test dead code in a debug build,
+	 * and turns a condition the caller handles into a fatal one.
+	 */
+	assert(reg->open || IS_STATSDB_REG(reg));
 	return;
 }
