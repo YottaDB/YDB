@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -498,7 +498,15 @@ void gvcst_init(gd_region *reg)
 					default:
 						assertpro(FALSE);
 				}
-				assert(TREF(gvcst_statsDB_open_ch_active));	/* below error goes to syslog and not to user */
+				/* When this statsDB open was driven by a base db open, "gvcst_statsDB_open_ch" is
+				 * established and catches the error below, which is how it reaches the syslog rather
+				 * than the user. That is not the only way to get here though: a statsDB region can
+				 * also be opened directly, as $ZPEEK on the file header of one does through
+				 * "op_fnzpeek" -> "gv_init_reg" -> here, and then there is no handler in between and
+				 * the error is delivered to the user. That is the right outcome - the user asked to
+				 * open a statsDB that cannot exist, and should be told so - and it is what a pro
+				 * build has always done, so do not assert on the handler being established.
+				 */
 				baseDBreg->reservedDBFlags |= RDBF_NOSTATS;	/* Disable STATS in base DB */
 				baseDBcsa->reservedDBFlags |= RDBF_NOSTATS;
 				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_DBFILERR, 2, DB_LEN_STR(baseDBreg), ERR_STATSDBFNERR,
