@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -145,6 +145,7 @@ YDBENVINDX_TABLE_ENTRY (YDBENVINDX_TLS_PASSWD_PREFIX,          "$ydb_tls_passwd_
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_TMP,                        "$ydb_tmp",                        "$gtm_tmp")
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_TMP_ONLY,                   "$ydb_tmp",                        "")
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_TPNOTACIDTIME,              "$ydb_tpnotacidtime",              "$gtm_tpnotacidtime")
+YDBENVINDX_TABLE_ENTRY (YDBENVINDX_TPNOTACIDTRIES,             "$ydb_tpnotacidtries",             "$gtm_tpnotacidtries")
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_TPRESTART_LOG_DELTA,        "$ydb_tprestart_log_delta",        "$gtm_tprestart_log_delta")
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_TPRESTART_LOG_FIRST,        "$ydb_tprestart_log_first",        "$gtm_tprestart_log_first")
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_TRACE_GBL_NAME,             "$ydb_trace_gbl_name",             "$gtm_trace_gbl_name")
