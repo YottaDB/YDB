@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -73,8 +73,8 @@ gd_addr *create_dummy_gbldir(void)
 #	endif
 
 	/* The below code might need corresponding changes if ever the gld format changes hence the GDE_LABEL_LITERAL assert */
-	GTM64_ONLY(assert(!MEMCMP_LIT(GDE_LABEL_LITERAL, "GTCGBDUNX115"));)
-	NON_GTM64_ONLY(assert(!MEMCMP_LIT(GDE_LABEL_LITERAL, "GTCGBDUNX015"));)
+	GTM64_ONLY(assert(!MEMCMP_LIT(GDE_LABEL_LITERAL, "GTCGBDUNX116"));)
+	NON_GTM64_ONLY(assert(!MEMCMP_LIT(GDE_LABEL_LITERAL, "GTCGBDUNX016"));)
 	addr = (gd_addr *)malloc(DUMMY_GBLDIR_SIZE + SIZEOF(gd_runtime_t));
 	assert(NULL != addr);
 	memset(addr, 0, DUMMY_GBLDIR_SIZE + SIZEOF(gd_runtime_t));
@@ -115,6 +115,15 @@ gd_addr *create_dummy_gbldir(void)
 	/* MAPS sections (Fixed and Variable) initialization complete */
 	basedb_seg->acc_meth = dba_bg;
 	statsdb_seg->acc_meth = dba_mm;
+	/* YDB#1143 : "search_idx_size" and "search_idx_slots" need no assignment. The "memset" above left
+	 * them zero, and zero is what GDE itself stores when the user names no size - it means "let MUPIP
+	 * CREATE choose" rather than "off" - so both segments here already carry what a real global
+	 * directory would. Zero is right for the statsDB segment for a second reason as well: MUPIP CREATE
+	 * gives a statsDB no search index whatever its segment asks for.
+	 * Stated rather than left silent because the GDE_LABEL_LITERAL assert above exists to send whoever
+	 * changes the global directory format to this function, and these two fields are what moved that
+	 * label to 016.
+	 */
 	addr->end = (UINTPTR_T)(basedb_seg + DUMMY_GBLDIR_N_REGS);
 	GLD_REG_INIT(basedb_reg, "DEFAULT", addr);	/* basedb region */
 	GLD_REG_INIT(statsdb_reg, "default", addr);	/* statsdb region */

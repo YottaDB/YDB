@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -31,6 +31,7 @@
 #include "gvcst_expand_key.h"
 #include "send_msg.h"
 #include "cert_blk.h"
+#include "gvcst_blk_sidx.h"
 
 /*
  * -------------------------------------------------------------------
@@ -137,6 +138,7 @@ error_def(ERR_TEXT);
 #endif
 
 #define	INVOKE_GVCST_SEARCH_FAIL_IF_NEEDED(pStat)	if (CDB_STAGNATE <= t_tries) gvcst_search_fail(pStat);
+
 #define	OUT_LINE	(1024 + 1)
 
 static	void	gvcst_search_fail(srch_blk_status *pStat)
@@ -656,6 +658,14 @@ enum cdb_sc	gvcst_search_blk(gv_key *pKey, srch_blk_status *pStat)
 	boolean_t		long_blk_id;
 	unsigned short		nRecLen;
 	boolean_t		level0;
+	sgmnt_addrs		*csa;			/* a local copy of "cs_addrs" : it is read several times
+							 * below and a global costs a load every time
+							 */
+	DEBUG_ONLY(boolean_t	used_index = FALSE;)	/* this search resumed from a search index sample */
+	DEBUG_ONLY(blk_sidx_samp used_samp;)		/* and the sample it resumed from, for the shadow check */
+	DEBUG_ONLY(trans_num	used_tn = 0;)		/* the block image this search STARTED from; see the */
+	DEBUG_ONLY(uint4	used_bsiz = 0;)		/*  shadow check at the end of this function */
+	DEBUG_ONLY(int4		used_cycle = 0;)	/* BG: the buffer generation it started from */
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -671,6 +681,17 @@ enum cdb_sc	gvcst_search_blk(gv_key *pKey, srch_blk_status *pStat)
 	if (level0 && TREF(expand_prev_key))
 		return gvcst_search_blk_expand_prevkey(pKey, pStat);
 	pTop = pBlkBase + MIN(((blk_hdr_ptr_t)pBlkBase)->bsiz, cs_data->blk_size);
+	/* Capture the image this search STARTS from, not the one it resumes from, for the DEBUG shadow
+	 * check at the end of this function. That check re-walks the block from its first record and
+	 * compares the answer with the one the index-assisted walk reached, and both walks use the pTop
+	 * computed on the line above. A block that changed between here and the resume would leave the
+	 * two comparing different images, and the check would report a disagreement the search index had
+	 * no part in. Every disagreement examined while testing under a concurrent MUPIP REORG, which
+	 * rewrites blocks underneath the processes searching them, proved to be exactly that.
+	 */
+	DEBUG_ONLY(used_tn = ((blk_hdr_ptr_t)pBlkBase)->tn;)
+	DEBUG_ONLY(used_bsiz = (uint4)((blk_hdr_ptr_t)pBlkBase)->bsiz;)
+	DEBUG_ONLY(used_cycle = (NULL != pStat->cr) ? pStat->cr->cycle : 0;)
 	pCurrTarg = pKey->base;
 	pTargKeyBase = pCurrTarg;
 	pRecBase = pBlkBase;
@@ -678,6 +699,144 @@ enum cdb_sc	gvcst_search_blk(gv_key *pKey, srch_blk_status *pStat)
 	nMatchCnt = 0;
 	nTargLen = (int)pKey->end;
 	nTargLen++;	/* for the terminating NUL on the key */
+	csa = cs_addrs;
+	/* Start the walk from the sampled record nearest the target rather than from the first record
+	 * (YDB#1143). The search index lives in a shared memory slot picked by block number, and is built
+	 * on demand. It is never trusted: its stamp must say it describes this exact block image, and
+	 * "gvcst_blk_sidx_locate" validates every byte it reads out of the slot and re-reads that stamp
+	 * once everything the resume needs is out of a builder's reach. Anything inconsistent leaves the
+	 * loop state below untouched, so the search skips the index and walks the block from its first
+	 * record.
+	 *
+	 * Nothing here re-examines the block itself, and a resumed walk needs no more cover than an ordinary
+	 * one : a concurrent rewrite tears a walk that started at the first record exactly as much as one
+	 * that started at a sample, and the validation the database already does catches both alike.
+	 */
+	if (!level0 && SEARCHIDX_AVAILABLE(csa) && (CYCLE_PVT_COPY != pStat->cycle))
+	{
+		blk_sidx_samp	samp;		/* three ints in a pro build; see gvcst_blk_sidx.h */
+		sm_uc_ptr_t	sidx;
+		block_id	lcl_blk;
+		blk_sidx_hdr	*lcl_hdr;
+		boolean_t	lcl_build;
+
+		/* The block number picks the slot, the same way for both access methods, and identifies the
+		 * image in it together with the tn. Which buffer holds the image, or whether any does, is of
+		 * no interest: that is what lets the index survive a global buffer being recycled, and what
+		 * sizes the array to the working set rather than to the buffer pool. See gvcst_blk_sidx.h.
+		 *
+		 * The CYCLE_PVT_COPY test above is what keeps TP private block images out, for both access
+		 * methods. In TP a search can run against a cw-set element's own copy of a block rather than
+		 * against the committed image: t_qread hands back that buffer with a cycle of CYCLE_PVT_COPY
+		 * and a NULL cache record, for BG and MM alike. Its content is the transaction's own while
+		 * its tn still names the committed image, so it must neither read a slot, where a stamp
+		 * could match an image it does not hold, nor populate one, where it would describe
+		 * uncommitted content to every other process. Testing the cycle says that directly, and for
+		 * both access methods; comparing the buffer against the cache record's would say it only for
+		 * BG, MM having no cache record to compare against.
+		 *
+		 * The cycle can be trusted here because AT AN INDEX LEVEL a history keeps buffaddr, cr and
+		 * cycle mutually consistent : all three are set together, by "t_qread", or by copying all
+		 * three as "gvcst_lftsib" and "gvcst_rtsib" do. Two places do re-point a buffaddr on its own
+		 * at a private buffer, "gvcst_search" with its "sync the buffers in pro, just in case" store
+		 * and "t_recompute_upd_array" just before it searches - but both act on the LEVEL 0 history
+		 * alone, and the !level0 test above has already excluded that. The assert below states what
+		 * is left, rather than paying to re-establish it out of shared memory on every search.
+		 */
+		assert((NULL == pStat->cr) || (pBlkBase == GDS_ANY_REL2ABS(csa, pStat->cr->buffaddr)));
+		lcl_blk = pStat->blk_num;
+		sidx = GDS_ANY_SEARCHIDX(csa, lcl_blk);
+		/* This BLK_SIDX_DESCRIBES does double duty and must stay AHEAD of the locate below. Besides
+		 * choosing between building and locating, its read of the stamp is the acquire half of the
+		 * builder's publish protocol : "gvcst_blk_sidx_locate" barriers immediately on entry and
+		 * relies on this read having already happened, rather than repeating the test on the hottest
+		 * path. See the CALLER CONTRACT above that function.
+		 */
+		if (!BLK_SIDX_DESCRIBES(sidx, pBlkBase, lcl_blk))
+		{	/* Nothing here describes this image. Build one for the searches that follow: that walks
+			 * the block once, which is precisely what this search is about to do anyway, and let
+			 * this search proceed the ordinary way.
+			 *
+			 * Only one process may write a slot, and gvcst_blk_sidx_build enforces that with an
+			 * atomic claim rather than leaving it to whoever gets there first. That both collapses
+			 * the redundant builds every reader of a heavily searched block would otherwise do the
+			 * moment it is updated, and - the part that is not an optimization - keeps two builders
+			 * from interleaving their writes into one slot. See gvcst_blk_sidx.h for why a slot
+			 * written by two builders at once corrupts a search rather than merely wasting work.
+			 */
+			lcl_hdr = (blk_sidx_hdr *)sidx;
+			lcl_build = TRUE;
+			if (BLK_SIDX_OWNED_BY_OTHER(sidx, lcl_blk))
+			{	/* Somebody else's block already has this slot. The slots are a shared cache, so
+				 * two blocks can collide on one.
+				 *
+				 * Both halves of BLK_SIDX_OWNED_BY_OTHER earn their place, and it is not
+				 * BLK_SIDX_DESCRIBES narrowed for convenience - see the three of them together in
+				 * gvcst_blk_sidx.h. The blk half distinguishes another block's entry from this
+				 * block's own gone stale, which must be rebuilt at once and never damped. The tn
+				 * half says the slot belongs to anybody at all : BLK_SIDX_TN_NONE is 0, so an
+				 * untouched slot in a zeroed segment reads blk 0, which differs from every index
+				 * block number, and without it the FIRST build of every block in the database would
+				 * be turned away BLK_SIDX_SKIP_LIMIT times before being allowed.
+				 *
+				 * Taking the slot every time would have the two blocks evict each other on every
+				 * search, both rebuilding constantly - measured at 2.3x SLOWER than no index at
+				 * all. So turn this block away and count it. Refusing forever would let a cold
+				 * block keep a slot that a busier one needs, hence the count: after BLK_SIDX_SKIP_LIMIT
+				 * attempts the newcomer takes the slot. A block that keeps being searched resets
+				 * the count each time it is used, so a busy incumbent is not displaced by an
+				 * occasional rival.
+				 *
+				 * Plain stores, like the build claim: this decides only WHEN a rebuild happens,
+				 * never whether an index is trusted, so a lost race costs nothing but timing.
+				 */
+				if (BLK_SIDX_SKIP_LIMIT > lcl_hdr->skips)
+				{
+					lcl_hdr->skips++;
+					lcl_build = FALSE;
+				} else
+					lcl_hdr->skips = 0;
+			}
+			if (lcl_build)
+				gvcst_blk_sidx_build(sidx, csa->search_idx_size, pBlkBase, cs_data->blk_size,
+							lcl_blk, pStat->cr);
+		} else if (gvcst_blk_sidx_locate(sidx, csa->search_idx_size, pBlkBase, lcl_blk,
+							pTargKeyBase, nTargLen, &samp))
+		{	/* This block just used the slot, so it is the busy incumbent. "skips" counts how many
+			 * times some OTHER block has been turned away from this slot - see the damper further
+			 * up, which is what does the counting - and clearing it here means those attempts only
+			 * add up while the incumbent goes unused. Without that, a cold rival searching this
+			 * slot once in a while would accumulate BLK_SIDX_SKIP_LIMIT attempts over any stretch
+			 * of time and evict a slot that is being used constantly.
+			 *
+			 * Read before it is written, rather than written unconditionally, and that is not
+			 * pedantry : "skips" is almost always already 0 on this path, and it lives in SHARED
+			 * memory. An unconditional store would take the slot's cache line exclusive on every
+			 * search, so the line would ping-pong between every process reading a hot block. The
+			 * read leaves it shared, and the store happens only when there is something to clear.
+			 */
+			if (0 != ((blk_sidx_hdr *)sidx)->skips)
+				((blk_sidx_hdr *)sidx)->skips = 0;
+			/* Resume as though the walk had reached the sampled record: it becomes the record last
+			 * examined, and the match count is what the target shares with its key. The loop then
+			 * carries on at the record AFTER it. Seeding the count is not optional - entering the
+			 * loop at a record with a match count of zero silently skips every following record
+			 * whose compression count exceeds zero.
+			 */
+			nTmp = samp.match;	/* "gvcst_blk_sidx_locate" worked this out while it had the key */
+			GET_USHORT(nRecLen, &((rec_hdr_ptr_t)(pBlkBase + samp.rec_off))->rsiz);
+			pRecBase = pBlkBase + samp.rec_off;
+			pPrevRec = pRecBase;
+			nMatchCnt = nTmp;
+			pCurrTarg = pTargKeyBase + nTmp;
+			nTargLen -= nTmp;
+			/* Record that this search resumed from a sample, and which sample it was. The block image
+			 * it started from was captured at the top of this function, the shadow check needing both.
+			 */
+			DEBUG_ONLY(used_index = TRUE;)
+			DEBUG_ONLY(used_samp = samp;)
+		}
+	}
 	for (;;)
 	{
 		pRec = pRecBase + nRecLen;
@@ -773,6 +932,11 @@ enum cdb_sc	gvcst_search_blk(gv_key *pKey, srch_blk_status *pStat)
 	pStat->curr_rec.offset = (unsigned short)(pRecBase - pBlkBase);
 	assert(pStat->curr_rec.offset >= SIZEOF(blk_hdr));
 	pStat->curr_rec.match = (unsigned short)nTargLen;
+#	ifdef DEBUG
+	if (used_index)
+		gvcst_blk_sidx_shadow_check(pKey, pStat, pBlkBase, pTop, long_blk_id, level0, used_tn, used_bsiz,
+						used_cycle, &used_samp);
+#	endif
 	return cdb_sc_normal;
 }
 

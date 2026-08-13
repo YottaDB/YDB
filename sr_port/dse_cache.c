@@ -3,7 +3,7 @@
  * Copyright (c) 2003-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019,2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -231,6 +231,21 @@ void dse_cache(void)
 					util_out_print("Region !AD :  encrypted_globuff  = 0x!XJ : Numelems = 0x!XL : Elemsize = "
 						"0x!XL", TRUE, REG_LEN_STR(reg), section_offset, csd->n_bts, csd->blk_size);
 				}
+				if (0 != csa->nl->search_idx_off)
+				{	/* YDB#1143 : the search index array sits between the global buffers and
+					 * the file header, so it is reported where it lies. "search_idx_off" is
+					 * relative to "mlkctl" rather than to "node_local", so it is turned back into
+					 * an address and re-expressed with DB_ABS2REL, which is the anchor every other
+					 * offset in this listing uses. It is read from "node_local" rather than from
+					 * this process's "search_idx_base" because that is NULL in a process which has
+					 * the feature off, MUPIP REORG for one, while the array is still there in the
+					 * shared memory segment for every other process to use.
+					 */
+					util_out_print("Region !AD :  search_index       = 0x!XJ : Numelems = 0x!XL : "
+						"Elemsize = 0x!XL", TRUE, REG_LEN_STR(reg),
+						DB_ABS2REL(GDS_ANY_REL2ABS(csa, csa->nl->search_idx_off)),
+						(uint4)csd->search_idx_slots, (uint4)csd->search_idx_size);
+				}
 				util_out_print("Region !AD :  db_file_header     = 0x!XJ", TRUE,
 					REG_LEN_STR(reg), DB_ABS2REL(csd));
 				util_out_print("Region !AD :  bt_que_header      = 0x!XJ : Numelems = 0x!XL : Elemsize = 0x!XL",
@@ -245,7 +260,24 @@ void dse_cache(void)
 			{
 				util_out_print("Region !AD :  shared_memory_size = 0x!XJ",
 					TRUE, REG_LEN_STR(reg), csa->nl->sec_size VMS_ONLY(* OS_PAGELET_SIZE));
-				util_out_print("Region !AD :  db_file_header     = 0x!XJ", TRUE, REG_LEN_STR(reg), csd);
+				/* The file header of an MM database lives INSIDE the shared memory segment, like
+				 * every other section listed here, so it is reported as an offset from the start
+				 * of that segment. It used to be reported as an address, which made it and the
+				 * search index line below the only two entries in this listing not comparable
+				 * with the rest.
+				 */
+				util_out_print("Region !AD :  db_file_header     = 0x!XJ", TRUE, REG_LEN_STR(reg),
+					DB_ABS2REL(csd));
+				if (0 != csa->nl->search_idx_off)
+				{	/* YDB#1143 : MM lays the array out at the END of the shared memory segment,
+					 * after the file header, because an MM segment has no global buffer array
+					 * for it to follow. Reported last here for the same reason.
+					 */
+					util_out_print("Region !AD :  search_index       = 0x!XJ : Numelems = 0x!XL : "
+						"Elemsize = 0x!XL", TRUE, REG_LEN_STR(reg),
+						DB_ABS2REL(GDS_ANY_REL2ABS(csa, csa->nl->search_idx_off)),
+						(uint4)csd->search_idx_slots, (uint4)csd->search_idx_size);
+				}
 			}
 		}
 		DSE_REL_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit, nocrit_present, csa, reg);

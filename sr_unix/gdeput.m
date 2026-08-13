@@ -156,6 +156,8 @@ gblstatmap:
 	. s segs(ysr,"FILE_NAME")=segs(ysr,"FILE_NAME")_".gst"
 	. s segs(ysr,"LOCK_SPACE")=defseg("LOCK_SPACE")
 	. s segs(ysr,"RESERVED_BYTES")=0
+	. ; YDB#1143 : nothing to set. 0 in a global directory means "let MUPIP CREATE choose", so a
+	. ; statsDB cannot be opted out from here; mu_cre_file forces search indexes off for one.
 	. i $i(nams),$i(regs),$i(segs)			; increment the counts
 	; Determine gd_region.statsDB_reg_index for runtime
 	k sreg
@@ -279,6 +281,10 @@ csegment:
 	e  s rec=rec_$$num2bin(4,0)
 	s rec=rec_$$num2bin(4,segs(s,"ASYNCIO"))
 	set rec=rec_filler16byte			; runtime filler (read_only +  filler)
+	; YDB#1143 : after the runtime filler, not inside it - these are persisted characteristics.
+	; -1 for the size means "let MUPIP CREATE choose", which it does from the block size.
+	set rec=rec_$$num2bin(4,segs(s,"SEARCH_INDEX_SIZE"))
+	set rec=rec_$$num2bin(4,segs(s,"SEARCH_INDEX_SLOTS"))
 	q
 cgblname:(s)
 	n len,coll,ver

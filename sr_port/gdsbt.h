@@ -622,6 +622,78 @@ typedef struct max_procs
 										 * for 8-byte "time" + space for null byte terminator
 										 */
 
+/* YDB#1143 : bounds on a search index, for MUPIP SET and GDE to validate against. The size itself
+ * is a file header field - see "search_idx_size" in sgmnt_data - because it decides how big the
+ * shared segment is, so every process attached has to agree on it.
+ */
+#define	BLK_SIDX_MIN_SIZE	128	/* below this too few samples fit for a binary search to pay */
+#define	BLK_SIDX_MAX_SIZE	8192
+/* The largest search index a database with this block size may have : 8 below the block size.
+ *
+ * An index holds a SAMPLE of the keys of ONE block, so an index as large as that block has stopped
+ * sampling - it is a second copy of the block, and searching it saves nothing over searching the
+ * block itself.
+ *
+ * The exact value follows from alignment. A size must be a multiple of 8 : slots sit end to end, each
+ * occupying exactly that many bytes, and each one starts with a "blk_sidx_hdr" whose leading fields
+ * are 8 bytes wide. MUPIP SET rounds a size up to a multiple of 8 and "db_csh_ref" asserts it. Block
+ * sizes are multiples of 512, hence already of 8, so the largest multiple of 8 below one is
+ * BLKSIZE - 8.
+ */
+#define	BLK_SIDX_BLK_MAX_SIZE(BLKSIZE)	((int4)(BLKSIZE) - 8)
+#define	BLK_SIDX_MAX_SLOTS	(1024 * 1024)	/* slot count ceiling; 1M slots is far beyond any need */
+/* What a size on its own gets. Swept against elapsed time on the threeen1gE benchmark at 256, 512,
+ * 1024, 2048, 4096 and 16384 slots, on two architectures and at two global buffer counts. Everything
+ * from 256 up delivered the same gain, so the count is chosen for what it costs rather than for what
+ * it buys.
+ *
+ * The ceiling on that choice is not the working set, it is the GLOBAL BUFFER POOL. At 4096 slots the
+ * array is 4MB, which is exactly the pool of a database nobody tuned - 1024 buffers of 4096 bytes -
+ * and at that ratio one of the two architectures lost the entire gain, twice in a row, where the same
+ * count against a 40MB pool was its best result. An index array that rivals the buffer pool it is
+ * meant to speed up stops paying : it competes with those buffers for the machine instead.
+ *
+ * 1024 slots is 1MB, a quarter of even a default 4MB pool, and measured indistinguishable from 4096
+ * everywhere it was safe. A database whose index blocks number in the tens of thousands can raise the
+ * count, watching "slots x size" against the global buffer pool as it does : a quarter of the pool
+ * measured safe and an equal share measured ruinous, and that is the whole of what is known.
+ */
+#define	BLK_SIDX_DEFAULT_SLOTS	1024
+/* Bring a size within the bounds above, as an expression. MUPIP CREATE is the one direct caller : GDE
+ * accepts anything from 0 to BLK_SIDX_MAX_SIZE for the segment characteristic, enforcing neither the
+ * minimum nor the block size ceiling - it cannot, since a segment's BLOCK_SIZE is set independently -
+ * so "mu_cre_file" has to bring the value into range rather than fail the creation over it.
+ * BLK_SIDX_DEFAULT_SIZE below is built on this, and that is what every other caller reaches.
+ *
+ * MUPIP SET deliberately does NOT clamp. An administrator who types a size out of range gets
+ * MUPIPSET2BIG naming the ceiling rather than a database silently holding some other number, so
+ * "mupip_set_file" tests BLK_SIDX_MAX_SIZE and BLK_SIDX_BLK_MAX_SIZE itself and only raises a
+ * too-small size to BLK_SIDX_MIN_SIZE. The bounds themselves are still defined here and nowhere else.
+ *
+ * A size of 0 means the feature is off and must not be passed through here : the callers test first.
+ */
+#define	BLK_SIDX_CLAMP_SIZE(SIZE, BLKSIZE)								\
+	((BLK_SIDX_MIN_SIZE > (SIZE)) ? BLK_SIDX_MIN_SIZE						\
+		: (BLK_SIDX_MAX_SIZE < (SIZE)) ? BLK_SIDX_MAX_SIZE					\
+		: (BLK_SIDX_BLK_MAX_SIZE(BLKSIZE) < (SIZE)) ? BLK_SIDX_BLK_MAX_SIZE(BLKSIZE)		\
+		: (int4)(SIZE))
+/* What a database gets when nobody names a size : a quarter of the block, rounded to 8 for the
+ * alignment the index array wants, then clamped. A search index samples the keys of ONE block, so
+ * what it can usefully hold scales with that block; a quarter reproduces the measured-good 1024 bytes
+ * at the 4096 byte default block size and gives a database with larger blocks an index in proportion.
+ */
+#define	BLK_SIDX_DEFAULT_SIZE(BLKSIZE)	BLK_SIDX_CLAMP_SIZE((int4)ROUND_UP2((BLKSIZE) / 4, 8), BLKSIZE)
+/* Give a file header what MUPIP CREATE would give a new database. Used by the auto upgrade of a
+ * database created before these fields existed, and at each point where a V6 header becomes a V7
+ * header - the fields do not exist until it does, and what lies at their offsets until then is
+ * whatever that database left in the V6 filler they were taken from.
+ */
+#define	SET_SEARCHIDX_DEFAULTS(CSD)								\
+MBSTART {											\
+	(CSD)->search_idx_size = BLK_SIDX_DEFAULT_SIZE((CSD)->blk_size);			\
+	(CSD)->search_idx_slots = BLK_SIDX_DEFAULT_SLOTS;					\
+} MBEND
+
 /* Mapped space local to each node on the cluster */
 typedef struct node_local_struct
 {
@@ -825,6 +897,18 @@ typedef struct node_local_struct
 	/* The following 2 fields are used by logic that determines whether the ydb mutex needs to be switched to pthread mutex */
 	uint8			prev_n_crit_que_slps, prev_n_crit_yields, prev_n_crit_failed;
 	uint8			switch_streak;
+	/* YDB#1143 : offset to the search index slot array; 0 if this database's shared memory segment
+	 * has none. Deliberately LAST. node_local holds counters and latches that many processes write
+	 * concurrently, and a write by any process invalidates the whole cache line in every other
+	 * processor, so which fields share a line decides how often those processors have to fetch it
+	 * back. Inserting a field mid-structure shifts every field after it by 8 bytes and redraws those
+	 * line boundaries, moving fields into and out of company with each other; appending leaves every
+	 * existing field exactly where it was.
+	 *
+	 * Nothing here is read on the search path: each process copies this offset once, at attach time,
+	 * into its own sgmnt_addrs - see the end of "db_init" in gvcst_init_sysops.c.
+	 */
+	sm_off_t		search_idx_off;
 } node_local;
 
 #define UPDATE_MAX_PROCS_STRING(NODE, MPS)	SNPRINTF(NODE->max_procs, MAX_PROCS_ARRAY_SIZE, "%d,%lu", MPS.cnt, MPS.time)

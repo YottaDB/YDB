@@ -335,6 +335,31 @@ void mupip_reorg(void)
 	}
 
 	mu_reorg_more_tries = mu_reorg_process = TRUE;
+	/* YDB#1143 : turn search indexes off, for this process only, on every region this REORG will touch.
+	 * REORG rewrites the blocks it walks, so an index it builds is invalidated by its own next update to
+	 * that block before the sampled keys can be reused. The build is paid for and never collected: on a
+	 * "pro" build the reorg pass measured 0.2034s with the feature off against 0.2518s with it on, a 24 PCT
+	 * cost, and with this exclusion the same measurement comes back level at 0.2037s against 0.2043s. Use a
+	 * "pro" build if this is ever re-measured - an ASAN build dilutes the ratio about fourfold, and reported
+	 * 6.6 PCT for the same workload. The slot it takes is also one that a concurrently running
+	 * application process may be using, so the churn is inflicted on that process and not only on REORG.
+	 *
+	 * A NULL "search_idx_base" is exactly the state a database with the feature turned off leaves behind,
+	 * and "SEARCHIDX_AVAILABLE" in "gvcst_blk_search" tests precisely that, so this adds nothing to the
+	 * search path rather than putting a REORG test on it.
+	 *
+	 * This has to happen here and not where "search_idx_base" is set in "gvcst_init_sysops", because the
+	 * "gv_select" above has already attached these regions by now and "mu_reorg_process" could not have
+	 * been set any earlier - see the comment on exactly that in the loop below. The test added there
+	 * covers any region that attaches from this point onwards, and the two together make the state hold
+	 * whatever the attach order.
+	 */
+	for (gl_ptr = gl_head.next; gl_ptr; gl_ptr = gl_ptr->next)
+	{
+		csa = REG2CSA(gl_ptr->reg);
+		if (NULL != csa)
+			csa->search_idx_base = NULL;
+	}
 	assert(NULL == gv_currkey_next_reorg);
 	GVKEYSIZE_INIT_IF_NEEDED;	/* sets "gv_keysize", "gv_currkey" and "gv_altkey" (if not already done) */
 	GVKEY_INIT(gv_currkey_next_reorg, gv_keysize);

@@ -768,6 +768,11 @@ int4	mu_upgrade_bmm(gd_region *reg, size_t blocks_needed)
 	csd->desired_db_format = GDSV7m;			/* Transitional phase 2 - all new blocks are V7m */
 	csd->minor_dbver = GDSMVCURR;				/* Raise the DB minor version */
 	MEMCPY_LIT(csd->label, GDS_LABEL);			/* Change to V7 label, but not fully upgraded */
+	/* YDB#1143 : the header has just become a V7 header, so the search index characteristics exist now
+	 * where a moment ago they were bytes inside a V6 filler. This is the ordinary MUPIP UPGRADE path,
+	 * the one a database with data in it takes.
+	 */
+	SET_SEARCHIDX_DEFAULTS(csd);
 	csd->desired_db_format_tn = csd->trans_hist.curr_tn;	/* Phase 1 complete, set the format change TN */
 	csd->trans_hist.early_tn = csd->trans_hist.curr_tn + 1;
 	INCREMENT_CURR_TN(csd);
@@ -1804,6 +1809,7 @@ enum cdb_sc upgrade_dir_tree(block_id curr_blk, block_id offset, gd_region *reg,
 			csd->fully_upgraded = TRUE;		/* Since it is V7 */
 			MEMCPY_LIT(csd->label, GDS_LABEL);	/* Change to V7 label, fully upgraded */
 			csd->minor_dbver = GDSMVCURR;		/* Raise the DB minor version to current */
+			SET_SEARCHIDX_DEFAULTS(csd);		/* YDB#1143 : a V7 header has these, a V6 one did not */
 			/* At this point the file header claims all V6ish settings such that there is a V6p database
 			 * certified for upgrade to V7m in spite of there being no actual datablocks. Emit a warning
 			 * about the wastage of space for no good reason

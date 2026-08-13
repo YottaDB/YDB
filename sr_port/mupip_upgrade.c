@@ -3,7 +3,7 @@
  * Copyright (c) 2005-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2025-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -452,6 +452,15 @@ void mupip_upgrade(void)
 			csd->fully_upgraded = TRUE;			/* Since it is V7 */
 			MEMCPY_LIT(csd->label, GDS_LABEL);		/* Change to V7 label, fully upgraded */
 			csd->minor_dbver = GDSMVCURR;			/* Raise the DB minor version */
+			/* YDB#1143 : the header has just become a V7 header, so the search index characteristics
+			 * exist now where a moment ago they were bytes inside a V6 filler. Give them what MUPIP
+			 * CREATE would give a new database. This is where a V6 database gets them rather than in
+			 * "v6_db_auto_upgrade", because that runs against a shared memory segment sized for a V6
+			 * database, with no room for an index array; here the database is standalone and will be
+			 * reopened, and "db_init" will size its segment from the values set below. This is the
+			 * path for a database with nothing in it; "mu_upgrade_bmm" has the other two.
+			 */
+			SET_SEARCHIDX_DEFAULTS(csd);
 #ifdef _AIX
 			if (dba_mm == reg->dyn.addr->acc_meth)
 				wcs_mm_recover(reg, csd->start_vbn - old_vbn);

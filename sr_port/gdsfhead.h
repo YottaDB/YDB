@@ -782,6 +782,19 @@ MBSTART {											\
 #define GDS_ANY_REL2ABS(CSA, x) (((sm_uc_ptr_t)((CSA)->mlkctl) + (sm_off_t)(x)))
 #define GDS_ANY_ABS2REL(CSA, x) (sm_off_t)(((sm_uc_ptr_t)(x) - (sm_uc_ptr_t)(CSA)->mlkctl))
 #define GDS_ANY_ENCRYPTGLOBUF(w,x) ((sm_uc_ptr_t)(w) + (sm_off_t)(x->nl->encrypt_glo_buff_off))
+/* YDB#1143 : the search index slot for block BLK. A BOUNDED CACHE keyed by block number, the same
+ * for BG and MM, so two blocks can land on one slot; the block number in the stamp detects that and
+ * the loser searches the ordinary way. Both operands are process-private (see sgmnt_addrs), so this
+ * reads no shared memory at all.
+ *
+ * SEARCHIDX_AVAILABLE below has to be true before this is used, and testing the result afterwards is
+ * not an alternative : with the feature off "search_idx_base" is NULL and "search_idx_slotmask" is -1
+ * (slot count 0, less 1), so this would compute a plausible looking address out of neither and hand
+ * back something that is not NULL.
+ */
+#define	GDS_ANY_SEARCHIDX(CSA, BLK)	((CSA)->search_idx_base						\
+					+ ((sm_off_t)((BLK) & (CSA)->search_idx_slotmask) * (CSA)->search_idx_size))
+#define	SEARCHIDX_AVAILABLE(CSA)	(NULL != (CSA)->search_idx_base)
 #define	ASSERT_IS_WITHIN_SHM_BOUNDS(ptr, csa)											\
 	assert((NULL == (ptr)) || (((ptr) >= csa->db_addrs[0]) && ((0 == csa->db_addrs[1]) || ((ptr) < csa->db_addrs[1]))))
 
@@ -2224,12 +2237,32 @@ typedef struct sgmnt_data_struct
 	int4		filler_5k;
 	/************* SECSHR_DB_CLNUP RELATED FIELDS (now moved to node_local) ***********/
 	int4		secshr_ops_index_filler;
-	int4		secshr_ops_array_filler[248];
+	int4		secshr_ops_array_filler[246];
 	/************** YottaDB specific fields *********************
 	 * We keep these fields at the end of what used to be a filler section (SECSHR_DB_CLNUP fields).
 	 * The hope is that even if GT.M starts using this filler section, they will use the first half so
 	 * YottaDB new fields will be added from the end of this section.
 	 */
+	/* YDB#1143 : bytes in one search index slot, 0 to disable. It lives in the FILE HEADER rather than
+	 * in an environment variable because it decides how big the shared memory segment is - through
+	 * CACHE_CONTROL_SIZE under BG, and under MM through a term "dbsecspc" adds past the file header -
+	 * and under BG it therefore also decides where the file header sits inside that segment. Two
+	 * processes disagreeing about it would not merely disagree about a tunable : under BG they would
+	 * read each other's shared memory at the wrong offsets.
+	 */
+	int4		search_idx_size;
+	/* YDB#1143 : how many search index slots this database gets, for either access method. The slots
+	 * are a bounded cache keyed by block number, so somebody has to say how many. Two quantities
+	 * settle that, and they are not the same one : the index-block working set says whether more
+	 * slots would help, and the global buffer pool says whether they cost too much, "slots x size"
+	 * being what has to stay well under it - BLK_SIDX_DEFAULT_SLOTS in gdsbt.h carries the
+	 * measurements. Neither is the size of the database, which the count does not track at all.
+	 * Rounded up to a power of two by MUPIP SET, which is what lets a reader turn a block number into
+	 * a slot number with a single bitwise AND against "slots - 1" instead of dividing by a value not
+	 * known until run time - see "search_idx_slotmask" in sgmnt_addrs and GDS_ANY_SEARCHIDX above.
+	 * 0 with the feature off.
+	 */
+	int4		search_idx_slots;
 	mutex_type_t	mutex_type;		/* mutex algorithm type (ydb, pthread or adaptive); Default is adaptive */
 	max_procs_t	max_procs;		/* count of the largest number of processes accessing the database
 						 * along with a timestamp. Needs 8-byte alignment.
@@ -2646,6 +2679,16 @@ typedef struct	gd_segment_struct
 	boolean_t		asyncio;	/* copied over to csd->asyncio at db creation time */
 	boolean_t		read_only;
 	char			filler[12];	/* filler to store runtime structures without changing gdeget/gdeput.m */
+	/* YDB#1143 : search index characteristics, so MUPIP CREATE can produce a database with them
+	 * already sized and no standalone MUPIP SET is needed to enable them. Appended AFTER the
+	 * filler, deliberately: the filler is for RUNTIME structures, which by definition gdeget and
+	 * gdeput never touch, and these are persisted characteristics that both must read and write.
+	 * That makes this a global directory format change - see GDE_LABEL_LITERAL in gbldirnam.h.
+	 * Appending rather than inserting leaves every existing field at the offset it already had,
+	 * including "am_offset", which GDE hardcodes.
+	 */
+	uint4			search_idx_size;	/* bytes per search index; 0 disables the feature */
+	uint4			search_idx_slots;	/* how many search indexes to keep */
 } gd_segment;
 
 typedef union
@@ -2884,6 +2927,17 @@ typedef struct	sgmnt_addrs_struct
 	int				mlkhash_shmid;	/* Shared memory id of attached lock hash array, or INVALID_SHMID
 							 * if internal. Set by GRAB_LOCK_CRIT_AND_SYNC().
 							 */
+	/* YDB#1143 : where this process finds the search index for a global buffer. Held HERE, in private
+	 * memory, rather than read from node_local on every search. The offset never changes after the
+	 * segment is created, so a shared read would buy nothing and cost something: the line it sits on
+	 * is shared with fields other processes write, and every writer would invalidate it for every
+	 * reader. Copying it once at attach puts it in this process's own cache, where nothing contends
+	 * for it, and makes its placement in node_local irrelevant.
+	 * "search_idx_base" is NULL when the shared memory segment carries no search index.
+	 */
+	sm_uc_ptr_t				search_idx_base;
+	int4					search_idx_size;/* private copy of the file header field; bytes per slot */
+	int4					search_idx_slotmask;/* slots-1, to pick a slot from a block number */
 } sgmnt_addrs;
 
 typedef struct gd_binding_struct
@@ -3940,7 +3994,8 @@ MBSTART {												\
  */
 #define CACHE_CONTROL_SIZE(X)												\
 	(ROUND_UP((ROUND_UP((X->bt_buckets + X->n_bts) * SIZEOF(cache_rec) + SIZEOF(cache_que_heads), OS_PAGE_SIZE)	\
-		+ ((gtm_uint64_t)X->n_bts * X->blk_size * (USES_ENCRYPTION(X->is_encrypted) ? 2 : 1))), OS_PAGE_SIZE))
+		+ ((gtm_uint64_t)X->n_bts * X->blk_size * (USES_ENCRYPTION(X->is_encrypted) ? 2 : 1))			\
+		+ ((gtm_uint64_t)X->search_idx_slots * X->search_idx_size)), OS_PAGE_SIZE))
 
 OS_PAGE_SIZE_DECLARE
 

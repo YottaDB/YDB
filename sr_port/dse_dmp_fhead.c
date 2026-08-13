@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -262,6 +262,7 @@ void dse_dmp_fhead (void)
 			util_out_print("  StatsDB Allocation            !19UL", TRUE, csd->statsdb_allocation);
 		util_out_print("  Data Reserved Bytes           !19UL", FALSE, csd->reserved_bytes);
 		util_out_print("  Index Reserved Bytes          !12UL", TRUE, csd->i_reserved_bytes);
+		/* YottaDB-only fields go after the ones inherited from GT.M */
 		util_out_print("  Max conc proc time         !22UL", FALSE, csd->max_procs.time);
 		util_out_print("  Max Concurrent processes         !9UL", TRUE, csd->max_procs.cnt);
 		util_out_print("  Reorg Sleep Nanoseconds         !17UL", FALSE, csd->reorg_sleep_nsec);
@@ -286,6 +287,8 @@ void dse_dmp_fhead (void)
 						: ((mutex_type_pthread == csd->mutex_type)
 							? "           PTHREAD"
 							: "               YDB"))));
+		util_out_print("  Search Index Size            !20UL", FALSE, csd->search_idx_size);
+		util_out_print("  Search Index Slots        !12UL", TRUE, csd->search_idx_slots);
 	}
 	if (CLI_PRESENT == cli_present("ALL"))
 	{	/* Only dump these if -/ALL as if part of above display */

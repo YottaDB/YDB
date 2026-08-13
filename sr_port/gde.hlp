@@ -282,11 +282,14 @@
    MSLT                   -MUTEX_SLOTS
    Null Subs              -[NO]NULL_SUBSCRIPTS
    Qdb Rndwn              -[NO]QDBRUNDOWN
-   Std Null Coll          -[NO]STDNULLCOLL
    Rec Size               -RECORD_SIZE
-   RES                    -RESERVED_BYTES
    Region                 -REGION
-   Stats                  -[NO[STATS
+   RES                    -RESERVED_BYTES
+   Search Index           -[NO]SEARCH_INDEX
+   SIDX                   -SEARCH_INDEX_SIZE
+   SISL                   -SEARCH_INDEX_SLOTS
+   Stats                  -[NO]STATS
+   Std Null Coll          -[NO]STDNULLCOLL
    Typ                    -DYNAMIC_SEGMENT
 
 2 Customizing_a_Global_Directory

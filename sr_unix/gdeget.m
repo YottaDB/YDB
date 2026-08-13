@@ -3,7 +3,7 @@
 ; Copyright (c) 2006-2020 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
-; Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	;
+; Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	;
 ; All rights reserved.						;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -39,6 +39,12 @@ RESTART ; used to re-run this routine from the start if wrong endianness is dete
 	s reghasv600fields=FALSE
 	i gldfmt>7 s reghasv600fields=TRUE
 	s v6312=0
+	; YDB#1143 : format 016 appends the search index characteristics to each segment, so a 015
+	; global directory is read with the smaller gd_segment and rewritten in the new format.
+	s v71=0
+	if (label="GTCGBDUNX015")!(label="GTCGBDUNX115") set label=hdrlab,v71=1,update=1  ;autoconvert
+	if (v71=1) new SIZEOF do v71init
+	s v71=0
 	if (label="GTCGBDUNX014")!(label="GTCGBDUNX114") set label=hdrlab,v6312=1,update=1  ;autoconvert
 	if (v6312=1) new SIZEOF do v6312init
 	s v6312=0
@@ -450,6 +456,15 @@ segment:
 	. s segs(s,"ASYNCIO")=defseg("ASYNCIO")
 	. if (seghasencrflag=TRUE)&(gtm64=TRUE) s rel=rel+4 ; Padding bytes for 64 bit platforms
 	if (gldfmt>8) set rel=rel+16     	 ; reserved for runtime fillers
+	; YDB#1143 : read the search index characteristics, which follow the runtime filler. A global
+	; directory written before format 016 has no such bytes, so fall back to the defaults - which
+	; are what MUPIP CREATE would have chosen anyway, so an older .gld keeps behaving as it did.
+	i (gldfmt>15) d
+	. s segs(s,"SEARCH_INDEX_SIZE")=$$bin2num($ze(rec,rel,rel+3)),rel=rel+4
+	. s segs(s,"SEARCH_INDEX_SLOTS")=$$bin2num($ze(rec,rel,rel+3)),rel=rel+4
+	e  d
+	. s segs(s,"SEARCH_INDEX_SIZE")=defseg("SEARCH_INDEX_SIZE")
+	. s segs(s,"SEARCH_INDEX_SLOTS")=defseg("SEARCH_INDEX_SLOTS")
 	s abs=abs+SIZEOF("gd_segment")-v30
 	q
 gblname:(i)
@@ -867,6 +882,42 @@ v6310init:
 	s MAXNAMLN=SIZEOF("mident")-1,MAXREGLN=32,MAXSEGLN=32   ; maximum name length allowed is 31 characters
         s PARNAMLN=31,PARREGLN=31,PARSEGLN=31
         q
+v71init:
+	; Format 015. Every structure is exactly as it is today EXCEPT gd_segment, which is 8 bytes
+	; shorter because format 016 appends the two search index characteristics to it. Stated in full
+	; rather than delegating to v6312init, which describes formats 013 and 014 and has a different
+	; gd_region and gd_contents - borrowing it here would misread every segment.
+	if (gtm64=FALSE) do
+	. s SIZEOF("am_offset")=336
+	. s SIZEOF("file_spec")=256
+	. s SIZEOF("gd_contents")=80
+	. s SIZEOF("gd_header")=16
+	. s SIZEOF("gd_map")=16
+	. s SIZEOF("gd_region")=416
+	. s SIZEOF("gd_region_padding")=0
+	. s SIZEOF("gd_segment")=372
+	else  do
+	. s SIZEOF("am_offset")=340
+	. s SIZEOF("file_spec")=256
+	. s SIZEOF("gd_contents")=120
+	. s SIZEOF("gd_header")=16
+	. s SIZEOF("gd_map")=24
+	. s SIZEOF("gd_region")=432
+	. s SIZEOF("gd_region_padding")=8
+	. s SIZEOF("gd_segment")=384
+	s SIZEOF("blk_hdr")=16
+	s SIZEOF("dsk_blk")=512
+	s SIZEOF("gd_gblname")=40
+	s SIZEOF("gd_inst_info")=SIZEOF("file_spec")
+	s SIZEOF("max_str")=1048576
+	s SIZEOF("mident")=32
+	s SIZEOF("reg_jnl_deq")=4
+	s SIZEOF("rec_hdr")=4
+	d gvstats^GDEINIT
+	s MAXNAMLN=SIZEOF("mident")-1,MAXREGLN=32,MAXSEGLN=32
+	s PARNAMLN=31,PARREGLN=31,PARSEGLN=31
+	q
+
 v6312init:
 	if ((olabel="GTCGBDUNX014")!(olabel="GTCGBDUNX013")) do
         . s SIZEOF("am_offset")=336

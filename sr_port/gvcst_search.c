@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -260,7 +260,7 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 							}
 						}
 						cse->done = TRUE;
-						leaf_blk_hist->cr = 0;
+						leaf_blk_hist->cr = NULL;
 						leaf_blk_hist->cycle = CYCLE_PVT_COPY;
 						leaf_blk_hist->buffaddr = cse->new_buff;
 					} else

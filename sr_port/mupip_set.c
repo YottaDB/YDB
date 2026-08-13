@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -120,6 +120,9 @@ void mupip_set(void)
 		|| (CLI_PRESENT == cli_present("RECORD_SIZE"))
 		|| (CLI_PRESENT == cli_present("REORG_SLEEP_NSEC"))
 		|| (CLI_PRESENT == cli_present("RESERVED_BYTES"))
+		|| (CLI_PRESENT == cli_present("SEARCH_INDEX"))
+		|| (CLI_NEGATED == cli_present("SEARCH_INDEX"))
+		|| (CLI_PRESENT == cli_present("SEARCH_INDEX_SIZE"))
 		|| (CLI_PRESENT == cli_present("SLEEP_SPIN_COUNT"))
 		|| (CLI_PRESENT == cli_present("SPIN_SLEEP_MASK"))
 		|| (CLI_NEGATED == cli_present("STATS"))

@@ -221,6 +221,13 @@ void db_auto_upgrade(gd_region *reg)
 								 */
 				csd->mutex_type = IS_STATSDB_REG(reg) ? mutex_type_ydb : mutex_type_adaptive_ydb;
 			case GDSMR208_V71003:
+				/* YottaDB r2.08 added the "search_idx_size" and "search_idx_slots" fields (YDB#1143)
+				 * and this is where they would normally be defaulted. They are NOT, deliberately: they
+				 * decide how big the shared memory segment is, and this function is not reached until
+				 * that segment has been created and laid out. "db_init" settles them earlier instead,
+				 * on the copy of the file header it reads from disk and then sizes the segment from -
+				 * see the YDB#1143 comment there.
+				 */
 				break;		/* so a new "case" needs to be added BEFORE the assert. */
 			case GDSMR208:
 				/* When adding a new minor version, the following template should be maintained
@@ -740,6 +747,16 @@ void v6_db_auto_upgrade(gd_region *reg)
 								 * but just to be safe handle it below as it is easy to do so.
 								 */
 				csd->mutex_type = IS_STATSDB_REG(reg) ? mutex_type_ydb : mutex_type_adaptive_ydb;
+				/* YDB#1143 : the "search_idx_size" and "search_idx_slots" fields are not touched here
+				 * either. "db_init" has already forced them to zero for a V6 header, before it sized
+				 * the shared memory segment, and zero is what a V6 database has to carry : that segment
+				 * has no room for an index array.
+				 * What gives such a database the defaults is MUPIP UPGRADE - "mu_upgrade_bmm" - at the
+				 * moment it turns the header into a V7 header, and NOT "db_init" when the database is
+				 * next opened. "db_init" cannot: that same conversion raises "minor_dbver" to
+				 * GDSMVCURR, so the "GDSMVCURR > minor_dbver" test it defaults on stops firing for this
+				 * database from then on.
+				 */
 				break;
 			case GDSMV63015:
 				assert(FALSE);	/* if this should come to pass, add appropriate code above the assert */

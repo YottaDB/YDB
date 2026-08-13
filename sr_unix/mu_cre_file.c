@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -176,6 +176,7 @@ unsigned char mu_cre_file(boolean_t caller_is_mupip_create)
 	ssize_t		status;
 	uint4		raw_dev_size;		/* size of a raw device, in bytes */
 	int4		save_errno;
+	int4		search_idx_size, search_idx_slots, lcl_slots;	/* YDB#1143 : from the .gld, or derived */
 	gtm_uint64_t	avail_blocks, blocks_for_create, blocks_for_extension, delta_blocks;
 	file_control	fc;
 	mstr		file;
@@ -375,6 +376,76 @@ unsigned char mu_cre_file(boolean_t caller_is_mupip_create)
 			/* Note: Above macro internally invokes CLEANUP(EXIT_ERR) */
 		REVERT;
 		return EXIT_ERR;
+	}
+	/* YDB#1143 : search indexes are ON for a new database. Measured on both benchmarks YottaDB
+	 * ships: threeen1gE, which spends much of its time searching index blocks, runs 11 to 19 PCT
+	 * faster at low concurrency and 3 to 4 PCT faster at 16 jobs, while interestposting, whose
+	 * sequential walk is carried by the clue and which cannot use a search index at all, measures
+	 * neutral to 1 PCT faster. Turning it off costs nothing measurable, so a database that does not
+	 * benefit is not paying for the option.
+	 *
+	 * The size is a quarter of the block size rather than a constant. A search index samples the
+	 * keys of ONE block, so what it can usefully hold scales with that block; 1024 bytes was the
+	 * measured-good value at the 4096 byte default and this reproduces it, while a database with
+	 * larger blocks gets an index in proportion. Clamped the same way MUPIP SET clamps it, so a
+	 * created database can never hold a value MUPIP SET would refuse.
+	 *
+	 * The slot count does not scale with anything: it is sized to the index blocks a workload
+	 * actually searches, which is unrelated to block size or to the buffer pool. See
+	 * BLK_SIDX_DEFAULT_SLOTS for the measurement behind 1024, and gvcst_blk_sidx.h for why the
+	 * memory is bytes x slots - 1MB here - rather than anything that grows with the database.
+	 */
+	search_idx_size = ((gd_segment *)gv_cur_region->dyn.addr)->search_idx_size;
+	search_idx_slots = ((gd_segment *)gv_cur_region->dyn.addr)->search_idx_slots;
+	if (IS_STATSDB_REG(gv_cur_region))
+	{	/* A statsDB gets no search index. Not because its tree is small - it carries one record per
+		 * live process, so thousands of processes make it large - but because next to nothing searches
+		 * that tree. A process locates its own record once and then holds on to it, doing no further
+		 * searches; only an external ^%YGBLSTAT walks the tree, and that is uncommon. An index here
+		 * would be shared memory spent for nothing, once per basedb region.
+		 */
+		search_idx_size = 0;
+	} else if (0 == search_idx_slots)
+	{	/* ZERO SLOTS is how a global directory says OFF. The size cannot carry that meaning, because
+		 * 0 there already means "choose for me" and GDE cannot express a second sentinel - it would
+		 * need a negative number, which its own SHOW -COMMAND output could not parse back. A count of
+		 * zero says it without a sentinel, since no slots IS no search index, and it leaves the size
+		 * free to keep its "choose for me" reading. Whatever size the global directory carries is
+		 * ignored here, exactly as MUPIP SET zeroes the slot count when the size goes to 0.
+		 */
+		search_idx_size = 0;
+	} else if (0 == search_idx_size)
+	{	/* The global directory has no opinion on the size, which is what GDE stores unless the user
+		 * named one, and what every global directory written before format 016 reads as. A search
+		 * index samples the keys of ONE block, so what it can usefully hold scales with that block: a
+		 * quarter of it reproduces the measured-good 1024 bytes at the 4096 byte default and gives
+		 * a database with larger blocks an index in proportion.
+		 */
+		search_idx_size = BLK_SIDX_DEFAULT_SIZE(BLK_SIZE);
+	} else
+	{	/* The global directory named a size. Bring it into range, so that a created database can never
+		 * hold a value MUPIP SET would go on to refuse : GDE enforces neither the minimum nor this
+		 * block size's ceiling. The statsDB zero above does not come through here : 0 means off and is
+		 * not a size to be clamped.
+		 */
+		search_idx_size = BLK_SIDX_CLAMP_SIZE(search_idx_size, BLK_SIZE);
+	}
+	cs_data->search_idx_size = search_idx_size;
+	if (0 == search_idx_size)
+		cs_data->search_idx_slots = 0;		/* off, whether from a statsDB or from zero slots in the
+							 * global directory : no size means no slots, which is how
+							 * MUPIP SET stores it too
+							 */
+	else
+	{	/* Slots are rounded up to a power of two so the reader can pick a slot with a mask, the
+		 * same rounding MUPIP SET applies. A count of 0 was taken as OFF above and cannot arrive here,
+		 * and GDE refuses a negative one, so no lower clamp is needed.
+		 */
+		if (BLK_SIDX_MAX_SLOTS < search_idx_slots)
+			search_idx_slots = BLK_SIDX_MAX_SLOTS;
+		for (lcl_slots = 1; lcl_slots < search_idx_slots; lcl_slots <<= 1)
+			;
+		cs_data->search_idx_slots = lcl_slots;
 	}
 	cs_data->write_fullblk = gv_cur_region->dyn.addr->full_blkwrt;
 	if (cs_data->write_fullblk)

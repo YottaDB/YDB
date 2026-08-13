@@ -1420,6 +1420,14 @@ boolean_t	tp_tend()
 		SET_CUR_CMT_STEP_IF(TRUE, csa->nl->cur_cmt_step, CMT02);
 		SET_CUR_CMT_STEP_IF((si == last_upd_tp_si_by_ftok), TREF(cur_cmt_step), CMT02);
 		is_mm = (dba_mm == csd->acc_meth);
+		/* See the matching comment in "t_end": for MM this makes early_tn visible BEFORE the block
+		 * updates that follow, so a concurrent reader can rely on "early_tn != curr_tn" to tell that
+		 * a commit is in flight. For BG the buffer pinning below serves the same purpose.
+		 */
+#		ifndef MM_WRITE_MEMORY_BARRIER_IS_NO_OP
+		if (is_mm)
+			MM_WRITE_MEMORY_BARRIER;
+#		endif
 		SET_CUR_CMT_STEP_IF(TRUE, csa->nl->cur_cmt_step, DECL_CMT03);
 		SET_CUR_CMT_STEP_IF((TREF(cur_cmt_step) < DECL_CMT03), TREF(cur_cmt_step), DECL_CMT03);
 		csa->t_commit_crit = T_COMMIT_CRIT_PHASE0;	/* phase0 : write journal records. Step CMT03 */

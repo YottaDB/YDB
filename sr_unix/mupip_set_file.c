@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -136,7 +136,12 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 	int4			defer_time, d_reserved_bytes, i_reserved_bytes, new_cache_size, new_disk_wait, new_extn_count,
 				new_flush_trigger, new_hard_spin, new_key_size, new_lock_space, new_mutex_space, new_null_subs = -1,
 				new_rec_size, new_sleep_cnt, new_spin_sleep, new_statsdb_alloc, new_stdnullcoll, new_wrt_per_flu,
-				reserved_bytes, spin_sleep_status, read_only_status, new_full_blkwrt, new_problksplit;
+				reserved_bytes, spin_sleep_status, read_only_status, new_full_blkwrt, new_problksplit,
+				search_idx_size, search_idx_status, search_idx_slots, lcl_slots, lcl_max_size,
+				lcl_idx_size, lcl_idx_slots, search_idx_onoff_status;
+	/* "bytes,slots" : 2 x (digits + sign) + comma + null. Reckoned like MAX_PROCS_ARRAY_SIZE in gdsbt.h */
+	char			search_idx_str[2 * (MAX_DIGITS_IN_INT4 + 1) + 1 + 1], *search_idx_ptr;
+	unsigned short		siz_len;
 	int			reorg_sleep_nsec_status;
 	sgmnt_data_ptr_t	csd, pvt_csd;
 	tp_region		*rptr, single;
@@ -431,6 +436,58 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SETQUALPROB, 2, LEN_AND_LIT("DATA_RESERVED_BYTES"));
 			exit_stat |= EXIT_ERR;
 		}
+	}
+	/* -[NO]SEARCH_INDEX says on or off without naming a number, and reads the same way it does in a
+	 * global directory : that consistency is the point of having it here at all. -NOSEARCH_INDEX
+	 * disables; -SEARCH_INDEX enables at the default size and count unless SEARCH_INDEX_SIZE names
+	 * them in the same command.
+	 */
+	search_idx_onoff_status = cli_present("SEARCH_INDEX");
+	if (search_idx_onoff_status)
+		need_standalone = TRUE;		/* same reason as the size below : the segment is resized */
+	/* Both mean "the default" until the SEARCH_INDEX_SIZE parse below says otherwise, which is what
+	 * -SEARCH_INDEX on its own asks for, and what a size of 0 asks for.
+	 */
+	search_idx_size = search_idx_slots = 0;
+	if ((search_idx_status = cli_present("SEARCH_INDEX_SIZE")))
+	{	/* "bytes" or "bytes,slots". The slot count applies to BG and MM alike : a block number picks
+		 * its slot with a mask, so the array is a bounded cache of that many slots whichever access
+		 * method the database uses. Left off, the database keeps the count it already has - see the
+		 * rounding further below.
+		 *
+		 * It arrives as one VAL_STR because a VAL_NUM qualifier could not hold the comma, which also
+		 * puts it outside "cli_numeric_check" - what refuses a negative value on a VAL_NUM qualifier -
+		 * so both numbers are range checked below, which is why the buffer allows a sign on each. It
+		 * is also one byte longer than the longest string it can hold, because "cli_get_str" null
+		 * terminates only by virtue of having zeroed the buffer before copying, and refuses anything
+		 * longer with CLISTRTOOLONG.
+		 */
+		search_idx_slots = 0;
+		siz_len = SIZEOF(search_idx_str);
+		if (!cli_get_str("SEARCH_INDEX_SIZE", search_idx_str, &siz_len))
+		{
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SETQUALPROB, 2, LEN_AND_LIT("SEARCH_INDEX_SIZE"));
+			exit_stat |= EXIT_ERR;
+		} else
+		{
+			search_idx_ptr = strchr(search_idx_str, ',');
+			if (NULL != search_idx_ptr)
+			{
+				*search_idx_ptr++ = '\0';
+				search_idx_slots = ATOI(search_idx_ptr);
+			}
+			search_idx_size = ATOI(search_idx_str);
+			if ((0 > search_idx_size) || (0 > search_idx_slots))
+			{
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SETQUALPROB, 2,
+						LEN_AND_LIT("SEARCH_INDEX_SIZE"));
+				exit_stat |= EXIT_ERR;
+			}
+		}
+		/* Standalone, unlike the reserved-bytes qualifiers: this decides how large the shared segment
+		 * is, so it cannot change under processes already attached to it (YDB#1143).
+		 */
+		need_standalone = TRUE;
 	}
 	/* SLEEP_SPIN_COUNT does not require standalone access and hence need_standalone will not be set to TRUE for this. */
 	if ((sleep_cnt_status = cli_present("SLEEP_SPIN_COUNT")))
@@ -809,6 +866,84 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 				DO_CLNUP_AND_SET_EXIT_STAT(exit_stat, reg_exit_stat);
 				continue;
 			}
+			if (search_idx_onoff_status && (CLI_NEGATED == search_idx_onoff_status))
+			{	/* -NOSEARCH_INDEX. The one way to turn the feature off here, and it reads the same
+				 * as -NOSEARCH_INDEX does in a global directory. Any SEARCH_INDEX_SIZE given in the
+				 * same command is ignored, exactly as a named size is ignored beside zero slots at
+				 * MUPIP CREATE (YDB#1143).
+				 */
+				pvt_csd->search_idx_size = 0;
+				pvt_csd->search_idx_slots = 0;
+			} else if (search_idx_status || search_idx_onoff_status)
+			{	/* Here, in the standalone branch, and not beside the reserved-bytes qualifiers: those
+				 * do not need standalone access so they are applied in the other branch, which a
+				 * region routed through here never reaches. A size of 0, or -SEARCH_INDEX with no
+				 * size at all, asks for the default; anything else is rounded up to a multiple of 8
+				 * and has to be in range. 0 does NOT disable here, any more than it does in a global
+				 * directory - -NOSEARCH_INDEX above is what disables (YDB#1143).
+				 */
+				lcl_max_size = BLK_SIDX_BLK_MAX_SIZE(pvt_csd->blk_size);
+				if (BLK_SIDX_MAX_SIZE < lcl_max_size)
+					lcl_max_size = BLK_SIDX_MAX_SIZE;
+				if (lcl_max_size < search_idx_size)
+				{	/* Checked BEFORE rounding, so the message quotes the value that was
+					 * actually typed rather than one the rounding invented. The ceiling is
+					 * whichever binds first, the absolute one or this block size's, since a
+					 * size that reaches the block size defeats the optimization it is asking
+					 * for - see BLK_SIDX_BLK_MAX_SIZE.
+					 */
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUPIPSET2BIG, 4,
+							search_idx_size, LEN_AND_LIT("SEARCH_INDEX_SIZE"),
+							lcl_max_size);
+					reg_exit_stat |= EXIT_WRN;
+				} else if (BLK_SIDX_MAX_SLOTS < search_idx_slots)
+				{
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUPIPSET2BIG, 4,
+							search_idx_slots, LEN_AND_LIT("SEARCH_INDEX_SIZE slot count"),
+							BLK_SIDX_MAX_SLOTS);
+					reg_exit_stat |= EXIT_WRN;
+				} else
+				{
+					/* Round into LOCALS and leave what was typed alone. One command can span
+					 * regions, and both of these are shaped per region - the size by this
+					 * region's block size, the count by what this region already holds - so
+					 * feeding one region's result to the next would carry that region's slot
+					 * count into its neighbour, and would quote a rounded size in the
+					 * MUPIPSET2BIG message above rather than the number that was typed.
+					 */
+					lcl_idx_size = search_idx_size;
+					if (0 == lcl_idx_size)
+						lcl_idx_size = BLK_SIDX_DEFAULT_SIZE(pvt_csd->blk_size);
+					else
+					{
+						lcl_idx_size = (int4)ROUND_UP2(lcl_idx_size, 8);
+						if (BLK_SIDX_MIN_SIZE > lcl_idx_size)
+							lcl_idx_size = BLK_SIDX_MIN_SIZE;
+					}
+					/* A block number picks the slot with a mask, for both access methods, so
+					 * round the count up to a power of two. A size on its own keeps the count
+					 * this database already has, so that changing the size does not quietly
+					 * discard a count somebody chose - the sweep behind BLK_SIDX_DEFAULT_SLOTS
+					 * found every count from 256 up performing alike, so the count is the
+					 * number a user has least reason to restate. A database with no count yet
+					 * takes the default, because without slots there is no array and refusing
+					 * to guess would make the commonest form of the command allocate nothing
+					 * (YDB#1143).
+					 */
+					lcl_idx_slots = search_idx_slots;
+					if (0 >= lcl_idx_slots)
+						lcl_idx_slots = (0 < pvt_csd->search_idx_slots)
+									? pvt_csd->search_idx_slots
+									: BLK_SIDX_DEFAULT_SLOTS;
+					assert(0 != lcl_idx_size);	/* 0 became the default just above */
+					lcl_slots = 1;
+					while (lcl_slots < lcl_idx_slots)
+						lcl_slots <<= 1;
+					lcl_idx_slots = lcl_slots;
+					pvt_csd->search_idx_size = lcl_idx_size;
+					pvt_csd->search_idx_slots = lcl_idx_slots;
+				}
+			}
 			if (full_blkwrt_status)
 			{
 				fbwsize = get_fs_block_size(fd);
@@ -1161,6 +1296,21 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
                         if (reorg_sleep_nsec_status)
 				util_out_print("Database file !AD now has reorg sleep nanoseconds !UL",
                                         TRUE, fn_len, fn, csd->reorg_sleep_nsec);
+			if (search_idx_status || search_idx_onoff_status)
+			{	/* -[NO]SEARCH_INDEX changes the same two fields the size qualifier does, so it gets
+				 * the same confirmation. Reporting only when a size was named would leave
+				 * -NOSEARCH_INDEX silent about a change it had just made.
+				 */
+				util_out_print("Database file !AD now has search index size !UL",
+					TRUE, fn_len, fn, csd->search_idx_size);
+				/* The count applies to both access methods now that a block number picks the
+				 * slot in each, and it is worth reporting most of all when the command did not
+				 * name one : that is the case where the number shown is the one the database
+				 * already carried, or the default it took for want of one.
+				 */
+				util_out_print("Database file !AD now has !UL search index slots",
+					TRUE, fn_len, fn, csd->search_idx_slots);
+			}
 			if (full_blkwrt_status)
 			{
 				switch(csd->write_fullblk)

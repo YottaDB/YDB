@@ -3,7 +3,7 @@
 ; Copyright (c) 2001-2020 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
-; Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries.	;
+; Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries.	;
 ; All rights reserved.						;
 ;								;
 ; Copyright (c) 2017-2018 Stephen L Johnson.			;
@@ -96,7 +96,7 @@ GDEINIT
 	. s SIZEOF("gd_map")=16			; --> size of the "gd_binding" structure (defined in gdsfhead.h)
 	. s SIZEOF("gd_region")=416		; --> size of the "gd_region"  structure (defined in gdsfhead.h)
 	. s SIZEOF("gd_region_padding")=0	; --> padding at end of "gd_region" structure (4-bytes for 64-bit platforms)
-	. s SIZEOF("gd_segment")=372		; --> size of the "gd_segment" structure (defined in gdsfhead.h)
+	. s SIZEOF("gd_segment")=380		; --> size of the "gd_segment" structure (defined in gdsfhead.h)
 	e  d
 	. s SIZEOF("am_offset")=340		; --> offset of "acc_meth" field in the "gd_segment" structure
 	. s SIZEOF("file_spec")=256		; --> maximum size (in bytes) of a file name specified in gde command line
@@ -105,7 +105,7 @@ GDEINIT
 	. s SIZEOF("gd_map")=24			; --> size of the "gd_binding" structure (defined in gdsfhead.h)
 	. s SIZEOF("gd_region")=432		; --> size of the "gd_region"  structure (defined in gdsfhead.h)
 	. s SIZEOF("gd_region_padding")=8	; --> padding at end of "gd_region" structure (4-bytes for 64-bit platforms)
-	. s SIZEOF("gd_segment")=384		; --> size of the "gd_segment" structure (defined in gdsfhead.h)
+	. s SIZEOF("gd_segment")=392		; --> size of the "gd_segment" structure (defined in gdsfhead.h)
 	d gvstats
 	s SIZEOF("blk_hdr")=16
 	s SIZEOF("dsk_blk")=512
@@ -183,6 +183,10 @@ GDEINIT
 	s minsegcommon("BLOCK_SIZE")=SIZEOF("dsk_blk"),maxsegcommon("BLOCK_SIZE")=HEX(4)-SIZEOF("dsk_blk")
 	s minsegcommon("EXTENSION_COUNT")=0,maxsegcommon("EXTENSION_COUNT")=HEX(5)-1
 	s minsegcommon("LOCK_SPACE")=10,maxsegcommon("LOCK_SPACE")=262144
+	s minsegcommon("SEARCH_INDEX_SIZE")=0	; 0 lets MUPIP CREATE choose the size; see SEARCH_INDEX_SLOTS for off
+	s maxsegcommon("SEARCH_INDEX_SIZE")=8192	; keep this in sync with BLK_SIDX_MAX_SIZE in gdsbt.h
+	s minsegcommon("SEARCH_INDEX_SLOTS")=0	; 0 means OFF : no slots is no search index. See "mu_cre_file"
+	s maxsegcommon("SEARCH_INDEX_SLOTS")=1048576	; keep this in sync with BLK_SIDX_MAX_SLOTS in gdsbt.h
 	s minsegcommon("MUTEX_SLOTS")=64	; keep this in sync with MIN_CRIT_ENTRY in gdsbt.h
 	s maxsegcommon("MUTEX_SLOTS")=32768	; keep this in sync with MAX_CRIT_ENTRY in gdsbt.h
 	s minsegcommon("RESERVED_BYTES")=0,maxsegcommon("RESERVED_BYTES")=HEX(4)-SIZEOF("dsk_blk")
@@ -209,6 +213,12 @@ GDEINIT
 	s defseg("FILE_TYPE")="DYNAMIC"
 	s defseg("LOCK_SPACE")=220	; If this changes, need to also change DEF_LOCK_SIZE macro in mlkdef.h
 	s defseg("MUTEX_SLOTS")=1024 ; keep this in sync with DEFAULT_NUM_CRIT_ENTRY in gdsbt.h
+	; YDB#1143 : 0 is "let MUPIP CREATE choose", which it does as a quarter of the block size. It
+	; cannot be a number here because the block size is a per segment characteristic GDE may not
+	; have seen yet when this default is applied, and it cannot be a negative sentinel because GDE
+	; has no way to express one - SHOW -COMMAND would emit a value its own parser rejects.
+	s defseg("SEARCH_INDEX_SIZE")=0
+	s defseg("SEARCH_INDEX_SLOTS")=1024 ; keep this in sync with BLK_SIDX_DEFAULT_SLOTS in gdsbt.h
 	s defseg("RESERVED_BYTES")=0
 	s defseg("WINDOW_SIZE")=""
 	q
@@ -278,6 +288,11 @@ syntabi:
 	s syntab("ADD","SEGMENT","LOCK_SPACE","TYPE")="TNUMBER"
 	s syntab("ADD","SEGMENT","MUTEX_SLOTS")="REQUIRED"
 	s syntab("ADD","SEGMENT","MUTEX_SLOTS","TYPE")="TNUMBER"
+	s syntab("ADD","SEGMENT","SEARCH_INDEX")="NEGATABLE"
+	s syntab("ADD","SEGMENT","SEARCH_INDEX_SIZE")="REQUIRED"
+	s syntab("ADD","SEGMENT","SEARCH_INDEX_SIZE","TYPE")="TNUMBER"
+	s syntab("ADD","SEGMENT","SEARCH_INDEX_SLOTS")="REQUIRED"
+	s syntab("ADD","SEGMENT","SEARCH_INDEX_SLOTS","TYPE")="TNUMBER"
 	s syntab("ADD","SEGMENT","RESERVED_BYTES")="REQUIRED"
 	s syntab("ADD","SEGMENT","RESERVED_BYTES","TYPE")="TNUMBER"
 	s syntab("ADD","SEGMENT","WINDOW_SIZE")="REQUIRED"
@@ -346,6 +361,11 @@ syntabi:
 	s syntab("CHANGE","SEGMENT","LOCK_SPACE","TYPE")="TNUMBER"
 	s syntab("CHANGE","SEGMENT","MUTEX_SLOTS")="REQUIRED"
 	s syntab("CHANGE","SEGMENT","MUTEX_SLOTS","TYPE")="TNUMBER"
+	s syntab("CHANGE","SEGMENT","SEARCH_INDEX")="NEGATABLE"
+	s syntab("CHANGE","SEGMENT","SEARCH_INDEX_SIZE")="REQUIRED"
+	s syntab("CHANGE","SEGMENT","SEARCH_INDEX_SIZE","TYPE")="TNUMBER"
+	s syntab("CHANGE","SEGMENT","SEARCH_INDEX_SLOTS")="REQUIRED"
+	s syntab("CHANGE","SEGMENT","SEARCH_INDEX_SLOTS","TYPE")="TNUMBER"
 	s syntab("CHANGE","SEGMENT","RESERVED_BYTES")="REQUIRED"
 	s syntab("CHANGE","SEGMENT","RESERVED_BYTES","TYPE")="TNUMBER"
 	s syntab("CHANGE","SEGMENT","WINDOW_SIZE")="REQUIRED"
@@ -405,6 +425,11 @@ syntabi:
 	s syntab("TEMPLATE","SEGMENT","LOCK_SPACE","TYPE")="TNUMBER"
 	s syntab("TEMPLATE","SEGMENT","MUTEX_SLOTS")="REQUIRED"
 	s syntab("TEMPLATE","SEGMENT","MUTEX_SLOTS","TYPE")="TNUMBER"
+	s syntab("TEMPLATE","SEGMENT","SEARCH_INDEX")="NEGATABLE"
+	s syntab("TEMPLATE","SEGMENT","SEARCH_INDEX_SIZE")="REQUIRED"
+	s syntab("TEMPLATE","SEGMENT","SEARCH_INDEX_SIZE","TYPE")="TNUMBER"
+	s syntab("TEMPLATE","SEGMENT","SEARCH_INDEX_SLOTS")="REQUIRED"
+	s syntab("TEMPLATE","SEGMENT","SEARCH_INDEX_SLOTS","TYPE")="TNUMBER"
 	s syntab("TEMPLATE","SEGMENT","RESERVED_BYTES")="REQUIRED"
 	s syntab("TEMPLATE","SEGMENT","RESERVED_BYTES","TYPE")="TNUMBER"
 	s syntab("TEMPLATE","SEGMENT","WINDOW_SIZE")="REQUIRED"
@@ -452,8 +477,8 @@ syntabi:
 	s syntab("VERIFY","TEMPLATE")=""
 	q
 UNIX:
-	s hdrlab="GTCGBDUNX015"         ; must be concurrently maintained in gbldirnam.h!!!
-	i (gtm64=TRUE) s hdrlab="GTCGBDUNX115" ; the high order digit is a 64-bit flag
+	s hdrlab="GTCGBDUNX016"         ; must be concurrently maintained in gbldirnam.h!!!
+	i (gtm64=TRUE) s hdrlab="GTCGBDUNX116" ; the high order digit is a 64-bit flag
 	s tfile=$view("GBLDIRXLATE",$ztrnlnm("ydb_gbldir"))
 	i ""=tfile d message^GDE(gdeerr("ZGBLDIRUNDEF"),"""""")
 	s accmeth="\BG\MM"

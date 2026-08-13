@@ -3,7 +3,7 @@
 ; Copyright (c) 2001-2020 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
-; Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	;
+; Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	;
 ; All rights reserved.						;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -247,6 +247,8 @@ BG	w ?x(8),"GLOB=",$j(segs(s,"GLOBAL_BUFFER_COUNT"),4)
 	w !,BOL,?x(8),"DALL=",$s(segs(s,"DEFER_ALLOCATE"):" YES",1:"  NO")
 	w !,BOL,?x(8),"AIO =",$s(segs(s,"ASYNCIO"):"  ON",1:" OFF")
 	w !,BOL,?x(8),"FBWR=",$j(segs(s,"FULLBLKWRT"),4)
+	w !,BOL,?x(8),"SIDX=",$s('segs(s,"SEARCH_INDEX_SIZE"):"AUTO",1:$j(segs(s,"SEARCH_INDEX_SIZE"),4))
+	w !,BOL,?x(8),"SISL=",$s('segs(s,"SEARCH_INDEX_SLOTS"):" OFF",1:$j(segs(s,"SEARCH_INDEX_SLOTS"),4))
 	q
 MM	w ?x(8),$s(segs(s,"DEFER"):"DEFER",1:"NODEFER")
 	w !,BOL,?x(8),"LOCK=",$j(segs(s,"LOCK_SPACE"),4)
@@ -255,6 +257,8 @@ MM	w ?x(8),$s(segs(s,"DEFER"):"DEFER",1:"NODEFER")
 	w !,BOL,?x(8),"MSLT=",$j(segs(s,"MUTEX_SLOTS"),4)
 	w !,BOL,?x(8),"DALL=",$s(segs(s,"DEFER_ALLOCATE"):" YES",1:"  NO")
 	w !,BOL,?x(8),"FBWR=",$j(segs(s,"FULLBLKWRT"),4)
+	w !,BOL,?x(8),"SIDX=",$s('segs(s,"SEARCH_INDEX_SIZE"):"AUTO",1:$j(segs(s,"SEARCH_INDEX_SIZE"),4))
+	w !,BOL,?x(8),"SISL=",$s('segs(s,"SEARCH_INDEX_SLOTS"):" OFF",1:$j(segs(s,"SEARCH_INDEX_SLOTS"),4))
 	q
 segmentc:
 	n s,q,val,synval,tmpval,type,am
@@ -266,6 +270,7 @@ segmentc:
 	. s q=""
 	. f  s q=$o(syntab("TEMPLATE","SEGMENT",q)) q:""=q  d
 	. . i q="ACCESS_METHOD" q  ; already processed
+	. . i q="SEARCH_INDEX" q  ; not a stored field : a spelling of SEARCH_INDEX_SLOTS, emitted as that
 	. . s synval=syntab("TEMPLATE","SEGMENT",q)
 	. . i synval["LIST" d ABORT^GDE	; segmentc is not designed to handle LIST in segment qualifiers.
 	. . s val=segs(s,q)
@@ -341,6 +346,8 @@ t1:	d tmpreghd
 	w !,BOL,?x(8),"DALL =",$s(tmpseg("BG","DEFER_ALLOCATE"):" YES",1:"  NO")
 	w !,BOL,?x(8),"AIO  =",$s(tmpseg("BG","ASYNCIO"):"  ON",1:" OFF")
 	w !,BOL,?x(8),"FBWR =",$j(tmpseg("BG","FULLBLKWRT"),4)
+	w !,BOL,?x(8),"SIDX =",$s('tmpseg("BG","SEARCH_INDEX_SIZE"):"AUTO",1:$j(tmpseg("BG","SEARCH_INDEX_SIZE"),4))
+	w !,BOL,?x(8),"SISL =",$j(tmpseg("BG","SEARCH_INDEX_SLOTS"),4)
 	w !,BOL,?x(1),"<default>"
 	w ?x(2),$s(tmpacc="MM":"   *",1:"")
 	w ?x(3),"MM"
@@ -353,6 +360,8 @@ t1:	d tmpreghd
 	w !,BOL,?x(8),"MSLT =",$j(tmpseg("MM","MUTEX_SLOTS"),4)
 	w !,BOL,?x(8),"DALL =",$s(tmpseg("MM","DEFER_ALLOCATE"):" YES",1:"  NO")
 	w !,BOL,?x(8),"FBWR =",$j(tmpseg("MM","FULLBLKWRT"),4)
+	w !,BOL,?x(8),"SIDX =",$s('tmpseg("MM","SEARCH_INDEX_SIZE"):"AUTO",1:$j(tmpseg("MM","SEARCH_INDEX_SIZE"),4))
+	w !,BOL,?x(8),"SISL =",$j(tmpseg("MM","SEARCH_INDEX_SLOTS"),4)
 	q
 tmpjnlbd:
 	w !,BOL,?x(1),"<default>",?x(2),$s($zl(tmpreg("FILE_NAME")):$$namedisp(tmpreg("FILE_NAME"),1),1:"<based on DB file-spec>")
@@ -438,6 +447,7 @@ templatec:
 	. s q=""
 	. f  s q=$o(syntab("TEMPLATE","SEGMENT",q)) q:""=q  d
 	. . i q="ACCESS_METHOD" q  ; already processed
+	. . i q="SEARCH_INDEX" q  ; not a stored field : a spelling of SEARCH_INDEX_SLOTS, emitted as that
 	. . s synval=syntab("TEMPLATE","SEGMENT",q)
 	. . i synval["LIST" d ABORT^GDE	; segmentc is not designed to handle LIST in segment qualifiers.
 	. . s tmpval=$get(tmpseg(am,q))

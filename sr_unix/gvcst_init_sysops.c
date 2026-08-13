@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -391,6 +391,7 @@ GBLREF	int			pool_init;
 GBLREF	boolean_t		jnlpool_init_needed;
 GBLREF	mstr			extnam_str;
 GBLREF	mval			dollar_zgbldir;
+GBLREF	boolean_t		mu_reorg_process;
 
 LITREF  char                    ydb_release_name[];
 LITREF  int4                    ydb_release_name_len;
@@ -735,6 +736,13 @@ void dbsecspc(gd_region *reg, sgmnt_data_ptr_t csd, gtm_uint64_t *sec_size)
 	/* Now, add sections specific to MM and BG */
 	if (dba_bg == reg->dyn.addr->acc_meth)
 		tmp_sec_size += CACHE_CONTROL_SIZE(csd) + (DIVIDE_ROUND_UP(BT_SIZE(csd), OS_PAGE_SIZE) * OS_PAGE_SIZE);
+	else if ((0 != csd->search_idx_size) && (0 < csd->search_idx_slots))
+	{	/* YDB#1143 : MM search indexes go at the very end of the shared memory segment, after the file
+		 * header, so that nothing already laid out shifts. BG has no equivalent here because its
+		 * slots are part of CACHE_CONTROL_SIZE, laid out after the global buffer array.
+		 */
+		tmp_sec_size += ROUND_UP((gtm_uint64_t)csd->search_idx_slots * csd->search_idx_size, OS_PAGE_SIZE);
+	}
 	ADJUST_SHM_SIZE_FOR_HUGEPAGES(tmp_sec_size, *sec_size); /* *sec_size is adjusted size */
 	return;
 }
@@ -1247,6 +1255,45 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 	reg->dyn.addr->read_only = tsd->read_only;
 	reg->dyn.addr->full_blkwrt = tsd->write_fullblk;
 	COPY_AIO_SETTINGS(reg->dyn.addr, tsd);	/* copy "asyncio" from tsd to reg->dyn.addr */
+	/* YDB#1143 : settle the search index characteristics on this copy of the file header, BEFORE the
+	 * "dbsecspc" calls below size the shared memory segment from them. "db_auto_upgrade" is where a
+	 * newly added file header field is normally given its default, but it does not run until that
+	 * segment has been created and laid out, which is too late for a field that decides how big the
+	 * segment is. Doing it here rather than there also keeps every process consistent: "tsd" is what
+	 * "CACHE_CONTROL_SIZE" is applied to further below to locate the file header inside the segment,
+	 * on the attach path as much as on the create path, so a process attaching later has to arrive at
+	 * the same numbers the creating process did. It does, because both read the same header from disk
+	 * and apply the same rule to it - and once the creating process flushes the header, the rule stops
+	 * firing because the version it tests has been raised.
+	 *
+	 * The two cases below, in the order the code tests them.
+	 *
+	 * A V6 file header has no search index fields at all, so there is nothing at those offsets to keep
+	 * and nothing to convert. Both are zeroed, which leaves the database without search indexes until
+	 * it is upgraded : "mu_upgrade_bmm" and "mupip_upgrade" each supply the defaults at the point where
+	 * the header they convert has just become a V7 one.
+	 *
+	 * A V7 file header from before r2.08 does carry the fields, but nothing meaningful in them. They
+	 * were taken from the end of "secshr_ops_array_filler", which held the live "secshr_ops_array"
+	 * before those fields moved to "node_local", and a file header is converted in place, so those
+	 * bytes are whatever that database last left behind rather than a size and a slot count. Sizing a
+	 * shared memory segment from them is what this prevents. Such a header gets what MUPIP CREATE
+	 * would give a new database, so an upgraded database has search indexes from its very first
+	 * attach rather than after a standalone MUPIP SET.
+	 */
+	if (MEMCMP_LIT(tsd->label, GDS_LABEL))
+	{	/* not a V7 file header : no such fields to default, "mupip_upgrade" supplies them later */
+		tsd->search_idx_size = 0;
+		tsd->search_idx_slots = 0;
+	} else if (GDSMVCURR > tsd->minor_dbver)
+	{	/* a V7 file header from before r2.08 : leftover filler bytes at those offsets */
+		if (IS_STATSDB_REGNAME(reg))
+		{	/* no index for a statsDB, as at creation : only ^%YGBLSTAT searches that tree - see "mu_cre_file" */
+			tsd->search_idx_size = 0;
+			tsd->search_idx_slots = 0;
+		} else
+			SET_SEARCHIDX_DEFAULTS(tsd);
+	}
 	new_shm_ipc = udi->shm_created;
 	if (tsd_read_only)
 	{	/* Do not create shared memory but instead malloc the space in process private memory */
@@ -1441,7 +1488,7 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 			db_csh_ini(csa);
 			bt_malloc(csa);
 		}
-		db_csh_ref(csa, TRUE);
+		db_csh_ref(csa, TRUE);	/* also settles "cnl->search_idx_off", for BG and MM alike (YDB#1143) */
 		shmpool_buff_init(reg);
 		SS_INFO_INIT(csa);
 		STRNCPY_STR(cnl->machine_name, machine_name, MAX_MCNAMELEN);				/* machine name */
@@ -1637,6 +1684,36 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 		if (is_bg)
 			db_csh_ini(csa);
 	}
+	/* YDB#1143 : take this process's private copy of where the search index array is - its base
+	 * address, the size of one index, and the mask that turns a block number into a slot number - so
+	 * that a search locates its slot without reading node_local. node_local is shared memory that
+	 * every attached process writes, and a write by any of them invalidates the whole cache line in
+	 * every other processor, so a read of it on the search path would keep missing in cache.
+	 *
+	 * Here, and only here, because every path above has settled "cnl->search_idx_off" by now: the
+	 * process creating the shared memory segment stored it in "db_csh_ref", which does that for both
+	 * access methods, and a process attaching to an existing one found it already set. A zero offset,
+	 * size or slot count leaves search_idx_base NULL, which is what SEARCHIDX_AVAILABLE tests, and
+	 * turns the feature off for this process. These three never change again for the life of the
+	 * attach: "db_csh_ref" asserts that even an online rollback cannot move the array.
+	 *
+	 * "db_init" is not the only way to attach: "mu_rndwn_file" attaches to the shared memory segment
+	 * on its own and never reaches here, so its sgmnt_addrs keeps the zeroes MALLOC_INIT left in it
+	 * (see FILE_CNTL_INIT in gdsfhead.h) and search_idx_base stays NULL, leaving the feature off.
+	 * That is correct rather than merely harmless : rundown performs no database searches.
+	 *
+	 * A REORG process is left with the feature off for the same reason: it rewrites the blocks it
+	 * walks, so an index it builds is invalidated before its samples can be reused. Note this test
+	 * alone does NOT cover plain MUPIP REORG, whose regions are attached by "gv_select" before
+	 * "mu_reorg_process" can be set; "mupip_reorg" clears "search_idx_base" itself for those. What
+	 * this covers is every region attached while the flag is already set, including the other
+	 * entry points that set it, "mu_trunc_tail_sweep" and "mu_upgrade_bmm".
+	 */
+	csa->search_idx_size = csd->search_idx_size;
+	csa->search_idx_slotmask = csd->search_idx_slots - 1;
+	csa->search_idx_base = ((0 != cnl->search_idx_off) && (0 != csd->search_idx_size)
+					&& (0 < csd->search_idx_slots) && !mu_reorg_process)
+					? (sm_uc_ptr_t)GDS_ANY_REL2ABS(csa, cnl->search_idx_off) : NULL;
 	if (new_shm_ipc)
 		UPDATE_MAX_PROCS_STRING(cnl, csd->max_procs);	/* We update the node_local's max_procs because we need
 								 * to make sure both cnl and csd are setup before we

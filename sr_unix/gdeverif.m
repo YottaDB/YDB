@@ -3,7 +3,7 @@
 ; Copyright (c) 2006-2020 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
-; Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	;
+; Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	;
 ; All rights reserved.						;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -220,6 +220,21 @@ RQUALS(rquals)
 	;
 SQUALS(am,squals)
 	if '$data(verified) new verified set verified=1
+	; -[NO]SEARCH_INDEX is a convenience spelling of the SEARCH_INDEX_SLOTS characteristic, no slots
+	; being no search index. It is translated into that field here and never stored itself, so a
+	; global directory holds only the two numbers and SHOW output round-trips through them. SQUALS is
+	; the one place worth doing it : ADD, CHANGE and RENAME call it with squals by reference and
+	; TEMPLATE reaches it through TSQUALS. It has to run BEFORE the loop below, which rejects any
+	; qualifier that is not itself a segment field.
+	if $data(squals("SEARCH_INDEX")) do
+	. if 'squals("SEARCH_INDEX") set squals("SEARCH_INDEX_SLOTS")=0
+	. else  do
+	. . new cur set cur=$get(squals("SEARCH_INDEX_SLOTS"))
+	. . if '$length(cur) do
+	. . . if $data(segs(SEGMENT,"SEARCH_INDEX_SLOTS")) set cur=segs(SEGMENT,"SEARCH_INDEX_SLOTS")
+	. . . else  set cur=+$get(tmpseg(am,"SEARCH_INDEX_SLOTS"))
+	. . if 'cur set squals("SEARCH_INDEX_SLOTS")=1024	; keep in sync with defseg in GDEINIT
+	. kill squals("SEARCH_INDEX")
 	new s set s=""
 	for  set s=$order(squals(s)) quit:'$length(s)  do:$length(squals(s)) segelm
 	quit:'verified verified
