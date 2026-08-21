@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -377,22 +377,28 @@ int4 gdsfilext(block_id blocks, block_id filesize, boolean_t trans_in_prog)
 					ERR_SYSCALL, 5, LEN_AND_STR(MEM_UNMAP_SYSCALL), CALLFROM, save_errno);
 			return NO_FREE_SPACE;
 		}
-	} else
-	{	/* Due to concurrency issues, it is possible some process had issued a disk read of the GDS block# corresponding
-		 * to "old_total" right after a truncate wrote a GDS-block of zeros on disk (to signal end of the db file).
-		 * If so, the global buffer containing this block needs to be invalidated now as part of the extend. If not, it is
-		 * possible the EOF block on disk is now going to be overwritten by a properly initialized bitmap block (as part
-		 * of the gdsfilext below) while the global buffer continues to have an incorrect copy of that bitmap block and
-		 * this in turn would cause XXXX failures due to a bad bitmap block in shared memory. (GTM-7519)
-		 */
-		cr = db_csh_get(old_total);
-		if ((NULL != cr) && ((cache_rec_ptr_t)CR_NOTVALID != cr))
-		{
-			assert((0 == cr->dirty) && (0 == cr->bt_index) && !cr->stopped);
-			cr->cycle++;
-			cr->blk = CR_BLKEMPTY;
-		}
 	}
+	/* Note: this used to also invalidate the global buffer of "old_total" here, for the case where a process had issued
+	 * a disk read of that block right after a truncate wrote a GDS-block of zeros on disk to signal end of the db file
+	 * (GTM-7519). That is no longer needed.
+	 *
+	 * The hazard it addressed, as its own comment described, was that the block of zeros would be "overwritten by a
+	 * properly initialized bitmap block (as part of the gdsfilext below)". It therefore bit only when "old_total" was
+	 * a block that THIS extension initializes as a local bitmap. The bitmap initialization loop below starts at
+	 * ROUND_UP(old_total, bplmap), and ROUND_UP leaves a value unchanged when it is already a multiple of the modulus,
+	 * so whenever "old_total" is bitmap-aligned the loop's first iteration is "old_total" itself and the invalidation
+	 * there covers exactly the block the old call covered.
+	 *
+	 * When "old_total" is not bitmap-aligned (for example after an ordinary extend, or after a truncate whose
+	 * "new_total" came from the -KEEP qualifier rather than from "highest_lbm_with_busy_blk + BLKS_PER_LMAP") the loop
+	 * starts strictly above it and no bitmap is ever written at "old_total". The zeros stay on disk and the block just
+	 * becomes an ordinary free block, so a buffer holding those zeros is not stale and there is nothing to invalidate.
+	 *
+	 * The invalidation in the loop is also strictly stronger than the old call in two ways. It covers every bitmap
+	 * this extension initializes rather than only the first. And it runs AFTER the block has been written, so it also
+	 * catches a read whose "pread" lands between "db_write_eof_block" below, which lengthens the file, and
+	 * "bml_init". The old call ran before "db_write_eof_block" and could not catch that; that window is #1253.
+	 */
 	CHECK_TN(cs_addrs, cs_data, cs_data->trans_hist.curr_tn);	/* can issue rts_error TNTOOLARGE */
 	new_total = old_total + new_blocks;
 	new_eof = BLK_ZERO_OFF(cs_data->start_vbn) + ((off_t)new_total * cs_data->blk_size);
@@ -514,6 +520,39 @@ int4 gdsfilext(block_id blocks, block_id filesize, boolean_t trans_in_prog)
 				GDSFILEXT_CLNUP;
 				send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(gv_cur_region), status);
 				return NO_FREE_SPACE;
+			}
+			if (!is_mm)
+			{	/* "bml_init" wrote this local bitmap block to disk using DSK_WRITE_NOCACHE, which by design
+				 * bypasses the global buffers. If a buffer already holds this block number, it is now
+				 * holding contents that no longer match what is on disk, and nothing else would correct
+				 * it, so any process that finds the block through "db_csh_get" would keep seeing the
+				 * stale contents for as long as the buffer survives. That is how a MUPIP REORG -TRUNCATE
+				 * came to read a local bitmap block as all zeros on every retry and fail with
+				 * MUTRUNCFAIL (see #1253). Invalidate the buffer here, while we hold crit, so that the
+				 * next reader of this block goes to disk.
+				 *
+				 * It is safe to do this while another process has a read in flight into that buffer.
+				 * "t_qread" resets "cr->blk" only on its read-failure path; on the success path it
+				 * leaves "cr->blk" alone, so the buffer stays invalidated and "db_csh_get" cannot hand
+				 * it out again, and "db_csh_getn" waits on "read_in_progress"/"r_epid" rather than
+				 * reusing a buffer that is being read into.
+				 *
+				 * MM needs none of this: it has no global buffer cache to go stale, since the mapping
+				 * and the write both go through the same page cache.
+				 */
+				assert(cs_addrs->now_crit);
+				cr = db_csh_get(map);
+				if ((NULL != cr) && ((cache_rec_ptr_t)CR_NOTVALID != cr))
+				{	/* Same assert the pre-existing "old_total" invalidation used. A block this
+					 * extension is creating was not a valid block before "total_blks" is published
+					 * below, so no transaction can have committed an update to it ("bt_index") and
+					 * no process can have been killed mid-commit on it ("stopped"); a truncate that
+					 * removed the block ran "clear_cache_array", which zeroes "bt_index" too.
+					 */
+					assert((0 == cr->dirty) && (0 == cr->bt_index) && !cr->stopped);
+					cr->cycle++;	/* so any process holding this buffer detects the change */
+					cr->blk = CR_BLKEMPTY;
+				}
 			}
 		}
 		assert(0 == new_bit_maps);
