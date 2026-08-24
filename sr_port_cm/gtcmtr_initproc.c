@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -45,19 +45,21 @@ GBLREF struct CLB *proc_to_clb[];	/* USHRT_MAX + 1 so procnum can wrap */
 GBLREF jnl_process_vector *originator_prc_vec;
 
 error_def(CMERR_INVPROT);
+error_def(ERR_BADGTMNETMSG);
 error_def(ERR_TOOMANYCLIENTS);
 
 cm_op_t gtcmtr_initproc(void)
 {
 	unsigned char *reply;
         unsigned short beginprocnum;
-        size_t jpv_size;
+        size_t jpv_size, jpv_avail;
 	protocol_msg myproto;
 
 	ASSERT_IS_LIBGNPSERVER;
 	reply = curr_entry->clb_ptr->mbf;
 	assert(*reply == CMMS_S_INITPROC);
 	reply++;
+	CM_CHECK_AVAIL(curr_entry, reply, S_PROTSIZE);	/* the protocol string has to actually be in the message */
 	gtcm_protocol(&myproto);
 	if (!gtcm_protocol_match((protocol_msg *)reply, &myproto))
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) CMERR_INVPROT);
@@ -67,11 +69,15 @@ cm_op_t gtcmtr_initproc(void)
 	curr_entry->client_supports_long_names = (0 <= memcmp(reply + CM_LEVEL_OFFSET, CMM_LONGNAMES_MIN_LEVEL, 3));
 	originator_prc_vec = curr_entry->pvec = (jnl_process_vector *)malloc(SIZEOF(jnl_process_vector));
 	jpv_size = SIZEOF(jnl_process_vector);
-	assert((jpv_size >= curr_entry->clb_ptr->cbl - S_HDRSIZE - S_PROTSIZE)
-			&& (S_HDRSIZE + S_PROTSIZE < curr_entry->clb_ptr->cbl));
-	if (jpv_size > (curr_entry->clb_ptr->cbl - S_HDRSIZE - S_PROTSIZE))
+	/* How much of the client's jnl_process_vector actually arrived. "cbl" is an "unsigned short", so a plain
+	 * subtraction goes negative on a message shorter than the header plus the protocol string and, converted to
+	 * "size_t" for the comparison against "jpv_size", makes the clamp below unreachable, copying a full
+	 * jnl_process_vector out of a partly filled "mbf" into the journal file. CM_MSG_BYTES_LEFT() floors at 0.
+	 */
+	jpv_avail = CM_MSG_BYTES_LEFT(curr_entry, curr_entry->clb_ptr->mbf + S_HDRSIZE + S_PROTSIZE);
+	if (jpv_size > jpv_avail)
 	{	/* our jpv is larger than client so limit copy and pad */
-		jpv_size = curr_entry->clb_ptr->cbl - S_HDRSIZE - S_PROTSIZE;
+		jpv_size = jpv_avail;
 		memset((char *)originator_prc_vec + jpv_size, 0, SIZEOF(jnl_process_vector) - jpv_size);
 	}
 	reply = curr_entry->clb_ptr->mbf;
