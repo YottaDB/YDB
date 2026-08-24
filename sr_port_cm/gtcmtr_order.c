@@ -51,7 +51,7 @@ cm_op_t gtcmtr_order(void)
 {
 	boolean_t		found;
 	unsigned char		*ptr, regnum;
-	unsigned short		top, old_top, len, tmp_len;
+	unsigned short		top, old_top, len, tmp_len, msg_len;
 	gv_key			*save_key;
 	cm_region_list		*reg_ref;
 	boolean_t		last_subsc_is_null;
@@ -163,6 +163,12 @@ cm_op_t gtcmtr_order(void)
 		len = gv_altkey->end + SIZEOF(unsigned short) + SIZEOF(unsigned short) + SIZEOF(unsigned short) +
 		      SIZEOF(char);
 	}
+	/* Size the reply before writing it, the way gtcmtr_query() and gtcmtr_reversequery() do: the code below
+	 * builds the reply straight into "mbf", which has to be known large enough to hold it first.
+	 */
+	msg_len = SIZEOF(unsigned char) + SIZEOF(unsigned short) + SIZEOF(unsigned char) + len;
+	if (msg_len > curr_entry->clb_ptr->mbl)
+		cmi_realloc_mbf(curr_entry->clb_ptr, msg_len);
 	ptr = curr_entry->clb_ptr->mbf;
 	*ptr++ = CMMS_R_ORDER;
 	tmp_len = len + 1;
@@ -180,7 +186,7 @@ cm_op_t gtcmtr_order(void)
 		       len - SIZEOF(unsigned short) - SIZEOF(unsigned short) - SIZEOF(unsigned short));
 	}
 	PUT_USHORT(ptr, old_top); /* ((gv_key *)ptr)->top = old_top; */
-	curr_entry->clb_ptr->cbl = SIZEOF(unsigned char) + SIZEOF(unsigned short) + SIZEOF(unsigned char) + len;
+	curr_entry->clb_ptr->cbl = msg_len;
 	reset_gv_target = INVALID_GV_TARGET;
 	return CM_WRITE;
 }
