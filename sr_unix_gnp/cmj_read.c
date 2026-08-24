@@ -74,7 +74,13 @@ cmi_status_t cmj_read_start(struct CLB *lnk)
 		lnk->ios.len_len = CMI_TCP_PREFIX_LEN;
 		lnk->ios.u.len = ntohs(lnk->ios.u.len);
 		if (lnk->ios.u.len > lnk->mbl)
+		{	/* Client claims a message larger than our buffer. Drop the link. Simply returning would leave the
+			 * CLB in CM_CLB_READ with no read outstanding and no event posted, hanging the connection.
+			 */
+			cmj_err(lnk, CMI_REASON_STATUS, CMI_OVERRUN);
+			cmj_postevent(lnk);
 			return CMI_OVERRUN;
+		}
 
 		while ((-1 == (rval = recv(lnk->mun, (void *)lnk->mbf, (int)lnk->ios.u.len, 0))) && EINTR == errno)
 			eintr_handling_check();
@@ -192,6 +198,18 @@ void cmj_read_interrupt(struct CLB *lnk)
 				rval -= (CMI_TCP_PREFIX_LEN - lnk->ios.len_len);
 				lnk->ios.len_len = CMI_TCP_PREFIX_LEN;
 				lnk->ios.u.len = ntohs(lnk->ios.u.len);
+				if (lnk->ios.u.len > lnk->mbl)
+				{	/* Same check as in cmj_read_start(). A client that splits the 2-byte length prefix
+					 * across TCP segments arrives at the length here instead of there. Without this
+					 * check, the next entry into this function takes the "length had been read" path
+					 * below and hands recvmsg() an iovec of "u.len - xfer_count" bytes at
+					 * "mbf + xfer_count", letting the client write up to 64K into "mbf" (which is
+					 * CM_MSG_BUF_SIZE + CM_BUFFER_OVERHEAD, i.e. 532 bytes, until INITREG grows it).
+					 */
+					cmj_err(lnk, CMI_REASON_STATUS, CMI_OVERRUN);
+					cmj_postevent(lnk);
+					return;
+				}
 			}
 			else
 			{
