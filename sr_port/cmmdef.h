@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -255,96 +255,168 @@ typedef struct
 		char msg[S_PROTSIZE];
 	} protocol_msg;
 
-#define CM_PUT_USHORT(PTR, USVAL, CONVFLAG) \
-	{ \
-		if (CONVFLAG) \
-		{ \
-			unsigned short val = GTM_BYTESWAP_16(USVAL); \
-			PUT_USHORT(PTR, val); \
-		} \
-		else \
-			PUT_USHORT(PTR, USVAL); \
+#define CM_PUT_USHORT(PTR, USVAL, CONVFLAG)				\
+	{								\
+		if (CONVFLAG)						\
+		{							\
+			unsigned short val = GTM_BYTESWAP_16(USVAL);	\
+			PUT_USHORT(PTR, val);				\
+		}							\
+		else							\
+			PUT_USHORT(PTR, USVAL);				\
 	}
 
-#define CM_PUT_SHORT(PTR, SVAL, CONVFLAG) \
-	{ \
-		if (CONVFLAG) \
-		{ \
-			short val = GTM_BYTESWAP_16(SVAL); \
-			PUT_SHORT(PTR, val); \
-		} \
-		else \
-			PUT_SHORT(PTR, SVAL); \
+#define CM_PUT_SHORT(PTR, SVAL, CONVFLAG)			\
+	{							\
+		if (CONVFLAG)					\
+		{						\
+			short val = GTM_BYTESWAP_16(SVAL);	\
+			PUT_SHORT(PTR, val);			\
+		}						\
+		else						\
+			PUT_SHORT(PTR, SVAL);			\
 	}
 
-#define CM_PUT_ULONG(PTR, ULVAL, CONVFLAG) \
-	{ \
-		if (CONVFLAG) \
-		{ \
-			uint4  val = GTM_BYTESWAP_32(ULVAL); \
-			PUT_ULONG(PTR, val); \
-		} \
-		else \
-			PUT_ULONG(PTR, ULVAL); \
+#define CM_PUT_ULONG(PTR, ULVAL, CONVFLAG)			\
+	{							\
+		if (CONVFLAG)					\
+		{						\
+			uint4  val = GTM_BYTESWAP_32(ULVAL);	\
+			PUT_ULONG(PTR, val);			\
+		}						\
+		else						\
+			PUT_ULONG(PTR, ULVAL);			\
 	}
 
-#define CM_PUT_LONG(PTR, LVAL, CONVFLAG) \
-	{ \
-		if (CONVFLAG) \
-		{ \
-			int4  val = GTM_BYTESWAP_32(LVAL); \
-			PUT_LONG(PTR, val); \
-		} \
-		else \
-			PUT_LONG(PTR, LVAL); \
+#define CM_PUT_LONG(PTR, LVAL, CONVFLAG)			\
+	{							\
+		if (CONVFLAG)					\
+		{						\
+			int4  val = GTM_BYTESWAP_32(LVAL);	\
+			PUT_LONG(PTR, val);			\
+		}						\
+		else						\
+			PUT_LONG(PTR, LVAL);			\
 	}
 
-#define CM_GET_USHORT(USVAR, PTR, CONVFLAG) \
-	{ \
-		if (CONVFLAG) \
-		{ \
-			unsigned short val; \
-			GET_USHORT(val, (PTR)); \
-			USVAR = GTM_BYTESWAP_16(val); \
-		} \
-		else \
-			GET_USHORT((USVAR), (PTR)); \
+#define CM_GET_USHORT(USVAR, PTR, CONVFLAG)		\
+	{						\
+		if (CONVFLAG)				\
+		{					\
+			unsigned short val;		\
+			GET_USHORT(val, (PTR));		\
+			USVAR = GTM_BYTESWAP_16(val);	\
+		}					\
+		else					\
+			GET_USHORT((USVAR), (PTR));	\
 	}
 
-#define CM_GET_SHORT(SVAR, PTR, CONVFLAG) \
-	{ \
-		if (CONVFLAG) \
-		{ \
-			short val; \
-			GET_SHORT(val, (PTR)); \
-			SVAR = GTM_BYTESWAP_16(val); \
-		} \
-		else \
-			GET_SHORT((SVAR), (PTR)); \
+#define CM_GET_SHORT(SVAR, PTR, CONVFLAG)		\
+	{						\
+		if (CONVFLAG)				\
+		{					\
+			short val;			\
+			GET_SHORT(val, (PTR));		\
+			SVAR = GTM_BYTESWAP_16(val);	\
+		}					\
+		else					\
+			GET_SHORT((SVAR), (PTR));	\
 	}
 
-#define CM_GET_ULONG(ULVAR, PTR, CONVFLAG) \
-	{ \
-		if (CONVFLAG) \
-		{ \
-			uint4 val; \
-			GET_ULONG(val, (PTR)); \
-			ULVAR = GTM_BYTESWAP_32(val); \
-		} \
-		else \
-			GET_ULONG((ULVAR), (PTR)); \
+#define CM_GET_ULONG(ULVAR, PTR, CONVFLAG)		\
+	{						\
+		if (CONVFLAG)				\
+		{					\
+			uint4 val;			\
+			GET_ULONG(val, (PTR));		\
+			ULVAR = GTM_BYTESWAP_32(val);	\
+		}					\
+		else					\
+			GET_ULONG((ULVAR), (PTR));	\
 	}
 
-#define CM_GET_LONG(LVAR, PTR, CONVFLAG) \
-	{ \
-		if (CONVFLAG) \
-		{ \
-			int4 val; \
-			GET_LONG(val, (PTR)); \
-			LVAR = GTM_BYTESWAP_32(val); \
-		} \
-		else \
-			GET_LONG((LVAR), (PTR)); \
+#define CM_GET_LONG(LVAR, PTR, CONVFLAG)		\
+	{						\
+		if (CONVFLAG)				\
+		{					\
+			int4 val;			\
+			GET_LONG(val, (PTR));		\
+			LVAR = GTM_BYTESWAP_32(val);	\
+		}					\
+		else					\
+			GET_LONG((LVAR), (PTR));	\
 	}
+
+/* ------------------------------------------------------------------------------------------------------------------
+ * Bounds checking of an inbound GT.CM GNP message.
+ *
+ * The GT.CM GNP server hands the raw client message buffer ("clb_ptr->mbf") to a gtcmtr_*() handler, which walks it
+ * with "*ptr++" and GET_USHORT() and feeds the lengths it finds there to memcpy()/malloc(). Every one of those
+ * lengths is chosen by the client, so each has to be checked against (a) how many bytes were actually received and
+ * (b) how big the destination is. And the check has to happen BEFORE the length is adjusted: a "len--" on an
+ * "unsigned short" 0 wraps around to 65535.
+ *
+ * "clb_ptr->cbl" holds the number of bytes cmj_fini() actually read for the message currently being processed, so it
+ * is the authoritative end of the message. Note that "clb_ptr->mbl" is NOT: it is the size of the allocated buffer,
+ * which is almost always larger than the message sitting in it.
+ * ------------------------------------------------------------------------------------------------------------------
+ */
+#define	CM_CLB_MSG_END(CLB)		((CLB)->mbf + (CLB)->cbl)
+#define	CM_CLB_BYTES_LEFT(CLB, PTR)	((CM_CLB_MSG_END(CLB) > (unsigned char *)(PTR))				\
+						? (size_t)(CM_CLB_MSG_END(CLB) - (unsigned char *)(PTR)) : (size_t)0)
+#define	CM_MSG_END(CNX)			CM_CLB_MSG_END((CNX)->clb_ptr)
+#define	CM_MSG_BYTES_LEFT(CNX, PTR)	CM_CLB_BYTES_LEFT((CNX)->clb_ptr, PTR)
+
+/* Reject the message currently being processed. Names the message type so the operator log identifies the sender's
+ * intent. Does not return.
+ */
+#define	CM_BADMSG(CNX)												\
+	RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_BADGTMNETMSG, 1, (int4)*(CNX)->clb_ptr->mbf)
+
+/* Verify NBYTES more bytes of the current message can be consumed starting at PTR */
+#define	CM_CHECK_AVAIL(CNX, PTR, NBYTES)									\
+MBSTART {													\
+	if ((size_t)(NBYTES) > CM_MSG_BYTES_LEFT(CNX, PTR))							\
+		CM_BADMSG(CNX);											\
+} MBEND
+
+/* The client side of the same problem. GT.CM GNP clients and their servers are designed to run within the same
+ * security zone, so this is not about a hostile server: the lengths in a reply need checking against what was
+ * received for the same reason the ones in a request do, so that a malformed message cannot walk a pointer off the
+ * end of the buffer. BADSRVRNETMSG is what the client code already raises for a reply it cannot parse. Does not
+ * return on failure.
+ */
+#define	CM_CHECK_AVAIL_REPLY(CLB, PTR, NBYTES)									\
+MBSTART {													\
+	if ((size_t)(NBYTES) > CM_CLB_BYTES_LEFT(CLB, PTR))							\
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_BADSRVRNETMSG);					\
+} MBEND
+
+/* TRUE for a (BASE, END, PREV) triple that does not describe a well formed gv_key. A key assembled out of a message
+ * describes itself with "end" and "prev", and the runtime indexes "base" with both, writing as well as reading: "end"
+ * is the offset of the second of the two <NUL> bytes that terminate a key, and "prev" the offset of the last
+ * subscript. LIMIT is one past the last byte of BASE holding message data, so a key has to end inside it. A caller
+ * with no "prev" worth checking passes 0, which turns that term off.
+ */
+#define	CM_BAD_KEY_SHAPE(BASE, END, PREV, LIMIT)							\
+	((2 > (END)) || ((END) >= (LIMIT))								\
+		|| (KEY_DELIMITER != (BASE)[(END)]) || (KEY_DELIMITER != (BASE)[(END) - 1])		\
+		|| ((0 != (PREV)) && ((PREV) >= (END))))
+
+/* Read the "<length> <region number>" prefix that the CMMS_Q_* messages carry, where <length> counts the region
+ * number itself plus whatever follows. Verifies the prefix was actually received and that <length> accounts for at
+ * least the region number, BEFORE the region number is subtracted from it: subtracting first would turn a
+ * client-supplied 0 into 65535.
+ */
+#define	CM_GET_REGNUM(CNX, PTR, REGNUM, LEN)									\
+MBSTART {													\
+	CM_CHECK_AVAIL(CNX, PTR, SIZEOF(unsigned short) + SIZEOF(unsigned char));				\
+	GET_USHORT(LEN, PTR);											\
+	(PTR) += SIZEOF(unsigned short);									\
+	if (0 == (LEN))												\
+		CM_BADMSG(CNX);											\
+	REGNUM = *(PTR)++;											\
+	(LEN)--;	/* subtract size of regnum */								\
+} MBEND
 
 #define CM_GET_GVCURRKEY(PTR, LEN)	PTR = gtcmtr_get_key(gv_currkey, PTR, LEN);
