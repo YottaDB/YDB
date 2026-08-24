@@ -3,7 +3,7 @@
  * Copyright (c) 2003-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  * Copyright (c) 2018 Stephen L Johnson.			*
@@ -223,10 +223,41 @@
    * We do not need memory barrier primitives on Solaris/SPARC.
    */
 
-  /* Memory accesses in Intel x86 and IBM S390 archtectures are strongly ordered */
+  /* Memory accesses in Intel x86 and IBM S390 archtectures are strongly ordered, so no fence
+   * INSTRUCTION is needed. A COMPILER barrier still is, and these expanded to nothing at all until
+   * YDB#1143 showed what that costs.
+   *
+   * The hardware not reordering two loads does not stop the COMPILER from deleting the second one.
+   * Where code reads a shared memory location, does some work, and reads it again to confirm it has
+   * not changed, the compiler is entitled to reuse the first value: the location is not volatile and
+   * nothing between the two reads tells it otherwise. It then folds the second test away as always
+   * true. Every architecture above is accidentally safe from this, because each of their barriers is
+   * an "__asm__ volatile" carrying a "memory" clobber, which is a compiler barrier as well as a
+   * hardware one. Only this branch, which emits nothing, was not.
+   *
+   * That is not theoretical. The search index in "gvcst_blk_sidx_locate" re-reads a slot's stamp
+   * after copying a sample out of it, exactly so that a slot rewritten under the reader is rejected.
+   * On a GCC production build - LTO is enabled for GCC only, so x86_64 - that function is inlined
+   * into "gvcst_search_blk", the two reads land in one function with nothing between them, and the
+   * re-check is compiled away. A reader then accepts a sample a builder was part way through
+   * writing, resumes its search at a record the sample's key does not belong to, and that becomes
+   * keys out of order on disk. It reproduces in seconds on x86_64 and has never been seen on
+   * aarch64, which is built with clang, gets no LTO, and has a "dmb ish" with a memory clobber.
+   *
+   * An empty "__asm__ volatile" with a memory clobber emits NO instruction. It costs nothing at run
+   * time; it only stops the optimizer moving or removing accesses across this point, which is the
+   * whole purpose of the macro.
+   *
+   * Both macros get the barrier. The read macro is the one a defect was traced to, but the write
+   * macro had the identical hole: it too can be shown to permit accesses to move across it, and a
+   * macro whose name promises an ordering point should provide one whether or not a failure has
+   * been attributed to it yet. The read side is the standing demonstration of what "no failure
+   * attributed yet" is worth - it was empty for as long, and cost four database corruptions the
+   * first time a build inlined across it.
+   */
 
-#  define SHM_WRITE_MEMORY_BARRIER
-#  define SHM_READ_MEMORY_BARRIER
+#  define SHM_WRITE_MEMORY_BARRIER	__asm__ volatile ("" ::: "memory")
+#  define SHM_READ_MEMORY_BARRIER	__asm__ volatile ("" ::: "memory")
 #  define MM_WRITE_MEMORY_BARRIER
 #  define MM_WRITE_MEMORY_BARRIER_IS_NO_OP
 
