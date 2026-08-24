@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -46,13 +46,14 @@ GBLREF gd_region	*gv_cur_region;
 GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF sgmnt_data_ptr_t	cs_data;
 
+error_def (ERR_BADGTMNETMSG);
 error_def (ERR_DBOPNERR);
 
 cm_region_head *gtcmd_ini_reg(connection_struct *cnx)
 {
 	cm_region_head  *last, *ptr;
 	struct stat	stat_buf;
-	unsigned char	*fname, buff[256];
+	unsigned char	*fname, buff[MAX_FN_LEN + 1];
 	unsigned short	len;
 	uint4		status, retlen;
 	unsigned char	ch, node[MAX_HOST_NAME_LEN], *tmp_ptr;
@@ -62,10 +63,19 @@ cm_region_head *gtcmd_ini_reg(connection_struct *cnx)
 	ptr = 0;
 	fname = cnx->clb_ptr->mbf;
 	fname++;
+	CM_CHECK_AVAIL(cnx, fname, SIZEOF(unsigned short));
 	GET_USHORT(len, fname); 	/* len = *((unsigned short *)fname); */
 	fname += SIZEOF(unsigned short);
-	buff[len] = 0;
+	/* "len" is the length of the database file name the client asked us to open. It indexes "buff" and sizes the
+	 * memcpy() into it, so it has to be checked against the size of "buff" and against the number of bytes
+	 * actually received: the whole message can be up to "mbl" bytes, so an unchecked name of a few hundred bytes
+	 * overruns "buff" on the stack. "buff" is sized to match "dyn.addr->fname" below.
+	 */
+	CM_CHECK_AVAIL(cnx, fname, len);
+	if ((0 == len) || (MAX_FN_LEN < len))
+		CM_BADMSG(cnx);
 	memcpy(buff, fname, len);
+	buff[len] = 0;
 	STAT_FILE((char *)buff, &stat_buf, status);
 	if ((uint4)-1 == status)
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_DBOPNERR, 2, len, fname, errno);
