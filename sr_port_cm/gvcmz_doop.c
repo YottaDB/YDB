@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -180,15 +180,25 @@ void gvcmz_doop(unsigned char query_code, unsigned char reply_code, mval *v)
 	if ((CMMS_R_PREV == reply_code) || (CMMS_R_QUERY == reply_code) || (CMMS_R_ORDER == reply_code)
 		|| (CMMS_R_REVERSEQUERY == reply_code))
 	{
+		CM_CHECK_AVAIL_REPLY(lnk, ptr, SIZEOF(short));
 		CM_GET_SHORT(len, ptr, ((link_info *)(lnk->usr))->convert_byteorder);
 		ptr += SIZEOF(short);
 		if (1 == len)
 			MV_FORCE_MVAL(v, 0);
 		else
-		{
+		{	/* "len", and the "end" and "prev" below, come from the server and are checked rather than
+			 * asserted, since a PRO build compiles asserts out. "keylen" is a "short", so a "len" below 8
+			 * makes it zero or negative and the memcpy() count enormous, and nothing else caps it at
+			 * "gv_altkey->top".
+			 */
+			if ((1 + (3 * SIZEOF(unsigned short))) >= len)
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_BADSRVRNETMSG);
+			CM_CHECK_AVAIL_REPLY(lnk, ptr, len);
 			if (*ptr++ != gv_cur_region->cmx_regnum)
 				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_BADSRVRNETMSG);
 			keylen = (len - 1 - (3 * SIZEOF(unsigned short)));	/* 3 for gv_key->top, prev, end */
+			if (keylen > gv_altkey->top)
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_BADSRVRNETMSG);
 #			ifdef DEBUG
 			CM_GET_USHORT(srv_buff_size, ptr, ((link_info *)(lnk->usr))->convert_byteorder);
 			assert(srv_buff_size == gv_altkey->top);
@@ -198,12 +208,24 @@ void gvcmz_doop(unsigned char query_code, unsigned char reply_code, mval *v)
 #			endif
 			ptr += SIZEOF(unsigned short);
 			CM_GET_USHORT(gv_altkey->end, ptr, ((link_info *)(lnk->usr))->convert_byteorder);
-			DEBUG_ONLY(assert(gv_altkey->end <= gv_altkey->top));
   			ptr += SIZEOF(unsigned short);
 			CM_GET_USHORT(gv_altkey->prev, ptr, ((link_info *)(lnk->usr))->convert_byteorder);
 			ptr += SIZEOF(unsigned short);
 			memcpy(gv_altkey->base, ptr, keylen);
 			ptr += keylen;
+			/* "end" is the offset of the second of the two <NUL> bytes terminating a key. Check the key
+			 * we were handed has that shape, since the caller indexes "base" with "end".
+			 * "prev" is deliberately not checked here, which is what the 0 passed for it below means.
+			 * For CMMS_R_ORDER and CMMS_R_PREV the server sets
+			 * it from the request key, but "gvcst_query()" and "gvcst_queryget()" never assign it, so for
+			 * CMMS_R_QUERY and CMMS_R_REVERSEQUERY the server sends whatever the previous operation in
+			 * that server process happened to leave in "gv_altkey->prev". It is not a description of the
+			 * key being returned and can exceed "end". Nothing here indexes "base" with it either:
+			 * "op_gvorder", "op_zprevious" and "op_gvnext" each overwrite "gv_altkey->prev" with
+			 * "gv_currkey->prev" before using it.
+			 */
+			if (CM_BAD_KEY_SHAPE(gv_altkey->base, gv_altkey->end, 0, keylen))
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_BADSRVRNETMSG);
 			MV_FORCE_MVAL(v, 1);
 		}
 		if ((CMMS_R_QUERY != reply_code) || (1 == len) || !((link_info *)lnk->usr)->query_is_queryget)
@@ -216,8 +238,12 @@ void gvcmz_doop(unsigned char query_code, unsigned char reply_code, mval *v)
 	assert((CMMS_R_GET == reply_code)
 		|| (CMMS_R_INCREMENT == reply_code)
 		|| ((CMMS_R_QUERY == reply_code) && ((link_info *)lnk->usr)->query_is_queryget && (1 < len)));
+	CM_CHECK_AVAIL_REPLY(lnk, ptr, SIZEOF(short));
 	CM_GET_SHORT(len, ptr, ((link_info *)(lnk->usr))->convert_byteorder);
 	ptr += SIZEOF(unsigned short);
+	if (0 > len)
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_BADSRVRNETMSG);
+	CM_CHECK_AVAIL_REPLY(lnk, ptr, len);	/* the memmove() below reads "len" bytes from here */
 	assert((ptr >= stringpool.base) && ((ptr + len) < stringpool.top)); /* incoming message is in stringpool */
 	v->mvtype = MV_STR;
 	v->str.len = len;
