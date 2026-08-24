@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -39,6 +39,8 @@ GBLREF gv_key		*gv_currkey;
 GBLREF gv_key		*gv_altkey;
 GBLREF gd_region        *gv_cur_region;
 
+error_def(ERR_BADGTMNETMSG);
+
 cm_op_t gtcmtr_query(void)
 {
 	unsigned char	*ptr, *gv_key_top_ptr, regnum;
@@ -53,11 +55,8 @@ cm_op_t gtcmtr_query(void)
 	ptr = curr_entry->clb_ptr->mbf;
 	assert(CMMS_Q_QUERY == *ptr);
 	ptr++;
-	GET_USHORT(tmp_len, ptr);
-	ptr += SIZEOF(short);
-	regnum = *ptr++;
+	CM_GET_REGNUM(curr_entry, ptr, regnum, tmp_len);
 	reg_ref = gtcm_find_region(curr_entry, regnum);
-	tmp_len--;	/* subtract size of regnum */
 	assert(0 == offsetof(gv_key, top));
 	GET_USHORT(old_top, ptr); /* old_top = ((gv_key *)ptr)->top; */
 	CM_GET_GVCURRKEY(ptr, tmp_len);

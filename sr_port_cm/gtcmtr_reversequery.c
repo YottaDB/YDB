@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -44,6 +44,8 @@ GBLREF gv_key		*gv_currkey;
 GBLREF gv_key		*gv_altkey;
 GBLREF gd_region        *gv_cur_region;
 
+error_def(ERR_BADGTMNETMSG);
+
 /* This function is invoked by the GT.CM GNP server on behalf of a $query(gvn,-1) operation on the client.
  * This function sets "gv_currkey" from the input message and invokes "gvcst_reversequery" (which does the $query)
  * and copies the result (which is in "gv_altkey") in a message that is sent back to the client by the caller.
@@ -63,11 +65,8 @@ cm_op_t gtcmtr_reversequery(void)
 	ptr = curr_entry->clb_ptr->mbf;
 	assert(CMMS_Q_REVERSEQUERY == *ptr);
 	ptr++;
-	GET_USHORT(tmp_len, ptr);
-	ptr += SIZEOF(short);
-	regnum = *ptr++;
+	CM_GET_REGNUM(curr_entry, ptr, regnum, tmp_len);
 	reg_ref = gtcm_find_region(curr_entry, regnum);
-	tmp_len--;	/* subtract size of regnum */
 	assert(0 == offsetof(gv_key, top));
 	GET_USHORT(old_top, ptr); /* old_top = ((gv_key *)ptr)->top; */
 	/* See gtcmtr_zprevious.c for comments on "old_top" */

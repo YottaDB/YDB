@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -34,6 +34,7 @@ GBLREF gv_key			*gv_currkey;
 GBLREF gv_namehead		*gv_target;
 GBLREF gd_region		*gv_cur_region;
 
+error_def(ERR_BADGTMNETMSG);
 error_def(ERR_DBPRIVERR);
 
 cm_op_t gtcmtr_zwithdraw(void)
@@ -46,11 +47,8 @@ cm_op_t gtcmtr_zwithdraw(void)
 	ptr = curr_entry->clb_ptr->mbf;
 	assert(*ptr == CMMS_Q_ZWITHDRAW);
 	ptr++;
-	GET_USHORT(len, ptr);
-	ptr += SIZEOF(unsigned short);
-	regnum = *ptr++;
+	CM_GET_REGNUM(curr_entry, ptr, regnum, len);
 	reg_ref = gtcm_find_region(curr_entry,regnum);
-	len--; /* subtract size of regnum */
 	CM_GET_GVCURRKEY(ptr, len);
 	gtcm_bind_name(reg_ref->reghead, TRUE);
 	if (gv_cur_region->read_only)

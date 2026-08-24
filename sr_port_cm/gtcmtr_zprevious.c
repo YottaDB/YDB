@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -46,6 +46,8 @@ GBLREF gv_key		*gv_altkey;
 GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF gd_region        *gv_cur_region;
 
+error_def(ERR_BADGTMNETMSG);
+
 cm_op_t gtcmtr_zprevious(void)
 {
 	boolean_t		found;
@@ -60,11 +62,8 @@ cm_op_t gtcmtr_zprevious(void)
 	ptr = curr_entry->clb_ptr->mbf;
 	assert(CMMS_Q_PREV == *ptr);
 	ptr++;
-	GET_USHORT(len, ptr);
-	ptr += SIZEOF(short);
-	regnum = *ptr++;
+	CM_GET_REGNUM(curr_entry, ptr, regnum, len);
 	reg_ref = gtcm_find_region(curr_entry, regnum);
-	len--;	/* subtract size of regnum */
 	assert(0 == offsetof(gv_key, top));
 	GET_USHORT(old_top, ptr); /* old_top = ((gv_key *)ptr)->top; */
 	/* old_top is the size of the gv_currkey structure allocated on the client side.
