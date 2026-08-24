@@ -59,7 +59,7 @@ error_def(ERR_SERVERERR);
 
 CONDITION_HANDLER(gtcm_ch)
 {
-	unsigned char	msgnum, sevmsgbuf[2048];
+	unsigned char	msgnum, sevmsgbuf[OUT_BUFF_SIZE];	/* holds a copy of util_outbuff, so must match its size */
 	unsigned char	*tempptr, *mbfptr, *endptr, *msgptr;
 	err_ctl		*fac;
 	int		i, msglen, len, rc, orig_severity;
@@ -122,7 +122,7 @@ CONDITION_HANDLER(gtcm_ch)
 		{
 			assert(msglen);
 			len = MIN(msglen, (int)(endptr - mbfptr));
-			memcpy(mbfptr, msgptr, msglen);
+			memcpy(mbfptr, msgptr, len);	/* "len", not "msglen": "len" is what fits in what is left */
 			mbfptr += len;
 			msgptr += len;
 			msglen -= len;
