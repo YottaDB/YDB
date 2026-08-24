@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -39,6 +39,7 @@ GBLREF gv_key		*gv_currkey;
 GBLREF connection_struct *curr_entry;
 GBLREF jnl_process_vector *originator_prc_vec;
 
+error_def(ERR_BADGTMNETMSG);
 error_def(ERR_GVIS);
 error_def(ERR_KEY2BIG);
 error_def(ERR_REC2BIG);
@@ -48,7 +49,7 @@ cm_op_t gtcmtr_bufflush(void)
 	cm_region_list	*reg_ref;
 	mval		v;
 	short		n;
-	unsigned short	num_trans, data_len;
+	unsigned short	num_trans, data_len, key_end, key_prev;
 	unsigned char	buff[MAX_ZWR_KEY_SZ], *end;
 	unsigned char	*ptr, regnum, len, cc, prv;
 	static readonly gds_file_id file;
@@ -58,21 +59,41 @@ cm_op_t gtcmtr_bufflush(void)
 	assert(*ptr == CMMS_B_BUFFLUSH);
 	ptr++;
 	v.mvtype = MV_STR;
+	CM_CHECK_AVAIL(curr_entry, ptr, SIZEOF(unsigned short));
 	GET_USHORT(num_trans, ptr);
 	ptr += SIZEOF(short);
 	for (; num_trans-- > 0;)
 	{
+		/* "len", "cc" and "prv" are single bytes from the client. "cc" is the number of leading bytes this key
+		 * shares with the previous one and "len" the number of bytes that follow it, so together they say where
+		 * in "gv_currkey" to write and how much. Bounding them with an assert will not do, since a PRO build
+		 * compiles it out, letting a client write up to 255 bytes at an offset of up to 255 into a key buffer
+		 * that is DBKEYSIZE(reg->max_key_size) bytes and can be as small as ~64.
+		 */
+		CM_CHECK_AVAIL(curr_entry, ptr, 4 * SIZEOF(unsigned char));
 		regnum = *ptr++;
 		reg_ref = gtcm_find_region(curr_entry, regnum);
 		len = *ptr++;
 		cc = *ptr++;
 		prv = *ptr++;
-		assert((unsigned short)(len + cc - 1) < gv_currkey->top);
+		CM_CHECK_AVAIL(curr_entry, ptr, len);
+		if ((0 == len) || ((unsigned short)(len + cc) > gv_currkey->top))
+			CM_BADMSG(curr_entry);
 		memcpy(&gv_currkey->base[cc], ptr, len);
 		ptr += len;
-		gv_currkey->end = (unsigned short)(len + cc - 1);
-		gv_currkey->prev = (unsigned short)prv;
-		assert((unsigned short)prv < gv_currkey->end);
+		/* Check the assembled key against the shape the runtime expects rather than asserting it. Check locals
+		 * rather than the key itself: assigning first and rejecting afterwards leaves a client supplied "end"
+		 * behind in gv_currkey, which the server goes on using, and the next region open then dies in
+		 * gvcst_reservedDB_funcs() on "assert((SIZEOF(gv_key) + gv_currkey->end + 1) <= SIZEOF(save_currkey))".
+		 * The bytes copied above stay inside the "(len + cc) > top" bound checked earlier, and the next
+		 * accepted operation overwrites them.
+		 */
+		key_end = (unsigned short)(len + cc - 1);
+		key_prev = (unsigned short)prv;
+		if (CM_BAD_KEY_SHAPE(gv_currkey->base, key_end, key_prev, len + cc))
+			CM_BADMSG(curr_entry);
+		gv_currkey->end = key_end;	/* only now that the shape is known good */
+		gv_currkey->prev = key_prev;
 		if ((n = gv_currkey->end + 1) > gv_cur_region->max_key_size)
 		{
 			if ((end = format_targ_key(&buff[0], MAX_ZWR_KEY_SZ, gv_currkey, TRUE)) == 0)
@@ -86,8 +107,10 @@ cm_op_t gtcmtr_bufflush(void)
 			cs_addrs->jnl->pini_addr = reg_ref->pini_addr;
 			originator_prc_vec = curr_entry->pvec;
 		}
+		CM_CHECK_AVAIL(curr_entry, ptr, SIZEOF(unsigned short));
 		GET_USHORT(data_len, ptr);
 		ptr += SIZEOF(short);
+		CM_CHECK_AVAIL(curr_entry, ptr, data_len);	/* gvcst_put() below reads "data_len" bytes from here */
 		v.str.len = data_len;
 		v.str.addr = (char *)ptr;
 		if (n + v.str.len + SIZEOF(rec_hdr) > gv_cur_region->max_rec_size)
