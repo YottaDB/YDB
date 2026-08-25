@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -130,6 +130,7 @@ error_def(ERR_OFRZACTIVE);
 error_def(ERR_SEMREMOVED);
 error_def(ERR_SHMREMOVED);
 error_def(ERR_STATSDBNOTSUPP);
+error_def(ERR_FILEDELFAIL);
 error_def(ERR_SYSCALL);
 error_def(ERR_TEXT);
 error_def(ERR_VERMISMATCH);
@@ -771,7 +772,40 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 				if (statsDBexists && statsDBrundown_status)
 				{
 					rc = UNLINK(statsdb_fname);
-					assert(0 == rc);
+					/* ENOENT is not a failure here. Two independent code paths remove a statsdb
+					 * and they hold different locks: this one, which runs when the basedb has NO
+					 * shared memory and holds the basedb ftok, and
+					 * UNLINK_STATSDB_AT_BASEDB_RUNDOWN in "gds_rundown", which runs when a normal
+					 * process exits as the last user. The second removes the shared memory before
+					 * it reaches its unlink, which is precisely the state that lets this path
+					 * decide no shared memory exists. So an exiting process can remove the statsdb
+					 * between the "mupfndfil" above finding it and the UNLINK here. Both callers
+					 * want the file gone, so finding that someone else got there first is the
+					 * wanted outcome, not an error.
+					 *
+					 * Any OTHER errno still asserts, since no situation is known in which this
+					 * process is not permitted to remove the file, and the message below says
+					 * which file and which errno so that a DEBUG failure is analysable rather
+					 * than just reporting that "0 == rc" was false. All DEBUG only: a PRO build
+					 * ignores every failure here and carries on with the basedb rundown, which
+					 * matters more.
+					 */
+					DEBUG_ONLY(
+						if (0 != rc)
+						{
+							save_errno = errno;
+							if (ENOENT != save_errno)
+							{
+								gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4)
+										ERR_FILEDELFAIL, 2,
+										statsdb_fname_len, statsdb_fname);
+								gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8)
+										ERR_SYSCALL, 5, LEN_AND_LIT("unlink()"),
+										CALLFROM, save_errno);
+							}
+							assert(ENOENT == save_errno);
+						}
+					)
 				}
 			}
 		}

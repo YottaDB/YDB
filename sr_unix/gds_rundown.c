@@ -120,6 +120,7 @@ error_def(ERR_CRITSEMFAIL);
 error_def(ERR_DBFILERR);
 error_def(ERR_DBRNDWN);
 error_def(ERR_DBRNDWNWRN);
+error_def(ERR_FILEDELFAIL);
 error_def(ERR_GTMASSERT);
 error_def(ERR_GTMASSERT2);
 error_def(ERR_GTMCHECK);
@@ -133,6 +134,7 @@ error_def(ERR_RNDWNSEMFAIL);
 error_def(ERR_RNDWNSKIPCNT);
 error_def(ERR_STACKOFLOW);
 error_def(ERR_STACKOFLOW);
+error_def(ERR_SYSCALL);
 error_def(ERR_TEXT);
 error_def(ERR_WCBLOCKED);
 

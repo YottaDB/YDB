@@ -955,7 +955,27 @@ MBSTART {														\
 		assert(CNL->statsdb_fname_len);	/* "gvcst_init" would not have set CNL->statsdb_created otherwise */	\
 		assert('\0' == CNL->statsdb_fname[CNL->statsdb_fname_len]);						\
 		rc = UNLINK(CNL->statsdb_fname);									\
-		assert(0 == rc);											\
+		/* ENOENT is not a failure : "mu_rndwn_file" removes a statsdb too, holding a different	\
+		 * lock, so it can get there first. Any other errno still asserts, after saying which	\
+		 * file and which errno so a DEBUG failure is analysable. All DEBUG only, so a PRO	\
+		 * build is unchanged. Expanded in only the two callers of this macro, so no other	\
+		 * includer of gdsbt.h needs "gtm_putmsg_csa" or these error_defs.			\
+		 */													\
+		DEBUG_ONLY(												\
+			if (0 != rc)											\
+			{												\
+				int	unlink_errno = errno;							\
+														\
+				if (ENOENT != unlink_errno)							\
+				{										\
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_FILEDELFAIL, 2,		\
+							CNL->statsdb_fname_len, CNL->statsdb_fname);		\
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,		\
+							LEN_AND_LIT("unlink()"), CALLFROM, unlink_errno);	\
+				}										\
+				assert(ENOENT == unlink_errno);							\
+			}												\
+		)													\
 		/* If error removing statsdb, ignore as we want to continue rundown of basedb (more important) */	\
 		CNL->statsdb_created = FALSE;										\
 	}														\
