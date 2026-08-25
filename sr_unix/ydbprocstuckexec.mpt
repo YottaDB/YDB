@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-; Copyright (c) 2020-2024 YottaDB LLC and/or its subsidiaries.	;
+; Copyright (c) 2020-2026 YottaDB LLC and/or its subsidiaries.	;
 ; All rights reserved.						;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -68,6 +68,15 @@
 	set procfsdir="/proc/"_blockpid_"/"	; directory in /procfs with blocking pid info
 	write "Invoked on ",blockpid," by ",callpid," for ",count,$select(1=count:"st",2=count:"nd",3=count:"rd",1:"th")," time; reason: ",msg,!
 	write "--------------------",!
+	; A non-positive blocking pid names no process, so there is nothing to report on. Say so and
+	; stop, rather than reading "/proc/0/", running "gdb -pid 0", and above all sending a signal to
+	; it: $ZSIGPROC(0,...) reaches kill(0,...), which signals EVERY process in this process group -
+	; this routine, the process that invoked it and whatever started that. YottaDB no longer invokes
+	; $ydb_procstuckexec with such a pid, but this routine can also be run by hand, so take care of
+	; that case too below.
+	if 0'<blockpid do  quit
+	. write "No stack trace collected : ",blockpid," does not name a process.",!
+	. close outfile
 	; report command line of blocking pid
 	set file=procfsdir_"cmdline",okflag=1
 	open file:(readonly:exception="set okflag=0 goto cmd1")

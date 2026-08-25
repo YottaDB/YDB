@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
- * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.      *
+ * Copyright (c) 2019-2026 YottaDB LLC and/or its subsidiaries.      *
  * All rights reserved.                                         *
  *								*
  *	This source code contains the intellectual property	*
@@ -47,7 +47,22 @@ void op_fnzsigproc(int pid, mval *sigval, mval *retcode)
 			return;
 		}
 	}
-	if (-1 == kill(pid, num))
+	/* Reject a non-positive pid. "kill()" gives these a meaning that no caller of $ZSIGPROC can
+	 * plausibly want: 0 signals EVERY process in the caller's process group, -1 signals every
+	 * process the user is permitted to signal, and any other negative value signals a whole process
+	 * group. A pid computed at the M level that comes out 0 would therefore take out the caller
+	 * itself along with everything sharing its process group, silently and with a success return.
+	 * That is not theoretical. "%YDBPROCSTUCKEXEC" is handed the pid blocking a stuck process, and
+	 * "wcs_recover" legitimately reports that pid as 0 when it finds a cache record whose read is in
+	 * progress but whose owner never recorded itself - which is what a "kill -9" landing inside the
+	 * window in "db_csh_getn" between LOCK_BUFF_FOR_READ and "cr->r_epid = process_id" leaves
+	 * behind. $ZSIGPROC(0,"USR1") then signalled the entire process group, killing the stuck process
+	 * script, the test that invoked it, and the shell it was started from.
+	 * EINVAL matches what is already returned above for a signal name that does not resolve.
+	 */
+	if (0 >= pid)
+		rc = EINVAL;
+	else if (-1 == kill(pid, num))
 		rc = errno;
 	else
 		rc = 0;

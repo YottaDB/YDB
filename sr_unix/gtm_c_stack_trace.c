@@ -3,7 +3,7 @@
  * Copyright (c) 2012-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -56,6 +56,20 @@ void gtm_c_stack_trace(char *message, pid_t waiting_pid, pid_t blocking_pid, uin
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	if (0 >= blocking_pid)
+	{	/* There is no process to look at, so there is nothing for the script to do. Callers can
+		 * legitimately get here with 0: "wcs_recover" reports a blocking pid of 0 when it finds a
+		 * cache record whose read is in progress but whose owner never recorded itself, which is
+		 * what a "kill -9" inside the window in "db_csh_getn" between LOCK_BUFF_FOR_READ and
+		 * "cr->r_epid = process_id" leaves behind.
+		 *
+		 * This matters beyond the shipped script, because $ydb_procstuckexec names an arbitrary
+		 * user supplied command. Handing it a pid of 0 invites it to do something to the process
+		 * GROUP rather than to one process. The shipped "%YDBPROCSTUCKEXEC" did exactly that, via
+		 * $ZSIGPROC(0,"USR1"), and killed the whole process group including the caller.
+		 */
+		return;
+	}
 	messagelen = strnlen(message, MAX_STRLEN);
 	assert(SIZEOF(count) <= SIZEOF(pid_t));
 	arr_len = GTM_MAX_DIR_LEN + messagelen + (3 * MAX_PIDSTR_LEN) + 5;	/* 4 spaces and a terminator */
