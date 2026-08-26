@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2022-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2022-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -128,8 +128,21 @@ void op_fngetjpi(mint jpid, mval *kwd, mval *ret)
 			if ((ret_size < buffer_size) && save_errno)
 			{
 				char	errstr[128];
+
+				/* Close fd before deciding what to do with the error. Avoids fd leak. */
+				FCLOSE(fp, status);
+				if (ESRCH == save_errno)
+				{	/* The process exited between the Fopen() above and this read. Linux returns
+					 * ESRCH from a read on an already open /proc/<pid>/cmdline once the process
+					 * has been reaped. That is the same "the process is not there" case the
+					 * failed-open path below handles, so answer it the same way rather than
+					 * reporting a system call error the caller cannot do anything about.
+					 */
+					*ret = literal_null;
+					return;
+				}
 				SNPRINTF(errstr, SIZEOF(errstr), "fread() : %s : Expected = %lld : Actual = %lld",
-								fp, (long long)buffer_size, (long long)ret_size);
+								filename, (long long)buffer_size, (long long)ret_size);
 				/* ERROR encountered during GTM_FREAD */
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8)
 						ERR_SYSCALL, 5, LEN_AND_STR(errstr), CALLFROM, save_errno);
@@ -270,8 +283,20 @@ void op_fngetjpi(mint jpid, mval *kwd, mval *ret)
 			{
 				char	errstr[128];
 
+				/* Close fd before deciding what to do with the error. Avoids fd leak. */
+				FCLOSE(fp, status);
+				if (ESRCH == save_errno)
+				{	/* The process exited between the Fopen() above and this read. Linux returns
+					 * ESRCH from a read on an already open /proc/<pid>/stat once the process has
+					 * been reaped. That is the same "the process is not there" case the
+					 * failed-open path below handles, so answer it the same way rather than
+					 * reporting a system call error the caller cannot do anything about.
+					 */
+					i2mval(ret, -1);
+					return;
+				}
 				SNPRINTF(errstr, SIZEOF(errstr), "fread() : %s : Expected = %lld : Actual = %lld",
-								fp, (long long)read_size, (long long)ret_size);
+								filename, (long long)read_size, (long long)ret_size);
 				/* ERROR encountered during GTM_FREAD */
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8)
 						ERR_SYSCALL, 5, LEN_AND_STR(errstr), CALLFROM, save_errno);
