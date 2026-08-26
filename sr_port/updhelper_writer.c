@@ -3,7 +3,7 @@
  * Copyright (c) 2005-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -142,6 +142,12 @@ int updhelper_writer(void)
 					/* Handle MM file extensions so that the flush timer can function properly. */
 					MM_DBFILEXT_REMAP_IF_NEEDED(csa, reg);
 				}
+				if (JNL_ENABLED(csd))
+				{	/* "wcs_timer_start" -> EPOCH_TAPER_IF_NEEDED uses jgbl.gbl_jrec_time so it has to
+					 * be current before that call.
+					 */
+					SET_GBL_JREC_TIME;
+				}
 				wcs_timer_start(reg, TRUE);
 				if ((cnl->wcs_active_lvl >= csd->flush_trigger * csd->writer_trigger_factor / 100.0)
 						&& !FROZEN_CHILLED(csa))
@@ -158,8 +164,7 @@ int updhelper_writer(void)
 					/* Open the journal so the flush timer can flush journal records. */
 					if ((NOJNL == jpc->channel) || JNL_FILE_SWITCHED(jpc))
 						ENSURE_JNL_OPEN(csa, reg);
-					SET_GBL_JREC_TIME;
-					assert(jgbl.gbl_jrec_time);
+					assert(jgbl.gbl_jrec_time);	/* set above, before "wcs_timer_start" */
 					/* If EPOCH is the most recent record written in the journal buffer, do not
 					 * attempt any more checks of time/crit or write epochs. Hence the "post_epoch_freeaddr"
 					 * use below. If EPOCH is not the most recent record in the journal buffer,

@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2026 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -15,6 +18,7 @@
 /* Start jnlsp.h - platform-specific journaling definitions.  */
 
 #include <errno.h>
+#include "gtm_time.h"	/* needed for "clock_gettime" */
 #include "filestruct.h" /* needed for unix_file_info */
 
 typedef gtm_int64_t		jnl_proc_time;
@@ -39,23 +43,35 @@ typedef unix_file_info		fi_type;
 #define EXTINTVMS(I)
 #define EXTTXTVMS(T,L)
 
-#ifndef GTM64
-#define	JNL_SHORT_TIME(S)		(time((time_t *)&S))
-#else
-#define JNL_SHORT_TIME(S)		\
-{					\
-	time_t temp_t; 			\
-	time(&temp_t); 			\
-	S = (int4) temp_t;		\
+/* The two macros below deliberately use "clock_gettime(CLOCK_REALTIME)" and not the cheaper "time()".
+ * On Linux BOTH are served from the vDSO, with no system call, so the difference is not kernel entry.
+ * It is what each one reads. "time()" returns a seconds value the kernel refreshes once per timekeeping
+ * tick, while "clock_gettime(CLOCK_REALTIME)" reads the hardware clocksource live. Reading a snapshot is
+ * why "time()" is the cheaper of the two, and it is also why it can report a second that is up to one
+ * tick behind what "clock_gettime(CLOCK_REALTIME)" reports (measured at ~1.6 milliseconds on a 6.12
+ * kernel).
+ *
+ * $HOROLOG, $ZHOROLOG and $ZUT ("op_zhorolog"/"op_zut") and the HANG command ("hiber_start_wall_time")
+ * all use "clock_gettime(CLOCK_REALTIME)". If journal record timestamps came from "time()", an M program
+ * that records $HOROLOG, does a HANG 1 and then updates a global could get a journal record stamped with
+ * the same second as the recorded $HOROLOG (instead of a later second). A MUPIP JOURNAL -SINCE/-BEFORE
+ * using that recorded $HOROLOG value would then incorrectly include the update done after the HANG.
+ */
+#define JNL_SHORT_TIME(S)				\
+{							\
+	struct timespec	temp_ts;			\
+							\
+	clock_gettime(CLOCK_REALTIME, &temp_ts);	\
+	S = (int4)temp_ts.tv_sec;			\
 }
-#endif
 
 #define JNL_WHOLE_FROM_SHORT_TIME(W, S)	W = (S)
-#define	JNL_WHOLE_TIME(W)		\
-{					\
-	time_t temp_t; 			\
-	time(&temp_t); 			\
-	W = temp_t;			\
+#define	JNL_WHOLE_TIME(W)				\
+{							\
+	struct timespec	temp_ts;			\
+							\
+	clock_gettime(CLOCK_REALTIME, &temp_ts);	\
+	W = temp_ts.tv_sec;				\
 }
 #define UNIX_TIME_T_OVERFLOW_WARN_THRESHOLD	0x7acdd140 /* Mon Apr 16 00:00:00 2035 EST */
 

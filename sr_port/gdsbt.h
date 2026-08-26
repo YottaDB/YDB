@@ -1216,7 +1216,15 @@ MBSTART {															\
 #define EPOCH_TAPER_TIME_PCT_DEFAULT	32
 #define EPOCH_TAPER_JNL_PCT_DEFAULT	13
 
-#define EPOCH_TAPER_IF_NEEDED(CSA, CSD, CNL, REG, DO_FSYNC, BUFFS_PER_FLUSH, FLUSH_TARGET)					\
+/* NOW is the current time in jnl_tm_t terms.  It is a parameter rather than a clock read inside this
+ * macro because the hot caller, "wcs_timer_start", runs at the end of a commit that has already read the
+ * clock into jgbl.gbl_jrec_time a few microseconds earlier, and reading it a second time showed up as a
+ * measurable per update cost.  NOW is only used to decide how far into the epoch interval we are, which is
+ * a flush aggressiveness heuristic measured in seconds, so a value a few microseconds old is ample.
+ * Callers that cannot know jgbl.gbl_jrec_time is current for this process should use
+ * EPOCH_TAPER_IF_NEEDED_CURTIME below instead.
+ */
+#define EPOCH_TAPER_IF_NEEDED(CSA, CSD, CNL, REG, DO_FSYNC, BUFFS_PER_FLUSH, FLUSH_TARGET, NOW)				\
 MBSTART	{															\
 	jnl_tm_t		now;												\
 	uint4			epoch_vector, jnl_autoswitchlimit, jnl_space_remaining, jnl_space_taper_interval;		\
@@ -1227,7 +1235,7 @@ MBSTART	{															\
 	etjb = CSA->jnl->jnl_buff;												\
 	/* Determine if we are in the time-based epoch taper */									\
 	relative_time_taper = 0;												\
-	JNL_SHORT_TIME(now);													\
+	now = (NOW);														\
 	next_epoch_time = etjb->next_epoch_time;										\
 	if (next_epoch_time > now) /* if no db updates next_epoch_time can be in the past */					\
 	{															\
@@ -1286,6 +1294,17 @@ MBSTART	{															\
 		CNL->epoch_taper_start_dbuffs = 0;										\
 		CNL->epoch_taper_need_fsync = FALSE;										\
 	}															\
+} MBEND
+
+/* Use this in paths where jgbl.gbl_jrec_time cannot be assumed current for this process, such as the read
+ * path in "t_qread", where a process that only ever reads never sets it.
+ */
+#define EPOCH_TAPER_IF_NEEDED_CURTIME(CSA, CSD, CNL, REG, DO_FSYNC, BUFFS_PER_FLUSH, FLUSH_TARGET)			\
+MBSTART	{														\
+	jnl_tm_t	curtime;										\
+															\
+	JNL_SHORT_TIME(curtime);										\
+	EPOCH_TAPER_IF_NEEDED(CSA, CSD, CNL, REG, DO_FSYNC, BUFFS_PER_FLUSH, FLUSH_TARGET, curtime);		\
 } MBEND
 
 /* Define pointer types for above structures that may be in shared memory and need 64

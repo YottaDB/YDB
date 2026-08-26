@@ -445,7 +445,8 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 						(0 != cnl->wcs_active_lvl) && (NOJNL != csa->jnl->channel) &&
 						(0 != cnl->jnl_file.u.inode) && csd->jnl_before_image)
 				{
-					EPOCH_TAPER_IF_NEEDED(csa, csd, cnl, (gd_region *) 0, FALSE, buffs_per_flush, flush_target);
+					EPOCH_TAPER_IF_NEEDED_CURTIME(csa, csd, cnl, (gd_region *) 0, FALSE, buffs_per_flush,
+									flush_target);
 				}
 				if ((flush_target <= cnl->wcs_active_lvl) && (FALSE == gv_cur_region->read_only))
 					JNL_ENSURE_OPEN_WCS_WTSTART(csa, gv_cur_region, buffs_per_flush, NULL, FALSE, dummy_errno);
