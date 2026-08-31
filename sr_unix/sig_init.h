@@ -511,6 +511,6 @@ void sig_init(void (*signal_handler)(), void (*ctrlc_handler)(), void (*suspsig_
 void null_handler(int sig, siginfo_t *info, void *context);
 void tt_sigwinch_event(int sig, siginfo_t *info, void *context);	/* SIGWINCH deviceparameter (see io.h) */
 void ydb_stm_invoke_deferred_signal_handler(void);
-void setup_altstack(void);
+void setup_altstack_if_needed(void);
 
 #endif

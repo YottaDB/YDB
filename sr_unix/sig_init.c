@@ -54,6 +54,12 @@ void sig_init(void (*signal_handler)(), void (*ctrlc_handler)(), void (*suspsig_
 	sigfillset(&all_signals);
 	/* Unblock all signals in case we inherit blocked signals from a parent process (YDB#1205) */
 	SIGPROCMASK(SIG_UNBLOCK, &all_signals, NULL, rc);
+	/* Every handler installed below sets SA_ONSTACK, so it runs on the alternate stack if one is defined.
+	 * Any alternate stack defined by another component in this process (a host language, or a sanitizer
+	 * runtime) is likely to be far smaller than the rundown a terminating signal performs needs. Replace
+	 * it first if so. This does nothing when no alternate stack is defined, which is the usual case.
+	 */
+	setup_altstack_if_needed();
 	memset(&ignore, 0, SIZEOF(ignore));
 	sigemptyset(&ignore.sa_mask);
 	/* Initialize handler definitions we deal with. All signals except those setup for SIG_DFL/SIG_IGN are setup

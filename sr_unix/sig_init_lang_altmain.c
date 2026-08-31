@@ -96,7 +96,7 @@ void sig_init_lang_altmain()
 	/* We need to expand the alternate stack that is used by some main languages to suit YottaDB. So if one is defined,
 	 * make sure it is large enough and if not, expand it.
 	 */
-	setup_altstack();
+	setup_altstack_if_needed();
 	/* Need to initialize a mutex attribute that will be used to create the signal pending queue mutex */
 	rc = pthread_mutexattr_init(&sigPendingAttr);
 	if (0 != rc)
