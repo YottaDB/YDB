@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2020-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -24,6 +24,36 @@
 #define CHDIR		chdir
 #define CHOWN		chown
 #define FCHOWN		fchown
+
+/* A build instrumented for code coverage flushes its counters from a handler registered with atexit(), which _exit()
+ * by design does not run, so an image leaving through UNDERSCORE_EXIT() contributes no coverage data. That is only
+ * worth correcting where an image ALWAYS leaves that way, which is the GT.CM GNP server: gtcm_exi_handler(), which
+ * only it registers, and gtcm_exi_ch() end in PROCDIE() unconditionally, whereas gtm_exit_handler() (mumps, mupip,
+ * dse, lke) reaches its PROCDIE() only when exiting on a non-zero condition and so flushes on a normal exit.
+ *
+ * Those two call FLUSH_LIBGCOV_COUNTERS() immediately before PROCDIE(). It is deliberately NOT in UNDERSCORE_EXIT()
+ * itself, and not at gtm_exit_handler()'s PROCDIE() either: either of those would also fire in processes that reach
+ * _exit() by other routes, and where such a process cannot write the .gcda files libgcov reports each one it could
+ * not open on stderr. A test that runs YDB as a second user then collects hundreds of those lines into its output.
+ * That is a permission problem rather than a fundamental one, and covering the other images is worth doing, but it
+ * is a change of its own and is left to a separate MR.
+ *
+ * "__gcov_dump" is a weak reference, so this costs a NULL test in a build without coverage instrumentation, where the
+ * symbol is not defined and resolves to NULL.
+ *
+ * A note on which "__gcov_dump" gets called. libyottadb.so and the executables that use it are each built with
+ * coverage, so each links its own copy of the libgcov runtime, and each copy holds the counters of only the objects
+ * compiled into that binary. Both callers of this macro are compiled into libyottadb.so, where "__gcov_dump" is a
+ * local symbol, absent from the dynamic symbol table, so the call binds at link time to libyottadb.so's copy. That is
+ * the copy holding their counters, and it cannot be interposed by the executable's copy.
+ */
+extern void __gcov_dump(void) __attribute__((weak));
+
+#define	FLUSH_LIBGCOV_COUNTERS()										\
+MBSTART {													\
+	if (NULL != __gcov_dump)										\
+		__gcov_dump();											\
+} MBEND
 
 /* Usual convention is to uppercase the system function in the GT.M macro wrapper. But in this case, we want to macro-wrap
  * the _exit() function. _EXIT is ruled out because names starting with _ are reserved for system functions.

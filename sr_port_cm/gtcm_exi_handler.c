@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -67,5 +67,6 @@ void gtcm_exi_handler()
 	}
 	exit_handler_complete = TRUE;
 	print_exit_stats();
+	FLUSH_LIBGCOV_COUNTERS();	/* PROCDIE() below is _exit(), which skips the libgcov exit handler */
 	PROCDIE(EXICONDITION);
 }

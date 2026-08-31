@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2015 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -70,5 +70,6 @@ CONDITION_HANDLER(gtcm_exi_ch)
 		FFLUSH(gtcm_errfs);
 	}
 	send_msg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TEXT, 2, RTS_ERROR_TEXT("GT.CM TERMINATION RUNDOWN ERROR"));
+	FLUSH_LIBGCOV_COUNTERS();	/* PROCDIE() below is _exit(), which skips the libgcov exit handler */
 	PROCDIE(exi_condition);
 }
