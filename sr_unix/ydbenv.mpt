@@ -780,18 +780,26 @@ createdirs:(envvar)
 
 ; Internally called function to create one directory if it does not already exist
 mkdir:(dir,umask)
-	new $test,mask
+	new $test,line,mask,mkdirerr
 	set umask=$get(umask),mask=$select($zlength(umask):"umask "_umask_";",1:"")
 	do:'$zlength($zsearch(dir,-1))
 	. ; If "dir" is a relative path, make it an absolute path as it is used in the "U237" error message
 	. ; and having an absolute path will be more helpful to the user than a relative path.
 	. set:$zextract(dir,1)'="/" dir=$zsearch(".",-1)_"/"_dir
 	. ;
-	. open "create":(shell="/bin/sh":command=mask_"mkdir -p "_dir:writeonly:readonly:stderr="stderr")::"pipe"
-	. use "create"
+	. set mkdirerr=""
+	. ; "readonly" (and not "writeonly", which is what this OPEN used to also specify) is needed for the
+	. ; "stderr" device below to be readable. With "writeonly", a READ from it gets a DEVICEWRITEONLY error.
+	. open "create":(shell="/bin/sh":command=mask_"mkdir -p "_dir:readonly:stderr="stderr")::"pipe"
+	. ; Collect the reason "mkdir -p" gives for a failure (e.g. "Permission denied", "No space left on
+	. ; device") in "mkdirerr" so the "U237" error below reports it and not just the exit status.
+	. use "stderr"
+	. for  read line quit:$zeof  set:$zlength(line) mkdirerr=mkdirerr_$select($zlength(mkdirerr):"; ",1:"")_line
+	. use io
 	. ; Wait up to 30 seconds (instead of the 2-second default) for the forked shell to be reaped.
 	. ; On a heavily loaded system, 2 seconds is not always enough, in which case CLOSE sets $ZCLOSE
-	. ; to -99 even though "mkdir -p" already created the directory.
+	. ; to -99 even though "mkdir -p" already created the directory. Note the CLOSE of "create" also
+	. ; closes the "stderr" device associated with it.
 	. close "create":(timeout=30)
 	. ; Issue an error only if the directory does not exist. A non-zero $ZCLOSE with the directory in
 	. ; place (e.g. a $ZCLOSE of -99, which is a waitpid() timeout) is not a "mkdir -p" failure.
@@ -808,7 +816,7 @@ Defaults
 	; gtmver:::env(ydbvar)#/g#/o#/o/utf8#/r:"ln -s "_env(ydbvar)_" "_env(gtmvar):$zpiece($zversion," ",2)_"_"_$zpiece($zversion," ",4)
 
 ;	Error message texts
-U237	;"-F-CREATEFAIL unable to create directory "_dir_" with error code "_$zclose
+U237	;"-F-CREATEFAIL unable to create directory "_dir_" with error code "_$zclose_$select($zlength(mkdirerr):" : "_mkdirerr,1:"")
 U238	;"-F-GLDCREATEERR Create global directory failed, stderr at ",err
 U239	;"-F-NOTAPATH Path "_file_" does not exist"
 U240	;"-F-NOTAGLDFILE "_file_ " is not a global directory file"
