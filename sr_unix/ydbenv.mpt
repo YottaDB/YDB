@@ -789,8 +789,13 @@ mkdir:(dir,umask)
 	. ;
 	. open "create":(shell="/bin/sh":command=mask_"mkdir -p "_dir:writeonly:readonly:stderr="stderr")::"pipe"
 	. use "create"
-	. close "create"
-	. set:$zclose $ecode=",U237,"
+	. ; Wait up to 30 seconds (instead of the 2-second default) for the forked shell to be reaped.
+	. ; On a heavily loaded system, 2 seconds is not always enough, in which case CLOSE sets $ZCLOSE
+	. ; to -99 even though "mkdir -p" already created the directory.
+	. close "create":(timeout=30)
+	. ; Issue an error only if the directory does not exist. A non-zero $ZCLOSE with the directory in
+	. ; place (e.g. a $ZCLOSE of -99, which is a waitpid() timeout) is not a "mkdir -p" failure.
+	. set:($zclose&('$zlength($zsearch(dir,-1)))) $ecode=",U237,"
 	quit
 
 ; End of code in routines - what follows are defaults and errors
