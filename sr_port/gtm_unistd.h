@@ -25,31 +25,33 @@
 #define CHOWN		chown
 #define FCHOWN		fchown
 
+extern void __gcov_dump(void) __attribute__((weak));
+
 /* A build instrumented for code coverage flushes its counters from a handler registered with atexit(), which _exit()
- * by design does not run, so an image leaving through UNDERSCORE_EXIT() contributes no coverage data. That is only
- * worth correcting where an image ALWAYS leaves that way, which is the GT.CM GNP server: gtcm_exi_handler(), which
- * only it registers, and gtcm_exi_ch() end in PROCDIE() unconditionally, whereas gtm_exit_handler() (mumps, mupip,
- * dse, lke) reaches its PROCDIE() only when exiting on a non-zero condition and so flushes on a normal exit.
+ * by design does not run, so an image leaving through UNDERSCORE_EXIT() contributes no coverage data.
+ * FLUSH_LIBGCOV_COUNTERS_IF_NEEDED() below writes them out explicitly. It is invoked immediately before the _exit()
+ * on each path where a YottaDB process (as opposed to a "fork"ed child of one) leaves that way. Those paths are
+ * PROCDIE() (sr_unix/errorsp.h), which covers "gtm_exit_handler" (mumps, mupip, dse and lke), "exi_ch",
+ * "gtcm_exi_handler" and "gtcm_exi_ch", and the individual UNDERSCORE_EXIT() calls in "generic_signal_handler",
+ * "mupip_exit_handler" and "drive_non_ydb_signal_handler_if_any".
  *
- * Those two call FLUSH_LIBGCOV_COUNTERS() immediately before PROCDIE(). It is deliberately NOT in UNDERSCORE_EXIT()
- * itself, and not at gtm_exit_handler()'s PROCDIE() either: either of those would also fire in processes that reach
- * _exit() by other routes, and where such a process cannot write the .gcda files libgcov reports each one it could
- * not open on stderr. A test that runs YDB as a second user then collects hundreds of those lines into its output.
- * That is a permission problem rather than a fundamental one, and covering the other images is worth doing, but it
- * is a change of its own and is left to a separate MR.
+ * It is deliberately NOT in UNDERSCORE_EXIT() itself. Every other caller is a "fork"ed child that never "exec"s, a
+ * daemonizing parent ("gtmsecshr"), or the child spawned to write a core ("gtm_dump_core"). Such a process inherits
+ * the counters of the process it came from, so a dump there would count what that process had already executed a
+ * second time, and it would do so on paths as common as a JOB command or a MUPIP BACKUP to a pipe, since the middle
+ * process in "ojstartchild" and the child in "gtm_pipe" reach _exit() in normal operation rather than only on an error.
  *
  * "__gcov_dump" is a weak reference, so this costs a NULL test in a build without coverage instrumentation, where the
  * symbol is not defined and resolves to NULL.
  *
- * A note on which "__gcov_dump" gets called. libyottadb.so and the executables that use it are each built with
- * coverage, so each links its own copy of the libgcov runtime, and each copy holds the counters of only the objects
- * compiled into that binary. Both callers of this macro are compiled into libyottadb.so, where "__gcov_dump" is a
- * local symbol, absent from the dynamic symbol table, so the call binds at link time to libyottadb.so's copy. That is
- * the copy holding their counters, and it cannot be interposed by the executable's copy.
+ * A note on which "__gcov_dump" gets called. The yottadb (i.e. mumps), mupip, dse, lke and GT.CM server executables
+ * each link libmumps.a statically, and so does libyottadb.so, so a coverage build gives every one of them its own
+ * copy of the libgcov runtime, holding the counters of only that binary's objects even though several binaries share
+ * a .gcda path and merge into it. "__gcov_dump" is a local symbol in each, absent from the dynamic symbol table, so
+ * this call binds at link time to the copy in the binary the caller was compiled into. That is the copy holding the
+ * counters of the code this process is running, and it cannot be interposed by another binary's copy.
  */
-extern void __gcov_dump(void) __attribute__((weak));
-
-#define	FLUSH_LIBGCOV_COUNTERS()										\
+#define	FLUSH_LIBGCOV_COUNTERS_IF_NEEDED()									\
 MBSTART {													\
 	if (NULL != __gcov_dump)										\
 		__gcov_dump();											\

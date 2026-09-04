@@ -67,6 +67,5 @@ void gtcm_exi_handler()
 	}
 	exit_handler_complete = TRUE;
 	print_exit_stats();
-	FLUSH_LIBGCOV_COUNTERS();	/* PROCDIE() below is _exit(), which skips the libgcov exit handler */
 	PROCDIE(EXICONDITION);
 }

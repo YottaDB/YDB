@@ -1,5 +1,5 @@
 /****************************************************************
- * Copyright (c) 2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2023-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -66,6 +66,10 @@ void drive_non_ydb_signal_handler_if_any(char *caller, int sig, siginfo_t *info,
 				assert(OK_TO_INTERRUPT);	/* ensure we are not in middle of database commit etc.
 								 * as otherwise we will end up in integrity errors.
 								 */
+				/* Flush gcov code coverage counters before _exit() call in UNDERSCORE_EXIT.  See comment
+				 * before FLUSH_LIBGCOV_COUNTERS_IF_NEEDED() in "sr_port/gtm_unistd.h" for more details.
+				 */
+				FLUSH_LIBGCOV_COUNTERS_IF_NEEDED();
 				UNDERSCORE_EXIT(-sig);
 			}
 		}

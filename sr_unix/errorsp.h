@@ -561,7 +561,15 @@ void stop_image_no_core(void);
 					EXIT(-exi_condition);							\
 				}
 
-#define PROCDIE(x)		UNDERSCORE_EXIT(x)	/* No exit handler, no cleanup, just die */
+/* Below macro is invoked when we want to terminate without any exit handler invocation.
+ * Flush gcov code coverage counters using FLUSH_LIBGCOV_COUNTERS_IF_NEEDED() that the _exit()
+ * (in UNDERSCORE_EXIT below) would otherwise discard. See the comment above FLUSH_LIBGCOV_COUNTERS_IF_NEEDED
+ * in "sr_port/gtm_unistd.h" for why the flush lives here and not in UNDERSCORE_EXIT().
+ */
+#define PROCDIE(x)		MBSTART {						\
+					FLUSH_LIBGCOV_COUNTERS_IF_NEEDED();		\
+					UNDERSCORE_EXIT(x);				\
+				} MBEND
 
 error_def(ERR_ASSERT);
 error_def(ERR_GTMASSERT);

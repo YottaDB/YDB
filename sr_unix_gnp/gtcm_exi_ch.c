@@ -70,6 +70,5 @@ CONDITION_HANDLER(gtcm_exi_ch)
 		FFLUSH(gtcm_errfs);
 	}
 	send_msg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TEXT, 2, RTS_ERROR_TEXT("GT.CM TERMINATION RUNDOWN ERROR"));
-	FLUSH_LIBGCOV_COUNTERS();	/* PROCDIE() below is _exit(), which skips the libgcov exit handler */
 	PROCDIE(exi_condition);
 }
