@@ -360,6 +360,7 @@ void readline_read_mval(mval *v) {
 	int line_length;
 	io_desc 	*io_ptr;
 	d_tt_struct 	*tt_ptr;
+	volatile boolean_t in_readline;	/* volatile as it is set after a sigsetjmp() and used before the next one */
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -380,7 +381,16 @@ void readline_read_mval(mval *v) {
 		 * Once we have the readline callback interface, we can take all of
 		 * the setjmp/longjmp code out, as we can use a select() call like
 		 * dm_read.c. */
-		if ((sigsetjmp(readline_signal_jmp, 1) != 0) || outofband) {
+		/* A non-zero return means we got here by a siglongjmp() out of libreadline, i.e. the event
+		 * interrupted the freadline() call below and libreadline holds state worth saving. Every site
+		 * that jumps here (ctrlc_handler(), tt_sigwinch_event() and ydb_os_signal_handler()) does so
+		 * only while "readline_catch_signal" is TRUE, which is only between the two assignments that
+		 * bracket each freadline() call below, so this is an exact test for "we were inside
+		 * libreadline". Note "readline_catch_signal" itself cannot be used for this: each of those
+		 * three sites sets it FALSE immediately before its siglongjmp, so it is FALSE here either way.
+		 */
+		in_readline = (0 != sigsetjmp(readline_signal_jmp, 1));
+		if (in_readline || outofband) {
 			/* Assert that the current number of active signals is
 			 * now zero. We only want to run siglongjmp (which
 			 * destroys the stack) if we are processing the last
@@ -393,43 +403,60 @@ void readline_read_mval(mval *v) {
 			/* Handle signals */
 			if (outofband) {
 				if (OUTOFBAND_RESTARTABLE(outofband)) {
-					unsigned char *readline_text_before_interrupt;
-
-					/* SIGUSR1/mupip intrpt (or SIGWINCH): save state if jobinterrupt/sigwinch *
-					 * See my message to the maintainer on how to do this. *
-					 * https://lists.gnu.org/archive/html/bug-readline/2023-09/msg00002.html *
+					/* Save libreadline's state only if the event interrupted a freadline() call. When
+					 * "outofband" was set outside libreadline, libreadline might never even have been
+					 * initialized, so saving its state now and restoring it on the way back in would
+					 * overwrite the live globals that rl_initialize() is about to set up, which is the
+					 * SIGSEGV of YDB#1269.
 					 */
-					/* Clean line state (cleans undo list--memory issue if we don't do that) */
-					frl_free_line_state();
+					if (in_readline) {
+						unsigned char *readline_text_before_interrupt;
 
-					/* Get the state from Readline and save */
-					ydb_readline_state = gtm_malloc(sizeof(struct readline_state));
-					frl_save_state(ydb_readline_state);
+						/* SIGUSR1/mupip intrpt (or SIGWINCH): save state if jobinterrupt/sigwinch *
+						 * See my message to the maintainer on how to do this. *
+						 * https://lists.gnu.org/archive/html/bug-readline/2023-09/msg00002.html *
+						 */
+						/* Clean line state (cleans undo list--memory issue if we don't do that) */
+						frl_free_line_state();
 
-					/* But extract string from readline as it will be overwritten in _rl_init_line_state
-					 * next time we use readline() call:
-					 *  741   the_line = rl_line_buffer;
-					 *  742   the_line[0] = 0; <--Here
+						/* Get the state from Readline and save */
+						ydb_readline_state = gtm_malloc(sizeof(struct readline_state));
+						frl_save_state(ydb_readline_state);
+
+						/* But extract string from readline as it will be overwritten in _rl_init_line_state
+						 * next time we use readline() call:
+						 *  741   the_line = rl_line_buffer;
+						 *  742   the_line[0] = 0; <--Here
+						 */
+						readline_text_before_interrupt = system_malloc(ydb_readline_state->buflen + 1);
+						strncpy((char *)readline_text_before_interrupt, ydb_readline_state->buffer,
+								ydb_readline_state->buflen);
+						readline_text_before_interrupt[ydb_readline_state->buflen] = '\0';
+
+						/* Save our string in tt_state_save, so we can replace Readline's overwritten string
+						 * with ours in the function hook readline_after_zinterrupt_startup_hook.
+						 */
+						tt_ptr->tt_state_save.buffer_start = readline_text_before_interrupt;
+
+						/* We get rid of the prompt as we don't need it (it's always (TREF(gtmprompt)).addr).
+						 * We are not supposed to touch rl_prompt, but there is no other way to prevent doing
+						 * readline from doing another free() on the prompt, which results in an ASAN double free error.
+						 */
+						system_free(ydb_readline_state->prompt);
+						ydb_readline_state->prompt = NULL;
+						*vrl_prompt = NULL;
+					}
+					/* The direct mode read was interrupted and will resume, whether or not the event
+					 * interrupted a freadline() call, and "mupintr" says exactly that: it is not about
+					 * libreadline. dm_read() sets it for every restartable event (sr_unix/dm_read.c),
+					 * and iott_write()/iott_wteol() raise ZINTRECURSEIO on it alone, which is what
+					 * stops $ZINTERRUPT doing IO to this device. This assignment therefore stays out
+					 * of the "if (in_readline)" block above and runs in both cases. If it did not run
+					 * for an event that reached us without interrupting freadline(), then $ZINTERRUPT
+					 * would get no ZINTRECURSEIO and would write to $PRINCIPAL, and the
+					 * "if (tt_ptr->mupintr)" block below would not run, so the prompt would be
+					 * repainted. See YDB#1269.
 					 */
-					readline_text_before_interrupt = system_malloc(ydb_readline_state->buflen + 1);
-					strncpy((char *)readline_text_before_interrupt, ydb_readline_state->buffer,
-							ydb_readline_state->buflen);
-					readline_text_before_interrupt[ydb_readline_state->buflen] = '\0';
-
-					/* Save our string in tt_state_save, so we can replace Readline's overwritten string
-					 * with ours in the function hook readline_after_zinterrupt_startup_hook.
-					 */
-					tt_ptr->tt_state_save.buffer_start = readline_text_before_interrupt;
-
-					/* We get rid of the prompt as we don't need it (it's always (TREF(gtmprompt)).addr).
-					 * We are not supposed to touch rl_prompt, but there is no other way to prevent doing
-					 * readline from doing another free() on the prompt, which results in an ASAN double free error.
-					 */
-					system_free(ydb_readline_state->prompt);
-					ydb_readline_state->prompt = NULL;
-					*vrl_prompt = NULL;
-
-					/* We have an interrupt */
 					tt_ptr->mupintr = TRUE;
 				}
 				if (ctrlc == outofband) {
@@ -483,8 +510,17 @@ void readline_read_mval(mval *v) {
 				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_ZINTDIRECT);
 			}
 
-			/* This is supposed to have been saved in the outofband event */
-			assert(NULL != ydb_readline_state);
+			if (NULL == ydb_readline_state) {
+				/* Nothing was saved on the way in, i.e. the event reached us without interrupting a
+				 * freadline() call: there is no partially typed line to put back, and libreadline may never
+				 * have been initialized, which is the SIGSEGV of YDB#1269. $ZINTERRUPT has run by now, so
+				 * drop "mupintr" and go round for an ordinary prompt and read. That is the same place the
+				 * "done" case at the end of this block reaches, and it gets there without touching
+				 * libreadline's globals.
+				 */
+				tt_ptr->mupintr = FALSE;
+				continue;
+			}
 			/* Is the readline done? (i.e. interrupt received after we pressed enter) */
 			done = ydb_readline_state->done;
 			/* Old string (->buffer will be replaced in readline_after_zinterrupt_startup_hook) */
