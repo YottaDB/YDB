@@ -176,23 +176,23 @@ boolean_t xfer_reset_if_setter(int4 event_type)
 		DEFER_INTERRUPTS(INTRPT_IN_EVENT_HANDLING, prev_intrpt_state);
 	switch (outofband)
 	{
-	case no_event:					/* no outofband to match up with */
+	case no_event:					/* no outofband to match up decide based on event_type */
 		switch (event_type)
 		{
-		case jobinterrupt:
-			res = dollar_zininterrupt;	/* might sh/could be an assert & fall through */
-			break;
 		case ctrlc:
 		case sighup:
 		case tptimeout:				/* the caller sets event_state to active */
 		case ztimeout:
 			res = TRUE;
 			break;
+		case jobinterrupt:
+			assert(dollar_zininterrupt);	/* WARNING fallthrough */
 		default:
 			res = FALSE;
 		}
+		break;
 	default:
-		res = (event_type == outofband);
+		res = (event_type == outofband);	/* it is a real outofband so use it */
 	}
 	if (res)
 	{	/* it's worth a try */

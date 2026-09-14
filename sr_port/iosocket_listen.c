@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -27,6 +27,7 @@
 #include "io.h"
 #include "gt_timer.h"
 #include "iosocketdef.h"
+#include "min_max.h"
 #include "error.h"
 
 error_def(ERR_CURRSOCKOFR);
@@ -88,14 +89,12 @@ boolean_t iosocket_listen_sock(socket_struct *socketptr, unsigned short len)
 	socketptr->state = socket_listening;
 	len = SIZEOF(LISTENING) - 1;
 	memcpy(&dsocketptr->iod->dollar.key[0], LISTENING, len);
-	dsocketptr->iod->dollar.key[len++] = '|';
-	memcpy(&dsocketptr->iod->dollar.key[len], socketptr->handle, socketptr->handle_len);
-	len += socketptr->handle_len;
-	dsocketptr->iod->dollar.key[len++] = '|';
+	/* UUID: `fe02bb5c-0be4-43d5-9c80-d2e34e9abe8f`	*/
+	APPEND_DKEY('|', dsocketptr->iod->dollar.key, len, socketptr->handle, socketptr->handle_len);
 	if (socket_local == socketptr->protocol)
-		SNPRINTF(&dsocketptr->iod->dollar.key[len], DD_BUFLEN - len, "%s",
+		SNPRINTF(&dsocketptr->iod->dollar.key[len], DD_BUFLEN - len, "|%s",
 					((struct sockaddr_un *)(socketptr->local.sa))->sun_path);
 	else
-		SNPRINTF(&dsocketptr->iod->dollar.key[len], DD_BUFLEN - len, "%d", socketptr->local.port);
+		SNPRINTF(&dsocketptr->iod->dollar.key[len], DD_BUFLEN - len, "|%d", socketptr->local.port);
 	return TRUE;
 }

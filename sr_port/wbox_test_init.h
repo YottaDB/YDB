@@ -242,7 +242,12 @@ typedef enum {
 	WBTEST_HOLD_BUFFER,			/* 192 : force process to hold a buffer for >6 but <60 seconds. */
 	WBTEST_RCVR_STALE_STRMCACHE,		/* 193 : Force stale stream cache in receiver to reproduce STRMNUMMISMTCH2 */
 	WBTEST_SOCKET_CLOSE,			/* 194 : Force buffer error conditions during socket close */
-	WBTEST_ABUSE_TIMERS			/* 195 : Establish a user timer handler that will do some unusual things */
+	WBTEST_ABUSE_TIMERS,			/* 195 : Establish a user timer handler that will do some unusual things */
+	WBTEST_LENGTHEN_MSG,			/* 196 : Force replication update message length beyond the upper bound */
+	WBTEST_RCVR_BAD_KEY_LEN,		/* 197 : Force bad key length in endian convert to trigger REPLXENDIANFAIL */
+	WBTEST_HELPOUT_TRIGNAMBAD,		/* 198 : Prevent asserts from tripping while intentionally fuzzing ^#t */
+	WBTEST_RCVR_BAD_STRM_INDEX,		/* 199 : Force bad strm_index in receiver to trigger REPLCOMM */
+	WBTEST_UPD_BAD_STRM_INDEX		/* 200 : Force bad strm_index in update process to trigger BADTRANS */
 
 	/* Note 1: when adding new white box test cases, please make use of WBTEST_ENABLED and WBTEST_ASSIGN_ONLY (defined below)
 	 * whenever applicable

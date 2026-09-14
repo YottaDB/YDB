@@ -798,6 +798,9 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 				repl_log(updproc_log_fp, TRUE, TRUE, "Processing REPL_HISTREC message\n");
 				input_histjrec = (repl_histrec_jnl_ptr_t)readaddrs;
 				histinfo = input_histjrec->histcontent;
+				/* UUID: 8db3b8c0-a40f-417c-adb7-57379d05c74e */
+				GTM_WHITE_BOX_TEST(WBTEST_UPD_BAD_STRM_INDEX,
+					histinfo.strm_index, MAX_SUPPL_STRMS);
 				expected_rec_len = SIZEOF(repl_histrec_jnl_t);
 			}
 			if (expected_rec_len != rec_len)
@@ -812,6 +815,10 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 			{
 				bad_trans_type = upd_bad_histinfo_start_seqno2;
 				assert(FALSE);
+			} else if (MAX_SUPPL_STRMS <= histinfo.strm_index)
+			{	/* UUID: 8db3b8c0-a40f-417c-adb7-57379d05c74e */
+				bad_trans_type = upd_bad_histinfo_strm_index;
+				assert(WBTEST_ENABLED(WBTEST_UPD_BAD_STRM_INDEX));
 			} else
 				bad_trans_type = upd_good_record;
 			if (upd_good_record != bad_trans_type)

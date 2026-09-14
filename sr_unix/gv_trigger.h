@@ -49,6 +49,8 @@ typedef enum
 					 * Both the index and the property name are guaranteed to be less than 20
 					 * and hence MAX_TRIG_UTIL_LEN set to 40 should be enough
 					 */
+#define	MAX_TRIGNAME_SEQ_NUM	999999	 /* Maximum auto-generated trigger name */
+
 /* Miscellaneous structures needed to build the global variable trigger superstructures : gv_trigger_t and gvt_trigger_t */
 typedef struct gvtr_subs_star_struct
 {

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,7 +32,8 @@ enum upd_bad_trans_type
 	upd_bad_histinfo_start_seqno2,
 	upd_fence_bad_ztworm_t_num,
 	upd_fence_bad_lgtrig_t_num,
-	upd_bad_key
+	upd_bad_key,
+	upd_bad_histinfo_strm_index
 };
 
 #define	UPD_GV_BIND_NAME(GD_HEADER, GVNAME, GVNH_REG)	GV_BIND_NAME_AND_ROOT_SEARCH(GD_HEADER, &GVNAME, GVNH_REG)

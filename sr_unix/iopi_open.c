@@ -321,6 +321,8 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 	int		return_stderr = FALSE;
 	char		ret_token[GTM_MAX_DIR_LEN];
 	char		error_str[MAXDEVPARLEN + STR_LIT_LEN(INVALID_CMD2)];
+	gtm_char_t	out_com_buf[MAX_STRLEN];
+	gtm_string_t    filtered_command;
 	int		save_errno;
 	int		flags;
 	int		fcntl_res, rc;
@@ -332,7 +334,6 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 	boolean_t	textflag;
 	int		ccsid, status, realfiletag;
 #endif
-	gtm_string_t    filtered_command;
 
 	DCL_THREADGBL_ACCESS;
 
@@ -416,7 +417,15 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 	/*Filter the command first, if required*/
 	if (RESTRICTED(pipe_filter))
 	{
-		filtered_command = gtm_filter_command(pcommand, "PIPE");
+		/* UUID: 34d7bde7-1dca-4f5f-bef6-ffbda6dadfaa */
+		if (sparams[PSHELL])
+		{
+			PIPE_ERROR_INIT();
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_RESTRICTEDOP, 1, "OPEN PIPE SHELL");
+		}
+		filtered_command.address = &out_com_buf[0];
+		filtered_command.length = SIZEOF(out_com_buf);
+		gtm_filter_command(pcommand, &filtered_command, "PIPE");
 		if (filtered_command.length)
 		{
 			if (!strlen(filtered_command.address)) /*empty command returned*/

@@ -3634,20 +3634,14 @@
    enables RESTART, which FIS strongly recommends in order to deal with
    implicit RESTARTs.
 
-3 TP_Performance
-   TP Performance
+3 TPRESTART_message
+   TPRESTART message
 
-   To achieve the best GT.M performance, transactions should:
-
-     * be as short as possible
-     * consist, as much as possible, only of global updates
-     * be SERIAL with no embedded LOCKs and minimal surrounding LOCKs where
-       justified
-     * have RESTART enabled with a minimum of local variables protected by a
-       restart portion of the TSTART argument.
-     * Large concurrent transactions using TCOMMIT may result in repeated and
-       inefficient attempts by competing processes to capture needed scarce
-       resources, resulting in poor performance.
+   This section provides examples of transaction processing (TP) in GT.M,
+   illustrating how related database updates execute as a single atomic unit
+   and how the system handles restart conditions arising from concurrent
+   access. It also describes how to interpret TPRESTART messages for
+   diagnostic and analysis purposes.
 
    Example:
 
@@ -3692,7 +3686,7 @@
        transaction in the region containing the global ("glbl: ..." in the
        TPRESTART message).
      * writeset - Out of the readset number, the number of GDS blocks this
-       process was attempted to UPDATE as part of this TP transaction in the
+       process was attempting to UPDATE as part of this TP transaction in the
        region containing the global ("glbl: ..." in the TPRESTART message).
      * local_tn - This is a never-decreasing counter (starting at 1 at
        process startup) incremented for every new TP transaction, TP restart,
@@ -4879,11 +4873,11 @@
 2 TROllback
    TROllback
 
-   The TROLLBACK command terminates a transaction by causing a ROLLBACK,
-   which removes all database updates performed within a transaction. A
-   TROLLBACK without an argument also sets $TLEVEL and $TRESTART to zero (0).
-   Issuing a TROLLBACK when no transaction is in progress ($TLEVEL=0)
-   produces an error.
+   The TROLLBACK command terminates a transaction by initiating a rollback
+   that removes all database updates performed within the transaction. When
+   used without an argument or a zero (0) argument, TROLLBACK sets both
+   $TLEVEL and $TRESTART to zero (0). If an application issues a TROLLBACK
+   when no transaction is in progress ($TLEVEL=0), GT.M reports an error.
 
    The format of the TROLLBACK command is:
 
@@ -19370,12 +19364,17 @@
 
    entryref: return-value routine-name (parameter, parameter, ... ) [: [ACIDTP] [SIGSAFE] [TERMIO] ]
 
-   The optional case-insensitive keyword ACIDTP following the parameter list
-   specifies the external call does not interact with an external actor and
-   completes in a reliably short time; this allows GT.M to skip TPNOTACID
-   checking otherwise associated with an external call. Improperly using this
-   feature can lead to intermittant and hard to diagnose performance issues
-   including hangs.
+   The optional, case-insensitive keyword ACIDTP, when specified in the
+   parameter list, serves as an explicit user-declared assurance that the
+   external call does not interact with any external actor and completes
+   within a consistently short duration. With ACIDTP, GT.M bypasses the
+   TPNOTACID checks that normally apply to external calls. ACIDTP can improve
+   performance in low-contention environments. If the application
+   consistently shows high transaction restarts (TR*) or transaction
+   conflicts (TC*) in GVSTATS, first address the underlying causes of
+   contention before enabling ACIDTP. Always compare system behavior with and
+   without ACIDTP under realistic contention scenarios before adopting ACIDTP
+   in production.
 
    The optional case-insensitive keyword SIGSAFE following the parameter list
    specifies the external call does not create its own signal handlers; this

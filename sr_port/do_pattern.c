@@ -66,8 +66,8 @@ int do_pattern(mval *str, mval *pat)
 	int		atom, unit, idx, index, hasfixed;
 	uint4		z_diff, *rpt, *rtop, rept;
 	uint4		repeat[MAX_PATTERN_ATOMS];
-	ua_patatom	*patidx[MAX_PATTERN_ATOMS];
-	unsigned char	*stridx[MAX_PATTERN_ATOMS];
+	ua_patatom	*patidx[MAX_PATTERN_ATOMS + 1];				/* UUID: 4c3a2ab0-a393-437e-9f74-f5829a12c48f */
+	unsigned char	*stridx[MAX_PATTERN_ATOMS + 1];				/* UUID: 4c3a2ab0-a393-437e-9f74-f5829a12c48f */
 	unsigned char	*strptr, *strtop, *strnext, *pstr, *ptop, *pnext;
 	uint4		code, tempuint, dfa_val;
 	ua_patatom	*patptr, *dfa_ptr;
@@ -105,6 +105,7 @@ int do_pattern(mval *str, mval *pat)
 	patptr += tempuint;
 	GET_LONG(count, patptr);
 	patptr++;
+	assert(MAX_PATTERN_ATOMS >= count);	/* count limited by compile in patstr UUID: 4c3a2ab0-a393-437e-9f74-f5829a12c48f */
 	GET_LONG(total_min, patptr);
 	patptr++;
 	GET_LONG(total_max, patptr);
@@ -389,6 +390,7 @@ int do_pattern(mval *str, mval *pat)
 					}
 				}
 				idx++;
+				assert(MAX_PATTERN_ATOMS >= idx);		/* UUID: 4c3a2ab0-a393-437e-9f74-f5829a12c48f */
 				stridx[idx] = strptr;
 				patidx[idx] = patptr;
 			}

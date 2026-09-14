@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -66,6 +66,7 @@ static inline void free_alts(alternation *init_altp)
 {														\
 	int			cursize, i;									\
 														\
+	assert(0 <= COUNT);											\
 	PATMASKPTR = OUTCHAR;											\
 	/* If this is a fixed pattern, generate code to invoke do_patfixed as that takes up less space in	\
 	 * the object code and has same runtime performance as the DFA. Else go through DFA.			\
@@ -93,7 +94,7 @@ static inline void free_alts(alternation *init_altp)
 		LASTPATPTR = PATMASKPTR;									\
 		LAST_INFINITE = TRUE;										\
 		COUNT++;											\
-		assert(0 < COUNT);										\
+		assert(MAX_PATTERN_ATOMS > COUNT);								\
 	} else													\
 	{													\
 		OUTCHAR = PATMASKPTR;										\
@@ -166,8 +167,8 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 	int		atom_map, altmax = 0, any_alt, altcount = 0, altmin = 0, altsimplify, bit,
 			charpos, chidx, count, curr_leaf_num, curr_min_dfa, cursize,
 			exp_temp[CHAR_CLASSES], high_in, jump, leafcnt, leaf_num = 0, low_in,
-			max[MAX_PATTERN_ATOMS], min[MAX_PATTERN_ATOMS], min_dfa = 0,
-			saw_delimiter, seq, seqcnt, size[MAX_PATTERN_ATOMS], size_in, sym_num = 0, total_max, total_min;
+			max[MAX_PATTERN_ATOMS + 1], min[MAX_PATTERN_ATOMS + 1], min_dfa = 0,
+			saw_delimiter, seq, seqcnt, size[MAX_PATTERN_ATOMS + 1], size_in, sym_num = 0, total_max, total_min;
 	int4		allmask, alloclen, altactive, altend, altlen, bitpos, bytelen, lower_bound = -1, status, upper_bound = 0;
 	mstr		alttail;
 	pat_strlit	strlit;
@@ -302,7 +303,8 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 				assert(inchar <= in_top);
 				instr->addr = (topseen ? (char *)inchar : (char *)inchar - 1);
 				free_alts(&init_alt);
-				return 0;
+				assert(MAX_PATTERN_ATOMS >= count);
+				return 0;							/* successfull compilation */
 			}
 			if (!topseen && (curchar != '.'))
 				upper_bound = lower_bound;
@@ -327,8 +329,8 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 						 * 	fixed part from the indefinite part.
 						 */
 						split_atom = TRUE;
-						if ((count >= (MAX_PATTERN_ATOMS - 1)) ||
-								(atom_map >= (MAX_PATTERN_ATOMS -2)))
+						if (((MAX_PATTERN_ATOMS - 2) < count) ||
+								((MAX_PATTERN_ATOMS - 3) < atom_map))
 						{
 							free_alts(&init_alt);
 							return ERR_PATMAXLEN;
@@ -367,7 +369,7 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 				}
 			}
 			instr->addr = (char *)inchar;
-			if (count >= MAX_PATTERN_ATOMS)
+			if (MAX_PATTERN_ATOMS <= count)
 			{
 				free_alts(&init_alt);
 				return ERR_PATMAXLEN;
@@ -781,7 +783,7 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 				if (pattern_mask & PATM_STRLIT)
 				{
 					memset(&exp_temp[0], 0, SIZEOF(exp_temp));
-					if (atom_map >= MAX_PATTERN_ATOMS)
+					if (MAX_PATTERN_ATOMS <= atom_map)
 					{
 						free_alts(&init_alt);
 						return ERR_PATMAXLEN;
@@ -856,7 +858,7 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 							atom_map--;
 						}
 					}
-					if (atom_map >= MAX_PATTERN_ATOMS)
+					if (MAX_PATTERN_ATOMS <= atom_map)
 					{
 						free_alts(&init_alt);
 						return ERR_PATMAXLEN;

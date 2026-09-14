@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2018 Fidelity National Information		*
+ * Copyright (c) 2018-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -12,4 +12,4 @@
 #include "gtmxc_types.h"
 #include "gtm_common_defs.h"
 
-gtm_string_t gtm_filter_command(char * command, char * caller_name);
+void gtm_filter_command(char *in_command, gtm_string_t *out_command, char *caller_name);

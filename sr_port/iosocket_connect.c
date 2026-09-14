@@ -58,7 +58,7 @@ error_def(ERR_ZINTRECURSEIO);
 boolean_t iosocket_connect(socket_struct *sockptr, int4 msec_timeout, boolean_t update_bufsiz)
 {
 	int		temp_1, keepalive_opt;
-	char		*errptr;
+	char		*errptr, *charptr;
 	int4		errlen, last_errno, save_errno;
 	int		d_socket_struct_len, res, nfds, sockerror;
 	fd_set		writefds;
@@ -585,10 +585,8 @@ boolean_t iosocket_connect(socket_struct *sockptr, int4 msec_timeout, boolean_t 
 	/* update dollar_key */
 	len = SIZEOF(ESTABLISHED) - 1;
 	memcpy(&iod->dollar.key[0], ESTABLISHED, len);
-	iod->dollar.key[len++] = '|';
-	memcpy(&iod->dollar.key[len], sockptr->handle, sockptr->handle_len);
-	len += sockptr->handle_len;
-	iod->dollar.key[len++] = '|';
+	/* UUID: `fe02bb5c-0be4-43d5-9c80-d2e34e9abe8f`	*/
+	APPEND_DKEY('|', iod->dollar.key, len, sockptr->handle, sockptr->handle_len);
 	/* translate internal address to numeric ip address */
 	assert(FALSE == need_socket);
 	if (NULL != sockptr->remote.ai_head)
@@ -647,7 +645,8 @@ boolean_t iosocket_connect(socket_struct *sockptr, int4 msec_timeout, boolean_t 
 			return FALSE;
 		}
 		STRNDUP(ipaddr, SA_MAXLEN, sockptr->remote.saddr_ip);
-		strncpy(&iod->dollar.key[len], sockptr->remote.saddr_ip, DD_BUFLEN - 1 - len);
+		APPEND_DKEY('|', iod->dollar.key, len, sockptr->remote.saddr_ip,
+			strlen(sockptr->remote.saddr_ip));	/* BYPASSOK */
 	if ((SOCKOPTIONS_PENDING & sockptr->options_state.alive)
 		|| (SOCKOPTIONS_PENDING & sockptr->options_state.cnt)
 		|| (SOCKOPTIONS_PENDING & sockptr->options_state.intvl))
@@ -662,7 +661,8 @@ boolean_t iosocket_connect(socket_struct *sockptr, int4 msec_timeout, boolean_t 
 		local_ai_ptr->ai_addrlen = sockptr->remote.ai.ai_addrlen;
 		local_ai_ptr->ai_protocol = sockptr->remote.ai.ai_protocol;
 		SOCKET_ADDR_COPY(sockptr->local, sockptr->remote.sa, sockptr->remote.ai.ai_addrlen);
-		STRNCPY_STR(&iod->dollar.key[len], ((struct sockaddr_un *)(sockptr->remote.sa))->sun_path, DD_BUFLEN - len - 1);
+		charptr = ((struct sockaddr_un *)(sockptr->remote.sa))->sun_path;
+		APPEND_DKEY('|', iod->dollar.key, len, charptr, strlen(charptr));	/* BYPASSOK */
 	}
 	iod->dollar.key[DD_BUFLEN - 1] = '\0';			/* In case we fill the buffer */
 	return TRUE;

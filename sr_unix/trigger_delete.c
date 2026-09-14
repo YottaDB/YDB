@@ -84,7 +84,7 @@ error_def(ERR_TRIGNAMBAD);
 {											\
 	if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))				\
 		t_retry(cdb_sc_triggermod);						\
-	assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);		\
+	assert(WBTEST_ENABLED(WBTEST_HELPOUT_TRIGDEFBAD));				\
 	rts_error_csa(CSA_ARG(CSA) VARLSTCNT(8) ERR_TRIGDEFBAD, 6, trigvn_len,		\
 			trigvn, LEN_AND_LIT("\"#TRHASH\""),HASH->str.len,		\
 			HASH->str.addr);						\
@@ -202,8 +202,8 @@ STATICFNDEF int4 update_trigger_name_value(char *trig_name, int trig_name_len, i
 	{	/* There has to be a #TNAME entry */
 		if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
 			t_retry(cdb_sc_triggermod);
-		assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
-		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_TRIGNAMBAD, 4, LEN_AND_LIT("\"#TNAME\""),
+		assert(WBTEST_ENABLED(WBTEST_HELPOUT_TRIGDEFBAD));
+		RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(6) ERR_TRIGNAMBAD, 4, LEN_AND_LIT("\"#TNAME\""),
 			trig_name_len - 1, trig_name);
 	}
 	ptr = trig_gbl.str.addr;
@@ -214,8 +214,8 @@ STATICFNDEF int4 update_trigger_name_value(char *trig_name, int trig_name_len, i
 	{
 		if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
 			t_retry(cdb_sc_triggermod);
-		assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
-		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_TRIGNAMBAD, 4, LEN_AND_LIT("\"#TNAME\""),
+		assert(WBTEST_ENABLED(WBTEST_HELPOUT_TRIGDEFBAD));
+		RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(6) ERR_TRIGNAMBAD, 4, LEN_AND_LIT("\"#TNAME\""),
 			trig_name_len - 1, trig_name);
 	}
 	memcpy(name_and_index, trig_gbl.str.addr, ++len); /* inline increment intended */
@@ -272,7 +272,7 @@ STATICFNDEF int4 update_trigger_hash_value(char *trigvn, int trigvn_len, char **
 		{	/* We expect $c(0) in the middle of ptr. If we dont find it, this is a restartable situation */
 			if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
 				t_retry(cdb_sc_triggermod);
-			assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
+			assert(WBTEST_ENABLED(WBTEST_HELPOUT_TRIGDEFBAD));
 			RTS_ERROR_CSA_ABT(REG2CSA(gv_cur_region), VARLSTCNT(8) ERR_TRIGDEFBAD, 6, trigvn_len, trigvn,
 				LEN_AND_LIT("\"#BHASH\""), mv_hash.str.len, mv_hash.str.addr);
 		}
@@ -308,7 +308,7 @@ STATICFNDEF int4 update_trigger_hash_value(char *trigvn, int trigvn_len, char **
 	{	/* We expect $c(0) in the middle of ptr. If we dont find it, this is a restartable situation */
 		if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
 			t_retry(cdb_sc_triggermod);
-		assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
+		assert(WBTEST_ENABLED(WBTEST_HELPOUT_TRIGDEFBAD));
 		RTS_ERROR_CSA_ABT(REG2CSA(gv_cur_region), VARLSTCNT(8) ERR_TRIGDEFBAD, 6, trigvn_len, trigvn,
 			LEN_AND_LIT("\"#LHASH\""), mv_hash.str.len, mv_hash.str.addr);
 	}
@@ -325,6 +325,7 @@ STATICFNDEF int4 update_trigger_hash_value(char *trigvn, int trigvn_len, char **
 
 boolean_t trigger_delete_name(mval *trigger_rec, uint4 *trig_stats)
 {
+	int			count;
 	sgmnt_addrs		*csa;
 	char			curr_name[MAX_MIDENT_LEN + 1];
 	uint4			curr_name_len, orig_name_len, trigger_name_len;
@@ -422,8 +423,8 @@ boolean_t trigger_delete_name(mval *trigger_rec, uint4 *trig_stats)
 				{	/* We expect $c(0) in the middle of ptr. If not found, this is a restartable situation */
 					if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
 						t_retry(cdb_sc_triggermod);
-					assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
-					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_TRIGNAMBAD, 4, LEN_AND_LIT("\"#TNAME\""),
+					assert(WBTEST_ENABLED(WBTEST_HELPOUT_TRIGDEFBAD));
+					RTS_ERROR_CSA_ABT(csa, VARLSTCNT(6) ERR_TRIGNAMBAD, 4, LEN_AND_LIT("\"#TNAME\""),
 						curr_name_len, curr_name);
 				}
 				memcpy(trigvn, trig_gbl.str.addr, trigvn_len);
@@ -434,8 +435,8 @@ boolean_t trigger_delete_name(mval *trigger_rec, uint4 *trig_stats)
 				{	/* Trigger indexes start from 1 */
 					if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
 						t_retry(cdb_sc_triggermod);
-					assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
-					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_TRIGNAMBAD, 4, LEN_AND_LIT("\"#TNAME\""),
+					assert(WBTEST_ENABLED(WBTEST_HELPOUT_TRIGDEFBAD));
+					RTS_ERROR_CSA_ABT(csa, VARLSTCNT(6) ERR_TRIGNAMBAD, 4, LEN_AND_LIT("\"#TNAME\""),
 						curr_name_len, curr_name);
 				}
 				SET_DISP_TRIGVN(reg, disp_trigvn, disp_trigvn_len, trigvn, trigvn_len);
@@ -445,9 +446,18 @@ boolean_t trigger_delete_name(mval *trigger_rec, uint4 *trig_stats)
 				{	/* We just looked this up, if it doesn't exist then assume a concurrent update occurred */
 					if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
 						t_retry(cdb_sc_triggermod);
-					assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
+					assert(WBTEST_ENABLED(WBTEST_HELPOUT_TRIGDEFBAD));
 					RTS_ERROR_CSA_ABT(REG2CSA(gv_cur_region), VARLSTCNT(8) ERR_TRIGDEFBAD, 6,
 						trigvn_len, trigvn, trigvn_len, trigvn, LEN_AND_LIT("\"#COUNT\""));
+				}
+				count = MV_FORCE_UINT(trigger_count);
+				if (count < trig_indx)
+				{	/* Trigger indexes start from 1 */
+					if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
+						t_retry(cdb_sc_triggermod);
+					assert(WBTEST_ENABLED(WBTEST_HELPOUT_TRIGDEFBAD));
+					RTS_ERROR_CSA_ABT(csa, VARLSTCNT(6) ERR_TRIGNAMBAD, 4, LEN_AND_LIT("\"#TNAME\""),
+						curr_name_len, curr_name);
 				}
 				if (!jnl_format_done && JNL_WRITE_LOGICAL_RECS(csa))
 				{
@@ -497,9 +507,22 @@ boolean_t trigger_delete_name(mval *trigger_rec, uint4 *trig_stats)
 			op_gvorder(&mv_curr_nam);
 			if (0 == mv_curr_nam.str.len)
 				break;
-			assert(mv_curr_nam.str.len < MAX_MIDENT_LEN);
-			memcpy(curr_name, mv_curr_nam.str.addr, mv_curr_nam.str.len);
-			curr_name_len = mv_curr_nam.str.len;
+			curr_name_len = (uint4)mv_curr_nam.str.len;
+			GTM_WHITE_BOX_TEST(WBTEST_HELPOUT_TRIGNAMBAD, curr_name_len, 32);
+			if (MAX_MIDENT_LEN < curr_name_len)
+			{	/* UUID: 30fefaf8-4e38-430c-a919-07dc861313a9 */
+				if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
+					t_retry(cdb_sc_triggermod);
+				assert(WBTEST_ENABLED(WBTEST_HELPOUT_TRIGDEFBAD) || WBTEST_ENABLED(WBTEST_HELPOUT_TRIGNAMBAD));
+				curr_name_len = MAX_MIDENT_LEN; /* Truncate massive values to MAX_MIDENT_LEN */
+				WBTEST_ONLY(WBTEST_HELPOUT_TRIGNAMBAD,
+				{
+					curr_name_len = mv_curr_nam.str.len;
+				});
+				RTS_ERROR_CSA_ABT(csa, VARLSTCNT(6) ERR_TRIGNAMBAD, 4,
+					LEN_AND_LIT("\"#TNAME\""), curr_name_len, mv_curr_nam.str.addr);
+			}
+			memcpy(curr_name, mv_curr_nam.str.addr, curr_name_len);
 			if (0 != memcmp(curr_name, save_name, trigger_name_len))
 				/* stop when gv_order returns a string that no longer starts save_name */
 				break;
@@ -600,7 +623,7 @@ int4 trigger_delete(char *trigvn, int trigvn_len, mval *trigger_count, int index
 			{ /* CMD, NAME and CHSET cannot be zero length */
 				if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
 					t_retry(cdb_sc_triggermod);
-				assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
+				assert(WBTEST_ENABLED(WBTEST_HELPOUT_TRIGDEFBAD));
 				RTS_ERROR_CSA_ABT(REG2CSA(gv_cur_region), VARLSTCNT(8) ERR_TRIGDEFBAD, 6, trigvn_len, trigvn,
 					trigvn_len, trigvn, STRLEN(trigger_subs[sub_indx]), trigger_subs[sub_indx]);
 			}
@@ -716,7 +739,7 @@ int4 trigger_delete(char *trigvn, int trigvn_len, mval *trigger_count, int index
 					{ /* CMD, NAME and CHSET cannot be zero length */
 						if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
 							t_retry(cdb_sc_triggermod);
-						assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
+						assert(WBTEST_ENABLED(WBTEST_HELPOUT_TRIGDEFBAD));
 						RTS_ERROR_CSA_ABT(REG2CSA(gv_cur_region), VARLSTCNT(8) ERR_TRIGDEFBAD,
 							6, trigvn_len, trigvn, trigvn_len, trigvn,
 							STRLEN(trigger_subs[sub_indx]), trigger_subs[sub_indx]);
@@ -735,7 +758,7 @@ int4 trigger_delete(char *trigvn, int trigvn_len, mval *trigger_count, int index
 						{ /* Exceeding the temporary buffer is impossible, restart*/
 							if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
 								t_retry(cdb_sc_triggermod);
-							assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
+							assert(WBTEST_ENABLED(WBTEST_HELPOUT_TRIGDEFBAD));
 							RTS_ERROR_CSA_ABT(REG2CSA(gv_cur_region), VARLSTCNT(8) ERR_TRIGDEFBAD,
 								6, trigvn_len, trigvn, trigvn_len, trigvn,
 								STRLEN(trigger_subs[sub_indx]), trigger_subs[sub_indx]);
@@ -865,7 +888,7 @@ void trigger_delete_all(mval *trigger_rec, uint4 *trig_stats)
 						curr_gbl_name.str.len, curr_gbl_name.str.addr,
 						curr_gbl_name.str.len, curr_gbl_name.str.addr, LEN_AND_LIT("\"#CYCLE\""),
 						ERR_TEXT, 2, RTS_ERROR_TEXT("#CYCLE field is missing"));
-				assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
+				assert(WBTEST_ENABLED(WBTEST_HELPOUT_TRIGDEFBAD));
 			} else
 			{
 				mv_cycle_ptr = &trigger_cycle;
@@ -892,7 +915,7 @@ void trigger_delete_all(mval *trigger_rec, uint4 *trig_stats)
 							curr_gbl_name.str.len, curr_gbl_name.str.addr,
 							curr_gbl_name.str.len, curr_gbl_name.str.addr, LEN_AND_LIT("\"#COUNT\""),
 							ERR_TEXT, 2, RTS_ERROR_TEXT("#COUNT field is missing. Skipped in results"));
-					assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
+					assert(WBTEST_ENABLED(WBTEST_HELPOUT_TRIGDEFBAD));
 					delete_required = TRUE;
 				}
 			}

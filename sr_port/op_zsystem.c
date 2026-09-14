@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -50,6 +50,7 @@ void op_zsystem(mval *v)
 #else
         int4            wait_stat;
 #endif
+	gtm_char_t	out_com_buf[MAX_STRLEN];
 	gtm_string_t	filtered_command;
 	DCL_THREADGBL_ACCESS;
 
@@ -75,7 +76,9 @@ void op_zsystem(mval *v)
 	/*Filter the command first, if required*/
 	if (RESTRICTED(zsy_filter))
 	{
-		filtered_command = gtm_filter_command(cmd_buf, ZSYSTEMSTR);
+		filtered_command.address = &out_com_buf[0];
+		filtered_command.length = SIZEOF(out_com_buf);
+		gtm_filter_command(cmd_buf, &filtered_command, ZSYSTEMSTR);
 		if (filtered_command.length)
 		{
 			if (!strlen(filtered_command.address)) /*empty command returned*/

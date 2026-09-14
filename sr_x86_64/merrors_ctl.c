@@ -1049,7 +1049,7 @@ LITDEF	err_msg merrors[] = {
 	{ "ENCODING", "M or W-1252 code designation for character set encoding, might return unexpected results when \"UTF-8\"=$ZCHSET", 0, 0 },
 	{ "DBMINRESBYTES", "Minimum RESERVED BYTES value required for certification/upgrade is !UL - Currently is !UL", 2, 0 },
 	{ "TRIGNOXPEL", "Triggers are not allowed in an XPEL routine", 0, 0 },
-	{ "UNUSEDMSG1218", "DBCDBCERTIFIED removed from code in V7.0-000 Nov 2020", 0, 0 },
+	{ "REPLMSGSIZE", "Replication message length !UL is outside the supported range of !UL to !UL", 3, 0 },
 	{ "UNUSEDMSG1219", "DBCMODBLK2BIG removed from code in V7.0-000 Nov 2020", 0, 0 },
 	{ "UNUSEDMSG1220", "DBCREC2BIG removed from code in V7.0-000 Nov 2020", 0, 0 },
 	{ "UNUSEDMSG1221", "DBCCMDFAIL removed from code in V7.0-000 Nov 2020", 0, 0 },
@@ -1212,7 +1212,7 @@ LITDEF	err_msg merrors[] = {
 	{ "BOOLSIDEFFECT", "Extrinsic ($$), External call ($&) or $INCREMENT() with potential side effects in Boolean expression", 0, 0 },
 	{ "DBBADUPGRDSTATE", "Correcting conflicting values for fields describing database version upgrade state in the file header for region !AD (!AD) - make fresh backups with new journal files immediately.", 4, 0 },
 	{ "WRITEWAITPID", "PID !UL waited !UL minute(s) for PID !UL to finish writing block 0x!16@XQ in database file !AD", 6, 0 },
-	{ "ZGOCALLOUTIN", "ZGOTO level 0 with entry ref not valid when using call-ins", 0, 0 },
+	{ "ZGOCALLOUTIN", "ZGOTO !UL:entryref not valid when using call-ins", 1, 0 },
 	{ "REPLNOXENDIAN", "!AD side is running on a GT.M version that does not support cross-endian replication. Upgrade the !AD side to at least V5.3-003 to support cross-endian replication. Cannot continue", 4, 0 },
 	{ "REPLXENDIANFAIL", "!AD side encountered error while doing endian conversion at journal sequence number 0x!16@XQ", 3, 0 },
 	{ "ZGOTOINVLVL2", "ZGOTO 0:entryref is not valid on VMS (UNLINK is a UNIX only feature)", 0, 0 },
@@ -2603,7 +2603,7 @@ LITDEF	int ERR_SEMUNDOOVERFLOW = 418816074;
 LITDEF	int ERR_ENCODING = 150380624;
 LITDEF	int ERR_DBMINRESBYTES = 150380634;
 LITDEF	int ERR_TRIGNOXPEL = 150380642;
-LITDEF	int ERR_UNUSEDMSG1218 = 150380651;
+LITDEF	int ERR_REPLMSGSIZE = 150380650;
 LITDEF	int ERR_UNUSEDMSG1219 = 150380658;
 LITDEF	int ERR_UNUSEDMSG1220 = 150380666;
 LITDEF	int ERR_UNUSEDMSG1221 = 150380674;

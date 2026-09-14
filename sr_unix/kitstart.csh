@@ -1,7 +1,7 @@
 #!/usr/local/bin/tcsh
 #################################################################
 #								#
-# Copyright (c) 2011-2023 Fidelity National Information		#
+# Copyright (c) 2011-2026 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -202,6 +202,14 @@ if ("$osname" == "linux" && ( "$arch" == "i586" || "x8664" == "$arch" )) then
 	chmod 444 $GNU_COPYING_license
 endif
 
+# UUID: 59c7cc79-222f-49b9-b167-6791c941be73 ; f003
+# UUID: 5fb67080-eb16-4385-82f8-9386949cabc1 ; f014
+# UUID: e2e17f18-7d81-42b0-b1f7-49143c6e07ba ; f006
+# UUID: ce075a3b-7eba-4ad7-9ba8-bb31b98cd0a2 ; f015
+# UUID: 5a68b3ed-958d-456e-a83c-d0a62b7261e2 ; f016
+# UUID: e4c56d93-78d7-46a5-896c-30d453bff3f6 ; f047
+# UUID: 70e55f33-4dae-4a44-8acb-c8a37258c7fb ; f076
+# V7.2-001 and up do not include GT.CM
 set product = "gtm"
 set dist = "$gtm_ver/dist"
 set tmp_dist = "$gtm_ver/tmp_dist"
@@ -209,8 +217,9 @@ set install = "$gtm_ver/install"
 set dist_prefix = "${product}_${version}_${osname}_${arch}"
 set mnotdistributed = '{CHK2LEV,CHKOP,GENDASH,GENOUT,GETNEAR,GTMDEFINEDTYPESTODB,GTMHLPLD,GTMTHREADGBLASM,LOAD,LOADOP,LOADVX,MSG,TTTGEN,TTTSCAN,UNLOAD}.[om] GDE*.m' #BYPASSOKLENGTH
 set notdistributed = '_*.o *.log map obj plugin/libgtm* plugin/*.tab plugin/gtmcrypt/maskpass{,.debug} plugin/r plugin/o'
-set misc_notdistributed = "gtcm_{pkdisp,play,shmclean}{,.debug}"
+set gtcm_notdistributed = "gtcm_*"
 set utf8_notdistributed = '_*.o *.m *.log map obj [a-z]*'
+set debugsumbols_notdistributed = "gtcm_*.debug"
 
 if (-d $dist || -d $tmp_dist || -d $install) then
 	echo ""
@@ -251,6 +260,8 @@ foreach image ($imagetype)
 		pushd $debug_symbol_dir
 		set dist_file = "${dist}/${product}-debug_${version}_${osname}_${arch}_${image}.${package_ext}"
 		echo ""
+		echo "Removing debug symbols that are not distributed (${debugsumbols_notdistributed})"
+		/bin/rm -rf ${debugsumbols_notdistributed} || exit 10
 		echo "Packaging debug symbols to ${dist_file}"
 		cp $gtm_tools/install_debug_symbols_sh.txt install_debug_symbols.sh
 		chmod +x install_debug_symbols.sh
@@ -263,9 +274,9 @@ foreach image ($imagetype)
 
 	endif
 	echo ""
-	echo "Removing files that are not distributed (${notdistributed} ${mnotdistributed} ${misc_notdistributed})"
-	set rm_from_dist = "$rm_from_dist `echo $mnotdistributed $misc_notdistributed`"
-	/bin/rm -rf ${notdistributed} ${mnotdistributed} ${misc_notdistributed} || exit 9
+	echo "Removing files that are not distributed (${notdistributed} ${mnotdistributed} ${gtcm_notdistributed})"
+	set rm_from_dist = "$rm_from_dist `echo $mnotdistributed $gtcm_notdistributed`"
+	/bin/rm -rf ${notdistributed} ${mnotdistributed} ${gtcm_notdistributed} || exit 9
 	if (-e utf8) then
 		cd utf8
 		/bin/rm -rf ${utf8_notdistributed} ${mnotdistributed} || exit 9

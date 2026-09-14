@@ -431,7 +431,7 @@ STATICFNDEF void gtmrecv_repl_send_loop_error(int status, char *msgtypestr)
 /* convert endianness of transaction */
 STATICFNDEF int repl_tr_endian_convert(unsigned char remote_jnl_ver, uchar_ptr_t jnl_buff, uint4 jnl_len)
 {
-	unsigned char			*jb, *jstart, *ptr;
+	unsigned char			*jb, *jstart, *ptr, *recend;
 	enum jnl_record_type		rectype;
 	int				status, reclen;
 	uint4				jlen;
@@ -461,12 +461,13 @@ STATICFNDEF int repl_tr_endian_convert(unsigned char remote_jnl_ver, uchar_ptr_t
 		rec = (jnl_record *) jb;
 		rectype = (enum jnl_record_type)rec->prefix.jrec_type;
 		reclen = rec->prefix.forwptr = GTM_BYTESWAP_24(rec->prefix.forwptr);
-		if (!IS_REPLICATED(rectype) || (0 == reclen) || (reclen > jlen))
+		if (!IS_REPLICATED(rectype) || (0 >= reclen) || ((uint4)reclen > jlen))
 		{	/* Bad OR Incomplete record */
 			assert(FALSE);
 			status = -1;
 			break;
 		}
+		recend = (unsigned char *)rec + reclen - JREC_SUFFIX_SIZE;
 		assert(!IS_ZTP(rectype));
 		assert((JRT_HISTREC == rectype) || (JRT_TRIPLE == rectype) || IS_SET_KILL_ZKILL_ZTWORM_LGTRIG_ZTRIG(rectype)
 		       || (JRT_TCOM == rectype) || (JRT_NULL == rectype));
@@ -484,7 +485,7 @@ STATICFNDEF int repl_tr_endian_convert(unsigned char remote_jnl_ver, uchar_ptr_t
 		{	/* pini_addr, time, checksum and tn field of the journal records created by the source server are
 			 * irrelevant to the receiver server and hence no point doing the endian conversion for them.
 			 */
-			((jrec_suffix *)((unsigned char *)rec + reclen - JREC_SUFFIX_SIZE))->backptr = reclen;
+			((jrec_suffix *)recend)->backptr = reclen;
 			rec->jrec_null.jnl_seqno = GTM_BYTESWAP_64(rec->jrec_null.jnl_seqno);
 			/* Starting jnl ver V22, we have a "strm_seqno" field in the journal record so endian convert that */
 			if (V22_JNL_VER <= remote_jnl_ver)
@@ -536,12 +537,29 @@ STATICFNDEF int repl_tr_endian_convert(unsigned char remote_jnl_ver, uchar_ptr_t
 				 */
 				nodeflags_keylen = *(jnl_str_len_t *)keystr;
 				*(jnl_str_len_t *)keystr = GTM_BYTESWAP_32(nodeflags_keylen);
+				GTM_WHITE_BOX_TEST(WBTEST_RCVR_BAD_KEY_LEN, keystr->length, reclen);
+				/* Validate that the key length fits within the record after endian conversion */
+				if (recend < ((unsigned char *)keystr + keystr->length + SIZEOF(jnl_str_len_t)))
+				{	/* Bad record - key length exceeds record boundary */
+					assert(WBTEST_ENABLED(WBTEST_RCVR_BAD_KEY_LEN));
+					status = -1;
+					break;
+				}
 				if (IS_SET(rectype))
 				{
 					assert(!IS_ZTWORM(rectype));
 					assert(!IS_LGTRIG(rectype));
-					/* SET records have a 'value' part which needs to be endian converted */
+					/* SET records have a 'value' part which needs to be endian converted.
+					 * Validate that the value length field fits within the record.
+					 */
+					GTM_WHITE_BOX_TEST(WBTEST_RCVR_BAD_KEY_LEN, keystr->length, reclen);
 					vallen_ptr = (mstr_len_t *)&keystr->text[keystr->length];
+					if (recend < ((unsigned char *)vallen_ptr + SIZEOF(mstr_len_t)))
+					{	/* Bad record - value length field exceeds record boundary */
+						assert(WBTEST_ENABLED(WBTEST_RCVR_BAD_KEY_LEN));
+						status = -1;
+						break;
+					}
 					GET_MSTR_LEN(temp_val, vallen_ptr);
 					temp_val = GTM_BYTESWAP_32(temp_val);
 					PUT_MSTR_LEN(vallen_ptr, temp_val);
@@ -1760,7 +1778,8 @@ STATICFNDEF void process_tr_buff(int msg_type)
 		assert((write_off != write_wrap) || (0 == write_off));
 		assert(remote_side->jnl_ver);
 		assert(!remote_side->cross_endian || (V18_JNL_VER <= remote_side->jnl_ver));
-		if (ENDIAN_CONVERSION_NEEDED(is_new_histrec, this_side->jnl_ver, remote_side->jnl_ver, remote_side->cross_endian))
+		if (ENDIAN_CONVERSION_NEEDED(is_new_histrec, this_side->jnl_ver, remote_side->jnl_ver,
+						remote_side->cross_endian))
 		{
 			if (SS_NORMAL != (status = repl_tr_endian_convert(remote_side->jnl_ver,
 							recvpool.recvdata_base + write_off, write_len)))
@@ -2016,6 +2035,20 @@ STATICFNDEF void process_tr_buff(int msg_type)
 				assert(JRT_HISTREC == pool_histrec->jrec_type);
 				assert(pool_histrec->forwptr == SIZEOF(repl_histrec_jnl_t));
 				pool_histinfo = &pool_histrec->histcontent;
+				/* UUID: 3709abf0-1f9f-40d3-bf22-5fc16e1f831c
+				 * "pool_histinfo->strm_index" came in over the wire from the source server. It is later
+				 * used (directly, and via "cur_histinfo") to index "last_rcvd_strm_histinfo[]" and
+				 * "is_valid_strm_histinfo[]" (both MAX_SUPPL_STRMS-sized) in shared memory, and is also
+				 * handed to the update process. Validate it before trusting it; in PRO builds the
+				 * downstream assert()s are no-ops. Abort before "recvpool_ctl->write" is advanced so the
+				 * update process never sees the malformed record.
+				 */
+				GTM_WHITE_BOX_TEST(WBTEST_RCVR_BAD_STRM_INDEX, pool_histinfo->strm_index,
+					MAX_SUPPL_STRMS);
+				if (MAX_SUPPL_STRMS <= pool_histinfo->strm_index)
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2,
+						LEN_AND_LIT("Out-of-range strm_index in REPL_HISTREC"
+						" message received from source"));
 				assert(pool_histinfo->start_seqno == recvpool_ctl->jnl_seqno);
 				assert(pool_histinfo->start_seqno >= recvpool.upd_proc_local->read_jnl_seqno);
 				if (jnlpool->repl_inst_filehdr->is_supplementary && !jnlpool->jnlpool_ctl->upd_disabled)
@@ -3083,6 +3116,51 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 				if (0 >= hdr_msg_len)
 					WACKY_MESSAGE(hdr_msg_type, &gtmrecv_sock_fd, 2);	/* invalid length - overflow */
 				msg_type = hdr_msg_type & REPL_TR_CMP_MSG_TYPE_MASK;
+				/* UUID: 52758346-b75d-4afd-8867-7dba9277a2ef */
+				switch (msg_type)
+				{
+					case REPL_HEARTBEAT:
+						if (SIZEOF(repl_heartbeat_msg_t) != hdr_msg_len)
+							WACKY_MESSAGE(hdr_msg_type, &gtmrecv_sock_fd, 2);
+						break;
+					case REPL_OLD_NEED_INSTANCE_INFO:
+						if (SIZEOF(repl_old_needinst_msg_t) != hdr_msg_len)
+							WACKY_MESSAGE(hdr_msg_type, &gtmrecv_sock_fd, 2);
+						break;
+					case REPL_NEED_INSTINFO:
+						if (SIZEOF(repl_needinst_msg_t) != hdr_msg_len)
+							WACKY_MESSAGE(hdr_msg_type, &gtmrecv_sock_fd, 2);
+						break;
+					case REPL_CMP_TEST:
+						if (SIZEOF(repl_cmpinfo_msg_t) != hdr_msg_len)
+							WACKY_MESSAGE(hdr_msg_type, &gtmrecv_sock_fd, 2);
+						break;
+					case REPL_NEED_STRMINFO:
+						if (SIZEOF(repl_needstrminfo_msg_t) != hdr_msg_len)
+							WACKY_MESSAGE(hdr_msg_type, &gtmrecv_sock_fd, 2);
+						break;
+					case REPL_NEED_HISTINFO:
+						if (SIZEOF(repl_needhistinfo_msg_t) != hdr_msg_len)
+							WACKY_MESSAGE(hdr_msg_type, &gtmrecv_sock_fd, 2);
+						break;
+					case REPL_WILL_RESTART_WITH_INFO:
+					case REPL_ROLLBACK_FIRST:
+						if (SIZEOF(repl_start_reply_msg_t) != hdr_msg_len)
+							WACKY_MESSAGE(hdr_msg_type, &gtmrecv_sock_fd, 2);
+						break;
+					case REPL_INST_NOHIST:
+						if (MIN_REPL_MSGLEN != hdr_msg_len)
+							WACKY_MESSAGE(hdr_msg_type, &gtmrecv_sock_fd, 2);
+						break;
+#					ifdef GTM_TLS
+					case REPL_NEED_TLS_INFO:
+						if (SIZEOF(repl_tlsinfo_msg_t) != hdr_msg_len)
+							WACKY_MESSAGE(hdr_msg_type, &gtmrecv_sock_fd, 2);
+						break;
+#					endif
+					default:
+						break;
+				}
 				if (REPL_TR_CMP_JNL_RECS == msg_type)
 				{
 					processed_hdrlen = REPL_MSG_HDRLEN;
@@ -3115,8 +3193,11 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 						cmpmsgp->cmplen = GTM_BYTESWAP_32(cmpmsgp->cmplen);
 						cmpmsgp->uncmplen = GTM_BYTESWAP_32(cmpmsgp->uncmplen);
 					}
-					gtmrecv_repl_cmpmsglen = cmpmsgp->cmplen;
+					// UUID: 6fcd60a1-b03a-4ea1-8365-60f62a1576ab (f017)
+					gtmrecv_repl_cmpmsglen = hdr_msg_len - processed_hdrlen;
 					gtmrecv_repl_uncmpmsglen = cmpmsgp->uncmplen;
+					assert(0 < gtmrecv_repl_cmpmsglen);
+					assert(cmpmsgp->cmplen <= gtmrecv_repl_cmpmsglen);
 					assert(0 < gtmrecv_repl_uncmpmsglen);
 					assert(REPL_TR_CMP_THRESHOLD <= gtmrecv_repl_uncmpmsglen);
 					msg_len = hdr_msg_len - processed_hdrlen;
@@ -3214,10 +3295,12 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 						}
 					}
 					break;
-
 				case REPL_HEARTBEAT:
 					if (0 == data_len)
 					{	/* Heartbeat msg contents start from buffp - msg_len */
+						assert(msg_len == (SIZEOF(heartbeat) - OFFSETOF(repl_heartbeat_msg_t, ack_seqno)));
+						assert((MIN_REPL_MSGLEN - REPL_MSG_HDRLEN)
+							== (SIZEOF(heartbeat) - OFFSETOF(repl_heartbeat_msg_t, ack_seqno)));
 						GTM_WHITE_BOX_TEST(WBTEST_REPL_HEARTBEAT_NO_ACK, dont_reply_to_heartbeat, TRUE);
 						if (dont_reply_to_heartbeat)
 						{
@@ -3266,7 +3349,6 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 							     ack_time, ack_seqno, time(NULL));
 					}
 					break;
-
 				case REPL_OLD_NEED_INSTANCE_INFO:
 					if (0 == data_len)
 					{
@@ -3327,7 +3409,6 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 							MAX_INSTNAME_LEN - 1);
 					}
 					break;
-
 				case REPL_NEED_INSTINFO:
 					if (0 == data_len)
 					{
@@ -3338,7 +3419,6 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 							return;
 					}
 					break;
-
 				case REPL_CMP_TEST:
 					if (0 == data_len)
 					{
@@ -3445,7 +3525,6 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 							repl_zlib_cmp_level = gtm_zlib_cmp_level;
 					}
 					break;
-
 				case REPL_NEED_STRMINFO:
 					if (0 == data_len)
 					{
@@ -3460,7 +3539,6 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 							return;
 					}
 					break;
-
 				case REPL_NEED_HISTINFO:
 				/* case REPL_NEED_TRIPLE_INFO: too but that message has been renamed to REPL_NEED_HISTINFO */
 					if (0 == data_len)
@@ -3480,7 +3558,6 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 							return;
 					}
 					break;
-
 				case REPL_WILL_RESTART_WITH_INFO:
 				case REPL_ROLLBACK_FIRST:
 					if (0 != data_len)
@@ -3709,7 +3786,6 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 					 */
 					gtmrecv_reinit_logseqno();
 					break;
-
 				case REPL_INST_NOHIST:
 					if (0 == data_len)
 					{
@@ -3722,7 +3798,6 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 						assert(FALSE);
 					}
 					break;
-
 				case REPL_LOGFILE_INFO:
 					if (0 == data_len)
 					{
@@ -3750,7 +3825,6 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 						CHECK_REPL_SEND_LOOP_ERROR(status, "REPL_LOGFILE_INFO");
 					}
 					break;
-
 #				ifdef GTM_TLS
 				case REPL_NEED_TLS_INFO:
 					if (0 != data_len)
@@ -3785,7 +3859,6 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 						pha_peer_cert_check = gtm_tls_has_post_hand_shake(repl_tls.sock);
 					}
 					break;
-
 				case REPL_RENEG_ACK_ME:
 					if (0 != data_len)
 						break;
@@ -3797,7 +3870,6 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 					DEBUG_ONLY(reneg_ack_sent = TRUE);
 					repl_tls.renegotiate_state = REPLTLS_WAITING_FOR_RENEG_COMPLETE;
 					break;
-
 				case REPL_RENEG_COMPLETE:
 					if (0 != data_len)
 						break;

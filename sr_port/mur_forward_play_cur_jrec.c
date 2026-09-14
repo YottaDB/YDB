@@ -62,6 +62,7 @@ GBLREF	boolean_t		forw_recov_lgtrig_only;
 
 error_def(ERR_DUPTN);
 error_def(ERR_FORCEDHALT);
+error_def(ERR_JNLBADRECFMT);
 error_def(ERR_JNLTPNEST);
 
 static	void	(* const extraction_routine[])(jnl_ctl_list *, enum broken_type, jnl_record *, pini_list_struct *) =
@@ -289,6 +290,14 @@ uint4	mur_forward_play_cur_jrec(reg_ctl_list *rctl)
 	if (is_set_kill_zkill_ztrig)
 	{
 		assert(NULL != keystr);
+interact3:
+		/* UUID: 319fab38-a7fe-4cbc-9743-8c9b128b2120 */
+		if (keystr->length >= gv_currkey->top)
+		{	/* Ensure keystr->length is undamaged / within design limit */
+			assert(FALSE);
+			mur_report_error(jctl, MUR_JNLBADRECFMT);
+			return ERR_JNLBADRECFMT;
+		}
 		memcpy(gv_currkey->base, &keystr->text[0], keystr->length);
 		gv_currkey->base[keystr->length] = '\0';
 		gv_currkey->end = keystr->length;
@@ -380,4 +389,6 @@ uint4	mur_forward_play_cur_jrec(reg_ctl_list *rctl)
 			return status;
 	}
 	return SS_NORMAL;
+	assertpro(FALSE);	/* ensure we never reach the goto below */
+	goto interact3;		/* This suppresses the compiler warning about an used label. */
 }

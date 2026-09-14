@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2010-2026 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,7 +14,7 @@
 #define TRIGGER_SELECT_PROTOS_INCLUDED
 
 STATICFNDCL void write_subscripts(char *out_rec, char **out_ptr, char **sub_ptr, int *sub_len);
-STATICFNDCL void write_out_trigger(char *gbl_name, uint4 gbl_name_len, int nam_indx);
+STATICFNDCL void write_out_trigger(char *gbl_name, uint4 gbl_name_len, int nam_indx, int nam_len, char *nam_ptr);
 STATICFNDCL void write_gbls_or_names(char *gbl_name, uint4 gbl_name_len, boolean_t trig_name);
 STATICFNDCL void dump_all_triggers(void);
 

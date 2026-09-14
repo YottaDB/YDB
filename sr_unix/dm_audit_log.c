@@ -1,6 +1,6 @@
 /****************************************************************
  *                                                              *
- * Copyright (c) 2018-2022 Fidelity National Information	*
+ * Copyright (c) 2018-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved. *
  *                                                              *
  *      This source code contains the intellectual property     *
@@ -527,7 +527,7 @@ int	dm_audit_log(mval *v, int src)
 {
 	unsigned char	log_msg_pre[GTM_PATH_MAX + MAX_AUDIT_PROC_INFO_LEN + MAX_SRCLINE + 1], *log_msg;
 	char 		cmd_pre[MAX_SRCLINE + 1], *cmd, *errptr, ttybuf[TTY_NAME_MAX + 1];
-	int		status, save_errno, log_msg_len, max_log_msg_len;
+	int		status, save_errno, log_msg_len, max_log_msg_len, i;
 	boolean_t	need_free = FALSE, save_is_zauditlog;
 	DCL_THREADGBL_ACCESS;
 
@@ -587,6 +587,12 @@ int	dm_audit_log(mval *v, int src)
 	}
 	STRNCPY_STR(cmd, v->str.addr, v->str.len);
 	cmd[v->str.len] = '\0';
+	/* UUID: 1154e2c4-0b83-4349-9eaa-7c847a852d4a */
+	for (i = 0; i < v->str.len; i++)
+	{
+		if (('\n' == cmd[i]) || ('\r' == cmd[i]))
+			cmd[i] = ' ';
+	}
 	memset(ttybuf, '\0', TTY_NAME_MAX  + 1);
 	memcpy(ttybuf, sys_input.addr, sys_input.len);
 

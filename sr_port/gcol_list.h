@@ -68,6 +68,25 @@ static inline boolean_t glist_ptr_span_in_range(const void *ptr, size_t len, con
 	return (base <= p) && (p < top) && ((UINTPTR_T)len <= (top - p));
 }
 
+/* TODO: The below function is a concession to potential stringpool misusers who create strings that may barely span over the
+ * top of the stringpool if needed space is miscalculated. In that case, provided that to do so would not require
+ * accessing invalid memory, we should treat these strings as being in the stringpool for the purposes of protection.
+ * After enough time has passed without asserts in testing, uses of this function can be replaced with
+ * glist_ptr_span_in_range() and asserts converted to assertpros. At that time we should also remove the additional
+ * 2 * OS_PAGE_SIZE allocation at the end of the stringpool range, which no longer serves its original purpose: to cause ACCVIO
+ * errors when accessed.
+ */
+static inline boolean_t glist_ptr_span_in_pool_range(
+	const void *ptr, size_t len, const void *low_p, const void *high_p, size_t real_size)
+{
+	UINTPTR_T p = (UINTPTR_T)ptr;
+	UINTPTR_T base = (UINTPTR_T)low_p;
+	UINTPTR_T top = (UINTPTR_T)high_p;
+	UINTPTR_T real_top = base + real_size;
+
+	return (base <= p) && (p < top) && ((UINTPTR_T)len <= (real_top - p));
+}
+
 static inline uint_least64_t glist_get_arraytype(uint_least64_t in_array)
 {
 	return GET_COORD_ARRAYTYPE(in_array);
@@ -349,17 +368,30 @@ static inline mstr_sort_array_element *glist_str_get_sort_array_element(const ms
 static inline boolean_t glist_str_in_a_stringpool(const mstr *str, spdesc *spool)
 {
 	assert(!timer_in_handler || WBTEST_ENABLED(WBTEST_ABUSE_TIMERS));
-	return (str->len && glist_ptr_span_in_range(str->addr, str->len, spool->base, spool->top));
+	assert(!str->len
+		|| (glist_ptr_span_in_range(str->addr, str->len, spool->base, spool->top)
+			== glist_ptr_span_in_pool_range(str->addr, str->len, spool->base, spool->top, spool->lastallocbytes)));
+	return (str->len && glist_ptr_span_in_pool_range(str->addr, str->len, spool->base, spool->top, spool->lastallocbytes));
 }
 
 static inline boolean_t glist_str_in_stringpool(const mstr *str)
 {
-	return (str->len && glist_ptr_span_in_range(str->addr, str->len, stringpool.base, stringpool.top));
+	assert(!str->len
+		|| (glist_ptr_span_in_range(str->addr, str->len, stringpool.base, stringpool.top)
+			== glist_ptr_span_in_pool_range(
+				str->addr, str->len, stringpool.base, stringpool.top, stringpool.lastallocbytes)));
+	return (str->len
+		&& glist_ptr_span_in_pool_range(str->addr, str->len, stringpool.base, stringpool.top, stringpool.lastallocbytes));
 }
 
 static inline boolean_t glist_umstr_in_stringpool(const unmanaged_mstr *str)
 {
-	return (str->len && glist_ptr_span_in_range(str->addr, str->len, stringpool.base, stringpool.top));
+	assert(!str->len
+		|| (glist_ptr_span_in_range(str->addr, str->len, stringpool.base, stringpool.top)
+			== glist_ptr_span_in_pool_range(
+				str->addr, str->len, stringpool.base, stringpool.top, stringpool.lastallocbytes)));
+	return (str->len
+		&& glist_ptr_span_in_pool_range(str->addr, str->len, stringpool.base, stringpool.top, stringpool.lastallocbytes));
 }
 
 static inline boolean_t glist_str_in_range(const mstr *str, const char *low_p, const char *high_p)

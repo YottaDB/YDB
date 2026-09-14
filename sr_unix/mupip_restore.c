@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -94,12 +94,18 @@ error_def(ERR_MUPRESTERR);
 error_def(ERR_TEXT);
 error_def(ERR_RESTORESUCCESS);
 
-#define COMMON_READ(S, BUFF, LEN, INBUF)		\
-{							\
-	assert(BACKUP_TEMPFILE_BUFF_SIZE >= LEN);	\
-	(*common_read)(S, BUFF, LEN);			\
-	if (0 != restore_read_errno)			\
-		CLNUP_AND_EXIT(ERR_MUPRESTERR, INBUF);	\
+#define COMMON_READ(S, BUFF, LEN, INBUF)							\
+{												\
+	/* UUID: 4bf03e7a-4844-4fcf-a781-8cce8be4029a */					\
+	if ((0 > (int4)(LEN)) || (BACKUP_TEMPFILE_BUFF_SIZE < (int4)(LEN)))			\
+	{											\
+		util_out_print("Aborting restore: input record length !SL is out of range",	\
+			TRUE, (int4)(LEN));							\
+		CLNUP_AND_EXIT(ERR_MUPRESTERR, INBUF);						\
+	}											\
+	(*common_read)(S, BUFF, LEN);								\
+	if (0 != restore_read_errno)								\
+		CLNUP_AND_EXIT(ERR_MUPRESTERR, INBUF);						\
 }
 
 #define CLNUP_AND_EXIT(EXIT_STATUS, INBUF)				\
@@ -515,6 +521,7 @@ void mupip_restore(void)
 		rsize = SIZEOF(muinc_blk_hdr) + inhead.blk_size;
 		for ( ; ; )
 		{	/* All records are of fixed size so process until we get to a zeroed record marking the end */
+interact4:
 			COMMON_READ(in, inbuf, rsize, inbuf);	/* Note rsize == sblkh_p */
 			if (0 == sblkh_p->blkid && FALSE == sblkh_p->valid_data)
 			{	/* This is supposed to be the end of list marker (null entry */
@@ -715,6 +722,8 @@ void mupip_restore(void)
 	gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_RESTORESUCCESS);
 	util_out_print("!UL blocks restored", TRUE, rest_blks);
 	CLNUP_AND_EXIT(SS_NORMAL, inbuf);
+	assertpro(FALSE);	/* ensure we never reach the goto below */
+	goto interact4;		/* this suppresses the compiler warning about an used label. */
 }
 
 STATICFNDEF void exec_read(BFILE *bf, char *buf, int nbytes)

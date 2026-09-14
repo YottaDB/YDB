@@ -138,6 +138,7 @@ error_def(ERR_REPL2OLD);
 error_def(ERR_REPLCOMM);
 error_def(ERR_REPLINSTNOHIST);
 error_def(ERR_TEXT);
+error_def(ERR_REPLMSGSIZE);
 
 CONDITION_HANDLER(gtmrecv_fetchresync_ch)
 {
@@ -451,6 +452,14 @@ int gtmrecv_fetchresync(int port, seq_num *resync_seqno, seq_num max_reg_seqno)
 				assert(SIZEOF(logfile_msg) > MIN_REPL_MSGLEN);
 				assert(MIN_REPL_MSGLEN < msg.len);
 				assert(remote_side->endianness_known);
+interactlabel:
+				/* UUID: 02308fc0-5e33-4d44-a03c-07737636040d */
+				if ((msg.len > SIZEOF(logfile_msg)) || (msg.len < MIN_REPL_MSGLEN))
+				{
+					repl_log(stdout, TRUE, TRUE, "Invalid replication update message length (%u) expected a value between"
+							" (%u) and (%lu). Rollback exiting. \n", msg.len, MIN_REPL_MSGLEN, (unsigned long)SIZEOF(logfile_msg));
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_REPLMSGSIZE, 3, msg.len, MIN_REPL_MSGLEN, SIZEOF(logfile_msg));
+				}
 				msgp = (uchar_ptr_t)&logfile_msg;
 				memcpy(msgp, &msg, MIN_REPL_MSGLEN);
 				REPL_RECV_LOOP(gtmrecv_sock_fd, msgp + MIN_REPL_MSGLEN, msg.len - MIN_REPL_MSGLEN, REPL_POLL_WAIT)
@@ -520,4 +529,6 @@ int gtmrecv_fetchresync(int port, seq_num *resync_seqno, seq_num max_reg_seqno)
 	 */
 	assert((*resync_seqno <= max_reg_seqno) || jnlpool->repl_inst_filehdr->is_supplementary);
 	return SS_NORMAL;
+	assertpro(FALSE);	/* Ensure we never reach the goto below */
+	goto interactlabel;	/* This suppresses the compiler warning about an unused label. */
 }

@@ -554,13 +554,11 @@ boolean_t iosocket_wait(io_desc *iod, int4 msec_timeout, mval *whatop, mval *han
 				len += len1;
 			}
 			assert(0 != len);
-			iod->dollar.key[len++] = '|';
-			memcpy(&iod->dollar.key[len], socketptr->handle, socketptr->handle_len);
-			len += socketptr->handle_len;
-			iod->dollar.key[len++] = '|';
+			/* UUID: `fe02bb5c-0be4-43d5-9c80-d2e34e9abe8f`	*/
+			APPEND_DKEY('|', iod->dollar.key, len, socketptr->handle, socketptr->handle_len);
 			if (NULL != socketptr->remote.saddr_ip)
 			{
-				strncpy(&iod->dollar.key[len], socketptr->remote.saddr_ip, DD_BUFLEN - 1 - len);
+				charptr = socketptr->remote.saddr_ip;
 			} else
 			{
 				assertpro(socket_local == socketptr->protocol);
@@ -570,8 +568,8 @@ boolean_t iosocket_wait(io_desc *iod, int4 msec_timeout, mval *whatop, mval *han
 					charptr = ((struct sockaddr_un *)(socketptr->remote.sa))->sun_path;
 				else
 					charptr = (char *)"";
-				strncpy(&dsocketptr->iod->dollar.key[len], charptr, DD_BUFLEN - len - 1);
 			}
+			APPEND_DKEY('|', iod->dollar.key, len, charptr, strlen(charptr));	/* BYPASSOK */
 			iod->dollar.key[DD_BUFLEN - 1] = '\0';
 		}
 		break;

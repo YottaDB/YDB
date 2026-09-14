@@ -606,4 +606,15 @@ MBSTART {											\
 	}											\
 } MBEND
 
+#define APPEND_DKEY(SEP, BUFFER, OFFSET, SRC, SRCLEN)				\
+MBSTART {									\
+	size_t	lsrclen;							\
+										\
+	if (('\0' != SEP) && ((sizeof(BUFFER) - 2) > OFFSET))	/* BYPASSOK */	\
+		BUFFER[OFFSET++] = SEP;						\
+	lsrclen = MIN(SRCLEN, (sizeof(BUFFER) - 1 - OFFSET));	/* BYPASSOK */	\
+	memcpy(&BUFFER[OFFSET], SRC, lsrclen);			/* BYPASSOK */	\
+	OFFSET += lsrclen;					\
+} MBEND
+
 #endif /* IO_H */

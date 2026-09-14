@@ -161,6 +161,29 @@ LITREF	char 			*trigger_subs[];
 	select_status = TRIG_FAILURE;							\
 }
 
+/* Verify that GVN fits inside MAX_MIDENT_LEN and then copy it. If not, retry or error */
+#define VALIDATE_AND_COPY_GLBNAME(DST, ADDR, LEN)					\
+{											\
+	uint4 ulen = LEN;								\
+											\
+	GTM_WHITE_BOX_TEST(WBTEST_HELPOUT_TRIGNAMBAD, ulen, 32);			\
+	if (MAX_MIDENT_LEN < ulen)							\
+	{	/* UUID: 30fefaf8-4e38-430c-a919-07dc861313a9 */			\
+		if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))			\
+			t_retry(cdb_sc_triggermod);					\
+		ulen = MAX_MIDENT_LEN; /* Truncate to MAX_MIDENT_LEN */			\
+		WBTEST_ONLY(WBTEST_HELPOUT_TRIGNAMBAD,					\
+		{									\
+			ulen = (uint4)LEN;						\
+		});									\
+		assert(WBTEST_ENABLED(WBTEST_HELPOUT_TRIGDEFBAD)			\
+			|| WBTEST_ENABLED(WBTEST_HELPOUT_TRIGNAMBAD));			\
+		RTS_ERROR_CSA_ABT(CSA_ARG(cs_addrs) VARLSTCNT(6) ERR_TRIGNAMBAD, 4,	\
+				LEN_AND_LIT("\"#TNAME\""), ulen, ADDR);			\
+	}										\
+	memcpy(DST, ADDR, LEN);								\
+}
+
 error_def(ERR_DBROLLEDBACK);
 error_def(ERR_MUNOACTION);
 error_def(ERR_MUNOACTION);
@@ -168,6 +191,7 @@ error_def(ERR_MUPCLIERR);
 error_def(ERR_MUPCLIERR);
 error_def(ERR_NEEDTRIGUPGRD);
 error_def(ERR_TRIGDEFBAD);
+error_def(ERR_TRIGNAMBAD);
 
 STATICDEF char *triggerfile_quals[] = {
 #define TRIGGER_SUBSDEF(SUBSTYPE, SUBSNAME, LITMVALNAME, TRIGFILEQUAL, PARTOFHASH)	TRIGFILEQUAL,
@@ -195,6 +219,7 @@ STATICFNDEF void write_subscripts(char *out_rec, char **out_ptr, char **sub_ptr,
 		} else if ('"' == *ptr)
 		{
 			len = len_left;
+			dst_len = MAX_GVSUBS_LEN; /* cff3d614-03d3-4734-ba12-291f8ebbf5c8 */
 			trigger_scan_string(ptr, &len_left, dst, &dst_len);
 			MAKE_ZWR_STR(dst, dst_len, out_rec, out_p);
 			len_left--;		/* Need to skip the trailing " */
@@ -211,7 +236,7 @@ STATICFNDEF void write_subscripts(char *out_rec, char **out_ptr, char **sub_ptr,
 	*out_ptr = out_p;
 }
 
-STATICFNDEF void write_out_trigger(char *gbl_name, uint4 gbl_name_len, int nam_indx)
+STATICFNDCL void write_out_trigger(char *gbl_name, uint4 gbl_name_len, int nam_indx, int nam_len, char *nam_ptr)
 {
 	mval			data_val;
 	char			out_rec[MAX_BUFF_SIZE];
@@ -242,13 +267,21 @@ STATICFNDEF void write_out_trigger(char *gbl_name, uint4 gbl_name_len, int nam_i
 	{
 		mv_trig_cnt_ptr = &trigger_count;
 		count = MV_FORCE_INT(mv_trig_cnt_ptr);
+		if ((0 > nam_indx) || (count < nam_indx))
+		{	/* Somehow requested index is negative or > #COUNT for gbl_name */
+			if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
+				t_retry(cdb_sc_triggermod);
+			assert(WBTEST_ENABLED(WBTEST_HELPOUT_TRIGDEFBAD));
+			RTS_ERROR_CSA_ABT(REG2CSA(gv_cur_region), VARLSTCNT(6) ERR_TRIGNAMBAD, 4, LEN_AND_LIT("\"#TNAME\""),
+					nam_len, nam_ptr);
+		}
 		assert(0 < count);
 		BUILD_HASHT_SUB_SUB_CURRKEY(gbl_name, gbl_name_len, LITERAL_HASHLABEL, STRLEN(LITERAL_HASHLABEL));
 		if (!gvcst_get(&trigger_value))
 		{	/* There has to be a #LABEL */
 			if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
 				t_retry(cdb_sc_triggermod);
-			assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
+			assert(WBTEST_ENABLED(WBTEST_HELPOUT_TRIGDEFBAD));
 			RTS_ERROR_CSA_ABT(REG2CSA(gv_cur_region), VARLSTCNT(8) ERR_TRIGDEFBAD, 6, gbl_name_len,
 				gbl_name, gbl_name_len, gbl_name, LEN_AND_LIT("\"#LABEL\""));
 		}
@@ -265,7 +298,7 @@ STATICFNDEF void write_out_trigger(char *gbl_name, uint4 gbl_name_len, int nam_i
 		{	/* There has to be a #CYCLE */
 			if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
 				t_retry(cdb_sc_triggermod);
-			assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
+			assert(WBTEST_ENABLED(WBTEST_HELPOUT_TRIGDEFBAD));
 			RTS_ERROR_CSA_ABT(REG2CSA(gv_cur_region), VARLSTCNT(8) ERR_TRIGDEFBAD, 6, gbl_name_len,
 				gbl_name, gbl_name_len, gbl_name, LEN_AND_LIT("\"#CYCLE\""));
 		}
@@ -287,7 +320,7 @@ STATICFNDEF void write_out_trigger(char *gbl_name, uint4 gbl_name_len, int nam_i
 			{	/* There has to be a #NAME */
 				if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
 					t_retry(cdb_sc_triggermod);
-				assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
+				assert(WBTEST_ENABLED(WBTEST_HELPOUT_TRIGDEFBAD));
 				RTS_ERROR_CSA_ABT(REG2CSA(gv_cur_region), VARLSTCNT(8) ERR_TRIGDEFBAD, 6, gbl_name_len,
 					gbl_name, gbl_name_len, gbl_name, LEN_AND_LIT("\"#NAME\""));
 
@@ -464,7 +497,7 @@ STATICFNDEF void write_gbls_or_names(char *gbl_name, uint4 gbl_name_len, boolean
 					op_gvorder(&mv_curr_nam);
 					if (0 == mv_curr_nam.str.len)
 						break;
-					memcpy(curr_name, mv_curr_nam.str.addr, mv_curr_nam.str.len);
+					VALIDATE_AND_COPY_GLBNAME(curr_name, mv_curr_nam.str.addr, mv_curr_nam.str.len);
 					curr_name_len = mv_curr_nam.str.len;
 					if (0 != memcmp(curr_name, save_name, gbl_name_len))
 						break;
@@ -480,7 +513,7 @@ STATICFNDEF void write_gbls_or_names(char *gbl_name, uint4 gbl_name_len, boolean
 			{	/* We expect $c(0) in the middle of addr. If we dont find it, this is a restartable situation */
 				if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
 					t_retry(cdb_sc_triggermod);
-				assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
+				assert(WBTEST_ENABLED(WBTEST_HELPOUT_TRIGDEFBAD));
 				RTS_ERROR_CSA_ABT(REG2CSA(gv_cur_region), VARLSTCNT(8) ERR_TRIGDEFBAD, 6,
 					LEN_AND_LIT("\"#TNAME\""), curr_name_len, curr_name,
 					mv_trigger_val.str.len, mv_trigger_val.str.addr);
@@ -491,10 +524,9 @@ STATICFNDEF void write_gbls_or_names(char *gbl_name, uint4 gbl_name_len, boolean
 			{	/* We expect a valid index */
 				if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
 					t_retry(cdb_sc_triggermod);
-				assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
-				RTS_ERROR_CSA_ABT(REG2CSA(gv_cur_region), VARLSTCNT(8) ERR_TRIGDEFBAD, 6,
-					LEN_AND_LIT("\"#TNAME\""), curr_name_len, curr_name,
-					mv_trigger_val.str.len, mv_trigger_val.str.addr);
+				assert(WBTEST_ENABLED(WBTEST_HELPOUT_TRIGDEFBAD));
+				RTS_ERROR_CSA_ABT(REG2CSA(gv_cur_region), VARLSTCNT(6) ERR_TRIGNAMBAD, 4,
+						LEN_AND_LIT("\"#TNAME\""), curr_name_len, curr_name);
 			}
 			/* Use a local buffer to avoid possible garbage collection issues from write_out_trigger below */
 			memcpy(curr_gbl, mv_trigger_val.str.addr, trigvn_len);
@@ -504,9 +536,10 @@ STATICFNDEF void write_gbls_or_names(char *gbl_name, uint4 gbl_name_len, boolean
 			STR2MVAL(trig_gbl, curr_name, curr_name_len);
 			indx = 0;
 		}
-		write_out_trigger(trig_gbl.str.addr, trig_gbl.str.len, indx);
+		write_out_trigger(trig_gbl.str.addr, trig_gbl.str.len, indx, curr_name_len, curr_name);
 		if (wildcard)
 		{
+			/* $get(^#t("#TNAME",trigger_name)) */
 			if (trig_name)
 			{
 				BUILD_HASHT_SUB_SUB_CURRKEY(LITERAL_HASHTNAME, STR_LIT_LEN(LITERAL_HASHTNAME), curr_name,
@@ -518,7 +551,7 @@ STATICFNDEF void write_gbls_or_names(char *gbl_name, uint4 gbl_name_len, boolean
 			op_gvorder(&mv_curr_nam);
 			if (0 == mv_curr_nam.str.len)
 				break;
-			memcpy(curr_name, mv_curr_nam.str.addr, mv_curr_nam.str.len);
+			VALIDATE_AND_COPY_GLBNAME(curr_name, mv_curr_nam.str.addr, mv_curr_nam.str.len);
 			if (0 != memcmp(curr_name, save_name, gbl_name_len))
 				break;
 			curr_name_len = mv_curr_nam.str.len;
@@ -529,7 +562,7 @@ STATICFNDEF void write_gbls_or_names(char *gbl_name, uint4 gbl_name_len, boolean
 
 STATICFNDEF void dump_all_triggers(void)
 {
-	mval			curr_gbl_name, val;
+	mval			mv_curr_nam, val;
 	gd_region		*reg;
 	gv_namehead		*save_gvtarget;
 	int			reg_index;
@@ -555,16 +588,29 @@ STATICFNDEF void dump_all_triggers(void)
 				RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(4) ERR_NEEDTRIGUPGRD, 2, DB_LEN_STR(gv_cur_region));
 			op_gvdata(&val);
 			if ((literal_ten.m[0] == val.m[0]) && (literal_ten.m[1] == val.m[1]))
-			{	/* $DATA(^#t) is 10 - get first subscript (trigger's global) */
+			{	/* $DATA(^#t(GVN)) is 10 - get first subscript (trigger's global) */
 				BUILD_HASHT_SUB_CURRKEY(LITERAL_MAXHASHVAL, STR_LIT_LEN(LITERAL_MAXHASHVAL));
 				while (TRUE)
 				{
-					op_gvorder(&curr_gbl_name);
-					if (0 == curr_gbl_name.str.len)
+					op_gvorder(&mv_curr_nam);
+					if (0 == mv_curr_nam.str.len)
 						break;
-					gbl_len = curr_gbl_name.str.len;
-					memcpy(global, curr_gbl_name.str.addr, gbl_len);
-					write_out_trigger(global, gbl_len, 0);
+					DEBUG_ONLY(gbl_len = mv_curr_nam.str.len); /* Stash length for WB test case */
+					GTM_WHITE_BOX_TEST(WBTEST_HELPOUT_TRIGNAMBAD, mv_curr_nam.str.len, 32);
+					if ((MAX_MIDENT_LEN < mv_curr_nam.str.len) || (0 > mv_curr_nam.str.len))
+					{	/* UUID: 30fefaf8-4e38-430c-a919-07dc861313a9 */
+						if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
+							t_retry(cdb_sc_triggermod);
+						assert(WBTEST_ENABLED(WBTEST_HELPOUT_TRIGDEFBAD)
+							|| WBTEST_ENABLED(WBTEST_HELPOUT_TRIGNAMBAD));
+						DEBUG_ONLY(mv_curr_nam.str.len = gbl_len);
+						rts_error_csa(cs_addrs, VARLSTCNT(8) ERR_TRIGDEFBAD, 6,
+								mv_curr_nam.str.len, mv_curr_nam.str.addr,
+								mv_curr_nam.str.len, mv_curr_nam.str.addr, 0, NULL);
+					}
+					gbl_len = mv_curr_nam.str.len;
+					memcpy(global, mv_curr_nam.str.addr, gbl_len);
+					write_out_trigger(global, gbl_len, 0, 0, NULL);
 					BUILD_HASHT_SUB_CURRKEY(global, gbl_len);
 				}
 			} else

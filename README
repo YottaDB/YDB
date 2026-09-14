@@ -24,9 +24,9 @@ To build GT.M for Linux, do the following steps:
    If CMake issues a NOTFOUND error, please see the FAQ below.
 
 2. Unpack the GT.M sources
-   The GT.M source tarball extracts to a directory with the version number in the name, gtm_V7.2-000_src
-   $ tar xfz gtm_V7.2-000_src.tar.gz
-   $ cd gtm_V7.2-000_src
+   The GT.M source tarball extracts to a directory with the version number in the name, gtm_V7.2-001_src
+   $ tar xfz gtm_V7.2-001_src.tar.gz
+   $ cd gtm_V7.2-001_src
 
    You should find this README, LICENSE, COPYING and CMakeLists.txt file and
    sr_* source directories.
@@ -52,16 +52,16 @@ To build GT.M for Linux, do the following steps:
    #     -D CMAKE_INSTALL_PREFIX:PATH=${PWD}/package
    #
 
-   $ cmake -D CMAKE_INSTALL_PREFIX:PATH=${PWD}/package <path to>/gtm_V7.2-000_src
+   $ cmake -D CMAKE_INSTALL_PREFIX:PATH=${PWD}/package <path to>/gtm_V7.2-001_src
 
    $ make
 
    $ make install
 
-   $ cd package/lib/fis-gtm/V7.2-000_x86_64
+   $ cd package/lib/fis-gtm/V7.2-001_x86_64
 
    # Now you are ready to install GT.M. Answer a few questions and install it.
-   # The recommended installation path is /opt/fis-gtm/V7.2-000_x86_64
+   # The recommended installation path is /opt/fis-gtm/V7.2-001_x86_64
 
    $ sudo ./configure
 

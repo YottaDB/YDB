@@ -138,6 +138,7 @@ error_def(ERR_STRMNUMMISMTCH2);
 error_def(ERR_TEXT);
 error_def(ERR_TLSCONVSOCK);
 error_def(ERR_TLSHANDSHAKE);
+error_def(ERR_REPLMSGSIZE);
 
 int gtmsource_est_conn()
 {
@@ -492,6 +493,15 @@ int gtmsource_recv_restart(seq_num *recvd_jnl_seqno, int *msg_type, int *start_f
 			assert(remote_side->endianness_known);
 			assert(REPL_PROTO_VER_REMOTE_LOGPATH <= remote_side->proto_ver);
 			assert(-1 != *msg_type);
+			/* UUID: 41b0b085-6269-4ddc-b738-51d047393df5 */
+			if (WBTEST_ENABLED(WBTEST_LENGTHEN_MSG))
+				msg.len = (1 < gtm_white_box_test_case_count) ? (SIZEOF(logfile_msg) + 1) : 1;
+			if ((msg.len > SIZEOF(logfile_msg)) || (msg.len < MIN_REPL_MSGLEN))
+			{
+				repl_log(stdout, TRUE, TRUE, "Invalid replication update message length (%u) expected a value between"
+					" (%u) and (%lu). \n", msg.len, MIN_REPL_MSGLEN, (unsigned long)SIZEOF(logfile_msg));
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_REPLMSGSIZE, 3, msg.len, MIN_REPL_MSGLEN, SIZEOF(logfile_msg));
+			}
 			buffp = (unsigned char *)&logfile_msg;
 			/* First copy what we already received */
 			memcpy(buffp, &msg, MIN_REPL_MSGLEN);

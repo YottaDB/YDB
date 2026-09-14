@@ -1047,7 +1047,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* ENCODING */
 	   0,	/* DBMINRESBYTES */
 	   0,	/* TRIGNOXPEL */
-	   0,	/* UNUSEDMSG1218 */
+	   0,	/* REPLMSGSIZE */
 	   0,	/* UNUSEDMSG1219 */
 	   0,	/* UNUSEDMSG1220 */
 	   0,	/* UNUSEDMSG1221 */

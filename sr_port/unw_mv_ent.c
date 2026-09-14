@@ -551,7 +551,9 @@ boolean_t unw_mv_ent(mv_stent *mv_st_ent, boolean_t unwind_newvars)
 			memcpy(&dollar_ecode, &mv_st_ent->mv_st_cont.mvs_zintr.dollar_ecode_save, SIZEOF(dollar_ecode));
 			memcpy(&dollar_stack, &mv_st_ent->mv_st_cont.mvs_zintr.dollar_stack_save, SIZEOF(dollar_stack));
 			/* ZTIMEOUT shares ZINTERRUPT transcendental frame. Explicitly set event since outofband can change */
-			lcl_outofband = (frame_pointer->type | SFT_ZTIMEOUT) ? ztimeout : jobinterrupt;
+			lcl_outofband = (frame_pointer->type & SFT_ZINTR) ? jobinterrupt : ztimeout;
+			assert((dollar_zininterrupt ? jobinterrupt : ztimeout) == lcl_outofband);
+			assert((jobinterrupt == lcl_outofband) == !(frame_pointer->type & SFT_ZTIMEOUT));
 			(void)xfer_reset_if_setter(lcl_outofband);
 			TAREF1(save_xfer_root, lcl_outofband).event_state = not_in_play;
 			dollar_zininterrupt = FALSE; /* Once reset, SIGUSR1s are not ignored and engage event handling */

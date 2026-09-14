@@ -90,6 +90,7 @@ error_def(ERR_STACKCRIT);
 		depth_count--;								\
 		if (0 == depth_count)							\
 			break;								\
+		ENSURE_STP_FREE_SPACE(1); /* for the ',' separator */			\
 		*stringpool.free++ = ',';						\
 		dst->str.len++;								\
 	}
@@ -189,6 +190,7 @@ void op_fnname(UNIX_ONLY_COMMA(int sub_count) mval *finaldst, ...)
 				stringpool.free--;
 				dst->str.len--;
 			}
+			ENSURE_STP_FREE_SPACE(1);
 			*stringpool.free++ = ')';
 			dst->str.len++;
 			assert((unsigned char *)(dst->str.addr + dst->str.len) == stringpool.free);
@@ -203,7 +205,11 @@ void op_fnname(UNIX_ONLY_COMMA(int sub_count) mval *finaldst, ...)
 		space_needed = (int)(STR_LIT_LEN("^[,]()") + MAX_MIDENT_LEN + sub_count - 1); 	/* ^[,]GLVN(max of sub_count-1 *
 											 * subscript separator commas) */
 		TEST_FAKE_STRINGPOOL_FULL;
-		/* We don't account for subscripts here as they are processed by mval_lex which reserves space if necessary */
+		/* Anything that comes after the first subscript MUST be reserved in the stringpool at the appropriate time.
+		 * mval_lex reserves space for each argument it puts into the stringpool, but it does not reserve space for
+		 * anything that comes after or between mval_lex invocations, and it will consume space_needed rather than
+		 * adding to it.
+		 */
 		ENSURE_STP_FREE_SPACE(space_needed);
 		dst->str.addr = (char *)stringpool.free;
 		if (fnname_type & FNGBL)
@@ -221,6 +227,7 @@ void op_fnname(UNIX_ONLY_COMMA(int sub_count) mval *finaldst, ...)
 			sub_count--;
 			if (fnname_type & FNEXTGBL2)
 			{
+				ENSURE_STP_FREE_SPACE(1);
 				*stringpool.free++ = ',';
 				dst->str.len++;
 				arg = va_arg(var, mval *);
@@ -228,6 +235,7 @@ void op_fnname(UNIX_ONLY_COMMA(int sub_count) mval *finaldst, ...)
 				dst->str.len += format_out.len;
 				sub_count--;
 			}
+			ENSURE_STP_FREE_SPACE(1 + MAX_MIDENT_LEN); /* for the ']' or '|' terminator and the name */
 			*stringpool.free++ = ((fnname_type & FNVBAR) ? '|' : ']');
 			dst->str.len++;
 		}
@@ -240,9 +248,11 @@ void op_fnname(UNIX_ONLY_COMMA(int sub_count) mval *finaldst, ...)
 		depth_count = ((sub_count < depth_count) ? sub_count : depth_count);
 		if (0 != depth_count)
 		{
+			ENSURE_STP_FREE_SPACE(1);
 			*stringpool.free++ = '(';
 			dst->str.len++;
 			COPY_SUBSCRIPTS;
+			ENSURE_STP_FREE_SPACE(1);
 			*stringpool.free++ = ')';
 			dst->str.len++;
 		}

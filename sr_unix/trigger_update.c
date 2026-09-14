@@ -112,7 +112,6 @@ static	boolean_t		promptanswer = TRUE;
 
 #define	MAX_COMMANDS_LEN	32		/* Need room for S,K,ZK,ZTK + room for expansion */
 #define	MAX_OPTIONS_LEN		32		/* Need room for NOI,NOC + room for expansion */
-#define	MAX_TRIGNAME_SEQ_NUM	999999
 #define	LITERAL_M		"M"
 #define	OPTIONS_I		1
 #define	OPTIONS_NOI		2
@@ -344,7 +343,7 @@ static	boolean_t		promptanswer = TRUE;
 
 #define HASHT_DEFINITION_ERROR(SUBSCRIPT, MOREINFO, CSA)					\
 {												\
-	assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);			\
+	assert(WBTEST_ENABLED(WBTEST_HELPOUT_TRIGDEFBAD));					\
 	rts_error_csa(CSA_ARG(CSA) VARLSTCNT(12) ERR_TRIGDEFBAD, 6, trigvn_len, trigvn,		\
 		trigvn_len, trigvn, LEN_AND_LIT(SUBSCRIPT),					\
 		ERR_TEXT, 2, RTS_ERROR_TEXT(MOREINFO));						\
@@ -499,7 +498,7 @@ boolean_t trigger_name_search(char *trigger_name, uint4 trigger_name_len, mval *
 		{	/* We expect $c(0) in the middle of ptr. If we dont find it, this is a restartable situation */
 			if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
 				t_retry(cdb_sc_triggermod);
-			assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
+			assert(WBTEST_ENABLED(WBTEST_HELPOUT_TRIGDEFBAD));
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_TRIGNAMBAD, 4, LEN_AND_LIT("\"#TNAME\""),
 				trigger_name_len, trigger_name);
 		}
@@ -1812,7 +1811,7 @@ STATICFNDEF trig_stats_t trigupdrec_reg(char *trigvn, uint4 trigvn_len, boolean_
 					{	/* SET trigger found previously is not found again */
 						if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
 							t_retry(cdb_sc_triggermod);
-						assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
+						assert(WBTEST_ENABLED(WBTEST_HELPOUT_TRIGDEFBAD));
 						util_out_print_gtmio("Error : Previously found SET trigger " \
 							"on ^!AD, named !AD but cannot find it again",
 							FLUSH, disp_trigvn_len, disp_trigvn,

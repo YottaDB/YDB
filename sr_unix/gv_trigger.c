@@ -793,7 +793,8 @@ void	gvtr_db_read_hasht(sgmnt_addrs *csa)
 	if (!is_defined)
 		HASHT_DEFINITION_RETRY_OR_ERROR("\"#COUNT\"","#COUNT field is missing", csa);
 	tmpint4 = mval2i(ret_mval);	/* decimal values are truncated by mval2i so we will accept a #COUNT of 1.5 as 1 */
-	if (0 >= tmpint4) /* ^#t("GBL","#COUNT") is not a positive integer. Error out */
+	if ((0 >= tmpint4) || (MAX_TRIGNAME_SEQ_NUM < tmpint4))
+		/* ^#t("GBL","#COUNT") is not a positive integer or too large. Error out */
 		HASHT_DEFINITION_ERROR("\"#COUNT\"","#COUNT field is negative", csa);
 	num_gv_triggers = (uint4)tmpint4;
 	gvt_trigger->num_gv_triggers = num_gv_triggers;

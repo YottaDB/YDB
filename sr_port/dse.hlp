@@ -241,7 +241,7 @@
    applicable to level 0 blocks only. The interpreted output as a result of
    the above command looks like the following:
 
-   Block 3   Size 4B   Level 0   TN 4 V6
+   Block 3   Size 4B   Level 0   TN 4 V6   Bitmap Status: Busy
    Rec:1  Blk 3  Off 10  Size 14  Cmpc 0  Key ^Fruits(1)
          10 : | 14  0  0  0 46 72 75 69 74 73  0 BF 11  0  0 41 70 70 6C 65|
               |  .  .  .  .  F  r  u  i  t  s  .  .  .  .  .  A  p  p  l  e|
@@ -1461,6 +1461,7 @@
    -G[VSTATS]
    -[NO]C[RIT]
    -[NO]H[EADER]
+   -[NO]STATUS
    -O[FFSET]=offset
    -R[ECORD]=record-number
    -U[PDPROC]
@@ -1539,6 +1540,18 @@
    By default, DUMP displays all information in a block or record.
 
    Incompatible with: -ALL, -FILEHEADER, -GLO, -UPDPROC and -ZWR.
+
+   -[NO]STATUS
+
+   -STATUS displays the block or bitmap status while dumping blocks. For
+   normal blocks the bitmap status displays as Free, Busy, Recycled, or
+   Corrupt. For bitmap blocks the block status displays as Freespace or Full.
+
+   -NOSTATUS does not display the block or bitmap status information.
+
+   Use only with -BLOCK.
+
+   Incompatible with: -GLO and -ZWR.
 
    -O[FFSET]=offset
 
@@ -2034,7 +2047,7 @@
    This command flags block 20 as free. A sample DSE DUMP output block 0 is
    as follows:
 
-   Block 0  Size 90  Level -1  TN 10B76A V7   Master Status: Free Space
+   Block 0  Size 90  Level -1  TN 10B76A V7   Block Status: Freespace
                    Low order                         High order
    Block        0: |  XXXXXXXX  XXXXXXXX  XXXXXXXX  XXXXXXXX  |
    Block       20: |  :XXXXXXX  XXXXXXXX  XXXXXXXX  XXXXXXXX  |
@@ -2064,7 +2077,7 @@
    This command marks block 20 as busy. A sample DSE DUMP output of block 0
    is as follows:
 
-   Block 0  Size 90  Level -1  TN 1 V7   Master Status: Free Space
+   Block 0  Size 90  Level -1  TN 1 V7   Block Status: Freespace
                    Low order                         High order
    Block        0: |  XXX.....  ........  ........  ........  |
    Block       20: |  X.......  ........  ........  ........  |
@@ -2816,6 +2829,10 @@
    |-----------+--------------------------------------------+-------------------------|
    |-          |-[NO]H[EADER]                               |Incompatible with        |
    |           |                                            |-FILEHEADER, -GLO        |
+   |-----------+--------------------------------------------+-------------------------|
+   |           |                                            |Incompatible with -GLO,  |
+   |-          |-[NO]STATUS                                 |-ZWR; Use only with      |
+   |           |                                            |-BLOCK                   |
    |-----------+--------------------------------------------+-------------------------|
    |-          |-O[FFSET]=offset                            |Incompatible with        |
    |           |                                            |-FILEHEADER, -RECORD     |

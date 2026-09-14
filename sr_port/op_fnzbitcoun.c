@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -25,10 +25,9 @@ void op_fnzbitcoun(mval *dst, mval *bitstr)
 	static unsigned char mask[8] = {128, 64, 32, 16, 8, 4, 2, 1};
 
 	MV_FORCE_STR(bitstr);
-
-	if (!bitstr->str.len)
+	/* UUID: 842ac95d-11ae-4711-a325-bdeacdee70e2 */
+	if (MIN_VALID_BITSTR_LEN > bitstr->str.len)
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_INVBITSTR);
-
 	byte_1 = (unsigned char *)bitstr->str.addr;
 	str_len = (bitstr->str.len - 1) * 8;
 	if (7 < *byte_1)

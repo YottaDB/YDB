@@ -588,8 +588,8 @@ STATICFNDEF boolean_t trigger_source_raov_trigload(mstr *trigname, gv_trigger_t 
 	cycle_start = csd->db_trigger_cycle;
 	gvtr_db_read_hasht(csa);
 	gvt_trigger = gvt->gvt_trigger;
-	if (NULL == gvt_trigger)
-	{
+	if ((NULL == gvt_trigger) || (gvt_trigger->num_gv_triggers < index))
+	{	/* No trigger or trigger indexes greater than num_gv_triggers f7ef7976-1e3c-4760-a822-20cdb2c3b327 */
 		if (CDB_STAGNATE > t_tries)
 			t_retry(cdb_sc_triggermod);
 		/* Return an error instead of TRIGDEFBAD. The caller will throw the error */

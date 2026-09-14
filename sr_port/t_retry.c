@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -595,14 +595,17 @@ void t_retry(enum cdb_sc failure)
 			SET_WC_BLOCKED_FINAL_RETRY_IF_NEEDED(csa, cnl, failure);
 			TP_RETRY_ACCOUNTING(csa, cnl);
 		} else /* csa can be NULL if cur_reg is not open yet (cdb_sc_needcrit) */
-			assert((CDB_STAGNATE == t_tries) && (cdb_sc_needcrit == failure));
+			assert(((CDB_STAGNATE == t_tries) && (cdb_sc_needcrit == failure))
+					/* csa null when retying a call from ZPrint/$text */
+					|| ((cdb_sc_triggermod == failure) && (WBTEST_ENABLED(WBTEST_HELPOUT_TRIGDEFBAD))));
 		if (NULL != gv_target)
 		{
 			if (cdb_sc_blkmod != failure)
 				TP_TRACE_HIST(CR_BLKEMPTY, gv_target);
 			gv_target->clue.end = 0;
-		} else /* only known case of gv_target being NULL is if t_retry is done from gvcst_init. assert this below */
-			assert((CDB_STAGNATE <= t_tries) && ((cdb_sc_needcrit == failure) || have_crit(CRIT_HAVE_ANY_REG)));
+		} else /* gv_target is NULL; allow t_retry done from gvcst_init or ZPrint/$text trigger code */
+			assert(((CDB_STAGNATE <= t_tries) && ((cdb_sc_needcrit == failure) || have_crit(CRIT_HAVE_ANY_REG)))
+					|| ((cdb_sc_triggermod == failure) && (WBTEST_ENABLED(WBTEST_HELPOUT_TRIGDEFBAD))));
 		if (!skip_invoke_restart)
 		{
 			GTMTRIG_ONLY(DBGTRIGR((stderr, "t_retry: invoking restart logic (INVOKE_RESTART)\n")));

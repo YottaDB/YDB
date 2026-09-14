@@ -179,9 +179,16 @@ CONDITION_HANDLER(gtmsecshr_cond_hndlr)
 void clean_client_sockets(char *path)
 {
 	char	last, suffix;
-	int	len;
+	int	len, sock_prefix_len;
 
 	len = STRLEN(path);
+	/* UUID: 0c8c21fa-7a97-415b-a5fd-23ad73017fa9
+	 * Refuse to unlink anything that doesn't match the expected pattern.
+	 */
+	sock_prefix_len =  gtmsecshr_socket_dir_len + STR_LIT_LEN(GTMSECSHR_SOCK_PREFIX);
+	if ((len <= sock_prefix_len) || (0 != memcmp(gtmsecshr_sock_name.sun_path, path, sock_prefix_len))
+		|| (NULL != memchr(path + sock_prefix_len, '/', len - sock_prefix_len)))
+		return;
 	last = path[len - 1];
 	for (suffix = 'a'; last > suffix; suffix++)
 	{
@@ -605,7 +612,7 @@ void gtmsecshr_signal_handler(int sig, siginfo_t *info, void *context)
 void service_request(gtmsecshr_mesg *buf, int msglen, char *rundir, int rundir_len)
 {
 	int			flags, fn_len, index, basind, save_errno, save_code;
-	int			stat_res, fd;
+	int			stat_res, fd, semval;
 	char			*basnam, *fn;
 	struct shmid_ds		temp_shmctl_buf;
 	struct stat		statbuf;
@@ -615,6 +622,8 @@ void service_request(gtmsecshr_mesg *buf, int msglen, char *rundir, int rundir_l
 	boolean_t		fd_opened_with_o_direct;
 	uint4			fsb_size;
 	ZOS_ONLY(int		realfiletag;)
+	union semun		semarg;
+	struct semid_ds		semctl_buf;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -680,6 +689,30 @@ void service_request(gtmsecshr_mesg *buf, int msglen, char *rundir, int rundir_l
 #			endif
 			break ;
 		case REMOVE_SEM:
+			semarg.buf = &semctl_buf;
+			/* ID: d1713578-58e8-401e-a35b-a0db135c5cb7 */
+			buf->code = (-1 == semctl((int)buf->mesg.id, 0, IPC_STAT, semarg)) ? errno : 0;
+			if (buf->code)
+			{
+				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(13) ERR_GTMSECSHRSRVFID, 6,
+					RTS_ERROR_LITERAL("Server"), process_id, buf->pid, save_code, buf->mesg.id, ERR_TEXT, 2,
+					RTS_ERROR_LITERAL("Unable to stat semaphore"), buf->code);
+			}
+			buf->code = (-1 == (semval = semctl((int)buf->mesg.id, semctl_buf.sem_nsems - 1, GETVAL, 0))) ? errno : 0;
+			if (buf->code)
+			{
+				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(13) ERR_GTMSECSHRSRVFID, 6,
+					RTS_ERROR_LITERAL("Server"), process_id, buf->pid, save_code, buf->mesg.id, ERR_TEXT, 2,
+					RTS_ERROR_LITERAL("Unable to get semaphore value"), buf->code);
+				break;
+			}
+			if (GTM_ID != semval)
+			{
+				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(12) ERR_GTMSECSHRSRVFID, 6,
+					RTS_ERROR_LITERAL("Server"), process_id, buf->pid, save_code, buf->mesg.id, ERR_TEXT, 2,
+					RTS_ERROR_LITERAL("Semaphore not owned by GT.M"));
+				break;
+			}
 			buf->code = (-1 == semctl((int)buf->mesg.id, 0, IPC_RMID, 0)) ? errno : 0;
 			if (!buf->code)
 				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_GTMSECSHRREMSEM, 2, buf->pid, buf->mesg.id);

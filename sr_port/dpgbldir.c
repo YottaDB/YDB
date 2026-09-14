@@ -48,8 +48,12 @@ GBLDEF gd_addr	*gd_addr_head;
 
 error_def(ERR_GDINVALID);
 
-/*+
-Function:       ZGBLDIR
+#define GLD_SECT_OUT_BND(OFFSET, CNT, ELEM_SIZ)			/* check section - UUID: 1efc1ab8-1c16-4fef-876c-18a591f49d2e */ \
+	(((UINTPTR_T)OFFSET < SIZEOF(gd_addr)) || ((UINTPTR_T)(OFFSET) > (UINTPTR_T)content_size)				\
+		|| ((UINTPTR_T)(CNT) > (((UINTPTR_T)content_size - (UINTPTR_T)(OFFSET)) / (UINTPTR_T)(ELEM_SIZ))))		\
+
+/*
+ Function:       ZGBLDIR
 
 		This function searches the list of global directory names for
 		the specified names.  If not found, it adds the new name to the
@@ -171,7 +175,7 @@ gd_addr *gd_load(unmanaged_mstr *v)
 	gd_addr			*table, *gd_addr_ptr;
 	gd_binding		*map, *map_top, *next_stats_map;
 	gd_region		*reg, *reg_top, *first_stats_reg;
-	uint4			t_offset, size;
+	uint4			content_size, t_offset, size;
 	gd_gblname		*gnam, *gnam_top;
 	int			i, n_regions, arraysize, disp_len;
 	trans_num		*array;
@@ -209,11 +213,32 @@ gd_addr *gd_load(unmanaged_mstr *v)
 			disp_len, disp_head.label);
 	}
 	size = LEGAL_IO_SIZE(temp_head.filesize);
+	if (size < (SIZEOF(header_struct) + SIZEOF(gd_addr)))
+	{	/* File too small to contain the gd_addr structure after header - UUID: 1efc1ab8-1c16-4fef-876c-18a591f49d2e */
+		close_gd_file(file_ptr);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_GDINVALID, 6, v->len, v->addr, LEN_AND_LIT(GDE_LABEL_LITERAL),
+			GDE_LABEL_SIZE - 1, temp_head.label);
+	}
 	header = (header_struct *)malloc(size);
 	file_read(file_ptr, size, (uchar_ptr_t)header, 1);			/* Read in body of file */
 	table = (gd_addr *)((char *)header + SIZEOF(header_struct));
-        table->local_locks = (struct gd_region_struct *)((UINTPTR_T)table->local_locks + (UINTPTR_T)table);
-	assert(table->var_maps_len == ((UINTPTR_T)table->regions - (UINTPTR_T)table->maps) - (table->n_maps * SIZEOF(gd_binding)));
+	content_size = size - SIZEOF(header_struct);
+	if (((UINTPTR_T)table->end > (UINTPTR_T)content_size)			/* UUID: 1efc1ab8-1c16-4fef-876c-18a591f49d2e */
+		|| ((UINTPTR_T)table->local_locks > (UINTPTR_T)content_size)
+		|| GLD_SECT_OUT_BND(table->maps, table->n_maps, SIZEOF(gd_binding))
+		|| GLD_SECT_OUT_BND(table->regions, table->n_regions, SIZEOF(gd_region))
+		|| GLD_SECT_OUT_BND(table->segments, table->n_segments, SIZEOF(gd_segment))
+		|| GLD_SECT_OUT_BND(table->gblnames, table->n_gblnames, SIZEOF(gd_gblname))
+		|| ((0 != (UINTPTR_T)table->instinfo) && GLD_SECT_OUT_BND(table->instinfo, 1, SIZEOF(gd_inst_info))))
+	{	/* some section does not add up - UUID: 1efc1ab8-1c16-4fef-876c-18a591f49d2e */
+		free(header);
+		close_gd_file(file_ptr);
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_GDINVALID, 6, v->len, v->addr, LEN_AND_LIT(GDE_LABEL_LITERAL),
+			LEN_AND_LIT("bad format"));
+	}
+	table->local_locks = (struct gd_region_struct *)((UINTPTR_T)table->local_locks + (UINTPTR_T)table);
+	assert(table->var_maps_len
+		== ((UINTPTR_T)table->regions - (UINTPTR_T)table->maps) - (table->n_maps * SIZEOF(gd_binding)));
 	table->maps = (struct gd_binding_struct *)((UINTPTR_T)table->maps + (UINTPTR_T)table);
 	table->regions = (struct gd_region_struct *)((UINTPTR_T)table->regions + (UINTPTR_T)table);
 	table->segments = (struct gd_segment_struct *)((UINTPTR_T)table->segments + (UINTPTR_T)table);

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ * Copyright (c) 2026 Fidelity National Information		*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,21 +10,16 @@
  *								*
  ****************************************************************/
 
+/*** STUB FILE ***/
 #include "mdef.h"
-#include "cmidef.h"
-#include "hashtab_mname.h"	/* needed for cmmdef.h */
-#include "cmmdef.h"
-#include "gvcmx.h"
-#include "gvcmz.h"
-#include "mvalconv.h"
+#include "gtm_facility.h"
+#include "fileinfo.h"
+#include "gdsroot.h"
+#include "gdsbt.h"
+#include "gdsfhead.h"
+#include "gtcm_jnl_switched.h"
 
-bool gvcmx_zprevious(void)
+void gtcm_jnl_switched(gd_region *reg)
 {
-	mval v;
-
-	gvcmz_doop(CMMS_Q_PREV, CMMS_R_PREV, &v);
-	if (MV_FORCE_INTD(&v))
-		return TRUE;
-	else
-		return FALSE;
+	return;
 }

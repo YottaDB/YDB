@@ -569,7 +569,7 @@ STATICFNDEF boolean_t process_options(char *option_str, uint4 option_len, boolea
 		return FALSE;
 	}
 	memcpy(local_options, option_str, option_len);
-	local_options[option_len] = '\0';
+	local_options[option_len] = '\0'; /* 5b20184b-c568-4f04-9971-de6db0a87b7c */
 	*isolation = *noisolation = *consistency = *noconsistency = FALSE;
 	ptr = local_options;
 	for ( ; 0 < option_len; ptr++, option_len--)
@@ -704,6 +704,11 @@ STATICFNDEF boolean_t process_subscripts(char *subscr_str, uint4 *subscr_len, ch
 			lvn_str[lvn_count] = lvn_start;
 			lvn_len[lvn_count] = tmp_len;
 			lvn_count++;
+			if (MAX_LVN_COUNT <= lvn_count)
+			{	/* UUID: 0d5f5109-17ee-4dc7-8108-8ccc62843e8a */
+				util_out_print_gtmio("Too many subscripts", FLUSH);
+				return FALSE;
+			}
 			if (MAX_GVSUBS_LEN < ++dst_len)
 			{
 				util_out_print_gtmio("Subscript too long", FLUSH);
@@ -1214,6 +1219,7 @@ boolean_t process_xecute(char *xecute_str, uint4 *xecute_len, boolean_t multi_li
 	if (!multi_line)
 	{
 		dst_string[0] = ' ';
+		dst_len = MAX_SRCLINE - 1; /* cff3d614-03d3-4734-ba12-291f8ebbf5c8 */
 		if (!trigger_scan_string(xecute_str, &src_len, dst_string + 1, &dst_len) || (1 != src_len))
 		{
 			util_out_print_gtmio("Invalid XECUTE string", FLUSH);

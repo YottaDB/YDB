@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2023 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -24,10 +24,9 @@ void op_fnzbitfind(mval *dst, mval *bitstr, int truthval, int pos)
 	static const unsigned char mask[8] = {0x80,0x40,0x20,0x10,0x8,0x4,0x2,0x1};
 
 	MV_FORCE_STR(bitstr);
-
-	if (!bitstr->str.len)
+	/* UUID: 842ac95d-11ae-4711-a325-bdeacdee70e2 */
+	if (MIN_VALID_BITSTR_LEN > bitstr->str.len)
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_INVBITSTR);
-
 	byte_1 = (unsigned char *)bitstr->str.addr;
 	str_len = (bitstr->str.len -1) * 8;
 	if (*byte_1 > 7)

@@ -21,6 +21,8 @@
 
 error_def(ERR_INDRMAXLEN);
 
+#define MIN_VALID_BITSTR_LEN 2	/* Valid bitstring must contain at least 2 bytes: addr[0] = metadata, addr[1] = 1st data byte */
+
 #ifdef VMS
 /* Define a TWO-argument VMS_ONLY macro (first argument is empty string but is needed because of the VMS-only , that follows) */
 #define	UNIX1_VMS2(X,Y)	X, Y

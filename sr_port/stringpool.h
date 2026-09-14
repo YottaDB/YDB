@@ -108,7 +108,7 @@ GBLREF	spdesc		stringpool;
 
 #define	IS_STP_SPACE_AVAILABLE_PRO(SPC)	((stringpool.free + SPC) <= stringpool.invokestpgcollevel)
 #define	IS_IN_STRINGPOOL(PTR, LEN) (((UINTPTR_T)stringpool.base <= (UINTPTR_T)PTR) && ((UINTPTR_T)PTR < (UINTPTR_T)stringpool.top) \
-		&& ((UINTPTR_T)LEN <= ((UINTPTR_T)stringpool.top - (UINTPTR_T)PTR)))
+		&& ((UINTPTR_T)LEN <= ((((UINTPTR_T)stringpool.base) + stringpool.lastallocbytes) - (UINTPTR_T)PTR)))
 #define	IS_AT_END_OF_STRINGPOOL(PTR, LEN)		(((unsigned char *)PTR + (int)(LEN)) == stringpool.free)
 #define	INVOKE_STP_GCOL(SPC)		stp_gcol(SPC);								/* BYPASSOK */
 

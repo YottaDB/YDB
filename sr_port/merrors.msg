@@ -1215,7 +1215,7 @@ SEMUNDOOVERFLOW	<The operating system per-process SEM_UNDO table is full and reg
 ENCODING	<M or W-1252 code designation for character set encoding, might return unexpected results when "UTF-8"=$ZCHSET>/warning/fao=0!/ansi=0
 DBMINRESBYTES	<Minimum RESERVED BYTES value required for certification/upgrade is !UL - Currently is !UL>/error/fao=2!/ansi=0
 TRIGNOXPEL	<Triggers are not allowed in an XPEL routine>/error/fao=0!/ansi=0
-UNUSEDMSG1218	<DBCDBCERTIFIED removed from code in V7.0-000 Nov 2020>/info/fao=0!/ansi=0
+REPLMSGSIZE	<Replication message length !UL is outside the supported range of !UL to !UL>/error/fao=3!/ansi=0
 UNUSEDMSG1219	<DBCMODBLK2BIG removed from code in V7.0-000 Nov 2020>/error/fao=0!/ansi=0
 UNUSEDMSG1220	<DBCREC2BIG removed from code in V7.0-000 Nov 2020>/error/fao=0!/ansi=0
 UNUSEDMSG1221	<DBCCMDFAIL removed from code in V7.0-000 Nov 2020>/error/fao=0!/ansi=0
@@ -1378,7 +1378,7 @@ LSINSERTED	<Line !UL, source module !AD exceeds maximum source line length; line
 BOOLSIDEFFECT	<Extrinsic ($$), External call ($&) or $INCREMENT() with potential side effects in Boolean expression>/warning/fao=0!/ansi=0
 DBBADUPGRDSTATE	<Correcting conflicting values for fields describing database version upgrade state in the file header for region !AD (!AD) - make fresh backups with new journal files immediately.>/warning/fao=4!/ansi=0
 WRITEWAITPID	<PID !UL waited !UL minute(s) for PID !UL to finish writing block 0x!16@XQ in database file !AD>/error/fao=6!/ansi=0
-ZGOCALLOUTIN	<ZGOTO level 0 with entry ref not valid when using call-ins>/error/fao=0!/ansi=0
+ZGOCALLOUTIN	<ZGOTO !UL:entryref not valid when using call-ins>/error/fao=1!/ansi=0
 REPLNOXENDIAN	<!AD side is running on a GT.M version that does not support cross-endian replication. Upgrade the !AD side to at least V5.3-003 to support cross-endian replication. Cannot continue>/error/fao=4!/ansi=0
 REPLXENDIANFAIL	<!AD side encountered error while doing endian conversion at journal sequence number 0x!16@XQ>/error/fao=3!/ansi=0
 ZGOTOINVLVL2	<ZGOTO 0:entryref is not valid on VMS (UNLINK is a UNIX only feature)>/error/fao=0!/ansi=0

@@ -13,6 +13,7 @@
 #include "mdef.h"
 
 #include "gtm_string.h"
+#include "gtm_stdlib.h"	/* needed for realpath */
 #include "gtm_limits.h"
 #include <dlfcn.h>
 
@@ -59,26 +60,40 @@ GBLREF boolean_t	gtm_dist_ok_to_use;
  */
 void_ptr_t fgn_getpak(char *package_name, int msgtype)
 {
-	void_ptr_t 	ret_handle;
+	void_ptr_t 	ret_handle = NULL;
 	char_ptr_t	dummy_err_str;
 	char		err_str[MAX_ERRSTR_LEN]; /* needed as util_out_print doesn't handle 64bit pointers */
-	char	 	librarypath[GTM_PATH_MAX], *lpath = NULL;
+	char	 	*lpath = NULL;
+	char		real_gtm_dist[GTM_PATH_MAX], real_package_name[GTM_PATH_MAX];
+	unsigned int	real_dist_len;
 	intrpt_state_t	prev_intrpt_state;
 
 	assert(gtm_dist_ok_to_use);
-	if ((RESTRICTED(library_load_path)) && (0 != memcmp(gtm_dist, package_name, gtm_dist_len)))
-	{	/* Restrictions in place and the path is not somewhere under $gtm_dist */
-		lpath = librarypath;
-		SNPRINTF(lpath, GTM_PATH_MAX, GTM_PLUGIN_FMT_FULL, gtm_dist, strrchr(package_name, '/'));
+	if (RESTRICTED(library_load_path))
+	{       /* Restrictions in place: allow only paths that canonicalize to somewhere under the canonical $gtm_dist */
+		lpath = NULL;
+		/* UUID: cedcb9ae-7eef-44b7-9c07-e30badc5fe9c */
+		if ((NULL != realpath(gtm_dist, real_gtm_dist)) && (NULL != realpath(package_name, real_package_name)))
+		{
+			real_dist_len = STRLEN(real_gtm_dist);
+			if ((0 == memcmp(real_gtm_dist, real_package_name, real_dist_len))
+					&& ('/' == real_package_name[real_dist_len]))
+				lpath = real_package_name;	/* dlopen the resolved path to avoid a symlink-swap TOCTOU */
+		}
 	} else
 		lpath = package_name;
-	DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
-	ret_handle = dlopen(lpath, RTLD_LAZY);
-	ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
+	if (NULL != lpath)
+	{
+		DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
+		ret_handle = dlopen(lpath, RTLD_LAZY);
+		ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
+	}
 	if (NULL == ret_handle)
 	{
 		if (SUCCESS != msgtype)
 		{
+			if (NULL == lpath)
+				lpath = package_name;
 			assert(!(msgtype & ~SEV_MSK));
 			if (RESTRICTED(library_load_path))
 			{

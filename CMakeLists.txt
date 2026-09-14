@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2012-2025 Fidelity National Information		#
+# Copyright (c) 2012-2026 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -28,7 +28,7 @@ foreach(lang ${languages})
 endforeach()
 
 # Defaults
-set(version V7.2-000)
+set(version V7.2-001)
 if("${version}" STREQUAL "")
         set(version V9.9-0)
 endif()
@@ -229,24 +229,40 @@ endmacro()
 
 #-----------------------------------------------------------------------------
 
+# Detect whether GT.CM sources are present in this source tree.
+file(GLOB gtcm_c_sources
+  ${GTM_SOURCE_DIR}/sr_port_cm/*.c
+  ${GTM_SOURCE_DIR}/sr_unix_cm/*.c
+  ${GTM_SOURCE_DIR}/sr_unix_gnp/*.c
+  )
+if(gtcm_c_sources)
+  set(GTCM ON)
+else()
+  set(GTCM OFF)
+endif()
+
 # Assign sources to libraries.
-load_source_list(libcmisockettcp sr_unix_gnp/libcmisockettcp.list)
 load_source_list(libdse          sr_unix/libdse.list)
-load_source_list(libgnpclient    sr_unix_gnp/libgnpclient.list)
-load_source_list(libgnpserver    sr_unix_gnp/libgnpserver.list)
-load_source_list(libgtcm         sr_unix_cm/libgtcm.list)
 load_source_list(liblke          sr_unix/liblke.list)
 load_source_list(libmupip        sr_unix/libmupip.list)
 load_source_list(libstub         sr_unix/libstub.list)
+if(GTCM)
+  load_source_list(libcmisockettcp sr_unix_gnp/libcmisockettcp.list)
+  load_source_list(libgnpclient    sr_unix_gnp/libgnpclient.list)
+  load_source_list(libgnpserver    sr_unix_gnp/libgnpserver.list)
+  load_source_list(libgtcm         sr_unix_cm/libgtcm.list)
+endif()
 
 # Assign sources to executables.
 set_source_list(gtm_threadgbl_deftypes gtm_threadgbl_deftypes)
 set_source_list(dse              dse dse_cmd)
-set_source_list(gtcm_gnp_server  gtcm_gnp_server)
-set_source_list(gtcm_pkdisp      gtcm_pkdisp)
-set_source_list(gtcm_play        gtcm_play omi_srvc_xct)
-set_source_list(gtcm_server      gtcm_main omi_srvc_xct)
-set_source_list(gtcm_shmclean    gtcm_shmclean)
+if(GTCM)
+  set_source_list(gtcm_gnp_server  gtcm_gnp_server)
+  set_source_list(gtcm_pkdisp      gtcm_pkdisp)
+  set_source_list(gtcm_play        gtcm_play omi_srvc_xct)
+  set_source_list(gtcm_server      gtcm_main omi_srvc_xct)
+  set_source_list(gtcm_shmclean    gtcm_shmclean)
+endif()
 set_source_list(gtmsecshr        gtmsecshr_wrapper)
 set_source_list(gtmsecshr_real   gtmsecshr)
 set_source_list(libgtmcrypt      gtmcrypt_ref gtmcrypt_pk_ref gtmcrypt_dbk_ref gtmcrypt_sym_ref gtmcrypt_util)
@@ -413,11 +429,14 @@ endforeach()
 
 add_custom_target(gen_export DEPENDS gtmexe_symbols.export gtmshr_symbols.export)
 
+# GT.CM static libraries
+set(gtcm_libs "")
+if(GTCM)
+  set(gtcm_libs gtcm cmisockettcp gnpclient gnpserver)
+endif()
+
 foreach(lib
-  gtcm
-  cmisockettcp
-  gnpclient
-  gnpserver
+  ${gtcm_libs}
   dse
   lke
   mupip
@@ -458,30 +477,40 @@ target_link_libraries(mupip		libmupip libmumps libstub)
 list(APPEND with_export mupip)
 
 add_executable(lke			${lke_SOURCES})
-target_link_libraries(lke		liblke libmumps libgnpclient libmumps libgnpclient libcmisockettcp)
+if(GTCM)
+  target_link_libraries(lke		liblke libmumps libgnpclient libmumps libgnpclient libcmisockettcp)
+else()
+  target_link_libraries(lke		liblke libmumps libstub)
+endif()
 list(APPEND with_export lke)
 
-add_executable(gtcm_server		${gtcm_server_SOURCES})
-target_link_libraries(gtcm_server	libgtcm libmumps libstub)
-list(APPEND with_export gtcm_server)
+if(GTCM)
+  add_executable(gtcm_server		${gtcm_server_SOURCES})
+  target_link_libraries(gtcm_server	libgtcm libmumps libstub)
+  list(APPEND with_export gtcm_server)
 
-add_executable(gtcm_gnp_server		${gtcm_gnp_server_SOURCES})
-target_link_libraries(gtcm_gnp_server	libgnpserver liblke libmumps libcmisockettcp libstub)
-list(APPEND with_export gtcm_gnp_server)
+  add_executable(gtcm_gnp_server	${gtcm_gnp_server_SOURCES})
+  target_link_libraries(gtcm_gnp_server	libgnpserver liblke libmumps libcmisockettcp libstub)
+  list(APPEND with_export gtcm_gnp_server)
 
-add_executable(gtcm_play		${gtcm_play_SOURCES})
-target_link_libraries(gtcm_play		libgtcm libmumps libstub)
-list(APPEND with_export gtcm_play)
+  add_executable(gtcm_play		${gtcm_play_SOURCES})
+  target_link_libraries(gtcm_play	libgtcm libmumps libstub)
+  list(APPEND with_export gtcm_play)
 
-add_executable(gtcm_pkdisp		${gtcm_pkdisp_SOURCES})
-target_link_libraries(gtcm_pkdisp	libgtcm libmumps libstub)
+  add_executable(gtcm_pkdisp		${gtcm_pkdisp_SOURCES})
+  target_link_libraries(gtcm_pkdisp	libgtcm libmumps libstub)
 
-add_executable(gtcm_shmclean 		${gtcm_shmclean_SOURCES})
-target_link_libraries(gtcm_shmclean	libgtcm libmumps libstub)
+  add_executable(gtcm_shmclean		${gtcm_shmclean_SOURCES})
+  target_link_libraries(gtcm_shmclean	libgtcm libmumps libstub)
+endif()
 
 add_library(libgtmshr MODULE ${libgtmshr_SOURCES})
 set_property(TARGET libgtmshr PROPERTY OUTPUT_NAME gtmshr)
-target_link_libraries(libgtmshr libmumps libgnpclient libcmisockettcp)
+if(GTCM)
+  target_link_libraries(libgtmshr libmumps libgnpclient libcmisockettcp)
+else()
+  target_link_libraries(libgtmshr libmumps libstub)
+endif()
 set_target_properties(libgtmshr PROPERTIES
   LINK_FLAGS "${libgtmshr_link}"
   LINK_DEPENDS "${libgtmshr_dep}"
@@ -674,17 +703,22 @@ install(TARGETS
   mumps
   dse
   lke
-  gtcm_server
-  gtcm_gnp_server
-  gtcm_pkdisp
-  gtcm_play
-  gtcm_shmclean
   gtmsecshr
   mupip
   libgtmshr
   DESTINATION ${GTM_INSTALL_DIR}
   )
 install(TARGETS gtmsecshr_real DESTINATION ${GTM_INSTALL_DIR}/gtmsecshrdir)
+if(GTCM)
+  install(TARGETS
+    gtcm_server
+    gtcm_gnp_server
+    gtcm_pkdisp
+    gtcm_play
+    gtcm_shmclean
+    DESTINATION ${GTM_INSTALL_DIR}
+    )
+endif()
 
 # <r>.m -> <R>.m
 #file(GLOB m_files_sr_port RELATIVE ${GTM_SOURCE_DIR}/sr_port ${GTM_SOURCE_DIR}/sr_port/*.m)
@@ -764,7 +798,7 @@ foreach(d ${gt_src_list})
 endforeach()
 
 set(files)
-foreach(f
+set(place_files_list
   gtm_common_defs.h
   gtm_descript.h
   gtm_limits.h
@@ -777,8 +811,6 @@ foreach(f
   gtmxc_types.h
   main_pragma.h
   arch.gtc
-  gtcm_run.gtc
-  gtcm_slist.gtc
   gdedefaults.gtc
   gtmcshrc.gtc
   gtmprofile.gtc
@@ -792,6 +824,10 @@ foreach(f
   mupip.hlp
   custom_errors_sample.txt
   )
+if(GTCM)
+  list(APPEND place_files_list gtcm_run.gtc gtcm_slist.gtc)
+endif()
+foreach(f ${place_files_list})
   select_file(src ${f})
   get_filename_component(srcfname "${src}" NAME)
   add_custom_command(

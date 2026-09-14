@@ -54,7 +54,7 @@ error_def(ERR_ZGOTOTOOBIG);
 void op_zgoto(mval *rtn_name, mval *lbl_name, int offset, int level)
 {
 	stack_frame	*fp, *fpprev;
-	int4		curlvl;
+	int4		curlvl, lcl_lvl;
 	mval		rtnname, lblname;
 	rhdtyp		*rtnhdr;
 	lnr_tabent 	USHBIN_ONLY(*)*lnrptr;
@@ -150,30 +150,39 @@ void op_zgoto(mval *rtn_name, mval *lbl_name, int offset, int level)
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(5) ERR_ZGOTOINVLVL, 3, GTMIMAGENAMETXT(image_type), level);
 #	endif
 #	ifdef UNIX
-	/* One last check if we are unlinking, make sure no call-in frames exist on our stack */
+	/* One last check: make sure we do not traverse across call-in frames */
+	for (lcl_lvl = curlvl, fp = frame_pointer; NULL != fp && lcl_lvl >= level; fp = fpprev)
+	{
+		fpprev = fp->old_frame_pointer;
+		if (!(fp->type & SFT_COUNT))
+		{
+			assert(!(fp->flags & SFF_CI));
+			continue;
+		}
+		if (fp->flags & SFF_CI)
+		{
+			assert(fp->type & SFT_COUNT);
+			/* We have a call-in frame - cannot unwind to this or beyond */
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_ZGOCALLOUTIN, 1, level);
+		}
+		if (NULL == fpprev)
+		{ /* Next frame is some sort of base frame */
+#		ifdef GTM_TRIGGER
+			if (fp->type & SFT_TRIGR)
+			{	/* Have a trigger baseframe, pick up stack continuation frame_pointer stored by
+				 *base_frame()
+				 */
+				fpprev = *(stack_frame **)(fp + 1);
+				continue;
+			} else
+#			endif
+				break;			/* Some other base frame that stops us */
+		}
+		if (lcl_lvl-- == level)
+			break;	/* We have reached the frame to which we will unwind */
+	}
 	if (0 == level)
 	{
-		for (fp = frame_pointer; NULL != fp; fp = fpprev)
-		{
-			fpprev = fp->old_frame_pointer;
-			if (!(fp->type & SFT_COUNT))
-				continue;
-			if (fp->flags & SFF_CI)
-				/* We have a call-in frame - cannot do unlink */
-				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_ZGOCALLOUTIN);
-			if (NULL == fpprev)
-			{	/* Next frame is some sort of base frame */
-#				ifdef GTM_TRIGGER
-				if (fp->type & SFT_TRIGR)
-				{	/* Have a trigger baseframe, pick up stack continuation frame_pointer stored by
-					 *base_frame() */
-					fpprev = *(stack_frame **)(fp + 1);
-					continue;
-				} else
-#				endif
-					break;			/* Some other base frame that stops us */
-			}
-		}
 		/* Full unlink/unwind requested. First unlink everything, then relink our target entryref */
 		gtm_unlink_all();
 		frame_func = new_stack_frame;
