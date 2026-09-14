@@ -232,6 +232,7 @@ void readline_init(void* handle) {
 	vrl_startup_hook		= dlsym(handle, "rl_startup_hook");
 	vrl_already_prompted		= dlsym(handle, "rl_already_prompted");
 	vrl_redisplay_function		= dlsym(handle, "rl_redisplay_function");
+	vrl_readline_state		= dlsym(handle, "rl_readline_state");
 	EOL				= 1;
 
 	if (!(
@@ -271,6 +272,7 @@ void readline_init(void* handle) {
 				&& vrl_startup_hook
 				&& vrl_already_prompted
 				&& vrl_redisplay_function
+				&& vrl_readline_state
 				&& EOL
 				))
 		return;
@@ -381,8 +383,9 @@ void readline_read_mval(mval *v) {
 		 * Once we have the readline callback interface, we can take all of
 		 * the setjmp/longjmp code out, as we can use a select() call like
 		 * dm_read.c. */
-		/* A non-zero return means we got here by a siglongjmp() out of libreadline, i.e. the event
-		 * interrupted the freadline() call below and libreadline holds state worth saving. Every site
+		/* A non-zero return means we got here by a siglongjmp() out of libreadline, i.e. the out-of-band
+		 * event (a MUPIP INTRPT or a SIGWINCH, the two that OUTOFBAND_RESTARTABLE() admits) interrupted
+		 * the freadline() call below and libreadline holds state worth saving. Every site
 		 * that jumps here (ctrlc_handler(), tt_sigwinch_event() and ydb_os_signal_handler()) does so
 		 * only while "readline_catch_signal" is TRUE, which is only between the two assignments that
 		 * bracket each freadline() call below, so this is an exact test for "we were inside
@@ -403,13 +406,28 @@ void readline_read_mval(mval *v) {
 			/* Handle signals */
 			if (outofband) {
 				if (OUTOFBAND_RESTARTABLE(outofband)) {
-					/* Save libreadline's state only if the event interrupted a freadline() call. When
-					 * "outofband" was set outside libreadline, libreadline might never even have been
-					 * initialized, so saving its state now and restoring it on the way back in would
-					 * overwrite the live globals that rl_initialize() is about to set up, which is the
-					 * SIGSEGV of YDB#1269.
+					/* Save libreadline's state only if the out-of-band event interrupted a freadline() call AND
+					 * libreadline had finished setting itself up when it did. Both halves matter, and
+					 * both are the SIGSEGV of YDB#1269.
+					 *
+					 * "in_readline": when "outofband" was set outside libreadline, libreadline might
+					 * never even have been initialized, so saving its state now and restoring it on the
+					 * way back in would overwrite the live globals that rl_initialize() is about to set
+					 * up.
+					 *
+					 * rl_readline_state: being inside freadline() is not on its own enough. On the FIRST
+					 * such call, readline() spends its opening moments inside rl_initialize(), which
+					 * sets rl_instream, rl_outstream and rl_line_buffer early but does not allocate
+					 * rl_executing_keyseq until it is nearly done, after _rl_init_terminal_io() and
+					 * rl_read_init_file() -- terminal ioctls and parsing ~/.inputrc, so not a narrow
+					 * window. An event landing there is inside freadline() yet finds a half-built
+					 * libreadline: rl_save_state() captures a NULL rl_executing_keyseq, and restoring
+					 * it puts that NULL back over the pointer rl_initialize() has since allocated, which
+					 * readline_internal_char() then writes through. RL_STATE_INITIALIZED is set only
+					 * once rl_initialize() has finished, and is never unset afterwards, so this costs
+					 * nothing after the first read.
 					 */
-					if (in_readline) {
+					if (in_readline && (RL_STATE_INITIALIZED & *vrl_readline_state)) {
 						unsigned char *readline_text_before_interrupt;
 
 						/* SIGUSR1/mupip intrpt (or SIGWINCH): save state if jobinterrupt/sigwinch *
@@ -446,13 +464,13 @@ void readline_read_mval(mval *v) {
 						ydb_readline_state->prompt = NULL;
 						*vrl_prompt = NULL;
 					}
-					/* The direct mode read was interrupted and will resume, whether or not the event
-					 * interrupted a freadline() call, and "mupintr" says exactly that: it is not about
+					/* The direct mode read was interrupted and will resume, whether or not the out-of-band
+					 * event interrupted a freadline() call, and "mupintr" says exactly that: it is not about
 					 * libreadline. dm_read() sets it for every restartable event (sr_unix/dm_read.c),
 					 * and iott_write()/iott_wteol() raise ZINTRECURSEIO on it alone, which is what
 					 * stops $ZINTERRUPT doing IO to this device. This assignment therefore stays out
 					 * of the "if (in_readline)" block above and runs in both cases. If it did not run
-					 * for an event that reached us without interrupting freadline(), then $ZINTERRUPT
+					 * for an out-of-band event that reached us without interrupting freadline(), then $ZINTERRUPT
 					 * would get no ZINTRECURSEIO and would write to $PRINCIPAL, and the
 					 * "if (tt_ptr->mupintr)" block below would not run, so the prompt would be
 					 * repainted. See YDB#1269.
@@ -511,10 +529,12 @@ void readline_read_mval(mval *v) {
 			}
 
 			if (NULL == ydb_readline_state) {
-				/* Nothing was saved on the way in, i.e. the event reached us without interrupting a
-				 * freadline() call: there is no partially typed line to put back, and libreadline may never
-				 * have been initialized, which is the SIGSEGV of YDB#1269. $ZINTERRUPT has run by now, so
-				 * drop "mupintr" and go round for an ordinary prompt and read. That is the same place the
+				/* Nothing was saved on the way in, for either of the two reasons the save above is
+				 * skipped: the out-of-band event reached us without interrupting a freadline() call, or
+				 * it interrupted one while rl_initialize() was still running. Either way there is no
+				 * partially typed line to put back and libreadline's globals are not ours to restore -
+				 * restoring them anyway is the SIGSEGV of YDB#1269. $ZINTERRUPT has run by now, so drop
+				 * "mupintr" and go round for an ordinary prompt and read. That is the same place the
 				 * "done" case at the end of this block reaches, and it gets there without touching
 				 * libreadline's globals.
 				 */

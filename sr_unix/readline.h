@@ -89,4 +89,5 @@ GBLREF int                      *vrl_catch_sigwinch;
 GBLREF rl_hook_func_t		**vrl_startup_hook;
 GBLREF int			*vrl_already_prompted;
 GBLREF rl_voidfunc_t 		**vrl_redisplay_function;
+GBLREF int			*vrl_readline_state;
 #endif
