@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2020-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2020-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -294,17 +294,30 @@ void	iorm_use(io_desc *iod, mval *pp)
 				rm_ptr->padchar = padchar;
 			}
 			break;
+		/* The four direction deviceparameters below do not apply to a PIPE's stderr device.
+		 * "iopi_open.c" creates that device read-only (its line 836) because the device exists
+		 * solely for the application to READ the command's stderr, and then hands "iorm_open" the
+		 * same deviceparameter list the caller gave the PIPE. Acting on a direction from that list
+		 * here would override what the device was created with: "writeonly" would leave it both
+		 * "read_only" and "write_only", and "iorm_readfl.c" refuses a READ from a "write_only"
+		 * device. "stderr_parent" is non-NULL only for that device; "iopi_open.c" is its only
+		 * assignment.
+		 */
 		case iop_readonly:
-			rm_ptr->read_only = TRUE;
+			if (NULL == rm_ptr->stderr_parent)
+				rm_ptr->read_only = TRUE;
 			break;
 		case iop_noreadonly:
-			rm_ptr->read_only = FALSE;
+			if (NULL == rm_ptr->stderr_parent)
+				rm_ptr->read_only = FALSE;
 			break;
 		case iop_writeonly:
-			rm_ptr->write_only = TRUE;
+			if (NULL == rm_ptr->stderr_parent)
+				rm_ptr->write_only = TRUE;
 			break;
 		case iop_nowriteonly:
-			rm_ptr->write_only = FALSE;
+			if (NULL == rm_ptr->stderr_parent)
+				rm_ptr->write_only = FALSE;
 			break;
 		case iop_recordsize:
 			if (dev_open != iod->state || (!IS_UTF_CHSET(iod->ichset) && !IS_UTF_CHSET(iod->ochset)) ||
