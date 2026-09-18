@@ -248,7 +248,7 @@ LITDEF	uint4 dev_param_index[27] =
 	0,   5,   9,   27,  35,  50,  66,  68,  73,  82,  82,  83,  91,  94,
 
 /*	O    P    Q    R    S    T    U    V    W    X    Y    Z    end	     */
-	166, 175, 194, 195, 210, 232, 242, 248, 249, 264, 265, 267, 289
+	166, 175, 194, 195, 210, 232, 242, 248, 249, 264, 265, 266, 289
 };
 
 /* Offset of string within letter in dev_param_names */
@@ -499,6 +499,22 @@ int deviceparameters(oprtype *c, char who_calls)
 
 	assert((SIZEOF(dev_param_names) / SIZEOF(nametabent) == dev_param_index[26]));
 	assert((SIZEOF(dev_param_data) / SIZEOF(unsigned char)) == dev_param_index[26]);
+#	ifdef DEBUG
+	{	/* int_namelook() searches only [dev_param_index[letter], dev_param_index[letter + 1]), but the
+		 * asserts above check only the total. Check that each index is where its letter's names begin
+		 * in dev_param_names[].
+		 */
+		int	letter, name_index;
+
+		for (letter = 0, name_index = 0; 26 > letter; letter++)
+		{
+			while ((dev_param_index[26] > name_index)
+					&& (('A' + letter) > dev_param_names[name_index].name[0]))
+				name_index++;
+			assert(dev_param_index[letter] == name_index);
+		}
+	}
+#	endif
 	is_parm_list = (TK_LPAREN == TREF(window_token));
 	if (is_parm_list)
 		advancewindow();
