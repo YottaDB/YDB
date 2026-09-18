@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -44,6 +44,7 @@ GBLREF	struct sigaction	orig_sig_action[];
 GBLREF	boolean_t		simpleThreadAPI_active;
 GBLREF	uint4			dollar_tlevel;
 GBLREF	int4			exi_condition;
+GBLREF	void			(*ydb_stm_thread_exit_fnptr)(void);
 #ifdef DEBUG
 GBLREF	pthread_t		ydb_stm_worker_thread_id;
 GBLREF	boolean_t		gtm_main_thread_id_set;
@@ -162,7 +163,25 @@ int ydb_exit()
 			for (sig = 1; sig <= NSIG; sig++)
 				sigaction(sig, &orig_sig_action[sig], NULL);
 		} else
+		{	/* Shut the signal thread down before restoring the main language's disposition for
+			 * YDBSIGNOTIFY. Both senders of that signal test "gtm_main_thread_id_set", which the
+			 * signal thread clears only once it notices "exit_handler_active" and returns. Restoring
+			 * first therefore leaves a window in which a YDBSIGNOTIFY sent as a wakeup instead
+			 * terminates the process.
+			 *
+			 * Drive "ydb_stm_thread_exit()" through "ydb_stm_thread_exit_fnptr", the way
+			 * "signal_exit_handler.c" does, rather than calling it directly. That keeps the STAPI
+			 * code it pulls in out of "gtmsecshr", which is why the pointer exists. The NULL check
+			 * is all the guard that is needed: the pointer is set by the signal thread itself in
+			 * "ydb_stm_thread()", so it is NULL exactly when no signal thread was ever started,
+			 * which is possible because that thread is created lazily on the first SimpleThreadAPI
+			 * call. If the thread did start but has since shut itself down, "ydb_stm_thread_exit()"
+			 * is itself a no-op.
+			 */
+			if (NULL != ydb_stm_thread_exit_fnptr)
+				(*ydb_stm_thread_exit_fnptr)();
 			sigaction(YDBSIGNOTIFY, &orig_sig_action[YDBSIGNOTIFY], NULL);	/* Restore one signal handler we used */
+		}
 		/* We might have opened one or more shlib handles using "dlopen". Do a "dlclose" of them now. */
 		dlopen_handle_array_close();
 		ydb_init_complete = FALSE;
