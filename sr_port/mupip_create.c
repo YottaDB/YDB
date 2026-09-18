@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2022-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2022-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -27,6 +27,7 @@
 #include "gdsfhead.h"
 #include "filestruct.h"
 #include "cli.h"
+#include "error.h"
 #include "iosp.h"
 #include "util.h"
 #include "mupip_exit.h"
@@ -105,7 +106,14 @@ void mupip_create(void)
 		gv_cur_region = NULL;
 	}
 	if (exit_stat & EXIT_MASK)
-		mupip_exit((ERR_DBNOCRE & ~EXIT_MASK) | (exit_stat & EXIT_MASK));
+	{	/* DBNOCRE summarizes the regions that were not created, each of which has already been reported.
+		 * It is a warning whatever the severity of those reports, so the severity of "exit_stat" (which is
+		 * EXIT_ERR, the same value as SEVERE, whenever any region failed) does not carry into the message.
+		 * The process still exits with a non-zero status since "mupip_exit" zeroes the status only for the
+		 * SUCCESS and INFO severities.
+		 */
+		mupip_exit(MAKE_MSG_WARNING(ERR_DBNOCRE));
+	}
 	else
 		mupip_exit(SS_NORMAL);
 }

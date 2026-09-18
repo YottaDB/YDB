@@ -281,7 +281,13 @@ unsigned char mu_cre_file(boolean_t caller_is_mupip_create)
 			return EXIT_NRM;
 		/* Suppress EEXIST messages for statsDBs */
 		if (!IS_STATSDB_REG(gv_cur_region) || (EEXIST != errno))
-			PUTMSG_ERROR_CSA(cs_addrs, 5, ERR_DBOPNERR, 2, LEN_AND_STR(path), save_errno);
+		{	/* MUPIP CREATE carries on with the remaining regions and summarizes with DBNOCRE when it is
+			 * done, so a region it could not create is a warning there rather than an error. Every other
+			 * caller stops at this point and needs the error severity.
+			 */
+			PUTMSG_ERROR_CSA(cs_addrs, 5, caller_is_mupip_create ? MAKE_MSG_WARNING(ERR_DBOPNERR) : ERR_DBOPNERR,
+					2, LEN_AND_STR(path), save_errno);
+		}
 		return EXIT_ERR;
 	}
 	cleanup_needed = TRUE;			/* File open now so cleanup needed */
