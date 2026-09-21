@@ -3,7 +3,7 @@
  * Copyright (c) 2003-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -181,6 +181,10 @@ void	jnl_file_close(gd_region *reg, boolean_t clean, boolean_t in_jnl_switch)
 				assert(header->eov_timestamp >= header->bov_timestamp);
 				header->eov_tn = eof_record.prefix.tn;
 				assert(header->eov_tn >= header->bov_tn);
+				/* An end_seqno of 0 in a journal file created with replication ON would make every later
+				 * ROLLBACK that reads this file fail with BEGSEQGTENDSEQ.
+				 */
+				assert(eof_record.jnl_seqno || (repl_open != header->repl_state));
 				header->end_seqno = eof_record.jnl_seqno;
 			}
 			for (idx = 0; idx < MAX_SUPPL_STRMS; idx++)

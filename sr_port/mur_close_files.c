@@ -424,7 +424,7 @@ boolean_t mur_close_files(void)
 						 * is set to TRUE) would not yet have been touched either. */
 						if (rctl->initialized)
 						{
-							csd->repl_state = rctl->repl_state;
+							csa->repl_state = csd->repl_state = rctl->repl_state;
 							csd->jnl_state = rctl->jnl_state;
 							csd->jnl_before_image = rctl->before_image;
 							csd->recov_interrupted = rctl->recov_interrupted;
