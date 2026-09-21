@@ -19,8 +19,17 @@
 # Use with data persistence:
 #   $ docker run --rm  -p 9080-9081:9080-9081 -v `pwd`/ydb-data:/data -ti yottadb/yottadb-rocky:latest-master
 
+# All the stages below install packages from the Rocky Linux repositories.  Point every
+# repository at the canonical mirror rather than at the mirrorlist: the mirrorlist picks a
+# mirror for each repository independently, so a BaseOS mirror that lags the AppStream mirror
+# leaves the exact-version dependency a -devel package has on its runtime package unresolvable.
+FROM rockylinux:9 as rocky-repos-pinned
+RUN sed -i -e 's|^mirrorlist=|#mirrorlist=|' \
+           -e 's|^#baseurl=http://dl.rockylinux.org|baseurl=https://dl.rockylinux.org|' \
+           /etc/yum.repos.d/rocky*.repo
+
 # Stage 1: YottaDB build image
-FROM rockylinux:9 as ydb-release-builder
+FROM rocky-repos-pinned as ydb-release-builder
 
 ARG CMAKE_BUILD_TYPE=Release
 RUN yum update -y || true && \
@@ -77,7 +86,7 @@ RUN mkdir -p /tmp/yottadb-build \
  && make install
 
 # Stage 2: YottaDB GUI install
-FROM rockylinux:9 as ydb-gui
+FROM rocky-repos-pinned as ydb-gui
 
 RUN --mount=type=bind,from=ydb-release-builder,source=/tmp/yottadb-release,target=/tmp/staging \
     # This is a strange step: The mount volume is readonly; and we actually write to it in ydbinstall
@@ -111,7 +120,7 @@ RUN --mount=type=bind,from=ydb-release-builder,source=/tmp/yottadb-release,targe
     /tmp/ydb-release/ydbinstall --utf8 --installdir /opt/yottadb/current --gui
 
 # Stage 3: YottaDB release image
-FROM rockylinux:9 as ydb-release
+FROM rocky-repos-pinned as ydb-release
 
 RUN --mount=type=bind,from=ydb-release-builder,source=/tmp/yottadb-release,target=/tmp/staging \
     --mount=type=bind,from=ydb-gui,source=/opt/yottadb/current/plugin/,target=/tmp/plugin \
@@ -142,6 +151,12 @@ RUN --mount=type=bind,from=ydb-release-builder,source=/tmp/yottadb-release,targe
     cp -R /tmp/plugin /opt/yottadb/current/ && \
     yum remove -y wget && \
     yum clean all && \
+    # Restore the stock repository configuration inherited from the base image so that the
+    # published image picks a nearby mirror the way a stock Rocky Linux image does
+    sed -i -e 's|^#mirrorlist=|mirrorlist=|' \
+           -e 's|^baseurl=https://dl.rockylinux.org|#baseurl=http://dl.rockylinux.org|' \
+           /etc/yum.repos.d/rocky*.repo && \
+    rm -f /etc/yum.repos.d/*.rpmnew && \
     rm -rf /var/cache/yum && \
     rm -rf /tmp/ydb-release
 
