@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -320,7 +320,15 @@ cache_rec_ptr_t	db_csh_getn(block_id block)
 			 */
 			if (dont_flush_buff)
 				continue;
-			if (lcnt < iter1)
+			/* The first pass over the cache (lcnt < iter1) skips dirty cache records entirely, looking
+			 * for a clean one to reuse instead. That means "wcs_get_space" below, and hence the
+			 * SPCFCBUFDELAY message it can issue, is only reached once a full pass has failed to turn up
+			 * any clean record. A test that wants SPCFCBUFDELAY would otherwise have to starve the cache
+			 * hard enough to reach that state, which is timing dependent and unreliable. Under
+			 * WBTEST_FORCE_SPCFCBUFDELAY, take dirty records from the first pass so the wait on whichever
+			 * record another process is stuck writing happens deterministically.
+			 */
+			if ((lcnt < iter1) DEBUG_ONLY(&& !WBTEST_ENABLED(WBTEST_FORCE_SPCFCBUFDELAY)))
 				continue;
 #			ifdef DEBUG
 			/* If this cr is a newer twin check that the older twin has a 0 value of "in_cw_set" (bg_update_phase2

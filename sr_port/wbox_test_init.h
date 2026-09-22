@@ -253,6 +253,12 @@ typedef enum {
 	WBTEST_YDB_RLSIGLONGJMP,                /* 406 : Slow down processing of SIGALRM timers to illustrate multiple signal processing issues with readline */
 	WBTEST_YDB_ENCR_ENV_TOOLONG,            /* 407 : Encryption env vars are set to too long values (v53003/D9I10002703 subtest) */
 	WBTEST_CONCBKUP_RUNNING,		/* 408 : Sleep in mupip_backup to test concurrent BACKUPs */
+	WBTEST_MULTI_WRITERSTUCK,		/* 409 : Like WBTEST_BUFOWNERSTUCK_STACK, but fakes more than one concurrent
+						 * writer so wcs_flu.c issues a WRITERSTUCK message for each of them */
+	WBTEST_FORCE_SPCFCBUFDELAY,		/* 410 : Force wcs_get_space() to reach the SPCFCBUFDELAY reporting interval
+						 * without waiting UNIX_GETSPACEWAIT iterations to get there, and make
+						 * db_csh_getn() reuse dirty cache records on its first pass so that
+						 * wcs_get_space() is actually reached without having to starve the cache */
 } wbtest_code_t;
 
 #if defined (DEBUG) && !defined (STATIC_ANALYSIS)

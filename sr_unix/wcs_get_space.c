@@ -3,7 +3,7 @@
  * Copyright (c) 2007-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -218,6 +218,14 @@ boolean_t wcs_get_space(gd_region *reg, int needed, cache_rec_ptr_t cr)
 			int4	cnl_in_wtstart;
 #			endif
 
+			/* Reaching the SPCFCBUFDELAY reporting interval the normal way means waiting
+			 * UNIX_GETSPACEWAIT (~2 minutes worth of "wcs_sleep") iterations, which is far too long
+			 * for a test to drive. Jump "lcnt" straight to the interval instead. This mirrors the
+			 * WBTEST_BUFOWNERSTUCK_STACK treatment of "lcnt" in "wcs_flu.c". Note the white box macro
+			 * resets its counter once it fires, so ydb_white_box_test_case_count controls how many
+			 * iterations elapse between successive SPCFCBUFDELAY messages.
+			 */
+			GTM_WHITE_BOX_TEST(WBTEST_FORCE_SPCFCBUFDELAY, lcnt, UNIX_GETSPACEWAIT);
 			if (0 == (lcnt % UNIX_GETSPACEWAIT))
 			{
 				send_msg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_SPCFCBUFDELAY, 4, &(cr->blk), DB_LEN_STR(reg), cr->epid);

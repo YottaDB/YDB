@@ -442,8 +442,20 @@ static inline boolean_t jnl_lseekwrite_hang(struct sgmnt_addrs_struct *csa)
 
 static inline void lseekwrite_hang_sleep(void)
 {
+	gtm_uint64_t	hang_usec;
+
+	/* Default to a fixed 3 minutes. A test that only needs the writer pinned long enough for another process
+	 * to notice it, and does not want to wait out the full 3 minutes, sets ydb_white_box_test_case_count to
+	 * the number of seconds it wants instead. Note that both white box test cases that reach this function,
+	 * WBTEST_DB_WRITE_HANG and WBTEST_JNL_WRITE_HANG, trigger off a write count (DB_HANG_TRIGGER and
+	 * JNL_HANG_TRIGGER respectively) rather than off ydb_white_box_test_case_count, so the count is otherwise
+	 * unused by them and is free to mean the hang duration.
+	 */
+	assert(WBTEST_ENABLED(WBTEST_DB_WRITE_HANG) || WBTEST_ENABLED(WBTEST_JNL_WRITE_HANG));
+	hang_usec = (0 < ydb_white_box_test_case_count)
+			? (gtm_uint64_t)ydb_white_box_test_case_count * E_6 : 180ULL * E_6;
 	send_msg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_TEXT, 2, LEN_AND_LIT("TEST-I-LSEEKWRITEHANGSTART"));			\
-	SLEEP_USEC(180ULL * E_6, TRUE);		/* Fixed 3 minutes, with restart. */
+	SLEEP_USEC(hang_usec, TRUE);		/* 3 minutes by default, with restart. */
 	send_msg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_TEXT, 2, LEN_AND_LIT("TEST-I-LSEEKWRITEHANGEND"));				\
 }
 #else
