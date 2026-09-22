@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -61,15 +61,7 @@ GBLREF 	gtmrecv_options_t	gtmrecv_options;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	repl_conn_info_t	*this_side, *remote_side;
 GBLREF	int4			strm_index;
-<<<<<<< HEAD
-GBLREF	char			repl_instfilename[MAX_FN_LEN + 1];	/* save first instance */
-GBLREF	char			repl_inst_name[MAX_INSTNAME_LEN];	/* for syslog */
 GBLREF	gd_addr			*gd_header;
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-GBLREF	char			repl_instfilename[MAX_FN_LEN + 1];	/* save first instance */
-GBLREF	char			repl_inst_name[MAX_INSTNAME_LEN];	/* for syslog */
-=======
->>>>>>> 07a11a26bb (GT.M V7.1-004)
 
 LITREF	char			ydb_release_name[];
 LITREF	int4			ydb_release_name_len;

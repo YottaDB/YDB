@@ -655,28 +655,6 @@ void	gvcst_put2(mval *val, span_parms *parms)
 		status = cdb_sc_normal;
 		lcl_dollar_tlevel = dollar_tlevel;
 	)
-<<<<<<< HEAD
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-	if (TREF(gvcst_incr_numoflow))
-	{
-		TREF(gvcst_incr_numoflow) = FALSE;
-		is_dollar_incr = TRUE;
-		status = cdb_sc_blkmod;
-		GOTO_RETRY;
-	}
-=======
-	if (TREF(gvcst_incr_numoflow))
-	{
-		TREF(gvcst_incr_numoflow) = FALSE;
-		is_dollar_incr = TRUE;
-		status = cdb_sc_blkmod;
-#		ifdef DEBUG
-		dbg_num_iters = 0;
-		lcl_t_tries = -1;
-#		endif
-		GOTO_RETRY;
-	}
->>>>>>> 07a11a26bb (GT.M V7.1-004)
 fresh_tn_start:
 #	ifdef DEBUG
 	lcl_t_tries = -1;

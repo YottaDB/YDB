@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2025-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -17,11 +17,6 @@
 
 #include "stringpool.h"
 #include "stp_parms.h"
-<<<<<<< HEAD
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-#include "mem_access.h"
-=======
-#include "mem_access.h"
 #include "send_msg.h"
 #include "caller_id.h"
 #ifdef DEBUG
@@ -32,7 +27,6 @@
 
 error_def(ERR_MEMORY);
 #define CALLERID ((unsigned char *)caller_id(0))
->>>>>>> 07a11a26bb (GT.M V7.1-004)
 
 GBLREF spdesc	stringpool;
 GBLREF size_t	totalRmalloc, totalRallocGta, zmalloclim;
@@ -63,45 +57,16 @@ void *stp_mmap(size_t size)
 
 void stp_init(size_t size)
 {
-<<<<<<< HEAD
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-	unsigned char	*na_page[2];
-
-	if (lasttop != 0)
-	{
-		na_page[0] = na_page[1]
-			   = stringpool.top + SIZEOF(char *);
-		reset_access(na_page, stringpool.prvprt);
-	}
-=======
-	unsigned char	*napage, *stpbase;
+	unsigned char	*napage;
 	size_t		allocbytes = size + SIZEOF(char *) + 2 * OS_PAGE_SIZE;
 
->>>>>>> 07a11a26bb (GT.M V7.1-004)
 	/* Allocate the size requested plus one longword so that loops that index through the stringpool can go one
 	 * iteration beyond the end of the stringpool without running off the end of the allocated memory region.
 	 */
-<<<<<<< HEAD
-	size = ROUND_UP2(size, 8);
-	stringpool.base = stringpool.free = (unsigned char *)malloc(size);
-	stringpool.lasttop = lasttop;
-	lasttop = stringpool.top = stringpool.invokestpgcollevel = stringpool.base + size;
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-	stringpool.base = stringpool.free
-                = (unsigned char *)malloc(size + SIZEOF(char *) + 2 * OS_PAGE_SIZE);
-        na_page[0] = na_page[1]
-                   = (unsigned char *)
-                ((((UINTPTR_T)stringpool.base + size + SIZEOF(char *) + 2 * OS_PAGE_SIZE) & ~(OS_PAGE_SIZE - 1)) - OS_PAGE_SIZE);
-	stringpool.lasttop = lasttop;
-	lasttop = stringpool.top = stringpool.invokestpgcollevel
-		= na_page[0] - SIZEOF(char *);
-	set_noaccess (na_page, &stringpool.prvprt);
-=======
 	stringpool.base = stringpool.free = (unsigned char *)stp_mmap(allocbytes);
 	stringpool.lastallocbytes = allocbytes;
 	napage = (unsigned char *)((((UINTPTR_T)stringpool.base + stringpool.lastallocbytes) & ~(OS_PAGE_SIZE - 1)) - OS_PAGE_SIZE);
 	stringpool.top = stringpool.invokestpgcollevel = napage - SIZEOF(char *);
->>>>>>> 07a11a26bb (GT.M V7.1-004)
 	stringpool.gcols = 0;
 	return;
 }

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -26,17 +26,6 @@
 #include "mvalconv.h"
 #include "restrict.h"
 #include "dm_audit_log.h"
-<<<<<<< HEAD
-#include "is_equ.h"		/* for MV_FORCE_NSTIMEOUT macro */
-#ifdef DEBUG
-#include "have_crit.h"		/* for the TPNOTACID_CHECK macro */
-#endif
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-#ifdef DEBUG
-#include "have_crit.h"		/* for the TPNOTACID_CHECK macro */
-#endif
-=======
->>>>>>> 07a11a26bb (GT.M V7.1-004)
 
 GBLREF io_pair		io_curr_device;
 GBLREF io_desc		*active_device;
@@ -52,13 +41,7 @@ int op_read(mval *v, mval *timeout)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-<<<<<<< HEAD
-	MV_FORCE_NSTIMEOUT(timeout, nsec_timeout, READTIMESTR);
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-	MV_FORCE_MSTIMEOUT(timeout, msec_timeout, READTIMESTR);
-=======
-	MV_FORCE_MSTIMEOUT(timeout, &msec_timeout, READTIMESTR);
->>>>>>> 07a11a26bb (GT.M V7.1-004)
+	MV_FORCE_NSTIMEOUT(timeout, &nsec_timeout, READTIMESTR);
 	active_device = io_curr_device.in;
 	v->mvtype = MV_STR;
 	v->str.len = 0;

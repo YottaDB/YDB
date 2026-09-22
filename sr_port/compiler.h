@@ -1,15 +1,9 @@
 /****************************************************************
  *								*
-<<<<<<< HEAD
- * Copyright (c) 2001-2022 Fidelity National Information	*
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
- * Copyright (c) 2001-2023 Fidelity National Information	*
-=======
  * Copyright (c) 2001-2024 Fidelity National Information	*
->>>>>>> 07a11a26bb (GT.M V7.1-004)
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -196,28 +190,6 @@ typedef struct
 	enum octype_t		octype;
 } octabstruct;
 
-<<<<<<< HEAD
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-/* Values for octype */
-#define OCT_NULL	0
-#define OCT_MVAL	1
-#define OCT_MINT	2
-#define OCT_MVADDR	4
-#define OCT_CDADDR	8
-#define OCT_VALUE	(OCT_MVAL | OCT_MINT | OCT_CDADDR)
-#define OCT_BOOL	16
-#define OCT_JUMP	32
-#define OCT_EXPRLEAF	64
-#define OCT_CGSKIP	128
-#define OCT_COERCE	256
-#define OCT_ARITH	512
-#define OCT_UNARY	1024
-#define OCT_NEGATED	2048
-#define OCT_REL 	4096
-/* For booleans which have a side-effect somewhere in their (or a direct ancestor's) second operand's triple chain */
-#define OCT_SE		8192
-
-=======
 typedef union mtreenode_union
 {
 	struct mtreelinks_struct
@@ -229,26 +201,6 @@ typedef union mtreenode_union
 	mlabel		lab;
 } mtreenode;
 
-/* Values for octype */
-#define OCT_NULL	0
-#define OCT_MVAL	1
-#define OCT_MINT	2
-#define OCT_MVADDR	4
-#define OCT_CDADDR	8
-#define OCT_VALUE	(OCT_MVAL | OCT_MINT | OCT_CDADDR)
-#define OCT_BOOL	16
-#define OCT_JUMP	32
-#define OCT_EXPRLEAF	64
-#define OCT_CGSKIP	128
-#define OCT_COERCE	256
-#define OCT_ARITH	512
-#define OCT_UNARY	1024
-#define OCT_NEGATED	2048
-#define OCT_REL 	4096
-/* For booleans which have a side-effect somewhere in their (or a direct ancestor's) second operand's triple chain */
-#define OCT_SE		8192
-
->>>>>>> 07a11a26bb (GT.M V7.1-004)
 typedef struct
 {
 	char			name[20];
@@ -760,7 +712,6 @@ MBSTART {									\
 # define CDREF_REF CDLT_REF
 #endif
 
-<<<<<<< HEAD
 #define	NBITS_IN_BOOL_DEPTH	11	/* Allows for a max boolean nesting depth of 2047.
 					 * Note: 2047 is hardcoded in BOOLEXPRTOODEEP message in ydberrors.msg
 					 * so any changes to NBITS_IN_BOOL_DEPTH should correspondingly change that hardcoding too.
@@ -973,8 +924,7 @@ MBSTART {									\
 
 #define	IS_LAST_BOOL_OPERAND_FALSE	FALSE
 #define	IS_LAST_BOOL_OPERAND_TRUE	TRUE
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-=======
+
 typedef int (*indir_fptr_void_t)(void);
 typedef int (*indir_fptr_opr_t)(oprtype *, opctype);
 
@@ -988,7 +938,6 @@ GBLREF unsigned int indir_fntype[];
 #define ASSERT_INDIR_FUNCTION_VOID(ARGCODE) (1)
 #define ASSERT_INDIR_FUNCTION_OPR(ARGCODE) (1)
 #endif
->>>>>>> 07a11a26bb (GT.M V7.1-004)
 
 int		actuallist(oprtype *opr);
 int		bool_expr(boolean_t sense, oprtype *addr, triple **boolexprfinish_ptr);

@@ -227,14 +227,8 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 				block_id sweep_start_blk)
 {
 	boolean_t		end_of_tree = FALSE, detailed_log;
-<<<<<<< HEAD
-	int			rec_size, lcl_rec_size = 0, pending_levels, exp_level, prev_pending_levels;
-	uint4			reorg_upgrade_pid;
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-	int			rec_size, lcl_rec_size = 0, pending_levels, exp_level;
-=======
 	int			rec_size, lcl_rec_size = 0, pending_levels, prev_pending_levels, exp_level;
->>>>>>> 07a11a26bb (GT.M V7.1-004)
+	uint4			reorg_upgrade_pid;
 	/*
 	 *
 	 * "level" is the level of the working block.
@@ -539,19 +533,7 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 						}
 						if (0 < kill_set_list.used)     /* increase kill_in_prog */
 							need_kip_incr = TRUE;
-<<<<<<< HEAD
-							if (!cs_addrs->now_crit)	/* Do not sleep while holding crit */
-								WAIT_ON_INHIBIT_KILLS(cs_addrs->nl, MAXWAIT2KILL);
-						}
 						DEBUG_ONLY(lcl_t_tries = t_tries);
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-							if (!cs_addrs->now_crit)	/* Do not sleep while holding crit */
-								WAIT_ON_INHIBIT_KILLS(cs_addrs->nl, MAXWAIT2KILL);
-						}
-						UNIX_ONLY(DEBUG_ONLY(lcl_t_tries = t_tries));
-=======
-						UNIX_ONLY(DEBUG_ONLY(lcl_t_tries = t_tries));
->>>>>>> 07a11a26bb (GT.M V7.1-004)
 						if ((trans_num)0 == (ret_tn = t_end(&(gv_target->hist), rtsib_hist,
 							TN_NOT_SPECIFIED)))
 						{
@@ -890,17 +872,7 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 			{
 				assert(0 < kill_set_list.used);
 				need_kip_incr = TRUE;
-<<<<<<< HEAD
-				if (!cs_addrs->now_crit)	/* Do not sleep while holding crit */
-					WAIT_ON_INHIBIT_KILLS(cs_addrs->nl, MAXWAIT2KILL);
 				DEBUG_ONLY(lcl_t_tries = t_tries);
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-				if (!cs_addrs->now_crit)	/* Do not sleep while holding crit */
-					WAIT_ON_INHIBIT_KILLS(cs_addrs->nl, MAXWAIT2KILL);
-				UNIX_ONLY(DEBUG_ONLY(lcl_t_tries = t_tries));
-=======
-				UNIX_ONLY(DEBUG_ONLY(lcl_t_tries = t_tries));
->>>>>>> 07a11a26bb (GT.M V7.1-004)
 				if ((trans_num)0 == (ret_tn = t_end(&(gv_target->hist), NULL, TN_NOT_SPECIFIED)))
 				{
 					need_kip_incr = FALSE;

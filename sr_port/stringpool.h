@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -115,17 +115,8 @@ error_def(ERR_SYSCALL);
 
 #define	ADD_TO_STPARRAY(PTR, PTRARRAY, PTRARRAYCUR, PTRARRAYTOP, TYPE)					\
 {													\
-<<<<<<< HEAD
 	GBLREF mstr		**stp_array;								\
 	GBLREF gtm_uint64_t	stp_array_size;								\
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-	GBLREF mstr	**stp_array;									\
-	GBLREF uint4	stp_array_size;									\
-=======
-	GBLREF mstr	**stp_array;									\
-	GBLREF uint4	stp_array_size;									\
-	int     	save_errno;									\
->>>>>>> 07a11a26bb (GT.M V7.1-004)
 													\
 	if (NULL == PTRARRAY)										\
 	{												\

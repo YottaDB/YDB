@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2021-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2021-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -50,12 +50,6 @@ error_def(ERR_NULSUBSC);
 
 /* Look at cert_blk.c for possible changes to macro format */
 
-<<<<<<< HEAD
-#define MAX_UTIL_LEN 128
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-#define MAX_UTIL_LEN 50
-=======
->>>>>>> 07a11a26bb (GT.M V7.1-004)
 #define BLOCK_WINDOW MAX_HEX_DIGITS_IN_INT8
 #define LEVEL_WINDOW 3
 #define OFFSET_WINDOW 4

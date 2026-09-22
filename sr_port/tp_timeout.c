@@ -1,15 +1,9 @@
 /****************************************************************
  *								*
-<<<<<<< HEAD
- * Copyright (c) 2001-2022 Fidelity National Information	*
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
- * Copyright (c) 2001-2023 Fidelity National Information	*
-=======
  * Copyright (c) 2001-2024 Fidelity National Information	*
->>>>>>> 07a11a26bb (GT.M V7.1-004)
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019-2024 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -135,13 +129,7 @@ void tp_start_timer(int4 timeout_milliseconds)
 	SHOWTIME(asccurtime);
 	DBGDFRDEVNT((stderr, "%d %s %s: tp_start_timer - tptimeout: %d\n", __LINE__, __FILE__, asccurtime, timeout_seconds));
 	in_timed_tn = TRUE;
-<<<<<<< HEAD
-	start_timer(TP_TIMER_ID, ((uint8)NANOSECS_IN_SEC * timeout_seconds), &tp_expire_now, 0, NULL);
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-	start_timer(TP_TIMER_ID, (1000 * timeout_seconds), &tp_expire_now, 0, NULL);
-=======
-	start_timer(TP_TIMER_ID, timeout_milliseconds, &tp_expire_now, 0, NULL);
->>>>>>> 07a11a26bb (GT.M V7.1-004)
+	start_timer(TP_TIMER_ID, ((uint8)NANOSECS_IN_MSEC * timeout_milliseconds), &tp_expire_now, 0, NULL);
 }
 
 /* ------------------------------------------------------------------

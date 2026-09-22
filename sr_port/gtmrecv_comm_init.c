@@ -42,31 +42,13 @@
 #include "util.h"
 #include "repl_log.h"
 #include "repl_comm.h"
-<<<<<<< HEAD
 #include "dogetaddrinfo.h"
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-=======
 #include "sgtm_putmsg.h"
 #include "repl_msg.h"
->>>>>>> 07a11a26bb (GT.M V7.1-004)
 
 GBLDEF	int                	gtmrecv_listen_sock_fd = FD_INVALID;
 GBLREF	gtmrecv_options_t  	gtmrecv_options;
-<<<<<<< HEAD
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-GBLREF	intrpt_state_t		intrpt_ok_state;
-
-error_def(ERR_GETADDRINFO);
-error_def(ERR_REPLCOMM);
-error_def(ERR_TEXT);
-=======
-GBLREF	intrpt_state_t		intrpt_ok_state;
 GBLREF  FILE                    *gtmrecv_log_fp;
-
-error_def(ERR_GETADDRINFO);
-error_def(ERR_REPLCOMM);
-error_def(ERR_TEXT);
->>>>>>> 07a11a26bb (GT.M V7.1-004)
 
 /* Initialize communication stuff */
 int gtmrecv_comm_init(in_port_t port)
@@ -87,13 +69,7 @@ int gtmrecv_comm_init(in_port_t port)
 	char                    local_port_buffer[NI_MAXSERV];
 	unsigned int		save_errno;
 	GTM_SOCKLEN_TYPE        len;
-<<<<<<< HEAD
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-	intrpt_state_t		prev_intrpt_state;
-=======
-	intrpt_state_t		prev_intrpt_state;
 	char                    print_msg[REPL_MSG_SIZE];
->>>>>>> 07a11a26bb (GT.M V7.1-004)
 
 	if (FD_INVALID != gtmrecv_listen_sock_fd) /* Initialization done already */
 		return (0);

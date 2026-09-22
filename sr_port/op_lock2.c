@@ -134,9 +134,9 @@ int	op_lock2(mval *timeout, unsigned char laflag)	/* timeout is in seconds */
 	SETUP_THREADGBL_ACCESS;
 	cm_action = laflag;
 	if (CM_ZALLOCATES == cm_action)		/* can't use ? : syntax here because of the way the macros nest */
-		MV_FORCE_NSTIMEOUT(timeout, nsec_timeout, ZALLOCTIMESTR);
+		MV_FORCE_NSTIMEOUT(timeout, &nsec_timeout, ZALLOCTIMESTR);
 	else
-		MV_FORCE_NSTIMEOUT(timeout, nsec_timeout, LOCKTIMESTR);
+		MV_FORCE_NSTIMEOUT(timeout, &nsec_timeout, LOCKTIMESTR);
 	return op_lock2_common(nsec_timeout, laflag);
 }
 
@@ -163,24 +163,8 @@ int	op_lock2_common(uint8 timeout, unsigned char laflag) /* timeout is in nanose
 	gotit = -1;
 	cm_action = laflag;
 	out_of_time = FALSE;
-<<<<<<< HEAD
 	TREF(mlk_yield_pid) = 0;
 	if (NO_M_TIMEOUT != timeout)
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-	timer_on = FALSE;
-	if (CM_ZALLOCATES == cm_action)		/* can't use ? : syntax here because of the way the macros nest */
-		MV_FORCE_MSTIMEOUT(timeout, msec_timeout, ZALLOCTIMESTR);
-	else
-		MV_FORCE_MSTIMEOUT(timeout, msec_timeout, LOCKTIMESTR);
-	if (NO_M_TIMEOUT != msec_timeout)
-=======
-	timer_on = FALSE;
-	if (CM_ZALLOCATES == cm_action)		/* can't use ? : syntax here because of the way the macros nest */
-		MV_FORCE_MSTIMEOUT(timeout, &msec_timeout, ZALLOCTIMESTR);
-	else
-		MV_FORCE_MSTIMEOUT(timeout, &msec_timeout, LOCKTIMESTR);
-	if (NO_M_TIMEOUT != msec_timeout)
->>>>>>> 07a11a26bb (GT.M V7.1-004)
 	{
 		if (0 == timeout)
 		{

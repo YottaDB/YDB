@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -70,17 +70,9 @@ void jobinterrupt_process_cleanup(void)
 	   caused us to drive the $zinterrupt handler and (2) we were already on a nice
 	   statement boundary when we were called to run $zinterrupt.
 	*/
-<<<<<<< HEAD
 	tref_transform = TRUE;
-	dollar_zininterrupt = FALSE;	/* No longer in a $zinterrupt */
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-	TREF(transform) = TRUE;
-	dollar_zininterrupt = FALSE;	/* No longer in a $zinterrupt */
-=======
-	TREF(transform) = TRUE;
 	DBGDFRDEVNT((stderr, "%d %s: jobinterrupt_process_cleanup cleanup\n", __LINE__, __FILE__));
 	dollar_zininterrupt = FALSE; /* Once reset, SIGUSR1s are not ignored and engage event handling */
->>>>>>> 07a11a26bb (GT.M V7.1-004)
 	/* Now build message for operator log with the form ERRWZINTR, compiler-error */
 	util_out_print(NULL, RESET);
 	msgbuff.addr = (char *)msgbuf;

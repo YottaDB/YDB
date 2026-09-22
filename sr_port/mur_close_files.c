@@ -982,22 +982,12 @@ boolean_t mur_close_files(void)
 		 * to error out because the semaphore should still exist in the system
 		 */
 		assert(udi->counter_ftok_incremented || jgbl.onlnrlbk || anticipatory_freeze_available);
-<<<<<<< HEAD
-		if (!ftok_sem_lock(jnlpool->jnlpool_dummy_reg, IMMEDIATE_FALSE)
-				|| !ftok_sem_release(jnlpool->jnlpool_dummy_reg, udi->counter_ftok_incremented, FALSE))
-			wrn_count++;
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-		if (!ftok_sem_lock(jnlpool->jnlpool_dummy_reg, FALSE)
-				|| !ftok_sem_release(jnlpool->jnlpool_dummy_reg, udi->counter_ftok_incremented, FALSE))
-			wrn_count++;
-=======
 		if (!local_ftok_counter_halted && udi->counter_ftok_incremented)
 		{
-			if (!ftok_sem_lock(jnlpool->jnlpool_dummy_reg, FALSE)
+			if (!ftok_sem_lock(jnlpool->jnlpool_dummy_reg, IMMEDIATE_FALSE)
 					|| !ftok_sem_release(jnlpool->jnlpool_dummy_reg, udi->counter_ftok_incremented, FALSE))
 				wrn_count++;
 		}
->>>>>>> 07a11a26bb (GT.M V7.1-004)
 	}
 	if (jgbl.onlnrlbk)
 	{	/* Signal completion */

@@ -115,19 +115,13 @@ error_def(ERR_ZTWORMHOLE2BIG);
 
 void op_svput(int varnum, mval *v)
 {
-	char		*vptr, lcl_str[256], *tmpPtr;
+	char		*vptr, *tmpPtr;
 	int		i, ok, state, tmp;
-	mval		lcl_mval;
 	int4		previous_gtm_strpllim;
 	size_t		rtmp;
 	sgmnt_addrs	*csa;			/* for ZGBLDIR */
 	gd_region	*reg, *reg_top;
-<<<<<<< HEAD
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-	mstr		trap_v;
-=======
 	mval		save_mval, *save_mval_ptr;
->>>>>>> 07a11a26bb (GT.M V7.1-004)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -227,37 +221,21 @@ void op_svput(int varnum, mval *v)
 				TREF(zpeek_regname_len) = 0;
 			}
 			break;
-<<<<<<< HEAD
-		case SV_ZMAXTPTIME:;
-			int	num;
-
-			/* Ensure $ZMAXTPTIME is never negative. If negative value is specified, treat it as 0 (i.e. NO timeout).
-			 * This is similar to how YDBENVINDX_MAXTPTIME env var is handled in "sr_port/gtm_env_init.c".
-			 */
-			num = mval2i(v);
-			if (0 > num)
-				num = 0;
-			TREF(dollar_zmaxtptime) = num;
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-		case SV_ZMAXTPTIME:
-			TREF(dollar_zmaxtptime) = mval2i(v);	/* Negative values == no timeout */
-=======
 		case SV_ZMAXTPTIME:
 			save_mval = *v;	/* use a stack variable copy to avoid modifying the state of what might be a GT.M literal */
 			save_mval_ptr = push_mval(&save_mval);	/* compiled code-runtime interactions rely on stable shared lits */
 			MV_FORCE_NUM(save_mval_ptr);
 			assert(MV_BIAS == MILLISECS_IN_SEC);				/* check math if this changes */
 			if (0 != save_mval_ptr->m[1])
-			{       /* just millisecond (3 digit) precision */
-			        op_fnj3(save_mval_ptr, 0, 3, save_mval_ptr);
-			        MV_FORCE_INT(save_mval_ptr);
-			        save_mval_ptr->mvtype = MV_INT | MV_NM;
+			{	/* just millisecond (3 digit) precision */
+				op_fnj3(save_mval_ptr, 0, 3, save_mval_ptr);
+				MV_FORCE_INT(save_mval_ptr);
+				save_mval_ptr->mvtype = MV_INT | MV_NM;
 			}
 			if (!((0 > save_mval_ptr->m[1]) || (TPTIMEOUT_MAX_TIME < save_mval_ptr->m[1])))
-			        TREF(dollar_zmaxtptime) = save_mval_ptr->m[1];
+				TREF(dollar_zmaxtptime) = save_mval_ptr->m[1];
 			if ((MVST_MVAL == mv_chain->mv_st_type) && (save_mval_ptr == &mv_chain->mv_st_cont.mvs_mval))
-			        POP_MV_STENT();
->>>>>>> 07a11a26bb (GT.M V7.1-004)
+				POP_MV_STENT();
 			break;
 		case SV_ZROUTINES:
 			if (RESTRICTED(zroutines_op))
@@ -278,58 +256,26 @@ void op_svput(int varnum, mval *v)
 				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_NOZTRAPINTRIG);
 #			endif
 			MV_FORCE_STR(v);
-<<<<<<< HEAD
-			/* Save string corresponding to input mval "v" in case the string pointed to by "v->str.addr"
-			 * gets shifted around by the op_newintrinsic()/gtm_newintrinsic() calls below
-			 */
-			lcl_mval = *v;
-			if (SIZEOF(lcl_str) < lcl_mval.str.len)
-			{
-				tmpPtr = (char *)malloc(lcl_mval.str.len);
-				memcpy(tmpPtr, v->str.addr, lcl_mval.str.len);
-				lcl_mval.str.addr = tmpPtr;
-			} else
-			{
-				memcpy(lcl_str, v->str.addr, lcl_mval.str.len);
-				lcl_mval.str.addr = lcl_str;
-			}
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-			/* Save v->str before op_newintrinsic(), which might overflow it. (gtm-DE304273) */
-			trap_v = v->str;
-=======
 			/* Save v->str before op_newintrinsic(), which might overflow it. (gtm-DE304273) */
 			save_mval = *v;
 			DBG_MARK_STRINGPOOL_UNEXPANDABLE;
->>>>>>> 07a11a26bb (GT.M V7.1-004)
 			if (ztrap_new)
 				op_newintrinsic(SV_ZTRAP);
-<<<<<<< HEAD
-			if (!v->str.len)
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-			if (!trap_v.len)
-=======
 			DBG_MARK_STRINGPOOL_EXPANDABLE;
 			save_mval_ptr = push_mval(&save_mval);
 			s2pool(&save_mval_ptr->str);
 #ifdef			DEBUG
-			if (WBTEST_ENABLED(WBTEST_MUNMAP_FREE) && (3 == gtm_white_box_test_case_count))
+			if (WBTEST_ENABLED(WBTEST_MUNMAP_FREE) && (3 == ydb_white_box_test_case_count))
 				INVOKE_STP_GCOL(stringpool.top - stringpool.free + 1);
 			if (WBTEST_ENABLED(WBTEST_ZTTEST))
 				INVOKE_STP_GCOL(MAX_SRCLINE);
-			if (WBTEST_ENABLED(WBTEST_MUNMAP_FREE) && (3 == gtm_white_box_test_case_count))
+			if (WBTEST_ENABLED(WBTEST_MUNMAP_FREE) && (3 == ydb_white_box_test_case_count))
 				INVOKE_STP_GCOL(stringpool.top - stringpool.free + 1);
 #endif
 			if (!save_mval_ptr->str.len)
->>>>>>> 07a11a26bb (GT.M V7.1-004)
 			{	/* Setting $ZTRAP to empty causes any current error trapping to be canceled */
 				(TREF(dollar_etrap)).mvtype = (TREF(dollar_ztrap)).mvtype = MV_STR;
-<<<<<<< HEAD
-				(TREF(dollar_ztrap)).str = v->str;
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-				(TREF(dollar_ztrap)).str = trap_v;
-=======
 				(TREF(dollar_ztrap)).str = save_mval_ptr->str;
->>>>>>> 07a11a26bb (GT.M V7.1-004)
 				(TREF(dollar_etrap)).str.len = 0;
 				ztrap_explicit_null = TRUE;
 				if ((MVST_MVAL == mv_chain->mv_st_type) && (save_mval_ptr == &mv_chain->mv_st_cont.mvs_mval))
@@ -344,29 +290,15 @@ void op_svput(int varnum, mval *v)
 					op_commarg(v, indir_linetail);
 					op_unwind();
 				}
-<<<<<<< HEAD
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-				(TREF(dollar_ztrap)).mvtype = MV_STR;
-				(TREF(dollar_ztrap)).str = trap_v;
-=======
 				(TREF(dollar_ztrap)).mvtype = MV_STR;
 				(TREF(dollar_ztrap)).str = save_mval_ptr->str;
 				if ((MVST_MVAL == mv_chain->mv_st_type) && (save_mval_ptr == &mv_chain->mv_st_cont.mvs_mval))
 					POP_MV_STENT();
->>>>>>> 07a11a26bb (GT.M V7.1-004)
 				if ((TREF(dollar_etrap)).str.len > 0)
 				{
 					gtm_newintrinsic(&(TREF(dollar_etrap)));
 					NULLIFY_TRAP(TREF(dollar_etrap));
 				}
-				(TREF(dollar_ztrap)).mvtype = MV_STR;
-				/* Copy the saved string (pointing to C-stack or malloc storage) back to the stringpool
-				 * before copying it to TREF(dollar_ztrap).str
-				 */
-				s2pool(&lcl_mval.str);
-				(TREF(dollar_ztrap)).str = lcl_mval.str;
-				if (SIZEOF(lcl_str) < lcl_mval.str.len)
-					free(tmpPtr);
 			}
 			if (ZTRAP_POP & TREF(ztrap_form))
 				ztrap_save_ctxt();

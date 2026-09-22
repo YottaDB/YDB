@@ -4,7 +4,7 @@
 # Copyright (c) 2001-2024 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
-# Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
@@ -79,22 +79,10 @@ if ( $buildshr_status != 0 ) then
 endif
 
 set gt_ld_linklib_options = "-L$gtm_obj $gtm_obj/gtm_main.o -lmumps -lgnpclient -lcmisockettcp"
-<<<<<<< HEAD
-set nolibyottadb = "no"	# by default build libyottadb
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-set nolibgtmshr = "no"	# by default build libgtmshr
-=======
->>>>>>> 07a11a26bb (GT.M V7.1-004)
 
-set build_libgtmshr = "yes"		# by default build libgtmshr
+set build_libyottadb = "yes"		# by default build libyottadb
 if ($gt_image == "bta") then
-<<<<<<< HEAD
-	set nolibyottadb = "yes"	# if bta build, build a static mumps executable
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-	set nolibgtmshr = "yes"	# if bta build, build a static mumps executable
-=======
-	set build_libgtmshr = "no"	# if bta build, build a static mumps executable
->>>>>>> 07a11a26bb (GT.M V7.1-004)
+	set build_libyottadb = "no"	# if bta build, build a static mumps executable
 endif
 
 if ("OS/390" == $HOSTOS) then
@@ -109,16 +97,8 @@ $shell $gtm_tools/genexport.csh $gtm_tools/yottadb_symbols.exp yottadb_symbols.$
 
 $shell $gtm_tools/genexport.csh $gtm_tools/ydbexe_symbols.exp ydbexe_symbols.$exp
 
-<<<<<<< HEAD
-if ($nolibyottadb == "no") then	# do not build libyottadb.so for bta builds
+if ($build_libyottadb == "yes") then
 	# Building libyottadb.so shared library
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-if ($nolibgtmshr == "no") then	# do not build libgtmshr.so for bta builds
-	# Building libgtmshr.so shared library
-=======
-if ($build_libgtmshr == "yes") then
-	# Building libgtmshr.so shared library
->>>>>>> 07a11a26bb (GT.M V7.1-004)
 	set aix_loadmap_option = ''
 	set aix_binitfini_option = ''
 	if ( $HOSTOS == "AIX") then
@@ -149,16 +129,10 @@ if ($build_libgtmshr == "yes") then
 	if ($HOSTOS == "OS/390") then
 		cp $gtm_obj/yottadb_symbols.$exp $3/
 	endif
-<<<<<<< HEAD
 	set gt_ld_linklib_options = "-L$gtm_obj"	# do not link in mumps whatever is already linked in libyottadb.so
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-	set gt_ld_linklib_options = "-L$gtm_obj"	# do not link in mumps whatever is already linked in libgtmshr.so
-=======
-	set gt_ld_linklib_options = "-L$gtm_obj"	# do not link in mumps whatever is already linked in libgtmshr.so
 else
-	# Do not build libgtmshr.so for bta builds. Export symbols for XC when linking MUMPS
+	# Do not build libyottadb.so for bta builds. Export symbols for XC when linking MUMPS
 	set gt_ld_linklib_options = "$gt_ld_linklib_options $gt_ld_options_all_exe"
->>>>>>> 07a11a26bb (GT.M V7.1-004)
 endif
 
 # Building mumps executable

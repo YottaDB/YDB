@@ -1685,16 +1685,8 @@ boolean_t trigger_update_rec(mval *trigger_rec, boolean_t noprompt, uint4 *trig_
 		 * the last byte in the string.
 		 */
 		assert(memchr(trigjrec->str.addr, '\n', trigjrec->str.len) == trigjrecptr);
-<<<<<<< HEAD
-		if (++trigjrecptr != (trigjrec->str.addr + trigjrec->str.len))
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-		 assert(memchr(trigjrec->str.addr, '\n', trigjrec->str.len) == trigjrecptr);
-		 *trigjrecptr++;
-		if (trigjrecptr != (trigjrec->str.addr + trigjrec->str.len))
-=======
 		trigjrecptr++;
 		if (trigjrecptr != (trigjrec->str.addr + trigjrec->str.len))
->>>>>>> 07a11a26bb (GT.M V7.1-004)
 		{
 			util_out_print_gtmio("Error : Newline allowed only inside multi-line xecute in $ztrigger ITEM", FLUSH);
 			trig_stats[STATS_ERROR_TRIGFILE]++;

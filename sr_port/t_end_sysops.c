@@ -1370,7 +1370,6 @@ void wcs_timer_start(gd_region *reg, boolean_t io_ok)
 	if ((0 != csd->epoch_taper) && (0 != cnl->wcs_active_lvl) && JNL_ENABLED(csd) && (0 != cnl->jnl_file.u.inode) &&
 		 csd->jnl_before_image && (cnl->epoch_taper_last_pid != process_id))
 	{
-<<<<<<< HEAD
 		/* Reuse the timestamp the commit just read rather than reading the clock again.  Every caller
 		 * of "wcs_timer_start" reaches it with jgbl.gbl_jrec_time set for the work it has just done:
 		 * "t_end" sets it in the same call, "op_tcommit" through "tp_tend", "op_ztcommit" pins one
@@ -1378,12 +1377,7 @@ void wcs_timer_start(gd_region *reg, boolean_t io_ok)
 		 */
 		assert(jgbl.gbl_jrec_time);
 		EPOCH_TAPER_IF_NEEDED(csa, csd, cnl, reg, TRUE, buffs_per_flush, flush_target, jgbl.gbl_jrec_time);
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-		EPOCH_TAPER_IF_NEEDED(csa, csd, cnl, reg, TRUE, buffs_per_flush, flush_target);
-=======
-		EPOCH_TAPER_IF_NEEDED(csa, csd, cnl, reg, TRUE, buffs_per_flush, flush_target);
 		cnl->epoch_taper_last_pid = process_id;
->>>>>>> 07a11a26bb (GT.M V7.1-004)
 	}
 	if ((flush_target <= cnl->wcs_active_lvl) && !FROZEN_CHILLED(csa))
 	{	/* Already in need of a good flush */

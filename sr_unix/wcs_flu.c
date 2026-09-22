@@ -91,181 +91,12 @@ MBSTART {										\
 		INCR_GVSTATS_COUNTER(CSA, CNL, n_jrec_epoch_idle, 1);			\
 } MBEND
 
-<<<<<<< HEAD
 /* Number of concurrent writers faked by the WBTEST_MULTI_WRITERSTUCK white box test case. One WRITERSTUCK
  * message is issued per faked writer, so this is also the number of messages the test expects to see. Must be
  * no more than MAX_WTSTART_PID_SLOTS, and one CNL->wtstart_pid[] slot must be filled in for each faked writer.
  */
 #define	MULTI_WRITERSTUCK_CNT	2
 
-#define	WAIT_FOR_CONCURRENT_WRITERS_TO_FINISH(FIX_IN_WTSTART, WAS_CRIT, REG, CSA, CNL)					\
-MBSTART {														\
-	unsigned int		lcnt;											\
-        struct shmid_ds         shm_buf;										\
-	int			i, msgcnt, save_errno;									\
-	pid_t			pid;											\
-															\
-	GTM_WHITE_BOX_TEST(WBTEST_BUFOWNERSTUCK_STACK, (CNL->in_wtstart), 1);						\
-	/* WBTEST_MULTI_WRITERSTUCK fakes MULTI_WRITERSTUCK_CNT concurrent writers (instead of the single		\
-	 * writer WBTEST_BUFOWNERSTUCK_STACK fakes) so the WRITERSTUCK loop below issues one message per		\
-	 * writer, each carrying its own "(I of N)" count.								\
-	 */														\
-	GTM_WHITE_BOX_TEST(WBTEST_MULTI_WRITERSTUCK, (CNL->in_wtstart), MULTI_WRITERSTUCK_CNT);				\
-	if (WRITERS_ACTIVE(CNL))											\
-	{														\
-		DEBUG_ONLY(int4	in_wtstart;) 		/* temporary for debugging purposes */				\
-		DEBUG_ONLY(int4	intent_wtstart;) 	/* temporary for debugging purposes */				\
-															\
-		assert(CSA->now_crit);											\
-		SIGNAL_WRITERS_TO_STOP(CNL);		/* to stop all active writers */				\
-		lcnt = 0;												\
-		do													\
-		{													\
-			DEBUG_ONLY(in_wtstart = CNL->in_wtstart;)							\
-			DEBUG_ONLY(intent_wtstart = CNL->intent_wtstart;)						\
-			GTM_WHITE_BOX_TEST(WBTEST_BUFOWNERSTUCK_STACK, lcnt, (MAXGETSPACEWAIT * 2) - 1);		\
-			GTM_WHITE_BOX_TEST(WBTEST_BUFOWNERSTUCK_STACK, CNL->wtstart_pid[0], process_id);		\
-			GTM_WHITE_BOX_TEST(WBTEST_MULTI_WRITERSTUCK, lcnt, (MAXGETSPACEWAIT * 2) - 1);			\
-			GTM_WHITE_BOX_TEST(WBTEST_MULTI_WRITERSTUCK, CNL->wtstart_pid[0], process_id);			\
-			GTM_WHITE_BOX_TEST(WBTEST_MULTI_WRITERSTUCK, CNL->wtstart_pid[1], process_id);			\
-			if (MAXGETSPACEWAIT DEBUG_ONLY( * 2) == ++lcnt)							\
-			{	/* We have noticed the below assert to fail occasionally on some platforms (mostly	\
-				 * AIX and Linux). We suspect it is because of waiting for another writer that is 	\
-				 * in jnl_fsync (as part of flushing a global buffer) which takes more than a minute	\
-				 * to finish. To avoid false failures (where the other writer finishes its job in	\
-				 * a little over a minute) we wait for twice the time in the debug version.		\
-				 */											\
-				GET_C_STACK_MULTIPLE_PIDS("WRITERSTUCK", CNL->wtstart_pid, MAX_WTSTART_PID_SLOTS, 1);	\
-				assert((ydb_white_box_test_case_enabled)						\
-					&& ((WBTEST_BUFOWNERSTUCK_STACK == ydb_white_box_test_case_number)		\
-						|| (WBTEST_MULTI_WRITERSTUCK == ydb_white_box_test_case_number)		\
-						|| (WBTEST_SLEEP_IN_WCS_WTSTART == ydb_white_box_test_case_number)	\
-						|| (WBTEST_DB_WRITE_HANG == ydb_white_box_test_case_number)		\
-						|| (WBTEST_EXPECT_IO_HANG == ydb_white_box_test_case_number)));		\
-				SIGNAL_WRITERS_TO_RESUME(CNL);								\
-				/* Send a syslog message for this unexpected event so we record it */			\
-				/* Note: Need to do this BEFORE the REL_CRIT_BEFORE_RETURN macro as we need		\
-				 * CSA->ti->curr_tn which is reliable only while we hold crit.				\
-				 */											\
-				send_msg_csa(CSA_ARG(csa) VARLSTCNT(7) ERR_WCSFLUFAILED, 5,				\
-						LEN_AND_LIT("WRITERSTUCK"), &CSA->ti->curr_tn, DB_LEN_STR(REG));	\
-				REL_CRIT_BEFORE_RETURN(CNL, REG, WAS_CRIT);						\
-				/* Disable white box testing after the first time the					\
-				WBTEST_BUFOWNERSTUCK_STACK mechanism has kicked in. This is because as			\
-				part of the exit handling process, the control once agin comes to wcs_flu		\
-				and at that time we do not want the WBTEST_BUFOWNERSTUCK_STACK white box		\
-				mechanism to kick in.*/									\
-				GTM_WHITE_BOX_TEST(WBTEST_BUFOWNERSTUCK_STACK, ydb_white_box_test_case_enabled, FALSE);	\
-				GTM_WHITE_BOX_TEST(WBTEST_MULTI_WRITERSTUCK, ydb_white_box_test_case_enabled, FALSE);	\
-				for (msgcnt = i = 0; (MAX_WTSTART_PID_SLOTS > i) && (CNL->in_wtstart >= msgcnt); i++)	\
-				{											\
-					if (0 == (pid = CNL->wtstart_pid[i]))						\
-						continue;								\
-					send_msg_csa(CSA_ARG(CSA) VARLSTCNT(7) ERR_WRITERSTUCK, 5, pid,	msgcnt + 1,	\
-							CNL->in_wtstart, DB_LEN_STR(REG));				\
-					msgcnt++;									\
-				}											\
-				return FALSE;										\
-			}												\
-			if (-1 == shmctl(udi->shmid, IPC_STAT, &shm_buf))						\
-			{												\
-				save_errno = errno;									\
-				if (1 == lcnt)										\
-				{											\
-					send_msg_csa(CSA_ARG(CSA) VARLSTCNT(4) ERR_DBFILERR, 2,				\
-							DB_LEN_STR(REG));						\
-					send_msg_csa(CSA_ARG(CSA) VARLSTCNT(8) ERR_SYSCALL, 5,				\
-							RTS_ERROR_LITERAL("shmctl()"), CALLFROM, save_errno);		\
-				} 											\
-			} else if (1 == shm_buf.shm_nattch)								\
-			{												\
-				assert((FALSE == CSA->in_wtstart) && (0 <= CNL->in_wtstart));				\
-				CNL->in_wtstart = 0;	/* fix improper value of in_wtstart if you are standalone */	\
-				FIX_IN_WTSTART = TRUE;									\
-				CNL->intent_wtstart = 0;/* fix improper value of intent_wtstart if standalone */	\
-			} else												\
-				wcs_sleep(lcnt);		/* wait for any in wcs_wtstart to finish */		\
-		} while (WRITERS_ACTIVE(CNL));										\
-		SIGNAL_WRITERS_TO_RESUME(CNL);										\
-	}														\
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-#define	WAIT_FOR_CONCURRENT_WRITERS_TO_FINISH(FIX_IN_WTSTART, WAS_CRIT, REG, CSA, CNL)					\
-MBSTART {														\
-	unsigned int		lcnt;											\
-        struct shmid_ds         shm_buf;										\
-	int			i, msgcnt, save_errno;									\
-	pid_t			pid;											\
-															\
-	GTM_WHITE_BOX_TEST(WBTEST_BUFOWNERSTUCK_STACK, (CNL->in_wtstart), 1);						\
-	if (WRITERS_ACTIVE(CNL))											\
-	{														\
-		DEBUG_ONLY(int4	in_wtstart;) 		/* temporary for debugging purposes */				\
-		DEBUG_ONLY(int4	intent_wtstart;) 	/* temporary for debugging purposes */				\
-															\
-		assert(CSA->now_crit);											\
-		SIGNAL_WRITERS_TO_STOP(CNL);		/* to stop all active writers */				\
-		lcnt = 0;												\
-		do													\
-		{													\
-			DEBUG_ONLY(in_wtstart = CNL->in_wtstart;)							\
-			DEBUG_ONLY(intent_wtstart = CNL->intent_wtstart;)						\
-			GTM_WHITE_BOX_TEST(WBTEST_BUFOWNERSTUCK_STACK, lcnt, (MAXGETSPACEWAIT * 2) - 1);		\
-			GTM_WHITE_BOX_TEST(WBTEST_BUFOWNERSTUCK_STACK, CNL->wtstart_pid[0], process_id);		\
-			if (MAXGETSPACEWAIT DEBUG_ONLY( * 2) == ++lcnt)							\
-			{	/* We have noticed the below assert to fail occasionally on some platforms (mostly	\
-				 * AIX and Linux). We suspect it is because of waiting for another writer that is 	\
-				 * in jnl_fsync (as part of flushing a global buffer) which takes more than a minute	\
-				 * to finish. To avoid false failures (where the other writer finishes its job in	\
-				 * a little over a minute) we wait for twice the time in the debug version.		\
-				 */											\
-				GET_C_STACK_MULTIPLE_PIDS("WRITERSTUCK", CNL->wtstart_pid, MAX_WTSTART_PID_SLOTS, 1);	\
-				assert((gtm_white_box_test_case_enabled)						\
-					&& ((WBTEST_BUFOWNERSTUCK_STACK == gtm_white_box_test_case_number)		\
-						|| (WBTEST_SLEEP_IN_WCS_WTSTART == gtm_white_box_test_case_number)	\
-						|| (WBTEST_DB_WRITE_HANG == gtm_white_box_test_case_number)		\
-						|| (WBTEST_EXPECT_IO_HANG == gtm_white_box_test_case_number)));		\
-				CNL->wcsflu_pid = 0;									\
-				SIGNAL_WRITERS_TO_RESUME(CNL);								\
-				if (!WAS_CRIT)										\
-					rel_crit(REG);									\
-				/* Disable white box testing after the first time the					\
-				WBTEST_BUFOWNERSTUCK_STACK mechanism has kicked in. This is because as			\
-				part of the exit handling process, the control once agin comes to wcs_flu		\
-				and at that time we do not want the WBTEST_BUFOWNERSTUCK_STACK white box		\
-				mechanism to kick in.*/									\
-				GTM_WHITE_BOX_TEST(WBTEST_BUFOWNERSTUCK_STACK, gtm_white_box_test_case_enabled, FALSE);	\
-				for (msgcnt = i = 0; (MAX_WTSTART_PID_SLOTS > i) && (CNL->in_wtstart >= msgcnt); i++)	\
-				{											\
-					if (0 == (pid = CNL->wtstart_pid[i]))						\
-						continue;								\
-					send_msg_csa(CSA_ARG(CSA) VARLSTCNT(7) ERR_WRITERSTUCK, 5, pid,	msgcnt + 1,	\
-							CNL->in_wtstart, DB_LEN_STR(REG));				\
-					msgcnt++;									\
-				}											\
-				return FALSE;										\
-			}												\
-			if (-1 == shmctl(udi->shmid, IPC_STAT, &shm_buf))						\
-			{												\
-				save_errno = errno;									\
-				if (1 == lcnt)										\
-				{											\
-					send_msg_csa(CSA_ARG(CSA) VARLSTCNT(4) ERR_DBFILERR, 2,				\
-							DB_LEN_STR(REG));						\
-					send_msg_csa(CSA_ARG(CSA) VARLSTCNT(8) ERR_SYSCALL, 5,				\
-							RTS_ERROR_LITERAL("shmctl()"), CALLFROM, save_errno);		\
-				} 											\
-			} else if (1 == shm_buf.shm_nattch)								\
-			{												\
-				assert((FALSE == CSA->in_wtstart) && (0 <= CNL->in_wtstart));				\
-				CNL->in_wtstart = 0;	/* fix improper value of in_wtstart if you are standalone */	\
-				FIX_IN_WTSTART = TRUE;									\
-				CNL->intent_wtstart = 0;/* fix improper value of intent_wtstart if standalone */	\
-			} else												\
-				wcs_sleep(lcnt);		/* wait for any in wcs_wtstart to finish */		\
-		} while (WRITERS_ACTIVE(CNL));										\
-		SIGNAL_WRITERS_TO_RESUME(CNL);										\
-	}														\
-=======
 #define	WAIT_FOR_CONCURRENT_WRITERS_TO_FINISH(FIX_IN_WTSTART, WAS_CRIT, REG, CSA, CNL)						\
 MBSTART {															\
 	unsigned int		lcnt;												\
@@ -274,6 +105,11 @@ MBSTART {															\
 	pid_t			pid;												\
 																\
 	GTM_WHITE_BOX_TEST(WBTEST_BUFOWNERSTUCK_STACK, (CNL->in_wtstart), 1);							\
+	/* WBTEST_MULTI_WRITERSTUCK fakes MULTI_WRITERSTUCK_CNT concurrent writers (instead of the single			\
+	 * writer WBTEST_BUFOWNERSTUCK_STACK fakes) so the WRITERSTUCK loop below issues one message per			\
+	 * writer, each carrying its own "(I of N)" count.									\
+	 */															\
+	GTM_WHITE_BOX_TEST(WBTEST_MULTI_WRITERSTUCK, (CNL->in_wtstart), MULTI_WRITERSTUCK_CNT);					\
 	if (WRITERS_ACTIVE(CNL))												\
 	{															\
 		DEBUG_ONLY(int4	in_wtstart;) 		/* temporary for debugging purposes */					\
@@ -288,6 +124,9 @@ MBSTART {															\
 			DEBUG_ONLY(intent_wtstart = CNL->intent_wtstart;)							\
 			GTM_WHITE_BOX_TEST(WBTEST_BUFOWNERSTUCK_STACK, lcnt, (MAXGETSPACEWAIT * 2) - 1);			\
 			GTM_WHITE_BOX_TEST(WBTEST_BUFOWNERSTUCK_STACK, CNL->wtstart_pid[0], process_id);			\
+			GTM_WHITE_BOX_TEST(WBTEST_MULTI_WRITERSTUCK, lcnt, (MAXGETSPACEWAIT * 2) - 1);				\
+			GTM_WHITE_BOX_TEST(WBTEST_MULTI_WRITERSTUCK, CNL->wtstart_pid[0], process_id);				\
+			GTM_WHITE_BOX_TEST(WBTEST_MULTI_WRITERSTUCK, CNL->wtstart_pid[1], process_id);				\
 			if (MAXGETSPACEWAIT DEBUG_ONLY( * 2) == ++lcnt)								\
 			{	/* We have noticed the below assert to fail occasionally on some platforms (mostly		\
 				 * AIX and Linux). We suspect it is because of waiting for another writer that is 		\
@@ -296,21 +135,27 @@ MBSTART {															\
 				 * a little over a minute) we wait for twice the time in the debug version.			\
 				 */												\
 				GET_C_STACK_MULTIPLE_PIDS("WRITERSTUCK", CNL->wtstart_pid, MAX_WTSTART_PID_SLOTS, 1);		\
-				assert((gtm_white_box_test_case_enabled)							\
-					&& ((WBTEST_BUFOWNERSTUCK_STACK == gtm_white_box_test_case_number)			\
-						|| (WBTEST_SLEEP_IN_WCS_WTSTART == gtm_white_box_test_case_number)		\
-						|| (WBTEST_DB_WRITE_HANG == gtm_white_box_test_case_number)			\
-						|| (WBTEST_EXPECT_IO_HANG == gtm_white_box_test_case_number)));			\
-				CNL->wcsflu_pid = 0;										\
+				assert((ydb_white_box_test_case_enabled)							\
+					&& ((WBTEST_BUFOWNERSTUCK_STACK == ydb_white_box_test_case_number)			\
+						|| (WBTEST_MULTI_WRITERSTUCK == ydb_white_box_test_case_number)			\
+						|| (WBTEST_SLEEP_IN_WCS_WTSTART == ydb_white_box_test_case_number)		\
+						|| (WBTEST_DB_WRITE_HANG == ydb_white_box_test_case_number)			\
+						|| (WBTEST_EXPECT_IO_HANG == ydb_white_box_test_case_number)));			\
 				SIGNAL_WRITERS_TO_RESUME(CNL);									\
-				if (!WAS_CRIT)											\
-					rel_crit(REG);										\
+				/* Send a syslog message for this unexpected event so we record it */				\
+				/* Note: Need to do this BEFORE the REL_CRIT_BEFORE_RETURN macro as we need			\
+				 * CSA->ti->curr_tn which is reliable only while we hold crit.					\
+				 */												\
+				send_msg_csa(CSA_ARG(csa) VARLSTCNT(7) ERR_WCSFLUFAILED, 5,					\
+						LEN_AND_LIT("WRITERSTUCK"), &CSA->ti->curr_tn, DB_LEN_STR(REG));		\
+				REL_CRIT_BEFORE_RETURN(CNL, REG, WAS_CRIT);							\
 				/* Disable white box testing after the first time the						\
 				WBTEST_BUFOWNERSTUCK_STACK mechanism has kicked in. This is because as				\
 				part of the exit handling process, the control once agin comes to wcs_flu			\
 				and at that time we do not want the WBTEST_BUFOWNERSTUCK_STACK white box			\
 				mechanism to kick in.*/										\
-				GTM_WHITE_BOX_TEST(WBTEST_BUFOWNERSTUCK_STACK, gtm_white_box_test_case_enabled, FALSE);		\
+				GTM_WHITE_BOX_TEST(WBTEST_BUFOWNERSTUCK_STACK, ydb_white_box_test_case_enabled, FALSE);		\
+				GTM_WHITE_BOX_TEST(WBTEST_MULTI_WRITERSTUCK, ydb_white_box_test_case_enabled, FALSE);		\
 				for (msgcnt = i = 0; (MAX_WTSTART_PID_SLOTS > i) && (CNL->in_wtstart >= msgcnt); i++)		\
 				{												\
 					if (0 == (pid = CNL->wtstart_pid[i]))							\
@@ -345,7 +190,6 @@ MBSTART {															\
 		} while (WRITERS_ACTIVE(CNL));											\
 		SIGNAL_WRITERS_TO_RESUME(CNL);											\
 	}															\
->>>>>>> 07a11a26bb (GT.M V7.1-004)
 } MBEND
 
 #define REL_CRIT_BEFORE_RETURN(CNL, REG, WAS_CRIT)	\

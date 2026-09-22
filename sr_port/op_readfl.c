@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -23,17 +23,6 @@
 #include "ebc_xlat.h"
 #include "tpnotacid_chk_inline.h"
 #include "mvalconv.h"
-<<<<<<< HEAD
-#include "is_equ.h"		/* for MV_FORCE_NSTIMEOUT macro */
-#ifdef DEBUG
-#include "have_crit.h"		/* for the TPNOTACID_CHECK macro */
-#endif
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-#ifdef DEBUG
-#include "have_crit.h"		/* for the TPNOTACID_CHECK macro */
-#endif
-=======
->>>>>>> 07a11a26bb (GT.M V7.1-004)
 
 GBLREF boolean_t	gtm_utf8_mode;
 GBLREF io_pair		io_curr_device;
@@ -52,13 +41,7 @@ int op_readfl(mval *v, int4 length, mval *timeout)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-<<<<<<< HEAD
-	MV_FORCE_NSTIMEOUT(timeout, nsec_timeout, READTIMESTR);
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-	MV_FORCE_MSTIMEOUT(timeout, msec_timeout, READTIMESTR);
-=======
-	MV_FORCE_MSTIMEOUT(timeout, &msec_timeout, READTIMESTR);
->>>>>>> 07a11a26bb (GT.M V7.1-004)
+	MV_FORCE_NSTIMEOUT(timeout, &nsec_timeout, READTIMESTR);
 	/* Length is in units of characters, MAX_STRLEN and allocation unit in stp is bytes. Compute the worst case need in bytes.
 	 * Worst case, every UTF char is 4 bytes
 	 */

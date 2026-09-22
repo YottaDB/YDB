@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -145,16 +145,8 @@ void mupip_restore(void)
 	unsigned char		tcp[5];
 	backup_type		type;
 	unsigned short		port;
-<<<<<<< HEAD
 	int4			timeout, cut;
-	void			(*common_read)();
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-	int4			timeout, cut, match;
-	void			(*common_read)();
-=======
-	int4			timeout, cut, match;
 	void			(*common_read)(BFILE *, char *, int4);
->>>>>>> 07a11a26bb (GT.M V7.1-004)
 	char			*errptr;
 	pid_t			waitpid_res;
 	muinc_blk_hdr_ptr_t	sblkh_p;

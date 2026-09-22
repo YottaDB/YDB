@@ -891,16 +891,12 @@ typedef struct node_local_struct
 	global_latch_t		freeze_latch;		/* Protect freeze/freeze_online field updates */
 	gtm_uint64_t		wcs_buffs_freed;	/* this is a count of the number of buffers transitioned to the free "queue" */
 	volatile gtm_uint64_t	dskspace_next_fire;
-<<<<<<< HEAD
 	global_latch_t		lock_crit;		/* mutex for LOCK processing */
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-	global_latch_t	lock_crit;		/* mutex for LOCK processing */
-=======
-	global_latch_t	lock_crit;		/* mutex for LOCK processing */
-	CACHELINE_PAD(8, 11)
->>>>>>> 07a11a26bb (GT.M V7.1-004)
+	CACHELINE_PAD(8, 11);
 	volatile block_id	tp_hint;
-<<<<<<< HEAD
+	pthread_mutex_t		read_completed_ctl;	/* Coordinate block read completion in BG */
+	pthread_cond_t		read_completed;
+	uint4			epoch_taper_last_pid;	/* last process to do an epoch taper */
 	char			max_procs[MAX_PROCS_ARRAY_SIZE];
 	/* The following 2 fields are used by logic that determines whether the ydb mutex needs to be switched to pthread mutex */
 	uint8			prev_n_crit_que_slps, prev_n_crit_yields, prev_n_crit_failed;
@@ -922,12 +918,6 @@ typedef struct node_local_struct
 	 * for the reason given above it, so no existing field moves.
 	 */
 	int4			kip_pid_overflow_cnt;
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-=======
-	pthread_mutex_t		read_completed_ctl;	/* Coordinate block read completion in BG */
-	pthread_cond_t		read_completed;
-	uint4			epoch_taper_last_pid;	/* last process to do an epoch taper */
->>>>>>> 07a11a26bb (GT.M V7.1-004)
 } node_local;
 
 #define UPDATE_MAX_PROCS_STRING(NODE, MPS)	SNPRINTF(NODE->max_procs, MAX_PROCS_ARRAY_SIZE, "%d,%lu", MPS.cnt, MPS.time)

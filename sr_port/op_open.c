@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -27,17 +27,6 @@
 #include "mmemory.h"
 #include "min_max.h"
 #include "mvalconv.h"
-<<<<<<< HEAD
-#include "is_equ.h"		/* for MV_FORCE_NSTIMEOUT macro */
-#ifdef DEBUG
-#include "have_crit.h"		/* for the TPNOTACID_CHECK macro */
-#endif
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-#ifdef DEBUG
-#include "have_crit.h"		/* for the TPNOTACID_CHECK macro */
-#endif
-=======
->>>>>>> 07a11a26bb (GT.M V7.1-004)
 
 GBLREF uint4		dollar_trestart;
 GBLREF io_log_name	*io_root_log_name;
@@ -77,13 +66,7 @@ int op_open(mval *device, mval *devparms, mval *timeout, mval *mspace)
 	if (mspace)
 		MV_FORCE_STR(mspace);
 	assert((unsigned char)*devparms->str.addr < n_iops);
-<<<<<<< HEAD
-	MV_FORCE_NSTIMEOUT(timeout, nsec_timeout, OPENTIMESTR);
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-	MV_FORCE_MSTIMEOUT(timeout, msec_timeout, OPENTIMESTR);
-=======
-	MV_FORCE_MSTIMEOUT(timeout, &msec_timeout, OPENTIMESTR);
->>>>>>> 07a11a26bb (GT.M V7.1-004)
+	MV_FORCE_NSTIMEOUT(timeout, &nsec_timeout, OPENTIMESTR);
 	if (dollar_principal || io_root_log_name->iod)
 	{
 		/* make sure that dollar_principal is defined or iod has been defined for the root */

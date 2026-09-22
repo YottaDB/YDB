@@ -32,42 +32,7 @@
 #include "stringpool.h"
 #include "min_max.h"
 #include "error.h"
-<<<<<<< HEAD
-#include "gdsroot.h"
-#include "gdskill.h"
-#include "gdsbt.h"
-#include "gtm_facility.h"
-#include "fileinfo.h"
-#include "gdsfhead.h"
-#include "gdscc.h"
-#include "filestruct.h"
-#include "buddy_list.h"		/* needed for tp.h */
-#include "jnl.h"
-#include "tp.h"
-#include "send_msg.h"
-#include "gtmmsg.h"		/* for gtm_putmsg() prototype */
-#include "change_reg.h"
-#include "getzposition.h"
-#include "is_equ.h"		/* for MV_FORCE_NSTIMEOUT macro */
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-#include "gdsroot.h"
-#include "gdskill.h"
-#include "gdsbt.h"
-#include "gtm_facility.h"
-#include "fileinfo.h"
-#include "gdsfhead.h"
-#include "gdscc.h"
-#include "filestruct.h"
-#include "buddy_list.h"		/* needed for tp.h */
-#include "jnl.h"
-#include "tp.h"
-#include "send_msg.h"
-#include "gtmmsg.h"		/* for gtm_putmsg() prototype */
-#include "change_reg.h"
-#include "getzposition.h"
-=======
 #include "tpnotacid_chk_inline.h"
->>>>>>> 07a11a26bb (GT.M V7.1-004)
 #ifdef DEBUG
 #include "wbox_test_init.h"
 #endif
@@ -139,13 +104,7 @@ void	iosocket_iocontrol(mstr *mn, int4 argcnt, va_list args)
 	{
 		arg = (0 < argcnt) ? va_arg(args, mval *) : (mval *)&literal_notimeout;
 		if ((NULL != arg) && !M_ARG_SKIPPED(arg) && MV_DEFINED(arg))
-<<<<<<< HEAD
-			MV_FORCE_NSTIMEOUT(arg, nsec_timeout, "/WAIT");
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-			MV_FORCE_MSTIMEOUT(arg, msec_timeout, FORMATTIMESTR);
-=======
-			MV_FORCE_MSTIMEOUT(arg, &msec_timeout, FORMATTIMESTR);
->>>>>>> 07a11a26bb (GT.M V7.1-004)
+			MV_FORCE_NSTIMEOUT(arg, &nsec_timeout, "/WAIT");
 		else
 		{
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_EXPR);
@@ -185,19 +144,9 @@ void	iosocket_iocontrol(mstr *mn, int4 argcnt, va_list args)
 				arg = (mval *)&literal_notimeout;
 		} else
 			arg = (mval *)&literal_notimeout;
-<<<<<<< HEAD
-		MV_FORCE_NSTIMEOUT(arg, nsec_timeout, "/PASS");
+		MV_FORCE_NSTIMEOUT(arg, &nsec_timeout, "/PASS");
 		iosocket_pass_local(io_curr_device.out, pid, nsec_timeout, n, args);
 	} else if (0 == STRCMP(action, "ACCEPT"))
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-		MV_FORCE_MSTIMEOUT(arg, msec_timeout, FORMATTIMESTR);
-		iosocket_pass_local(io_curr_device.out, pid, msec_timeout, n, args);
-	} else if (0 == memcmp(action, "ACCEPT", length))
-=======
-		MV_FORCE_MSTIMEOUT(arg, &msec_timeout, FORMATTIMESTR);
-		iosocket_pass_local(io_curr_device.out, pid, msec_timeout, n, args);
-	} else if (0 == memcmp(action, "ACCEPT", length))
->>>>>>> 07a11a26bb (GT.M V7.1-004)
 	{
 		n = argcnt;
 		if (1 <= argcnt)
@@ -225,16 +174,8 @@ void	iosocket_iocontrol(mstr *mn, int4 argcnt, va_list args)
 				arg = (mval *)&literal_notimeout;
 		} else
 			arg = (mval *)&literal_notimeout;
-<<<<<<< HEAD
-		MV_FORCE_NSTIMEOUT(arg, nsec_timeout, "/ACCEPT");
+		MV_FORCE_NSTIMEOUT(arg, &nsec_timeout, "/ACCEPT");
 		iosocket_accept_local(io_curr_device.in, handlesvar, pid, nsec_timeout, n, args);
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-		MV_FORCE_MSTIMEOUT(arg, msec_timeout, FORMATTIMESTR);
-		iosocket_accept_local(io_curr_device.in, handlesvar, pid, msec_timeout, n, args);
-=======
-		MV_FORCE_MSTIMEOUT(arg, &msec_timeout, FORMATTIMESTR);
-		iosocket_accept_local(io_curr_device.in, handlesvar, pid, msec_timeout, n, args);
->>>>>>> 07a11a26bb (GT.M V7.1-004)
 #ifdef	GTM_TLS
 	} else if (0 == STRCMP(action, "TLS"))
 	{	/*	WRITE /TLS(option[,[nsec_timeout][,tlsid[,password]]]) */
@@ -260,13 +201,7 @@ void	iosocket_iocontrol(mstr *mn, int4 argcnt, va_list args)
 				arg = (mval *)&literal_notimeout;
 		} else
 			arg = (mval *)&literal_notimeout;
-<<<<<<< HEAD
-		MV_FORCE_NSTIMEOUT(arg, nsec_timeout, "/TLS");
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-		MV_FORCE_MSTIMEOUT(arg, msec_timeout, FORMATTIMESTR);
-=======
-		MV_FORCE_MSTIMEOUT(arg, &msec_timeout, FORMATTIMESTR);
->>>>>>> 07a11a26bb (GT.M V7.1-004)
+		MV_FORCE_NSTIMEOUT(arg, &nsec_timeout, "/TLS");
 		if (3 <= argcnt)
 		{
 			tlsid = va_arg(args, mval *);

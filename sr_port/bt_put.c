@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -45,15 +45,7 @@ error_def(ERR_WCBLOCKED);
 
 bt_rec_ptr_t bt_put(sgmnt_addrs *csa, block_id block)
 {
-<<<<<<< HEAD
-	bt_rec_ptr_t		bt, q0, q1, hdr;
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-	bt_rec_ptr_t		bt, q0, q1, hdr;
-	sgmnt_addrs		*csa;
-=======
 	bt_rec_ptr_t		bt, q0, q1, hdr, lbt;
-	sgmnt_addrs		*csa;
->>>>>>> 07a11a26bb (GT.M V7.1-004)
 	sgmnt_data_ptr_t	csd;
 	cache_rec_ptr_t		cr;
 	th_rec_ptr_t		th;

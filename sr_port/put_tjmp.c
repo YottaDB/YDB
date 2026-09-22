@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2022-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -19,18 +19,9 @@
 
 oprtype put_tjmp(triple *x)
 {
-<<<<<<< HEAD
-	assert(NULL != x);
-	oprtype a;
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-oprtype a;
-a.oprclass = TJMP_REF;
-a.oprval.tref = x;
-return a;
-=======
 	oprtype a;
 
->>>>>>> 07a11a26bb (GT.M V7.1-004)
+	assert(NULL != x);
 	a.oprclass = TJMP_REF;
 	a.oprval.tref = x;
 	return a;

@@ -281,10 +281,6 @@ boolean_t compiler_startup(void)
 	DBG_MARK_STRINGPOOL_USABLE;	/* Now that we are about to switch stringpool back to rts_stringpool, make it usable */
 	indr_stringpool = stringpool;
 	stringpool = rts_stringpool;
-<<<<<<< HEAD
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-	mstr_native_align = save_mstr_native_align;
-=======
 	if (STP_MIN_CONTRACTION < indr_stringpool.lastallocbytes)
 	{	/* Free the indirection stringpool when there is a large compilation.
 		 * The memory would have returned to the OS within the next compilation.
@@ -293,8 +289,6 @@ boolean_t compiler_startup(void)
 		stp_fini(indr_stringpool.base, indr_stringpool.lastallocbytes);
 		indr_stringpool.base = NULL;
 	}
-	mstr_native_align = save_mstr_native_align;
->>>>>>> 07a11a26bb (GT.M V7.1-004)
 	REVERT;
 	return errknt ? TRUE : FALSE;
 }

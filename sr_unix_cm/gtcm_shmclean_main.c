@@ -1,9 +1,9 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2022 Fidelity National Information	*
+ * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -38,6 +38,7 @@
 #include "trans_log_name.h"
 #include "common_startup_init.h"
 #include "gtm_threadgbl_init.h"
+#include "hugetlbfs_overrides.h"
 
 GBLDEF	int	quiet = 0;
 GBLDEF	int	rc_cpt_sem;     /* semaphore for CPTable */

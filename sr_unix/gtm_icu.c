@@ -3,7 +3,7 @@
  * Copyright (c) 2006-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -57,17 +57,9 @@ GBLREF char			ydb_dist[GTM_PATH_MAX];
 GBLREF	volatile boolean_t	timer_in_handler;
 GBLREF mstr			dollar_zicuver;
 
-<<<<<<< HEAD
 LITREF	char	*ydbenvname[YDBENVINDX_MAX_INDEX];
 LITREF	char	*gtmenvname[YDBENVINDX_MAX_INDEX];
 
-typedef void (*icu_func_t)();	/* a generic pointer type to the ICU function */
-
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-typedef void (*icu_func_t)();	/* a generic pointer type to the ICU function */
-
-=======
->>>>>>> 07a11a26bb (GT.M V7.1-004)
 /* For now the minimum ICU version supported is 3.6 */
 #define	ICU_MINIMUM_SUPPORTED_VER	"3.6"
 #define IS_ICU_VER_GREATER_THAN_MIN_VER(major_ver, minor_ver) ((3 < major_ver) || ((3 == major_ver) && (6 <= minor_ver)))
@@ -100,15 +92,9 @@ typedef void (*icu_func_t)();	/* a generic pointer type to the ICU function */
  */
 typedef uint8_t UVersionInfo[MAX_ICU_VERSION_LENGTH];
 
-<<<<<<< HEAD
-/* The first parameter to ICUVERLT36 can be either ICU_LIBNAME or $ydb_icu_version. Depending on the choice
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-/* The first parameter to ICUVERLT36 can be either ICU_LIBNAME or $gtm_icu_version. Depending on the choice
-=======
 typedef void (*icu_func_t)(UVersionInfo);	/* a generic pointer type to the ICU function */
 
-/* The first parameter to ICUVERLT36 can be either ICU_LIBNAME or $gtm_icu_version. Depending on the choice
->>>>>>> 07a11a26bb (GT.M V7.1-004)
+/* The first parameter to ICUVERLT36 can be either ICU_LIBNAME or $ydb_icu_version. Depending on the choice
  * of the first parameter, different suffix is chosen.
  */
 #define ICU_LIBNAME_SUFFIX		" has version"

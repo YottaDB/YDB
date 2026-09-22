@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -38,17 +38,6 @@
 #include "tpnotacid_chk_inline.h"
 #include "iosocketdef.h"
 #include "min_max.h"
-<<<<<<< HEAD
-#include "is_equ.h"		/* for MV_FORCE_NSTIMEOUT macro */
-#ifdef DEBUG
-#include "have_crit.h"		/* for the TPNOTACID_CHECK macro */
-#endif
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-#ifdef DEBUG
-#include "have_crit.h"		/* for the TPNOTACID_CHECK macro */
-#endif
-=======
->>>>>>> 07a11a26bb (GT.M V7.1-004)
 
 void	job_timer_handler(void);
 
@@ -158,16 +147,8 @@ int	op_job(int4 argcnt, ...)
 	}
 	/* Start the timer */
 	ojtimeout = timed = FALSE;
-<<<<<<< HEAD
-	MV_FORCE_NSTIMEOUT(timeout, nsec_timeout, JOBTIMESTR);
+	MV_FORCE_NSTIMEOUT(timeout, &nsec_timeout, JOBTIMESTR);
 	if ((0 < nsec_timeout) && (NO_M_TIMEOUT != nsec_timeout))
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-	MV_FORCE_MSTIMEOUT(timeout, msec_timeout, JOBTIMESTR);
-	if ((0 < msec_timeout) && (NO_M_TIMEOUT != msec_timeout))
-=======
-	MV_FORCE_MSTIMEOUT(timeout, &msec_timeout, JOBTIMESTR);
-	if ((0 < msec_timeout) && (NO_M_TIMEOUT != msec_timeout))
->>>>>>> 07a11a26bb (GT.M V7.1-004)
 	{
 		timed = TRUE;
 		start_timer((TID)&tid, nsec_timeout, job_timer_handler, 0, NULL);

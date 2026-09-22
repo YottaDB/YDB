@@ -3,7 +3,7 @@
  * Copyright (c) 2006-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -267,23 +267,11 @@ int gtmsource_est_conn()
 				} else /* Decrease the frequency of showing the connection failure error messages */
 					throw_errors = FALSE;
 			}
-<<<<<<< HEAD
 			/* Pause before trying the connection again then check if any interrupting conditions occurred
 			 * before retrying the connection.
 			 */
-			LONG_SLEEP(soft_tries_period);
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-			LONG_SLEEP(soft_tries_period);
-=======
-
-			/* Sometimes we undersleep in AIX.  We adopt the solution from op_hang.c to add an additional 2ms and make
-			 * sure we get into the next second */
 			soft_tries_period_ms = soft_tries_period * 1000;
-#ifdef AIX
-			soft_tries_period_ms += 2;
-#endif
 			LONG_SLEEP_MSEC(soft_tries_period_ms);
->>>>>>> 07a11a26bb (GT.M V7.1-004)
 			gtmsource_poll_actions(FALSE);
 			if ((GTMSOURCE_CHANGING_MODE == gtmsource_state) || (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state))
 				return (SS_NORMAL);

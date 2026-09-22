@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
@@ -179,63 +179,9 @@ unsigned char *mval2subsc(mval *in_val, gv_key *out_key, boolean_t std_null_coll
 			goto ALLDONE;
 		} else
 		{
-<<<<<<< HEAD
 			is_negative = TRUE;
 			cvt_table = neg_code;
 			mt = -mt;
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-			*out_ptr++ = is_negative ? ~(SUBSCRIPT_BIAS - 2) : (SUBSCRIPT_BIAS - 2);
-			*out_ptr++ = cvt_table[mt * 10];
-			goto FINISH_NUMBER;
-		}
-		if (100 > mt)
-		{
-			*out_ptr++ = is_negative ? ~(SUBSCRIPT_BIAS - 1) : (SUBSCRIPT_BIAS - 1);
-			*out_ptr++ = cvt_table[mt];
-			goto FINISH_NUMBER;
-		}
-		tm = temp_mantissa;
-		if (1000 > mt)
-		{
-			exp_val = SUBSCRIPT_BIAS;
-			goto ODD_INTEGER;
-		}
-		if (10000 > mt)
-		{
-			exp_val = SUBSCRIPT_BIAS + 1;
-			goto EVEN_INTEGER;
-		}
-		if (100000 > mt)
-		{
-			exp_val = SUBSCRIPT_BIAS + 2;
-			goto ODD_INTEGER;
-=======
-			*out_ptr++ = is_negative ? (unsigned char)~(SUBSCRIPT_BIAS - 2) : (unsigned char)(SUBSCRIPT_BIAS - 2);
-			*out_ptr++ = cvt_table[mt * 10];
-			goto FINISH_NUMBER;
-		}
-		if (100 > mt)
-		{
-			*out_ptr++ = is_negative ? (unsigned char)~(SUBSCRIPT_BIAS - 1) : (unsigned char)(SUBSCRIPT_BIAS - 1);
-			*out_ptr++ = cvt_table[mt];
-			goto FINISH_NUMBER;
-		}
-		tm = temp_mantissa;
-		if (1000 > mt)
-		{
-			exp_val = SUBSCRIPT_BIAS;
-			goto ODD_INTEGER;
-		}
-		if (10000 > mt)
-		{
-			exp_val = SUBSCRIPT_BIAS + 1;
-			goto EVEN_INTEGER;
-		}
-		if (100000 > mt)
-		{
-			exp_val = SUBSCRIPT_BIAS + 2;
-			goto ODD_INTEGER;
->>>>>>> 07a11a26bb (GT.M V7.1-004)
 		}
 		if (1000000 > mt)
 		{

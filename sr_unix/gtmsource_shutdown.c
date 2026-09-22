@@ -3,7 +3,7 @@
  * Copyright (c) 2006-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -321,15 +321,9 @@ int gtmsource_shutdown(boolean_t auto_shutdown, int exit_status)
 	if (!ftok_sem_release(jnlpool->jnlpool_dummy_reg, !ftok_counter_halted && udi->counter_ftok_incremented, FALSE))
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_JNLPOOLSETUP);
 	assert(!num_src_servers_running || (ABNORMAL_SHUTDOWN == exit_status));
-<<<<<<< HEAD
-	return ((!auto_shutdown && (1 == maxindex) && num_src_servers_running) ? shutdown_status : exit_status);
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-	return (((1 == maxindex) && num_src_servers_running) ? shutdown_status : exit_status);
-=======
 	retval = (((1 == maxindex) && num_src_servers_running) ? shutdown_status : exit_status);
 	repl_log(stdout, TRUE, TRUE, "Finished source server SHUTDOWN operation\n");
 	return retval;
->>>>>>> 07a11a26bb (GT.M V7.1-004)
 }
 
 void gtmsource_stop(boolean_t exit)

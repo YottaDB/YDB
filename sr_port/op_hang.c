@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -84,7 +84,6 @@ void op_hang(mval* num)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-<<<<<<< HEAD
 	ms = 0;
 	MV_FORCE_NUM(num);
 	if (num->mvtype & MV_INT)
@@ -101,43 +100,10 @@ void op_hang(mval* num)
 		assert(0 <= ms);
 	}
 	DEBUG_ONLY(orig_ms = ms);
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-	ms = 0;
-	MV_FORCE_NUM(num);
-	if (num->mvtype & MV_INT)
-	{
-		if (0 < num->m[1])
-		{
-			assert(MV_BIAS >= 1000);	/* if formats change overflow may need attention */
-			ms = num->m[1] * (1000 / MV_BIAS);
-		}
-	} else if (0 == num->sgn) 		/* if sign is not 0 it means num is negative */
-	{
-		tmp = mval2double(num) * (double)1000;
-		ms = ((double)MAXPOSINT4 >= tmp) ? (int)tmp : (int)MAXPOSINT4;
-		assert(0 <= ms);
-	}
-=======
-	MV_FORCE_MSTIMEOUT(num, &ms, HANGSTR);
->>>>>>> 07a11a26bb (GT.M V7.1-004)
 	if (ms)
 	{
-<<<<<<< HEAD
-		if ((TREF(tpnotacidtime)).m[1] < ms)
+		if (TREF(tpnotacidtime) < ms)
 			TPNOTACID_CHECK(HANGSTR);
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-		if ((TREF(tpnotacidtime)).m[1] < ms)
-			TPNOTACID_CHECK(HANGSTR);
-#		ifdef _AIX	/* AIX times are a bit wobbly, so nudge any 1sec. hang aiming to landing in the next sec */
-		if (1000 == ms)		/* some apps expect a HANG 1 (1000 MS) to land in the next second */
-			ms +=2;		/* push a bit (in milliseconds) */
-#		endif
-=======
-#		ifdef _AIX	/* AIX times are a bit wobbly, so nudge any 1sec. hang aiming to landing in the next sec */
-		if (1000 == ms)		/* some apps expect a HANG 1 (1000 MS) to land in the next second */
-			ms +=2;		/* push a bit (in milliseconds) */
-#		endif
->>>>>>> 07a11a26bb (GT.M V7.1-004)
 #		if defined(DEBUG)
 		if (WBTEST_ENABLED(WBTEST_DEFERRED_TIMERS) && (3 > ydb_white_box_test_case_count) && (123000 == ms))
 		{	/* LONG_SLEEP messes with signals */

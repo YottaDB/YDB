@@ -38,33 +38,13 @@
 
 GBLDEF zshow_out	*zwr_output;
 
-<<<<<<< HEAD
-GBLREF gv_namehead	*gv_target;
-GBLREF gv_namehead	*reset_gv_target;
-GBLREF gv_key		*gv_currkey;
-GBLREF gd_region	*gv_cur_region;
-GBLREF sgmnt_addrs	*cs_addrs;
-GBLREF gvzwrite_datablk	*gvzwrite_block;
-GBLREF gd_addr		*gd_header;
-GBLREF bool		undef_inhibit;
-GBLREF uint4		dollar_tlevel;
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-GBLREF gv_namehead	*gv_target;
-GBLREF gv_namehead	*reset_gv_target;
-GBLREF gv_key		*gv_currkey;
-GBLREF gd_region	*gv_cur_region;
-GBLREF sgmnt_addrs	*cs_addrs;
-GBLREF gvzwrite_datablk	*gvzwrite_block;
-GBLREF gd_addr		*gd_header;
-GBLREF bool		undef_inhibit;
-=======
 GBLREF bool			undef_inhibit;
 GBLREF gd_addr			*gd_header;
 GBLREF gd_region		*gv_cur_region;
 GBLREF gv_key			*gv_currkey;
 GBLREF gv_namehead		*gv_target, *reset_gv_target;
 GBLREF gvzwrite_datablk		*gvzwrite_block;
->>>>>>> 07a11a26bb (GT.M V7.1-004)
+GBLREF uint4			dollar_tlevel;
 
 error_def(ERR_GVNAKED);
 
@@ -153,21 +133,9 @@ void gvzwr_fini(zshow_out *out, int pat)
 					sgnl_gvundef();
 			} else
 				gvzwr_var(MV_FORCE_INTD(&data), 0);
-<<<<<<< HEAD
-			}
-		} else	/* Old (naked) reference. Keep previous gv_target reference */
-		{
-			if (IS_ILLEGAL_GVNAKED(gv_currkey))
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-			}
-		} else	/* Old (naked) reference. Keep previous gv_target reference */
-		{
-			if (gv_currkey->prev == 0)
-=======
 		} else
 		{	/* old (naked) reference. Keep previous gv_target */
-			if (gv_currkey->prev == 0)
->>>>>>> 07a11a26bb (GT.M V7.1-004)
+			if (IS_ILLEGAL_GVNAKED(gv_currkey))
 				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_GVNAKED);
 			gv_currkey->end = gv_currkey->prev;
 			gv_currkey->base[gv_currkey->end] = 0;

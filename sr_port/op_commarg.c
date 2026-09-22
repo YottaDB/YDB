@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -35,11 +35,6 @@ GBLDEF int (*indir_fcn[])() = {
 #include "indir.h"
 };
 
-<<<<<<< HEAD
-GBLREF int4			aligned_source_buffer[];
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-GBLREF int4			aligned_source_buffer;
-=======
 #ifdef DO_INDIR_FUNCTION_CHECK
 int indir_dummy_fn_void(void);
 int indir_dummy_fn_opr(oprtype *, opctype);
@@ -52,8 +47,7 @@ GBLDEF unsigned int indir_fntype[] = {
 };
 #endif
 
-GBLREF int4			aligned_source_buffer;
->>>>>>> 07a11a26bb (GT.M V7.1-004)
+GBLREF int4			aligned_source_buffer[];
 GBLREF stack_frame		*frame_pointer;
 GBLREF unsigned short 		proc_act_type;
 

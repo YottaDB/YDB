@@ -57,18 +57,6 @@
    To retain the default Global Directory, exit GDE without making any
    changes.
 
-<<<<<<< HEAD
-   Example:
-
-   $ export ydb_gbldir=/home/jdoe/node1/prod.gld
-
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-   Example:
-
-   $ export gtmgbldir=/home/jdoe/node1/prod.gld
-
-=======
->>>>>>> 07a11a26bb (GT.M V7.1-004)
 2 Creating_a_Default_Global_Directory
    Creating a Default Global Directory
 

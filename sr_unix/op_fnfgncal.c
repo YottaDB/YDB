@@ -1,15 +1,9 @@
 /****************************************************************
  *								*
-<<<<<<< HEAD
- * Copyright (c) 2001-2021 Fidelity National Information	*
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
- * Copyright (c) 2001-2023 Fidelity National Information	*
-=======
  * Copyright (c) 2001-2024 Fidelity National Information	*
->>>>>>> 07a11a26bb (GT.M V7.1-004)
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -47,13 +41,9 @@
 #include "gtm_malloc.h"		/* for VERIFY_STORAGE_CHAINS */
 #include "ydb_getenv.h"
 #include "send_msg.h"
-<<<<<<< HEAD
+#include "tpnotacid_chk_inline.h"
 #include "io.h"
 #include "iottdef.h"
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-=======
-#include "tpnotacid_chk_inline.h"
->>>>>>> 07a11a26bb (GT.M V7.1-004)
 
 /******************************************************************************
  *
@@ -153,7 +143,8 @@ error_def(ERR_XCRETNULLREF);
 error_def(ERR_EXTCALLBOUNDS);
 error_def(ERR_EXCEEDSPREALLOC);
 
-<<<<<<< HEAD
+#define EXCALLSTR "CALL OUT"
+
 /* Allocate a buffer to store list of external call parameters. Need to maintain one buffer for each call-in level possible
  * since it is possible for external calls to nest in which case the nested external call's buffer should not mess with
  * the parent external call's malloced buffer. Hence the CALLIN_MAX_LEVEL array definition below.
@@ -181,10 +172,6 @@ STATICDEF	unsigned int	op_fnfgncal_call_buff_len[CALLIN_MAX_LEVEL + 2];
 	}										\
 	PTR = op_fnfgncal_call_buff[callinLevel];					\
 }
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-=======
-#define EXCALLSTR "CALL OUT"
->>>>>>> 07a11a26bb (GT.M V7.1-004)
 
 STATICDEF int		call_table_initialized = 0;
 /* The following are one-letter mnemonics for Java argument types (capital letters to denote output direction):

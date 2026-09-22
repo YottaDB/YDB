@@ -3,7 +3,7 @@
  * Copyright (c) 2013-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -149,15 +149,7 @@ typedef struct relinkrec_struct
 					 * object file linked list (starting at rtnobj_shm_offset)
 					 */
 	gtm_uint64_t	objhash;	/* Hash of the object file last touched here */
-<<<<<<< HEAD
-	uint4		rtnobj_supersede;
-	CACHELINE_PAD_COND(92, 1);	/* Add 36 bytes (on top of 92 bytes) to make this structure 128 bytes to avoid cacheline
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-	uint4		rtnobj_supersede;
-	CACHELINE_PAD_COND(92, 1)	/* Add 36 bytes (on top of 92 bytes) to make this structure 128 bytes to avoid cacheline
-=======
-	CACHELINE_PAD_COND(88, 1)	/* Add 40 bytes (on top of 88 bytes) to make this structure 128 bytes to avoid cacheline
->>>>>>> 07a11a26bb (GT.M V7.1-004)
+	CACHELINE_PAD_COND(88, 1);	/* Add 40 bytes (on top of 88 bytes) to make this structure 128 bytes to avoid cacheline
 					 * interference (between successive relinkrec_t structures in shared memory) on the RS6000
 					 * (where the cacheline is 128 bytes currently). Other platforms have smaller
 					 * cachelines (i.e. 64 bytes or lesser) and so this structure (88 bytes currently)

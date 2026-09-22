@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2026 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -26,6 +29,7 @@
 #include "getzposition.h"
 #include "send_msg.h"
 #include "iotimer.h"
+#include "is_equ.h"		/* for "mv_force_nstimeout" below */
 #include "mvalconv.h"
 #include "min_max.h"
 #ifdef DEBUG
@@ -39,12 +43,14 @@
 #define TPTIMEOUT_MAX_TIME	60000	/* maximum (in milliseconds) for dollar_zmaxtptime */
 #define TPNOTACID_DEF_MAX_TRIES	16	/* default TPNOTACID tries */
 #define TPNOTACID_LIM_MAX_TRIES	100	/* limit on TPNOTACID tries */
-#define NOTPNOTACID		"NA"	/* for users of MV_FORCE_MSTIMEOUT to supress TPNOACID check, e.g. ztimeout_routines */
+#define NOTPNOTACID		"NA"	/* for users of MV_FORCE_NSTIMEOUT to supress TPNOACID check, e.g. ztimeout_routines */
 
 GBLREF	boolean_t	mupip_jnl_recover;
 GBLREF	tp_region	*tp_reg_list;
 GBLREF	unsigned int	t_tries;
 GBLREF	uint4		dollar_tlevel, dollar_trestart;
+
+LITREF	mval		literal_notimeout;
 
 error_def(ERR_TPNOTACID);
 
@@ -105,9 +111,14 @@ static inline void tpnotacid_check(char* caller_str)
 	if ((tries = TREF(tpnotacidtries)) && !dollar_trestart)			/* WARNING: assignment */
 		return;								/* 1st try gets a pass except under "audit" */
 	if (CDB_STAGNATE <= t_tries)
-	{	/* release held DB crit(s) first */
-		TP_REL_CRIT_ALL_REG;
+	{	/* Note: The TP_REL_CRIT_ALL_REG call needs to happen AFTER the TP_FINAL_RETRY_DECREMENT_T_TRIES_IF_OK
+		 * call as otherwise it is possible a SIGTERM/SIGINT/SIGQUIT signal gets handled as part of the
+		 * TP_REL_CRIT_ALL_REG call taking us to exit processing while "t_tries" is still set to "CDB_STAGNATE"
+		 * which would confuse other code as we are effectively in the final retry but not holding crit on a
+		 * region inside a TP transaction.
+		 */
 		TP_FINAL_RETRY_DECREMENT_T_TRIES_IF_OK;
+		TP_REL_CRIT_ALL_REG;
 	}
 	if ((CDB_STAGNATE <= dollar_trestart) || !tries)
 	{	/* syslog message treats 0 == tries like an "audit" request */
@@ -131,32 +142,43 @@ static inline void tpnotacid_check(char* caller_str)
 	}
 }
 
-#define MV_FORCE_MSTIMEOUT(TMV, TMS, NOTACID) mv_force_mstimeout(TMV, TMS, NOTACID)
+#define MV_FORCE_NSTIMEOUT(TMV, TNS, NOTACID) mv_force_nstimeout(TMV, TNS, NOTACID)
 
-static inline void mv_force_mstimeout(mval* tmv, int4* tms, char* notacid)
+/* YottaDB arms its timers in nanoseconds ("start_timer" takes a uint8 and ABS_TIME is a "struct timespec"),
+ * so this is the nanosecond counterpart of GT.M's "mv_force_mstimeout". Two differences follow from that:
+ *   1. NO_M_TIMEOUT is a 64-bit sentinel in YottaDB (sr_port/iotimer.h) and so does not fit in "tmv->m[1]".
+ *      The no-timeout test therefore compares against "literal_notimeout" rather than against "m[1]".
+ *   2. A positive timeout is capped at MAXUINT8 rather than MAXPOSINT4.
+ * TREF(tpnotacidtime) is a millisecond count in both trees, so it is scaled up for the comparison below.
+ */
+static inline void mv_force_nstimeout(mval *tmv, uint8 *tns, char *notacid)
 {
+	double		tmpdouble;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	MV_FORCE_NUM(tmv);
-	if (NO_M_TIMEOUT == tmv->m[1])
-		*tms = NO_M_TIMEOUT;
+	if (is_equ((mval *)&literal_notimeout, tmv))
+		*tns = NO_M_TIMEOUT;
 	else
 	{
 		assert(MV_BIAS == MILLISECS_IN_SEC);	/* if formats change scale may need attention */
-		/* negative becomes 0 larger than MAXPOSINT4 caps to MAXPOSINT4 */
 		if (tmv->mvtype & MV_INT)
-			*tms = tmv->m[1];
-		else
-		{
-			tmv->e += 3;		/* for non-ints, bump exponent to get millisecs from MV_FORCE_INT */
-			*tms = MIN(MAXPOSINT4, MV_FORCE_INT(tmv));
-			tmv->e -= 3;		/* we messed with the exponent, so restore it to its original value */
-		}
-		if (0 > *tms)
-			*tms = 0;
+		{	/* tmv is an integer. m[1] directly has the # of milliseconds we want.
+			 * If it is negative though, set timeout to 0.
+			 */
+			*tns = tmv->m[1] * (uint8)NANOSECS_IN_MSEC;
+			if (0 > *tns)
+				*tns = 0;
+		} else if (0 == tmv->sgn)	/* if sign is 0 it means tmv is positive */
+		{	/* Cap positive timeout at MAXUINT8 */
+			tmpdouble = mval2double(tmv) * (double)NANOSECS_IN_SEC;
+			*tns = ((double)MAXUINT8 >= tmpdouble) ? (uint8)tmpdouble : (uint8)MAXUINT8;
+		} else
+			*tns = 0;		/* sign is not zero, implies tmv is negative, set timeout to 0 */
 	}
-	if ((TREF(tpnotacidtime) < *tms) && (STRNCMP_LIT(notacid, "NA")))	/* no TPNOTACID for ZTIMEOUT */
+	/* no TPNOTACID for ZTIMEOUT */
+	if (((TREF(tpnotacidtime) * (uint8)NANOSECS_IN_MSEC) < *tns) && (STRNCMP_LIT(notacid, NOTPNOTACID)))
 		TPNOTACID_CHECK(notacid);
 }
 #endif /* TPNOTACID_CHK_INLINE_INCLUDED */

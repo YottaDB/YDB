@@ -84,18 +84,6 @@ GBLREF	is_anticipatory_freeze_needed_t		is_anticipatory_freeze_needed_fnptr;
 GBLREF	set_anticipatory_freeze_t		set_anticipatory_freeze_fnptr;
 GBLREF	err_ctl					merrors_ctl;
 GBLREF	jnl_gbls_t				jgbl;
-<<<<<<< HEAD
-GBLREF	char					repl_instfilename[];
-GBLREF	char					repl_inst_name[];
-GBLREF	gd_addr					*repl_inst_from_gld;
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-GBLREF	gd_addr					*gd_header;
-GBLREF	char					repl_instfilename[];
-GBLREF	char					repl_inst_name[];
-GBLREF	gd_addr					*repl_inst_from_gld;
-=======
-GBLREF	gd_addr					*gd_header;
->>>>>>> 07a11a26bb (GT.M V7.1-004)
 GBLREF  boolean_t				in_repl_inst_edit;
 
 #ifdef DEBUG
@@ -1342,34 +1330,8 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 	}
 	if (!hold_onto_ftok_sem && !ftok_sem_release(jnlpool->jnlpool_dummy_reg, FALSE, FALSE))
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_JNLPOOLSETUP);
-<<<<<<< HEAD
 	assert(NULL != jnlpool);
 	assert(NULL != jnlpool->jnlpool_ctl);
-	if (('\0' == repl_inst_name[0]) && ('\0' != repl_instfilename[0]))
-	{	/* fill in instance name if right instance file name and first */
-		if (0 == STRCMP(repl_instfilename, instfilename))
-			memcpy(repl_inst_name, repl_instance.inst_info.this_instname, MAX_INSTNAME_LEN);
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-	/* Set up pool_init if jnlpool is still attached (e.g. we could have detached if GTMRELAXED and upd_disabled) */
-	if ((NULL != jnlpool) && (NULL != jnlpool->jnlpool_ctl))
-	{
-		if (('\0' == repl_inst_name[0]) && ('\0' != repl_instfilename[0]))
-		{	/* fill in instance name if right instance file name and first */
-			if (0 == STRCMP(repl_instfilename, instfilename))
-				memcpy(repl_inst_name, repl_instance.inst_info.this_instname, MAX_INSTNAME_LEN);
-		}
-		jnlpool->pool_init = TRUE;
-		pool_init++;
-		ENABLE_FREEZE_ON_ERROR;
-=======
-	/* Set up pool_init if jnlpool is still attached (e.g. we could have detached if GTMRELAXED and upd_disabled) */
-	if ((NULL != jnlpool) && (NULL != jnlpool->jnlpool_ctl))
-	{
-		jnlpool->pool_init = TRUE;
-		pool_init++;
-		ENABLE_FREEZE_ON_ERROR;
->>>>>>> 07a11a26bb (GT.M V7.1-004)
-	}
 	jnlpool->pool_init = TRUE;
 	pool_init++;
 	ENABLE_FREEZE_ON_ERROR;

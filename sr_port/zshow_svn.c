@@ -1,15 +1,9 @@
 /****************************************************************
  *								*
-<<<<<<< HEAD
- * Copyright (c) 2001-2022 Fidelity National Information	*
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
- * Copyright (c) 2001-2023 Fidelity National Information	*
-=======
  * Copyright (c) 2001-2024 Fidelity National Information	*
->>>>>>> 07a11a26bb (GT.M V7.1-004)
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -181,27 +175,13 @@ GBLREF mval			*dollar_ztdata, *dollar_ztdelim, *dollar_ztoldval, *dollar_ztrigge
 GBLREF mval			*dollar_ztupdate, *dollar_ztvalue, dollar_ztwormhole;
 #endif
 
-<<<<<<< HEAD
-LITREF mval		literal_zero, literal_one, literal_null, literal_sqlnull;
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-LITREF mval		literal_zero, literal_one, literal_null;
-=======
->>>>>>> 07a11a26bb (GT.M V7.1-004)
 LITREF char		gtm_release_name[];
 LITREF int4		gtm_release_name_len;
-<<<<<<< HEAD
 LITREF char		ydb_release_stamp[];
 LITREF int4		ydb_release_stamp_len;
 LITREF char		ydb_release_name[];
 LITREF int4		ydb_release_name_len;
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-LITREF char		gtm_release_stamp[];
-LITREF int4		gtm_release_stamp_len;
-=======
-LITREF char		gtm_release_stamp[];
-LITREF int4		gtm_release_stamp_len;
-LITREF mval		literal_mv_bias, literal_null, literal_zero, literal_one;
->>>>>>> 07a11a26bb (GT.M V7.1-004)
+LITREF mval		literal_mv_bias, literal_null, literal_zero, literal_one, literal_sqlnull;
 
 #define ZWRITE_DOLLAR_PRINCIPAL(MVAL, X, TEXT, OUTPUT)					\
 {											\

@@ -1,16 +1,10 @@
 /****************************************************************
  *								*
-<<<<<<< HEAD
- * Copyright 2001 Sanchez Computer Associates, Inc.		*
- *								*
- * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
- * All rights reserved.						*
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
-=======
  * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
->>>>>>> 07a11a26bb (GT.M V7.1-004)
+ *								*
+ * Copyright (c) 2019-2026 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -41,9 +35,4 @@ void change_fhead_timer_ns(char *timer_name, uint8 *timer_address, uint8 default
 	bool zero_is_ok);
 void change_fhead_timer_ms(char *timer_name, sm_int_ptr_t timer_address, int default_time,
 	bool zero_is_ok);
-<<<<<<< HEAD
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-
-=======
 #endif
->>>>>>> 07a11a26bb (GT.M V7.1-004)

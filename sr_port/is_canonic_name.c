@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2024 Fidelity National Information	*
+ * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
@@ -75,18 +75,6 @@ boolean_t is_canonic_name(mval *src, int *subscripts, int *start_off, int *stop_
 			*start_off = start[contains_env + seq];
 			*stop_off = stop[contains_env + seq];
 		}
-<<<<<<< HEAD
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-		if ('"' == src->str.addr[*start_off])
-			*start_off++;
-		if ((0 < *stop_off) && ('"' == src->str.addr[*stop_off - 1]))
-			*stop_off--;
-=======
-		if ('"' == src->str.addr[*start_off])
-			start_off++;
-		if ((0 < *stop_off) && ('"' == src->str.addr[*stop_off - 1]))
-			stop_off--;
->>>>>>> 07a11a26bb (GT.M V7.1-004)
 		return TRUE;
 	}
 	return FALSE;

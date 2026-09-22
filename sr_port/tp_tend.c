@@ -284,14 +284,8 @@ boolean_t	tp_tend()
 	sgm_info		*last_upd_tp_si_by_ftok = NULL, *last_p2_tp_si_by_ftok = NULL;
 	cw_set_element		*last_p1_cse = NULL, *last_p2_cse = NULL, *sgm_last_p1_cse = NULL, *sgm_last_p2_cse = NULL,
 				*dbg_cse = NULL;
-<<<<<<< HEAD
-	sgmnt_addrs		*last_6a_csa = NULL, *last_jnld_csa;
-	boolean_t		frozen_hard;	/* used only by asserts, see DBG_SET_FROZEN_HARD_CONFIRMED */
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-	sgmnt_addrs		*last_6a_csa = NULL, *last_jnld_csa;
-=======
 	sgmnt_addrs		*last_6a_csa = NULL, *last_jnld_csa = NULL;
->>>>>>> 07a11a26bb (GT.M V7.1-004)
+	boolean_t		frozen_hard;	/* used only by asserts, see DBG_SET_FROZEN_HARD_CONFIRMED */
 #	endif
 	int4			tprestart_syslog_delta;
 	block_id		pvt_total_blks;

@@ -753,15 +753,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 			real_xfer_reset(outofband);
 			TAREF1(save_xfer_root, outofband).event_state = not_in_play;	/* sighup & ctrap both headed to trap */
 		}
-<<<<<<< HEAD
-		outofband = no_event;
 		if (!trans_action && !dm_action && !(frame_pointer->type & SFT_DM))
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-		outofband = no_event;
-		if (!trans_action && !(frame_pointer->type & SFT_DM))
-=======
-		if (!trans_action && !(frame_pointer->type & SFT_DM))
->>>>>>> 07a11a26bb (GT.M V7.1-004)
 		{
 			if (!repeat_error)
 			{

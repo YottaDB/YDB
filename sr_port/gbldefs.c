@@ -905,14 +905,7 @@ GBLDEF	mval		*alias_retarg;			/* Points to an alias return arg created by a "QUI
 #ifdef DEBUG_ALIAS
 GBLDEF	boolean_t	lvamon_enabled;			/* Enable lv_val/alias monitoring */
 #endif
-<<<<<<< HEAD
 GBLDEF	int4		ydb_zlib_cmp_level;		/* zlib compression level specified at process startup */
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-GBLDEF	block_id	gtm_tp_allocation_clue;		/* block# hint to start allocation for created blocks in TP */
-GBLDEF	int4		gtm_zlib_cmp_level;		/* zlib compression level specified at process startup */
-=======
-GBLDEF	int4		gtm_zlib_cmp_level;		/* zlib compression level specified at process startup */
->>>>>>> 07a11a26bb (GT.M V7.1-004)
 GBLDEF	int4		repl_zlib_cmp_level;		/* zlib compression level currently in use in replication pipe.
 							 * This is a source-server specific variable and is non-zero only
 							 * if compression is enabled and works in the receiver server as well.

@@ -3,7 +3,7 @@
  * Copyright (c) 2018-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2023-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2023-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -168,13 +168,7 @@ void check_and_set_ztimeout(mval *inp_val)
 			ztimeout_seconds.mvtype = MV_STR;
 			(TREF(dollar_ztimeout)).ztimeout_seconds = ztimeout_seconds;
 			zt_sec_ptr = &ztimeout_seconds;				/* compile of below macro requires explicit ptr */
-<<<<<<< HEAD
-			MV_FORCE_NSTIMEOUT(zt_sec_ptr, nsec_timeout, ZTIMEOUTSTR);
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-			MV_FORCE_MSTIMEOUT(zt_sec_ptr, msec_timeout, ZTIMEOUTSTR);
-=======
-			MV_FORCE_MSTIMEOUT(zt_sec_ptr, &msec_timeout, NOTPNOTACID);
->>>>>>> 07a11a26bb (GT.M V7.1-004)
+			MV_FORCE_NSTIMEOUT(zt_sec_ptr, &nsec_timeout, NOTPNOTACID);
 			assert(INTRPT_IN_EVENT_HANDLING != intrpt_ok_state);
 			DEFER_INTERRUPTS(INTRPT_IN_EVENT_HANDLING, prev_intrpt_state);
 			ztimeout_clear_timer();

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -23,22 +23,8 @@
 #include "iott_setterm.h"
 #include "tpnotacid_chk_inline.h"
 #include "op.h"
-<<<<<<< HEAD
-#include "change_reg.h"
-#include "getzposition.h"
-#ifdef DEBUG
-#include "have_crit.h"		/* for the TPNOTACID_CHECK macro */
-#endif
 #include "iottdef.h"
 #include "ydb_getenv.h"
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-#include "change_reg.h"
-#include "getzposition.h"
-#ifdef DEBUG
-#include "have_crit.h"		/* for the TPNOTACID_CHECK macro */
-#endif
-=======
->>>>>>> 07a11a26bb (GT.M V7.1-004)
 #include "gtmxc_types.h"
 #include "gtm_filter_command.h"
 #include "restrict.h"

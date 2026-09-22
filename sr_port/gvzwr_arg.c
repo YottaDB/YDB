@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2022-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -30,15 +30,9 @@ void gvzwr_arg(int t, mval *a1, mval *a2)
 	int i;
 
 	i = gvzwrite_block->subsc_count++;
-<<<<<<< HEAD
 	/* Check if we are going to overflow allocation. See corresponding malloc in gvzwr_init.c (size = MAX_GVSUBSCRIPTS + 1) */
 	if (MAX_GVSUBSCRIPTS < i)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXNRSUBSCRIPTS);
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-	/* it would be good to guard the array i < sizeof... */
-=======
-	assert(MAX_GVSUBSCRIPTS >= i);	/* guard the array */
->>>>>>> 07a11a26bb (GT.M V7.1-004)
 	if (a1)
 	{
 		MV_FORCE_DEFINED(a1);

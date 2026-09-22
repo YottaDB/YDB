@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -48,14 +48,10 @@
 #ifdef __MVS__
 #include "gtm_zos_io.h"
 #endif
-<<<<<<< HEAD
 #include "gtm_rename.h"
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-=======
 #ifdef DEBUG
 #include "util.h"
 #endif
->>>>>>> 07a11a26bb (GT.M V7.1-004)
 
 GBLDEF repl_ctl_element		*repl_ctl_list = NULL;
 GBLDEF repl_rctl_elem_t		*repl_rctl_list = NULL;

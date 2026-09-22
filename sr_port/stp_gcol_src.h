@@ -557,16 +557,8 @@ void stp_gcol_sort(size_t space_asked)	/* BYPASSOK */
 	unsigned char		*begaddr, *endaddr, *cpyaddr;
 #	endif
 	int			index, fixup_cnt;
-<<<<<<< HEAD
 	ssize_t			space_before_compact, space_after_compact, blklen, delta, space_reclaim, cpylen;
-	ssize_t			space_needed, tmplen, tmplen2;
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-	ssize_t			space_before_compact, space_after_compact, blklen, delta, space_reclaim, padlen;
-	ssize_t			totspace, space_needed, tmplen, tmplen2;
-=======
-	ssize_t			space_before_compact, space_after_compact, blklen, delta, space_reclaim, padlen;
-	ssize_t			prev_stp_size = 0, reserved_bytes, space_needed, tmplen, tmplen2, totspace;
->>>>>>> 07a11a26bb (GT.M V7.1-004)
+	ssize_t			prev_stp_size = 0, reserved_bytes, space_needed, tmplen, tmplen2;
 	io_log_name		*l;		/* logical name pointer		*/
 	lv_blk			*lv_blk_ptr;
 	lv_val			*lvp, *lvlimit;
@@ -675,23 +667,13 @@ void stp_gcol_sort(size_t space_asked)	/* BYPASSOK */
 		incr_factor = &indr_stp_incr_factor;
 	}
 	if (NULL == stp_array)
-<<<<<<< HEAD
-		stp_array = (mstr **)malloc((stp_array_size = STP_MAXITEMS) * SIZEOF(mstr *));
-	sp_topstr = sp_array = stp_array;
-	sp_arraytop = sp_topstr + stp_array_size;
-	sp_totspace = 0;
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-		stp_array = (mstr **)malloc((stp_array_size = STP_MAXITEMS) * SIZEOF(mstr *));
-	topstr = array = stp_array;
-	arraytop = topstr + stp_array_size;
-=======
 	{
 		stp_array_size = STP_MAXITEMS;
 		stp_array = (mstr **)stp_mmap(stp_array_size * SIZEOF(mstr *));
 	}
-	topstr = array = stp_array;
-	arraytop = topstr + stp_array_size;
->>>>>>> 07a11a26bb (GT.M V7.1-004)
+	sp_topstr = sp_array = stp_array;
+	sp_arraytop = sp_topstr + stp_array_size;
+	sp_totspace = 0;
 	/* If dqloop == 0 then we got here from mcompile. If literal_chain.que.fl == 0 then put_lit was never
 	 * done as is true in gtcm_server. Test for cache_table.size is to check that we have not done a
 	 * cache_init() which would be true if doing mumps standalone compile.
@@ -1279,16 +1261,10 @@ void stp_gcol_sort(size_t space_asked)	/* BYPASSOK */
 	assert(stringpool.free <= stringpool.top);
 	stringpool.invokestpgcollevel = (STP_SPACE_USED_MULTIPLIER * (space_asked + stringpool.free - stringpool.base))
 		+ stringpool.base;
-<<<<<<< HEAD
 	if ((stringpool.invokestpgcollevel - stringpool.free) < (space_asked + lvnode_space))
 		stringpool.invokestpgcollevel = stringpool.free + space_asked + lvnode_space;
-	stringpool.invokestpgcollevel = (((stringpool.invokestpgcollevel - stringpool.base) < STP_GCOL_TRIGGER_FLOOR)
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-	stringpool.invokestpgcollevel = (((stringpool.invokestpgcollevel - stringpool.base) < STP_GCOL_TRIGGER_FLOOR)
-=======
 	reserved_bytes = (ssize_t)(stringpool.top - stringpool.invokestpgcollevel);
 	if (((stringpool.invokestpgcollevel - stringpool.base) < STP_GCOL_TRIGGER_FLOOR)
->>>>>>> 07a11a26bb (GT.M V7.1-004)
 		|| (stringpool.invokestpgcollevel > stringpool.top))
 	{
 		stringpool.invokestpgcollevel = stringpool.top;

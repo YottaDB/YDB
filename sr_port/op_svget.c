@@ -99,7 +99,6 @@ error_def(ERR_INVSVN);
 error_def(ERR_UNIMPLOP);
 error_def(ERR_ZDIROUTOFSYNC);
 
-<<<<<<< HEAD
 LITREF mval		literal_zero, literal_one, literal_null, literal_sqlnull;
 LITREF char		gtm_release_name[];
 LITREF int4		gtm_release_name_len;
@@ -107,17 +106,6 @@ LITREF char		ydb_release_stamp[];
 LITREF int4		ydb_release_stamp_len;
 LITREF char		ydb_release_name[];
 LITREF int4		ydb_release_name_len;
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-LITREF mval		literal_zero, literal_one, literal_null;
-LITREF char		gtm_release_name[];
-LITREF int4		gtm_release_name_len;
-LITREF char		gtm_release_stamp[];
-LITREF int4		gtm_release_stamp_len;
-=======
-LITREF char	gtm_release_name[], gtm_release_stamp[];
-LITREF int4	gtm_release_name_len, gtm_release_stamp_len;
-LITREF mval	literal_null, literal_one, literal_zero;
->>>>>>> 07a11a26bb (GT.M V7.1-004)
 
 void op_svget(int varnum, mval *v)
 {

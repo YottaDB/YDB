@@ -16,16 +16,10 @@
 #include "mdef.h"
 
 #include <errno.h>
-<<<<<<< HEAD
 
 #include "gtm_stdio.h"
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-#include "gtm_stdlib.h"
-
-=======
 #include "gtm_stdlib.h"
 #include "gtm_fcntl.h"	/* Needed for AIX's silly open to open64 translations */
->>>>>>> 07a11a26bb (GT.M V7.1-004)
 #include "gdsroot.h"
 #include "gdskill.h"
 #include "gdsbt.h"
@@ -118,20 +112,14 @@ void	op_dmode(void)
 	TPNOTACID_CHECK(DIRECTMODESTR);
 	if (io_curr_device.in->type == tt)
 	{
-<<<<<<< HEAD
 		/* Read input from user, using readline or old direct mode */
 		readline_check_and_loadlib(); /* sets readline_file on the first call if readline is requested */
 		if (NULL != readline_file) {
 			readline_read_mval(input_line);
 		} else {
-			dm_read(input_line);
+			input_line = dm_read(input_line);
 			op_wteol(1);
 		}
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-		dm_read(input_line);
-=======
-		input_line = dm_read(input_line);
->>>>>>> 07a11a26bb (GT.M V7.1-004)
 		/* If direct mode auditing is enabled, this attempts to send the command to logger */
 		if ((AUDIT_ENABLE_DMODE & RESTRICTED(dm_audit_enable)) && !dm_audit_log(input_line, AUDIT_SRC_DMREAD))
 		{

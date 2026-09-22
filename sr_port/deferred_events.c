@@ -307,12 +307,7 @@ boolean_t real_xfer_reset(int4 event_type)
  */
 void async_action(bool lnfetch_or_start)
 {
-<<<<<<< HEAD
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-	boolean_t	ours;
-=======
-	boolean_t	ours, save_async_dm_read;
->>>>>>> 07a11a26bb (GT.M V7.1-004)
+	boolean_t	save_async_dm_read;
 	intrpt_state_t	prev_intrpt_state;
 	DCL_THREADGBL_ACCESS;
 
@@ -352,18 +347,8 @@ void async_action(bool lnfetch_or_start)
 		case jobinterrupt:
 			dollar_zininterrupt = TRUE;	/* do this at every point to minimize nesting; WARNING: fallthrough*/
 		case ctrlc:							/* these go from pending to active here */
-<<<<<<< HEAD
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-			TAREF1(save_xfer_root, outofband).event_state = active;
-			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_CTRLC);
-			break;
-=======
-			TAREF1(save_xfer_root, outofband).event_state = active;
 			if (save_async_dm_read && (MVST_MVAL == mv_chain->mv_st_type))
 				POP_MV_STENT();		/* In Direct Mode, so pop mval from top of stack to avoid memory leak */
-			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_CTRLC);
-			break;
->>>>>>> 07a11a26bb (GT.M V7.1-004)
 		case ctrap:
 		case defer_error:
 			TAREF1(save_xfer_root, outofband).event_state = active;			/*WARNING: fallthrough */

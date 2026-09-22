@@ -120,14 +120,8 @@ MBSTART {									\
 	PERROR(errbuff);							\
 } MBEND
 
-<<<<<<< HEAD
 #define	OUT_LINE	(512 + 1)
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-#define	OUT_LINE	512 + 1
-=======
-#define	OUT_LINE	512 + 1
 #define	USUAL_UMASK	022
->>>>>>> 07a11a26bb (GT.M V7.1-004)
 
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	jnlpool_addrs_ptr_t	jnlpool;

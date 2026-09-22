@@ -739,16 +739,10 @@ void	util_out_send_oper(char *addr, unsigned int len)
 		{	/* Read instace file name from jnlpool */
 			INSERT_MARKER;
 			BUILD_FACILITY((char *)jnlpool->repl_inst_filehdr->inst_info.this_instname);
-<<<<<<< HEAD
-		} else if (!process_exiting)
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-		} else
-=======
 			assert((!IS_GTM_IMAGE) || ('\0' == repl_inst_name[0]));
 			memcpy(repl_inst_name, jnlpool->repl_inst_filehdr->inst_info.this_instname, MAX_INSTNAME_LEN);
 			repl_inst_from_gld = (jnlpool->gd_instinfo) ? jnlpool->gd_ptr : NULL;	/* for gtmpcat */
-		} else
->>>>>>> 07a11a26bb (GT.M V7.1-004)
+		} else if (!process_exiting)
 		{	/* Read instance name from instance file */
 			fn_len = &file_name_len;
 			bufsize = MAX_FN_LEN + 1;

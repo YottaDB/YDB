@@ -34,15 +34,9 @@
 			 * level to invoke the garbage collector (so if you have a large string pool but later only use a small
 			 * part, it will be concentrated at the bottom of the stringpool (so the OS can swap the rest out).
 			 */
-<<<<<<< HEAD
 #define STP_GCOL_TRIGGER_FLOOR 150000 /* Don't set the target level to call the garbage collector below this value. */
+#define STP_MIN_CONTRACTION (1024 * 1024) /* Don't contract (mmap/munmap) the stringpool below this value (1MiB) */
 #define STP_FREE_PER_LVNODE 16 /* After a garbage collection of the runtime stringpool, which walks every local variable node, keep at
 			 * least this many bytes free (growing the stringpool if needed) for every node walked, and do not trigger
 			 * the next collection before that many more bytes of it have been used.
 			 */
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-#define STP_GCOL_TRIGGER_FLOOR 100000 /* Don't set the target level to call the garbage collector below this value. */
-=======
-#define STP_GCOL_TRIGGER_FLOOR 100000 /* Don't set the target level to call the garbage collector below this value. */
-#define STP_MIN_CONTRACTION (1024 * 1024) /* Don't contract (mmap/munmap) the stringpool below this value (1MiB) */
->>>>>>> 07a11a26bb (GT.M V7.1-004)

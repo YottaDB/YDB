@@ -23,6 +23,10 @@
 #ifdef __linux__
 #	define LINUX_ONLY(X) X
 #	define NON_LINUX_ONLY(X)
+#	if !defined(__MUSL)
+#	  /* TODO: Verify Alpine/MUSL can't use POSIX timers ##ALPINE_TODO## */
+#	  define YDB_USE_POSIX_TIMERS
+#	endif
 #else
 #	define LINUX_ONLY(X)
 #	define NON_LINUX_ONLY(X) X
@@ -40,11 +44,21 @@
 #	define Linux390_ONLY(X)
 #endif
 
-#if !defined(__alpha) && !defined(__sparc) && !defined(__hpux) && !defined(mips) && !defined(__ia64)
-#	define UNALIGNED_ACCESS_SUPPORTED
+/* This macro always being true works for its current use in copy.h on AARCH64, ARMV6l, ARMV7l and x86_64 which are all of the platforms
+ * that YottaDB currently supports.
+ */
+#define UNALIGNED_ACCESS_SUPPORTED
+
+/* On 32 bit ARM (ARMV6l and ARMV7l), unaligned access is supported for some assembly operations but not for others. In the rare circumstances where
+ * a string passed to an MMRHASH function is not 4 byte aligned, that function can cause a SIG-11. This does not appear to be the case for AARCH64
+ * (64 bit ARM).
+ */
+#if !defined(__armv6l__) && !defined(__armv7l__)
+#	define UNALIGNED_ACCESS_FULLY_SUPPORTED
 #endif
 
-#if defined(__i386) || defined(__x86_64__) || defined(_AIX) || defined (__sun)
+#if defined(__i386) || defined(__x86_64__) || defined(_AIX) || defined (__sun)							\
+		|| defined(__armv6l__) || defined(__armv7l__) || defined(__aarch64__)
 #	define GTM_PTHREAD
 #	define GTM_PTHREAD_ONLY(X) X
 #	define NON_GTM_PTHREAD_ONLY(X)
@@ -75,12 +89,37 @@
 #define NON_X86_64_ONLY(x)    x
 #endif /* __x86_64__ */
 
+#if defined(__armv6l__) || defined(__armv7l__) || defined(__aarch64__)
+#define ARM_ONLY(x)			x
+#define NON_ARM_ONLY(x)
+#else
+#define ARM_ONLY(x)
+#define NON_ARM_ONLY(x)    		x
+#endif /* __armv6l__ || __armv7l__ || __aarch64__ */
+
+#if defined(__x86_64__) || defined(__armv6l__) || defined(__armv7l__) || defined(__aarch64__)
+#define	X86_64_OR_ARM_ONLY(x)		x
+#define	NON_X86_64_OR_ARM_ONLY(x)
+#else
+#define	X86_64_OR_ARM_ONLY(x)
+#define	NON_X86_64_OR_ARM_ONLY(x)	x
+#endif
+
 #if defined(__i386) || defined(__x86_64__) || defined(__ia64) || defined(__MVS__) || defined(Linux390)
-#define NON_RISC_ONLY(x)	x
-#define RISC_ONLY(x)
-#elif defined(__sparc) || defined(_AIX) || defined(__alpha)
-#define RISC_ONLY(x)	x
-#define NON_RISC_ONLY(x)
+#    define NON_RISC_ONLY(x)		x
+#    define RISC_ONLY(x)
+#    define AARCH64_RISC_ONLY(x)
+#    define NON_AARCH64_RISC_ONLY(x)
+#elif defined(__sparc) || defined(_AIX) || defined(__alpha) || defined(__armv6l__) || defined(__armv7l__) || defined(__aarch64__)
+#    define RISC_ONLY(x)		x
+#    define NON_RISC_ONLY(x)
+#    if defined(__aarch64__)
+#	define AARCH64_RISC_ONLY(x)	x
+#	define NON_AARCH64_RISC_ONLY(x)
+#    else
+#	define AARCH64_RISC_ONLY(x)
+#	define NON_AARCH64_RISC_ONLY(x)	x
+#    endif
 #endif
 
 #ifdef _AIX
@@ -306,120 +345,6 @@ typedef UINTPTR_T uintszofptr_t;
 #	define CYGWIN_ONLY(X)
 #endif
 
-<<<<<<< HEAD
-#ifdef __linux__
-#	define LINUX_ONLY(X) X
-#	define NON_LINUX_ONLY(X)
-#	if !defined(__MUSL)
-#	  /* TODO: Verify Alpine/MUSL can't use POSIX timers ##ALPINE_TODO## */
-#	  define YDB_USE_POSIX_TIMERS
-#	endif
-#else
-#	define LINUX_ONLY(X)
-#	define NON_LINUX_ONLY(X) X
-#endif
-
-#ifdef __MVS__
-#	define ZOS_ONLY(X) X
-#else
-#	define ZOS_ONLY(X)
-#endif
-
-#ifdef Linux390
-#	define Linux390_ONLY(X) X
-#else
-#	define Linux390_ONLY(X)
-#endif
-
-/* This macro always being true works for its current use in copy.h on AARCH64, ARMV6l, ARMV7l and x86_64 which are all of the platforms
- * that YottaDB currently supports.
- */
-#define UNALIGNED_ACCESS_SUPPORTED
-
-
-/* On 32 bit ARM (ARMV6l and ARMV7l), unaligned access is supported for some assembly operations but not for others. In the rare circumstances where
- * a string passed to an MMRHASH function is not 4 byte aligned, that function can cause a SIG-11. This does not appear to be the case for AARCH64
- * (64 bit ARM).
- */
-#if !defined(__armv6l__) && !defined(__armv7l__)
-#	define UNALIGNED_ACCESS_FULLY_SUPPORTED
-#endif
-
-
-#if defined(__i386) || defined(__x86_64__) || defined(_AIX) || defined (__sun)							\
-		|| defined(__armv6l__) || defined(__armv7l__) || defined(__aarch64__)
-#	define GTM_PTHREAD
-#	define GTM_PTHREAD_ONLY(X) X
-#	define NON_GTM_PTHREAD_ONLY(X)
-#else
-#	define GTM_PTHREAD_ONLY(X)
-#	define NON_GTM_PTHREAD_ONLY(X)	X
-#endif
-
-#if defined(__ia64)
-#	define IA64_ONLY(X)	X
-#	define NON_IA64_ONLY(X)
-#  ifdef DEBUG
-#	define	IA64_DEBUG_ONLY(X)	X
-#  else
-#	define	IA64_DEBUG_ONLY(X)
-#  endif /* DEBUG */
-#else
-#	define	IA64_ONLY(X)
-#	define	NON_IA64_ONLY(X)	X
-#	define	IA64_DEBUG_ONLY(X)
-#endif/* __ia64 */
-
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-#ifdef __linux__
-#	define LINUX_ONLY(X) X
-#	define NON_LINUX_ONLY(X)
-#else
-#	define LINUX_ONLY(X)
-#	define NON_LINUX_ONLY(X) X
-#endif
-
-#ifdef __MVS__
-#	define ZOS_ONLY(X) X
-#else
-#	define ZOS_ONLY(X)
-#endif
-
-#ifdef Linux390
-#	define Linux390_ONLY(X) X
-#else
-#	define Linux390_ONLY(X)
-#endif
-
-#if !defined(__alpha) && !defined(__sparc) && !defined(__hpux) && !defined(mips) && !defined(__ia64)
-#	define UNALIGNED_ACCESS_SUPPORTED
-#endif
-
-#if defined(__i386) || defined(__x86_64__) || defined(_AIX) || defined (__sun)
-#	define GTM_PTHREAD
-#	define GTM_PTHREAD_ONLY(X) X
-#	define NON_GTM_PTHREAD_ONLY(X)
-#else
-#	define GTM_PTHREAD_ONLY(X)
-#	define NON_GTM_PTHREAD_ONLY(X)	X
-#endif
-
-#if defined(__ia64)
-#	define IA64_ONLY(X)	X
-#	define NON_IA64_ONLY(X)
-#  ifdef DEBUG
-#	define	IA64_DEBUG_ONLY(X)	X
-#  else
-#	define	IA64_DEBUG_ONLY(X)
-#  endif /* DEBUG */
-#else
-#	define	IA64_ONLY(X)
-#	define	NON_IA64_ONLY(X)	X
-#	define	IA64_DEBUG_ONLY(X)
-#endif/* __ia64 */
-
-=======
->>>>>>> 07a11a26bb (GT.M V7.1-004)
 /* macro to check that the OFFSET & SIZE of TYPE1.MEMBER1 is identical to that of TYPE2.MEMBER2 */
 #define	IS_OFFSET_AND_SIZE_MATCH(TYPE1, MEMBER1, TYPE2, MEMBER2)		\
 	(SIZEOF(((TYPE1 *)NULL)->MEMBER1) == SIZEOF(((TYPE2 *)NULL)->MEMBER2))	\
@@ -427,94 +352,6 @@ typedef UINTPTR_T uintszofptr_t;
 
 #define	IS_OFFSET_MATCH(TYPE1, MEMBER1, TYPE2, MEMBER2)	(OFFSETOF(TYPE1, MEMBER1) == OFFSETOF(TYPE2, MEMBER2))
 
-<<<<<<< HEAD
-#ifdef __x86_64__
-#define X86_64_ONLY(x)			x
-#define NON_X86_64_ONLY(x)
-#else
-#define X86_64_ONLY(x)
-#define NON_X86_64_ONLY(x)    		x
-#endif /* __x86_64__ */
-
-#if defined(__armv6l__) || defined(__armv7l__) || defined(__aarch64__)
-#define ARM_ONLY(x)			x
-#define NON_ARM_ONLY(x)
-#else
-#define ARM_ONLY(x)
-#define NON_ARM_ONLY(x)    		x
-#endif /* __armv6l__ || __armv7l__ || __aarch64__ */
-
-#if defined(__x86_64__) || defined(__armv6l__) || defined(__armv7l__) || defined(__aarch64__)
-#define	X86_64_OR_ARM_ONLY(x)		x
-#define	NON_X86_64_OR_ARM_ONLY(x)
-#else
-#define	X86_64_OR_ARM_ONLY(x)
-#define	NON_X86_64_OR_ARM_ONLY(x)	x
-#endif
-
-#if defined(__i386) || defined(__x86_64__) || defined(__ia64) || defined(__MVS__) || defined(Linux390)
-#    define NON_RISC_ONLY(x)		x
-#    define RISC_ONLY(x)
-#    define AARCH64_RISC_ONLY(x)
-#    define NON_AARCH64_RISC_ONLY(x)
-#elif defined(__sparc) || defined(_AIX) || defined(__alpha) || defined(__armv6l__) || defined(__armv7l__) || defined(__aarch64__)
-#    define RISC_ONLY(x)		x
-#    define NON_RISC_ONLY(x)
-#    if defined(__aarch64__)
-#	define AARCH64_RISC_ONLY(x)	x
-#	define NON_AARCH64_RISC_ONLY(x)
-#    else
-#	define AARCH64_RISC_ONLY(x)
-#	define NON_AARCH64_RISC_ONLY(x)	x
-#    endif
-#endif
-
-#ifdef _AIX
-#       define  AIX_ONLY(X) X
-#else
-#       define  AIX_ONLY(X)
-#endif
-
-#ifdef __sparc
-#	define  SPARC_ONLY(X) X
-#else
-#define SPARC_ONLY(X)
-#endif
-#define BITS_PER_UCHAR	8 /* note, C does not require this to be 8, see <limits.h> for definitions of CHAR_BIT and UCHAR_MAX */
-
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-#ifdef __x86_64__
-#define X86_64_ONLY(x)		x
-#define NON_X86_64_ONLY(x)
-#else
-#define X86_64_ONLY(x)
-#define NON_X86_64_ONLY(x)    x
-#endif /* __x86_64__ */
-
-#if defined(__i386) || defined(__x86_64__) || defined(__ia64) || defined(__MVS__) || defined(Linux390)
-#define NON_RISC_ONLY(x)	x
-#define RISC_ONLY(x)
-#elif defined(__sparc) || defined(_AIX) || defined(__alpha)
-#define RISC_ONLY(x)	x
-#define NON_RISC_ONLY(x)
-#endif
-
-
-#ifdef _AIX
-#       define  AIX_ONLY(X) X
-#else
-#       define  AIX_ONLY(X)
-#endif
-
-#ifdef __sparc
-#	define  SPARC_ONLY(X) X
-#else
-#define SPARC_ONLY(X)
-#endif
-#define BITS_PER_UCHAR	8 /* note, C does not require this to be 8, see <limits.h> for definitions of CHAR_BIT and UCHAR_MAX */
-
-=======
->>>>>>> 07a11a26bb (GT.M V7.1-004)
 #define MAXPOSINT4		((int4)0x7fffffff)
 #define MINNEGINT4		((int4)0x80000000)
 
@@ -776,8 +613,6 @@ mval *underr_overwrite(mval *start, ...);
 /* Note MV_FORCE_CANONICAL currently only used in op_add() when vars are known to be defined so no MV_FORCE_DEFINED()
    macro has been added. If uses are added, this needs to be revisited. 01/2008 se
 */
-<<<<<<< HEAD
-#define ZTIMEOUTSTR "ZTIMEOUT"
 #define INVOKE_RESTART	rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_TPRETRY);
 
 #define	FNPC_INDX_INVALID	0xff	/* Initial value of `fnpc_indx` field of mval to indicate it is not usable.
@@ -787,34 +622,6 @@ mval *underr_overwrite(mval *start, ...);
 					 */
 #define	UTFCGR_INDX_INVALID	0xff
 
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-#define ZTIMEOUTSTR "ZTIMEOUT"
-#define MV_FORCE_MSTIMEOUT(TMV, TMS, NOTACID)	/* requires a flock of include files especially for TP */		\
-MBSTART {					/* also requires threaddef DCL and SETUP*/				\
-	GBLREF uint4		dollar_tlevel;										\
-	GBLREF uint4		dollar_trestart;									\
-															\
-															\
-	MV_FORCE_NUM(TMV);												\
-	if (NO_M_TIMEOUT == TMV->m[1])											\
-		TMS = NO_M_TIMEOUT;											\
-	else														\
-	{														\
-		assert(MV_BIAS >= 1000);	/* if formats change scale may need attention */			\
-		/* negative becomes 0 larger than MAXPOSINT4 caps to MAXPOSINT4 */					\
-		if (!(TMV->mvtype & MV_INT))										\
-			TMV->e += 3;	/* for non-ints, bump exponent to get millisecs from MV_FORCE_INT */		\
-		TMS = ((TMV->mvtype & MV_INT) ? TMV->m[1] : MIN(MAXPOSINT4, MV_FORCE_INT(TMV)));			\
-		if (!(TMV->mvtype & MV_INT))										\
-			TMV->e -= 3;	/* if we messed with the exponent, restore it to its original value */		\
-		if (0 > TMS)												\
-			TMS = 0;											\
-	}														\
-	if ((STRNCMP_LIT(NOTACID, "ZTIMEOUTSTR")) && ((TREF(tpnotacidtime)).m[1] < TMS))				\
-		TPNOTACID_CHECK(NOTACID);										\
-} MBEND
-=======
->>>>>>> 07a11a26bb (GT.M V7.1-004)
 #define MV_FORCE_CANONICAL(X)	((((X)->mvtype & MV_NM) == 0 ? s2n(X) : 0 ) \
 				 ,((X)->mvtype & MV_NUM_APPROX ? (X)->mvtype &= MV_NUM_MASK : 0 ))
 #define MV_IS_NUMERIC(X)	(((X)->mvtype & MV_NM) != 0)
@@ -1564,8 +1371,8 @@ typedef INTPTR_T  ptroff_t;
    *NOT* be used in the fileheader as its length expansion is platform
    specific. It should only be used in internal shared memory
    structures that are NOT otherwise placement sensitive.
-   A ; is included in the definition instead of when used since an extra ;
-   in a structure is not accepted by some compilers.
+   The ; is not included in the definition. Callers write it at the point of
+   use, as with other macros.
 */
 
 #ifdef CACHELINE_SIZE

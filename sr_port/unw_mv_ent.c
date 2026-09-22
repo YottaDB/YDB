@@ -429,21 +429,6 @@ void unw_mv_ent(mv_stent *mv_st_ent)
 			/* Restore environment to pre-$zinterrupt evocation. Note the first few elements of MVST_ZINTR
 			 * and MVST_TRIGR are the same, so the processing of those elements is commonized.
 			 */
-<<<<<<< HEAD
-			if (sigwinch == mv_st_ent->mv_st_cont.mvs_zintr.intrpt_type)
-			{	/* this mv_stent belongs to a SIGWINCH deviceparameter handler frame */
-				sigwinch_inprog = FALSE;
-				TAREF1(save_xfer_root, sigwinch).event_state = not_in_play;
-			} else
-			{
-				dollar_zininterrupt = FALSE;
-				TAREF1(save_xfer_root, jobinterrupt).event_state = not_in_play;
-			}
-||||||| parent of 07a11a26bb (GT.M V7.1-004)
-			dollar_zininterrupt = FALSE;
-			TAREF1(save_xfer_root, jobinterrupt).event_state = not_in_play;
-=======
->>>>>>> 07a11a26bb (GT.M V7.1-004)
 			/* Get rid of old values that may exist */
 			if (dollar_ecode.begin)
 				free(dollar_ecode.begin);
@@ -459,11 +444,21 @@ void unw_mv_ent(mv_stent *mv_st_ent)
 			error_frame = mv_st_ent->mv_st_cont.mvs_zintr.error_frame_save;
 			memcpy(&dollar_ecode, &mv_st_ent->mv_st_cont.mvs_zintr.dollar_ecode_save, SIZEOF(dollar_ecode));
 			memcpy(&dollar_stack, &mv_st_ent->mv_st_cont.mvs_zintr.dollar_stack_save, SIZEOF(dollar_stack));
-			/* ZTIMEOUT shares ZINTERRUPT transcendental frame. Explicitly set event since outofband can change */
-			lcl_outofband = (frame_pointer->type | SFT_ZTIMEOUT) ? ztimeout : jobinterrupt;
-			(void)xfer_reset_if_setter(lcl_outofband);
-			TAREF1(save_xfer_root, lcl_outofband).event_state = not_in_play;
-			dollar_zininterrupt = FALSE; /* Once reset, SIGUSR1s are not ignored and engage event handling */
+			if (sigwinch == mv_st_ent->mv_st_cont.mvs_zintr.intrpt_type)
+			{	/* this mv_stent belongs to a SIGWINCH deviceparameter handler frame */
+				sigwinch_inprog = FALSE;
+				TAREF1(save_xfer_root, sigwinch).event_state = not_in_play;
+			} else
+			{	/* ZTIMEOUT shares ZINTERRUPT transcendental frame. Explicitly set event since outofband
+				 * can change.
+				 */
+				lcl_outofband = (frame_pointer->type | SFT_ZTIMEOUT) ? ztimeout : jobinterrupt;
+				(void)xfer_reset_if_setter(lcl_outofband);
+				TAREF1(save_xfer_root, lcl_outofband).event_state = not_in_play;
+				dollar_zininterrupt = FALSE;	/* Once reset, SIGUSR1s are not ignored and engage event
+								 * handling.
+								 */
+			}
 			TRY_EVENT_POP;							/* Fall into MVST_TRIGR */
 		case MVST_TRIGR:
 			dollar_truth = (boolean_t)mv_st_ent->mv_st_cont.mvs_trigr.saved_dollar_truth;
