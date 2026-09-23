@@ -3,7 +3,7 @@
  * Copyright (c) 2013-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -17,6 +17,7 @@
 #include "mdef.h"
 
 #include "gtm_limits.h"
+#include "gtm_signal.h"
 #include "gtm_socket.h"
 #include "gtm_unistd.h"
 #include "gtm_iconv.h"
@@ -38,6 +39,7 @@
 #include "error.h"
 #include "op.h"
 #include "indir_enum.h"
+#include "sig_init.h"	/* for USING_ALTERNATE_SIGHANDLING and SET_ALTERNATE_SIGHANDLER */
 
 GBLREF	boolean_t		gtm_utf8_mode, hup_on;
 GBLREF	d_socket_struct		*newdsocket, *socket_pool;
@@ -383,26 +385,40 @@ void	iosocket_use(io_desc *iod, mval *pp)
 				break;
 			case iop_hupenable:
 				if (!hup_on)
-				{
+				{	/* if it is already hupenable, no need to change */
 					if (dsocketptr == (d_socket_struct *)io_std_device.in->dev_sp)
-					{	/* socket is principal device */
-						sigemptyset(&act.sa_mask);
-						act.sa_flags = 0;
-						act.sa_handler = ctrlc_handler_ptr;
-						sigaction(SIGHUP, &act, 0);
+					{	/* socket is principal device; enable the hup_handler the same way
+						 * iott_use.c and term_setup.c do it for a terminal $PRINCIPAL.
+						 */
+						if (!USING_ALTERNATE_SIGHANDLING)
+						{
+							sigemptyset(&act.sa_mask);
+							act.sa_flags = YDB_SIGACTION_FLAGS;
+							act.sa_sigaction = ctrlc_handler_ptr;
+							sigaction(SIGHUP, &act, 0);
+						} else
+						{
+							SET_ALTERNATE_SIGHANDLER(SIGHUP, &ydb_altmain_sighandler);
+						}
 						hup_on = TRUE;
 					}
 				}
 				break;
 			case iop_nohupenable:
 				if (hup_on)
-				{
+				{	/* if it is already nohupenable, no need to change */
 					if (dsocketptr == (d_socket_struct *)io_std_device.in->dev_sp)
-					{	/* socket is principal device */
-						sigemptyset(&act.sa_mask);
-						act.sa_flags = 0;
-						act.sa_handler = SIG_IGN;
-						sigaction(SIGHUP, &act, 0);
+					{	/* socket is principal device; disable the hup_handler */
+						if (!USING_ALTERNATE_SIGHANDLING)
+						{
+							sigemptyset(&act.sa_mask);
+							act.sa_flags = 0;
+							act.sa_handler = SIG_IGN;
+							sigaction(SIGHUP, &act, 0);
+						} else
+						{
+							SET_ALTERNATE_SIGHANDLER(SIGHUP, NULL);
+						}
 						hup_on = FALSE;
 					}
 				}

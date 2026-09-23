@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2022-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2022-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -45,8 +45,8 @@ void  term_setup(boolean_t ctrlc_enable)
 	SETUP_THREADGBL_ACCESS;
 	outofband = no_event;
 	ctrlc_on = (tt == io_std_device.in->type) ? ctrlc_enable : FALSE;
-	if (hup_on && (tt == io_std_device.in->type))
-	{	/* If $PRINCIPAL, enable the hup_handler - similar to iop_hupenable code in iott_use.c */
+	if (hup_on && ((tt == io_std_device.in->type) || (gtmsocket == io_std_device.in->type)))
+	{	/* If $PRINCIPAL, enable the hup_handler - similar to iop_hupenable code in iott_use.c and iosocket_use.c */
 		if (!USING_ALTERNATE_SIGHANDLING)
 		{
 			sigemptyset(&act.sa_mask);
