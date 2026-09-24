@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
@@ -25,12 +25,34 @@ stages:
  - docker-manifest
  - docker-tag
 
+# The Ubuntu and Debian mirrors are briefly inconsistent while a sync is in progress (a "Hash Sum
+# mismatch" on an index, or a 404 for a package that a newer index no longer lists), and are
+# occasionally unreachable. apt_get_install takes the arguments of "apt-get install" and retries
+# the update and the install as a pair, since only a fresh index fixes the 404, waiting longer
+# after each attempt, since a sync takes minutes.
+.apt-get-retry:
+  script:
+    - |
+      apt_get_install() {
+        attempt=1
+        while ! { apt-get update -qq && apt-get install "$@"; }; do
+          if [ "$attempt" -ge 5 ]; then
+            echo "apt-get failed after 5 attempts" >&2
+            return 1
+          fi
+          echo "apt-get failed on attempt ${attempt} of 5; retrying in $((attempt * 60)) seconds" >&2
+          sleep $((attempt * 60))
+          attempt=$((attempt + 1))
+        done
+      }
+
 commit-verify:
   image: ubuntu:24.04
   stage: build
   interruptible: true
   before_script:
-    - apt-get update -qq && apt-get install -y -qq git wget gnupg
+    - !reference [.apt-get-retry, script]
+    - apt_get_install -y -qq git wget gnupg
   script:
     - ci/commit_verify.sh ci/needs_copyright.sh https://gitlab.com/YottaDB/DB/YDB
 
@@ -49,8 +71,8 @@ commit-verify:
     when: always
     expire_in: 1 month
   script:
-    - apt-get update -q
-    - apt-get -q install -y --no-install-recommends >/dev/null
+    - !reference [.apt-get-retry, script]
+    - apt_get_install -q -y --no-install-recommends >/dev/null
         ca-certificates
         clang-14
         clang-tidy-14
