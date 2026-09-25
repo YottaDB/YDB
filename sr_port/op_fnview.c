@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -230,16 +230,16 @@ void	op_fnview(int numarg, mval *dst, ...)
 			commastr.len = 1;
 			commastr.addr = ",";
 			ENSURE_STP_FREE_SPACE((STATS_MAX_DIGITS * 3) + 2);
-			MV_FORCE_MVAL(dst, (int)(stringpool.top - stringpool.base));
+			MV_FORCE_64MVAL(dst, stringpool.top - stringpool.base);
 			MV_FORCE_STR(dst);
 			dst->mvtype = vtp->restype;
 			s2pool_concat(dst, &commastr);
 			arg2 = &tmpmval;
-			MV_FORCE_MVAL(arg2, (int)(stringpool.free - stringpool.base));
+			MV_FORCE_64MVAL(arg2, stringpool.free - stringpool.base);
 			MV_FORCE_STR(arg2);
 			s2pool_concat(dst, &arg2->str);
 			s2pool_concat(dst, &commastr);
-			MV_FORCE_MVAL(arg2, (int)(stringpool.top - stringpool.invokestpgcollevel));
+			MV_FORCE_64MVAL(arg2, stringpool.top - stringpool.invokestpgcollevel);
 			MV_FORCE_STR(arg2);
 			s2pool_concat(dst, &arg2->str);
 			break;
@@ -249,12 +249,12 @@ void	op_fnview(int numarg, mval *dst, ...)
 			commastr.len = 1;
 			commastr.addr = ",";
 			ENSURE_STP_FREE_SPACE((STATS_MAX_DIGITS * 2) + 1);
-			MV_FORCE_MVAL(dst, sp_totspace_nosort);
+			MV_FORCE_64MVAL(dst, sp_totspace_nosort);
 			MV_FORCE_STR(dst);
 			dst->mvtype = vtp->restype;
 			s2pool_concat(dst, &commastr);
 			arg2 = &tmpmval;
-			MV_FORCE_MVAL(arg2, sp_totspace);
+			MV_FORCE_64MVAL(arg2, sp_totspace);
 			MV_FORCE_STR(arg2);
 			s2pool_concat(dst, &arg2->str);
 			break;
