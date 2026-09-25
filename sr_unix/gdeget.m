@@ -231,6 +231,7 @@ RESTART ; used to re-run this routine from the start if wrong endianness is dete
 	. f s="GLOBAL_BUFFER_COUNT","LOCK_SPACE" d tmpseg(am,s)
 	. i (gldfmt>8) d tmpseg(am,"MUTEX_SLOTS")
 	. i 'v30 d tmpseg(am,"RESERVED_BYTES")					;autoconvert, can be condensed someday
+	. i (gldfmt>15) d tmpseg(am,"SEARCH_INDEX_SIZE"),tmpseg(am,"SEARCH_INDEX_SLOTS")
 	. d tmpseg(am,"WINDOW_SIZE")
 	.
 	c file
