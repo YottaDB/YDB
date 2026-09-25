@@ -1066,9 +1066,9 @@ void stp_gcol_sort(size_t space_asked)	/* BYPASSOK */
 	 * could also exceed the currently available free space in the stringpool. Hence skip the below assert in those cases.
 	 */
 #	if !defined(STP_MOVE) && !defined(STP_GCOL_NOSORT)
-	assert(0 <= (signed)space_before_compact);
-	assert(0 <= (signed)space_after_compact);
-	assert((signed)space_after_compact >= (signed)space_before_compact);
+	assert(0 <= space_before_compact);
+	assert(0 <= space_after_compact);
+	assert(space_after_compact >= space_before_compact);
 #	endif
 	space_reclaim = space_after_compact - space_before_compact;
 	space_needed -= (ssize_t)space_after_compact;
