@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -714,7 +714,7 @@ void	op_view(int numarg, mval *keyword, ...)
 			gv_fillfactor = testvalue;
 			break;
 		case VTK_STPGCOL:
-			INVOKE_STP_GCOL(INTCAST(stringpool.top - stringpool.free) + 1);/* Computation to avoid assert in stp_gcol */
+			INVOKE_STP_GCOL(0);
 			break;
 		case VTK_STPGCOLNOSORT:
 			/* The below usages of "stringpool.stp_gcol_nosort" assume that the current stringpool is the runtime
