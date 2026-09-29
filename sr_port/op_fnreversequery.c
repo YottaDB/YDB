@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -238,11 +238,18 @@ void op_fnreversequery_va(int sbscnt, mval *dst, va_list var)
 				assert(nexti <= sbscnt);
 				i = nexti;
 			}
-			if ((NULL == node) || (NULL == tmp_lvt) || (i == sbscnt))
+			if ((NULL != node) && (NULL == tmp_lvt) && (i < sbscnt))
+			{	/* Key found but it has no subtree and there are more input lvn subscripts. "node" is an
+				 * ancestor of the input lvn and so collates immediately before it. It is the reverse $query
+				 * result if it is defined. If not, the ascend loop below moves on to its left sibling.
+				 */
+				descend = FALSE;
+				break;
+			}
+			if ((NULL == node) || (i == sbscnt))
 			{	/* (NULL == node)    ==> Key not found in tree at this level
-				 * (NULL == tmp_lvt) ==> Subtree does not exist at this level
 				 * (i == sbscnt)     ==> At last specified input lvn subscript level
-				 * For all 3 cases, to get reverse $query of input node, need to start from left sibling of
+				 * For both cases, to get reverse $query of input node, need to start from left sibling of
 				 * parent level. Parent level is still "lvt" tree with key="arg1"
 				 */
 				node = lvAvlTreeKeyCollatedPrev(lvt, arg1);
