@@ -16,6 +16,10 @@
 #include "mdef.h"
 
 #include <stdarg.h>
+#include <sys/mman.h>
+#ifndef __MUSL
+# include <malloc.h>		/* Needed for malloc_trim() in VTK_STPGCOLFREE */
+#endif
 #ifdef DEBUG
 # include "gtm_syslog.h"	/* Needed for white box case in VTK_STORDUMP */
 #endif
@@ -122,6 +126,7 @@ GBLREF	boolean_t		dmterm_default;
 GBLREF	mstr			extnam_str;
 GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	boolean_t		ydb_ztrigger_output;
+OS_PAGE_SIZE_DECLARE
 DEBUG_ONLY(GBLREF  tp_region	*tp_reg_list;)	/* Ptr to list of tp_regions for a TP transaction */
 
 error_def(ERR_ACTRANGE);
@@ -190,6 +195,7 @@ void	op_view(int numarg, mval *keyword, ...)
 	sgmnt_data_ptr_t	csd;
 	symval			*cstab, *lvlsymtab;
 	uint4			jnl_status, dummy_errno;
+	unsigned char		*stp_free_start, *stp_free_end;
 	va_list			var;
 	viewparm		parmblk, parmblk2;
 	viewtab_entry		*vtp;
@@ -715,6 +721,35 @@ void	op_view(int numarg, mval *keyword, ...)
 			break;
 		case VTK_STPGCOL:
 			INVOKE_STP_GCOL(0);
+			break;
+		case VTK_STPGCOLFREE:
+			/* Garbage collect the runtime stringpool, then return to the operating system the physical memory of
+			 * the whole pages in its unused part, and of the free pages in the C library heap.
+			 */
+			assert(stringpool.base == rts_stringpool.base);
+			INVOKE_STP_GCOL(0);
+			stp_free_start = (unsigned char *)ROUND_UP2((UINTPTR_T)stringpool.free, OS_PAGE_SIZE);
+			stp_free_end = (unsigned char *)ROUND_DOWN2((UINTPTR_T)stringpool.top, OS_PAGE_SIZE);
+			if (stp_free_start < stp_free_end)
+			{	/* MADV_DONTNEED frees the physical memory of these pages but keeps them mapped, so the stringpool
+				 * keeps its size, and a page reads back as zeros the next time it is used. No code relies on the
+				 * contents of the unused part of the stringpool. The range ends at or below "stringpool.top" so it
+				 * does not touch the gtm_malloc trailer or the C library header that follow the stringpool. The
+				 * C library sees the stringpool as one block in use, so malloc_trim() below does not release
+				 * these pages.
+				 */
+				status = madvise(stp_free_start, stp_free_end - stp_free_start, MADV_DONTNEED);
+				assert(0 == status);
+			}
+			/* As gtm_malloc turns off mmap() allocations with mallopt(M_MMAP_MAX, 0), free() returns memory to the
+			 * operating system only from the top of the heap; freed blocks below a block in use, for example the
+			 * memory of local variables freed by a KILL, stay resident. Since glibc 2.8, malloc_trim(0) applies
+			 * MADV_DONTNEED to the whole pages of every free block in the heap, not just to the free memory at its
+			 * top. musl has no malloc_trim().
+			 */
+#			ifndef __MUSL
+			malloc_trim(0);
+#			endif
 			break;
 		case VTK_STPGCOLNOSORT:
 			/* The below usages of "stringpool.stp_gcol_nosort" assume that the current stringpool is the runtime

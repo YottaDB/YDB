@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -125,6 +125,7 @@ VIEWTAB("STATSHARE",		VTP_NULL | VTP_DBREGION,	VTK_STATSHARE,		MV_NM),
 VIEWTAB("STKSIZ",		VTP_NULL,			VTK_STKSIZ,		MV_NM),
 VIEWTAB("STORDUMP",		VTP_NULL,			VTK_STORDUMP,		MV_NM), /* nodoc : code debugging feature */
 VIEWTAB("STP_GCOL",		VTP_NULL,			VTK_STPGCOL,		MV_NM),
+VIEWTAB("STP_GCOL_FREE",	VTP_NULL,			VTK_STPGCOLFREE,	MV_NM),
 VIEWTAB("STP_GCOL_NOSORT",	VTP_NULL | VTP_VALUE,		VTK_STPGCOLNOSORT,	MV_NM),
 VIEWTAB("TESTPOINT",		VTP_VALUE,			VTK_TESTPOINT,		MV_NM),
 VIEWTAB("TOTALBLOCKS",		VTP_DBREGION,			VTK_BLTOTAL,		MV_NM),
