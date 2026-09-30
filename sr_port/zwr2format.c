@@ -1,5 +1,8 @@
 /****************************************************************
  *								*
+ * Copyright (c) 2026 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
@@ -59,12 +62,14 @@ boolean_t zwr2format(mstr *src, mstr *des)
 			case 0: /* state that interprets graphic vs. non-graphic */
 				ch = *cp++;
 				if ('$' == ch)
-				{
-					ch = chtmp = TOUPPER(*cp++);
-					if (('C' != ch) && (('Z' != ch) || ('C' != (ch = TOUPPER(*cp++))) ||
-						('H' != (ch = TOUPPER(*cp++)))))
+				{	/* Check cp against end before each read so a truncated input cannot read past it */
+					if (cp >= end)
 						return FALSE;
-					if ('(' != (ch = *cp++))
+					ch = chtmp = TOUPPER(*cp++);
+					if (('C' != ch) && (('Z' != ch) || (cp >= end) || ('C' != (ch = TOUPPER(*cp++)))
+							|| (cp >= end) || ('H' != (ch = TOUPPER(*cp++)))))
+						return FALSE;
+					if ((cp >= end) || ('(' != (ch = *cp++)))
 						return FALSE;
 					fastate = ('C' == chtmp) ? 2 : 3;
 				} else if ('"' == ch)
@@ -103,7 +108,10 @@ boolean_t zwr2format(mstr *src, mstr *des)
 								return FALSE;
 						}
 					} else
+					{	/* closing quote is the last character of the input */
 						FORMAT_PRINTABLE(cp - 1);
+						fastate = 0;
+					}
 				}
 				break;
 			case 2:	/* parsing the string after $C( */
@@ -125,6 +133,8 @@ boolean_t zwr2format(mstr *src, mstr *des)
 					des->len += (int)(strnext - &dstptr[des->len]);
 				}
 #				endif
+				if (cp >= end)
+					return FALSE;	/* no ',' or ')' after the number, e.g. input ends with "$C(65" */
 				switch(ch = *cp++)
 				{
 				case ',':
@@ -144,6 +154,8 @@ boolean_t zwr2format(mstr *src, mstr *des)
 				if (num < 0 || num > 255)
 					return FALSE;
 				FORMAT_CHAR(num);
+				if (cp >= end)
+					return FALSE;	/* no ',' or ')' after the number, e.g. input ends with "$ZCH(65" */
 				switch(ch = *cp++)
 				{
 				case ',':
@@ -183,6 +195,9 @@ boolean_t zwr2format(mstr *src, mstr *des)
 				break;
 			}
 		}
+		/* Accept only input ending after a complete string, $C()/$ZCH() or number */
+		return ((fastate == 0) && (end[-1] != '_'))
+			|| (((fastate == 4) || (fastate == 5)) && ('0' <= end[-1]) && (end[-1] <= '9'));
 	}
 	return TRUE;
 }
