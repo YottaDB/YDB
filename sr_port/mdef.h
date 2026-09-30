@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  * Copyright (c) 2017-2018 Stephen L Johnson.			*
@@ -1484,6 +1484,8 @@ gtm_uint64_t asc_hex2l(uchar_ptr_t p, int len);
 
 /* This macro converts a decimal string to a number (a more efficient alternative to asc2i).
  * It is used by zwr2format() and str2gvargs which is called a lot during MUPIP LOAD (can be time-consuming for a big database).
+ * "num" is set to -1 if "cp" does not start with a digit, or if the number does not fit in an int. In the latter case, "cp"
+ * is left just past the digit that made it overflow.
  */
 #define A2I(cp, end, num)												\
 {															\
@@ -1491,8 +1493,7 @@ gtm_uint64_t asc_hex2l(uchar_ptr_t p, int len);
 	unsigned char	ch;												\
 															\
 	for (num = 0; (0 <= num) && ((cp) < (end)) && ('0' <= (ch = *((unsigned char*)cp))) && ('9' >= ch); ++(cp))	\
-		num = ((num) * 10) + (unsigned int)(ch - (unsigned char)'0');						\
-	assert((0 <= num) || ydb_white_box_test_case_enabled);								\
+		num = (((MAXPOSINT4 - (ch - '0')) / 10) < (num)) ? -1 : (((num) * 10) + (ch - '0'));			\
 	if (cpbase == ((unsigned char*)cp))										\
 		num = (int)-1;												\
 }

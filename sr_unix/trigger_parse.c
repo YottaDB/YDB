@@ -3,7 +3,7 @@
  * Copyright (c) 2010-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -829,7 +829,8 @@ STATICFNDEF boolean_t process_subscripts(char *subscr_str, uint4 *subscr_len, ch
 										MAX_GVSUBS_LEN);
 							if (0 > num1)
 							{
-								util_out_print_gtmio("Alternation integer overflow", FLUSH);
+								util_out_print_gtmio("Integer overflow in pattern repeat count",
+										FLUSH);
 								return FALSE;
 							}
 						}
@@ -849,7 +850,8 @@ STATICFNDEF boolean_t process_subscripts(char *subscr_str, uint4 *subscr_len, ch
 									MAX_GVSUBS_LEN);
 								if (0 > num2)
 								{
-									util_out_print_gtmio("Alternation integer overflow", FLUSH);
+									util_out_print_gtmio("Integer overflow in pattern repeat"
+											" count", FLUSH);
 									return FALSE;
 								}
 							}
@@ -1114,7 +1116,13 @@ STATICFNDEF boolean_t process_pieces(char *piece_str, uint4 *piece_len)
 			case '9':
 				ptr1 = ptr;
 				A2I(ptr1, ptr + len, num);
-				if ((0 >= num) || (MAX_PIECE_VALUE < num))
+				if (0 > num)
+				{	/* A2I() returns -1 for a number too large for an int */
+					CONV_STR_AND_PRINT("Integer overflow in PIECES - ", *piece_len, piece_str);
+					have_error = TRUE;
+					break;
+				}
+				if ((0 == num) || (MAX_PIECE_VALUE < num))
 				{
 					CONV_NUM_AND_STR_AND_PRINT("Invalid value !UL in PIECES - !AD", num, *piece_len, piece_str);
 					have_error = TRUE;
@@ -1158,7 +1166,13 @@ STATICFNDEF boolean_t process_pieces(char *piece_str, uint4 *piece_len)
 				}
 				ptr1 = ptr;
 				A2I(ptr1, ptr + len, num);
-				if ((0 >= num) || (MAX_PIECE_VALUE < num))
+				if (0 > num)
+				{	/* A2I() returns -1 for a number too large for an int */
+					CONV_STR_AND_PRINT("Integer overflow in PIECES - ", *piece_len, piece_str);
+					have_error = TRUE;
+					break;
+				}
+				if ((0 == num) || (MAX_PIECE_VALUE < num))
 				{
 					CONV_NUM_AND_STR_AND_PRINT("Invalid value \"!UL\" in PIECES - !AD", num,
 								   *piece_len, piece_str);
