@@ -6,6 +6,9 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2026 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -202,6 +205,11 @@ boolean_t zwr2format(mstr *src, mstr *des)
 	return TRUE;
 }
 
+/* Byte at offset "off" of "ptr", or '\0' if "off" is at or past "len" (the end of the input). No byte the key parser
+ * looks for is '\0', so a truncated input ends the key instead of reading past the end of the input.
+ */
+#define	KEYCHAR(ptr, off, len)	(((off) < (len)) ? (ptr)[off] : '\0')
+
 /* Routine to compute the length of the KEY, length of the VALUE and Offset of VALUE in ZWR format.
  * This function takes 2 inputs and returns 5 piece of information.
  * INPUT:
@@ -213,6 +221,9 @@ boolean_t zwr2format(mstr *src, mstr *des)
  *	val_len		: length of the value(Length of the value present on right hand side of '=' sign).
  *	val_off1	: offset inside the value of spanning node present.
  *	val_len1	: length of data (of spanning node) present in the block.
+ * Only a caller that passes non-NULL val_off1 and val_len1 accepts the $ze(...) format. For any other caller, a
+ * leading '$' is parsed as part of an ordinary key. A $ze(...) format input with no closing ')' returns a negative
+ * val_len.
  */
 int zwrkeyvallen(char* ptr, int len, char **val_off, int *val_len, int *val_off1, int *val_len1)
 {
@@ -222,7 +233,12 @@ int zwrkeyvallen(char* ptr, int len, char **val_off, int *val_len, int *val_off1
 
 	keylength = 0;	/* determine length of key */
 	keystate  = 0;
-	ptr = (extfmt = ('$' == ptr[keylength]) ? 1 : 0) ? ptr + 4 : ptr; /*In extract first 4 chars are '$', 'z', 'e' and '(' */
+	extfmt = (NULL != val_off1) && (NULL != val_len1) && (0 < len) && ('$' == ptr[0]);
+	if (extfmt)
+	{	/* In extract first 4 chars are '$', 'z', 'e' and '(' */
+		ptr += 4;
+		len = (4 < len) ? (len - 4) : 0;
+	}
 	keepgoing = TRUE;
 	while ((keylength < len) && keepgoing) /* slightly different here from go_load since we can get kill records too */
 	{
@@ -251,10 +267,7 @@ int zwrkeyvallen(char* ptr, int len, char **val_off, int *val_len, int *val_off1
 				keystate = 2;
 				break;
 			case '$': /* step into $C(...) */
-				chtmp = TOUPPER(ptr[keylength]);
-				assert(('C' == chtmp && '(' == ptr[keylength + 1]) ||
-					('Z' == chtmp && 'C' == TOUPPER(ptr[keylength + 1]) &&
-						'H' == TOUPPER(ptr[keylength + 2]) && '(' == ptr[keylength + 3]));
+				chtmp = TOUPPER(KEYCHAR(ptr, keylength, len));
 				keylength += ('C' == chtmp) ? 2 : 4;
 				keystate = 3;
 				break;
@@ -263,17 +276,13 @@ int zwrkeyvallen(char* ptr, int len, char **val_off, int *val_len, int *val_off1
 		case 2:	/* in "..." */
 			if ('"' == ch)
 			{
-				switch (ptr[keylength])
+				switch (KEYCHAR(ptr, keylength, len))
 				{
 				case '"': /* "" */
 					keylength++;
 					break;
 				case '_': /* _$C(...) or _$ZCH(...) */
-					assert('$' == ptr[keylength + 1]);
-					chtmp = TOUPPER(ptr[keylength + 2]);
-					assert(('C' == chtmp && '(' == ptr[keylength + 3]) || ('Z' == chtmp &&
-						'C' == TOUPPER(ptr[keylength + 3]) && 'H' == TOUPPER(ptr[keylength + 4]) &&
-							'(' == ptr[keylength + 5]));
+					chtmp = TOUPPER(KEYCHAR(ptr, keylength + 2, len));
 					keylength += ('C' == chtmp) ? 4 : 6;
 					keystate = 3;
 					break;
@@ -285,10 +294,9 @@ int zwrkeyvallen(char* ptr, int len, char **val_off, int *val_len, int *val_off1
 		case 3:	/* in $C(...) or $ZCH(...) */
 			if (')' == ch)
 			{
-				if ('_' == ptr[keylength]) /* step into "..." or $C(...) or $ZCH(...) */
+				if ('_' == KEYCHAR(ptr, keylength, len)) /* step into "..." or $C(...) or $ZCH(...) */
 				{
-					assert('"' == ptr[keylength + 1] || '$' == ptr[keylength + 1]);
-					if ('"' == ptr[keylength + 1])
+					if ('"' == KEYCHAR(ptr, keylength + 1, len))
 					{ /* step into "..." by advancing over the begin quote */
 						keylength += 2;
 						keystate = 2;
@@ -307,12 +315,16 @@ int zwrkeyvallen(char* ptr, int len, char **val_off, int *val_len, int *val_off1
 			break;
 		}
 	}
+	if (len < keylength)
+		keylength = len;	/* a skip over "$C(" and the like went past the end of a truncated input */
 	if (extfmt)
 	{
 		off = keylength + 1;	/* to point to second exp in $ext format */
 		tmp = val_off1;
 		*tmp = 0;
-		while (TRUE)
+		*val_len1 = 0;
+		ch = '\0';
+		while (off < len)
 		{
 			ch = ptr[off++];
 			if (')' == ch)
@@ -325,8 +337,15 @@ int zwrkeyvallen(char* ptr, int len, char **val_off, int *val_len, int *val_off1
 			}
 			*tmp = (10 * (*tmp)) + ch - 48;
 		}
-		*val_off = ptr + off + SIZEOF(char); 		/* SIZEOF(char) is used to make adjustment for '=' sign */
-		*val_len = len - (off + SIZEOF(char) + 4); 	/* The prefix '$ze(' account for 4 chars */
+		if (')' != ch)
+		{	/* the input ended before the closing ')' */
+			*val_off = ptr + off;
+			*val_len = -1;
+		} else
+		{
+			*val_off = ptr + off + SIZEOF(char);	/* SIZEOF(char) is used to make adjustment for '=' sign */
+			*val_len = len - (off + SIZEOF(char));	/* len already excludes the prefix '$ze(' */
+		}
 	} else
 	{
 		*val_off = ptr + (keylength + SIZEOF(char));	/* SIZEOF(char) is used to make adjustment for '=' sign */

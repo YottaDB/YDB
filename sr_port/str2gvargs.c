@@ -3,7 +3,7 @@
  * Copyright (c) 2002-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -43,6 +43,11 @@ error_def(ERR_EORNOTFND);
 error_def(ERR_RPARENREQD);
 error_def(ERR_DLRCILLEGAL);
 
+/* Byte at "p", or '\0' if "p" is at or past "top" (the end of the input). No byte the parser looks for is '\0', so a
+ * key that is cut short is reported as such instead of being parsed from whatever bytes follow it in memory.
+ */
+#define	CH_AT(p, top)	(((p) < (top)) ? *(p) : '\0')
+
 static mval subsc[MAX_GVSUBSCRIPTS]; 	/* At return, op_gvargs elements will be pointing to elements of this array, hence static */
 static MSTR_DEF(subsc_buffer, 0, NULL); /* Buffer space (subsc_buffer.addr) will be allocated on the first call.
 					 * Buffer space to hold string mvals in subsc; we don't want to use stringpool because
@@ -66,7 +71,6 @@ boolean_t str2gvargs(char *cp, int len, gvargs_t *op_gvargs)
 	concat = FALSE;
 	c_ref = cp;
 	c_top = cp + len;
-	assert(0 < len); /* why is our code calling with "" string? */
 	if (len > subsc_buffer.len)
 	{
 		if (NULL != subsc_buffer.addr)
@@ -80,7 +84,7 @@ boolean_t str2gvargs(char *cp, int len, gvargs_t *op_gvargs)
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_NOTGBL, 2, (len > 0) ? len : 0, c_ref);
 	spt->mvtype = MV_STR;
 	spt->str.addr = cp;
-	ch = *cp;
+	ch = CH_AT(cp, c_top);
 	if ('(' == ch)
 	{
 		spt->str.len = INTCAST(cp - spt->str.addr - 1);
@@ -109,7 +113,7 @@ boolean_t str2gvargs(char *cp, int len, gvargs_t *op_gvargs)
 		for (; ;)
 		{
 			spt->mvtype = MV_STR;
-			ch = *cp;
+			ch = CH_AT(cp, c_top);
 			if ('\"' == ch)
 			{
 				if (!concat)
@@ -124,8 +128,11 @@ boolean_t str2gvargs(char *cp, int len, gvargs_t *op_gvargs)
 					if (cp == c_top)
 						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_STRUNXEOR, 2, len, c_ref);
 					if ('\"' == *cp)
-						if ('\"' != *++cp)
+					{
+						cp++;
+						if ('\"' != CH_AT(cp, c_top))
 							break;
+					}
 					*p1++ = *cp++;
 				}
 				if (!concat)
@@ -137,7 +144,7 @@ boolean_t str2gvargs(char *cp, int len, gvargs_t *op_gvargs)
 					spt->str.len += (mstr_len_t)(p1 - p2);
 					subsc_ptr += p1 - p2;
 				}
-				if ('_' == *cp)
+				if ('_' == CH_AT(cp, c_top))
 				{
 					cp++;
 					concat = TRUE;
@@ -146,8 +153,8 @@ boolean_t str2gvargs(char *cp, int len, gvargs_t *op_gvargs)
 			} else if ('$' == ch)
 			{
 				cp++;
-				chtmp = TOUPPER(*cp);
-				isdolar = (((3 <= c_top - cp) && ('C' == chtmp)) || ('(' == cp[1]));
+				chtmp = TOUPPER(CH_AT(cp, c_top));
+				isdolar = ((3 <= c_top - cp) && ('C' == chtmp) && ('(' == cp[1]));
 				if (!isdolar)
 					isdolar = (5 <= c_top - cp && 'Z' == chtmp && 'C' == cp[1] && 'H' == cp[2] && '(' == cp[3]);
 				if (!isdolar)
@@ -205,19 +212,19 @@ boolean_t str2gvargs(char *cp, int len, gvargs_t *op_gvargs)
 						spt->str.len += chlen;
 						subsc_ptr += chlen;
 					}
-					if (',' == *cp)
+					if (',' == CH_AT(cp, c_top))
 					{
 						concat = TRUE;
 						if (++cp == c_top)
 							RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_DLRCUNXEOR, 2, len, c_ref);
 						continue;
 					}
-					if (')' != *cp)
+					if (')' != CH_AT(cp, c_top))
 						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_DLRCUNXEOR, 2, len, c_ref);
 					break;
 				}
 				cp++;
-				if ('_' == *cp)
+				if ('_' == CH_AT(cp, c_top))
 				{
 					cp++;
 					concat = TRUE;
@@ -269,13 +276,14 @@ boolean_t str2gvargs(char *cp, int len, gvargs_t *op_gvargs)
 			op_gvargs->args[count] = spt;
 			count++;
 			spt++;
-			if (',' != *cp)
+			if (',' != CH_AT(cp, c_top))
 				break;
 			concat = FALSE;
 			cp++;
 		}
-		if (')' != *cp++)
+		if (')' != CH_AT(cp, c_top))
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_RPARENREQD, 2, len, c_ref);
+		cp++;
 		if (cp < c_top)
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_EORNOTFND, 2, len, c_ref);
 	}
