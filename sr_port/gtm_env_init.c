@@ -93,10 +93,11 @@ GBLREF	block_id	ydb_skip_bml_num;
 void	gtm_env_init(void)
 {
 	boolean_t		ret, is_defined;
-	char			buf[MAX_TRANS_NAME_LEN];
+	char			buf[MAX_TRANS_NAME_LEN], *endptr;
 	double			time;
 	int			i, j;
-	int4			status, tpnat;
+	int4			status;
+	long			tpnat_long;
 	mstr			trans;
 	size_t			tmp_malloc_limit;
 	uint4			cachent, memsize, reservesize, tdbglvl, tmsock, trctblbytes, trctblsize;
@@ -334,9 +335,19 @@ void	gtm_env_init(void)
 		}
 		/* Initialize $ydb_tpnotacidtries */
 		TREF(tpnotacidtries) = TPNOTACID_DEF_MAX_TRIES;
-		tpnat = ydb_trans_numeric(YDBENVINDX_TPNOTACIDTRIES, &is_defined, IGNORE_ERRORS_TRUE, NULL);
-		if ((is_defined && (0 == tpnat)) || ((TPNOTACID_LIM_MAX_TRIES >= tpnat) && (CDB_STAGNATE < tpnat)))
-			TREF(tpnotacidtries) = tpnat;
+		if (SS_NORMAL == (status = ydb_trans_log_name(YDBENVINDX_TPNOTACIDTRIES, &trans, buf, SIZEOF(buf),
+												IGNORE_ERRORS_TRUE, NULL)))
+		{	/* Accept only a value that is entirely numeric and is either 0 ("audit") or within the supported range.
+			 * Anything else, including a value that is not a number, keeps the default.
+			 */
+			assert(SIZEOF(buf) > trans.len);
+			assert('\0' == buf[trans.len]);
+			errno = 0;
+			tpnat_long = STRTOL(buf, &endptr, 0);
+			if ((0 == errno) && (endptr != buf) && ('\0' == *endptr) && ((0 == tpnat_long)
+					|| ((TPNOTACID_LIM_MAX_TRIES >= tpnat_long) && (CDB_STAGNATE < tpnat_long))))
+				TREF(tpnotacidtries) = (int4)tpnat_long;
+		}
 		/* Initialize $ydb_tprestart_log_first */
 		TREF(tprestart_syslog_first) = ydb_trans_numeric(YDBENVINDX_TPRESTART_LOG_FIRST, &is_defined,
 												IGNORE_ERRORS_TRUE, NULL);
