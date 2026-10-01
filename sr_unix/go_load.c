@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -212,6 +212,10 @@ void go_load(gtm_uint64_t begin, gtm_uint64_t end, unsigned char *rec_buff, char
 			util_out_print(0, TRUE);
 			mu_ctrlc_occurred = FALSE;
 		}
+		/* Each record is read into the start of the line buffer. The code below advances "ptr" past a leading
+		 * newline or a "$ze(" prefix, so reset it here; on the first iteration the record is already there.
+		 */
+		ptr = line3_ptr;
 		if ((iter > begin) && (0 > (len = go_get(&ptr, MAX_STRLEN, max_rec_size) - dos)))	/* WARNING assignment */
 			break;
 		if (mupip_error_occurred)
