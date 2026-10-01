@@ -41,6 +41,8 @@ GBLREF	u_casemap_t 		gtm_strToTitle_ptr;		/* Function pointer for gtm_strToTitle
 #endif
 #include "stringpool.h"
 #include "stp_parms.h"
+#include "gt_timer.h"
+#include "getjobnum.h"
 
 GBLREF	char			cli_err_str[];
 GBLREF  stack_frame     	*frame_pointer;
@@ -51,6 +53,10 @@ GBLREF	CLI_ENTRY		mumps_cmd_ary[];
 GBLREF	int			mumps_status;
 GBLREF	char			ydb_dist[YDB_PATH_MAX];
 GBLREF	boolean_t		ydb_dist_ok_to_use;
+#ifdef YDB_USE_POSIX_TIMERS
+GBLREF	pid_t			posix_timer_thread_id;
+GBLREF	boolean_t		posix_timer_created;
+#endif
 GTMTRIG_DBG_ONLY(GBLREF ch_ret_type (*ch_at_trigger_init)();)
 
 /* Initialization routine - can be called directly by call-in caller or can be driven by ydb_ci*() implicitly. But
@@ -148,6 +154,13 @@ int ydb_init()
 			 */
 			assert(!ydb_init_complete);
 			ydb_init_complete = TRUE;
+			/* This process inherited the parent's timer queue (which can hold timers whose handling the parent
+			 * deferred) and the record that a POSIX timer was created, but not the POSIX timer itself. Clear both
+			 * before "ydb_child_init" can run a deferred timer handler. Otherwise restarting the system timer calls
+			 * "timer_settime" with a timer id that does not exist in this process and fails with EINVAL.
+			 */
+			clear_timers();
+			CLEAR_POSIX_TIMER_FIELDS_IF_APPLICABLE;
 			status = ydb_child_init(NULL);
 			if (YDB_OK != status)
 			{

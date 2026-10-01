@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  * Copyright (c) 2018 Stephen L Johnson.			*
@@ -108,6 +108,25 @@
 }
 
 #ifdef YDB_USE_POSIX_TIMERS
+/* Issue an ERR_SYSCALL error for a failed POSIX timer system call, followed by the timer state as an ERR_TEXT so it is
+ * part of $ZSTATUS (and so is seen even in an environment that has no syslog). timer_settime() fails with EINVAL either
+ * for a timer id that does not exist in this process or for an invalid expiry time. A process_id that differs from
+ * getpid() means a forked child still using the parent's timer state, whose posix_timer_id does not exist in the
+ * child. Otherwise, check time_to_expir for an invalid expiry time.
+ */
+#	define REPORT_POSIX_TIMER_ERROR(SYSCALL_NAME, TIME_TO_EXPIR, ERRNO)						\
+	MBSTART {													\
+		char s[512];												\
+															\
+		SNPRINTF(s, SIZEOF(s), "posix_timer_id: %ld; posix_timer_created: %d; posix_timer_thread_id: %d; "	\
+			"gettid(): %ld; process_id: %u; getpid(): %d; fork_after_ydb_init: %d; timer_active: %d; "	\
+			"time_to_expir: [tv_sec: %ld; tv_nsec: %ld]",							\
+			(long)(intptr_t)posix_timer_id, posix_timer_created, posix_timer_thread_id,			\
+			(long)syscall(SYS_gettid), process_id, getpid(), fork_after_ydb_init, timer_active,		\
+			(long)(TIME_TO_EXPIR)->tv_sec, (long)(TIME_TO_EXPIR)->tv_nsec);					\
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(12) ERR_SYSCALL, 5, RTS_ERROR_LITERAL(SYSCALL_NAME), CALLFROM,	\
+			ERR_TEXT, 2, LEN_AND_STR(s), ERRNO);								\
+	} MBEND
 	STATICDEF struct itimerspec	sys_timer, old_sys_timer;
 	STATICDEF ABS_TIME		sys_timer_at;			/* Absolute time associated with sys_timer */
 #else
@@ -276,6 +295,8 @@ GBLREF	boolean_t		noThreadAPI_active;
 #ifdef YDB_USE_POSIX_TIMERS
 GBLREF	pid_t			posix_timer_thread_id;
 GBLREF	boolean_t		posix_timer_created;
+GBLREF	uint4			process_id;
+GBLREF	int			fork_after_ydb_init;
 #endif
 #ifdef DEBUG
 GBLREF	boolean_t		in_nondeferrable_signal_handler;
@@ -695,8 +716,7 @@ STATICFNDEF void sys_settimer(TID tid, ABS_TIME *time_to_expir)
 		{
 			save_errno = errno;
 			assert(FALSE);
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7)
-				      ERR_SYSCALL, 5, RTS_ERROR_LITERAL("timer_create()"), CALLFROM, save_errno);
+			REPORT_POSIX_TIMER_ERROR("timer_create()", time_to_expir, save_errno);
 		}
 		posix_timer_created = TRUE;
 	}
@@ -714,8 +734,7 @@ STATICFNDEF void sys_settimer(TID tid, ABS_TIME *time_to_expir)
 		WBTEST_ONLY(WBTEST_SETITIMER_ERROR,
 			save_errno = EINVAL;
 		);
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8)
-					ERR_SYSCALL, 5, RTS_ERROR_LITERAL("timer_settime()"), CALLFROM, save_errno);
+		REPORT_POSIX_TIMER_ERROR("timer_settime()", time_to_expir, save_errno);
 	}
 #	else
 	if (in_setitimer_error)
