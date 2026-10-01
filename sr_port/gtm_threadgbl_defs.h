@@ -203,6 +203,9 @@ THREADGBLDEF(skip_DB_exists_check,		boolean_t)			/* skip check for whether the D
 THREADGBLDEF(skip_file_corrupt_check,		boolean_t)			/* skip file_corrupt check in grab_crit */
 THREADGBLDEF(tpnotacidtime,			int4)				/* millisecond limit 4 possibly long non-ACID ops */
 THREADGBLDEF(tpnotacidtries,			int4)				/* limit on tpnotacid events in TP */
+THREADGBLDEF(tpnotacid_last_caller,		char *)				/* operation of the last TPNOTACID syslog warning */
+THREADGBLAR1DEF(tpnotacid_last_zpos,		char,		MAX_ENTRYREF_LEN)	/* $ZPOSITION of that warning */
+THREADGBLDEF(tpnotacid_last_zpos_len,		int4)				/* length of tpnotacid_last_zpos; 0 if none sent */
 THREADGBLDEF(tp_restart_count,			uint4)				/* tp_restart counter */
 THREADGBLDEF(tp_restart_dont_counts,		int4)				/* tp_restart count adjustment; NOTE: DEBUG only */
 THREADGBLDEF(tp_restart_entryref,		mval)				/* tp_restart position for reporting */

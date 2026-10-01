@@ -97,8 +97,6 @@ MBSTART {													\
 
 #define	TPNOTACID_CHECK(CALLER_STR) if (dollar_tlevel) tpnotacid_check(CALLER_STR);
 
-STATICDEF char	*last_caller, *last_zpos_addr;
-
 static inline void tpnotacid_check(char* caller_str)
 {
 	mval	zpos;
@@ -123,12 +121,19 @@ static inline void tpnotacid_check(char* caller_str)
 	if ((CDB_STAGNATE <= dollar_trestart) || !tries)
 	{	/* syslog message treats 0 == tries like an "audit" request */
 		getzposition(&zpos);
-		if ((last_zpos_addr != zpos.str.addr) && (last_caller != caller_str))
-		{	/* nag limited to change from last one */
+		/* Nag limited to a change from the last one. The state is in threadgbl rather than in statics, as this
+		 * function is compiled separately into every module that includes this header. The position is compared
+		 * by content since each "getzposition" call returns a fresh stringpool address.
+		 */
+		if ((TREF(tpnotacid_last_caller) != caller_str) || (TREF(tpnotacid_last_zpos_len) != zpos.str.len)
+				|| memcmp(TADR(tpnotacid_last_zpos), zpos.str.addr, zpos.str.len))
+		{
 			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_TPNOTACID, 6, LEN_AND_STR(caller_str), zpos.str.len,
 				zpos.str.addr, TREF(tpnotacidtime), dollar_trestart);
-			last_zpos_addr = zpos.str.addr;
-			last_caller = caller_str;
+			assert(MAX_ENTRYREF_LEN >= zpos.str.len);
+			memcpy(TADR(tpnotacid_last_zpos), zpos.str.addr, zpos.str.len);
+			TREF(tpnotacid_last_zpos_len) = zpos.str.len;
+			TREF(tpnotacid_last_caller) = caller_str;
 		}	/* send_msg might get duplicated but not considered likely or a problem */
 		if (dollar_trestart > (tries ? tries : TPNOTACID_DEF_MAX_TRIES))
 		{	/* hard limit; tries rarely zero as that is intended as a way of discovering not acid code */
