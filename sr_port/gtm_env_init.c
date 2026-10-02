@@ -44,6 +44,7 @@
 #include "parse_trctbl_groups.h"
 #include "tpnotacid_chk_inline.h"
 #include "cli.h"
+#include "jnl.h"
 #include "repl_filter.h"
 #include "gds_blk_upgrade.h"
 #include "mlkdef.h"
