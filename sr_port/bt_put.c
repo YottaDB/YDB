@@ -73,7 +73,10 @@ bt_rec_ptr_t bt_put(sgmnt_addrs *csa, block_id block)
 			{
 				cr = (cache_rec_ptr_t)GDS_ANY_REL2ABS(csa, lbt->cache_index);
 				if (cr->dirty)
-					wcs_get_space(reg, 0, cr);
+				{
+					assert(&FILE_INFO(gv_cur_region)->s_addrs == csa);
+					wcs_get_space(gv_cur_region, 0, cr);
+				}
 			}
 		}
 #		endif
