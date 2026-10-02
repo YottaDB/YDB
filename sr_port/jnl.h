@@ -541,35 +541,35 @@ MBSTART {															\
 	GBLREF uint4 		process_id;											\
 	GBLREF volatile int4	gtmMallocDepth;											\
 	GBLREF intrpt_state_t	intrpt_ok_state;										\
-	GBLREF boolean_t	gtm_white_box_test_case_enabled;								\
-	int			start_jnl_cleanup_wbox = gtm_white_box_test_case_count;						\
+	GBLREF boolean_t	ydb_white_box_test_case_enabled;								\
+	int			start_jnl_cleanup_wbox = ydb_white_box_test_case_count;						\
 																\
 	assert(!OK_TO_INTERRUPT);												\
 	if (WBTEST_ENABLED(WBTEST_JNL_CLEANUP))											\
 	{															\
-		if (!gtm_wbox_input_test_case_count && (JNL_CLEANUP_MUPIP_STOP <= gtm_white_box_test_case_count))		\
+		if (!gtm_wbox_input_test_case_count && (JNL_CLEANUP_MUPIP_STOP <= ydb_white_box_test_case_count))		\
 		{														\
 			gtm_wbox_input_test_case_count = JNL_CLEANUP_MUPIP_STOP;						\
-		} else if (!gtm_wbox_input_test_case_count && (JNL_CLEANUP_KILL9 <= gtm_white_box_test_case_count))		\
+		} else if (!gtm_wbox_input_test_case_count && (JNL_CLEANUP_KILL9 <= ydb_white_box_test_case_count))		\
 		{														\
 			gtm_wbox_input_test_case_count = JNL_CLEANUP_KILL9;							\
 		}														\
-		if ((JNL_CLEANUP_MUPIP_STOP <= gtm_white_box_test_case_count)							\
-				&& (gtm_wbox_input_test_case_count++ >= (gtm_white_box_test_case_count + 10)) 			\
+		if ((JNL_CLEANUP_MUPIP_STOP <= ydb_white_box_test_case_count)							\
+				&& (gtm_wbox_input_test_case_count++ >= (ydb_white_box_test_case_count + 10)) 			\
 				&& !have_crit(CRIT_IN_COMMIT | CRIT_IN_WTSTART)) 						\
 		{														\
-			gtm_white_box_test_case_enabled = FALSE;								\
+			ydb_white_box_test_case_enabled = FALSE;								\
 			for (int mustp = 0; mustp < 5; mustp++)									\
 			{													\
 				kill(process_id, SIGTERM);									\
 				SHORT_SLEEP(100);										\
 			}													\
 			assert(false);												\
-		} else if ((JNL_CLEANUP_KILL9 <= gtm_white_box_test_case_count)							\
-				&& (gtm_wbox_input_test_case_count++ >= (gtm_white_box_test_case_count + 10)) 			\
+		} else if ((JNL_CLEANUP_KILL9 <= ydb_white_box_test_case_count)							\
+				&& (gtm_wbox_input_test_case_count++ >= (ydb_white_box_test_case_count + 10)) 			\
 				&& !have_crit(CRIT_IN_COMMIT | CRIT_IN_WTSTART))						\
 		{														\
-			gtm_white_box_test_case_enabled = FALSE;								\
+			ydb_white_box_test_case_enabled = FALSE;								\
 			kill(process_id, SIGKILL);										\
 			LONG_SLEEP(10);												\
 			assert(false);												\

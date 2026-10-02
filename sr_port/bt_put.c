@@ -64,9 +64,9 @@ bt_rec_ptr_t bt_put(sgmnt_addrs *csa, block_id block)
 		bt = (bt_rec_ptr_t)((sm_uc_ptr_t)bt + bt->blkque.fl), lcnt++)
 	{
 #		ifdef DEBUG
-		if (gtm_white_box_test_case_enabled
-				&& (WBTEST_PHS1_NOSPACE == gtm_white_box_test_case_number)
-				&& (gtm_wbox_input_test_case_count < gtm_white_box_test_case_count))
+		if (ydb_white_box_test_case_enabled
+				&& (WBTEST_PHS1_NOSPACE == ydb_white_box_test_case_number)
+				&& (gtm_wbox_input_test_case_count < ydb_white_box_test_case_count))
 		{
 			lbt = (bt_rec_ptr_t)((sm_uc_ptr_t)(csa->th_base) + csa->th_base->tnque.fl - SIZEOF(th->tnque));
 			if (CR_NOTVALID != lbt->cache_index)

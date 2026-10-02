@@ -79,7 +79,7 @@ void stp_fini(unsigned char *strpool_base, size_t size)
 	char		buff[50], line[20], *fgets_res;
 	unsigned int	rss_before, rss_after;
 
-	if (WBTEST_ENABLED(WBTEST_MUNMAP_FREE) && (2 == gtm_white_box_test_case_count))
+	if (WBTEST_ENABLED(WBTEST_MUNMAP_FREE) && (2 == ydb_white_box_test_case_count))
 	{
 		SNPRINTF(buff, SIZEOF(buff), "ps -p %u -o rssize | grep -v RSS", getpid());
 		pf = POPEN(buff ,"r");

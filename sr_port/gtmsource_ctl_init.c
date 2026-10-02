@@ -500,7 +500,7 @@ int repl_ctl_close(repl_ctl_element *ctl)
 				if (NULL != ctl->repl_buff->buff[index].base_buff)
 				{
 #					ifdef DEBUG
-					if (WBTEST_ENABLED(WBTEST_MUNMAP_FREE) && (1 == gtm_white_box_test_case_count))
+					if (WBTEST_ENABLED(WBTEST_MUNMAP_FREE) && (1 == ydb_white_box_test_case_count))
 					{
 						SNPRINTF(buff, SIZEOF(buff), "ps -p %u -o rssize | grep -v RSS", getpid());
 						if (NULL == (pf = POPEN(buff ,"r")))
@@ -515,7 +515,7 @@ int repl_ctl_close(repl_ctl_element *ctl)
 						util_out_print("WBTEST_MUNMAP_FREE : VmRSS !UL kB", TRUE,
 												STRTOUL(line, NULL, 10));
 						/* Only need to signal the test once */
-						gtm_white_box_test_case_enabled = FALSE;
+						ydb_white_box_test_case_enabled = FALSE;
 					}
 #					endif
 					size = ctl->repl_buff->fc->jfh->alignsize + ctl->repl_buff->fc->fs_block_size;
