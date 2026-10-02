@@ -125,6 +125,11 @@ build-test:
 # docker images creation mechanism.
 .docker-create:
   stage: docker-create
+  # The package installs in the Dockerfiles fail when an Ubuntu, Debian or Rocky Linux mirror is
+  # mid-sync or unreachable
+  retry:
+    max: 1
+    when: script_failure
   script:
     - docker build --platform=${PLATFORM} ${ARGS} --provenance=false --pull -t yottadb/${REPO}:${DOCKERHUBTAG} -f ${DOCKERFILE} .
     - echo "$HUB_PASSWORD" | docker login --password-stdin -u "$HUB_USERNAME"
