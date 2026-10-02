@@ -232,6 +232,7 @@ enum shmget_caller
 #include <stdarg.h>
 #include <stdbool.h>
 
+#include <stdlib.h>	/* ahead of mdefsp.h, whose malloc()/free() macros would otherwise rewrite its prototypes */
 #include "mdefsa.h"
 #include "gtm_common_defs.h"
 #include "mdefsp.h"
