@@ -1268,15 +1268,15 @@ void stp_gcol_sort(size_t space_asked)	/* BYPASSOK */
 		|| (stringpool.invokestpgcollevel > stringpool.top))
 	{
 		stringpool.invokestpgcollevel = stringpool.top;
-	} else if (( STP_MIN_CONTRACTION < reserved_bytes) && (array < topstr))
+	} else if (( STP_MIN_CONTRACTION < reserved_bytes) && (sp_array < sp_topstr))
 	{	/* Contract the stringpool */
 		assert(stringpool.top > stringpool.invokestpgcollevel);
 		strpool_base = stringpool.base;
 		prev_stp_size = stringpool.lastallocbytes;
 		stp_init((ssize_t)(stringpool.invokestpgcollevel - stringpool.base));
 		assert(strpool_base != stringpool.base); /* Initiate a smaller space successfully */
-		cstr = array;
-		COPY2STPOOL(cstr, topstr);
+		cstr = sp_array;
+		COPY2STPOOL(cstr, sp_topstr);
 		(strpool_base == rts_stringpool.base) ? (rts_stringpool = stringpool) : (indr_stringpool = stringpool);
 		assert(0 < prev_stp_size);
 		stp_fini(strpool_base, prev_stp_size);

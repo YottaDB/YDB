@@ -724,7 +724,8 @@ void	op_view(int numarg, mval *keyword, ...)
 			break;
 		case VTK_STPGCOLFREE:
 			/* Garbage collect the runtime stringpool, then return to the operating system the physical memory of
-			 * the whole pages in its unused part, and of the free pages in the C library heap.
+			 * the whole pages in its unused part, and of the free pages in the C library heap. A garbage collection
+			 * that leaves enough of the stringpool unused shrinks it, which leaves less for the madvise() below.
 			 */
 			assert(stringpool.base == rts_stringpool.base);
 			INVOKE_STP_GCOL(0);
@@ -733,10 +734,9 @@ void	op_view(int numarg, mval *keyword, ...)
 			if (stp_free_start < stp_free_end)
 			{	/* MADV_DONTNEED frees the physical memory of these pages but keeps them mapped, so the stringpool
 				 * keeps its size, and a page reads back as zeros the next time it is used. No code relies on the
-				 * contents of the unused part of the stringpool. The range ends at or below "stringpool.top" so it
-				 * does not touch the gtm_malloc trailer or the C library header that follow the stringpool. The
-				 * C library sees the stringpool as one block in use, so malloc_trim() below does not release
-				 * these pages.
+				 * contents of the unused part of the stringpool. The range ends at or below "stringpool.top", short
+				 * of the spare space that "stp_init" maps past it. The stringpool is an anonymous mapping from
+				 * "stp_mmap" that malloc() does not manage, so malloc_trim() below does not release these pages.
 				 */
 				status = madvise(stp_free_start, stp_free_end - stp_free_start, MADV_DONTNEED);
 				assert(0 == status);
