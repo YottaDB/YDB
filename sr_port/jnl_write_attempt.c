@@ -362,7 +362,7 @@ uint4 jnl_write_attempt(jnl_private_control *jpc, uint4 threshold)
 			{
 				if (!is_proc_alive(holder_pid, 1))
 				{
-					COMPSWAP_UNLOCK(&jb->phase2_commit_latch, holder_pid, NULL, 0, NULL);
+					COMPSWAP_UNLOCK(&jb->phase2_commit_latch, holder_pid, 0);
 				}
 			}
 		}

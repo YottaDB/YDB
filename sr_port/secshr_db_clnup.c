@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -465,7 +465,7 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 					if (jbp->phase2_commit_latch.u.parts.latch_pid == process_id)
 					{
 						FIXUP_JBP_FREE_IF_NEEDED(jbp);
-						COMPSWAP_UNLOCK(&jbp->phase2_commit_latch, process_id, 0, LOCK_AVAILABLE, 0);
+						COMPSWAP_UNLOCK(&jbp->phase2_commit_latch, process_id, LOCK_AVAILABLE);
 					}
 					if (jbp->blocked == process_id)
 					{
