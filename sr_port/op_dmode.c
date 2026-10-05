@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -118,7 +118,8 @@ void	op_dmode(void)
 	if (io_curr_device.in->type == tt)
 	{
 		/* Read input from user, using readline or old direct mode */
-		if (NULL != readline_file) { /* readline_file set in io_init */
+		readline_check_and_loadlib(); /* sets readline_file on the first call if readline is requested */
+		if (NULL != readline_file) {
 			readline_read_mval(input_line);
 		} else {
 			dm_read(input_line);

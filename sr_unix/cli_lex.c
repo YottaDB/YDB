@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -422,6 +422,8 @@ char *cli_fgets(char *destbuffer, int buffersize, FILE *fp, boolean_t in_tp)
 	if (in_tp)
 		cli_lex_in_ptr->tp = NULL;
 
+	if (isatty(0))
+		readline_check_and_loadlib(); /* sets readline_file on the first call if readline is requested */
 	if ((NULL != readline_file) && isatty(0)) {
 		/* NB:
 		 * Unlike the FGETS_FILE call, this code does not return \n as part of the read;

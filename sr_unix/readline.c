@@ -36,6 +36,7 @@
 #include "stringpool.h"
 #include "deferred_events_queue.h"
 #include "cli.h"
+#include "invocation_mode.h"
 
 #include "readline.h"
 
@@ -164,12 +165,24 @@ LITREF gtmImageName		gtmImageNames[];
 /* This function checks the env var ydb_readline and then tries to dlopen libreadline.so.
  * If everything goes fine, then we call readline_init. Sets readline_file to a file name
  * as a signal of success.
+ *
+ * It is called just before the first read from a terminal in direct mode or at a DSE/LKE/MUPIP prompt,
+ * not at process startup. That way, a process that never reads from a terminal through readline (e.g. one
+ * whose input is a file or pipe, or a "yottadb -run" that never enters direct mode) does not pay the cost of
+ * loading the readline library and the history file, does not create the history file, and does not issue a
+ * READLINEFILEPERM warning. Only the first call does anything; later calls return immediately.
  */
 void readline_check_and_loadlib(void) {
+	static boolean_t	load_attempted;	/* Only used in this function so not using STATICDEF */
 	void			*readline_handle = NULL;
 	boolean_t		readline_requested = FALSE;
 	boolean_t		setup_succeeded = FALSE;
 
+	if (load_attempted)
+		return;
+	load_attempted = TRUE;
+	if (MUMPS_CALLIN == invocation_mode)
+		return;
 	/* $ydb_readline=1 */
 	readline_requested = ydb_logical_truth_value(YDBENVINDX_READLINE, FALSE, NULL);
 

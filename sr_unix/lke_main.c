@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -65,7 +65,6 @@
 #include "have_crit.h"
 #include "gt_timers_add_safe_hndlrs.h"
 #include "continue_handler.h"
-#include "readline.h"
 #include "restrict.h"
 #include "dm_audit_log.h"
 #include "dpgbldir_sysops.h"	/* for dpzgbini prototype */
@@ -124,7 +123,6 @@ int lke_main(int argc, char *argv[], char **envp)
 	cli_ret = cli_lex_setup(argc, argv);
 	if (cli_ret)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) cli_ret, 2, LEN_AND_STR(cli_err_str));
-	readline_check_and_loadlib(); /* sets readline_file */
 	/*      this should be after cli_lex_setup() due to S390 A/E conversion    */
 	OPERATOR_LOG_MSG;
 	while (1)
