@@ -3,7 +3,7 @@
  * Copyright (c) 2015-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -20,6 +20,7 @@
 #include "gtm_pthread.h"
 
 #include <errno.h>
+#include <execinfo.h>		/* for backtrace */
 
 #include "gtm_multi_thread.h"
 #include "iosp.h"		/* for SS_NORMAL */
@@ -120,6 +121,7 @@ int	gtm_multi_thread(gtm_pthread_fnptr_t fnptr, int ntasks, int max_threads,
 	 * In addition, the pthread_* functions are not async-signal-safe so it is better to block those signals
 	 * when we use those functions below.
 	 */
+	gtm_pthread_exit_preload();
 	assert(blocksig_initialized);
 	SIGPROCMASK(SIG_BLOCK, &block_sigsent, &savemask, rc);
 	DEBUG_ONLY(error_line = 0;)
@@ -182,6 +184,22 @@ int	gtm_multi_thread(gtm_pthread_fnptr_t fnptr, int ntasks, int max_threads,
 	 */
 #	endif
 	return final_ret;
+}
+
+/* glibc's "pthread_exit" needs the unwinder in libgcc_s.so.1, which it loads with "dlopen" the first time it is called.
+ * If that load fails (e.g. because the thread is exiting after an out-of-memory error), glibc aborts the process instead of
+ * letting the thread exit. "backtrace" needs the same library and loads it the same way, so calling it once, in the main
+ * thread before creating a thread that can call "pthread_exit", does that load while memory is still available.
+ * A failure here is not reported since "backtrace" just returns 0 in that case. "preloaded" is set only on success so
+ * that a load that failed (e.g. under a temporary memory shortage) is attempted again before the next thread is created.
+ */
+void	gtm_pthread_exit_preload(void)
+{
+	static boolean_t	preloaded;
+	void			*frame;
+
+	if (!preloaded && backtrace(&frame, 1))
+		preloaded = TRUE;
 }
 
 #ifdef GTM_PTHREAD

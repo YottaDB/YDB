@@ -3,7 +3,7 @@
  * Copyright (c) 2015-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -22,6 +22,7 @@ typedef	void *(*gtm_pthread_fnptr_t)(void *parm);
 
 int	gtm_multi_thread(gtm_pthread_fnptr_t fnptr, int ntasks, int max_threads,
 			 pthread_t *thr_array, void **ret_array, void *parmarray, int parmElemSize);
+void	gtm_pthread_exit_preload(void);
 
 GBLREF	boolean_t	multi_thread_in_use;		/* TRUE => threads are in use. FALSE => not in use */
 GBLREF	boolean_t	thread_mutex_initialized;	/* TRUE => "thread_mutex" variable is initialized */

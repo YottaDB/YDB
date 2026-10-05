@@ -3,7 +3,7 @@
  * Copyright (c) 2016-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -41,6 +41,7 @@
 #include <stdint.h>
 #include "gtm_poll.h"
 #include "gtm_stdlib.h"
+#include "gtm_multi_thread.h"	/* for gtm_pthread_exit_preload */
 
 /* aio_shim.c: serves as a "shim" between both POSIX AIO and Linux AIO
  * interfaces. Because POSIX AIO is truly asynchronous from the client's
@@ -442,6 +443,7 @@ STATICFNDCL int aio_shim_thread_init(gd_addr *gd)
 	 *    variable to TRUE to ensure that macro goes through "pthread_sigmask" and not "sigprocmask".
 	 *    But that has its own race conditions so we skip the macro and directly call "pthread_sigmask".
 	 */
+	gtm_pthread_exit_preload();	/* the worker thread can call "pthread_exit" */
 	ret = pthread_sigmask(SIG_BLOCK, &block_worker, &savemask);
 	assert(0 == ret);
 	UNUSED(ret);
