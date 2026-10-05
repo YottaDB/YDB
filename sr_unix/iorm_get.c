@@ -3,7 +3,7 @@
  * Copyright (c) 2006-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -28,6 +28,7 @@
 #include "stringpool.h"
 #include "gt_timer.h"
 #include "gtmio.h"
+#include "gtm_poll.h"
 #include "have_crit.h"
 #include "eintr_wrappers.h"
 #include "wake_alarm.h"

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -584,6 +584,8 @@ MBSTART {											\
 		RLEN = -1;									\
 } MBEND
 
+#define PIPE_READ_POLL_MSEC	100	/* Longest DOREADRLTO2 waits in poll() before rechecking its timeout flag */
+
 #define DOREADRLTO2(FDESC, FBUFF, FBUFF_LEN, TOFLAG, BLOCKED_IN, ISPIPE, FLAGS, RLEN,				\
 			TOT_BYTES_READ, TIMER_ID, NSEC_TIMEOUT, PIPE_ZERO_TIMEOUT, UTF_VAR_PF, PIPE_OR_FIFO)	\
 MBSTART {													\
@@ -643,7 +645,34 @@ MBSTART {													\
 		/* if we didn't read 1 character or it's an error don't read anymore now */			\
 		if (skip_read)											\
 			break;											\
-		if (-1 != (gtmioStatus = read(FDESC, gtmioBuff, gtmioBuffLen)))					\
+		/* A timed read of a PIPE or FIFO relies on its timer's SIGALRM to interrupt a blocking		\
+		 * read(). A timer that pops after one read() returns (e.g. with a partial line) and before	\
+		 * the next one starts interrupts nothing, and that read() blocks until more input arrives.	\
+		 * So wait for input with poll(), at most PIPE_READ_POLL_MSEC at a time, and give up as		\
+		 * soon as TOFLAG is set. A gtmioStatus of -1 here makes the code below treat it like a		\
+		 * read() that returned EINTR.									\
+		 */												\
+		gtmioStatus = 0;										\
+		if (PIPE_OR_FIFO && (0 != *(NSEC_TIMEOUT)) && (NO_M_TIMEOUT != *(NSEC_TIMEOUT)))		\
+		{												\
+			struct pollfd	gtmioPollFd;								\
+														\
+			gtmioPollFd.fd = FDESC;									\
+			gtmioPollFd.events = POLLIN;								\
+			for (;;)										\
+			{											\
+				if (TOFLAG)									\
+				{										\
+					gtmioStatus = -1;							\
+					errno = EINTR;								\
+					break;									\
+				}										\
+				gtmioPollFd.revents = 0;							\
+				if (0 != (gtmioStatus = poll(&gtmioPollFd, 1, PIPE_READ_POLL_MSEC)))		\
+					break;									\
+			}											\
+		}												\
+		if ((-1 != gtmioStatus) && (-1 != (gtmioStatus = read(FDESC, gtmioBuff, gtmioBuffLen))))	\
 		{												\
 			gtmioBuffLen -= gtmioStatus;								\
 			if (0 == gtmioBuffLen || 0 == gtmioStatus)						\

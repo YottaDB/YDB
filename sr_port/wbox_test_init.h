@@ -261,6 +261,8 @@ typedef enum {
 						 * wcs_get_space() is actually reached without having to starve the cache */
 	WBTEST_YDB_READLINE_TRUNCFAIL,		/* 411 : Behave as if readline's "history_truncate_file()" failed without trimming
 						 * the history file, to exercise the fallback in "readline_write_history()" */
+	WBTEST_YDB_PIPE_READ_TIMER_POP,		/* 412 : A timed READ of a PIPE waits for its timer to pop after each read()
+						 * that returns input and before the next read() */
 } wbtest_code_t;
 
 #if defined (DEBUG) && !defined (STATIC_ANALYSIS)

@@ -27,6 +27,7 @@
 #include "stringpool.h"
 #include "gt_timer.h"
 #include "gtmio.h"
+#include "gtm_poll.h"
 #include "have_crit.h"
 #include "eintr_wrappers.h"
 #include "wake_alarm.h"
@@ -154,6 +155,7 @@ int	iorm_readfl (mval *v, int4 width, uint8 nsec_timeout) /* timeout in nanoseco
 	FILE		*filstr;
 	boolean_t	pipe_zero_timeout = FALSE;
 	boolean_t	pipe_or_fifo = FALSE;
+	int		wb_sleeps;
 	boolean_t	follow_timeout = FALSE;
 	boolean_t	bom_timeout = FALSE;
 	int		follow_width;
@@ -904,6 +906,11 @@ int	iorm_readfl (mval *v, int4 width, uint8 nsec_timeout) /* timeout in nanoseco
 									(status > 0) ? status : chunk_bytes_read, NULL);
 							rm_ptr->read_occurred = TRUE;
 							rm_ptr->done_1st_read = TRUE;
+						}
+						if (WBTEST_ENABLED(WBTEST_YDB_PIPE_READ_TIMER_POP) && timed && (0 < status))
+						{	/* Let the timer pop after this read() and before the next one */
+							for (wb_sleeps = 0; !out_of_time && (6000 > wb_sleeps); wb_sleeps++)
+								SHORT_SLEEP(10);
 						}
 					}
 					PIPE_DEBUG(PRINTF(" M 4: read chunk  status: %d chunk_bytes_read: %d\n",
