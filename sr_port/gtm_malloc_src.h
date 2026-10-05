@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -78,6 +78,7 @@
 #include "deferred_exit_handler.h"
 #include "deferred_events_queue.h"
 #include "deferred_events.h"
+#include "wbox_test_init.h"
 
 /* This routine is compiled twice, once as debug and once as pro and put into the same pro build. The alternative
  * memory manager is selected with the debug flags (any non-zero ydb_dbglvl setting invokes debug memory manager in
@@ -119,6 +120,17 @@
 #define TAIL_CALL_LEVEL 1
 #endif
 
+/* gtm_malloc_dbg.c expands this header with DEBUG defined even in a pro build, and defines PRO_BUILD
+ * along with it. The white box globals exist only in a DEBUG build, so the white box case below has
+ * to expand only when this is one.
+ */
+#if !defined(DEBUG) || defined(PRO_BUILD)
+#define WBTEST_HOLD_FORK_LOCK_IN_MALLOC_ONLY(SIZE)
+#else
+#define WBTEST_HOLD_FORK_LOCK_IN_MALLOC_ONLY(SIZE)							\
+	WBTEST_ONLY(WBTEST_HOLD_FORK_LOCK_IN_MALLOC, wbox_hold_fork_lock_in_malloc(SIZE);)
+#endif
+
 /* #GTM_THREAD_SAFE : The below macro (MALLOC) is thread-safe because caller ensures serialization with locks */
 #  define MALLOC(SIZE, ADDR) 										\
 MBSTART{												\
@@ -127,6 +139,7 @@ MBSTART{												\
 													\
 	assert(IS_PTHREAD_LOCKED_AND_HOLDER);								\
 	DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, PREV_INTRPT_STATE);				\
+	WBTEST_HOLD_FORK_LOCK_IN_MALLOC_ONLY(SIZE);							\
 	ADDR = (void *)malloc(SIZE);									\
 	ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, PREV_INTRPT_STATE);				\
 	if (NULL == (void *)ADDR)									\
@@ -1467,6 +1480,7 @@ void *system_malloc(size_t size)
 	boolean_t	was_holder;
 
 	DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
+	WBTEST_HOLD_FORK_LOCK_IN_MALLOC_ONLY(size);
 	rval = malloc(size);
 	if (!rval)
 	{

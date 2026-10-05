@@ -291,6 +291,7 @@ GBLDEF	cache_rec_ptr_t	cr_array[((MAX_BT_DEPTH * 2) - 1) * 2];	/* Maximum number
 GBLDEF	unsigned int	cr_array_index;
 GBLDEF	boolean_t	need_core;		/* Core file should be created */
 GBLDEF	boolean_t	created_core;		/* core file was created */
+GBLDEF	boolean_t	fork_n_core_deferred;	/* "deferred_exit_handler" to fork a core that "generic_signal_handler" did not */
 GBLDEF	unsigned int	core_in_progress;	/* creating core NOW if > 0 */
 GBLDEF	boolean_t	dont_want_core;		/* Higher level flag overrides need_core set by lower level rtns */
 GBLDEF	void		(*exit_handler_fptr)();	/* Function pointer for exit handler */

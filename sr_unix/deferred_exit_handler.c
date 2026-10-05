@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -42,6 +42,7 @@
 
 GBLREF	int4			exi_condition;
 GBLREF	int4			forced_exit_err;
+GBLREF	boolean_t		fork_n_core_deferred;
 GBLREF	uint4			process_id;
 GBLREF	gtmsiginfo_t		signal_info;
 GBLREF	enum gtmImageTypes	image_type;
@@ -107,6 +108,13 @@ void deferred_exit_handler(void)
 		ENABLE_INTERRUPTS(INTRPT_NO_TIMER_EVENTS, prev_intrpt_state);
 	}
 #	endif
+	if (fork_n_core_deferred)
+	{	/* "generic_signal_handler" wanted a core but could not fork one safely at the time. Interrupts are now
+		 * enabled, so fork it here, before "signal_exit_handler" runs (it writes the zshow dump only after a core).
+		 */
+		fork_n_core_deferred = FALSE;
+		gtm_fork_n_core();
+	}
 	/* If we are using alternate signal handling, retrieve the signal number from `sig_num` field which was
 	 * stored using the ALTERNATE_SIGHANDLING_SAVE_SIGNUM macro in `generic_signal_handler.c`. This is because
 	 * we would not have done a FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED invocation in that case.

@@ -119,6 +119,7 @@ GBLREF	int4			exi_condition;
 GBLREF	boolean_t		dont_want_core;
 GBLREF	boolean_t		created_core;
 GBLREF	boolean_t		need_core;
+GBLREF	boolean_t		fork_n_core_deferred;
 GBLREF	uint4			process_id;
 GBLREF	volatile int4		exit_state;
 GBLREF	ABS_TIME		mu_stop_tm_array[EXIT_IMMED - 1]; /* Save times of previous MUPIP STOPs */
@@ -484,7 +485,15 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context, boolean_t i
 						if (non_forwarded_sig_seen[exit_state])
 							exit_state++;	/* Make exit pending, may still be tolerant though */
 						need_core = TRUE;
-						MULTI_THREAD_AWARE_FORK_N_CORE(signal_forwarded);
+						/* If this thread was interrupted inside malloc(), a fork() now can wait forever for
+						 * a lock that the interrupted malloc() holds, as an allocator (ASAN's for one) can
+						 * take its lock in a fork() handler. Leave the core to "deferred_exit_handler" then.
+						 */
+						if (signal_forwarded || (INTRPT_IN_FUNC_WITH_MALLOC != intrpt_ok_state))
+						{
+							MULTI_THREAD_AWARE_FORK_N_CORE(signal_forwarded);
+						} else
+							fork_n_core_deferred = TRUE;
 						DECREMENT_IN_OS_SIGNAL_HANDLER_IF_NEEDED;
 						CLEANUP_AND_RETURN(got_tlevel_lock);
 					}

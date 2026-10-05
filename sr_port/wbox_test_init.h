@@ -31,6 +31,7 @@ REFTYPE	int		ydb_white_box_test_case_count;
 REFTYPE	int 		gtm_wbox_input_test_case_count;
 
 void wbox_test_init(void);
+void wbox_hold_fork_lock_in_malloc(size_t size);
 
 /* List of whitebox testcases */
 typedef enum {
@@ -263,7 +264,13 @@ typedef enum {
 						 * the history file, to exercise the fallback in "readline_write_history()" */
 	WBTEST_YDB_PIPE_READ_TIMER_POP,		/* 412 : A timed READ of a PIPE waits for its timer to pop after each read()
 						 * that returns input and before the next read() */
+	WBTEST_HOLD_FORK_LOCK_IN_MALLOC,	/* 413 : Before the first malloc() of WBTEST_HOLD_FORK_LOCK_MIN_SIZE bytes or more,
+						 * hold a lock that a pthread_atfork() prepare handler also takes, and sleep,
+						 * so a signal sent then interrupts code that a fork() would deadlock with */
 } wbtest_code_t;
+
+#define	WBTEST_HOLD_FORK_LOCK_MIN_SIZE	(64 * 1024 * 1024)	/* Size of the malloc() that WBTEST_HOLD_FORK_LOCK_IN_MALLOC stops */
+#define	WBTEST_HOLD_FORK_LOCK_SECONDS	5			/* How long WBTEST_HOLD_FORK_LOCK_IN_MALLOC holds the lock */
 
 #if defined (DEBUG) && !defined (STATIC_ANALYSIS)
 /* Make sure to setenv ydb_white_box_test_case_count if you are going to use GTM_WHITE_BOX_TEST */
