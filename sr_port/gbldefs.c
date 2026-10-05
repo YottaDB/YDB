@@ -1457,6 +1457,8 @@ GBLDEF int			(*frl_restore_state)(struct readline_state*);
 GBLDEF int			(*frl_bind_key_in_map)(int, rl_command_func_t *, Keymap);
 GBLDEF Keymap			(*frl_get_keymap)(void);
 GBLDEF int			(*fhistory_truncate_file)(const char *, int);
+GBLDEF void			(*fclear_history)(void);
+GBLDEF int			(*fwrite_history)(const char *);
 /* Readline library variables = v + variable name */
 GBLDEF char			**vrl_readline_name;
 GBLDEF char			**vrl_prompt;

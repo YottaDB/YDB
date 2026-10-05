@@ -10,6 +10,7 @@
  *								*
  ****************************************************************/
 #include <dlfcn.h>
+#include <errno.h>
 
 #include "mdef.h"
 #include "op.h"
@@ -32,6 +33,7 @@
 #include "eintr_wrappers.h" //CLOSE
 #include "ydb_logical_truth_value.h"
 #include "ydb_trans_log_name.h"
+#include "wbox_test_init.h"
 #include "gtmimagename.h"
 #include "stringpool.h"
 #include "deferred_events_queue.h"
@@ -234,6 +236,8 @@ void readline_init(void* handle) {
 	frl_bind_key_in_map		= dlsym(handle, "rl_bind_key_in_map");
 	frl_get_keymap			= dlsym(handle, "rl_get_keymap");
 	fhistory_truncate_file		= dlsym(handle, "history_truncate_file");
+	fclear_history			= dlsym(handle, "clear_history");
+	fwrite_history			= dlsym(handle, "write_history");
 	SYM				= 1;
 	vrl_readline_name		= dlsym(handle, "rl_readline_name");
 	vrl_prompt			= dlsym(handle, "rl_prompt");
@@ -275,6 +279,8 @@ void readline_init(void* handle) {
 				&& frl_bind_key_in_map
 				&& frl_get_keymap
 				&& fhistory_truncate_file
+				&& fclear_history
+				&& fwrite_history
 				&& SYM
 				&& vrl_readline_name
 				&& vrl_prompt
@@ -337,6 +343,8 @@ void readline_init(void* handle) {
 
 /* Writes history; called by various functions in YottaDB at shutdown */
 void readline_write_history(void) {
+	int	status;
+
 	if (NULL != readline_file) {
 		/* Clamp the number of entries to append to the file to the maximum runtime list */
 		if (ydb_rl_entries_count > *vhistory_max_entries)
@@ -344,7 +352,23 @@ void readline_write_history(void) {
 		/* Append session history to readline file */
 		fappend_history(ydb_rl_entries_count, readline_file);
 		/* Truncate the file to 1000 entries; we have no setting right now to change this. */
-		fhistory_truncate_file(readline_file, 1000);
+		if (WBTEST_ENABLED(WBTEST_YDB_READLINE_TRUNCFAIL))
+			status = ENOENT;	/* Behave as if "history_truncate_file()" failed without trimming the file */
+		else
+			status = fhistory_truncate_file(readline_file, 1000);
+		if (0 != status) {
+			/* Some readline builds have a "history_truncate_file()" that always fails without trimming the file
+			 * (e.g. one that opens its temporary file without O_CREAT). Without the code below, the file would then
+			 * grow without limit, and every process that loads it would take longer to start. So do the truncation
+			 * here instead. Read the file as it is now (which includes the entries other concurrent sessions
+			 * appended) into an empty history list that keeps only the last 1000 entries, and write that list over
+			 * the file. The result is the same as what a working "history_truncate_file()" would have produced.
+			 */
+			fclear_history();
+			fstifle_history(1000);
+			if (0 == fread_history(readline_file))
+				fwrite_history(readline_file);
+		}
 		gtm_free(readline_file);
 		readline_file = NULL;
 	}

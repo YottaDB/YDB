@@ -259,6 +259,8 @@ typedef enum {
 						 * without waiting UNIX_GETSPACEWAIT iterations to get there, and make
 						 * db_csh_getn() reuse dirty cache records on its first pass so that
 						 * wcs_get_space() is actually reached without having to starve the cache */
+	WBTEST_YDB_READLINE_TRUNCFAIL,		/* 411 : Behave as if readline's "history_truncate_file()" failed without trimming
+						 * the history file, to exercise the fallback in "readline_write_history()" */
 } wbtest_code_t;
 
 #if defined (DEBUG) && !defined (STATIC_ANALYSIS)
