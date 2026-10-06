@@ -235,7 +235,14 @@ void clear_fake_enospc_if_master_dead(void);
  */
 /* #GTM_THREAD_SAFE : The below macro (WAIT_FOR_REPL_INST_UNFREEZE) is thread-safe */
 #define WAIT_FOR_REPL_INST_UNFREEZE(CSA)											\
-		wait_for_repl_inst_unfreeze(CSA)
+		wait_for_repl_inst_unfreeze(CSA, FALSE)
+
+/* Same as WAIT_FOR_REPL_INST_UNFREEZE except that if an exit request is pending, it returns FALSE instead of calling EXIT().
+ * This lets the caller release resources it holds (e.g. the journal pool lock) before exiting. Returns TRUE otherwise.
+ */
+/* #GTM_THREAD_SAFE : The below macro (WAIT_FOR_REPL_INST_UNFREEZE_OR_EXIT_REQUEST) is thread-safe */
+#define WAIT_FOR_REPL_INST_UNFREEZE_OR_EXIT_REQUEST(CSA)									\
+		wait_for_repl_inst_unfreeze(CSA, TRUE)
 
 /* This is a safer version of the WAIT_FOR_REPL_INST_UNFREEZE macro, which waits for the instance freeze
  * to be lifted off but is not sure if the process has access to the journal pool yet.
@@ -261,7 +268,7 @@ void clear_fake_enospc_if_master_dead(void);
 	WAIT_FOR_REPL_INST_UNFREEZE_NOCSA_JPL(jnlpool);					\
 }
 #define	WAIT_FOR_REPL_INST_UNFREEZE_NOCSA_JPL(JPL)					\
-		wait_for_repl_inst_unfreeze_nocsa_jpl(JPL)
+		wait_for_repl_inst_unfreeze_nocsa_jpl(JPL, FALSE)
 
 #define WAIT_FOR_REPL_INST_UNFREEZE_NOCSA_SAFE				\
 {									\
@@ -537,7 +544,10 @@ static inline boolean_t instance_freeze_honored(sgmnt_addrs *csa, jnlpool_addrs_
 				|| ((NULL != csa->nl) && (csa->nl->onln_rlbk_pid))));
 }
 
-static inline void wait_for_repl_inst_unfreeze_nocsa_jpl(jnlpool_addrs_ptr_t jpl)
+/* Waits for the instance freeze to be lifted. If an exit request is pending, calls EXIT() if "return_on_exit" is FALSE and
+ * returns FALSE if it is TRUE. Returns TRUE once the freeze is lifted.
+ */
+static inline boolean_t wait_for_repl_inst_unfreeze_nocsa_jpl(jnlpool_addrs_ptr_t jpl, boolean_t return_on_exit)
 {
 	GBLREF	int4			exit_state;
 	GBLREF	int4			exi_condition;
@@ -553,6 +563,8 @@ static inline void wait_for_repl_inst_unfreeze_nocsa_jpl(jnlpool_addrs_ptr_t jpl
 	{
 		if (exit_state != 0)
 		{
+			if (return_on_exit)
+				return FALSE;
 			forced_exit_err_display();
 			EXIT(-exi_condition);
 		}
@@ -576,9 +588,11 @@ static inline void wait_for_repl_inst_unfreeze_nocsa_jpl(jnlpool_addrs_ptr_t jpl
 		DEBUG_ONLY(CLEAR_FAKE_ENOSPC_IF_MASTER_DEAD);
 	}
 	SET_FREEZE_INVISIBLE_IF_DEFERRING(TREF(defer_instance_freeze));
+	return TRUE;
 }
 
-static inline void wait_for_repl_inst_unfreeze(sgmnt_addrs *csa)
+/* See "wait_for_repl_inst_unfreeze_nocsa_jpl" for "return_on_exit" and the return value */
+static inline boolean_t wait_for_repl_inst_unfreeze(sgmnt_addrs *csa, boolean_t return_on_exit)
 {
 	gd_region		*reg;
 	jnlpool_addrs_ptr_t	local_jnlpool;	/* needed by INSTANCE_FREEZE_HONORED */
@@ -594,7 +608,8 @@ static inline void wait_for_repl_inst_unfreeze(sgmnt_addrs *csa)
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_MUINSTFROZEN, 5, CTIME_BEFORE_NL, &time_str[0],
 					local_jnlpool->repl_inst_filehdr->inst_info.this_instname, DB_LEN_STR(reg));
 		}
-		WAIT_FOR_REPL_INST_UNFREEZE_NOCSA_JPL(local_jnlpool);
+		if (!wait_for_repl_inst_unfreeze_nocsa_jpl(local_jnlpool, return_on_exit))
+			return FALSE;
 		if (!IS_GTM_IMAGE)
 		{
 			GET_CUR_TIME(time_str);
@@ -602,6 +617,7 @@ static inline void wait_for_repl_inst_unfreeze(sgmnt_addrs *csa)
 					local_jnlpool->repl_inst_filehdr->inst_info.this_instname, DB_LEN_STR(reg));
 		}
 	}
+	return TRUE;
 }
 
 #endif	/* #ifndef ANTICIPATORY_FREEZE_H */

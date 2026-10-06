@@ -3,7 +3,7 @@
  * Copyright (c) 2012-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -134,6 +134,11 @@ void wait_for_disk_space(sgmnt_addrs *csa, char *fn, int fd, off_t offset, char 
 			send_msg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_DSKNOSPCAVAIL, 2, fn_len, fn);
 		} else if (exit_state != 0)
 		{
+			/* Release the journal pool lock if we obtained it above so the exit handler does not find
+			 * it held when it finishes an in-progress commit.
+			 */
+			if (!was_crit)
+				rel_lock(jnlpool->jnlpool_dummy_reg);
 			forced_exit_err_display();
 			EXIT(-exi_condition);
 		}
@@ -149,7 +154,11 @@ void wait_for_disk_space(sgmnt_addrs *csa, char *fn, int fd, off_t offset, char 
 				&& (STRCMP(wait_comment, jnlpool->jnlpool_ctl->freeze_comment) != 0))
 		{
 			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_DSKNOSPCBLOCKED, 2, fn_len, fn);
-			WAIT_FOR_REPL_INST_UNFREEZE(csa);
+			/* Do not let the wait call EXIT() on an exit request as we might hold the journal pool lock.
+			 * Instead, go to the top of the loop which releases the lock before the EXIT().
+			 */
+			if (!WAIT_FOR_REPL_INST_UNFREEZE_OR_EXIT_REQUEST(csa))
+				continue;
 		}
 		LSEEKWRITE(fd, offset, buf, count, tmp_errno);
 #		ifdef DEBUG
