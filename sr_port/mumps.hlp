@@ -12568,8 +12568,8 @@
 
    $ZMAXTPTIME can be SET but cannot be NEWed.
 
-   $ZMAXTPTIME takes its value from the environment variable ydb_zmaxtptime.
-   If ydb_zmaxtptime is not defined, the initial value of $ZMAXTPTIME is zero
+   $ZMAXTPTIME takes its value from the environment variable ydb_maxtptime.
+   If ydb_maxtptime is not defined, the initial value of $ZMAXTPTIME is zero
    (0) seconds which indicates "no timeout" (unlimited time). The value of
    $ZMAXTPTIME when a transaction's outermost TSTART operation executes
    determines the timeout setting for that transaction.
@@ -12579,9 +12579,11 @@
 
    **Note**
 
-   Negative values of $ZMAXTPTIME are also treated as "no timeout". Timeouts
-   apply only to the outermost transaction, that is, $ZMAXTPTIME has no
-   effect when TSTART is nested within another transaction.
+   $ZMAXTPTIME accepts values from 0 to 60 seconds. A SET of a value outside
+   that range leaves $ZMAXTPTIME unchanged, and a value of ydb_maxtptime
+   outside that range is ignored. Timeouts apply only to the outermost
+   transaction, that is, $ZMAXTPTIME has no effect when TSTART is nested
+   within another transaction.
 
    Example:
 
