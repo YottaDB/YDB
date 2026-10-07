@@ -3,7 +3,7 @@
 # Copyright (c) 2013-2023 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
-# Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 # Copyright (c) 2017-2018 Stephen L Johnson.			#
@@ -128,6 +128,15 @@ if (CMAKE_COMPILER_IS_GNUCC)
   endif()
   if(ENABLE_AUTO_VAR_INIT_PATTERN AND ${CMAKE_C_COMPILER_VERSION} VERSION_GREATER_EQUAL "12.0.0")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -ftrivial-auto-var-init=pattern")
+  endif()
+  if(("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "aarch64") AND ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug"))
+    # On AARCH64, gcc builds that have both a stack protector and -fstack-clash-protection (the default on Ubuntu) in effect
+    # can generate incorrect unwind information (https://gcc.gnu.org/bugzilla/show_bug.cgi?id=119610) for functions with a
+    # large stack frame. Unwinding through such a function, which "caller_id()" does by calling "backtrace()", then terminates
+    # the process with a SIG-11. So disable stack clash protection. Only Debug builds have a stack protector (see
+    # -fstack-protector-all below), so other builds keep stack clash protection. The gcc version does not tell whether the
+    # compiler has the fix, as distributions backport fixes without changing the version.
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fno-stack-clash-protection")
   endif()
 else()
   if(${CMAKE_C_COMPILER_VERSION} VERSION_GREATER_EQUAL "13.0.0")
