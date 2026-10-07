@@ -1038,6 +1038,7 @@ MBSTART {												\
 	if (lclReg != gv_cur_region)									\
 	{												\
 		gv_cur_region = lclReg;									\
+		COMPILER_FENCE(memory_order_release);							\
 		if (IS_REG_BG_OR_MM(lclReg))								\
 		{											\
 			assert(lclReg->open);								\
