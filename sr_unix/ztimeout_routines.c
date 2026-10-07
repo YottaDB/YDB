@@ -60,7 +60,6 @@
 #include "nametabtyp.h"
 #include "namelook.h"
 #endif
-#include "is_equ.h"		/* for MV_FORCE_NSTIMEOUT macro */
 
 GBLREF	boolean_t		ydb_white_box_test_case_enabled, ztrap_explicit_null;
 GBLREF	dollar_ecode_type	dollar_ecode;

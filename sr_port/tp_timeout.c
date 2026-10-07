@@ -127,7 +127,7 @@ void tp_start_timer(int4 timeout_milliseconds)
 {
 	assert(!in_timed_tn);
 	SHOWTIME(asccurtime);
-	DBGDFRDEVNT((stderr, "%d %s %s: tp_start_timer - tptimeout: %d\n", __LINE__, __FILE__, asccurtime, timeout_seconds));
+	DBGDFRDEVNT((stderr, "%d %s %s: tp_start_timer - tptimeout: %d\n", __LINE__, __FILE__, asccurtime, timeout_milliseconds));
 	in_timed_tn = TRUE;
 	start_timer(TP_TIMER_ID, ((uint8)NANOSECS_IN_MSEC * timeout_milliseconds), &tp_expire_now, 0, NULL);
 }

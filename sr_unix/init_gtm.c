@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -73,7 +73,7 @@ GBLREF void		(*stx_error_va_fptr)(int in_error, va_list args);	/* Function point
 										 */
 GBLREF void		(*tp_timeout_action_ptr)(void);
 GBLREF void		(*tp_timeout_clear_ptr)(void);
-GBLREF void		(*tp_timeout_start_timer_ptr)(int4 tmout_sec);
+GBLREF void		(*tp_timeout_start_timer_ptr)(int4 timeout_milliseconds);
 GBLREF void		(*unw_prof_frame_ptr)(void);
 #ifdef GTM_PTHREAD
 GBLREF pthread_t	gtm_main_thread_id;

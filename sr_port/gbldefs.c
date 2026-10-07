@@ -333,7 +333,7 @@ GBLDEF	gtmsource_options_t	gtmsource_options;
 GBLDEF	gtmrecv_options_t	gtmrecv_options;
 
 GBLDEF	boolean_t		is_tracing_on;
-GBLDEF	void			(*tp_timeout_start_timer_ptr)(int4 tmout_sec) = tp_start_timer_dummy;
+GBLDEF	void			(*tp_timeout_start_timer_ptr)(int4 timeout_milliseconds) = tp_start_timer_dummy;
 GBLDEF	void			(*tp_timeout_clear_ptr)(void) = tp_clear_timeout_dummy;
 GBLDEF	void			(*tp_timeout_action_ptr)(void) = tp_timeout_action_dummy;
 GBLDEF	void			(*ctrlc_handler_ptr)(void) = ctrlc_handler_dummy;

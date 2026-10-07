@@ -83,7 +83,7 @@ GBLREF	tp_region		*tp_reg_list, *tp_reg_free_list;
 GBLREF	trans_num		local_tn;		/* transaction number for THIS PROCESS */
 GBLREF	trans_num		tstart_local_tn;	/* copy of global variable "local_tn" at op_tstart time */
 GBLREF	boolean_t		mupip_jnl_recover;
-GBLREF 	void			(*tp_timeout_start_timer_ptr)(int4 tmout_sec);
+GBLREF 	void			(*tp_timeout_start_timer_ptr)(int4 timeout_milliseconds);
 GBLREF  sgm_info                *first_sgm_info;
 GBLREF  global_tlvl_info	*global_tlvl_info_head;
 GBLREF  buddy_list		*global_tlvl_info_list;

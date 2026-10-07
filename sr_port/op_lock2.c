@@ -51,7 +51,6 @@
 #include "is_proc_alive.h"
 #include "mvalconv.h"
 #include "min_max.h"
-#include "is_equ.h"		/* for MV_FORCE_NSTIMEOUT macro */
 
 GBLREF	bool		out_of_time, remlkreq;
 GBLREF	mlk_pvtblk	*mlk_pvt_root;

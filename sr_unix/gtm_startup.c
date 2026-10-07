@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -151,7 +151,6 @@ void gtm_startup(struct startup_vector *svec)
 	 * hence, various references to data copied from *svec could profitably be referenced directly
 	 */
 	boolean_t		is_defined;
-	char			*temp;
 	int4			temp_ydb_strpllim;
 	stack_frame 		*frame_pointer_lcl;
 	static char 		other_mode_buf[] = "OTHER";

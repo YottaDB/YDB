@@ -990,7 +990,7 @@ void tp_cw_list(cw_set_element **cs);
 void tp_get_cw(cw_set_element *cs, int depth, cw_set_element **cs1);
 void tp_incr_clean_up(uint4 newlevel);
 void tp_set_sgm(void);
-void tp_start_timer_dummy(int4 timeout_seconds);
+void tp_start_timer_dummy(int4 timeout_milliseconds);
 void tp_clear_timeout_dummy(void);
 void tp_timeout_action_dummy(void);
 
