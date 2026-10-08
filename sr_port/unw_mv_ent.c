@@ -452,7 +452,9 @@ void unw_mv_ent(mv_stent *mv_st_ent)
 			{	/* ZTIMEOUT shares ZINTERRUPT transcendental frame. Explicitly set event since outofband
 				 * can change.
 				 */
-				lcl_outofband = (frame_pointer->type | SFT_ZTIMEOUT) ? ztimeout : jobinterrupt;
+				lcl_outofband = (frame_pointer->type & SFT_ZINTR) ? jobinterrupt : ztimeout;
+				assert((dollar_zininterrupt ? jobinterrupt : ztimeout) == lcl_outofband);
+				assert((jobinterrupt == lcl_outofband) == !(frame_pointer->type & SFT_ZTIMEOUT));
 				(void)xfer_reset_if_setter(lcl_outofband);
 				TAREF1(save_xfer_root, lcl_outofband).event_state = not_in_play;
 				dollar_zininterrupt = FALSE;	/* Once reset, SIGUSR1s are not ignored and engage event
