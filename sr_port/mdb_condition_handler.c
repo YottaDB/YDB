@@ -97,6 +97,7 @@
 #include "trace_table.h"
 #include "caller_id.h"
 #include "bool_zysqlnull.h"
+#include "lckclr.h"
 
 GBLREF	boolean_t		created_core, dont_want_core, hup_on, in_gvcst_incr, prin_dm_io, prin_in_dev_failure,
 				prin_out_dev_failure, run_time;
@@ -556,7 +557,13 @@ CONDITION_HANDLER(mdb_condition_handler)
 	if ((SUCCESS != SEVERITY) && (INFO != SEVERITY))
 	{
 		ENABLE_AST;
-		lks_this_cmd = 0;			/* Current cmd won't resume so reset lock count for interrupted cmd */
+		if (lks_this_cmd)
+		{	/* Current LOCK cmd won't resume. Clear the in-progress flag of its lock names (else a later LOCK + of
+			 * one of those names neither counts nor acquires it) and reset the lock count for the interrupted cmd.
+			 */
+			lckclr();
+			lks_this_cmd = 0;
+		}
 		if ((0 == dollar_tlevel) || (CDB_STAGNATE > t_tries))
 		{	/* Only release crit if we are NOT in TP *or* if we are in TP, we aren't in final retry */
 			for (addr_ptr = get_next_gdr(NULL); addr_ptr; addr_ptr = get_next_gdr(addr_ptr))

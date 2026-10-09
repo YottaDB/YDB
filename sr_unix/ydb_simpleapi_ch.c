@@ -59,6 +59,7 @@
 #include "gvt_inline.h"
 #include "deferred_events_queue.h"
 #include "op.h"
+#include "lckclr.h"
 
 GBLREF	stack_frame		*frame_pointer;
 GBLREF	boolean_t		created_core;
@@ -90,6 +91,7 @@ GBLREF	uint4			process_id;
 GBLREF  mval			dollar_zstatus;
 GBLREF int			zydecode_args;
 GBLREF int			zyencode_args;
+GBLREF	unsigned short		lks_this_cmd;
 #ifdef DEBUG
 GBLREF	char			*thread_mutex_holder_rtn;
 GBLREF	int			thread_mutex_holder_line;
@@ -288,6 +290,14 @@ CONDITION_HANDLER(ydb_simpleapi_ch)
 	 */
 	if ((SUCCESS != SEVERITY) && (INFO != SEVERITY))
 	{
+		if (lks_this_cmd)
+		{	/* Current lock call won't resume. Clear the in-progress flag of its lock names (else a later
+			 * ydb_lock_incr_s() of one of those names neither counts nor acquires it) and reset the lock count
+			 * (else the next lock call issues BADLOCKNEST).
+			 */
+			lckclr();
+			lks_this_cmd = 0;
+		}
 		if ((0 == dollar_tlevel) || (CDB_STAGNATE > t_tries))
 		{	/* Only release crit if we are NOT in TP *or* if we are in TP, we aren't in final retry */
 			for (addr_ptr = get_next_gdr(NULL); addr_ptr; addr_ptr = get_next_gdr(addr_ptr))
