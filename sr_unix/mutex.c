@@ -1380,8 +1380,10 @@ void mutex_clean_dead_owner(gd_region* reg, uint4 holder_pid)
 			&& (cnl->last_wcs_recover_tn != csd->trans_hist.curr_tn))
 		{
 			/* i.e. Process was killed after CMT02 but before CMT13.
-			 * It is represented as: */
-			assert(((DECL_CMT02 < cnl->cur_cmt_step) && (CMT13 > cnl->cur_cmt_step))
+			 * It is represented as below. "cur_cmt_step" moves from DECL_CMT02 to CMT02 only after "early_tn"
+			 * is incremented, so a process killed in between leaves it at DECL_CMT02.
+			 */
+			assert(((DECL_CMT02 <= cnl->cur_cmt_step) && (CMT13 > cnl->cur_cmt_step))
 					|| (cnl->last_wcs_recover_tn == csd->trans_hist.curr_tn));
 			assert(NULL != csa->jnl);
 			assert(NULL != csa->jnl->jnl_buff);
