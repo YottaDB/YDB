@@ -226,7 +226,7 @@ void	op_fnview(int numarg, mval *dst, ...)
 		case VTK_SPSIZE:
 			commastr.len = 1;
 			commastr.addr = ",";
-			ENSURE_STP_FREE_SPACE((STATS_MAX_DIGITS * 3) + 2);
+			ENSURE_STP_FREE_SPACE((STATS_MAX_DIGITS * 2) + 1);
 			MV_FORCE_64MVAL(dst, stringpool.top - stringpool.base);
 			MV_FORCE_STR(dst);
 			dst->mvtype = vtp->restype;
