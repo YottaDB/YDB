@@ -106,6 +106,7 @@ build-test:
     name: registry.gitlab.com/yottadb/db/ydbtest
     entrypoint: [""]
   stage: build
+  interruptible: true
   artifacts:
     paths:
       - testarea1/
