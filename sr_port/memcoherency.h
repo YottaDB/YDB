@@ -110,7 +110,7 @@
    *
    * MM_WRITE_MEMORY_BARRIER is the same compiler barrier. GT.M V7.1-004 made it a compiler fence
    * here, where it had been empty, so the MM commit stores it orders are not reordered by the
-   * compiler either; MM_WRITE_MEMORY_BARRIER_IS_NO_OP is therefore not defined on x86_64.
+   * compiler either.
    */
 
 #  define SHM_WRITE_MEMORY_BARRIER	__asm__ volatile ("" ::: "memory")

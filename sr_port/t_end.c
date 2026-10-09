@@ -1384,10 +1384,8 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 	 * same reason as the one before INCREMENT_CURR_TN below: buffers are pinned before db TN moves,
 	 * and pinning uses compswap, which carries the needed barriers.
 	 */
-#	ifndef MM_WRITE_MEMORY_BARRIER_IS_NO_OP
 	if (is_mm)
 		MM_WRITE_MEMORY_BARRIER;
-#	endif
 	SET_CUR_CMT_STEP_IF(TRUE, csa->nl->cur_cmt_step, CMT02);
 	SET_CUR_CMT_STEP_IF(TRUE, TREF(cur_cmt_step), CMT02);
 	SET_CUR_CMT_STEP_IF(TRUE, csa->nl->cur_cmt_step, DECL_CMT03);
@@ -1919,10 +1917,8 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 	/* To avoid confusing concurrent processes, MM requires a barrier before incrementing db TN. For BG, cr->in_tend
 	 * serves this purpose so no barrier is needed. See comment in tp_tend.
 	 */
-#	ifndef MM_WRITE_MEMORY_BARRIER_IS_NO_OP
 	if (is_mm)
 		MM_WRITE_MEMORY_BARRIER;
-#	endif
 #	ifdef DEBUG
 	if (WBTEST_ENABLED(WBTEST_PHS1_POSTSLEEP))
 	{	/* Allow enough time for us to validate that concurrent activity is happening elsewhere in the

@@ -1424,10 +1424,8 @@ boolean_t	tp_tend()
 		 * updates that follow, so a concurrent reader can rely on "early_tn != curr_tn" to tell that
 		 * a commit is in flight. For BG the buffer pinning below serves the same purpose.
 		 */
-#		ifndef MM_WRITE_MEMORY_BARRIER_IS_NO_OP
 		if (is_mm)
 			MM_WRITE_MEMORY_BARRIER;
-#		endif
 		SET_CUR_CMT_STEP_IF(TRUE, csa->nl->cur_cmt_step, DECL_CMT03);
 		SET_CUR_CMT_STEP_IF((TREF(cur_cmt_step) < DECL_CMT03), TREF(cur_cmt_step), DECL_CMT03);
 		csa->t_commit_crit = T_COMMIT_CRIT_PHASE0;	/* phase0 : write journal records. Step CMT03 */
@@ -1972,10 +1970,8 @@ boolean_t	tp_tend()
 			 * the old contents for the new contents. The acts of pinning and unpinning use compswap which does the
 			 * needed memory barriers.
 			 */
-#			ifndef MM_WRITE_MEMORY_BARRIER_IS_NO_OP
 			if (is_mm)
 				MM_WRITE_MEMORY_BARRIER;
-#			endif
 #			ifdef DEBUG
 			if (WBTEST_ENABLED(WBTEST_PHS1_POSTSLEEP))
 			{       /* Allow enough time for us to validate that concurrent activity is happening elsewhere in the
