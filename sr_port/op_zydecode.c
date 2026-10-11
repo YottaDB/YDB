@@ -355,7 +355,7 @@ void op_zydecode(void)
 			POP_MV_STENT();	/* subsc */
 			POP_MV_STENT();	/* value */
 			zydecode_args = 0;	/* Must reset to zero to reuse zydecode */
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZYDECODEWRONGCNT);	/* no JSON chunk count in source global */
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZYDECODEWRONGCNT);	/* no JSON chunk count in source local */
 		}
 		if (ARG1_IS_LCL(zydecode_args))
 		{	/*==================== ZYDECODE lvn1=lvn2 =====================*/
@@ -394,8 +394,7 @@ void op_zydecode(void)
 			lv = dglvnp->lclp[IND2];
 			is_base_var = LV_IS_BASE_VAR(lv);
 			base_lv = !is_base_var ? LV_GET_BASE_VAR(lv) : lv;
-			/* Note assignment - there must be at least one JSON node */
-			if ((0 == lv->v.str.len) || (1 > (cnt = MV_FORCE_INTD(&lv->v))))
+			if (1 > (cnt = MV_FORCE_INTD(&lv->v)))	/* Note assignment - there must be at least one JSON node */
 			{
 				UNDO_ACTIVE_LV(actlv_op_zydecode2); /* kill "dst" and parents as applicable if $data(dst)=0 */
 				POP_MV_STENT();	/* subsc */
@@ -412,6 +411,7 @@ void op_zydecode(void)
 				undef_inhibit = true;	/* handle undefined errors here so we can reset zydecode_args */
 				dst_lv = op_getindx(VARLSTCNT(2) lv, subsc);
 				undef_inhibit = undef_inhibit_save;
+				MV_FORCE_STRD(&dst_lv->v);	/* a numeric-only value has no string form until forced */
 				if (dst_lv->v.str.len)
 				{
 					if ((json_size + dst_lv->v.str.len) > realloc_size)
@@ -484,8 +484,7 @@ void op_zydecode(void)
 			lv = dglvnp->lclp[IND2];
 			is_base_var = LV_IS_BASE_VAR(lv);
 			base_lv = !is_base_var ? LV_GET_BASE_VAR(lv) : lv;
-			/* Note assignment - there must be at least one JSON node */
-			if ((0 == lv->v.str.len) || (1 > (cnt = MV_FORCE_INTD(&lv->v))))
+			if (1 > (cnt = MV_FORCE_INTD(&lv->v)))	/* Note assignment - there must be at least one JSON node */
 			{
 				gvname_env_restore(gblp1);	/* store destination as naked indicator in gv_currkey */
 				POP_MV_STENT();	/* subsc */
@@ -502,6 +501,7 @@ void op_zydecode(void)
 				undef_inhibit = true;	/* handle undefined errors here so we can reset zydecode_args */
 				dst_lv = op_getindx(VARLSTCNT(2) lv, subsc);
 				undef_inhibit = undef_inhibit_save;
+				MV_FORCE_STRD(&dst_lv->v);	/* a numeric-only value has no string form until forced */
 				if (dst_lv->v.str.len)
 				{
 					if ((json_size + dst_lv->v.str.len) > realloc_size)
