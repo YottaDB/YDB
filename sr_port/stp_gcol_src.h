@@ -365,12 +365,14 @@ MBSTART {														\
 	{														\
 		unsigned char	*strpool_base;										\
 		ssize_t		size;											\
+		size_t		allocbytes;										\
 															\
 		assert(CSTR < TOPSTR);											\
 		strpool_base = stringpool.base;										\
 		assert(strpool_base == rts_stringpool.base);								\
 		size = stringpool.top - stringpool.base;								\
-		stringpool.base = stringpool.free = malloc(size);							\
+		allocbytes = stringpool.lastallocbytes;									\
+		stringpool.base = stringpool.free = (unsigned char *)stp_mmap(allocbytes);				\
 		stringpool.top = stringpool.base + size;								\
 		stringpool.invokestpgcollevel = stringpool.invokestpgcollevel + (stringpool.base - strpool_base);	\
 		while (CSTR < TOPSTR)											\
@@ -390,7 +392,7 @@ MBSTART {														\
 			CSTR++;												\
 		}													\
 		rts_stringpool = stringpool;										\
-		free(strpool_base);											\
+		stp_fini(strpool_base, allocbytes);									\
 	}
 #endif
 

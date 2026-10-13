@@ -274,7 +274,7 @@ int ydb_init()
 		 * if we still have not successfully finished a "ydb_init".
 		 */
 		if (NULL != stringpool.top)
-			free(stringpool.base);
+			stp_fini(stringpool.base, stringpool.lastallocbytes);
 		stp_init(STP_INITSIZE_REQUESTED);
 		ESTABLISH_NORET(gtmci_ch, error_encountered);
 		if (error_encountered)

@@ -192,7 +192,7 @@ void gtm_startup(struct startup_vector *svec)
 	 * this is what is going to be used for the rest of the process now that "ydb_init" is done with its stringpool need.
 	 */
 	if (NULL != stringpool.top)
-		free(stringpool.base);
+		stp_fini(stringpool.base, stringpool.lastallocbytes);
 	stp_init(svec->user_strpl_size);
 	assertpro(stringpool.base);
 	rts_stringpool = stringpool;
