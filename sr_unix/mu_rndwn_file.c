@@ -1223,7 +1223,17 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 				 * by storing the return value in "statsDBrundown_status".
 				 */
 				statsDBrundown_status = mu_rndwn_file_statsdb(statsDBreg, &statsDBexists, standalone);
-				assert(!cnl->statsdb_created || statsDBexists);
+				/* "statsDBexists" can be FALSE even though "cnl->statsdb_created" is TRUE. The flag
+				 * lives in the basedb shared memory and is cleared only by
+				 * UNLINK_STATSDB_AT_BASEDB_RUNDOWN, which runs when the basedb is run down. If an
+				 * earlier attempt to run down the basedb failed, its shared memory is left behind
+				 * with the flag still set, and the statsdb file can be removed or renamed while
+				 * that shared memory waits to be run down. Nothing is wrong in that case and
+				 * nothing needs doing: "mu_rndwn_file_statsdb" has already reported success for
+				 * having nothing to run down, and the basedb rundown below matters more. The
+				 * UNLINK in the "no_shm_exists" branch above and UNLINK_STATSDB_AT_BASEDB_RUNDOWN
+				 * likewise treat a statsdb file that is already gone (ENOENT) as the wanted outcome.
+				 */
 				assert(csa == cs_addrs);	/* cs_addrs should not have changed in above call */
 				if (cnl->statsdb_created)
 				{	/* If basedb shm exists, note statsdb rundown status in basedb shm too */
