@@ -939,6 +939,8 @@ void endian_header(sgmnt_data *new, sgmnt_data *old, boolean_t new_is_native)
 	SWAP_SD4_CAST(certified_for_upgrade_to, enum db_ver);
 	/************* SECSHR_DB_CLNUP RELATED FIELDS (now moved to node_local) ***********/
 	/* "secshr_ops_index_filler" and "secshr_ops_array_filler" need not be converted (they are fillers) */
+	/************** YottaDB specific fields *********************/
+	SWAP_SD4(kip_set_by_dse);
 	/********************************************************/
 	/* "next_upgrd_warn" isn't valid since the database is fully_upgraded and the latch values differ by platform
 	 * and since we don't know where the db will be used, we will ignore it.

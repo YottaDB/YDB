@@ -3,7 +3,7 @@
  * Copyright (c) 2010-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -298,6 +298,7 @@ THREADGBLDEF(in_zwrite,				boolean_t)			/* ZWrite is active */
 THREADGBLDEF(is_socketpool,			boolean_t)			/* True when device-to-be-opened is socketpool */
 THREADGBLDEF(ydb_socket_keepalive_idle,		int)				/* Initialized from $ydb_socket_keepalive_idle */
 THREADGBLDEF(in_mupip_integ,			boolean_t)			/* To let DO_DB_HDR_CHECK skip DBFLCORRP */
+THREADGBLDEF(kip_wait_done,			boolean_t)			/* "ss_initiate" waited for kill-in-prog */
 THREADGBLDEF(instance_frozen_crit_skipped,	boolean_t)			/* To indicate Instance Freeze is on, CRIT skipped*/
 THREADGBLDEF(integ_cannotskip_crit,		boolean_t)			/* indicates whether a SKIP CRIT is allowed */
 THREADGBLDEF(retry_buffer_returned_null,	boolean_t)			/* If a retried block in integ returned a NULL */

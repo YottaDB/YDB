@@ -63,6 +63,7 @@
 #include "gtm_caseconv.h"
 #include "gt_timer.h"
 #include "is_proc_alive.h"
+#include "memcoherency.h"
 #include "is_file_identical.h"
 #include "dbfilop.h"
 #include "mupip_exit.h"
@@ -280,6 +281,7 @@ void mupip_backup(void)
 	int			group_id;
 	int			perm;
 	uint4			*kip_pids_arr_ptr;
+	boolean_t		kip_alive;
 	seq_num			jnl_seqno;
 	char			time_str[CTIME_BEFORE_NL + 2];	/* for GET_CUR_TIME macro */
 	struct perm_diag_data	pdd;
@@ -1018,6 +1020,9 @@ repl_inst_bkup_done1:
 			kip_pids_arr_ptr = cs_addrs->nl->kip_pid_array;
 			while (cs_data->kill_in_prog && (MAX_CRIT_TRY > crit_counter++))
 			{
+				KIP_PIDS_ALIVE(cs_addrs, kip_alive);
+				if (!kip_alive)
+					break;	/* No process is left that could clear "kill_in_prog" in this region */
 				GET_C_STACK_FOR_KIP(kip_pids_arr_ptr, crit_counter, MAX_CRIT_TRY, 1, MAX_KIP_PID_SLOTS);
 				wcs_sleep(crit_counter);
 			}
@@ -1045,17 +1050,29 @@ repl_inst_bkup_done1:
 			 * regions so all regions will have same eov/bov timestamps.
 			 */
 			UPDATE_GBL_JREC_TIME;
-			if (cs_data->kill_in_prog)
-			{
-				if (MAX_CRIT_TRY < crit_counter)
-					gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_BACKUPKILLIP,
-						       2, DB_LEN_STR(gv_cur_region));
-				else	/* lets wait some more */
+			if (cs_data->kill_in_prog && (MAX_CRIT_TRY >= crit_counter))
+			{	/* Wait some more, unless no process is left that could clear "kill_in_prog" */
+				KIP_PIDS_ALIVE(cs_addrs, kip_alive);
+				if (kip_alive)
 				{
 					kip_count++;
 					break;
 				}
 			}
+		}
+		if (kip_count)
+			continue;
+		/* No region is waited on any longer, either because its KILL has no process left or because the wait
+		 * timed out. Report the regions whose "kill_in_prog" is still set. This is done here rather than in
+		 * the loop above, which can run more than once, so that each region is reported once.
+		 */
+		for (rptr = (backup_reg_list *)(grlist); NULL != rptr; rptr = rptr->fPtr)
+		{
+			if (rptr->not_this_time > keep_going)
+				continue;
+			TP_CHANGE_REG(rptr->reg);
+			if (cs_data->kill_in_prog)
+				gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_BACKUPKILLIP, 2, DB_LEN_STR(gv_cur_region));
 		}
 	}
 	assert(reg_count == have_crit(CRIT_HAVE_ANY_REG | CRIT_ALL_REGIONS));
@@ -1479,6 +1496,7 @@ repl_inst_bkup_done2:
 			if (rptr->backup_hdr->kill_in_prog)
 				rptr->backup_hdr->abandoned_kills = TRUE;
 			rptr->backup_hdr->kill_in_prog = FALSE;
+			rptr->backup_hdr->kip_set_by_dse = 0;
 			memset(rptr->backup_hdr->machine_name, 0, MAX_MCNAMELEN);
 			rptr->backup_hdr->repl_state = repl_closed;
 			rptr->backup_hdr->semid = INVALID_SEMID;

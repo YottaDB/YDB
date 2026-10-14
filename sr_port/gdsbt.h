@@ -898,7 +898,7 @@ typedef struct node_local_struct
 	uint8			prev_n_crit_que_slps, prev_n_crit_yields, prev_n_crit_failed;
 	uint8			switch_streak;
 	/* YDB#1143 : offset to the search index slot array; 0 if this database's shared memory segment
-	 * has none. Deliberately LAST. node_local holds counters and latches that many processes write
+	 * has none. Deliberately at the END. node_local holds counters and latches that many processes write
 	 * concurrently, and a write by any process invalidates the whole cache line in every other
 	 * processor, so which fields share a line decides how often those processors have to fetch it
 	 * back. Inserting a field mid-structure shifts every field after it by 8 bytes and redraws those
@@ -909,6 +909,11 @@ typedef struct node_local_struct
 	 * into its own sgmnt_addrs - see the end of "db_init" in gvcst_init_sysops.c.
 	 */
 	sm_off_t		search_idx_off;
+	/* Number of processes doing a KILL that INSERT_KIP_PID found no free slot for in "kip_pid_array". While it is
+	 * non-zero, an empty "kip_pid_array" does not mean that no KILL is in progress. Appended after "search_idx_off"
+	 * for the reason given above it, so no existing field moves.
+	 */
+	int4			kip_pid_overflow_cnt;
 } node_local;
 
 #define UPDATE_MAX_PROCS_STRING(NODE, MPS)	SNPRINTF(NODE->max_procs, MAX_PROCS_ARRAY_SIZE, "%d,%lu", MPS.cnt, MPS.time)

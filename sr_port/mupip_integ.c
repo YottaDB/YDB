@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -888,6 +888,7 @@ void mupip_integ(void)
 				{
 					mu_int_data.abandoned_kills = 0;
 					mu_int_data.kill_in_prog = 0;
+					mu_int_data.kip_set_by_dse = 0;
 					update_filehdr = TRUE;
 				}
 				if ((MAXUINT8 != blocks_free) && (mu_int_data.trans_hist.free_blocks != blocks_free))

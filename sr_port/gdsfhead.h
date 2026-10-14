@@ -2237,12 +2237,15 @@ typedef struct sgmnt_data_struct
 	int4		filler_5k;
 	/************* SECSHR_DB_CLNUP RELATED FIELDS (now moved to node_local) ***********/
 	int4		secshr_ops_index_filler;
-	int4		secshr_ops_array_filler[246];
+	int4		secshr_ops_array_filler[245];
 	/************** YottaDB specific fields *********************
 	 * We keep these fields at the end of what used to be a filler section (SECSHR_DB_CLNUP fields).
 	 * The hope is that even if GT.M starts using this filler section, they will use the first half so
 	 * YottaDB new fields will be added from the end of this section.
 	 */
+	int4		kip_set_by_dse;		/* non-zero when "kill_in_prog" was last set by DSE CHANGE -FILEHEADER, so no
+						 * process is doing the KILL it counts. See KIP_PIDS_ALIVE.
+						 */
 	/* YDB#1143 : bytes in one search index slot, 0 to disable. It lives in the FILE HEADER rather than
 	 * in an environment variable because it decides how big the shared memory segment is - through
 	 * CACHE_CONTROL_SIZE under BG, and under MM through a term "dbsecspc" adds past the file header -
@@ -2938,6 +2941,10 @@ typedef struct	sgmnt_addrs_struct
 	sm_uc_ptr_t				search_idx_base;
 	int4					search_idx_size;/* private copy of the file header field; bytes per slot */
 	int4					search_idx_slotmask;/* slots-1, to pick a slot from a block number */
+	boolean_t				kip_pid_overflowed;	/* TRUE while this process's KILL is counted in
+									 * "cnl->kip_pid_overflow_cnt" instead of having a slot
+									 * in "cnl->kip_pid_array"
+									 */
 } sgmnt_addrs;
 
 typedef struct gd_binding_struct
@@ -4050,6 +4057,7 @@ MBSTART {									\
 										\
 	kip_pid_arr_ptr = local_csa->nl->kip_pid_array;				\
 	assert(local_csa->now_crit);						\
+	assert(!local_csa->kip_pid_overflowed);					\
 	for (idx = 0; idx < MAX_KIP_PID_SLOTS; idx++)				\
 	{									\
 		pid = kip_pid_arr_ptr[idx];					\
@@ -4059,6 +4067,11 @@ MBSTART {									\
 			break;							\
 		}								\
 	}									\
+	if (MAX_KIP_PID_SLOTS == idx)						\
+	{	/* No free slot. Count this KILL so KIP_PIDS_ALIVE knows the array is incomplete. */ \
+		INCR_CNT(&local_csa->nl->kip_pid_overflow_cnt, &local_csa->nl->wc_var_lock); \
+		local_csa->kip_pid_overflowed = TRUE;				\
+	}									\
 } MBEND
 /* Remove the process_id from the list of process ids actively doing a kill */
 #define REMOVE_KIP_PID(local_csa)						\
@@ -4067,14 +4080,59 @@ MBSTART {									\
 	uint4		*kip_pid_arr_ptr;					\
 	GBLREF uint4	process_id;						\
 										\
-	kip_pid_arr_ptr = local_csa->nl->kip_pid_array;				\
-	for (idx = 0; idx < MAX_KIP_PID_SLOTS; idx++)				\
+	if (local_csa->kip_pid_overflowed)					\
+	{	/* INSERT_KIP_PID found no slot for this process and counted it instead */ \
+		DECR_CNT(&local_csa->nl->kip_pid_overflow_cnt, &local_csa->nl->wc_var_lock); \
+		local_csa->kip_pid_overflowed = FALSE;				\
+	} else									\
 	{									\
-		if (process_id == kip_pid_arr_ptr[idx])				\
+		kip_pid_arr_ptr = local_csa->nl->kip_pid_array;			\
+		for (idx = 0; idx < MAX_KIP_PID_SLOTS; idx++)			\
 		{								\
-			kip_pid_arr_ptr[idx] = 0;				\
-			break;							\
+			if (process_id == kip_pid_arr_ptr[idx])			\
+			{							\
+				kip_pid_arr_ptr[idx] = 0;			\
+				break;						\
+			}							\
 		}								\
+	}									\
+} MBEND
+/* Sets ALIVE to FALSE when no process that could clear "kill_in_prog" is left: either the KIP pid array
+ * holds no pid at all, or every pid in it belongs to a process that no longer exists. The wait loops in
+ * "ss_initiate.c", "region_freeze.c", "mu_int_maps.c" and "mupip_backup.c" use this to stop waiting rather
+ * than spend a minute on a field nothing will change.
+ * INSERT_KIP_PID and REMOVE_KIP_PID above are reached from INCR_KIP and DECR_KIP, both of which run in the
+ * process doing the KILL, and INSERT_KIP_PID runs while it holds crit. A KILL that is in progress therefore
+ * has its process recorded either in the array or, when all MAX_KIP_PID_SLOTS slots were taken, in
+ * "kip_pid_overflow_cnt". While that count is non-zero the array is incomplete, so ALIVE is TRUE and the wait
+ * continues as before. A process that is killed while counted leaves the count set until the shared memory
+ * is recreated, which costs only the wait this would otherwise save.
+ * The wait loops read "kill_in_prog" and the array without crit. So INCR_KIP records the process before it
+ * raises "kill_in_prog", and DECR_KIP lowers "kill_in_prog" before it removes the process, and a caller that
+ * read a non-zero "kill_in_prog" before invoking this finds the process of every KILL counted in it. The
+ * read barrier below orders the caller's read of "kill_in_prog" before the reads of the array.
+ * A "kill_in_prog" that DSE CHANGE -FILEHEADER set has no process doing a KILL either, but it is how tests
+ * and operators simulate a KILL in progress, so "kip_set_by_dse" reports it as alive too and the wait is as
+ * before. That leaves one way for a non-zero "kill_in_prog" to count a KILL that no live process is doing, a
+ * KILL whose process terminated without running its cleanup. Its dead pid stays in the array while the shared
+ * memory does, and once the shared memory is recreated "kill_in_prog" is read back from the file header with
+ * an empty array.
+ * A pid the system has since reused for an unrelated process reads as alive and keeps the wait, which is
+ * the behaviour this replaces, so that case is no worse than it was.
+ * The caller supplies "is_proc_alive.h" and "memcoherency.h".
+ */
+#define KIP_PIDS_ALIVE(CSA, ALIVE)						\
+MBSTART {									\
+	int		kip_idx;						\
+	uint4		kip_pid;						\
+										\
+	SHM_READ_MEMORY_BARRIER;						\
+	ALIVE = ((0 != (CSA)->hdr->kip_set_by_dse) || (0 != (CSA)->nl->kip_pid_overflow_cnt));	\
+	for (kip_idx = 0; !ALIVE && (kip_idx < MAX_KIP_PID_SLOTS); kip_idx++)	\
+	{									\
+		kip_pid = (CSA)->nl->kip_pid_array[kip_idx];			\
+		if ((0 != kip_pid) && is_proc_alive(kip_pid, 0))		\
+			ALIVE = TRUE;						\
 	}									\
 } MBEND
 /* Insert the process_id into the list of process ids with active wcs_timers
@@ -4142,8 +4200,9 @@ MBSTART {									\
 	local_csd = CSD;							\
 	local_csa = CSA;							\
 	assert(NULL == KIP_CSA);						\
-	INCR_CNT(&local_csd->kill_in_prog, &local_csa->nl->wc_var_lock);	\
+	/* Record the process first. KIP_PIDS_ALIVE relies on this order */	\
 	INSERT_KIP_PID(local_csa);						\
+	INCR_CNT(&local_csd->kill_in_prog, &local_csa->nl->wc_var_lock);	\
 	KIP_CSA = CSA;								\
 } MBEND
 

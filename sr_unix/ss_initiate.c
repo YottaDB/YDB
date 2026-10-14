@@ -203,7 +203,7 @@ boolean_t	ss_initiate(gd_region *reg,			/* Region in which snapshot has to be st
 			    char *calling_utility)		/* Who called ss_initiate */
 {
 	boolean_t		debug_mupip = FALSE;
-	boolean_t		final_retry, wait_for_zero_kip;
+	boolean_t		final_retry, kip_alive, wait_for_zero_kip;
 	char			*tempfilename, eof_marker[EOF_MARKER_SIZE], tempdir_trans_buffer[YDB_PATH_MAX];
 	char			tempdir_full_buffer[YDB_PATH_MAX], tempnamprefix[MAX_FN_LEN + 1];
 	char			time_str[CTIME_BEFORE_NL + 2]; /* for GET_CUR_TIME macro */
@@ -540,9 +540,20 @@ boolean_t	ss_initiate(gd_region *reg,			/* Region in which snapshot has to be st
 			}
 			while (csd->kill_in_prog && (MAX_CRIT_TRY > crit_counter++))
 			{
+				KIP_PIDS_ALIVE(csa, kip_alive);
+				if (!kip_alive)
+				{	/* No process is left that could clear "kill_in_prog". Leave the counter where a
+					 * timeout would have left it, as the state to hand the rest of the code is that
+					 * same state: a wait that is over with "kill_in_prog" still set. Here it also keeps
+					 * a later retry of the enclosing loop from starting a second wait.
+					 */
+					crit_counter = MAX_CRIT_TRY;
+					break;
+				}
 				GET_C_STACK_FOR_KIP(kip_pids_arr_ptr, crit_counter, MAX_CRIT_TRY, 1, MAX_KIP_PID_SLOTS);
 				wcs_sleep(crit_counter);
 			}
+			TREF(kip_wait_done) = TRUE;	/* "mu_int_maps" does not wait for this region a second time */
 			if (debug_mupip)
 			{
 				GET_CUR_TIME(time_str);

@@ -228,6 +228,10 @@ void db_auto_upgrade(gd_region *reg)
 				 * on the copy of the file header it reads from disk and then sizes the segment from -
 				 * see the YDB#1143 comment there.
 				 */
+				/* YottaDB r2.08 also added "kip_set_by_dse". It sits where "secshr_ops_array_filler" used
+				 * to end, and those bytes could hold anything an old version left there.
+				 */
+				csd->kip_set_by_dse = 0;
 				break;		/* so a new "case" needs to be added BEFORE the assert. */
 			case GDSMR208:
 				/* When adding a new minor version, the following template should be maintained
@@ -757,6 +761,10 @@ void v6_db_auto_upgrade(gd_region *reg)
 				 * GDSMVCURR, so the "GDSMVCURR > minor_dbver" test it defaults on stops firing for this
 				 * database from then on.
 				 */
+				/* YottaDB r2.08 added "kip_set_by_dse". In a V6 header its bytes are part of
+				 * "secshr_ops_array_filler", which could hold anything an old version left there.
+				 */
+				csd->kip_set_by_dse = 0;
 				break;
 			case GDSMV63015:
 				assert(FALSE);	/* if this should come to pass, add appropriate code above the assert */

@@ -653,15 +653,13 @@ void dse_chng_fhead(void)
 		if (cli_get_str("KILL_IN_PROG", buf, &buf_len))
 		{
 			lower_to_upper((uchar_ptr_t)buf, (uchar_ptr_t)buf, buf_len);
-			if (0 == STRCMP(buf, "NONE"))
-				cs_data->kill_in_prog = 0;
+			GET_VALUE_INTO_X;
+			if (-1 > x)
+				util_out_print("Invalid value for kill_in_prog qualifier", TRUE);
 			else
 			{
-				GET_VALUE_INTO_X;
-				if (-1 > x)
-					util_out_print("Invalid value for kill_in_prog qualifier", TRUE);
-				else
-					cs_data->kill_in_prog = x;
+				cs_data->kill_in_prog = x;
+				cs_data->kip_set_by_dse = (0 != x);
 			}
 		}
 	}

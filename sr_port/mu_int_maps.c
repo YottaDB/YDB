@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2022-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2022-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -31,6 +31,8 @@
 #include "wcs_sleep.h"
 #include "gtm_time.h"
 #include "gtm_c_stack_trace.h"
+#include "is_proc_alive.h"
+#include "memcoherency.h"
 
 /* Include prototypes */
 #include "bit_set.h"
@@ -80,7 +82,7 @@ void mu_int_maps(void)
 	unsigned char	*local;
 	char		time_str[CTIME_BEFORE_NL + 2]; /* for GET_CUR_TIME macro */
 	uchar_ptr_t	blk_base, buff_blk_base, free_blk_base;
-	boolean_t	wait_on_kip, agree, disk_full, local_full, master_full;
+	boolean_t	wait_on_kip, agree, disk_full, kip_alive, local_full, master_full;
 	block_id	maps, mapsize, mcnt, lcnt, bcnt;
 	unsigned int	level;
 	uint_ptr_t	dskmap_p;
@@ -91,23 +93,38 @@ void mu_int_maps(void)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	/* Before going into mu_int_maps, check if there are any KIPs and wait for them */
+	/* Before going into mu_int_maps, check if there are any KIPs and wait for them.
+	 * The wait tests only the live "cs_data->kill_in_prog". "mu_int_data" is the copy of the file header taken
+	 * when this region's INTEG started, so its "kill_in_prog" never clears and testing it would keep the wait
+	 * going after the KILL had finished.
+	 * Two cases skip the wait rather than spend up to a minute on it:
+	 *   a) The wait for this region has been done already and recorded in TREF(kip_wait_done): by
+	 *      "ss_initiate" for an ONLINE INTEG, which is the default, and by "region_freeze_main" for a
+	 *      -NOONLINE one. Either way, waiting a second time here would add a second minute to the first.
+	 *   b) "cs_addrs" is NULL, which is a MUPIP INTEG holding standalone access. No other process can be
+	 *      doing a KILL then, and there is no shared memory for "KIP_PIDS_ALIVE" to look in.
+	 */
 	crit_counter = 1;
-	wait_on_kip = (cs_data && cs_data->kill_in_prog) || mu_int_data.kill_in_prog;
+	wait_on_kip = (cs_data && cs_data->kill_in_prog) && !TREF(kip_wait_done) && (NULL != cs_addrs);
+	TREF(kip_wait_done) = FALSE;	/* consumed: the next region gets its own wait */
 	if (wait_on_kip)
 	{
 		GET_CUR_TIME(time_str);
 		util_out_print("!/MUPIP INFO: mu_int_maps: !AD : Start kill-in-prog wait.", TRUE,
 			CTIME_BEFORE_NL, time_str);
-	}
-	while (((cs_data && cs_data->kill_in_prog) || mu_int_data.kill_in_prog) && (MAX_CRIT_TRY > crit_counter++))
-	{
-		if (cs_addrs)
+		while (cs_data->kill_in_prog && (MAX_CRIT_TRY > crit_counter++))
+		{
+			KIP_PIDS_ALIVE(cs_addrs, kip_alive);
+			if (!kip_alive)
+			{	/* No process is left that could clear "kill_in_prog", so there is nothing to wait
+				 * for and the rest of this minute would be spent for nothing.
+				 */
+				crit_counter = MAX_CRIT_TRY;
+				break;
+			}
 			GET_C_STACK_FOR_KIP(cs_addrs->nl->kip_pid_array, crit_counter, MAX_CRIT_TRY, 1, MAX_KIP_PID_SLOTS);
-		wcs_sleep(crit_counter);
-	}
-	if (wait_on_kip)
-	{
+			wcs_sleep(crit_counter);
+		}
 		GET_CUR_TIME(time_str);
 		util_out_print("!/MUPIP INFO: mu_int_maps: !AD : Done with kill-in-prog wait.", TRUE,
 			CTIME_BEFORE_NL, time_str);

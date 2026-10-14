@@ -28,6 +28,7 @@
 #include "send_msg.h"
 #include "caller_id.h"
 #include "sleep_cnt.h"
+#include "is_proc_alive.h"
 #include "interlock.h"
 #include "add_inter.h"
 #include "wcs_backoff.h"
@@ -109,7 +110,7 @@ freeze_status	region_freeze_main(gd_region *region, boolean_t freeze, boolean_t 
 	int			dummy_errno, save_errno;
 	uint4			was_online;
 	char			time_str[CTIME_BEFORE_NL + 2];       /* for GET_CUR_TIME macro */
-	boolean_t		cleanup_autorelease, jnl_switch_done, was_crit, jnl_switch_err;
+	boolean_t		cleanup_autorelease, jnl_switch_done, kip_alive, was_crit, jnl_switch_err;
 	freeze_status		rval;
 	unsigned int		lcnt;
 
@@ -209,6 +210,16 @@ freeze_status	region_freeze_main(gd_region *region, boolean_t freeze, boolean_t 
 						break;	/* Found it to be zero while holding crit. Safe to proceed. */
 					rel_crit(region);	/* A final-retry KILL slipped in. Wait some more. */
 				}
+				KIP_PIDS_ALIVE(csa, kip_alive);
+				if (!kip_alive)
+				{	/* No process is left that could clear "kill_in_prog". Leave the counter where a
+					 * timeout would have left it, as the state to hand the code below is that same
+					 * state: a wait that is over with "kill_in_prog" still set, which is what returns
+					 * REG_HAS_KIP.
+					 */
+					sleep_counter = MAX_CRIT_TRY;
+					break;
+				}
 				wcs_sleep(sleep_counter);
 			} while (MAX_CRIT_TRY > sleep_counter++);
 			if (debug_mupip)
@@ -217,6 +228,7 @@ freeze_status	region_freeze_main(gd_region *region, boolean_t freeze, boolean_t 
 				util_out_print("!/MUPIP INFO: !AD : Done with kill-in-prog wait on region", TRUE,
 					       CTIME_BEFORE_NL, time_str);
 			}
+			TREF(kip_wait_done) = TRUE;	/* "mu_int_maps" does not wait for this region a second time */
 			if (!csa->now_crit)
 			{	/* We get here without crit only if the above do/while loop timed out (in which case
 				 * the "MAX_CRIT_TRY <= sleep_counter" check below returns REG_HAS_KIP). Grab crit like
