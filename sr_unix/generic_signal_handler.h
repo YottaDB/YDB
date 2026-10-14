@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001 Sanchez Computer Associates, Inc.		*
  *								*
- * Copyright (c) 2019-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -38,7 +38,7 @@ void drive_non_ydb_signal_handler_if_any(char *caller, int sig, siginfo_t *info,
 															\
 	int	i;													\
 															\
-	if (!SIGNAL_FORWARDED)												\
+	if (!(SIGNAL_FORWARDED))											\
 		gtm_fork_n_core();	/* Generate "virgin" core while we can */					\
 	else														\
 	{	/* Signal the forwarding thread that it is now okay for it to do the "gtm_fork_n_core".			\

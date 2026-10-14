@@ -487,12 +487,15 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context, boolean_t i
 						need_core = TRUE;
 						/* If this thread was interrupted inside malloc(), a fork() now can wait forever for
 						 * a lock that the interrupted malloc() holds, as an allocator (ASAN's for one) can
-						 * take its lock in a fork() handler. Leave the core to "deferred_exit_handler" then.
+						 * take its lock in a fork() handler. Leave the core to "deferred_exit_handler"
+						 * then. A forwarded signal is handled here outside of any OS signal handler, so
+						 * not inside malloc(). This thread forks the core itself because the thread that
+						 * received a signal sent with kill() does not wait to fork it (see the comment in
+						 * the DO_FORK_N_CORE_IN_THIS_THREAD_IF_NEEDED macro).
 						 */
 						if (signal_forwarded || (INTRPT_IN_FUNC_WITH_MALLOC != intrpt_ok_state))
-						{
-							MULTI_THREAD_AWARE_FORK_N_CORE(signal_forwarded);
-						} else
+							gtm_fork_n_core();
+						else
 							fork_n_core_deferred = TRUE;
 						DECREMENT_IN_OS_SIGNAL_HANDLER_IF_NEEDED;
 						CLEANUP_AND_RETURN(got_tlevel_lock);
@@ -559,7 +562,10 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context, boolean_t i
 		 */
 		SIGPROCMASK(SIG_BLOCK, &blockalrm, &savemask, rc);
 		need_core = TRUE;
-		MULTI_THREAD_AWARE_FORK_N_CORE(signal_forwarded);
+		/* The thread that received a signal sent with kill() does not wait to fork the core (see the comment in the
+		 * DO_FORK_N_CORE_IN_THIS_THREAD_IF_NEEDED macro), so fork it in this thread even if the signal was forwarded.
+		 */
+		MULTI_THREAD_AWARE_FORK_N_CORE(signal_forwarded && (GTMSIGINFO_USER != signal_info.infotype));
 	}
 	if (IS_GTMSECSHR_IMAGE)
 	{

@@ -229,7 +229,7 @@ GBLREF	void			(*ydb_stm_thread_exit_fnptr)(void);
 	CONTEXT = &stapi_signal_handler_oscontext[SIGHNDLRTYPE].sig_context;					\
 }
 
-#define	DO_FORK_N_CORE_IN_THIS_THREAD_IF_NEEDED(SIG)						\
+#define	DO_FORK_N_CORE_IN_THIS_THREAD_IF_NEEDED(SIG, IS_SENT_BY_KILL)				\
 {												\
 	/* This thread got a signal that will trigger exit handler processing. The signal	\
 	 * has been forwarded to the appropriate thread. But it is possible we got a signal	\
@@ -248,8 +248,14 @@ GBLREF	void			(*ydb_stm_thread_exit_fnptr)(void);
 	 * the same time (YottaDB engine is not multi-thread safe yet). Hence waiting for the	\
 	 * signal handling thread to let us know when it is safe for us to take over control of	\
 	 * the YottaDB engine for a short period of time (1 minute) to generate the core.	\
+	 * A signal sent by another process with "kill()" (SI_USER) is the exception. The	\
+	 * kernel delivers it to any thread that does not block it, so this thread's C-stack	\
+	 * says nothing about it, and this thread may be inside "malloc()" in non-YottaDB code	\
+	 * where a "fork()" can wait forever for a lock that the interrupted "malloc()" holds.	\
+	 * For such a signal, return right away and let the signal handling thread fork the	\
+	 * core itself (see "generic_signal_handler").						\
 	 */											\
-	if (!IS_DONT_WANT_CORE_TRUE(SIG))							\
+	if (!IS_DONT_WANT_CORE_TRUE(SIG) && !(IS_SENT_BY_KILL))					\
 	{											\
 		int	i;									\
 												\
@@ -330,9 +336,10 @@ GBLREF	void			(*ydb_stm_thread_exit_fnptr)(void);
 			pthread_t	mutexHolderThreadId, thisThreadId;							\
 			int		tLevel;											\
 			boolean_t	isSigThreadDirected, signalForwarded, thisThreadIsMutexHolder;				\
-			boolean_t	is_exi_signal;										\
+			boolean_t	is_exi_signal, isSentByKill;								\
 																\
 			is_exi_signal = (NULL != GOT_LOCK);									\
+			isSentByKill = (SI_USER == INFO->si_code);	/* Signal sent by another process with "kill()" */	\
 			/* Note: The below comment talks about SIGALRM as an example but the same reasoning applies to		\
 			 * other signals too which this macro can be called for.						\
 			 *													\
@@ -358,7 +365,7 @@ GBLREF	void			(*ydb_stm_thread_exit_fnptr)(void);
 				*(volatile uint4 *)GOT_LOCK = 0;	/* volatile needed to avoid compiler warning when	\
 									 * GOT_LOCK is NULL in caller.				\
 									 */							\
-				if (!mutexHolderThreadId)									\
+				if (!mutexHolderThreadId && !isSentByKill)							\
 				{	/* This is a signal that exits the process. And no thread holds the "tLevel"th		\
 					 * engine lock. See if we can get it right away as it will help this process		\
 					 * terminate quickly. Otherwise, like in the r130/ydb534 subtest for example, it	\
@@ -366,6 +373,10 @@ GBLREF	void			(*ydb_stm_thread_exit_fnptr)(void);
 					 * Note that "pthread_mutex_trylock()" is not async-signal-safe (i.e. it should not	\
 					 * be used inside a signal handler (which this entire macro is) but it seems to work	\
 					 * without issues and alternate solutions are messier.					\
+					 * A signal sent by another process with "kill()" (SI_USER) is not handled here, since	\
+					 * this thread is not running YottaDB code and may be inside "malloc()", where		\
+					 * "generic_signal_handler" would run the exit handler and fork a core. It is deferred	\
+					 * instead, and the STAPI signal thread ("ydb_stm_thread") handles it within a second.	\
 					 */											\
 					int	status;										\
 																\
@@ -446,7 +457,7 @@ GBLREF	void			(*ydb_stm_thread_exit_fnptr)(void);
 				{												\
 					STAPI_SET_SIGNAL_HANDLER_DEFERRED(SIGHNDLRTYPE, SIG, INFO, CONTEXT);			\
 					if (is_exi_signal)									\
-						DO_FORK_N_CORE_IN_THIS_THREAD_IF_NEEDED(SIG);					\
+						DO_FORK_N_CORE_IN_THIS_THREAD_IF_NEEDED(SIG, isSentByKill);			\
 				}												\
 				return;												\
 			} else													\
