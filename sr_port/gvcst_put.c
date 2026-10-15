@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -1866,9 +1866,11 @@ tn_restart:
 						== new_blk_size_l);
 					assert((new_blk_size_single <= new_blk_size_l) || (CDB_STAGNATE > t_tries));
 					assert((new_blk_size_single != new_blk_size_l)
-						|| ((0 == prev_rec_offset) && (SIZEOF(blk_hdr) == curr_rec_offset)));
+						|| ((0 == prev_rec_offset) && (SIZEOF(blk_hdr) == curr_rec_offset))
+						|| (CDB_STAGNATE > t_tries));
 					assert((new_blk_size_single >= new_blk_size_l)
-						|| ((SIZEOF(blk_hdr) <= prev_rec_offset) && (SIZEOF(blk_hdr) < curr_rec_offset)));
+						|| ((SIZEOF(blk_hdr) <= prev_rec_offset) && (SIZEOF(blk_hdr) < curr_rec_offset))
+						|| (CDB_STAGNATE > t_tries));
 					if ((new_blk_size_l > blk_fill_size) && (new_blk_size_l > new_blk_size_single))
 					{	/* There is at least one existing record to the left of the split point.
 						 * Do the initial split this pass and make an extra split next pass.
