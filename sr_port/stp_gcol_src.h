@@ -568,6 +568,7 @@ void stp_gcol_sort(size_t space_asked)	/* BYPASSOK */
 	int			*incr_factor;
 	int			killcnt;
 	ssize_t			stp_incr;
+	ssize_t			lv_nodes = 0, lvnode_space = 0;
 	ht_ent_objcode 		*tabent_objcode, *topent;
 	ht_ent_mname		*tabent_mname, *topent_mname;
 	ht_ent_addr		*tabent_addr, *topent_addr;
@@ -853,6 +854,8 @@ void stp_gcol_sort(size_t space_asked)	/* BYPASSOK */
 								 */
 								MVAL_STPG_ADD(&(lvp->v));
 							}
+							/* Count each slot visited above, in use or freed */
+							lv_nodes += (lvlimit - (lv_val *)LV_BLK_GET_BASE(lv_blk_ptr));
 						}
 						for (lv_blk_ptr = symtab->lvtreenode_first_block; NULL != lv_blk_ptr;
 						     lv_blk_ptr = lv_blk_ptr->next)
@@ -875,6 +878,8 @@ void stp_gcol_sort(size_t space_asked)	/* BYPASSOK */
 								LV_NODE_KEY_STPG_ADD(node);	/* Protect node subscript */
 								MVAL_STPG_ADD(&(node->v));	/* Protect node value */
 							}
+							/* Count each slot visited above, in use or freed */
+							lv_nodes += (node_limit - (lvTreeNode *)LV_BLK_GET_BASE(lv_blk_ptr));
 						}
 					}
 					continue;	/* continue loop, not after switch stmt */
@@ -1073,8 +1078,19 @@ void stp_gcol_sort(size_t space_asked)	/* BYPASSOK */
 	space_reclaim = space_after_compact - space_before_compact;
 	space_needed -= (ssize_t)space_after_compact;
 	DBGSTPGCOL((stderr, "space_needed=%li\n", space_needed));
-	/* After compaction if less than 31.25% of space is avail, consider it a low reclaim pass */
-	if (STP_LOWRECLAIM_LEVEL(stringpool.top - stringpool.base) > space_after_compact) /* BYPASSOK */
+	/* This garbage collection is a low reclaim pass if, after compaction, it leaves
+	 *   a) less than 31.25% (STP_LOWRECLAIM_LEVEL) of the stringpool free, or
+	 *   b) less than STP_FREE_PER_LVNODE bytes free for each local variable node slot it walked. A runtime
+	 *      stringpool garbage collection walks every local variable node slot, so it needs to leave enough free
+	 *      space that the next one is not due before enough of the stringpool has been used to pay for that walk.
+	 *      The level that triggers the next collection is set to match (below). lv_nodes is 0 for the indirect
+	 *      stringpool, which walks no local variables.
+	 * STP_MAXLOWRECLAIM_PASSES low reclaim passes in a row grow the stringpool (case iii below). Any other pass resets
+	 * the count.
+	 */
+	lvnode_space = lv_nodes * STP_FREE_PER_LVNODE;
+	if ((STP_LOWRECLAIM_LEVEL(stringpool.top - stringpool.base) > space_after_compact) /* BYPASSOK */
+			|| (lvnode_space > space_after_compact))
 		(*low_reclaim_passes)++;
 	else
 		*low_reclaim_passes = 0;
@@ -1233,6 +1249,8 @@ void stp_gcol_sort(size_t space_asked)	/* BYPASSOK */
 	assert(stringpool.free <= stringpool.top);
 	stringpool.invokestpgcollevel = (STP_SPACE_USED_MULTIPLIER * (space_asked + stringpool.free - stringpool.base))
 		+ stringpool.base;
+	if ((stringpool.invokestpgcollevel - stringpool.free) < (space_asked + lvnode_space))
+		stringpool.invokestpgcollevel = stringpool.free + space_asked + lvnode_space;
 	stringpool.invokestpgcollevel = (((stringpool.invokestpgcollevel - stringpool.base) < STP_GCOL_TRIGGER_FLOOR)
 		|| (stringpool.invokestpgcollevel > stringpool.top))
 		? stringpool.top : stringpool.invokestpgcollevel;

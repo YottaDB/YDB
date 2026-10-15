@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2022-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -35,3 +35,7 @@
 			 * part, it will be concentrated at the bottom of the stringpool (so the OS can swap the rest out).
 			 */
 #define STP_GCOL_TRIGGER_FLOOR 150000 /* Don't set the target level to call the garbage collector below this value. */
+#define STP_FREE_PER_LVNODE 16 /* After a garbage collection of the runtime stringpool, which walks every local variable node, keep at
+			 * least this many bytes free (growing the stringpool if needed) for every node walked, and do not trigger
+			 * the next collection before that many more bytes of it have been used.
+			 */
