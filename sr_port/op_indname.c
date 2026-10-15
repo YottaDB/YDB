@@ -20,6 +20,8 @@
 #include "compiler.h"
 #include "stringpool.h"
 #include "op.h"
+#include "lv_val.h"
+#include "indr_fast_lvn.h"
 
 GBLREF spdesc stringpool;
 
@@ -68,5 +70,9 @@ void op_indname(mval *dst, mval *target, mval *subs)
 	dst->str.addr = (char *)stringpool.free;
 	dst->str.len = INTCAST((char *)out - dst->str.addr);
 	stringpool.free = out;
+	/* Record this string so that the fast indirection path can give its stringpool space back once a read has
+	 * located the node it names (see indr_fast_lvn_release)
+	 */
+	indr_fast_lvn_record_name(dst);
 	return;
 }

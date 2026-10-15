@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -23,6 +23,7 @@
 #include "toktyp.h"
 #include "cache.h"
 #include "op.h"
+#include "indr_fast_lvn.h"
 #include "valid_mname.h"
 #include <rtnhdr.h>	/* see HDR_FILE_INCLUDE_SYNTAX comment in mdef.h for why <> syntax is needed */
 
@@ -38,12 +39,36 @@ void	op_indglvn(mval *v,mval *dst)
 	mstr		*obj, object;
 	oprtype		x, getdst;
 	var_tabent	targ_key;
+	indr_fast_lvn	lvn;
+	lv_val		*node;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	MV_FORCE_STR(v);
 	indir_src.str = v->str;
 	indir_src.code = indir_glvn;
+	if (indr_fast_lvn_parse(v, &lvn))
+	{	/* Fast indirection path, which avoids compiling the string for performance: it is a simple local variable
+		 * reference, so fetch the value as the compiled code would. If the node has no value, leave the UNDEF
+		 * error (or the NOUNDEF null string) to the compiled code.
+		 */
+		node = indr_fast_lvn_node(&lvn, lvn.nsubs);
+		if ((NULL != node) && LV_IS_VAL_DEFINED(node))
+		{
+			*dst = node->v;
+			/* The mval of an alias container node (SET *x(1)=y) has MV_ALIASCONT set and holds a pointer to
+			 * the local variable it refers to. Its value for M code is the null string. Clear the flag so that
+			 * the result is a plain value, as op_fnget and op_fnget1 do for the compiled code. op_sto clears it
+			 * too, so a SET of the result is safe either way, but no other consumer should mistake the result
+			 * for a container.
+			 */
+			dst->mvtype &= ~MV_ALIASCONT;
+			indr_fast_lvn_done(&lvn);
+			indr_fast_lvn_release(v);
+			return;
+		}
+		indr_fast_lvn_done(&lvn);
+	}
 	if (NULL == (obj = cache_get(&indir_src)))
 	{
 		if (valid_mname(&v->str))

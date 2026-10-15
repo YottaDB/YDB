@@ -3,7 +3,7 @@
  * Copyright (c) 2012-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -33,6 +33,7 @@
 #include "mv_stent.h"
 #include "min_max.h"
 #include "glvn_pool.h"
+#include "indr_fast_lvn.h"
 
 error_def(ERR_VAREXPECTED);
 
@@ -45,12 +46,23 @@ void op_indsavglvn(mval *target, uint4 slot, uint4 do_ref)
 	oprtype         v, getdst;
 	opctype		put_oc;
 	triple          *s, *s1, *sub, *share;
+	indr_fast_lvn	ilvn;
+	boolean_t	saved;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	MV_FORCE_STR(target);
 	indir_src.str = target->str;
 	indir_src.code = do_ref ? indir_savglvn1 : indir_savglvn0;		/* must differenitate the 2 code variants */
+	if (indr_fast_lvn_parse(target, &ilvn))
+	{	/* Fast indirection path, which avoids compiling the string for performance: it is a simple local variable
+		 * reference, so save it in the glvn pool slot as the compiled code would.
+		 */
+		saved = indr_fast_lvn_save(&ilvn, slot);
+		indr_fast_lvn_done(&ilvn);
+		if (saved)
+			return;
+	}
 	if (NULL == (obj = cache_get(&indir_src)))
 	{
 		obj = &object;
