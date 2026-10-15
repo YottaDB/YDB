@@ -17,6 +17,7 @@
 
 #include <stdarg.h>
 #include "gtm_string.h"
+#include "gtm_strings.h"
 #include "gtm_stdio.h"
 
 #include "gtmio.h"
@@ -52,6 +53,7 @@ error_def(ERR_COLLATIONUNDEF);
 error_def(ERR_DBBADNSUB);
 error_def(ERR_NOCANONICNAME);
 error_def(ERR_SUB2LONG);
+error_def(ERR_ZYSQLNULLNOTVALID);
 
 STATICDEF gd_region	*gvn2gds_save_gv_cur_region;
 
@@ -192,6 +194,9 @@ void convert_key_to_db(mval *gvn, int start, int stop, gv_key *gvkey, unsigned c
 		mval2subsc(&tmpval, gvkey, gv_cur_region->std_null_coll);
 	} else
 	{	/* It's a string. We need to accept strings, $CHAR args, and $ZCHAR args. */
+		if (((stop - start) == DOLLAR_ZYSQLNULL_STRLEN)
+			&& (0 == STRNCASECMP(&gvn->str.addr[start], DOLLAR_ZYSQLNULL_STRING, DOLLAR_ZYSQLNULL_STRLEN)))
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_ZYSQLNULLNOTVALID);	/* not valid as a database subscript */
 		str = &strbuff[0];
 		str_top = &strbuff[0] + MAX_KEY_SZ + 1;
 		/* MV_NUM_APPROX needed by mval2subsc to skip val_iscan call */

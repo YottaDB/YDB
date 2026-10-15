@@ -15,6 +15,8 @@
 
 #include "mdef.h"
 #include "gtm_ctype.h"
+#include "gtm_string.h"
+#include "gtm_strings.h"
 #include "is_canonic_name.h"
 #include "gv_trigger_common.h"
 
@@ -199,6 +201,24 @@ boolean_t parse_gv_name_and_subscripts(mval *src, int *subscripts, int *start, i
 				}
 				if ('$' == letter)
 				{
+					if (((lastcpt - cpt) > DOLLAR_ZYSQLNULL_STRLEN)
+						&& (0 == STRNCASECMP(cpt, DOLLAR_ZYSQLNULL_STRING, DOLLAR_ZYSQLNULL_STRLEN))
+						&& ((',' == cpt[DOLLAR_ZYSQLNULL_STRLEN])
+							|| (term == cpt[DOLLAR_ZYSQLNULL_STRLEN])))
+					{	/* A $ZYSQLNULL subscript or environment, written as the unquoted text $ZYSQLNULL,
+						 * which is how $NAME writes it
+						 */
+						isrc += DOLLAR_ZYSQLNULL_STRLEN;
+						cpt += DOLLAR_ZYSQLNULL_STRLEN;
+						letter = *cpt;
+						if (',' == letter)
+							state = DISPATCH_FOR_STARTING_COMPONENT;
+						else
+							state = (')' == term) ? END_OF_PROCESSING : EXPECT_FIRST_LETTER_OF_NAME;
+						if ((0 < subs_count) || (1 == envpart))
+							*stop++ = isrc;
+						break;
+					}
 					state = IN_CHAR_FUNC;	/* $[z]char() */
 					break;
 				}

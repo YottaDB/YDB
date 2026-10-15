@@ -17,6 +17,7 @@
 
 #include "gtm_ctype.h"
 #include "gtm_string.h"
+#include "gtm_strings.h"
 
 #include "error.h"
 #include "stringpool.h"
@@ -31,6 +32,7 @@ error_def(ERR_INVDLRCVAL);
 #endif
 
 GBLREF spdesc stringpool;
+LITREF mval literal_sqlnull;
 
 error_def(ERR_NOCANONICNAME);
 error_def(ERR_NOSUBSCRIPT);
@@ -107,6 +109,12 @@ void op_fnqsubscript(mval *src, int seq, mval *dst)
 		{	/* add ^ here in case there's an intervening environment */
 			dst->str.addr[odst++] = '^';
 			UTF8_ONLY(++char_len);
+		}
+		if (((stop - isrc) == DOLLAR_ZYSQLNULL_STRLEN) && ('$' == src->str.addr[isrc])
+			&& (0 == STRNCASECMP(&src->str.addr[isrc], DOLLAR_ZYSQLNULL_STRING, DOLLAR_ZYSQLNULL_STRLEN)))
+		{	/* $ZYSQLNULL subscript */
+			*dst = literal_sqlnull;
+			return;
 		}
 		if ((0 == isrc) || ('"' == src->str.addr[isrc - 1])
 			|| ((('"' != (letter = src->str.addr[isrc])) && ('$' != letter))))
