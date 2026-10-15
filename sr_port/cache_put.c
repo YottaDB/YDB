@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -24,6 +24,7 @@
 #include "stringpool.h"
 
 GBLREF	hash_table_objcode	cache_table;
+GBLREF	spdesc			stringpool;
 GBLREF	int			indir_cache_mem_size;
 GBLREF  uint4           	max_cache_memsize;      /* Maximum bytes used for indirect cache object code */
 GBLREF  uint4           	max_cache_entries;      /* Maximum number of cached indirect compilations */
@@ -84,6 +85,15 @@ void cache_put(icode_str *src, mstr *object)
 		for (varent = var_base, i = 0; i < fixup_cnt; i++, varent++)
 			varent->var_name.addr = (INTPTR_T) varent->var_name.addr + object->addr;
 	}
+	/* The stringpool copy of the object (built there by ind_code) is now garbage except for its literal text, which
+	 * the fixups above point the cached literals and variable names at. That copy starts with the header and the
+	 * literal text, and fixup_vals_off, the offset of the literal mval table that follows them (see indir_lits),
+	 * is where the text ends, rounded up to a word. When the object is the last thing in the stringpool, give back
+	 * everything from there to the end now, rather than leave it for the next garbage collection to reclaim. The
+	 * header stays, as it lies below the literal text.
+	 */
+	if (((unsigned char *)object->addr + object->len) == stringpool.free)
+		stringpool.free = (unsigned char *)object->addr + ((ihdtyp *)object->addr)->fixup_vals_off;
 	*object = csp->obj;				/* Update location of object code for comp_indr */
 	cacheflush(csp->obj.addr, csp->obj.len, BCACHE);
 }

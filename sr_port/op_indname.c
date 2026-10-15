@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2026 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -35,7 +38,7 @@ void op_indname(mval *dst, mval *target, mval *subs)
 	MV_FORCE_STR(subs);
 	if ((target->str.len + subs->str.len) > MAX_SRCLINE)
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_INDRMAXLEN, 1, MAX_SRCLINE);
-	ENSURE_STP_FREE_SPACE(MAX_SRCLINE);
+	ENSURE_STP_FREE_SPACE(target->str.len + subs->str.len + 3);	/* at most 3 more for the "@#(" added below */
 	start = out = stringpool.free;
 	for (cp = (unsigned char *)target->str.addr, i = target->str.len, quoted = 0; i; i--)
 	{	/* simple parsing transfer rather than memcpy so an embedded "comment" doesn't cause premature truncation */
