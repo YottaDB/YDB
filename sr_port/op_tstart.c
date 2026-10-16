@@ -106,6 +106,7 @@ GBLREF	mval			dollar_ztslate;
 LITREF	mval			literal_null;
 #endif
 GBLREF	int4			tstart_gtmci_nested_level;
+GBLREF	uint4			dollar_trestart;
 #ifdef VMS
 GBLREF	boolean_t		tp_has_kill_t_cse; /* cse->mode of kill_t_write or kill_t_create got created in this transaction */
 #endif
@@ -189,6 +190,8 @@ void	op_tstart(int tstart_flag, ...) /* value of $T when TSTART */
 	MV_FORCE_STR(tid);
 	if (!dollar_tlevel)
 	{
+		assert(!dollar_trestart);		/* A restart resumes past this call, so this is always a new transaction */
+		TREF(tpnotacid_err_sent) = FALSE;	/* Report its TPNOTACID error to the syslog afresh */
 		jnl_fence_ctl.fence_list = JNL_FENCE_LIST_END;
 		jgbl.cumul_jnl_rec_len = 0;
 #		ifdef DEBUG

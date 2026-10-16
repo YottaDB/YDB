@@ -571,6 +571,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 		 * If such an error reaches the frame of the LOCK, this handler runs again in that frame and abandons the LOCK.
 		 */
 		ABANDON_LOCK_CMD_UNLESS_RESUMED(frame_pointer);
+		TREF(tpnotacid_in_dmode) = FALSE;	/* An error ends any direct mode read; "op_dmode" sets it on re-entry */
 		if ((0 == dollar_tlevel) || (CDB_STAGNATE > t_tries))
 		{	/* Only release crit if we are NOT in TP *or* if we are in TP, we aren't in final retry */
 			for (addr_ptr = get_next_gdr(NULL); addr_ptr; addr_ptr = get_next_gdr(addr_ptr))

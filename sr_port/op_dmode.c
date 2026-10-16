@@ -109,6 +109,7 @@ void	op_dmode(void)
 		tt_ptr = NULL;
 	if (!prin_out_dev_failure && (!tt_ptr || !tt_ptr->mupintr))
 		op_wteol(1);
+	TREF(tpnotacid_in_dmode) = TRUE;	/* The prompt and read skip the TPNOTACID retry limit; see "tpnotacid_check" */
 	TPNOTACID_CHECK(DIRECTMODESTR);
 	if (io_curr_device.in->type == tt)
 	{
@@ -147,6 +148,7 @@ void	op_dmode(void)
 		op_wteol(1);
 	}
 
+	TREF(tpnotacid_in_dmode) = FALSE;
 	prin_dm_io = FALSE;
 	io_curr_device = save_device;
 	dmode_intruptd = FALSE;

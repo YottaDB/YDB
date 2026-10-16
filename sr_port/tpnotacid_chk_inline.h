@@ -134,12 +134,29 @@ static inline void tpnotacid_check(char* caller_str)
 			memcpy(TADR(tpnotacid_last_zpos), zpos.str.addr, zpos.str.len);
 			TREF(tpnotacid_last_zpos_len) = zpos.str.len;
 			TREF(tpnotacid_last_caller) = caller_str;
+			TREF(tpnotacid_err_sent) = FALSE;	/* a new position gets its own syslog error; see below */
 		}	/* send_msg might get duplicated but not considered likely or a problem */
 		if (dollar_trestart > (tries ? tries : TPNOTACID_DEF_MAX_TRIES))
 		{	/* hard limit; tries rarely zero as that is intended as a way of discovering not acid code */
 			assert(zpos.str.addr);
-			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) MAKE_MSG_ERROR(ERR_TPNOTACID), 6, LEN_AND_STR(caller_str),
-				zpos.str.len, zpos.str.addr, TREF(tpnotacidtime), dollar_trestart);
+			/* Direct mode is exempt. Raising the error from its prompt would drive the error trap, which with the
+			 * default $ZTRAP="B" enters direct mode again, so the process would never reach the prompt and would
+			 * loop indefinitely. A process waiting at the prompt is not livelocked, and the user can TROLLBACK.
+			 */
+			if (TREF(tpnotacid_in_dmode))
+				return;
+			/* An error repeated from the same operation and position in one transaction (for example by an error
+			 * trap that re-executes the line) is sent to the syslog only once. This relies on the warning code
+			 * earlier in this block, which records the current position and clears the flag whenever the
+			 * position changes, so this check must stay after it. "op_tstart" clears the flag when a new
+			 * transaction starts, so a recurrence in a later transaction is reported again.
+			 */
+			if (!TREF(tpnotacid_err_sent))
+			{
+				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) MAKE_MSG_ERROR(ERR_TPNOTACID), 6, LEN_AND_STR(caller_str),
+					zpos.str.len, zpos.str.addr, TREF(tpnotacidtime), dollar_trestart);
+				TREF(tpnotacid_err_sent) = TRUE;
+			}
 			cslen = strlen(caller_str);	/* for reasons not identified 2nd LEN_AND_STR produced unreliable length */
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) MAKE_MSG_ERROR(ERR_TPNOTACID), 6, cslen, caller_str, zpos.str.len,
 				zpos.str.addr, TREF(tpnotacidtime), dollar_trestart);

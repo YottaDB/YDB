@@ -206,6 +206,11 @@ THREADGBLDEF(tpnotacidtries,			int4)				/* limit on tpnotacid events in TP */
 THREADGBLDEF(tpnotacid_last_caller,		char *)				/* operation of the last TPNOTACID syslog warning */
 THREADGBLAR1DEF(tpnotacid_last_zpos,		char,		MAX_ENTRYREF_LEN)	/* $ZPOSITION of that warning */
 THREADGBLDEF(tpnotacid_last_zpos_len,		int4)				/* length of tpnotacid_last_zpos; 0 if none sent */
+THREADGBLDEF(tpnotacid_err_sent,		boolean_t)			/* TPNOTACID syslog error sent for the warning's
+										 * position in the current transaction */
+THREADGBLDEF(tpnotacid_in_dmode,		boolean_t)			/* TRUE in "op_dmode" from its TPNOTACID check
+										 * until the command is read; the TPNOTACID
+										 * retry limit then raises no error */
 THREADGBLDEF(tp_restart_count,			uint4)				/* tp_restart counter */
 THREADGBLDEF(tp_restart_dont_counts,		int4)				/* tp_restart count adjustment; NOTE: DEBUG only */
 THREADGBLDEF(tp_restart_entryref,		mval)				/* tp_restart position for reporting */
