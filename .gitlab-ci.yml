@@ -56,6 +56,19 @@ commit-verify:
   script:
     - ci/commit_verify.sh ci/needs_copyright.sh https://gitlab.com/YottaDB/DB/YDB
 
+# Every send_msg/gtm_putmsg/rts_error call site states its own argument count in VARLSTCNT, and a
+# count higher than the number of arguments passed makes the consumption loop read past the end of
+# the va_list. This needs no build, so it runs beside commit-verify.
+varlstcnt-verify:
+  image: ubuntu:24.04
+  stage: build
+  interruptible: true
+  before_script:
+    - !reference [.apt-get-retry, script]
+    - apt_get_install -y -qq python3
+  script:
+    - ci/check_varlstcnt.py
+
 .clang-tidy:
   image: ubuntu:24.04
   # NOTE: conceptually this is a test and not a build.
