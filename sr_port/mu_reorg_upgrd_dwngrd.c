@@ -355,7 +355,7 @@ void	mu_reorg_upgrd_dwngrd(void)
 			mu_reorg_more_tries = FALSE;
 			if (IS_ONLNRLBK_ACTIVE(csa))
 				util_out_print("Region !AD : Ended due to concurrent ROLLBACK -ONLINE", TRUE);
-			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_MUUPGRDNRDY, 5, DB_LEN_STR(reg),
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_MUUPGRDNRDY, 5, DB_LEN_STR(reg),
 					RTS_ERROR_LITERAL("V7"), &csd->blks_to_upgrd);
 			break;
 		}

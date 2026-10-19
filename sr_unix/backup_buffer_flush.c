@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -144,7 +144,7 @@ boolean_t backup_buffer_flush(gd_region *reg)
 				sbufh_p->backup_errno = status;
 				csa->nl->nbb = BACKUP_NOT_IN_PROGRESS;
 				assert(FALSE);
-				send_msg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_BKUPTMPFILWRITE, 2,
+				send_msg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_BKUPTMPFILWRITE, 2,
 						LEN_AND_STR(sbufh_p->tempfilename), status);
 				break;	/* close file, release lock and return now.. */
 			}

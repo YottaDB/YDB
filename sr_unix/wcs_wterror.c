@@ -3,7 +3,7 @@
  * Copyright (c) 2016-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -133,7 +133,7 @@ void	wcs_wterror(gd_region *reg, int4 save_errno)
 #ifdef			USE_LIBAIO
 			} else
 			{	/* If the error string was set, then we can output the syscall that failed as well. */
-				send_msg_csa(CSA_ARG(csa) VARLSTCNT(15) ERR_DBIOERR, 4, REG_LEN_STR(reg), DB_LEN_STR(reg),
+				send_msg_csa(CSA_ARG(csa) VARLSTCNT(14) ERR_DBIOERR, 4, REG_LEN_STR(reg), DB_LEN_STR(reg),
 						ERR_SYSCALL, 5, LEN_AND_STR(aio_shim_errstr), CALLFROM,
 						save_errno);
 				aio_shim_errstr = NULL;

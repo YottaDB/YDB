@@ -3,7 +3,7 @@
  * Copyright (c) 2013-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -97,7 +97,7 @@ int mk_tmp_object_file(const unsigned char *object_fname, int object_fname_len)
 	SETUP_THREADGBL_ACCESS;
 	/* Make sure room in buffer for addition of unique-ifying MKSTEMP_MASK on end of file name */
 	if ((object_fname_len + SIZEOF(MKSTEMP_MASK) - 1) > TLEN(tmp_object_file_name))
-		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(9) ERR_OBJFILERR, 2, object_fname_len, object_fname, ERR_TEXT,
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_OBJFILERR, 2, object_fname_len, object_fname, ERR_TEXT,
 			2, RTS_ERROR_TEXT("Object file name exceeds buffer size"));
 	/* The mkstemp() routine is known to bogus-fail for no apparent reason at all especially on AIX 6.1. In the event
 	 * this shortcoming plagues other platforms as well, we add a low-cost retry wrapper.

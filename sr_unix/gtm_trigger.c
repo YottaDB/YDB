@@ -3,7 +3,7 @@
  * Copyright (c) 2010-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -450,7 +450,7 @@ int gtm_trigger_complink(gv_trigger_t *trigdsc, boolean_t dolink)
 		assert(0 == urc);
 		PRO_ONLY(UNUSED(urc));
 		assert(FALSE);
-		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(5) ERR_TEXT, 2, RTS_ERROR_LITERAL("Compilation string too long"));
+		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_TEXT, 2, RTS_ERROR_LITERAL("Compilation string too long"));
 	}
 	zcompprm.mvtype = MV_STR;
 	zcompprm.str.addr = zcomp_parms;

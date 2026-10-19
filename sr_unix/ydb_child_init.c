@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -383,7 +383,7 @@ STATICFNDEF void ydb_child_init_sem_incrcnt(gd_region *reg, ydb_reg_type_t reg_t
 		if (udi->grabbed_ftok_sem && !ftok_sem_release(reg, DECR_CNT_FALSE, IMMEDIATE_FALSE))
 		{
 			assert(FALSE);
-			rts_error_csa(CSA_ARG(csa) VARLSTCNT(12) ERR_DBFILERR, 2, DB_LEN_STR(reg),
+			rts_error_csa(CSA_ARG(csa) VARLSTCNT(11) ERR_DBFILERR, 2, DB_LEN_STR(reg),
 				ERR_SYSCALL, 5, RTS_ERROR_TEXT("ydb_child_init() ftok_sem_release1"), CALLFROM);
 		}
 		/* Ensure that journal files are reopened by this process since we need to write a
@@ -456,7 +456,7 @@ STATICFNDEF void ydb_child_init_sem_incrcnt(gd_region *reg, ydb_reg_type_t reg_t
 		if (!ftok_sem_release(reg, DECR_CNT_FALSE, IMMEDIATE_FALSE))
 		{
 			assert(FALSE);
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(10) err_code, 0,
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) err_code, 0,
 				ERR_SYSCALL, 5, RTS_ERROR_TEXT("ydb_child_init() ftok_sem_release2"), CALLFROM);
 		}
 	}

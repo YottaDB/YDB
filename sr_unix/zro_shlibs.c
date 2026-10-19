@@ -93,7 +93,7 @@ void zro_shlibs_unlink_all(void)
 			} else
 			{
 				assert(FALSE);
-				RTS_ERROR_ABT(VARLSTCNT(11) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("dlclose()_2"), CALLFROM);
+				RTS_ERROR_ABT(VARLSTCNT(7) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("dlclose()_2"), CALLFROM);
 			}
 		}
 		free(oshlb);

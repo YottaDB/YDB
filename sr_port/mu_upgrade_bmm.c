@@ -747,7 +747,7 @@ int4	mu_upgrade_bmm(gd_region *reg, size_t blocks_needed)
 		csa->hold_onto_crit = FALSE;
 		t_abort(reg, csa);						/* do crit and other cleanup */
 		mu_upgrade_in_prog = MUPIP_UPGRADE_OFF;
-		gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(13) ERR_DBFILERR, 2, DB_LEN_STR(reg),
+		gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(12) ERR_DBFILERR, 2, DB_LEN_STR(reg),
 			ERR_TEXT, 2, RTS_ERROR_TEXT("Error initializing additional master bit map space."),
 			ERR_TEXT, 2, LEN_AND_STR(STRERROR(save_errno)));
 		return ERR_MUNOFINISH;

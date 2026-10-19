@@ -3,7 +3,7 @@
  * Copyright (c) 2012-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -120,7 +120,7 @@ boolean_t	grab_gtmsource_srv_latch(sm_global_latch_ptr_t latch, uint4 max_timeou
 	DUMP_LOCKHIST();
 	assert(FALSE);
 	assert(jnlpool->gtmsource_local && jnlpool->gtmsource_local->gtmsource_pid);
-	rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_SRVLCKWT2LNG, 2, jnlpool->gtmsource_local->gtmsource_pid,
+	rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SRVLCKWT2LNG, 2, jnlpool->gtmsource_local->gtmsource_pid,
 			max_timeout_in_secs);
 	return FALSE; /* to keep the compiler happy */
 }
