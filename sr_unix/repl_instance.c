@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -25,6 +25,7 @@
 #include "gtm_time.h"
 
 #include <sys/sem.h>
+#include <sys/shm.h>
 #include <sys/mman.h>
 #include <errno.h>
 
@@ -57,6 +58,7 @@
 #include "have_crit.h"
 #include "anticipatory_freeze.h"
 #include "gtmimagename.h"
+#include "gtm_sem.h"
 #ifdef __MVS__
 #include "gtm_zos_io.h"
 #endif
@@ -99,6 +101,8 @@ error_def(ERR_REPLINSTUNDEF);
 error_def(ERR_REPLINSTWRITE);
 error_def(ERR_SYSCALL);
 error_def(ERR_TEXT);
+
+STATICFNDCL void	clear_stale_recvpool_fields(repl_inst_hdr *inst_hdr);
 
 /* Description:
  *	Get the environment of replication instance.
@@ -1279,8 +1283,11 @@ void	repl_inst_flush_jnlpool(boolean_t reset_replpool_fields, boolean_t reset_cr
 		{
 			jnlpool->repl_inst_filehdr->jnlpool_semid = INVALID_SEMID;
 			jnlpool->repl_inst_filehdr->jnlpool_shmid = INVALID_SHMID;
-			jnlpool->repl_inst_filehdr->recvpool_semid = INVALID_SEMID;	/* Just in case it is not already reset */
-			jnlpool->repl_inst_filehdr->recvpool_shmid = INVALID_SHMID;	/* Just in case it is not already reset */
+			/* A receive pool that is still around (for example because the receiver server and update process
+			 * were killed) is not removed here, so keep its ids in the file header. That is how MUPIP RUNDOWN
+			 * and a later receiver server find it. Clear only ids that no longer name an existing receive pool.
+			 */
+			clear_stale_recvpool_fields(jnlpool->repl_inst_filehdr);
 		}
 	}
 	/* If the source server that created the journal pool died before it was completely initialized in "gtmsource_seqno_init"
@@ -1300,6 +1307,48 @@ void	repl_inst_flush_jnlpool(boolean_t reset_replpool_fields, boolean_t reset_cr
 		repl_inst_write(udi->fn, (off_t)0, (sm_uc_ptr_t)jnlpool->repl_inst_filehdr, REPL_INST_HDR_SIZE + GTMSRC_LCL_SIZE);
 	} else
 		repl_inst_write(udi->fn, (off_t)0, (sm_uc_ptr_t)jnlpool->repl_inst_filehdr, REPL_INST_HDR_SIZE);
+}
+
+/* Description:
+ *	Clears the receive pool semaphore and shared memory ids (and their creation times) in the instance file header
+ *	unless they name an existing semaphore or shared memory with the creation time recorded in the header. This is
+ *	the same check as "recvpool_init" and "mu_rndwn_repl_instance" use to tell a live receive pool from a stale id.
+ *	The semaphore id is cleared only if the shared memory id is cleared too, since "recvpool_init" requires an INVALID
+ *	shared memory id whenever the semaphore id is INVALID. So if the semaphore is gone but the shared memory is not,
+ *	both ids stay, so that MUPIP RUNDOWN can still find and remove the shared memory.
+ * Parameters:
+ *	inst_hdr : instance file header to update
+ * Return Value:
+ *	None
+ */
+STATICFNDEF void	clear_stale_recvpool_fields(repl_inst_hdr *inst_hdr)
+{
+	struct shmid_ds	shmstat;
+	struct semid_ds	semstat;
+	union semun	semarg;
+
+	if ((INVALID_SHMID != inst_hdr->recvpool_shmid)
+		&& ((-1 == shmctl(inst_hdr->recvpool_shmid, IPC_STAT, &shmstat))
+			|| (shmstat.shm_ctime != inst_hdr->recvpool_shmid_ctime)))
+	{
+		inst_hdr->recvpool_shmid = INVALID_SHMID;
+		inst_hdr->recvpool_shmid_ctime = 0;
+	}
+	/* "recvpool_init" never records a shared memory id without a semaphore id */
+	assert((INVALID_SHMID == inst_hdr->recvpool_shmid) || (INVALID_SEMID != inst_hdr->recvpool_semid));
+	/* Check the semaphore only if the shared memory id was cleared. While the shared memory still exists, keep the
+	 * semaphore id even if it is stale, as "recvpool_init" requires a semaphore id with every shared memory id.
+	 */
+	if ((INVALID_SHMID == inst_hdr->recvpool_shmid) && (INVALID_SEMID != inst_hdr->recvpool_semid))
+	{
+		semarg.buf = &semstat;
+		if ((-1 == semctl(inst_hdr->recvpool_semid, DB_CONTROL_SEM, IPC_STAT, semarg))
+				|| (semstat.sem_ctime != inst_hdr->recvpool_semid_ctime))
+		{
+			inst_hdr->recvpool_semid = INVALID_SEMID;
+			inst_hdr->recvpool_semid_ctime = 0;
+		}
+	}
 }
 
 /* This function determines if this replication instance was formerly a root primary. It finds this out by looking at the
