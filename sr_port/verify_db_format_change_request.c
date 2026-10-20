@@ -3,6 +3,9 @@
  * Copyright (c) 2005-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2026 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -63,7 +66,7 @@ int4	verify_db_format_change_request(gd_region *reg, enum db_ver new_db_format, 
 	assert(GDSV6 < new_db_format);	/* Switching to V6 and before has been disallowed since V7. Nothing should request it */
 	if (reg_cmcheck(reg))
 	{
-		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_NOGTCMDB, 2, LEN_AND_STR(command_name), DB_LEN_STR(reg));
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_NOGTCMDB, 4, LEN_AND_STR(command_name), DB_LEN_STR(reg));
 		return ERR_NOGTCMDB;
 	}
 	if (reg->read_only)

@@ -1397,9 +1397,9 @@ repl_inst_bkup_done2:
 							status = dbfilop(fc);
 							if (SS_NORMAL != status)
 							{
-								gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(7)
+								gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(5)
 										ERR_DBFILERR, 2,
-										DB_LEN_STR(gv_cur_region), 0, status, 0);
+										DB_LEN_STR(gv_cur_region), status);
 								rptr->not_this_time = give_up_after_create_tempfile;
 								DECR_INHIBIT_KILLS(cs_addrs->nl);
 								rel_crit(rptr->reg);

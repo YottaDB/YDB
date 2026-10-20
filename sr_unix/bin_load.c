@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -527,7 +527,7 @@ void bin_load(gtm_uint64_t begin, gtm_uint64_t end, char *line1_ptr, int line1_l
 								RTS_ERROR_TEXT(index_err_buf), ERR_GVFAILCORE);
 							gtm_fork_n_core();
 							gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) MAKE_MSG_SEVERE(ERR_RECLOAD),
-								2, LEN_AND_STR(msg_buff), msg_buff, ERR_TEXT, 2,
+								2, LEN_AND_STR(msg_buff), ERR_TEXT, 2,
 								RTS_ERROR_TEXT(index_err_buf));
 							FREE_MALLOCS;
 							return;

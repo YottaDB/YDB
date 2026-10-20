@@ -531,7 +531,7 @@ int gtmrecv(void)
 	if ((UPDPROC_EXISTS == upd_start_status && recvpool_ctl->fresh_start) ||
 	    (UPDPROC_START_ERR == upd_start_status && GTMRECV_MAX_UPDSTART_ATTEMPTS <= upd_start_attempts))
 	{
-		sgtm_putmsg(print_msg, REPL_MSG_SIZE, VARLSTCNT(4) ERR_REPLERR, RTS_ERROR_LITERAL(
+		sgtm_putmsg(print_msg, REPL_MSG_SIZE, VARLSTCNT(4) ERR_REPLERR, 2, RTS_ERROR_STRING(
 			(UPDPROC_EXISTS == upd_start_status) ?
 			    "Runaway Update Process. Aborting..." :
 			    "Too many failed attempts to fork Update Process. Aborting..."));
