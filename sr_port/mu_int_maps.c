@@ -106,7 +106,8 @@ void mu_int_maps(void)
 	 */
 	crit_counter = 1;
 	wait_on_kip = (cs_data && cs_data->kill_in_prog) && !TREF(kip_wait_done) && (NULL != cs_addrs);
-	TREF(kip_wait_done) = FALSE;	/* consumed: the next region gets its own wait */
+	/* Now that whether this region waits is decided, clear it before the next region's wait potentially starts */
+	TREF(kip_wait_done) = FALSE;
 	if (wait_on_kip)
 	{
 		GET_CUR_TIME(time_str);

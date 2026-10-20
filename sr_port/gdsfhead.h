@@ -4105,21 +4105,18 @@ MBSTART {									\
  * process doing the KILL, and INSERT_KIP_PID runs while it holds crit. A KILL that is in progress therefore
  * has its process recorded either in the array or, when all MAX_KIP_PID_SLOTS slots were taken, in
  * "kip_pid_overflow_cnt". While that count is non-zero the array is incomplete, so ALIVE is TRUE and the wait
- * continues as before. A process that is killed while counted leaves the count set until the shared memory
- * is recreated, which costs only the wait this would otherwise save.
+ * continues. A process that is killed while counted leaves the count set until the shared memory is
+ * recreated, and until then ALIVE stays TRUE and every wait runs to its full length.
  * The wait loops read "kill_in_prog" and the array without crit. So INCR_KIP records the process before it
  * raises "kill_in_prog", and DECR_KIP lowers "kill_in_prog" before it removes the process, and a caller that
  * read a non-zero "kill_in_prog" before invoking this finds the process of every KILL counted in it. The
  * read barrier below orders the caller's read of "kill_in_prog" before the reads of the array.
  * A "kill_in_prog" that DSE CHANGE -FILEHEADER set has no process doing a KILL either, but it is how tests
- * and operators simulate a KILL in progress, so "kip_set_by_dse" reports it as alive too and the wait is as
- * before. That leaves one way for a non-zero "kill_in_prog" to count a KILL that no live process is doing, a
+ * and operators simulate a KILL in progress, so "kip_set_by_dse" reports it as alive too and the wait
+ * continues. That leaves one way for a non-zero "kill_in_prog" to count a KILL that no live process is doing, a
  * KILL whose process terminated without running its cleanup. Its dead pid stays in the array while the shared
  * memory does, and once the shared memory is recreated "kill_in_prog" is read back from the file header with
  * an empty array.
- * A pid the system has since reused for an unrelated process reads as alive and keeps the wait, which is
- * the behaviour this replaces, so that case is no worse than it was.
- * The caller supplies "is_proc_alive.h" and "memcoherency.h".
  */
 #define KIP_PIDS_ALIVE(CSA, ALIVE)						\
 MBSTART {									\

@@ -103,10 +103,11 @@ void mu_int_reg(gd_region *reg, boolean_t *return_value, boolean_t return_after_
 	}
 	/* TREF(kip_wait_done) is one flag for the whole process. "region_freeze" and "ss_initiate" set it when they
 	 * wait for a KILL in progress, and "mu_int_maps" clears it. If an earlier region set it but never reached
-	 * "mu_int_maps" (because after the wait its freeze, read-only wait, snapshot or encryption setup failed, or
-	 * "mu_int_fhead" found errors in its file header, or because the INTEG was of -BLOCK or -SUBSCRIPT and so
-	 * does not call "mu_int_maps" at all), it is still set here and would make "mu_int_maps" skip the wait for
-	 * this region, for which nothing has waited yet. So clear it before this region's wait.
+	 * "mu_int_maps" (because, after that wait, the earlier region's freeze, read-only wait, snapshot or encryption
+	 * setup failed, or "mu_int_fhead" found errors in the earlier region's file header, or because the INTEG was of
+	 * -BLOCK or -SUBSCRIPT and so does not call "mu_int_maps" at all), it is still set here and would make
+	 * "mu_int_maps" skip the wait for this region, for which nothing has waited yet. So clear it before this
+	 * region's wait.
 	 */
 	TREF(kip_wait_done) = FALSE;
 	change_reg();
