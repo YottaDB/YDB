@@ -529,7 +529,7 @@ char *cli_fgets(char *destbuffer, int buffersize, FILE *fp, boolean_t in_tp)
 			in_len = u_strlen(cli_fgets_Ubuffer);
 			if ('\n' != cli_fgets_Ubuffer[in_len - 1])
 			{
-				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ARGSLONGLINE, 2, in_len);
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_ARGSLONGLINE, 1, in_len);
 				/* There is a buffer overflow, so drain the input buffer with more u_fgets */
 				do
 				{	/* no u_ferror so use plain ferror */
@@ -589,7 +589,7 @@ char *cli_fgets(char *destbuffer, int buffersize, FILE *fp, boolean_t in_tp)
 			in_len = strlen(cli_fgets_buffer);
 			assert(in_len <= MAX_LINE);
 			if ('\n' != cli_fgets_buffer[in_len - 1]) {
-				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ARGSLONGLINE, 2, in_len);
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_ARGSLONGLINE, 1, in_len);
 				/* There is a buffer overflow, so drain the input buffer with more fgets */
 				do
 				{

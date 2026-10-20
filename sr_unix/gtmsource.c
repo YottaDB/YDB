@@ -220,8 +220,8 @@ int gtmsource()
 							continue;
 						if (!gtmsource_local->hrtbt_recvd)
 						{
-							sgtm_putmsg(print_msg, OUT_BUFF_SIZE - 1, VARLSTCNT(6) ERR_REPLNORESP,
-									4, LEN_AND_STR(gtmsource_local->secondary_instname),
+							sgtm_putmsg(print_msg, OUT_BUFF_SIZE - 1, VARLSTCNT(5) ERR_REPLNORESP,
+									3, LEN_AND_STR(gtmsource_local->secondary_instname),
 									gtmsource_options.shutdown_time);
 							repl_log(stdout, TRUE, TRUE, print_msg);
 							if (gtmsource_local->connect_parms[GTMSOURCE_CONN_HEARTBEAT_PERIOD] >

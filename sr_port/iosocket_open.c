@@ -436,7 +436,7 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, uint
 			if (0 < dsocketptr->n_socket && ((ochset_specified && (temp_ochset != ioptr->ochset))
 				|| (ichset_specified && (temp_ichset != ioptr->ichset))))
 			{
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(10) ERR_CHSETALREADY, 8,
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_CHSETALREADY, 4,
 					chset_names[ioptr->ichset].len, chset_names[ioptr->ichset].addr,
 					chset_names[ioptr->ochset].len, chset_names[ioptr->ochset].addr);
 				return FALSE;

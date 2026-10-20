@@ -74,7 +74,8 @@ void mupip_dump_fhead(void)
 	SETUP_THREADGBL_ACCESS;
 	/* Verify ydb_dist, and make sure there is a parameter. */
 	if (!ydb_dist_ok_to_use)
-		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_YDBDISTUNVERIF, 4, LEN_AND_STR(ydb_dist));
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_YDBDISTUNVERIF, 4, LEN_AND_STR(ydb_dist),
+			GTMIMAGENAMETXT(image_type));
 	if (CLI_PRESENT == cli_present("REGION"))
 	{	/* region */
 		status = SS_NORMAL;

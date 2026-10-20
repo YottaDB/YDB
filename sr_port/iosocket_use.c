@@ -454,7 +454,7 @@ void	iosocket_use(io_desc *iod, mval *pp)
 		assert(CHSET_MAX_IDX_ALL != temp_ichset);
 		if (0 < dsocketptr->n_socket && ((temp_ochset != iod->ochset) || (temp_ichset != iod->ichset)))
 		{
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(10) ERR_CHSETALREADY, 8,
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_CHSETALREADY, 4,
 				chset_names[iod->ichset].len, chset_names[iod->ichset].addr,
 				chset_names[iod->ochset].len, chset_names[iod->ochset].addr);
 			return;

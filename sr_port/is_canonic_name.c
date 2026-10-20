@@ -431,7 +431,7 @@ boolean_t parse_gv_name_and_subscripts(mval *src, int *subscripts, int *start, i
 			assert(4 > utf8_len);
 			if (0 > utf8_len)
 				RTS_ERROR_CSA_ABT(NULL,
-					VARLSTCNT(6) ERR_BADCHAR, 4, cpt - 1, LEN_AND_LIT(UTF8_NAME));
+					VARLSTCNT(6) ERR_BADCHAR, 4, 1, cpt - 1, LEN_AND_LIT(UTF8_NAME));
 			isrc += utf8_len;
 			cpt += utf8_len;
 		}

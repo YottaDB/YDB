@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -178,7 +178,7 @@ void mucregini(block_id blk_init_size, enum db_ver desired_db_ver)
 		reg_autoswitch = gv_cur_region->jnl_autoswitchlimit;
 		if (csd->jnl_alq + csd->jnl_deq > reg_autoswitch)
 		{
-			PUTMSG_WARN_CSA((CSA_ARG(cs_addrs) VARLSTCNT(8) ERR_JNLALLOCGROW, 6, csd->jnl_alq,
+			PUTMSG_WARN_CSA((CSA_ARG(cs_addrs) VARLSTCNT(7) ERR_JNLALLOCGROW, 5, csd->jnl_alq,
 					 gv_cur_region->jnl_autoswitchlimit, "database file", DB_LEN_STR(gv_cur_region)));
 			csd->autoswitchlimit = reg_autoswitch;
 			csd->jnl_alq = csd->autoswitchlimit;
@@ -191,7 +191,7 @@ void mucregini(block_id blk_init_size, enum db_ver desired_db_ver)
 			 */
 			if (JNL_AUTOSWITCHLIMIT_MIN > csd->autoswitchlimit)
 			{
-				PUTMSG_WARN_CSA((CSA_ARG(cs_addrs) VARLSTCNT(8) ERR_JNLALLOCGROW, 6, csd->jnl_alq,
+				PUTMSG_WARN_CSA((CSA_ARG(cs_addrs) VARLSTCNT(7) ERR_JNLALLOCGROW, 5, csd->jnl_alq,
 						 reg_autoswitch, "database file", DB_LEN_STR(gv_cur_region)));
 				csd->jnl_alq = reg_autoswitch;
 				csd->autoswitchlimit = reg_autoswitch;

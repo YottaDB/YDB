@@ -3,7 +3,7 @@
  * Copyright (c) 2016-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -721,7 +721,7 @@ CONDITION_HANDLER(gvcst_remove_statsDB_linkage_ch)
 	memcpy(buffer, TREF(util_outbuff_ptr), msglen);
 	getzposition(&zpos);	/* Find out where it occurred */
 	/* Send whole thing to syslog */
-	send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_RNDWNSTATSDBFAIL, 10, REG_LEN_STR(save_statsDBreg),
+	send_msg_csa(CSA_ARG(NULL) VARLSTCNT(10) ERR_RNDWNSTATSDBFAIL, 8, REG_LEN_STR(save_statsDBreg),
 		     DB_LEN_STR(save_statsDBreg), zpos.str.len, zpos.str.addr, msglen, buffer);
 	if (DUMPABLE && !SUPPRESS_DUMP)
 	{

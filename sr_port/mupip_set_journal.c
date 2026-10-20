@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -460,7 +460,7 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 			 */
 			if (jnl_info.autoswitchlimit < jnl_info.alloc)
 			{
-				gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(7) ERR_JNLSWITCHTOOSM, 5,
+				gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(6) ERR_JNLSWITCHTOOSM, 4,
 						jnl_info.autoswitchlimit, jnl_info.alloc, DB_LEN_STR(gv_cur_region));
 				if (newjnlfiles)
 					gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_JNLNOCREATE, 2,
@@ -470,7 +470,7 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 			} else if (jnl_info.alloc + jnl_info.extend > jnl_info.autoswitchlimit
 					&& jnl_info.alloc != jnl_info.autoswitchlimit)
 			{
-				gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(8) ERR_JNLALLOCGROW, 6, jnl_info.alloc,
+				gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(7) ERR_JNLALLOCGROW, 5, jnl_info.alloc,
 						jnl_info.autoswitchlimit, "database file", DB_LEN_STR(gv_cur_region));
 				jnl_info.alloc = jnl_info.autoswitchlimit;
 			} else

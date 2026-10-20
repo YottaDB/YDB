@@ -3,7 +3,7 @@
  * Copyright (c) 2018-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -95,8 +95,8 @@ boolean_t mlk_shrhash_resize(mlk_pvtctl_ptr_t pctl)
 				if (-1 == status)
 					send_msg_csa(CSA_ARG(pctl->csa) VARLSTCNT(8)
 							ERR_SYSCALL, 5, LEN_AND_LIT("shm_rmid"), CALLFROM, errno, 0);
-				send_msg_csa(CSA_ARG(pctl->csa) VARLSTCNT(5)
-						ERR_MLKHASHRESIZEFAIL, 3, shrhash_size_old, shrhash_size_new);
+				send_msg_csa(CSA_ARG(pctl->csa) VARLSTCNT(4)
+						ERR_MLKHASHRESIZEFAIL, 2, shrhash_size_old, shrhash_size_new);
 				if (shrhash_size_new > (pctl->ctl->max_blkcnt - pctl->ctl->blkcnt) * 2)
 				{	/* We have more than twice as many hash buckets as we have active shrblks,
 					 * indicating something pathological, so try rehashing instead.
