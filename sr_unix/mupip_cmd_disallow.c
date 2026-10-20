@@ -3,7 +3,7 @@
  * Copyright (c) 2002-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -438,7 +438,7 @@ boolean_t cli_disallow_mupip_replic_source(void)
 			 * exactly the same set of qualifiers (which is TRUE in this case). */
 
 	/* every source server command cannot have any more than one of the above control qualifiers */
-	disallow_return_value = cli_check_any2(VARLSTCNT(11) p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13);
+	disallow_return_value = cli_check_any2(VARLSTCNT(13) p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13);
 	CLI_DIS_CHECK_N_RESET;
 
 	/* It's an error to specify TLSID and PLAINTEXTFALLBACK qualifiers on platforms that don't support SSL/TLS communication. */
