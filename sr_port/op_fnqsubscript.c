@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2026 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -36,12 +39,18 @@ error_def(ERR_NOSUBSCRIPT);
 #define UTF_CHAR_CPY(FROM, TO, FROM_OFFSET, TO_OFFSET, UTF_LEN)			\
 {										\
 	unsigned int	temp_int;						\
-	temp_int = UTF8_MBFOLLOW(&FROM->str.addr[--FROM_OFFSET]);		\
-	assert((4 > temp_int) && (0 <= (int)temp_int));				\
+	char		*temp_ptr;						\
+										\
+	/* is_canonic_name() accepted the name, so this is either a valid	\
+	 * character or, with VIEW "NOBADCHAR", an invalid byte copied as one.	\
+	 */									\
+	temp_ptr = &FROM->str.addr[--FROM_OFFSET];				\
+	(void)UTF8_VALID(temp_ptr, &FROM->str.addr[FROM->str.len], temp_int);	\
+	assert((1 <= temp_int) && (4 >= temp_int));				\
 	do									\
 	{									\
 		TO->str.addr[TO_OFFSET++] = FROM->str.addr[FROM_OFFSET++];	\
-	} while (temp_int--);							\
+	} while (--temp_int);							\
 	++UTF_LEN;								\
 }
 #else

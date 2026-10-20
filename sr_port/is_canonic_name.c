@@ -25,7 +25,6 @@
 #ifdef UTF8_SUPPORTED
 #include "gtm_utf8.h"
 GBLREF	boolean_t	badchar_inhibit;
-error_def(ERR_BADCHAR);
 #endif
 
 /*
@@ -51,7 +50,7 @@ boolean_t is_canonic_name(mval *src, int *subscripts, int *start_off, int *stop_
 	/* determine which buffer to use */
 	DETERMINE_BUFFER(src, start_buff, stop_buff, start, stop);
 	seq = *subscripts;
-	if (parse_gv_name_and_subscripts(src, subscripts, start, stop, &contains_env))
+	if (parse_gv_name_and_subscripts(src, subscripts, start, stop, &contains_env, TRUE))
 	{
 #		ifdef DEBUG
 		/* Check that the sequence of start[i] and stop[i] is
@@ -96,11 +95,15 @@ boolean_t is_canonic_name(mval *src, int *subscripts, int *start_off, int *stop_
  *	contains_env - Pointer returns whether there was an environment or not. This is an integer
  *		       for ease of indexing into the start and stop arrays, i.e. start[contains_env]
  *		       will always return the start of the name.
+ *	badchar_err  - In UTF-8 mode, TRUE issues BADCHAR for a byte sequence that is not a valid UTF-8
+ *		       character (unless VIEW "NOBADCHAR" is in effect). FALSE steps over each byte of such
+ *		       a sequence as one character.
  * Return:
  *	boolean_t    - TRUE indicates good name; FALSE indicates defective
  * -----------------------------------------------
  */
-boolean_t parse_gv_name_and_subscripts(mval *src, int *subscripts, int *start, int *stop, int *contains_env)
+boolean_t parse_gv_name_and_subscripts(mval *src, int *subscripts, int *start, int *stop, int *contains_env,
+						boolean_t badchar_err)
 {
 	char		term;
 	int		envpart;
@@ -426,12 +429,11 @@ boolean_t parse_gv_name_and_subscripts(mval *src, int *subscripts, int *start, i
 #		ifdef UTF8_SUPPORTED
 		if (!gtm_utf8_mode || (0 == (letter & 0x80)))
 			isrc++, cpt++;
-		else if (0 < (utf8_len = UTF8_MBFOLLOW((isrc++, cpt++))))
-		{	/* multi-byte increment */
-			assert(4 > utf8_len);
-			if (0 > utf8_len)
-				RTS_ERROR_CSA_ABT(NULL,
-					VARLSTCNT(6) ERR_BADCHAR, 4, 1, cpt - 1, LEN_AND_LIT(UTF8_NAME));
+		else
+		{	/* multi-byte increment. An invalid byte not reported as BADCHAR is stepped over as one character. */
+			if (!UTF8_VALID(cpt, lastcpt, utf8_len) && badchar_err && !badchar_inhibit)
+				UTF8_BADCHAR(0, cpt, lastcpt, 0, NULL);
+			assert((1 <= utf8_len) && (4 >= utf8_len));
 			isrc += utf8_len;
 			cpt += utf8_len;
 		}

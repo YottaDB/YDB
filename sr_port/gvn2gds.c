@@ -115,8 +115,10 @@ unsigned char *gvn2gds(mval *gvn, gv_key *gvkey, int act)
 	gvkey->prev = 0;
 	gvkey->top = DBKEYSIZE(MAX_KEY_SZ);
 	key_top = key_start + gvkey->top;
-	/* We will parse all of the components up front. */
-	if (!parse_gv_name_and_subscripts(gvn, &subscript, start, stop, &contains_env))
+	/* We will parse all of the components up front. The reverse conversion (gds2gvn) writes a subscript's
+	 * bytes inside quotes as they are, so do not issue BADCHAR for a byte that is not valid UTF-8.
+	 */
+	if (!parse_gv_name_and_subscripts(gvn, &subscript, start, stop, &contains_env, FALSE))
 		NOCANONICNAME_ERROR(gvn);
 	if ((tmp_len = (stop[contains_env] - start[contains_env])) > (max_len = gvkey->top))
 	{

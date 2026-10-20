@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2026 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -50,4 +53,5 @@ MBSTART {									\
 } MBEND
 
 boolean_t is_canonic_name(mval *src, int *subscripts, int *start_off, int *stop_off);
-boolean_t parse_gv_name_and_subscripts(mval *src, int *subscripts, int *start, int *stop, int *contains_env);
+boolean_t parse_gv_name_and_subscripts(mval *src, int *subscripts, int *start, int *stop, int *contains_env,
+						boolean_t badchar_err);
