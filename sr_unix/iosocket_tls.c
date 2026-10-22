@@ -69,6 +69,16 @@ error_def(ERR_SETSOCKOPTERR);
 #define FLUSH_OUTPUT_ERROR	"unable to flush pending output"
 #define UNREAD_INPUT	"unread input"
 
+/* Restore the file status flags saved before the handshake made a blocking socket nonblocking */
+#define RESTORE_HANDSHAKE_BLOCKING(SOCKETPTR, HANDSHAKE_NONBLOCK, FCNTL_FLAGS, FCNTL_RES)	\
+{												\
+	if (HANDSHAKE_NONBLOCK)									\
+	{											\
+		FCNTL3((SOCKETPTR)->sd, F_SETFL, FCNTL_FLAGS, FCNTL_RES);			\
+		HANDSHAKE_NONBLOCK = FALSE;							\
+	}											\
+}
+
 typedef enum
 {
 	tlsopt_invalid,
@@ -93,7 +103,7 @@ void	iosocket_tls(mval *optionmval, uint8 nsec_timeout, mval *tlsid, mval *passw
 	gtm_tls_socket_t	*tlssocket;
 	ABS_TIME		cur_time, end_time;
 	struct pollfd		fds;
-	boolean_t		ch_set;
+	boolean_t		ch_set, handshake_nonblock;
 	int			poll_timeout;
 	DCL_THREADGBL_ACCESS;
 
@@ -274,7 +284,7 @@ void	iosocket_tls(mval *optionmval, uint8 nsec_timeout, mval *tlsid, mval *passw
 				FCNTL2(socketptr->sd, F_GETFL, fcntl_flags);
 				if (fcntl_flags < 0)
 				{
-					iod->dollar.za = 9;
+					iod->dollar.za = ZA_IO_ERR;
 					save_errno = errno;
 					errptr = (char *)STRERROR(save_errno);
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_GETSOCKOPTERR, 5,
@@ -285,7 +295,7 @@ void	iosocket_tls(mval *optionmval, uint8 nsec_timeout, mval *tlsid, mval *passw
 				FCNTL3(socketptr->sd, F_SETFL, fcntl_flags | (O_NDELAY | O_NONBLOCK), fcntl_res);
 				if (fcntl_res < 0)
 				{
-					iod->dollar.za = 9;
+					iod->dollar.za = ZA_IO_ERR;
 					save_errno = errno;
 					errptr = (char *)STRERROR(save_errno);
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_SETSOCKOPTERR, 5,
@@ -310,12 +320,44 @@ void	iosocket_tls(mval *optionmval, uint8 nsec_timeout, mval *tlsid, mval *passw
 #				endif
 			}
 		}
+		handshake_nonblock = FALSE;
+		if ((NO_M_TIMEOUT != nsec_timeout) && !socketptr->nonblocking)
+		{	/* A blocking socket would block the handshake in read() or write() and ignore the timeout, so make it
+			 * nonblocking until the handshake completes. The plugin then returns GTMTLS_WANT_READ/GTMTLS_WANT_WRITE
+			 * and the poll() below waits for no longer than the remaining time.
+			 */
+			FCNTL2(socketptr->sd, F_GETFL, fcntl_flags);
+			if (fcntl_flags < 0)
+			{
+				iod->dollar.za = ZA_IO_ERR;
+				save_errno = errno;
+				errptr = (char *)STRERROR(save_errno);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_GETSOCKOPTERR, 5,
+					LEN_AND_LIT("F_GETFL FOR TLS HANDSHAKE"), save_errno, LEN_AND_STR(errptr));
+				return;
+			}
+			if (!(fcntl_flags & O_NONBLOCK))
+			{
+				FCNTL3(socketptr->sd, F_SETFL, fcntl_flags | O_NONBLOCK, fcntl_res);
+				if (fcntl_res < 0)
+				{
+					iod->dollar.za = ZA_IO_ERR;
+					save_errno = errno;
+					errptr = (char *)STRERROR(save_errno);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_SETSOCKOPTERR, 5,
+						LEN_AND_LIT("F_SETFL FOR TLS HANDSHAKE"), save_errno, LEN_AND_STR(errptr));
+					return;
+				}
+				handshake_nonblock = TRUE;
+			}
+		}
 		socketptr->tlssocket = gtm_tls_socket(tls_ctx, NULL, socketptr->sd, idstr, flags);
 		if (NULL == socketptr->tlssocket)
 		{
 			socketptr->tlsenabled = FALSE;
 			errp = gtm_tls_get_error(NULL);
 			SET_DOLLARDEVICE_ONECOMMA_ERRSTR(iod, errp, errlen);
+			RESTORE_HANDSHAKE_BLOCKING(socketptr, handshake_nonblock, fcntl_flags, fcntl_res);
 			if (socketptr->ioerror)
 				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_TLSCONVSOCK, 0, ERR_TEXT, 2, LEN_AND_STR(errp));
 			if (NO_M_TIMEOUT != nsec_timeout)
@@ -370,6 +412,7 @@ void	iosocket_tls(mval *optionmval, uint8 nsec_timeout, mval *tlsid, mval *passw
 					errp = STRERROR(save_errno);
 				socketptr->tlsenabled = FALSE;
 				SET_DOLLARDEVICE_ONECOMMA_ERRSTR(iod, errp, errlen);
+				RESTORE_HANDSHAKE_BLOCKING(socketptr, handshake_nonblock, fcntl_flags, fcntl_res);
 				if (socketptr->ioerror)
 					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_TLSHANDSHAKE, 0,
 						      ERR_TEXT, 2, LEN_AND_STR(errp));
@@ -388,6 +431,7 @@ void	iosocket_tls(mval *optionmval, uint8 nsec_timeout, mval *tlsid, mval *passw
 					{	/* no more time */
 						gtm_tls_session_close((gtm_tls_socket_t **)&socketptr->tlssocket);
 						socketptr->tlsenabled = FALSE;
+						RESTORE_HANDSHAKE_BLOCKING(socketptr, handshake_nonblock, fcntl_flags, fcntl_res);
 						dollar_truth = FALSE;
 						REVERT_GTMIO_CH(&iod->pair, ch_set);
 						return;
@@ -399,6 +443,7 @@ void	iosocket_tls(mval *optionmval, uint8 nsec_timeout, mval *tlsid, mval *passw
 				{	/* only one chance */
 					gtm_tls_session_close((gtm_tls_socket_t **)&socketptr->tlssocket);
 					socketptr->tlsenabled = FALSE;
+					RESTORE_HANDSHAKE_BLOCKING(socketptr, handshake_nonblock, fcntl_flags, fcntl_res);
 					dollar_truth = FALSE;
 					REVERT_GTMIO_CH(&iod->pair, ch_set);
 					return;
@@ -415,6 +460,7 @@ void	iosocket_tls(mval *optionmval, uint8 nsec_timeout, mval *tlsid, mval *passw
 				{	/* post hand-shake auth failure */
 					errp = gtm_tls_get_error((gtm_tls_socket_t *)socketptr->tlssocket);
 					SET_DOLLARDEVICE_ONECOMMA_ERRSTR(iod, errp, errlen);
+					RESTORE_HANDSHAKE_BLOCKING(socketptr, handshake_nonblock, fcntl_flags, fcntl_res);
 					if (socketptr->ioerror)
 						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_TLSHANDSHAKE, 0,
 							ERR_TEXT, 2, errlen, errp);
@@ -438,6 +484,7 @@ void	iosocket_tls(mval *optionmval, uint8 nsec_timeout, mval *tlsid, mval *passw
 						{	/* no more time */
 							gtm_tls_session_close((gtm_tls_socket_t **)&socketptr->tlssocket);
 							socketptr->tlsenabled = FALSE;
+							RESTORE_HANDSHAKE_BLOCKING(socketptr, handshake_nonblock, fcntl_flags, fcntl_res);
 							dollar_truth = FALSE;
 							REVERT_GTMIO_CH(&iod->pair, ch_set);
 							return;
@@ -450,6 +497,7 @@ void	iosocket_tls(mval *optionmval, uint8 nsec_timeout, mval *tlsid, mval *passw
 					{	/* only one chance */
 						gtm_tls_session_close((gtm_tls_socket_t **)&socketptr->tlssocket);
 						socketptr->tlsenabled = FALSE;
+						RESTORE_HANDSHAKE_BLOCKING(socketptr, handshake_nonblock, fcntl_flags, fcntl_res);
 						dollar_truth = FALSE;
 						REVERT_GTMIO_CH(&iod->pair, ch_set);
 						return;
@@ -479,6 +527,7 @@ void	iosocket_tls(mval *optionmval, uint8 nsec_timeout, mval *tlsid, mval *passw
 				{	/* post hand-shake auth failure */
 					errp = gtm_tls_get_error((gtm_tls_socket_t *)socketptr->tlssocket);
 					SET_DOLLARDEVICE_ONECOMMA_ERRSTR(iod, errp, errlen);
+					RESTORE_HANDSHAKE_BLOCKING(socketptr, handshake_nonblock, fcntl_flags, fcntl_res);
 					if (socketptr->ioerror)
 						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_TLSHANDSHAKE, 0,
 							ERR_TEXT, 2, errlen, errp);
@@ -487,6 +536,19 @@ void	iosocket_tls(mval *optionmval, uint8 nsec_timeout, mval *tlsid, mval *passw
 					REVERT_GTMIO_CH(&iod->pair, ch_set);
 					return;
 				}
+			}
+		}
+		if (handshake_nonblock)
+		{	/* the socket was blocking before the handshake, so make it blocking again */
+			FCNTL3(socketptr->sd, F_SETFL, fcntl_flags, fcntl_res);
+			if (fcntl_res < 0)
+			{
+				iod->dollar.za = ZA_IO_ERR;
+				save_errno = errno;
+				errptr = (char *)STRERROR(save_errno);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_SETSOCKOPTERR, 5,
+					LEN_AND_LIT("F_SETFL FOR TLS HANDSHAKE"), save_errno, LEN_AND_STR(errptr));
+				return;
 			}
 		}
 		/* turn on output buffering */
