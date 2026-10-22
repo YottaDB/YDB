@@ -26,19 +26,22 @@ GBLREF	stack_t			oldaltstack;
 GBLREF	char			*altstackptr;
 OS_PAGE_SIZE_DECLARE
 
-/* If an alternate stack is defined, see if it is big enough for us to use. We set SA_ONSTACK on every
+/* Make sure an alternate stack big enough for us to use is defined. We set SA_ONSTACK on every
  * signal handler we install (see YDB_SIGACTION_FLAGS in "gtm_signal.h"), so a handler runs on whatever
  * alternate stack happens to be defined, and a handler for a terminating signal runs the entire rundown
  * path. As an example, Go (1.12.6 currently) allocates a 32K alternate stack which is completely
  * inappropriate for YDB since jnl_file_close() alone takes 67K in a single stack variable. A sanitizer
  * runtime is another component that defines one. If the stack is too small, supply a larger one.
  *
- * Everything this function does is under the "oldaltstack.ss_size" check below, namely
- *	if ((0 < oldaltstack.ss_size) && (YDB_ALTSTACK_SIZE > oldaltstack.ss_size))
- * If no alternate stack is defined, which is the usual case, "oldaltstack.ss_size" is 0, that check is
- * FALSE, so this function does nothing and SA_ONSTACK has no effect, meaning handlers run on the normal
- * stack. That same check is also what makes repeated calls to this function harmless, since the stack
- * this function installs is not smaller than YDB_ALTSTACK_SIZE.
+ * If no alternate stack is defined, which is the usual case, supply one too. Without it, signal handlers
+ * run on the normal stack, so a SIGSEGV caused by the normal stack being unable to grow (for example at
+ * the address space limit) cannot be handled, and the process terminates with no message and no ZSHOW dump.
+ * The stack supplied is mapped but not touched unless a signal handler runs.
+ *
+ * Everything this function does is under the check below, namely
+ *	if ((oldaltstack.ss_flags & SS_DISABLE) || (YDB_ALTSTACK_SIZE > oldaltstack.ss_size))
+ * which also makes repeated calls to this function harmless, since the stack this function installs is
+ * not smaller than YDB_ALTSTACK_SIZE.
  */
 void setup_altstack_if_needed()
 {
@@ -54,8 +57,8 @@ void setup_altstack_if_needed()
 	}
 	DBGSIGHND((stderr, "sig_init: Alt stack definition: 0x"lvaddr",  flags: 0x%08lx,  size: %d\n",
 		   oldaltstack.ss_sp, oldaltstack.ss_flags, oldaltstack.ss_size));
-	if ((0 < oldaltstack.ss_size) && (YDB_ALTSTACK_SIZE > oldaltstack.ss_size))
-	{	/* Altstack exists but is too small - make one larger that is aligned (both start and length) */
+	if ((oldaltstack.ss_flags & SS_DISABLE) || (YDB_ALTSTACK_SIZE > oldaltstack.ss_size))
+	{	/* No altstack, or one that is too small - make one large enough that is aligned (both start and length) */
 		assert(0 == (YDB_ALTSTACK_SIZE & (OS_PAGE_SIZE - 1)));	/* Make sure len is page aligned */
 		altstackptr = mmap(NULL, YDB_ALTSTACK_SIZE + (OS_PAGE_SIZE * 2), (PROT_READ + PROT_WRITE + PROT_EXEC),
 				   (MAP_PRIVATE + MAP_ANONYMOUS), -1, 0);

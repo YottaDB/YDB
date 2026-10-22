@@ -23,7 +23,8 @@
 /* Describe the flags needed when it replaces/sets a signal handler. SA_ONSTACK is required by Go so that signal handlers
  * use an alternate stack if available. Note this means our handlers run on an alternate stack defined by any other
  * component in the process, not just Go, so "setup_altstack_if_needed()" (called by "sig_init()" and by
- * "sig_init_lang_altmain()") replaces any such stack that is too small for us. Go provides one example of a too small stack.
+ * "sig_init_lang_altmain()") replaces any such stack that is too small for us, and defines one if there is none. Go provides
+ * one example of a too small stack.
  * The SA_SIGINFO flag gives us full information about the signal interrupt when we enter a signal handler. This is
  * needed both by us and to effectively forward a signal we receive to the caller's signal handler that we replaced.
  */

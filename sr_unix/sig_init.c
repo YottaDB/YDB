@@ -57,7 +57,8 @@ void sig_init(void (*signal_handler)(), void (*ctrlc_handler)(), void (*suspsig_
 	/* Every handler installed below sets SA_ONSTACK, so it runs on the alternate stack if one is defined.
 	 * Any alternate stack defined by another component in this process (a host language, or a sanitizer
 	 * runtime) is likely to be far smaller than the rundown a terminating signal performs needs. Replace
-	 * it first if so. This does nothing when no alternate stack is defined, which is the usual case.
+	 * it first if so, and define one if there is none, so a handler can run even when the normal stack
+	 * cannot grow.
 	 */
 	setup_altstack_if_needed();
 	memset(&ignore, 0, SIZEOF(ignore));
