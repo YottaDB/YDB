@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -230,16 +230,20 @@ void	deferred_signal_handler(void);
 
 /* Macro to be used whenever we want to handle any signals that we deferred handling in the process.
  * In VMS, we dont do any signal handling, only exit handling.
+ * While threads started by "gtm_multi_thread" are running (multi_thread_in_use is TRUE), the main thread is not inside
+ * threaded code but must not handle deferred events either, since exit processing tears down structures (e.g. journal
+ * files) that the threads are still using. "gtm_multi_thread" handles deferred events once all its threads are done.
  */
 #define	DEFERRED_SIGNAL_HANDLING_CHECK									\
 MBSTART {												\
 	char			*rname;									\
 													\
-	if (INSIDE_THREADED_CODE(rname))								\
+	if (!multi_thread_in_use)									\
 	{												\
+		if (INTRPT_OK_TO_INTERRUPT == intrpt_ok_state)						\
+			DEFERRED_SIGNAL_HANDLING_CHECK_TRIMMED;						\
+	} else if (INSIDE_THREADED_CODE(rname))								\
 		PTHREAD_EXIT_IF_FORCED_EXIT;								\
-	} else if (INTRPT_OK_TO_INTERRUPT == intrpt_ok_state)						\
-		DEFERRED_SIGNAL_HANDLING_CHECK_TRIMMED;							\
 } MBEND
 
 /* This is a trimmed down version of the DEFERRED_SIGNAL_HANDLING_CHECK macro which is called
