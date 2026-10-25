@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -150,7 +150,14 @@ void op_fnquery_va(int sbscnt, mval *dst, va_list var)
 			}
 			if ((is_num = MV_IS_CANONICAL(arg1)))
 				MV_FORCE_NUM(arg1);
-			else if ((nexti == sbscnt) && !is_sqlnull && (0 == arg1->str.len))
+			/* If the last subscript is a null subscript, strip it below, but only with GT.M null collation. With
+			 * GT.M null collation, a null subscript collates after numeric and before string subscripts, so
+			 * stripping it lets $QUERY(x(...,"")) return the first node at that level. With standard null
+			 * collation, a null subscript collates before every other subscript, so the last subscript is instead
+			 * looked up like any other subscript, which returns the node that follows x(...,""), never x(...,"")
+			 * itself.
+			 */
+			else if ((nexti == sbscnt) && !is_sqlnull && (0 == arg1->str.len) && !TREF(local_collseq_stdnull))
 			{	/* The last search argument is a null string. For this situation, there is the possibility
 				 * of a syntax collision if (1) the user had (for example) specified $Q(a(1,3,"") to get
 				 * the first a(1,3,x) node or (2) this is the "next" element that was legitimately returned
