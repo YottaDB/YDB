@@ -3,7 +3,7 @@
  * Copyright (c) 2010-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -1207,7 +1207,7 @@ boolean_t trigger_update_rec(mval *trigger_rec, boolean_t noprompt, uint4 *trig_
 	stringkey		kill_trigger_hash, set_trigger_hash;
 	char			tmp_str[MAX_HASH_LEN + 1];
 	unsigned char		*dispbuff;
-	mval			multi_jrec, *trigjrec;
+	mval			multi_jrec, *trigjrec, lcl_trigger_rec;
 	char			*trigjrecptr = NULL;
 	int			trigjreclen;
 	io_pair			io_save_device;
@@ -1226,6 +1226,8 @@ boolean_t trigger_update_rec(mval *trigger_rec, boolean_t noprompt, uint4 *trig_
 	uint4			set_hash_totlen, kill_hash_totlen;
 	static char 		*trigptr_buff = NULL;
 	static unsigned int	trigptr_alloclen = 0;
+	static char		*trigrec_buff = NULL;
+	static unsigned int	trigrec_alloclen = 0;
 	static char		*xecute_buffer;
 	DCL_THREADGBL_ACCESS;
 
@@ -1252,9 +1254,33 @@ boolean_t trigger_update_rec(mval *trigger_rec, boolean_t noprompt, uint4 *trig_
 		trigjrecptr = memchr(trigger_rec->str.addr, '\n', len);
 		if (NULL != trigjrecptr)
 		{	/* Trigger definition has at least one newline in it. Check if it has a multi-line trigger specification */
-			char		*ptr, *top;
+			char		*ptr, *top, *orig_ptr;
 			boolean_t	needs_reordering;
 
+			/* Pointers into the trigger definition (e.g. "trigjrecptr" and later "values[XECUTE_SUB]") are used
+			 * until this function returns, across calls that can invoke "stp_gcol()" (e.g. "trigger_parse()",
+			 * "process_xecute()", "gen_trigname_sequence()"). If the trigger definition is in the stringpool, a
+			 * garbage collection could move it and leave those pointers pointing to stale (or freed) memory.
+			 * Therefore work on a copy of the trigger definition in malloced memory. The copy goes in the second
+			 * half of "trigrec_buff". The first half is where the reordered definition (if needed) goes below.
+			 * Point a local mval to the copy so the caller's mval (e.g. an M local variable) is not modified.
+			 */
+			if ((2 * (len + 1)) > trigrec_alloclen)
+			{
+				if (trigrec_alloclen)
+					free(trigrec_buff);
+				trigrec_alloclen = 2 * (2 * (len + 1));	/* Use "2 *" to avoid lots of incremental malloc/free */
+				trigrec_buff = malloc(trigrec_alloclen);
+			}
+			orig_ptr = trigrec_buff + len + 1;
+			memcpy(orig_ptr, trigger_rec->str.addr, len);
+			orig_ptr[len] = '\0';	/* null terminate, so that the copy the reordering code below makes of it
+						 * (with "len + 1" bytes) is null terminated for "strcasestr()"
+						 */
+			trigjrecptr = orig_ptr + (trigjrecptr - trigger_rec->str.addr);
+			lcl_trigger_rec = *trigger_rec;
+			lcl_trigger_rec.str.addr = orig_ptr;
+			trigger_rec = &lcl_trigger_rec;
 			/* First check if the substring (XTENDED_STOP_NEWLINE) exists in the string and if it is
 			 * followed by a string other than an optional '\n' character. In that case, we need to do reordering.
 			 * Else we can skip the reordering.
@@ -1297,21 +1323,17 @@ boolean_t trigger_update_rec(mval *trigger_rec, boolean_t noprompt, uint4 *trig_
 				 * For example the multi-line trigger definition below gets changed (where \n stands for newline)
 				 *	From: +^SAMPLE -commands=S -xecute=<<\n w 123,!\n>>\n-name=abcd
 				 *	To  : +^SAMPLE -commands=S -name=abcd -xecute=<<\n w 123,!\n>>
-				 * To do that first we copy the string to the stringpool and allocate one more byte at the
-				 * end so it is null terminated (this lets use "strcasestr()"). This also guarantees us the
-				 * memory is read-write and so we can then safely proceed with moving the qualifiers around.
+				 * To do that first we copy the null terminated copy of the string (at "orig_ptr") to the first
+				 * half of "trigrec_buff" (this lets us use "strcasestr()") and then move the qualifiers around
+				 * there, using "orig_ptr" as the source.
 				 */
 				int	tail_offset;
-				char	*xecute_ptr, *orig_ptr;
+				char	*xecute_ptr;
 
-				orig_ptr = trigger_rec->str.addr;
 				/* At this point, "ptr" points past the XTENDED_STOP_NEWLINE string */
 				tail_offset = ptr - orig_ptr;
-				ENSURE_STP_FREE_SPACE(len + 1);
-				memcpy(stringpool.free, orig_ptr, len);
-				ptr = (char *)stringpool.free;
-				ptr[len] = '\0';
-				stringpool.free += len + 1;
+				ptr = trigrec_buff;
+				memcpy(ptr, orig_ptr, len + 1);	/* + 1 to include the null terminator */
 				/* Need to use "strcasestr()" because "-xecute" specified by user is case insensitive */
 				xecute_ptr = strcasestr(ptr, XECUTE_MULTI_LINE);
 				/* Note that "needs_reordering" was based on searching for XTENDED_STOP_NEWLINE. Whereas
