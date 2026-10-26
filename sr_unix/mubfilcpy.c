@@ -54,6 +54,8 @@
 #include "jnl.h"
 #include <math.h>
 #include <dlfcn.h>
+#include <sys/ioctl.h>
+#include <linux/fs.h>	/* needed for FICLONE */
 #define BUF_MAX		100
 #define MIN_ETA		10
 #define SHOWPERCENT	24
@@ -405,7 +407,16 @@ boolean_t	mubfilcpy (backup_reg_list *list, boolean_t showprogress, int attemptc
 
 		size_t	in_off, out_off, data_off, hole_off;
 		in_off = out_off = data_off = hole_off = 0;
-		do
+		ret = 0;
+		/* If the file system can share extents between files (e.g. XFS with reflink=1), clone the whole file.
+		 * This is as fast as the copy_file_range() loop below (which would share the extents anyway) and does
+		 * not rely on SEEK_DATA/SEEK_HOLE, which some kernels report incorrectly for files with shared extents
+		 * (a block written with O_DIRECT is reported as a hole and so would be missing from the backup).
+		 * If the clone is not supported (EOPNOTSUPP, EXDEV, EINVAL etc.), fall back to the loop below.
+		 */
+		if (0 == ioctl(outfd, FICLONE, infd))
+			remaining = 0;
+		while ((0 < remaining) && (-1 < ret))
 		{
 			if ((in_off == data_off) || (in_off == hole_off))
 			{
@@ -543,7 +554,7 @@ boolean_t	mubfilcpy (backup_reg_list *list, boolean_t showprogress, int attemptc
 			}
 			if (TRUE == mu_ctrlc_occurred)
 				CLEANUP_AND_RETURN_FALSE(CANNOT_RETRY);
-		} while ((0 < remaining) && (-1 < ret));
+		}
 		close(infd);
 		close(outfd);
 		if ((0 != remaining) || (ret == -1))
