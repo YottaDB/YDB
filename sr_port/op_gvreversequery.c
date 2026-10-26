@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -62,6 +62,7 @@ void op_gvreversequery(mval *v)
 	enum db_acc_method 	acc_meth;
 	unsigned char		ch1, ch2, *extnamsrc, *extnamdst, *extnamtop;
 	int			maxlen;
+	mint			data;
 	char			extnamdelim[] = "^|\"\"|";
 	mval			val;
 	gv_key			*last_gvquery_key;
@@ -81,21 +82,59 @@ void op_gvreversequery(mval *v)
 	 * collation order.
 	 */
 	assert(dba_usr != acc_meth);
-	if (TREF(gv_last_subsc_null) && (NEVER == gv_cur_region->std_null_coll)
-	    && ((last_gvquery_key->end != gv_currkey->end)
-		|| memcmp(last_gvquery_key->base, gv_currkey->base, last_gvquery_key->end)))
-	{	/* Treat null subscript specification as a special meaning (to get the last subscript) */
-		currkey_has_special_meaning = TRUE;
+	if (!TREF(gv_last_subsc_null))
+	{	/* The last subscript, if any, is not a null subscript */
+		assert((gv_currkey->end != gv_currkey->prev + 2)
+			|| (((NEVER == gv_cur_region->std_null_coll) ? STR_SUB_PREFIX : SUBSCRIPT_STDCOL_NULL)
+				!= gv_currkey->base[gv_currkey->prev]));
+		currkey_has_special_meaning = FALSE;
+	} else if ((last_gvquery_key->end == gv_currkey->end)
+		 && (0 == memcmp(last_gvquery_key->base, gv_currkey->base, last_gvquery_key->end)))
+	{	/* The last subscript is a null subscript, but the input key is the previous $query() result, so a reverse
+		 * $query() loop moves on to its predecessor, even if the loop killed that node.
+		 */
+		assert(((NEVER == gv_cur_region->std_null_coll) ? STR_SUB_PREFIX : SUBSCRIPT_STDCOL_NULL)
+			== gv_currkey->base[gv_currkey->prev]);
+		assert(KEY_DELIMITER == gv_currkey->base[gv_currkey->prev + 1]);
+		assert(gv_currkey->end == gv_currkey->prev + 2);
+		currkey_has_special_meaning = FALSE;
+	} else if (NEVER == gv_cur_region->std_null_coll)
+	{	/* With GT.M null collation, the null subscript is a request for the last node at this level */
 		assert(STR_SUB_PREFIX == gv_currkey->base[gv_currkey->prev]);
+		currkey_has_special_meaning = TRUE;
+	} else
+	{	/* With standard null collation, the null subscript collates before all other subscripts at its level. If
+		 * the input node has no value, the null subscript is a request for the last node at this level. If it has
+		 * a value, the input key is treated as is. The code below finds $DATA() of the input node the way
+		 * op_gvdata() does, but op_gvdata() cannot be called here, since it issues a NULSUBSC error for a null
+		 * subscript in a region where null subscripts are not allowed, and here the null subscript only says
+		 * where the reverse $query() starts.
+		 */
+		assert(SUBSCRIPT_STDCOL_NULL == gv_currkey->base[gv_currkey->prev]);
+		if (IS_ACC_METH_BG_OR_MM(acc_meth))
+		{
+			gvnh_reg = TREF(gd_targ_gvnh_reg);
+			if (NULL == gvnh_reg)
+				data = (gv_target->root ? gvcst_data() : 0);
+			else
+				INVOKE_GVCST_SPR_XXX(gvnh_reg, data = gvcst_spr_data());
+		} else
+		{
+			assert(acc_meth == dba_cm);
+			data = gvcmx_data();
+		}
+		currkey_has_special_meaning = !(data & 1);
+	}
+	if (currkey_has_special_meaning)
+	{	/* Treat null subscript specification as a special meaning (to get the last subscript) */
+		assert(((NEVER == gv_cur_region->std_null_coll) ? STR_SUB_PREFIX : SUBSCRIPT_STDCOL_NULL)
+			== gv_currkey->base[gv_currkey->prev]);
 		assert(KEY_DELIMITER == gv_currkey->base[gv_currkey->prev + 1]);
 		assert(gv_currkey->end == gv_currkey->prev + 2);
 		assert(gv_currkey->end < gv_currkey->top); /* need "<" (not "<=") to account for terminating 0x00 */
 		gv_currkey->base[gv_currkey->prev] = 01;
 		gv_append_max_subs_key(gv_currkey, gv_target);
-	} else
-		currkey_has_special_meaning = FALSE;	/* Input key is to be treated as is.
-							 * No special meaning like is the case for a null subscript.
-							 */
+	}
 	if (IS_ACC_METH_BG_OR_MM(acc_meth))
 	{
 		gvnh_reg = TREF(gd_targ_gvnh_reg);
