@@ -187,9 +187,9 @@ void op_fnquery_va(int sbscnt, mval *dst, va_list var)
 								break;	/* This subscript isn't the same */
 						} else if (MV_IS_STRING(argp2) && MV_IS_STRING(lfrsbs))
 						{	/* Should be string only in order to compare */
-							if ((argp2)->str.len == lfrsbs->str.len
-							    && 0 != memcmp((argp2)->str.addr, lfrsbs->str.addr,
-									   lfrsbs->str.len))
+							if (((argp2)->str.len != lfrsbs->str.len)
+							    || (0 != memcmp((argp2)->str.addr, lfrsbs->str.addr,
+									    lfrsbs->str.len)))
 								break;	/* This subscript isn't the same */
 						} else
 							break;		/* This subscript isn't even close.. */
@@ -517,6 +517,26 @@ void op_fnquery_va(int sbscnt, mval *dst, va_list var)
 				 */
 				v2_mvtype = (!is_sqlnull ? MV_STR : (MV_STR | MV_SQLNULL));
 				v2->mvtype = v2_mvtype;
+				if (last_sub_null)
+				{	/* The last subscript of the result is "", so save each subscript of the result, as the
+					 * next call compares the saved subscripts with its input subscripts. Save the subscript
+					 * itself, not its formatted form in the $QUERY() result. Copy the subscript to the
+					 * stringpool if it is not there, and keep v1 at the end of the stringpool. An empty
+					 * subscript needs no copy, as memcmp() of 0 bytes reads nothing and stp_gcol() skips
+					 * empty strings.
+					 */
+					if (v2->str.len && !IS_ADDR_IN_STRINGPOOL(v2->str.addr))
+					{
+						ENSURE_STP_FREE_SPACE(v2->str.len + v1->str.len);
+						memcpy(stringpool.free, v2->str.addr, v2->str.len);
+						v2->str.addr = (char *)stringpool.free;
+						stringpool.free += v2->str.len;
+						memcpy(stringpool.free, v1->str.addr, v1->str.len);
+						v1->str.addr = (char *)stringpool.free;
+						stringpool.free += v1->str.len;
+					}
+					TAREF1(last_fnquery_return_sub,(TREF(last_fnquery_return_subcnt))++) = *v2;
+				}
 				mval_lex(v2, &format_out);
 				if (format_out.addr != (char *)stringpool.free)	/* BYPASSOK */
 				{	/* We must put the string on the string pool ourself - mval_lex didn't do it
@@ -534,14 +554,6 @@ void op_fnquery_va(int sbscnt, mval *dst, va_list var)
 					}
 					*stringpool.free++ = '\"';
 					memcpy(stringpool.free, v2->str.addr, v2->str.len);
-					if (last_sub_null)
-					{
-						TAREF1(last_fnquery_return_sub,(TREF(last_fnquery_return_subcnt))).mvtype
-							= MV_STR;
-						TAREF1(last_fnquery_return_sub,(TREF(last_fnquery_return_subcnt))).str.addr
-							= (char *)stringpool.free;
-						TAREF1(last_fnquery_return_sub,(TREF(last_fnquery_return_subcnt))++).str.len = v2->str.len;
-					}
 					stringpool.free += v2->str.len;
 					*stringpool.free++ = '\"';
 				} else
@@ -556,15 +568,6 @@ void op_fnquery_va(int sbscnt, mval *dst, va_list var)
 						stringpool.free += v1->str.len;
 						assert(v2->str.len == format_out.len);
 						memcpy(stringpool.free, v2->str.addr, format_out.len);
-					}
-					if (last_sub_null)
-					{
-						TAREF1(last_fnquery_return_sub,(TREF(last_fnquery_return_subcnt))).mvtype
-							= v2_mvtype;
-						TAREF1(last_fnquery_return_sub,(TREF(last_fnquery_return_subcnt))).str.addr
-							= (char *)stringpool.free;
-						TAREF1(last_fnquery_return_sub,(TREF(last_fnquery_return_subcnt))++).str.len
-							= format_out.len;
 					}
 					stringpool.free += format_out.len;
 				}
