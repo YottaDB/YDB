@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -27,6 +27,7 @@
 #include "compiler.h"
 #include "obj_file.h"
 #include "error.h"
+#include "glvn_pool.h"
 
 GBLREF mv_stent		*mv_chain;
 GBLREF unsigned char	*stackbase, *stacktop, *stackwarn, *msp;
@@ -83,6 +84,11 @@ void comp_indr(mstr *obj)
         GTM64_ONLY(sf->mpc = (unsigned char *)ROUND_UP2((UINTPTR_T)sf->mpc, SECTION_ALIGN_BOUNDARY));
 	sf->mpc = sf->mpc + (2 * SIZEOF(INTPTR_T)); /* Account for hdroffset and MAGIC_VALUE */
 	sf->flags = SFF_INDCE;		/* We will be needing cleanup for this frame */
+	/* "*sf = *frame_pointer" above copied the parent frame's glvn pool low water mark. Give this frame its own
+	 * so it can only recycle and drain glvn pool slots that it allocated itself, instead of recycling or draining
+	 * slots that the parent frame allocated.
+	 */
+	SET_GLVN_INDX(sf, GLVN_POOL_UNTOUCHED);
 	sf->ret_value = NULL;
 	sf->dollar_test = -1;		/* initialize it with -1 for indication of not yet being used */
 	DEBUG_ONLY(

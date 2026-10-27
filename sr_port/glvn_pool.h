@@ -2,6 +2,9 @@
  *								*
  *	Copyright 2012, 2013 Fidelity Information Services, Inc	*
  *								*
+ * Copyright (c) 2026 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -27,7 +30,7 @@
  * glvn pool state, i.e. the top of the array of still-relevant entries. After completion of the set, the pool is restored to
  * this state and younger entries popped. With FOR, it's more convenient defer popping until another FOR loop at the same
  * nesting level starts. At that time the previously used FOR slot is recycled and everything younger than it is popped.
- * Finally, when a non-indirect frame is unwound, all younger pool entries are popped.
+ * Finally, when a frame is unwound, all pool entries it allocated are popped.
  */
 
 #define ANY_SLOT			0
@@ -89,8 +92,10 @@
 	uint4			INDX, FINDX;											\
 	glvn_pool_entry		*SLOT;												\
 																\
-	if ((GLVN_POOL_UNTOUCHED != GLVN_INDX(frame_pointer)) && !(frame_pointer->flags & SFF_INDCE))				\
-	{	/* Someone used an ugly FOR control variable or did an indirect set. */						\
+	if (GLVN_POOL_UNTOUCHED != GLVN_INDX(frame_pointer))									\
+	{	/* This frame took a glvn pool slot (SET @, $ORDER(@), a FOR over a subscripted or indirect			\
+		 * control variable, ...): pop the pool back to the frame's mark and restore for_slot[].			\
+		 */														\
 		INDX = (GLVN_POOL_EMPTY != GLVN_INDX(frame_pointer)) ? GLVN_INDX(frame_pointer) : 0;				\
 		op_glvnpop(INDX);												\
 		for (I = 1; I <= MAX_FOR_STACK; I++)										\
