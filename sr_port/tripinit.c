@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2022-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -60,6 +60,8 @@ void tripinit(void)
 	{
 		while (TREF(expr_depth))
 			DECREMENT_EXPR_DEPTH;				/* in case of prior errors */
+		/* Clear level 0, which the decrements above and the end of the prior compilation propagate into */
+		(TREF(side_effect_base))[0] = FALSE;
 	}
 	mlitmax = mlmax = mvmax = 0;
 	mlabtab = NULL;
