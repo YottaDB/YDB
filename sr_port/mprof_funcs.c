@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -238,6 +238,14 @@ void turn_tracing_off(mval *gvn)
 	if (FALSE == is_tracing_on)
 		return;
 	assert(TREF(mprof_ptr));
+	assert(!save_to_gbl || (0 != (TREF(mprof_ptr))->gbl_to_fill.str.addr));
+	if (NULL != gvn)
+	{	/* Parse before collecting times, so that a rejected name does not count the time of the current line twice */
+		parse_gvn(gvn);
+	} else if (save_to_gbl && (0 == (TREF(mprof_ptr))->curr_num_subscripts))
+	{	/* An error in an earlier parse_gvn() left the parsed global name unusable, so reparse the saved one */
+		parse_gvn(&(TREF(mprof_ptr))->gbl_to_fill);
+	}
 	TIMES(&(TREF(mprof_ptr))->tcurr);
 	UNIX_ONLY(child_times_usec();)
 	process_system = (TREF(mprof_ptr))->tcurr.tms_stime;
@@ -247,9 +255,6 @@ void turn_tracing_off(mval *gvn)
 	{
 		UPDATE_TIME(TREF(mprof_ptr));
 	}
-	if (NULL != gvn)
-		parse_gvn(gvn);
-	assert(!save_to_gbl || (0 != (TREF(mprof_ptr))->gbl_to_fill.str.addr));
 	/* If tracing was initialized from an environment variable, and it had a proper global name, save results
 	 * to that global; otherwise, just toss the collected data.
 	 */
@@ -639,7 +644,8 @@ void crt_gbl(mprof_tree *p, boolean_t is_for)
 	SETUP_THREADGBL_ACCESS;
 	if (0 == p->e.count)
 		return;
-	count = (int)(TREF(mprof_ptr))->gvargs.count;
+	count = (TREF(mprof_ptr))->curr_num_subscripts;
+	assert(0 < count);
 	spt = &(TREF(mprof_ptr))->subsc[count];
 	/* Global name --> ^PREFIX(<OPTIONAL ARGUMENTS>, "rout-name", "label-name", "line-num", "forloop"). */
 	spt->mvtype = MV_STR;
@@ -737,7 +743,8 @@ STATICFNDEF void insert_total_times(boolean_t for_process)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	count = (int)(TREF(mprof_ptr))->gvargs.count;
+	count = (TREF(mprof_ptr))->curr_num_subscripts;
+	assert(0 < count);
 	spt = &(TREF(mprof_ptr))->subsc[count];
 	spt->mvtype = MV_STR;
 	if (for_process)
@@ -873,6 +880,7 @@ STATICFNDEF void parse_gvn(mval *gvn)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	(TREF(mprof_ptr))->curr_num_subscripts = 0;	/* Not usable until the parse below succeeds */
 	c_ref = gvn->str.addr;
 	c_top = c_ref + gvn->str.len;
 	if (!gvn->str.len || ('^' != *c_ref++))
