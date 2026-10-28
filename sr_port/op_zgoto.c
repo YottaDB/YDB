@@ -3,7 +3,7 @@
  * Copyright (c) 2011-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -29,6 +29,7 @@
 #include "linktrc.h"
 #include "gtm_unlink_all.h"
 #include "gtm_trigger_trc.h"
+#include "dm_setup.h"
 
 GBLREF	stack_frame	*frame_pointer;
 GBLREF	boolean_t	goframes_unwound_trigger;
@@ -47,6 +48,7 @@ void op_zgoto(mval *rtn_name, mval *lbl_name, int offset, int level)
 {
 	stack_frame	*fp, *fpprev;
 	int4		curlvl;
+	int		status;
 	mval		rtnname, lblname;
 	rhdtyp		*rtnhdr;
 	lnr_tabent 	USHBIN_ONLY(*)*lnrptr;
@@ -94,7 +96,15 @@ void op_zgoto(mval *rtn_name, mval *lbl_name, int offset, int level)
 		ARLINK_ONLY(TADR(lnk_proxy)->rtnhdr_adr = rtnhdr);
 		DBGINDCOMP((stderr, "op_zgoto: routine resolved to 0x"lvaddr" (1)\n", rtnhdr));
 		if (0 == level)
-		{	/* If doing unlink, recall name of routine as well as will need it later */
+		{	/* If doing unlink, recall name of routine as well as will need it later. gtm_unlink_all() below
+			 * frees every routine, including the direct mode routine GTM$DMOD. GTM$DMOD has no object file
+			 * (make_dmode() builds GTM$DMOD in memory) and "$" is not valid in an M name, so relinking GTM$DMOD
+			 * by name after the unlink fails with NOTMNAME and ZLNOOBJECT, on an M stack that is already
+			 * unwound. So require an explicit routine name in that case, and issue the error before unwinding.
+			 */
+			MEMVCMP(GTM_DMOD, (SIZEOF(GTM_DMOD) - 1), rtnhdr->routine_name.addr, rtnhdr->routine_name.len, status);
+			if (!status)
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_RTNNAME);
 			memcpy(rtnname_buff, rtnhdr->routine_name.addr, rtnhdr->routine_name.len);
 			rtnname.str.addr = rtnname_buff;
 			rtnname.str.len = rtnhdr->routine_name.len;
