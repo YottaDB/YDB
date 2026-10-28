@@ -24,6 +24,8 @@
 #include "error.h"
 #include "error_trap.h"
 #include "io.h"
+#include "op.h"
+#include "tp_frame.h"
 #ifdef GTM_TRIGGER
 # include "gtm_trigger_trc.h"
 #endif
@@ -35,6 +37,7 @@ GBLREF	mstr		*err_act;
 GBLREF	io_desc		*active_device;
 GBLREF	boolean_t	ztrap_explicit_null;
 GBLREF	boolean_t	tref_transform;
+GBLREF	tp_frame	*tp_pointer;
 
 error_def(ERR_STACKCRIT);
 error_def(ERR_ERRWZTIMEOUT);
@@ -152,6 +155,13 @@ void trans_code_cleanup(void)
 		 * now before we get rid of the pointers used by that cleanup.
 		 */
 		IF_INDR_FRAME_CLEANUP_CACHE_ENTRY_AND_UNMARK(fp);
+		/* This frame returns through pseudo_ret, which QUITs the frame. A transaction started in this frame or
+		 * in a younger one (e.g. by a TSTART in the error trap code) would make that QUIT issue TPQUIT, and this
+		 * routine would be invoked for that error and return the frame to the same QUIT, again and again. So
+		 * roll back those transactions, as goframes() does for the frames that goframes() unwinds.
+		 */
+		while (tp_pointer && (tp_pointer->fp <= fp))
+			OP_TROLLBACK(-1);
 		fp->mpc = CODE_ADDRESS(pseudo_ret);
 		fp->ctxt = GTM_CONTEXT(pseudo_ret);
 		fp->flags &= SFF_NORET_VIA_MUMTSTART_OFF;	/* Frame enterable now with mpc reset */
