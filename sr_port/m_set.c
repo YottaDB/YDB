@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -408,9 +408,11 @@ int m_set(void)
 				dqrins(&targchain, exorder, tmp);
 				advancewindow();	/* skip past the function name */
 				advancewindow();	/* skip past the left paren */
-				/* Parse the remaining arguments until corresponding RIGHT-PAREN/SPACE/EOL is reached */
+				/* Skip the remaining arguments up to the matching RIGHT-PAREN. A SPACE or EOL before it stops the
+				 * scan and gets RPARENMISSING below, as does an invalid token (FALSE return) here.
+				 */
 				if (!parse_until_rparen_or_space())
-					SYNTAX_ERROR_NOREPORT_HERE;
+					SYNTAX_ERROR(ERR_RPARENMISSING);
 				s = NULL;
 			} else
 			{

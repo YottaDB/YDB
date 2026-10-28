@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2020-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2020-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -66,8 +66,11 @@ int eval_expr(oprtype *a)
 	SETUP_THREADGBL_ACCESS;
 	CHKTCHAIN(TREF(curtchain), exorder, TRUE);	/* defined away in mdq.h except with DEBUG_TRIPLES */
 	if (!expratom(&optyp_1))
-	{	/* If didn't already add an error of our own, do so now to catch all expression errors */
-		if (!ALREADY_RTERROR)
+	{	/* If didn't already add an error of our own, do so now to catch all expression errors.
+		 * An OC_RTERROR triple from a warning (e.g. INVSVN) does not count as it does not set "source_error_found".
+		 * An EXPR error is still wanted in that case, as the warning does not report the missing expression.
+		 */
+		if (!ALREADY_RTERROR || !TREF(source_error_found))
 			stx_error(ERR_EXPR);
 		return EXPR_FAIL;
 	}
