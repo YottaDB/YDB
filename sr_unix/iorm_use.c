@@ -174,6 +174,7 @@ error_def(ERR_DEVPARMNEG);
 error_def(ERR_RMWIDTHPOS);
 error_def(ERR_RMWIDTHTOOBIG);
 error_def(ERR_RECSIZENOTEVEN);
+error_def(ERR_RECSIZETOOSMALL);
 error_def(ERR_SYSCALL);
 error_def(ERR_WIDTHTOOSMALL);
 error_def(ERR_PADCHARINVALID);
@@ -194,7 +195,7 @@ void	iorm_use(io_desc *iod, mval *pp)
 	struct stat	statbuf;
 	int		p_offset;
 	mstr		chset_mstr;
-	gtm_chset_t	width_chset, temp_chset = CHSET_MAX_IDX_ALL;
+	gtm_chset_t	width_chset, temp_chset = CHSET_MAX_IDX_ALL, ichset_before, ochset_before;
 	int		seek_len;
 	char		seek_str[LIMIT_SEEK_STR];
 	char		*seek_ptr;
@@ -229,6 +230,8 @@ void	iorm_use(io_desc *iod, mval *pp)
 	seek_specified = ichset_specified = ochset_specified = chset_allowed = FALSE;
 	dev_name = iod->trans_name;
 	recsize_before = rm_ptr->recordsize;
+	ichset_before = iod->ichset;
+	ochset_before = iod->ochset;
 	def_recsize_before = rm_ptr->def_recsize;
 	if (ZOS_ONLY(TRUE ||) gtm_utf8_mode)
 		chset_allowed = TRUE;
@@ -976,11 +979,22 @@ void	iorm_use(io_desc *iod, mval *pp)
 				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_RECSIZENOTEVEN, 1, rm_ptr->recordsize);
 		}
 	}
+	/* A record must be able to hold any one character, which can take up to GTM_MB_LEN_MAX bytes in UTF-8 and in UTF-16.
+	 * The RECORDSIZE and the CHSET can come from different OPEN and USE commands, so check whenever either is in effect.
+	 */
+	if (gtm_utf8_mode && (IS_UTF_CHSET(iod->ichset) || IS_UTF_CHSET(iod->ochset)) && (GTM_MB_LEN_MAX > rm_ptr->recordsize))
+	{	/* Keep the device usable with its previous RECORDSIZE and CHSET */
+		recordsize = rm_ptr->recordsize;
+		rm_ptr->recordsize = recsize_before;
+		iod->ichset = ichset_before;
+		iod->ochset = ochset_before;
+		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_RECSIZETOOSMALL, 2, recordsize, GTM_MB_LEN_MAX);
+	}
 	/* Now that recordsize and CHSET parms have been handled (if any), set WIDTH if necessary */
 	if (rm_ptr->def_width && (recsize_before != rm_ptr->recordsize || def_recsize_before != rm_ptr->def_recsize))
 	{	/* record size was specified even if the same value */
 		SET_WIDTH_BYTES;
-		assert(width_bytes <= rm_ptr->recordsize);	/* or else RECSIZENOTEVEN error would have been issued */
+		assert(width_bytes <= rm_ptr->recordsize);	/* or else RECSIZETOOSMALL error would have been issued */
 		iod->width = rm_ptr->recordsize;		/* this width will hold at least one character due to above check */
 	}
 	if (dev_closed == iod->state)

@@ -833,6 +833,8 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, uint8 tim
 				io_ptr->dollar.devicebuffer = NULL;
 				io_ptr->disp_ptr = iod->disp_ptr;
 				in_d_rm->fixed = d_rm->fixed;
+				in_d_rm->recordsize = d_rm->recordsize;
+				in_d_rm->def_recsize = d_rm->def_recsize;
 				in_d_rm->read_only = TRUE;
 				in_d_rm->padchar = d_rm->padchar;
 				in_d_rm->inbuf = d_rm->inbuf;

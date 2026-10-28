@@ -96,6 +96,7 @@ BADZYENZYDENEST	<Unsupported nesting of ZYENCODE or ZYDECODE command>/error/fao=
 DUPLICATENEW	<Variable !AD appears twice in the same NEW command>/warning/fao=2
 SIGWINCHRQST	<SIGWINCH interrupt requested>/error/fao=0
 ERRWSIGWINCH	<Error while processing SIGWINCH deviceparameter handler>/error/fao=0
+RECSIZETOOSMALL	<RECORDSIZE [!UL] needs to be at least !UL if ICHSET or OCHSET is UTF-8, UTF-16, UTF-16LE or UTF-16BE>/error/fao=2
 !
 ! If there are UNUSEDMSG* lines unused for more than one year and at least two non-patch releases, use them before adding new lines.
 !
