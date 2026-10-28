@@ -195,7 +195,7 @@ boolean_t	mubfilcpy (backup_reg_list *list, boolean_t showprogress, int attemptc
 	struct perm_diag_data	pdd;
 	int			ftruncate_res;
 	trans_num		ONE = 0x1;
-	boolean_t		in_kernel, use_cp_or_pax = TRUE;
+	boolean_t		cloned, in_kernel, use_cp_or_pax = TRUE;
 	int 			digicnt = 0, eta = MIN_ETA, infd, outfd, speedcnt = 0, transpadcnt = 0;
 	int 			csdigicnt = 0, cspadcnt = 0, speedigits = 0;
 	double			progper = 0, progfact = SHOWPERCENT;
@@ -413,12 +413,13 @@ boolean_t	mubfilcpy (backup_reg_list *list, boolean_t showprogress, int attemptc
 		 * not rely on SEEK_DATA/SEEK_HOLE, which some kernels report incorrectly for files with shared extents
 		 * (a block written with O_DIRECT is reported as a hole and so would be missing from the backup).
 		 * If the clone is not supported (EOPNOTSUPP, EXDEV, EINVAL etc.), fall back to the loop below.
+		 * A successful clone is treated as one iteration of the loop that copies the whole file, so the
+		 * progress reporting and the Ctrl-C check at the end of the loop apply to it too.
 		 */
-		if (0 == ioctl(outfd, FICLONE, infd))
-			remaining = 0;
+		cloned = (0 == ioctl(outfd, FICLONE, infd));
 		while ((0 < remaining) && (-1 < ret))
 		{
-			if ((in_off == data_off) || (in_off == hole_off))
+			if (!cloned && ((in_off == data_off) || (in_off == hole_off)))
 			{
 				for ( ; ; )
 				{
@@ -479,25 +480,32 @@ boolean_t	mubfilcpy (backup_reg_list *list, boolean_t showprogress, int attemptc
 				if (0 == remaining)
 					break;
 			}
-			assert(in_off < stat.st_size);
-			assert(out_off < stat.st_size);
-			assert(data_off < stat.st_size);
-			assert(hole_off <= stat.st_size);
 			strtm = time(NULL);
-			copy_file_range_p = func_ptr;
-
-			size_t	max_cp_len;
-			max_cp_len = hole_off - in_off;
-			assert(max_cp_len <= remaining);
-			ret = copy_file_range_p(infd, (loff_t *)&in_off, outfd, (loff_t *)&out_off, max_cp_len, 0);
-			save_errno = errno;
-			if (1 > ret)
+			if (cloned)
 			{
-				if (EXDEV == save_errno)
-					CLEANUP_AND_RETURN_FALSE(CAN_RETRY); /* Silently ignore and switch to cp */
-				if (1 == (status = handle_err("Error occurred during the copy phase of MUPIP BACKUP",
-						save_errno))) /* WARNING assignment */
-					CLEANUP_AND_RETURN_FALSE(CAN_RETRY);
+				assert(0 == in_off);
+				ret = remaining;	/* The clone copied the whole file */
+			} else
+			{
+				assert(in_off < stat.st_size);
+				assert(out_off < stat.st_size);
+				assert(data_off < stat.st_size);
+				assert(hole_off <= stat.st_size);
+				copy_file_range_p = func_ptr;
+
+				size_t	max_cp_len;
+				max_cp_len = hole_off - in_off;
+				assert(max_cp_len <= remaining);
+				ret = copy_file_range_p(infd, (loff_t *)&in_off, outfd, (loff_t *)&out_off, max_cp_len, 0);
+				save_errno = errno;
+				if (1 > ret)
+				{
+					if (EXDEV == save_errno)
+						CLEANUP_AND_RETURN_FALSE(CAN_RETRY); /* Silently ignore and switch to cp */
+					if (1 == (status = handle_err("Error occurred during the copy phase of MUPIP BACKUP",
+							save_errno))) /* WARNING assignment */
+						CLEANUP_AND_RETURN_FALSE(CAN_RETRY);
+				}
 			}
 			if (WBTEST_ENABLED(WBTEST_BACKUP_FORCE_SLEEP))
 			{
