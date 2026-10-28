@@ -44,7 +44,20 @@ error_def(ERR_ERRWSIGWINCH);
 			else if (&(TREF(dollar_ztrap)).str == err_act)	\
 				errmsg = ERR_ERRWZTRAP;			\
 			else						\
-				assertpro(FALSE && err_act);		\
+			{	/* err_act points to neither, as a	\
+				 * handler dispatched while this frame	\
+				 * was active (e.g. a device		\
+				 * EXCEPTION) overwrote the global	\
+				 * err_act, and nothing restores it.	\
+				 * Restoring err_act is not needed	\
+				 * here, as setting $ETRAP or $ZTRAP	\
+				 * empties the other, so $ZTRAP not	\
+				 * being empty tells which trap code	\
+				 * this frame runs.			\
+				 */					\
+				errmsg = (0 < (TREF(dollar_ztrap)).str.len)	\
+					? ERR_ERRWZTRAP : ERR_ERRWETRAP;	\
+			}						\
 			break;						\
 		case SFT_ZSTEP_ACT:					\
 			errmsg = ERR_ERRWEXC;				\
