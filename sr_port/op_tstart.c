@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -116,6 +116,11 @@ GBLREF	uint4			update_trans;
 
 #define TP_STACK_SIZE ((TP_MAX_LEVEL + 1) * SIZEOF(tp_frame))	/* Size of TP stack frame with no-overflow pad */
 
+/* Returns where the mval pointed to by PTR lives after the M stack range [LO, HI) has been moved down by SHIFT bytes */
+#define ADJUST_SHIFTED_MVAL_PTR(PTR, LO, HI, SHIFT)							\
+	((((unsigned char *)(PTR) >= (LO)) && ((unsigned char *)(PTR) < (HI)))				\
+		? (mval *)((unsigned char *)(PTR) - (SHIFT)) : (PTR))
+
 void	op_tstart(int tstart_flag, ...) /* value of $T when TSTART */
 {
 	boolean_t		serial;			/* whether SERIAL keyword was present */
@@ -133,6 +138,7 @@ void	op_tstart(int tstart_flag, ...) /* value of $T when TSTART */
 	stack_frame		*fp, *fp_fix;
 	tp_frame		*tf;
 	unsigned char		*old_sp, *top, *tstack_ptr, *ptrstart, *ptrend, *ptrinvalidbegin;
+	unsigned char		*shift_lo = NULL, *shift_hi = NULL;	/* M stack range moved down by shift_size, if any */
 	va_list			varlst;
 	tp_region		*tr, *tr_next;
 	sgm_info		*si;
@@ -146,7 +152,7 @@ void	op_tstart(int tstart_flag, ...) /* value of $T when TSTART */
 	mname_entry		tpvent;
 	ht_ent_mname		*tabent, *curent, *topent;
 	sgmnt_addrs		*csa;
-	int4			shift_size;
+	int4			shift_size = 0;
 	boolean_t		tphold_noshift = FALSE, implicit_tstart;
 	lv_val			**lvarraycur = NULL, **lvarray = NULL, **lvarraytop = NULL, **lvptr;
 	GTMTRIG_ONLY(boolean_t	implicit_trigger;)
@@ -305,6 +311,13 @@ void	op_tstart(int tstart_flag, ...) /* value of $T when TSTART */
 				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_STACKCRIT);
 		}
 		memmove(msp, old_sp, top - (unsigned char *)old_sp);	/* Shift stack w/possible overlapping ranges */
+		/* The "tid" and varname mval pointers we were passed can point to temporaries of the frames just shifted
+		 * (e.g. the result of an expression or of a name indirection in Direct Mode). Note the range so those
+		 * pointers can be adjusted before they are used below.
+		 */
+		shift_lo = old_sp;
+		shift_hi = top;
+		tid = ADJUST_SHIFTED_MVAL_PTR(tid, shift_lo, shift_hi, shift_size);
 		mv_st_ent = (mv_stent *)(top - shift_size);
 		mv_st_ent->mv_st_type = MVST_TPHOLD;
 		ADJUST_FRAME_POINTER(frame_pointer, shift_size);
@@ -478,6 +491,7 @@ void	op_tstart(int tstart_flag, ...) /* value of $T when TSTART */
 		for (pres = 0;  pres < prescnt;  ++pres)
 		{
 			preserve = va_arg(lvname, mval *);
+			preserve = ADJUST_SHIFTED_MVAL_PTR(preserve, shift_lo, shift_hi, shift_size);
 			assert(MV_IS_STRING(preserve));		/* Check if this loop can be eliminated */
 		}
 		va_end(lvname);
@@ -495,8 +509,10 @@ void	op_tstart(int tstart_flag, ...) /* value of $T when TSTART */
 		for (pres = 0;  pres < prescnt;  ++pres)
 		{
 			if (NULL == preserve_array)
+			{
 				preserve = va_arg(varlst, mval *);
-			else
+				preserve = ADJUST_SHIFTED_MVAL_PTR(preserve, shift_lo, shift_hi, shift_size);
+			} else
 				preserve = &preserve_array[pres];
 			/* Note: the assumption (according to the comment below) is that this mval points into the literal table
 			 * and thus could not possibly be undefined. In that case, I do not understand why the earlier loop to
