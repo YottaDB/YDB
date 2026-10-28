@@ -984,7 +984,7 @@ boolean_t mur_close_files(void)
 	}
 	if (jgbl.onlnrlbk)
 	{	/* Signal completion */
-		assert(NULL != jnlpool);
+		assert((NULL != jnlpool) || !murgbl.clean_exit);
 		assert(((NULL != inst_hdr) && (udi == FILE_INFO(jnlpool->jnlpool_dummy_reg))) || !murgbl.clean_exit);
 		finish_err_code = murgbl.clean_exit ? ERR_ORLBKCMPLT : ERR_ORLBKTERMNTD;
 		assert(!murgbl.repl_standalone || ((NULL != inst_hdr) && (NULL != udi)));

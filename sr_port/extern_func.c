@@ -3,6 +3,9 @@
  * Copyright (c) 2011-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2026 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -33,7 +36,11 @@ int extern_func(oprtype *a)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	assert(TK_AMPERSAND == TREF(window_token));
+	/* "expritem()" calls this after "$&", but also after "$$" when the token after the second "$" is bad (e.g. an
+	 * unterminated string literal), because the "advancewindow()" it did before the call then set the current token
+	 * to TK_ERROR, which is not TK_DOLLAR. We issue an error below in that case.
+	 */
+	assert((TK_AMPERSAND == TREF(window_token)) || (TK_ERROR == TREF(window_token)));
 	advancewindow();
 	cnt = 0;
 	extref = ((TREF(source_buffer)).addr + TREF(last_source_column) - 1);

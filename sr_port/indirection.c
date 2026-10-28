@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -43,7 +43,11 @@ int indirection(oprtype *a)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	assert(TK_ATSIGN == TREF(window_token));
+	/* The caller has found an at-sign, but the current token is TK_ERROR if "advancewindow()" found an unterminated
+	 * string literal after it, or if the at-sign is followed by a byte above 127 (which "op_indlvarg()" checks only in
+	 * the text). We issue an error below in that case.
+	 */
+	assert((TK_ATSIGN == TREF(window_token)) || (TK_ERROR == TREF(window_token)));
 	concat_athashes = (2 == source_column);
 	INCREMENT_EXPR_DEPTH;
 	advancewindow();

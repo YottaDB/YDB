@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -123,7 +123,6 @@ boolean_t	ecode_add(mstr *str)		/* add "str" to $ECODE and return whether SUCCES
 	eclostmid_len = dest - &eclostmid_buf[0];
 	assert(SIZEOF(eclostmid_buf) >= eclostmid_len);
 
-	assert(str->len < DOLLAR_ECODE_ALLOC);
 	space_left = dollar_ecode.top - dollar_ecode.end;
 	ecode_index = dollar_ecode.index;
 	shrink = FALSE;
@@ -151,7 +150,7 @@ boolean_t	ecode_add(mstr *str)		/* add "str" to $ECODE and return whether SUCCES
 	for ( ; space_left < (int)str->len; )	/* note explicit typecasting to make sure it is a signed comparison */
 	{
 		ecode_index--;
-		if (1 > ecode_index)	/* if ecode_index == -1 ==> str->len > DOLLAR_ECODE_ALLOC so nothing can be done in PRO */
+		if (1 > ecode_index)	/* if ecode_index == -1 ==> str->len > DOLLAR_ECODE_ALLOC so nothing can be done */
 			return FALSE;	/* if ecode_index == 0 ==> first ECODE needs to be overlaid. we do not want to do that. */
 		space_left += dollar_ecode.array[ecode_index].ecode_str.len - 1;
 	}

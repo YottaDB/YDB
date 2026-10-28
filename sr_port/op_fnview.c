@@ -183,17 +183,14 @@ void	op_fnview(int numarg, mval *dst, ...)
 		arg1 = va_arg(var, mval *);
 		MV_FORCE_STR(arg1);
 		if (--numarg > 0)
-		{
-			arg2 = va_arg(var, mval *);
-			DEBUG_ONLY(--numarg;)
-		} else
+			arg2 = va_arg(var, mval *);	/* Any arguments after the second one are ignored */
+		else
 			arg2 = (mval *)NULL;
 	} else
 	{
 		arg1 = (mval *)NULL;
 		arg2 = (mval *)NULL;
 	}
-	assert(!numarg);
 	va_end(var);
 	vtp = viewkeys(&keyword->str);
 	view_arg_convert(vtp, (int)vtp->parm, arg1, &parmblk, IS_DOLLAR_VIEW_TRUE);

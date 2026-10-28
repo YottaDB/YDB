@@ -883,5 +883,8 @@ void allow_dzwrtac_as_mident(void)
 	(TREF(director_ident)).len = movlen + 1;
 	/* Nnw forward the scan to pull director token values into window token for use by our caller */
 	advancewindow();
-	assert(TK_IDENT == TREF(window_token));
+	/* TK_ERROR is possible if the token after the $ZWRTACxxx is bad (e.g. an unterminated string literal).
+	 * The caller issues an error in that case.
+	 */
+	assert((TK_IDENT == TREF(window_token)) || (TK_ERROR == TREF(window_token)));
 }
