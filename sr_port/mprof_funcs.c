@@ -67,6 +67,7 @@ STATICFNDCL void insert_total_times(boolean_t for_process);
 #define PROCESS_TIME		"*RUN"		/* Label to store CPU time for current process. */
 #define MPROF_NULL_LABEL	"^"
 #define MPROF_FOR_LOOP		"FOR_LOOP"
+#define MPROF_ADDED_SUBSCRIPTS	5		/* Max subscripts crt_gbl() adds: routine, label, line, FOR_LOOP, level */
 #define TIMES			times_usec
 #define CHILDREN_TIMES		children_times_usec
 #define MPROF_RTS_ERROR(x)	rts_error_csa x
@@ -646,6 +647,8 @@ void crt_gbl(mprof_tree *p, boolean_t is_for)
 		return;
 	count = (TREF(mprof_ptr))->curr_num_subscripts;
 	assert(0 < count);
+	assert((count + MPROF_ADDED_SUBSCRIPTS) <= (int)ARRAYSIZE((TREF(mprof_ptr))->subsc));
+	assert(ARRAYSIZE((TREF(mprof_ptr))->subsc) == ARRAYSIZE((TREF(mprof_ptr))->gvargs.args));
 	spt = &(TREF(mprof_ptr))->subsc[count];
 	/* Global name --> ^PREFIX(<OPTIONAL ARGUMENTS>, "rout-name", "label-name", "line-num", "forloop"). */
 	spt->mvtype = MV_STR;
@@ -745,6 +748,7 @@ STATICFNDEF void insert_total_times(boolean_t for_process)
 	SETUP_THREADGBL_ACCESS;
 	count = (TREF(mprof_ptr))->curr_num_subscripts;
 	assert(0 < count);
+	assert(count < (int)ARRAYSIZE((TREF(mprof_ptr))->subsc));
 	spt = &(TREF(mprof_ptr))->subsc[count];
 	spt->mvtype = MV_STR;
 	if (for_process)
@@ -996,7 +1000,7 @@ STATICFNDEF void parse_gvn(mval *gvn)
 				continue;
 			}
 			spt->str.len = INTCAST(mpsp - spt->str.addr);
-			if (MAX_GVSUBSCRIPTS < count)
+			if ((MAX_GVSUBSCRIPTS - MPROF_ADDED_SUBSCRIPTS) < count)
 				MPROF_RTS_ERROR((CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXNRSUBSCRIPTS));
 			(TREF(mprof_ptr))->gvargs.args[count++] = spt++;
 			if (',' != *c_ref)

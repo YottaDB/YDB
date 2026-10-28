@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2022-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2022-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -118,7 +118,7 @@ typedef struct mprof_wrapper_struct
 	char			**pcavailptr, **pcavailbase;
 	int			pcavail;
 	boolean_t		is_tracing_ini;
-	mval			subsc[MAX_GVSUBSCRIPTS];
+	mval			subsc[MAX_GVSUBSCRIPTS + 1];	/* Global name and up to MAX_GVSUBSCRIPTS subscripts */
 	gvargs_t		gvargs;
 	mval			gbl_to_fill;
 } mprof_wrapper;
