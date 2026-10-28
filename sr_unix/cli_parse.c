@@ -431,7 +431,10 @@ int 	parse_arg(CLI_ENTRY *pcmd_parms, int *eof)
 					 * the last one overrides
 					 */
 					if (pparm->pval_str)
+					{
 						free(pparm->pval_str);
+						pparm->pval_str = NULL;
+					}
 					if (pparm->qual_vals)
 						clear_parm_vals(pparm->qual_vals, FALSE);
 
