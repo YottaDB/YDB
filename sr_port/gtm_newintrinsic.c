@@ -35,7 +35,7 @@ error_def(ERR_STACKOFLOW);
 
 /* Note this module follows the basic pattern of op_newvar which handles the same
    function except for local vars instead of intrinsic vars. */
-void gtm_newintrinsic(mval *intrinsic)
+mv_stent *gtm_newintrinsic(mval *intrinsic)
 {
 	mv_stent 	*mv_st_ent, *mvst_tmp, *mvst_prev;
 	stack_frame	*fp, *fp_prev, *fp_fix;
@@ -51,8 +51,9 @@ void gtm_newintrinsic(mval *intrinsic)
 		   Create restore entry for intrinsic var.
 		*/
 		PUSH_MV_STENT(MVST_MSAV);
-		mv_chain->mv_st_cont.mvs_msav.v = *intrinsic;
-		mv_chain->mv_st_cont.mvs_msav.addr = intrinsic;
+		mv_st_ent = mv_chain;
+		mv_st_ent->mv_st_cont.mvs_msav.v = *intrinsic;
+		mv_st_ent->mv_st_cont.mvs_msav.addr = intrinsic;
 		shift_size = 0;
 	} else
 	{	/* Current (youngest) frame IS an indirect frame.
@@ -143,5 +144,5 @@ void gtm_newintrinsic(mval *intrinsic)
 		intrinsic->mvtype = MV_STR;
 		intrinsic->str.len = 0;
 	}
-	return;
+	return mv_st_ent;
 }

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -29,6 +29,7 @@
 #include "dpgbldir.h"
 #include "dpgbldir_sysops.h"
 #include "error_trap.h"		/* for STACK_ZTRAP_EXPLICIT_NULL macro */
+#include "mv_stent.h"
 
 GBLREF gv_key		*gv_currkey;
 GBLREF gv_namehead	*gv_target;
@@ -56,7 +57,8 @@ error_def(ERR_NOZTRAPINTRIG);
 void op_newintrinsic(int intrtype)
 {
 	mval		*intrinsic;
-	boolean_t	stored_explicit_null, etrap_was_active;
+	mv_stent	*mv_st_ent;
+	boolean_t	etrap_was_active;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -68,12 +70,6 @@ void op_newintrinsic(int intrtype)
 				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_NOZTRAPINTRIG);
 #			endif
 			assert(!ztrap_explicit_null || (0 == (TREF(dollar_ztrap)).str.len));
-			DEBUG_ONLY(stored_explicit_null = FALSE;)
-			if (ztrap_explicit_null && (0 == (TREF(dollar_ztrap)).str.len))
-			{
-				DEBUG_ONLY(stored_explicit_null = TRUE;)
-				(TREF(dollar_ztrap)).str.len = STACK_ZTRAP_EXPLICIT_NULL;	/* used later by unw_mv_ent() */
-			}
 			/* Intentionally omitted the "break" here */
 		case SV_ETRAP:
 			/* Save the active error trap to the stack if either of them is new'ed */
@@ -106,9 +102,20 @@ void op_newintrinsic(int intrtype)
 		default:	/* Only above types defined by compiler */
 			assertpro(FALSE && intrtype);
 	}
-	gtm_newintrinsic(intrinsic);
+	mv_st_ent = gtm_newintrinsic(intrinsic);
 	if (SV_ZTRAP == intrtype)
 	{
+		/* Mark only the saved copy (never $ZTRAP itself) so an error from gtm_newintrinsic() (e.g. STACKCRIT)
+		 * cannot leave the marker behind in $ZTRAP. unw_mv_ent() uses the marker in the saved copy to restore
+		 * the explicit null. This tests "ztrap_explicit_null" before the line after this block sets
+		 * "ztrap_explicit_null" to TRUE for the new $ZTRAP, so "ztrap_explicit_null" still says whether the
+		 * saved $ZTRAP was explicitly null.
+		 */
+		if (ztrap_explicit_null)
+		{
+			assert(&(TREF(dollar_ztrap)) == mv_st_ent->mv_st_cont.mvs_msav.addr);
+			mv_st_ent->mv_st_cont.mvs_msav.v.str.len = STACK_ZTRAP_EXPLICIT_NULL;
+		}
 		ztrap_explicit_null = TRUE;
 		if (etrap_was_active)
 			NULLIFY_TRAP(TREF(dollar_etrap));
@@ -136,6 +143,6 @@ void op_newintrinsic(int intrtype)
 		if (gv_target)
 			gv_target->clue.end = 0;
 	}
-	assert((SV_ZTRAP != intrtype) || !stored_explicit_null || (0 == intrinsic->str.len));
+	assert((SV_ZTRAP != intrtype) || (0 == intrinsic->str.len));
         return;
 }
