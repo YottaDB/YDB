@@ -87,6 +87,7 @@ LITDEF	err_msg ydberrors[] = {
 	{ "SIGWINCHRQST", "SIGWINCH interrupt requested", 0, 0 },
 	{ "ERRWSIGWINCH", "Error while processing SIGWINCH deviceparameter handler", 0, 0 },
 	{ "RECSIZETOOSMALL", "RECORDSIZE [!UL] needs to be at least !UL if ICHSET or OCHSET is UTF-8, UTF-16, UTF-16LE or UTF-16BE", 2, 0 },
+	{ "TRESTNEW", "Cannot restart transaction because the restart cannot undo an argumentless or exclusive NEW done after its TSTART", 0, 0 },
 };
 
 
@@ -100,7 +101,7 @@ GBLDEF	err_ctl ydberrors_ctl = {
 	256,
 	"YDB",
 	&ydberrors[0],
-	70,
+	71,
 	&ydberrors_undocarr[0],
 	1
 };
