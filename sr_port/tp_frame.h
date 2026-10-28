@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -105,3 +105,26 @@ typedef struct tp_frame_struct
 	unsigned char			*restart_ctxt;
 	struct lv_val_struct		*active_lv;	/* saved/restored only for OUTERMOST tstart */
 } tp_frame;
+
+/* Adjust the stack frame and mv_stent pointers in the tp_frame blocks that point into the part of the M stack (above
+ * stacktop, below "top") that the caller is moving down by "shift" bytes to make room for an mv_stent under a frame.
+ * A tp_frame whose "fp" is below "top" is expected to have its "mvc" below "top" too, so that is asserted.
+ */
+#define	ADJUST_TP_FRAME_POINTERS(top, shift)									\
+MBSTART {													\
+	GBLREF tp_frame		*tp_pointer;									\
+	GBLREF uint4		dollar_tlevel;									\
+	GBLREF unsigned char	*stacktop;									\
+														\
+	tp_frame		*tpp;										\
+														\
+	assert(((NULL == tp_pointer) && !dollar_tlevel) || ((NULL != tp_pointer) && dollar_tlevel));		\
+	for (tpp = tp_pointer; (tpp && ((unsigned char *)tpp->fp < (top))); tpp = tpp->old_tp_frame)		\
+	{													\
+		if ((unsigned char *)tpp->fp > stacktop)							\
+			tpp->fp = (struct stack_frame_struct *)((char *)tpp->fp - (shift));			\
+		assert((unsigned char *)tpp->mvc < (top));							\
+		if ((unsigned char *)tpp->mvc > stacktop)							\
+			tpp->mvc = (struct mv_stent_struct *)((char *)tpp->mvc - (shift));			\
+	}													\
+} MBEND

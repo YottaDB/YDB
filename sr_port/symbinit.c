@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -30,6 +30,7 @@
 #include "gdsfhead.h"
 #include "alias.h"
 #include "dollar_zlevel.h"
+#include "tp_frame.h"
 
 #define MVST_STAB_SIZE (SIZEOF(*mv_chain) - SIZEOF(mv_chain->mv_st_cont) + SIZEOF(mv_chain->mv_st_cont.mvs_stab))
 
@@ -130,6 +131,7 @@ int4 symbinit(void)
 				ADJUST_FRAME_POINTER(fp_fix->old_frame_pointer, shift_size);
 			}
 		}
+		ADJUST_TP_FRAME_POINTERS(top, shift_size);
 		if ((unsigned char *)mv_chain >= top)
 		{
 			mv_st_ent->mv_st_next = (uint4)((char *)mv_chain - (char *)mv_st_ent);

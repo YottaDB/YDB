@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -34,9 +34,7 @@
 GBLREF mv_stent		*mv_chain;
 GBLREF unsigned char	*stackbase, *stacktop, *msp, *stackwarn;
 GBLREF stack_frame	*frame_pointer;
-GBLREF tp_frame		*tp_pointer;
 GBLREF symval		*curr_symval;
-GBLREF uint4		dollar_tlevel;
 
 error_def(ERR_STACKOFLOW);
 error_def(ERR_STACKCRIT);
@@ -53,7 +51,6 @@ void op_newvar(uint4 arg1)
 	lv_val		*new;
 	var_tabent	*varname;
 	mvs_ntab_struct *ptab;
-	tp_frame	*tpp;
 	int		indx;
 	int4		shift_size;
 	DBGRFCT_ONLY(mident_fixed vname;)
@@ -146,18 +143,7 @@ void op_newvar(uint4 arg1)
 				ADJUST_FRAME_POINTER(fp_fix->old_frame_pointer, shift_size);
 			}
 		}
-		/* Adjust stackframe and mvstent pointers in relevant tp_frame blocks */
-		assert(((NULL == tp_pointer) && !dollar_tlevel) || ((NULL != tp_pointer) && dollar_tlevel));
-		for (tpp = tp_pointer; (tpp && ((unsigned char *)tpp->fp < top)); tpp = tpp->old_tp_frame)
-		{
-			if ((unsigned char *)tpp->fp > stacktop)
-				tpp->fp = (struct stack_frame_struct *)((char *)tpp->fp - shift_size);
-			/* Note low check for < top may be superfluous here but without a test case to verify, I
-			 * feel better leaving it in. SE 8/2001
-			 */
-			if ((unsigned char *)tpp->mvc < top && (unsigned char *)tpp->mvc > stacktop)
-				tpp->mvc = (struct mv_stent_struct *)((char *)tpp->mvc - shift_size);
-		}
+		ADJUST_TP_FRAME_POINTERS(top, shift_size);
 		/* Put new mvstent entry on (into) the mvstent chain */
 		if ((unsigned char *)mv_chain >= top)
 		{	/* Just put new entry on end of chain which preceeds our base frame */
