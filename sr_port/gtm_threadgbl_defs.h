@@ -343,6 +343,7 @@ THREADGBLDEF(ydb_autorelink_keeprtn,		boolean_t)			/* do not let go of objects i
 THREADGBLDEF(open_shlib_root,			open_shlib *)			/* Anchor for open shared library list */
 THREADGBLDEF(parm_pool_ptr,			parm_pool *)			/* Pointer to the parameter pool */
 THREADGBLDEF(parms_cnt,                         unsigned int)                   /* Parameters count */
+THREADGBLDEF(parm_ary_used,			int)				/* 1 + highest parm_ary[] index in use */
 THREADGBLDEF(sapi_query_node_subs,		mstr *)				/* -> Array of YDB_MAX_SUBS mstrs holding subs
 										 * .. to return to ydb_node_*_s(). */
 THREADGBLDEF(sapi_query_node_subs_cnt,		int)				/* Count of subs filled in */

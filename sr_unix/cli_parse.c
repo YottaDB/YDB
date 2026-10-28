@@ -47,6 +47,8 @@
 		TAREF1(parm_ary_len, PARM_ARY_INDEX) = TAREF1(parm_str_len, PARM_ARY_INDEX);			\
 	}													\
 	assert(NULL != (TAREF1(parm_ary, PARM_ARY_INDEX))); /* 4SCA: parm_ary_len ensure this */		\
+	if ((int)(PARM_ARY_INDEX) >= TREF(parm_ary_used))							\
+		TREF(parm_ary_used) = (int)(PARM_ARY_INDEX) + 1;						\
 }
 
 #if MAX_OPT_LEN > MAX_LINE
@@ -807,7 +809,7 @@ boolean_t cli_get_sub_quals(CLI_ENTRY *pparm)
  */
 int parse_cmd(void)
 {
-	int	res, cmd_ind;
+	int	res, cmd_ind, i;
 	char	*cmd_str;
 	int	opt_cnt;
 	int	eof;
@@ -818,6 +820,25 @@ int parse_cmd(void)
 	gpqual_root = NULL;
 	func = 0;
 	TREF(parms_cnt) = 0;			/* Parameters count */
+	/* Discard parameter values left over from a previous command so "cli_get_parm" does not return them
+	 * (or treat them as already consumed) for a command that did not specify those parameters.
+	 * GROW_HEAP_IF_NEEDED records in "parm_ary_used" one more than the highest index written, so no entry
+	 * at or above it can be set.
+	 */
+#	ifdef DEBUG
+	for (i = TREF(parm_ary_used); i < MAX_PARMS; i++)
+		assert(NULL == TAREF1(parm_ary, i));
+#	endif
+	for (i = 0; i < TREF(parm_ary_used); i++)
+	{
+		if (NULL != TAREF1(parm_ary, i))
+		{
+			free(TAREF1(parm_ary, i));
+			TAREF1(parm_ary, i) = NULL;
+			TAREF1(parm_ary_len, i) = 0;
+		}
+	}
+	TREF(parm_ary_used) = 0;
 	*cli_err_str = 0;
 
 	cmd_str = cli_token_buf;
