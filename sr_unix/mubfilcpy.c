@@ -485,6 +485,7 @@ boolean_t	mubfilcpy (backup_reg_list *list, boolean_t showprogress, int attemptc
 			{
 				assert(0 == in_off);
 				ret = remaining;	/* The clone copied the whole file */
+				in_off = out_off = stat.st_size;
 			} else
 			{
 				assert(in_off < stat.st_size);
@@ -514,7 +515,8 @@ boolean_t	mubfilcpy (backup_reg_list *list, boolean_t showprogress, int attemptc
 				showprogress = TRUE;
 			}
 			endtm = time(NULL);
-			bytesspliced = in_off + (size_t)ret;
+			bytesspliced = in_off;	/* Offset reached in the source file, so skipped holes count as copied */
+			assert(bytesspliced <= transfersize);	/* So the progress percentage is never more than 100 */
 			if ((endtm > strtm) && (0 < ret))
 				currspeed = DIVIDE_ROUND_UP(ret, (endtm - strtm)); /* bytes per second*/
 			remaining = remaining - ret;
