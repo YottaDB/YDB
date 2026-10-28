@@ -2,7 +2,7 @@
  *								*
  * Copyright 2012 Fidelity Information Services, Inc		*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -88,6 +88,8 @@ void glvn_pool_expand_mvals(void)
 	shift = (INTPTR_T)mval_stack - (INTPTR_T)old_mval_stack;
 	for (slot = pool->slot, top = slot + pool->top - 1; slot < top; slot++)
 	{	/* Touch up glvn_info pointers, but leave lvn start alone */
+		if (OC_NOOP == slot->sav_opcode)
+			continue;	/* op_glvnslot reserved it but it was never filled in, so it holds no pointers */
 		n = slot->glvn_info.n;
 		assert(n <= MAX_ACTUALS);
 		if (FIRST_SAVED_ARG(slot))
