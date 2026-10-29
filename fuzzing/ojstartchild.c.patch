@@ -1,0 +1,38 @@
+#################################################################
+#								#
+# Copyright (c) 2026 YottaDB LLC and/or its subsidiaries.	#
+# All rights reserved.						#
+#								#
+#	This source code contains the intellectual property	#
+#	of its copyright holder(s), and is made available	#
+#	under a license.  If you do not know the terms of	#
+#	the license, please stop and do not read further.	#
+#								#
+#################################################################
+
+diff --git a/sr_unix/ojstartchild.c b/sr_unix/ojstartchild.c
+index 1de2aadd6..003a2debd 100644
+--- a/sr_unix/ojstartchild.c
++++ b/sr_unix/ojstartchild.c
+@@ -260,7 +260,11 @@ STATICFNDEF int io_rename(job_params_msg *params, const int jobid)
+ 
+ 	STRNCPY_STR(path, params->output.buffer, params->output.len);
+ 	SNPRINTF(&path[params->output.len], MAX_STDIOE_LEN - params->output.len, ".%d", jobid);
+-	if (rename(params->output.buffer, path))
++	/* During fuzz testing, "fuzzing/ojchildioset.c.patch" sends the output and error of the JOB to /dev/null instead of
++	 * creating the OUTPUT and ERROR files, so there is no file to rename. Treat that as success so VIEW "JOBPID":1 does not
++	 * fail the JOB.
++	 */
++	if (rename(params->output.buffer, path) && (ENOENT != errno))
+ 	{
+ 		job_errno = errno;
+ 		return(joberr_stdout_rename);
+@@ -271,7 +275,7 @@ STATICFNDEF int io_rename(job_params_msg *params, const int jobid)
+ 		return 0;
+ 	STRNCPY_STR(path, params->error.buffer, params->error.len);
+ 	SNPRINTF(&path[params->error.len], MAX_STDIOE_LEN - params->error.len,  ".%d", jobid);
+-	if (rename(params->error.buffer, path))
++	if (rename(params->error.buffer, path) && (ENOENT != errno))
+ 	{
+ 		job_errno = errno;
+ 		return(joberr_stderr_rename);
