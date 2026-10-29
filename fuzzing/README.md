@@ -28,7 +28,7 @@ To fuzz something, we first need to have AFL be able to track execution, etc.  T
 
 2. We change CC and CXX to use `afl-clang-fast`/`afl-gcc-fast` and `afl-clang-fast++`/`afl-g++-fast` from the system path depending on whether the clang or gcc version of afl is available.
 
-3. We then build/instrument YottaDB.
+3. We then build/instrument YottaDB three times: a RelWithDebInfo build in `build-instrumented` (fastest), a Debug build in `build-instrumented-dbg` (assert failures become crashes) and a Debug build with the address sanitizer in `build-instrumented-asan` (memory errors that do not cause a SIG-11 become crashes).
 
 4. And finally undo the patches done in Step 1.
 
@@ -42,7 +42,7 @@ This is handled in `make_corpus.sh`.
 
 ### Fuzzing it
 
-Finally, we fuzz!  For ease, what we do here is start a bunch (technically `nproc` - 2) of tmux sessions, each of which is running an afl-fuzz session.  Then, to check if things are running you can list the sessions (`tmux ls`), attach to a session (`tmux a -t Leader` for example), and then see the AFL main screen.  Finally, if you wanna see what's going on globally, you can run `afl-whatsup output` from the root of the fuzzing directory to get a look at everything at once.
+Finally, we fuzz!  For ease, what we do here is start a bunch (technically `nproc` - 2) of tmux sessions, each of which is running an afl-fuzz session.  The Leader runs `build-instrumented`, Follower1 runs `build-instrumented-asan` and the remaining followers alternate between `build-instrumented-dbg` and `build-instrumented`.  Then, to check if things are running you can list the sessions (`tmux ls`), attach to a session (`tmux a -t Leader` for example), and then see the AFL main screen.  Finally, if you wanna see what's going on globally, you can run `afl-whatsup output` from the root of the fuzzing directory to get a look at everything at once.
 
 This is in `fuzz.sh`.
 

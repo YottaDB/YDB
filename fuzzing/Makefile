@@ -65,5 +65,5 @@ reset:
 clean: rm reset
 
 rm:
-	rm -rf build-instrumented inputs output env NotMinCorpus YDBTest
+	rm -rf build-instrumented build-instrumented-dbg build-instrumented-asan inputs output env NotMinCorpus YDBTest
 

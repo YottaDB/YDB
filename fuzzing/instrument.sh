@@ -2,7 +2,7 @@
 
 #################################################################
 #								#
-# Copyright (c) 2021-2022 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2021-2026 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 # Original code by Zachary Minneker from Security Innovation.	#
@@ -18,10 +18,6 @@ set -e	# exit on error
 
 echo "Patching..."
 make patch
-
-mkdir build-instrumented
-echo "Cmaking..."
-cd build-instrumented || exit
 
 set +e	# temporarily disable "exit on error" as "which" commands below can error out saying command does not exist.
 # Check if afl-clang-fast exists. If so use it. If not check afl-gcc-fast. If so use it. If neither exists, issue error.
@@ -45,8 +41,6 @@ if [ "" = "$cppcompiler" ] ; then
 fi
 set -e	# Re-enable "exit on error" now that "which" commands are done.
 
-CC=$ccompiler CXX=$cppcompiler cmake ../../
-
 # On Debian 11 and Ubuntu 21.10, gcc (10 and 11 versions respectively) did not work when building afl++ from source.
 # Setting the CC env var to clang during that build process let that build work. When the resulting "afl-clang-fast" was used
 # instrument YottaDB in the "make" below, we saw errors like the following towards the end of building YottaDB.
@@ -56,11 +50,29 @@ CC=$ccompiler CXX=$cppcompiler cmake ../../
 # Setting this env var stopped the above message and fuzzing worked without issues. Hence the below line.
 export AFL_IGNORE_PROBLEMS=1
 
-echo "Making..."
-make -j "$(nproc)"
+# Build 3 instrumented versions of YottaDB.
+#	build-instrumented      : RelWithDebInfo build. Runs fastest. Used by "make_corpus.sh" and by the Leader in "fuzz.sh".
+#	build-instrumented-dbg  : Debug build. Assert failures (which Release builds do not check) also get recorded as crashes.
+#	build-instrumented-asan : Debug build with address sanitizer. Catches memory errors that do not cause a SIG-11.
+# "fuzz.sh" spreads the followers across these builds.
+build() {
+	dir=$1
+	shift
+	mkdir "$dir"
+	echo "Cmaking $dir..."
+	(
+	cd "$dir" || exit 1
+	CC=$ccompiler CXX=$cppcompiler cmake "$@" ../../
+	echo "Making $dir..."
+	make -j "$(nproc)"
+	)
+}
+
+build build-instrumented
+build build-instrumented-dbg -D CMAKE_BUILD_TYPE=Debug
+build build-instrumented-asan -D CMAKE_BUILD_TYPE=Debug -D ENABLE_ASAN=ON
 
 # Undo source code changes now that build is done. This allows later "git status" commands to not show the patch as a diff.
 echo "Undoing patch..."
-cd ..
 make reset
 
