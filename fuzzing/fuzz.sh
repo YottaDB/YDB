@@ -33,6 +33,11 @@ export AFL_SKIP_CPUFREQ=1
 # See comment in "fuzzing/instrument.sh" for why this is needed.
 export AFL_IGNORE_PROBLEMS=1
 
+# By default, afl-fuzz disables core files of the fuzzed processes. Let them create core files (in the current directory
+# if /proc/sys/kernel/core_pattern is "core") as they help analyze crashes that do not reproduce outside the fuzzing
+# environment. "cleaner.sh" keeps the first few core files of each afl-fuzz instance in the "env/cores" directory.
+export AFL_ALLOW_CORES=1
+
 # If EDITOR environment variable is set to a gui editor (e.g. gvim), ZEDIT commands that get tested by afl-fuzz below
 # would invoke lots of gvim windows in the background and clutter the desktop. Prevent that by unsetting the env var
 # in case it is set. In this case, a default editor would be chosen (usually vi) which does not open a new window.
@@ -69,7 +74,7 @@ start_fuzzer() {
 		envvars="$envvars ASAN_OPTIONS=detect_leaks=0:abort_on_error=1:symbolize=0:unmap_shadow_on_exit=1:verify_asan_link_order=0"
 	fi
 	tmux new-session -d -s "$name" "env $envvars afl-fuzz -D -t 5000+ -i ../../inputs -o ../../output $role $name -- ../../$build/yottadb -dir"
-	tmux new-session -d -s "Cleaner$name" "../../cleaner.sh"
+	tmux new-session -d -s "Cleaner$name" "../../cleaner.sh $name"
 }
 
 echo "Creating leader..."

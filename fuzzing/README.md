@@ -14,7 +14,7 @@ Run the fuzzer as a dedicated user that cannot write to anyone else's files. The
 
 You should only have to call `make`.  The makefile in this directory should handle everything else, and afterwards you can run `tmux ls` to check for running fuzzing instances.
 
-You can gather the crashing inputs by navigating to `output` and then for example to `Leader` and finally `crashes`.
+You can gather the crashing inputs by navigating to `output` and then for example to `Leader` and finally `crashes`. The first few core files of each afl-fuzz instance are kept in `env/cores` (for example `env/cores/Leader`). They are only needed for a crash that does not reproduce from its input in `crashes`. They are the first core files of the instance whatever the crash, so a crash that comes after them has no core file kept.
 
 ## How does this work?
 
