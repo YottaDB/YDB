@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -76,6 +76,10 @@ CONDITION_HANDLER(compiler_ch)
 	}
 	if (indr_stringpool.base == stringpool.base)
 	{
+#		ifdef DEBUG
+		if (stringpool_unusable)	/* error after "compiler_startup" marked the literal pool unusable */
+			DBG_MARK_STRINGPOOL_USABLE;
+#		endif
 		indr_stringpool = stringpool;
 		stringpool = rts_stringpool;
 	}

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -237,8 +237,12 @@ int f_select(oprtype *a, opctype op)
 		{	/* jump to the end in case the run time value should turn out to be (the first) TRUE */
 			ref = newtriple(OC_JMP);
 			ref->operand[0] = endtrip;
-			INSERT_BOOLEXPRFINISH_AFTER_JUMP(boolexprfinish, boolexprfinish2);
-			*cnd = put_tjmp(boolexprfinish2);
+			if (NULL != boolexprfinish)
+			{
+				INSERT_BOOLEXPRFINISH_AFTER_JUMP(boolexprfinish, boolexprfinish2);
+				*cnd = put_tjmp(boolexprfinish2);
+			} else	/* e.g. a NUMOFLOW compile time warning removed the OC_BOOLEXPRSTART/OC_BOOLEXPRFINISH pair */
+				tnxtarg(cnd);
 			/* No need for INSERT_OC_JMP_BEFORE_OC_BOOLEXPRFINISH since OC_JMP has already been inserted above */
 		}
 		if (TK_COMMA != TREF(window_token))

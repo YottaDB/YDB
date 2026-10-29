@@ -50,7 +50,9 @@ void op_indname(mval *dst, mval *target, mval *subs)
 			break;		/* comment delimiter means the value is complete */
 		*out++ = *cp++;
 	}
-	assert(!quoted);
+	/* "quoted" can still be TRUE here if the target has an unbalanced quote (e.g. a value of a single "). That is user
+	 * input and not a bug; compiling the resulting name issues a VAREXPECTED error.
+	 */
 	if ((*start == '@') && (0 != subs->str.len))
 	{
 		*out++ = '@';

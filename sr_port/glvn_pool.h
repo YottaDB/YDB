@@ -49,8 +49,6 @@
 #define INIT_GLVN_POOL_CAPACITY		8
 #define INIT_GLVN_POOL_MVAL_CAPACITY	64
 #define GLVN_POOL_UNTOUCHED		0
-#define MAX_EXPECTED_CAPACITY		2048
-#define MAX_EXPECTED_MVAL_CAPACITY	2048
 #define SLOT_NEEDS_REWIND(INDX)		(((TREF(glvn_pool_ptr))->top <= (INDX)) && (GLVN_POOL_EMPTY != (INDX)))
 #define SLOT_OPCODE(INDX)		((TREF(glvn_pool_ptr))->slot[INDX].sav_opcode)
 

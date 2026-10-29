@@ -59,7 +59,6 @@ void glvn_pool_expand_slots(void)
 	SETUP_THREADGBL_ACCESS;
 	old_pool = TREF(glvn_pool_ptr);
 	capacity = 2 * old_pool->capacity;
-	assert(capacity <= MAX_EXPECTED_CAPACITY); 		/* Don't expect more than this in the test system */
 	slotoff = (uint4)OFFSETOF(glvn_pool, slot[0]);
 	pool = (glvn_pool *)malloc(ROUND_UP(slotoff, (capacity + 1) * SIZEOF(glvn_pool_entry)));
 	memcpy(pool, old_pool, slotoff + old_pool->top * SIZEOF(glvn_pool_entry));
@@ -81,7 +80,6 @@ void glvn_pool_expand_mvals(void)
 	SETUP_THREADGBL_ACCESS;
 	pool = TREF(glvn_pool_ptr);
 	mval_capacity = 2 * pool->mval_capacity;
-	assert(mval_capacity <= MAX_EXPECTED_MVAL_CAPACITY);	/* Don't expect more than this in the test system */
 	old_mval_stack = pool->mval_stack;
 	mval_stack = (mval *)malloc(mval_capacity * SIZEOF(mval));
 	memcpy(mval_stack, old_mval_stack, pool->mval_top * SIZEOF(mval));

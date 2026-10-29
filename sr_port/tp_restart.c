@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -851,6 +851,11 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 		GTMTRIG_ONLY(DBGTRIGR((stderr, "tp_restart: Leaving tp_restart via TRESTNOT error - state reset to 0\n")));
 		if (save_jnlpool != jnlpool)
 			jnlpool = save_jnlpool;
+		/* A transaction that is not restartable never restarts, so $TRESTART stays 0, and so must this count of
+		 * restarts that $TRESTART does not reflect, even though "t_tries" was incremented above.
+		 */
+		assert(0 == dollar_trestart);
+		DEBUG_ONLY(TREF(tp_restart_dont_counts) = 0);
 		if (IS_MCODE_RUNNING)
 		{
 			getzposition(&beganHere);

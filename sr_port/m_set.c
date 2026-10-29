@@ -396,16 +396,19 @@ int m_set(void)
 			if (0 > index)
 			{
 				STX_ERROR_WARN(ERR_INVFCN);	/* sets "parse_warn" to TRUE */
-				/* OC_RTERROR triple would have been inserted in "curtchain" by ins_errtriple
-				 * (invoked by stx_error). We need to switch it to "targchain" to be consistent
-				 * with every other codepath in this module.
-				 */
-				tmp = (TREF(curtchain))->exorder.bl; /* corresponds to put_ilit(FALSE) in ins_errtriple */
-				tmp = tmp->exorder.bl;	/* corresponds to put_ilit(in_error) in ins_errtriple */
-				tmp = tmp->exorder.bl;	/* corresponds to newtriple(OC_RTERROR) in ins_errtriple */
-				assert(OC_RTERROR == tmp->opcode);
-				dqdel(tmp, exorder);
-				dqrins(&targchain, exorder, tmp);
+				if (CGP_NOSTATE != cg_phase)
+				{	/* OC_RTERROR triple would have been inserted in "curtchain" by ins_errtriple
+					 * (invoked by stx_error). We need to switch it to "targchain" to be consistent
+					 * with every other codepath in this module. In case of "$zycompile()", no
+					 * OC_RTERROR triple was inserted (see the INVSVN case above).
+					 */
+					tmp = (TREF(curtchain))->exorder.bl; /* corresponds to put_ilit(FALSE) in ins_errtriple */
+					tmp = tmp->exorder.bl;	/* corresponds to put_ilit(in_error) in ins_errtriple */
+					tmp = tmp->exorder.bl;	/* corresponds to newtriple(OC_RTERROR) in ins_errtriple */
+					assert(OC_RTERROR == tmp->opcode);
+					dqdel(tmp, exorder);
+					dqrins(&targchain, exorder, tmp);
+				}
 				advancewindow();	/* skip past the function name */
 				advancewindow();	/* skip past the left paren */
 				/* Skip the remaining arguments up to the matching RIGHT-PAREN. A SPACE or EOL before it stops the

@@ -3,7 +3,7 @@
  * Copyright (c) 2010-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -234,10 +234,10 @@ typedef struct gvtr_invoke_parms_struct
 			 * t_retry does this transfer of control using the MUM_TSTART macro). We instead expect to handle	\
 			 * retries internally in gvcst_put. We also expect any restarts occurring in nested trigger code to	\
 			 * eventually end up as a RESTART return code from "gtm_trigger" so we get to choose how to handle the	\
-			 * restart for this implicit TSTART.									\
+			 * restart for this implicit TSTART. It is set after the "op_tstart" call below, as that call can	\
+			 * issue an error (e.g. TPMIXUP inside a ZTSTART fence), after which this update does not continue.	\
 			 */													\
 			assert(!donot_INVOKE_MUMTSTART);									\
-			DEBUG_ONLY(donot_INVOKE_MUMTSTART = TRUE;)								\
 			/* With journal recovery, we expect it to play non-TP journal records as non-TP transactions and ZTP	\
 			 * journal records as ZTP transactions so we dont expect an implicit TP wrap to be done inside recovery	\
 			 * due to a trigger (as this means GT.M and recovery have different values for GVT->gvt_trigger which	\
@@ -247,6 +247,7 @@ typedef struct gvtr_invoke_parms_struct
 			LCL_TSTART = TRUE;											\
 			 /* 0 ==> save no locals but RESTART OK */ 								\
 			op_tstart((IMPLICIT_TSTART | IMPLICIT_TRIGGER_TSTART), TRUE, &literal_batch, 0);			\
+			DEBUG_ONLY(donot_INVOKE_MUMTSTART = TRUE;)								\
 			/* Ensure that the op_tstart done above has set up the TP frame and that the first entry is		\
 			 * of MVST_TPHOLD type.											\
 			 */													\

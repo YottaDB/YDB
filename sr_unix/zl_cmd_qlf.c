@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -231,7 +231,11 @@ void zl_cmd_qlf(mstr *quals, command_qualifier *qualif, char *srcstr, unsigned s
 		module_name.len = int_module_name.len = clen;
 		memcpy(int_module_name.addr, routine_name.addr, clen);
 	} else
-		assert(!last || int_module_name.len || !pblk.b_name);
+	{	/* The module name can be empty if the -OBJECT qualifier names a directory without a file name (e.g. "-object=dir/").
+		 * An error is issued later in that case.
+		 */
+		assert(!last || int_module_name.len || !pblk.b_name || (CLI_PRESENT == cli_present("OBJECT")));
+	}
 	assert(!last || *srclen);
 	if (!last)
 	{

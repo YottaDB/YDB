@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2026 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -32,7 +35,11 @@ int exfunc(oprtype *a, boolean_t alias_target)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	assert(TK_DOLLAR == TREF(window_token));
+	/* "m_set()" calls this for the "$$" right-hand side of an alias assignment ("SET *a=$$label"), but the
+	 * "advancewindow()" it did before the call sets the current token to TK_ERROR in place of the second "$" if
+	 * the token after it is bad (e.g. an unterminated string literal). "entryref()" issues an error in that case.
+	 */
+	assert((TK_DOLLAR == TREF(window_token)) || (TK_ERROR == TREF(window_token)));
 	advancewindow();
 	exorder_init(&tmpchain);
 	oldchain = setcurtchain(&tmpchain);

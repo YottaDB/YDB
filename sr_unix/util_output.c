@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -429,14 +429,6 @@ caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, ssize_t size, in
 							isprintable = TRUE;
 						}
 					}
-					assert(('\0' != ch) || (2 != faocnt) || !STRNCMP_LIT(message, "!/!_!AD"));
-					/* the assert above is to detect <NUL> bytes in GT.M messages, which cause trouble;
-					 * however, we have no control over the content of user-supplied input: that may contain
-					 * <NUL> bytes, which, as of this writing, we believe is confined, at least in our testing,
-					 * to reporting source syntax errors; therefore the assert tries to side-step any such
-					 * syntax errors by their signature, which is unique to the messages for SRCLINE and
-					 * EXTSRCLIN and. although DBG only, avoids a GBLDEF or gtm_threadglb_def
-					 */
 					assert((c + chlen) <= ctop);
 					assert(0 < chlen);
 					assert((0 < chwidth) || ((0 == chwidth) && gtm_utf8_mode));
