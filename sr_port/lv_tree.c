@@ -3,7 +3,7 @@
  * Copyright (c) 2011-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -2048,11 +2048,16 @@ void lvAvlTreeNodeDelete(lvTree *lvt, lvTreeNode *node)
 /* This function needs to be invoked BEFORE invoking "lvAvlTreeNodeDelete()" in case we are trying to delete
  * a lv node that was not the most recently looked up node. See UNDO_ACTIVE_LV macro for one caller that needs this.
  * This function adjusts the "descent_dir" fields of all ancestors of the input "node" so they point to a path that
- * leads to "node".
+ * leads to "node". It does the same in the tree of each subscripted node above "node" that "lv_kill()" also deletes
+ * (by invoking "lvAvlTreeNodeDelete()" on it), which it does if deleting "node" leaves that node with no value and no
+ * children. It does not touch any other tree, since a tree in which no node gets deleted keeps its "lastLookup" clue,
+ * and a later lookup that uses the clue relies on the "descent_dir" fields on the path to the clue node.
  */
 void lvAvlTreeNodePrepareForDelete(lvTreeNode *node)
 {
 	lvTreeNode	*curNode, *parentNode;
+	lvTree		*lvt;
+	lv_val		*sbs_parent;
 
 	assert(NULL != node);
 	curNode = node;
@@ -2060,7 +2065,28 @@ void lvAvlTreeNodePrepareForDelete(lvTreeNode *node)
 	{
 		parentNode = curNode->avl_parent;
 		if (NULL == parentNode)
-			break;
+		{	/* Reached the root of this tree. Continue with the tree that the subscripted node above this tree is in, but
+			 * only if "lv_kill()" deletes that subscripted node too, using the same two checks as "lv_kill()".
+			 */
+			lvt = curNode->tree_parent;
+			/* "lv_kill()" deletes the subscripted node above this tree only if this tree is empty after the delete,
+			 * i.e. "curNode" is its only node (a tree with one node has height 1). Otherwise that subscripted node
+			 * stays even if it has no value (e.g. "x(1)" when "x(1,2)" exists and "x(1,1)" is deleted), no node is
+			 * deleted in its tree, and that tree has to keep the "descent_dir" fields that its "lastLookup" clue
+			 * relies on.
+			 */
+			if (1 != lvt->avl_height)
+				break;
+			sbs_parent = (lv_val *)LVT_PARENT(lvt);
+			/* Stop at the base variable, which is not in any tree. Also stop if the subscripted node has a value, since
+			 * "lv_kill()" does not delete it then (e.g. "x(1)" after "set x(1)=1"), and so must not touch its tree
+			 * for the same reason as above.
+			 */
+			if (LV_IS_BASE_VAR(sbs_parent) || LV_IS_VAL_DEFINED(sbs_parent))
+				break;
+			curNode = (lvTreeNode *)sbs_parent;
+			continue;
+		}
 		assert((curNode == parentNode->avl_left) || (curNode == parentNode->avl_right));
 		parentNode->descent_dir = ((curNode == parentNode->avl_left) ? TREE_DESCEND_LEFT : TREE_DESCEND_RIGHT);
 		curNode = parentNode;
