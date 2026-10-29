@@ -2,6 +2,9 @@
  *								*
  *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
+ * Copyright (c) 2026 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -44,8 +47,8 @@ const static readonly unsigned char job_param_index[27] =
       /* A(2)    B(0)   C(2)   D(4)   E(2)   F(0)  G(2)  H(0)  I(4)   J(0)  K(0)  L(2)  M(0) */
 	 0,	2,    	 2,     4,     8,    10,     10,   12,   12,    16,   16,   16,   18,
       /* N(6)	O(2)	P(6)	Q(0)	R(0)	S(6)	T(0)   U(0)	V(0)	W(0)   X(0)	Y(0)	Z(0) */
-	18,	24,	26,	32,	32,	32,	39,	39,	39,	39,	39,	39,	39,
-	39
+	18,	24,	26,	32,	32,	32,	38,	38,	38,	38,	38,	38,	38,
+	38
 };
 #else
 const static readonly unsigned char job_param_index[27] =
@@ -83,6 +86,24 @@ int one_job_param (char **parptr)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	assert((SIZEOF(job_param_names) / SIZEOF(nametabent)) == job_param_index[26]);
+	assert((SIZEOF(job_param_data) / SIZEOF(jp_type)) == job_param_index[26]);
+#	ifdef DEBUG
+	{	/* namelook() searches only [job_param_index[letter], job_param_index[letter + 1]), but the
+		 * asserts above check only the total. Check that each index is where its letter's names begin
+		 * in job_param_names[].
+		 */
+		int	letter, name_index;
+
+		for (letter = 0, name_index = 0; 26 > letter; letter++)
+		{
+			while ((job_param_index[26] > name_index)
+					&& (('A' + letter) > job_param_names[name_index].name[0]))
+				name_index++;
+			assert(job_param_index[letter] == name_index);
+		}
+	}
+#	endif
 	if ((TK_IDENT != TREF(window_token))
 	     || (0 > (x = (namelook(job_param_index, job_param_names, (TREF(window_ident)).addr, (TREF(window_ident)).len)))))
 	{	/* NOTE assigment above */
