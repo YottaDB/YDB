@@ -8,6 +8,8 @@ This script assumes you have tmux installed (`apt install tmux -y` or similar fo
 
 You also have to run `echo core >/proc/sys/kernel/core_pattern` *as root* before you call `make`!
 
+Run the fuzzer as a dedicated user that cannot write to anyone else's files. The patches described below stop the fuzzed M code from running shell commands, but it can still create, overwrite or delete any file the user has write access to (for example with `OPEN` or `ZLINK` on an absolute path, or after changing `$ZDIRECTORY`).
+
 ## Running it
 
 You should only have to call `make`.  The makefile in this directory should handle everything else, and afterwards you can run `tmux ls` to check for running fuzzing instances.
@@ -22,7 +24,7 @@ At a high level, we've only made a makefile which calls three scripts in this di
 
 To fuzz something, we first need to have AFL be able to track execution, etc.  This means, of course, instrumentation.  To do that we need to make two small changes to the build process:
 
-1. We patch out the signal handlers installed for SIGBUS, SIGSEGV, SIGILL, SIGFPE, etc in `sr_unix/sig_init.c`.  This is a one line change that we do with `patch`.
+1. We patch out the signal handlers installed for SIGBUS, SIGSEGV, SIGILL, SIGFPE, etc in `sr_unix/sig_init.c`.  This is a one line change that we do with `patch`. Other patches (see the `patch` target in the `Makefile`) turn events that would dump a core (e.g. an assert failure) into a SIG-11 that afl-fuzz records as a crash, keep messages out of the syslog, and stop the fuzzed M code from running shell commands or signaling other processes (`ZSYSTEM`, `ZEDIT`, PIPE devices, the `STARTUP` parameter of `JOB` and `$ZSIGPROC`).
 
 2. We change CC and CXX to use `afl-clang-fast`/`afl-gcc-fast` and `afl-clang-fast++`/`afl-g++-fast` from the system path depending on whether the clang or gcc version of afl is available.
 

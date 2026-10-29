@@ -1,0 +1,27 @@
+#################################################################
+#								#
+# Copyright (c) 2026 YottaDB LLC and/or its subsidiaries.	#
+# All rights reserved.						#
+#								#
+#	This source code contains the intellectual property	#
+#	of its copyright holder(s), and is made available	#
+#	under a license.  If you do not know the terms of	#
+#	the license, please stop and do not read further.	#
+#								#
+#################################################################
+
+diff --git a/sr_unix/op_fnzsyslog.c b/sr_unix/op_fnzsyslog.c
+index 8766d71ac..bd6bda897 100644
+--- a/sr_unix/op_fnzsyslog.c
++++ b/sr_unix/op_fnzsyslog.c
+@@ -40,7 +40,9 @@ void op_fnzsyslog(mval* src, mval* dst)
+ 	{
+ 		memcpy(rebuff, src->str.addr, len);	/* Rebuffer to add null terminator */
+ 		rebuff[len] = '\0';			/* Add null terminator */
+-		util_out_send_oper(rebuff, len);
++		/* Do not send to syslog during fuzz testing as fuzzed M code that calls $ZSYSLOG in a loop can flood the
++		 * syslog (and fill the disk).
++		 */
+ 	}
+ 	memcpy(dst, &literal_one, SIZEOF(mval));
+ }

@@ -1,0 +1,28 @@
+#################################################################
+#								#
+# Copyright (c) 2026 YottaDB LLC and/or its subsidiaries.	#
+# All rights reserved.						#
+#								#
+#	This source code contains the intellectual property	#
+#	of its copyright holder(s), and is made available	#
+#	under a license.  If you do not know the terms of	#
+#	the license, please stop and do not read further.	#
+#								#
+#################################################################
+
+diff --git a/sr_unix/op_zedit.c b/sr_unix/op_zedit.c
+index b82364e3a..f808ab771 100644
+--- a/sr_unix/op_zedit.c
++++ b/sr_unix/op_zedit.c
+@@ -174,7 +174,10 @@ void op_zedit(mval *v, mval *p)
+ 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_RESTRICTEDOP, 1, "ZEDIT");
+ 
+ 	flush_pio();
+-	ret = gtm_system_internal(editor.addr, es, NULL, NULL);
++	/* Skip invoking the editor during fuzz testing. Fuzzed M code can point the editor to any program (for example with
++	 * VIEW "SETENV":"EDITOR":"/path/to/program") and so run arbitrary commands through ZEDIT.
++	 */
++	ret = 0;
+ 	if (-1 == ret)
+ 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("gtm_system_internal()"), CALLFROM, errno);
+ 	assert(WIFEXITED(ret));	/* Since "gtm_system_internal" does a WAITPID with options parameter set to 0,

@@ -1,0 +1,27 @@
+#################################################################
+#								#
+# Copyright (c) 2026 YottaDB LLC and/or its subsidiaries.	#
+# All rights reserved.						#
+#								#
+#	This source code contains the intellectual property	#
+#	of its copyright holder(s), and is made available	#
+#	under a license.  If you do not know the terms of	#
+#	the license, please stop and do not read further.	#
+#								#
+#################################################################
+
+diff --git a/sr_unix/iopi_open.c b/sr_unix/iopi_open.c
+index baa846e9b..058532ff4 100644
+--- a/sr_unix/iopi_open.c
++++ b/sr_unix/iopi_open.c
+@@ -665,6 +665,10 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, uint8 tim
+ 				UNDERSCORE_EXIT(ERR_DEVOPENFAIL);
+ 			}
+ 		}
++		/* Skip executing the PIPE command during fuzz testing as it would let fuzzed M code run arbitrary shell commands.
++		 * For example, OPEN "p":(COMMAND="rm -rf ~")::"PIPE". Exit the child instead so the parent sees an empty pipe.
++		 */
++		UNDERSCORE_EXIT(0);
+ 		if (0 == slen[PSHELL])
+ 		{
+ 			/* get SHELL environment */

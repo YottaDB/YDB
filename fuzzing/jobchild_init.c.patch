@@ -1,0 +1,28 @@
+#################################################################
+#								#
+# Copyright (c) 2026 YottaDB LLC and/or its subsidiaries.	#
+# All rights reserved.						#
+#								#
+#	This source code contains the intellectual property	#
+#	of its copyright holder(s), and is made available	#
+#	under a license.  If you do not know the terms of	#
+#	the license, please stop and do not read further.	#
+#								#
+#################################################################
+
+diff --git a/sr_unix/jobchild_init.c b/sr_unix/jobchild_init.c
+index 7be5bdf69..39c6a555f 100644
+--- a/sr_unix/jobchild_init.c
++++ b/sr_unix/jobchild_init.c
+@@ -102,7 +102,10 @@ void jobchild_init(void)
+ 		if (jparms.params.startup.len)
+ 		{
+ 			jparms.params.startup.buffer[jparms.params.startup.len] = '\0';
+-			status = SYSTEM(jparms.params.startup.buffer);
++			/* Skip executing the STARTUP command during fuzz testing as it would let fuzzed M code run arbitrary
++			 * shell commands. For example, JOB ^x:(STARTUP="rm -rf ~").
++			 */
++			status = 0;
+ 			if (-1 == status)
+ 				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_JOBSTARTCMDFAIL, 0, errno);
+ 			else if (0 != status)
