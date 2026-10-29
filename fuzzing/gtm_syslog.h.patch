@@ -1,0 +1,28 @@
+#################################################################
+#								#
+# Copyright (c) 2026 YottaDB LLC and/or its subsidiaries.	#
+# All rights reserved.						#
+#								#
+#	This source code contains the intellectual property	#
+#	of its copyright holder(s), and is made available	#
+#	under a license.  If you do not know the terms of	#
+#	the license, please stop and do not read further.	#
+#								#
+#################################################################
+
+diff --git a/sr_unix/gtm_syslog.h b/sr_unix/gtm_syslog.h
+index d45a30700..42b0745e6 100644
+--- a/sr_unix/gtm_syslog.h
++++ b/sr_unix/gtm_syslog.h
+@@ -24,7 +24,10 @@
+  * potential of causing a hang (YDB#464).
+  */
+ #define OPENLOG		assert(!in_os_signal_handler); openlog
+-#define SYSLOG		assert(!in_os_signal_handler); syslog
++/* Do not write to the syslog during fuzz testing. Fuzzed processes send many messages to the syslog (e.g. DBFILEXT,
++ * GBLOFLOW, FORCEDHALT, TRIGCOMPFAIL), enough to fill the disk holding it. The message is still formatted by the caller.
++ */
++#define SYSLOG(...)	assert(!in_os_signal_handler)
+ #define CLOSELOG	assert(!in_os_signal_handler); closelog
+ 
+ #endif

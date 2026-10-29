@@ -37,6 +37,7 @@ patch:
 	patch --no-backup-if-mismatch ../sr_unix/gtm_dump_core.c gtm_dump_core.c.patch
 	patch --no-backup-if-mismatch ../sr_unix/gtm_fork_n_core.c gtm_fork_n_core.c.patch
 	patch --no-backup-if-mismatch ../sr_unix/gtm_putmsg_list.c gtm_putmsg_list.c.patch
+	patch --no-backup-if-mismatch ../sr_unix/gtm_syslog.h gtm_syslog.h.patch
 	patch --no-backup-if-mismatch ../sr_unix/iopi_open.c iopi_open.c.patch
 	patch --no-backup-if-mismatch ../sr_unix/jobchild_init.c jobchild_init.c.patch
 	patch --no-backup-if-mismatch ../sr_unix/mutexsp.h mutexsp.h.patch
@@ -57,6 +58,7 @@ reset:
 	patch --reject-file=- --no-backup-if-mismatch --reverse ../sr_unix/gtm_dump_core.c gtm_dump_core.c.patch
 	patch --reject-file=- --no-backup-if-mismatch --reverse ../sr_unix/gtm_fork_n_core.c gtm_fork_n_core.c.patch
 	patch --reject-file=- --no-backup-if-mismatch --reverse ../sr_unix/gtm_putmsg_list.c gtm_putmsg_list.c.patch
+	patch --reject-file=- --no-backup-if-mismatch --reverse ../sr_unix/gtm_syslog.h gtm_syslog.h.patch
 	patch --reject-file=- --no-backup-if-mismatch --reverse ../sr_unix/iopi_open.c iopi_open.c.patch
 	patch --reject-file=- --no-backup-if-mismatch --reverse ../sr_unix/jobchild_init.c jobchild_init.c.patch
 	patch --reject-file=- --no-backup-if-mismatch --reverse ../sr_unix/mutexsp.h mutexsp.h.patch
