@@ -98,7 +98,9 @@ AFL_MAP_SIZE=$(AFL_DUMP_MAP_SIZE=1 LD_PRELOAD=$AFL_PRELOAD ../build-instrumented
 export AFL_MAP_SIZE
 
 echo "Running afl-cmin..."
-afl-cmin -i ../NotMinCorpus/ -o ../inputs -- ../build-instrumented/yottadb -dir
+# "-T all" runs one afl-cmin worker per CPU. With a single worker (the default), the more than 10,000 inputs take hours
+# as many of them wait (e.g. for a lock or a device) until the timeout.
+afl-cmin -T all -i ../NotMinCorpus/ -o ../inputs -- ../build-instrumented/yottadb -dir
 )
 
 echo "Cleanup"
