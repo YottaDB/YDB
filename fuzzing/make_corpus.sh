@@ -2,7 +2,7 @@
 
 #################################################################
 #								#
-# Copyright (c) 2021-2022 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2021-2026 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 # Original code by Zachary Minneker from Security Innovation.	#
@@ -74,6 +74,14 @@ cd env || exit
 
 # Set env var before invoking yottadb. See comment in "fuzzing/instrument.sh" for why this is needed.
 export AFL_IGNORE_PROBLEMS=1
+
+# The yottadb executable loads libyottadb.so using dlopen(). The coverage of a library that is loaded after the afl
+# forkserver starts is not recorded, so preload libyottadb.so. Also set AFL_MAP_SIZE to the coverage map size that the
+# executable and the preloaded library need. See "fuzz.sh" for more details.
+export AFL_PRELOAD=$PWD/../build-instrumented/libyottadb.so
+# afl prints the map size and exits with a non-zero status if AFL_DUMP_MAP_SIZE is set, hence the "|| true".
+AFL_MAP_SIZE=$(AFL_DUMP_MAP_SIZE=1 LD_PRELOAD=$AFL_PRELOAD ../build-instrumented/yottadb -dir < /dev/null) || true
+export AFL_MAP_SIZE
 
 echo "Running afl-cmin..."
 afl-cmin -i ../NotMinCorpus/ -o ../inputs -- ../build-instrumented/yottadb -dir

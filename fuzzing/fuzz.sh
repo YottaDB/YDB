@@ -64,6 +64,15 @@ start_fuzzer() {
 	build=$3
 	dist=$(cd "../../$build" && pwd)
 	envvars="ydb_dist=$(printf %q "$dist")"
+	# The yottadb executable is a small program that loads libyottadb.so using dlopen(). Almost all of the instrumented
+	# code is in libyottadb.so. The coverage of a library that is loaded after the afl forkserver starts is not recorded
+	# (AFL_IGNORE_PROBLEMS hides the afl error about it), which would leave afl-fuzz with coverage of just the yottadb
+	# executable (a few tens of edges). So preload libyottadb.so. That needs AFL_MAP_SIZE set to the coverage map size
+	# that the executable and the preloaded library need, which AFL_DUMP_MAP_SIZE displays. afl exits with a non-zero
+	# status after displaying it, hence the "|| true".
+	lib=$dist/libyottadb.so
+	mapsize=$(AFL_DUMP_MAP_SIZE=1 LD_PRELOAD=$lib "$dist/yottadb" -dir < /dev/null) || true
+	envvars="$envvars AFL_PRELOAD=$(printf %q "$lib") AFL_MAP_SIZE=$mapsize"
 	if [ -n "${ydb_routines+set}" ]; then
 		routines=${ydb_routines//\/build-instrumented\//\/$build\/}
 		routines=${routines//\/build-instrumented)/\/$build)}
