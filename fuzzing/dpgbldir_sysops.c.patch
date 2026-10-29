@@ -1,0 +1,29 @@
+#################################################################
+#								#
+# Copyright (c) 2026 YottaDB LLC and/or its subsidiaries.	#
+# All rights reserved.						#
+#								#
+#	This source code contains the intellectual property	#
+#	of its copyright holder(s), and is made available	#
+#	under a license.  If you do not know the terms of	#
+#	the license, please stop and do not read further.	#
+#								#
+#################################################################
+
+diff --git a/sr_unix/dpgbldir_sysops.c b/sr_unix/dpgbldir_sysops.c
+index af88cbdca..543901860 100644
+--- a/sr_unix/dpgbldir_sysops.c
++++ b/sr_unix/dpgbldir_sysops.c
+@@ -63,7 +63,11 @@ error_def(ERR_BADTAG);
+ #endif
+ 
+ /* 30 millisec is an arbitrarily chosen value yielding a wait that seems sufficient, but not too annoying */
+-#define WAIT_OUT_RENAME_GAP	30
++/* Try only once during fuzz testing. Fuzzed M code often references global directories that do not exist (e.g. with
++ * an extended reference), and the retries (about 0.5 seconds in all) made such inputs slow enough to time out.
++ * No GDE runs at the same time during fuzz testing, so the retries are not needed.
++ */
++#define WAIT_OUT_RENAME_GAP	1
+ 
+ mstr *get_name(mstr *ms)
+ {

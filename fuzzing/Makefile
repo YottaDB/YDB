@@ -34,6 +34,7 @@ patch:
 	patch --no-backup-if-mismatch ../sr_port/op_hang.c op_hang.c.patch
 	patch --no-backup-if-mismatch ../sr_port/op_zsystem.c op_zsystem.c.patch
 	patch --no-backup-if-mismatch ../sr_port/stp_gcol_src.h stp_gcol_src.h.patch
+	patch --no-backup-if-mismatch ../sr_unix/dpgbldir_sysops.c dpgbldir_sysops.c.patch
 	patch --no-backup-if-mismatch ../sr_unix/gtm_dump_core.c gtm_dump_core.c.patch
 	patch --no-backup-if-mismatch ../sr_unix/gtm_fork_n_core.c gtm_fork_n_core.c.patch
 	patch --no-backup-if-mismatch ../sr_unix/gtm_putmsg_list.c gtm_putmsg_list.c.patch
@@ -55,6 +56,7 @@ reset:
 	patch --reject-file=- --no-backup-if-mismatch --reverse ../sr_port/op_hang.c op_hang.c.patch
 	patch --reject-file=- --no-backup-if-mismatch --reverse ../sr_port/op_zsystem.c op_zsystem.c.patch
 	patch --reject-file=- --no-backup-if-mismatch --reverse ../sr_port/stp_gcol_src.h stp_gcol_src.h.patch
+	patch --reject-file=- --no-backup-if-mismatch --reverse ../sr_unix/dpgbldir_sysops.c dpgbldir_sysops.c.patch
 	patch --reject-file=- --no-backup-if-mismatch --reverse ../sr_unix/gtm_dump_core.c gtm_dump_core.c.patch
 	patch --reject-file=- --no-backup-if-mismatch --reverse ../sr_unix/gtm_fork_n_core.c gtm_fork_n_core.c.patch
 	patch --reject-file=- --no-backup-if-mismatch --reverse ../sr_unix/gtm_putmsg_list.c gtm_putmsg_list.c.patch
