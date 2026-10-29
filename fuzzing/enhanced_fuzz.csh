@@ -2,7 +2,7 @@
 
 #################################################################
 #								#
-# Copyright (c) 2022 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2022-2026 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 # Original code by Zachary Minneker from Security Innovation.	#
@@ -123,18 +123,18 @@ else
 endif
 echo "setenv ydb_badchar \"$badchar\"" >> settings.csh
 
-# Randomly set ydb_compile env var
+# Randomly set ydb_compile env var. Each of the 3 bits of $rand chooses whether one qualifier is included.
 set rand = `shuf -i 0-7 -n 1`
 set compile = ""
-set bit = `expr $rand % 4`
+set bit = `expr $rand % 2`
 if ($bit) then
 	set compile = "$compile -dynamic_literals"
 endif
-set bit = `expr $rand % 2`
+set bit = `expr $rand / 2 % 2`
 if ($bit) then
 	set compile = "$compile -embed_source"
 endif
-set bit = `expr $rand % 1`
+set bit = `expr $rand / 4 % 2`
 if ($bit) then
 	set compile = "$compile -noline_entry"
 endif
