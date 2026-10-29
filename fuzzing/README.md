@@ -56,6 +56,8 @@ Just kill the tmux server (`tmux kill-server`).
 
 On modern version of AFL++, you can remove the input directory to make `afl-fuzz` read from the input queue instead of from an input corpus.  Simply remove `-i inputs` from fuzz.sh, and replace it with `-i-`.  Then, rerun all the fuzzers by just calling `./fuzz.sh`.
 
+To instead start a new campaign (e.g. with a newer YottaDB build) from what an earlier campaign found, save the `output/Leader/queue` directory of the earlier campaign and set the `FUZZ_SEED_DIR` env var to it before running `make corpus` (or `enhanced_fuzz.csh`). `make_corpus.sh` then adds those inputs to the YDBTest tests before running `afl-cmin`.
+
 ## Issues
 
 - Fuzzing YDB like this creates a LOT of trash files all over the place.  Its not _that_ common, but its worth pointing out.  We get around this by running a helper script which deletes ./env/\* every once in a while, but a true fix for this would involve further patches to YDB that might shadow bugs, which we want to avoid.

@@ -63,6 +63,20 @@ do
 done
 )
 
+# If FUZZ_SEED_DIR is set, it is a directory of inputs saved from an earlier fuzzing campaign (for example the
+# "output/Leader/queue" directory of that campaign). Add those inputs too so a new campaign (e.g. with a newer YottaDB
+# build or with different random env vars from "enhanced_fuzz.csh") starts from what the earlier campaign found
+# instead of from just the YDBTest tests. "afl-cmin" below drops the inputs that do not add coverage.
+if [ -n "$FUZZ_SEED_DIR" ]; then
+	echo "Copying inputs from $FUZZ_SEED_DIR..."
+	num=0
+	find "$FUZZ_SEED_DIR" -maxdepth 1 -type f | while read -r file
+	do
+		num=$((num + 1))
+		cp "$file" ./NotMinCorpus/seed$num
+	done
+fi
+
 echo "Removing tests directory..."
 rm -rf YDBTest
 
