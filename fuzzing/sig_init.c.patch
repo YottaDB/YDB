@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2021-2022 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2021-2026 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 # Original code by Zachary Minneker from Security Innovation.	#
@@ -13,15 +13,24 @@
 #################################################################
 
 diff --git a/sr_unix/sig_init.c b/sr_unix/sig_init.c
-index 9b986ed7..42a57471 100755
+index ae5eb81f9..fa2e8deed 100644
 --- a/sr_unix/sig_init.c
 +++ b/sr_unix/sig_init.c
-@@ -147,7 +147,7 @@ void sig_init(void (*signal_handler)(), void (*ctrlc_handler)(), void (*suspsig_
- 			case SIGTERM:
+@@ -155,9 +155,16 @@ void sig_init(void (*signal_handler)(), void (*ctrlc_handler)(), void (*suspsig_
+ #			ifndef __linux__
+ 			case SIGSYS:
+ #			endif
+-			case SIGTERM:
  			case SIGTRAP:
  				/* These are all being handled by the generic_signal_handler. */
--				sigaction(sig, &gen_action, NULL);
 +				//sigaction(sig, &gen_action, NULL);
++				break;
++			case SIGTERM:
++				/* Keep the SIGTERM handler during fuzz testing. "fuzzing/fuzz.sh" makes afl-fuzz send SIGTERM
++				 * (instead of SIGKILL) to a process that times out, and the handler defers the exit until the
++				 * process is out of crit and not in the middle of a database update, so the database is not left
++				 * damaged.
++				 */
+ 				sigaction(sig, &gen_action, NULL);
  				break;
  			case SIGKILL:
- 			case SIGSTOP:

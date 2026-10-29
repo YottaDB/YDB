@@ -38,6 +38,12 @@ export AFL_IGNORE_PROBLEMS=1
 # environment. "cleaner.sh" keeps the first few core files of each afl-fuzz instance in the "env/cores" directory.
 export AFL_ALLOW_CORES=1
 
+# By default, afl-fuzz kills a fuzzed process that times out with SIGKILL. If that process is updating a database
+# (see "enhanced_fuzz.csh" for when a database is used), that can leave the database damaged (DBDANGER and DBCRERR
+# messages in the syslog), which then causes errors in every later process. Send SIGTERM instead (YottaDB defers the
+# exit until it is safe, see "sig_init.c.patch"). afl-fuzz also sends this signal to the forkserver when it exits.
+export AFL_KILL_SIGNAL=15
+
 # If EDITOR environment variable is set to a gui editor (e.g. gvim), ZEDIT commands that get tested by afl-fuzz below
 # would invoke lots of gvim windows in the background and clutter the desktop. Prevent that by unsetting the env var
 # in case it is set. In this case, a default editor would be chosen (usually vi) which does not open a new window.
@@ -78,9 +84,28 @@ start_fuzzer() {
 		routines=${routines//\/build-instrumented)/\/$build)}
 		envvars="$envvars ydb_routines=$(printf %q "$routines")"
 	fi
+	asanopts=""
 	if [ "build-instrumented-asan" = "$build" ]; then
 		# afl-fuzz requires abort_on_error=1 and symbolize=0. The rest are from YDBTest/com/set_asan_options_env_var.csh.
-		envvars="$envvars ASAN_OPTIONS=detect_leaks=0:abort_on_error=1:symbolize=0:unmap_shadow_on_exit=1:verify_asan_link_order=0"
+		asanopts="detect_leaks=0:abort_on_error=1:symbolize=0:unmap_shadow_on_exit=1:verify_asan_link_order=0"
+		envvars="$envvars ASAN_OPTIONS=$asanopts"
+	fi
+	if [ -n "${ydb_gbldir+set}" ]; then
+		# If "enhanced_fuzz.csh" chose to use a database, give each afl-fuzz instance its own database (in the "db"
+		# subdirectory, which "cleaner.sh" does not touch) so a process that dies holding crit, or a damaged database,
+		# affects only the fuzzed processes of that instance.
+		mkdir db
+		(
+		cd db || exit 1
+		echo "change -segment DEFAULT -file=$PWD/yottadb.dat" > gde.com
+		# Create the database in M mode with the default routines (like "enhanced_fuzz.csh" does, before the random
+		# env vars are set) as GDE does not work with all of them (e.g. ydb_routines pointing only to the utf8
+		# directory of the build, which does not have all the routines GDE needs).
+		unset ydb_routines gtmroutines ydb_chset gtm_chset
+		export LC_ALL=C ydb_dist=$dist ydb_gbldir=$PWD/yottadb.gld ASAN_OPTIONS=$asanopts
+		"$dist/yottadb" -run GDE @gde.com > create.log 2>&1 && "$dist/mupip" create >> create.log 2>&1
+		) || { echo "Could not create the database of $name. See $PWD/db/create.log. Exiting."; exit 1; }
+		envvars="$envvars ydb_gbldir=$(printf %q "$PWD/db/yottadb.gld")"
 	fi
 	tmux new-session -d -s "$name" "env $envvars afl-fuzz -D -t 5000+ -i ../../inputs -o ../../output $role $name -- ../../$build/yottadb -dir"
 	tmux new-session -d -s "Cleaner$name" "../../cleaner.sh $name"

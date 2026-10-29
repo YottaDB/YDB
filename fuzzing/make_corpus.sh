@@ -89,6 +89,9 @@ cd env || exit
 # Set env var before invoking yottadb. See comment in "fuzzing/instrument.sh" for why this is needed.
 export AFL_IGNORE_PROBLEMS=1
 
+# See comment in "fuzzing/fuzz.sh" for why this is needed.
+export AFL_KILL_SIGNAL=15
+
 # The yottadb executable loads libyottadb.so using dlopen(). The coverage of a library that is loaded after the afl
 # forkserver starts is not recorded, so preload libyottadb.so. Also set AFL_MAP_SIZE to the coverage map size that the
 # executable and the preloaded library need. See "fuzz.sh" for more details.
