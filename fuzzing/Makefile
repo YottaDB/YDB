@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2021-2022 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2021-2026 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 # Original code by Zachary Minneker from Security Innovation.	#
@@ -41,18 +41,18 @@ patch:
 	patch --no-backup-if-mismatch ../sr_unix/sig_init.c sig_init.c.patch
 
 reset:
-	patch --reject-file=- --reverse ../sr_port/io.h io.h.patch
-	patch --reject-file=- --reverse ../sr_port/jobexam_process.c jobexam_process.c.patch
-	patch --reject-file=- --reverse ../sr_port/op_fnzsigproc.c op_fnzsigproc.c.patch
-	patch --reject-file=- --reverse ../sr_port/op_hang.c op_hang.c.patch
-	patch --reject-file=- --reverse ../sr_port/op_zsystem.c op_zsystem.c.patch
-	patch --reject-file=- --reverse ../sr_port/stp_gcol_src.h stp_gcol_src.h.patch
-	patch --reject-file=- --reverse ../sr_unix/gtm_dump_core.c gtm_dump_core.c.patch
-	patch --reject-file=- --reverse ../sr_unix/gtm_fork_n_core.c gtm_fork_n_core.c.patch
-	patch --reject-file=- --reverse ../sr_unix/gtm_putmsg_list.c gtm_putmsg_list.c.patch
-	patch --reject-file=- --reverse ../sr_unix/ojchildioset.c ojchildioset.c.patch
-	patch --reject-file=- --reverse ../sr_unix/op_zmess.c op_zmess.c.patch
-	patch --reject-file=- --reverse ../sr_unix/sig_init.c sig_init.c.patch
+	patch --reject-file=- --no-backup-if-mismatch --reverse ../sr_port/io.h io.h.patch
+	patch --reject-file=- --no-backup-if-mismatch --reverse ../sr_port/jobexam_process.c jobexam_process.c.patch
+	patch --reject-file=- --no-backup-if-mismatch --reverse ../sr_port/op_fnzsigproc.c op_fnzsigproc.c.patch
+	patch --reject-file=- --no-backup-if-mismatch --reverse ../sr_port/op_hang.c op_hang.c.patch
+	patch --reject-file=- --no-backup-if-mismatch --reverse ../sr_port/op_zsystem.c op_zsystem.c.patch
+	patch --reject-file=- --no-backup-if-mismatch --reverse ../sr_port/stp_gcol_src.h stp_gcol_src.h.patch
+	patch --reject-file=- --no-backup-if-mismatch --reverse ../sr_unix/gtm_dump_core.c gtm_dump_core.c.patch
+	patch --reject-file=- --no-backup-if-mismatch --reverse ../sr_unix/gtm_fork_n_core.c gtm_fork_n_core.c.patch
+	patch --reject-file=- --no-backup-if-mismatch --reverse ../sr_unix/gtm_putmsg_list.c gtm_putmsg_list.c.patch
+	patch --reject-file=- --no-backup-if-mismatch --reverse ../sr_unix/ojchildioset.c ojchildioset.c.patch
+	patch --reject-file=- --no-backup-if-mismatch --reverse ../sr_unix/op_zmess.c op_zmess.c.patch
+	patch --reject-file=- --no-backup-if-mismatch --reverse ../sr_unix/sig_init.c sig_init.c.patch
 
 clean: rm reset
 
