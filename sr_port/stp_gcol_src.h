@@ -84,7 +84,7 @@ GBLREF io_log_name		*io_root_log_name;
 GBLREF lvzwrite_datablk		*lvzwrite_block;
 GBLREF mliteral			literal_chain;
 GBLREF mstr			*comline_base, **stp_array;
-GBLREF mval			dollar_system, dollar_zerror, dollar_zgbldir, dollar_zstatus;
+GBLREF mval			dollar_system, dollar_system_initial, dollar_zerror, dollar_zgbldir, dollar_zstatus;
 GBLREF mval			dollar_zyerror, dollar_zinterrupt, dollar_zsource, dollar_ztexit;
 GBLREF mval			dollar_testmv, dollar_zcmdline;
 GBLREF mv_stent			*mv_chain;
@@ -809,6 +809,7 @@ void stp_gcol_sort(size_t space_asked)	/* BYPASSOK */
 		}
 		MVAL_STPG_ADD(&(TREF(dollar_etrap)));
 		MVAL_STPG_ADD(&dollar_system);
+		MVAL_STPG_ADD(&dollar_system_initial);	/* used by SET $SYSTEM (see "op_svput.c") */
 		MVAL_STPG_ADD(&dollar_zsource);
 		MVAL_STPG_ADD(&(TREF(dollar_ztrap)));
 		MVAL_STPG_ADD(&dollar_zstatus);
