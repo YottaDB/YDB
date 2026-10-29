@@ -55,6 +55,11 @@ make instrument
 
 # Now that the build is ready, set "ydb_dist" env var
 setenv ydb_dist $PWD/build-instrumented
+
+# The instrumented yottadb and mupip executables, when run outside afl-fuzz (like the GDE and MUPIP CREATE commands
+# below), abort with "FATAL: forkserver is already up, but an instrumented dlopen() library loaded afterwards" as they
+# load the instrumented libyottadb.so using dlopen(). Setting the below env var avoids that.
+setenv AFL_IGNORE_PROBLEMS 1
 echo "setenv ydb_dist $ydb_dist" >> settings.csh
 
 # -----------------------------------------------------------
@@ -72,7 +77,15 @@ CAT_EOF
 	rm -f yottadb.gld yottadb.dat
 	setenv ydb_gbldir ${PWD}/yottadb.gld	# Need this before the GDE command
 	$ydb_dist/yottadb -run GDE @tmp.com
+	if ($status) then
+		echo "GDE failed to create yottadb.gld. Exiting."
+		exit -1
+	endif
 	$ydb_dist/mupip create
+	if ($status) then
+		echo "MUPIP CREATE failed to create yottadb.dat. Exiting."
+		exit -1
+	endif
 	echo "setenv ydb_gbldir $ydb_gbldir" >> settings.csh
 else
 	echo "unsetenv ydb_gbldir gtmgbldir" >> settings.csh
