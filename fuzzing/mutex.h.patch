@@ -1,0 +1,28 @@
+#################################################################
+#								#
+# Copyright (c) 2026 YottaDB LLC and/or its subsidiaries.	#
+# All rights reserved.						#
+#								#
+#	This source code contains the intellectual property	#
+#	of its copyright holder(s), and is made available	#
+#	under a license.  If you do not know the terms of	#
+#	the license, please stop and do not read further.	#
+#								#
+#################################################################
+
+diff --git a/sr_port/mutex.h b/sr_port/mutex.h
+index 1f0078963..571fb84d4 100644
+--- a/sr_port/mutex.h
++++ b/sr_port/mutex.h
+@@ -22,7 +22,10 @@
+ #define MUTEX_SLEEP_SPIN_COUNT		128
+ #define MUTEX_SPIN_SLEEP_MASK		0	/* default to cause rel_quant */
+ 
+-#define MUTEXLCKALERT_INTERVAL		32	/* seconds [UNIX only] */
++/* Use 2 seconds during fuzz testing (instead of 32) so crit owned by a dead process is salvaged before afl-fuzz kills
++ * the waiting process on its 5 second timeout. See fuzzing/mutexsp.h.patch for details.
++ */
++#define MUTEXLCKALERT_INTERVAL		2	/* seconds [UNIX only] */
+ 
+ #define MAX_MUTEX_CLNS (1 << 3) /* Must be an exact power of two. */
+ 

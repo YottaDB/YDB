@@ -1,0 +1,30 @@
+#################################################################
+#								#
+# Copyright (c) 2026 YottaDB LLC and/or its subsidiaries.	#
+# All rights reserved.						#
+#								#
+#	This source code contains the intellectual property	#
+#	of its copyright holder(s), and is made available	#
+#	under a license.  If you do not know the terms of	#
+#	the license, please stop and do not read further.	#
+#								#
+#################################################################
+
+diff --git a/sr_unix/mutexsp.h b/sr_unix/mutexsp.h
+index e30ecb789..c7bc61507 100644
+--- a/sr_unix/mutexsp.h
++++ b/sr_unix/mutexsp.h
+@@ -19,7 +19,12 @@
+ #include "gtm_semaphore.h"		/* needed only with ydb mutex (not with pthread mutex) */
+ 
+ #define MUTEX_INIT_SEMVAL		LOCK_AVAILABLE
+-#define MUTEX_CONST_TIMEOUT_VAL		16
++/* Use a 1 second timeout during fuzz testing (instead of 16 seconds) so a process waiting for crit checks for and
++ * salvages crit owned by a process that afl-fuzz killed on a timeout (or that crashed) before afl-fuzz kills the
++ * waiting process too on its own 5 second timeout. Otherwise every later process waits for crit until it is killed.
++ * MUTEXLCKALERT_INTERVAL (see fuzzing/mutex.h.patch) has to be twice this value.
++ */
++#define MUTEX_CONST_TIMEOUT_VAL		1
+ 
+ #define HUNDRED_MSEC 			100000
+ 
