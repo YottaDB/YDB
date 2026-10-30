@@ -3,7 +3,7 @@
  * Copyright (c) 2006-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -32,7 +32,7 @@ int f_char(oprtype *a, opctype op)
 {
 	boolean_t 	all_lits;
 	unsigned char 	*base, *outptr, *tmpptr;
-	int 		argc, ch, char_len, size;
+	int 		argc, ch, char_len, i, size;
 	mval		v;
 	oprtype 	*argp, argv[CHARMAXARGS];
 	triple 		*curr, *last, *root;
@@ -69,7 +69,7 @@ int f_char(oprtype *a, opctype op)
 		ENSURE_STP_FREE_SPACE(size);
 		base = stringpool.free;
 		argp = &argv[0];
-		for (outptr = base, char_len = 0; argc > 0; --argc, argp++)
+		for (outptr = base, char_len = 0, i = 0; i < argc; i++, argp++)
 		{	/* For each wide char value, convert to UTF chars in stringpool buffer */
 			ch = argp->oprval.tref->operand[0].oprval.ilit;
 			if (0 <= ch)
@@ -81,26 +81,35 @@ int f_char(oprtype *a, opctype op)
 				else if (!badchar_inhibit)
 				{	/* Cannot use STX_ERROR_WARN macro here because we need to pass a few more parameters
 					 * to "stx_error" in the INVDLRCVAL case whereas we did not need to in the NUMOFLOW case.
+					 * "stx_error" issues the warning (with the invalid value) when compiling a routine. It does not
+					 * insert an OC_RTERROR triple for this error (see "ins_errtriple"), as that would issue
+					 * INVDLRCVAL without the value at run time. Instead, generate a run time call of $CHAR() below,
+					 * so that "op_fnchar" issues INVDLRCVAL with the value if and when this code runs.
 					 */
 					assert(IS_STX_WARN(ERR_INVDLRCVAL));
 					stx_error(ERR_INVDLRCVAL, 1, ch);
-					MV_INIT_STRING(&v, 0, NULL);
-					v.str.char_len = char_len;
-					v.mvtype |= MV_UTF_LEN;
-					CLEAR_MVAL_BITS(&v);
-					*a = put_lit(&v);
-					return TRUE;
+#					ifdef GTM_TRIGGER
+					if (TREF(trigger_compile_and_link))
+						return FALSE;	/* Warnings are errors in a trigger compile, so stop the parse,
+								 * as STX_ERROR_WARN does
+								 */
+#					endif
+					all_lits = FALSE;
+					break;
 				}
 				outptr = tmpptr;
 			}
 		}
-		stringpool.free = outptr;
-		MV_INIT_STRING(&v, outptr - base, base);
-		v.str.char_len = char_len;
-		v.mvtype |= MV_UTF_LEN;
-		CLEAR_MVAL_BITS(&v);
-		*a = put_lit(&v);
-		return TRUE;
+		if (all_lits)
+		{
+			stringpool.free = outptr;
+			MV_INIT_STRING(&v, outptr - base, base);
+			v.str.char_len = char_len;
+			v.mvtype |= MV_UTF_LEN;
+			CLEAR_MVAL_BITS(&v);
+			*a = put_lit(&v);
+			return TRUE;
+		}
 	}
 	root = maketriple(op);
 	root->operand[0] = put_ilit(argc + 1);

@@ -24,6 +24,7 @@ GBLREF	triple		t_orig;
 
 error_def(ERR_ASSERT);
 error_def(ERR_GTMASSERT);
+error_def(ERR_INVDLRCVAL);
 error_def(ERR_DIVZERO);
 error_def(ERR_EXPRTOODEEP);
 error_def(ERR_NEGFRACPWR);
@@ -87,8 +88,11 @@ void ins_errtriple(int4 in_error)
 					|| (ERR_EXPRTOODEEP == in_error))
 			TREF(rts_error_in_parse) = TRUE;
 	} else
-	{	/* For IS_STX_WARN errors (if not compiling a trigger), parsing continues, so dont strip the chain */
-		add_rterror_triple = TRUE;
+	{	/* For IS_STX_WARN errors (if not compiling a trigger), parsing continues, so dont strip the chain.
+		 * For INVDLRCVAL, "f_char" generates a run time call of $CHAR() that issues the error with the invalid value,
+		 * so an OC_RTERROR triple, which would issue it without the value, is not needed.
+		 */
+		add_rterror_triple = (ERR_INVDLRCVAL != in_error);
 	}
 	if (add_rterror_triple)
 	{	/* WARN error or first error in the current line */
