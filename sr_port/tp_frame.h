@@ -88,7 +88,13 @@ typedef struct tp_frame_struct
 								 * do a "op_trollback" or not before returning to caller.
 								 * Field is inherited across nested op_tstarts.
 								 */
-	unsigned int			filler : 23;
+	unsigned int			dmode_uncounted_fp : 1;	/* TRUE if this TSTART was done in Direct Mode and the frame
+								 * under the Direct Mode frame (the restart frame "fp") is not a
+								 * counted frame, e.g. Direct Mode entered by a BREAK in $ZTRAP.
+								 * A restart of a transaction whose outermost TSTART has it set
+								 * issues TRESTNOT (see tp_restart.c).
+								 */
+	unsigned int			filler : 22;
 	unsigned char 			*restart_pc;
 	struct stack_frame_struct	*fp;
 	struct mv_stent_struct		*mvc;

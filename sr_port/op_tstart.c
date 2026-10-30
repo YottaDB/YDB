@@ -153,7 +153,7 @@ void	op_tstart(int tstart_flag, ...) /* value of $T when TSTART */
 	ht_ent_mname		*tabent, *curent, *topent;
 	sgmnt_addrs		*csa;
 	int4			shift_size = 0;
-	boolean_t		tphold_noshift = FALSE, implicit_tstart;
+	boolean_t		tphold_noshift = FALSE, implicit_tstart, dmode_uncounted_fp;
 	lv_val			**lvarraycur = NULL, **lvarray = NULL, **lvarraytop = NULL, **lvptr;
 	GTMTRIG_ONLY(boolean_t	implicit_trigger;)
 #	ifdef DEBUG
@@ -297,6 +297,13 @@ void	op_tstart(int tstart_flag, ...) /* value of $T when TSTART */
 	{	/* Put a TPHOLD underneath dmode frame */
 		assert(frame_pointer->old_frame_pointer->old_frame_pointer);
 		fp = frame_pointer->old_frame_pointer->old_frame_pointer;
+		/* If the frame under the Direct Mode frame is not a counted frame (e.g. Direct Mode was entered by a BREAK in
+		 * $ZTRAP), a TP restart cannot resume at "fp" correctly. Note this so "tp_restart()" can issue TRESTNOT if this
+		 * is the outermost TSTART. It cannot tell later, as a TSTART outside Direct Mode (e.g. in $ZINTERRUPT) can also
+		 * have an uncounted restart frame, yet restart correctly, and the Direct Mode frame that tells the two apart may
+		 * be gone by then (e.g. after a TPQUIT).
+		 */
+		dmode_uncounted_fp = !(fp->type & SFT_COUNT);
 		top = (unsigned char *)(frame_pointer->old_frame_pointer + 1);
 		old_sp = msp;
 		shift_size = mvs_size[MVST_TPHOLD];
@@ -358,6 +365,7 @@ void	op_tstart(int tstart_flag, ...) /* value of $T when TSTART */
 		PUSH_MV_STENT(MVST_TPHOLD);
 		mv_st_ent = mv_chain;
 		fp = frame_pointer;
+		dmode_uncounted_fp = FALSE;
 	}
 	mv_st_ent->mv_st_cont.mvs_tp_holder.tphold_tlevel = dollar_tlevel;
 #	ifdef GTM_TRIGGER
@@ -385,6 +393,7 @@ void	op_tstart(int tstart_flag, ...) /* value of $T when TSTART */
 	tf->serial = serial;
 	tf->trans_id = *tid;
 	tf->restartable = (NORESTART != prescnt);
+	tf->dmode_uncounted_fp = dmode_uncounted_fp;
 	tf->old_locks = (NULL != mlk_pvt_root);
 #	ifdef DEBUG
 	/* Do check that gv_currkey and gv_target are in sync.

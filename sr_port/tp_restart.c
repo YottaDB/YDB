@@ -129,9 +129,9 @@ CONDITION_HANDLER(tp_restart_ch)
 int tp_restart(int newlevel, boolean_t handle_errors_internally)
 {
 	boolean_t		reset_clues_done = FALSE;
-	boolean_t		tp_tend_status;
+	boolean_t		tp_tend_status, symval_restored;
 	enum cdb_sc		status;
-	int			tprestart_rc, len;
+	int			tprestart_rc, len, restart_err;
 	int4			num_closed = 0;
 	gd_region		*restart_reg, *reg;
 	gv_namehead		*gvt;
@@ -141,7 +141,7 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 	mval			beganHere;
 	symval			*sym;
 	sgmnt_addrs		*csa, *jpl_csa;
-	tp_frame		*tf;
+	tp_frame		*tf, *lvl_tf;
 	tp_region		*tr;
 	unsigned char		buff[MAX_ZWR_KEY_SZ], *end, fail_hist[RESTART_CODE_EXPANSION_FACTOR];
 	unsigned char		start_pos[MAX_ENTRYREF_LEN], fail_pos[MAX_ENTRYREF_LEN], *start_end, *fail_end, *addr;
@@ -182,36 +182,63 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 	DBGTRIGR((stderr, "tp_restart: Entry state: %d\n", tprestart_state));
 	save_jnlpool = jnlpool;
 	if (TPRESTART_STATE_NORMAL == tprestart_state)
-	{	/* A restart unwinds the M stack down to the MVST_TPHOLD mv_stent of the outermost TSTART, after which the symbol
-		 * table in use at that TSTART must again be the current one. An argumentless or exclusive NEW done after that
-		 * TSTART in a frame that does not count as a stack level (e.g. a Direct Mode line) puts the MVST_STAB mv_stent
-		 * for its new symbol table on an older frame (see "symbinit"), below the MVST_TPHOLD, where the unwind does not
-		 * reach. Find the symbol table that the unwind would leave current, and if it is not the one in use at TSTART,
-		 * issue an error before anything is changed so the transaction remains as it was.
+	{	/* A restart unwinds the M stack level by level down to the MVST_TPHOLD mv_stent of the outermost TSTART. At each
+		 * level that restores local variables, and at the outermost level, the symbol table in use at the TSTART of that
+		 * level must again be the current one when the unwind reaches the MVST_TPHOLD mv_stent of that level (see
+		 * "tp_unwind_restlv()"). An argumentless or exclusive NEW done after that TSTART in a frame that does not count
+		 * as a stack level (e.g. a Direct Mode line) puts the MVST_STAB mv_stent for its new symbol table on an older
+		 * frame (see "symbinit"), below that MVST_TPHOLD, where the unwind does not reach. Find the symbol table that
+		 * the unwind would leave current at each such level, and if it is not the one in use at its TSTART, issue an
+		 * error before anything is changed so the transaction remains as it was.
 		 */
 		tf = (tp_frame *)(tpstackbase - SIZEOF(tp_frame));	/* tp_frame of the outermost TSTART */
-		/* Each MVST_STAB mv_stent that the unwind will reach (those above the MVST_TPHOLD of the outermost
-		 * TSTART) makes the symbol table that was current before its NEW ("last_tab") current again. Follow
-		 * that chain from the current symbol table to find the one the unwind would leave current.
+		/* Each MVST_STAB mv_stent that the unwind will reach makes the symbol table that was current before its NEW
+		 * ("last_tab") current again. Follow that chain from the current symbol table, level by level from the
+		 * innermost, to find the one the unwind would leave current at the MVST_TPHOLD of each level, and, for a level
+		 * that restores local variables and for the outermost level, compare it with the one in use at its TSTART.
 		 */
 		sym = curr_symval;
-		for (mvc = mv_chain; mvc < tf->mvc; mvc = (mv_stent *)(mvc->mv_st_next + (char *)mvc))
+		mvc = mv_chain;
+		symval_restored = TRUE;
+		for (lvl_tf = tp_pointer; NULL != lvl_tf; lvl_tf = lvl_tf->old_tp_frame)
 		{
-			if ((MVST_STAB == mvc->mv_st_type) && (sym == mvc->mv_st_cont.mvs_stab))
-				sym = sym->last_tab;
+			assert((NULL != lvl_tf->old_tp_frame) || (tf == lvl_tf));	/* the last level is the outermost */
+			for ( ; mvc < lvl_tf->mvc; mvc = (mv_stent *)(mvc->mv_st_next + (char *)mvc))
+			{
+				if ((MVST_STAB == mvc->mv_st_type) && (sym == mvc->mv_st_cont.mvs_stab))
+					sym = sym->last_tab;
+			}
+			if (((lvl_tf == tf) || (NULL != lvl_tf->vars)) && (sym != lvl_tf->sym))
+			{
+				symval_restored = FALSE;
+				break;
+			}
 		}
-		if (sym != tf->sym)
-		{	/* The unwind would not get back to the symbol table in use at the TSTART. This happens when a NEW done
-			 * after the TSTART, in a frame that does not count as a stack level, put the MVST_STAB mv_stent, which
-			 * undoes it, on an older frame (see "symbinit"), past the MVST_TPHOLD where the unwind stops, so the
-			 * unwind cannot undo that NEW. Issue TRESTNEW, with TRESTLOC when M code is running, as the TRESTNOT
-			 * code below does. Nothing has been changed yet, so the transaction is left as it was.
+		if (!symval_restored)
+		{	/* At that level, the unwind would not get back to the symbol table in use at its TSTART. This happens
+			 * when a NEW done after the TSTART, in a frame that does not count as a stack level, put the MVST_STAB
+			 * mv_stent, which undoes it, on an older frame (see "symbinit"), past the MVST_TPHOLD of that level
+			 * where the unwind stops, so the unwind cannot undo that NEW.
+			 */
+			restart_err = ERR_TRESTNEW;
+		} else if (tf->dmode_uncounted_fp)
+		{	/* The outermost TSTART was done in Direct Mode on top of a frame that does not count as a stack level
+			 * (see comment in "op_tstart()" where "dmode_uncounted_fp" is set), where the restart cannot resume.
+			 */
+			restart_err = ERR_TRESTNOT;
+		} else
+			restart_err = 0;
+		if (restart_err)
+		{	/* Issue the error, with TRESTLOC when M code is running, as the TRESTNOT code below does. Nothing has
+			 * been changed yet, so the transaction is left as it was.
 			 */
 			if (IS_MCODE_RUNNING)
 			{	/* The TRESTNOT code gets the TSTART position from "getzposition" after the unwind. Nothing is
-				 * unwound here, so find it the way "getzposition" would after unwinding to the TSTART frame:
-				 * the restart point in that frame if it is in the frame's routine, or else the current position
-				 * in the nearest older frame whose routine it is in (e.g. for a TSTART done in Direct Mode).
+				 * unwound here, so find it the way "getzposition" would after unwinding to the frame of the
+				 * outermost TSTART ("tf"), which TRESTLOC reports as the transaction start even when the check
+				 * failed at an inner level: the restart point in that frame if it is in the frame's routine, or
+				 * else the current position in the nearest older frame whose routine it is in (e.g. for a TSTART
+				 * done in Direct Mode).
 				 */
 				start_end = start_pos;
 				for (fp = tf->fp; NULL != fp; fp = fp->old_frame_pointer)
@@ -225,13 +252,13 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 				}
 				/* The current position, where the restart is attempted */
 				fail_end = get_symb_line(fail_pos, MAX_ENTRYREF_LEN, NULL, NULL);
-				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_TRESTNEW);		/* Separate msgs so we get both */
+				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) restart_err);		/* Separate msgs so we get both */
 				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TRESTLOC, 4, start_end - start_pos, start_pos,
 					fail_end - fail_pos, fail_pos);
-				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_TRESTNEW, 0, ERR_TRESTLOC, 4,
+				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) restart_err, 0, ERR_TRESTLOC, 4,
 					start_end - start_pos, start_pos, fail_end - fail_pos, fail_pos);
 			} else
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_TRESTNEW);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) restart_err);
 			return 0; /* for the compiler only -- never executed */
 		}
 	}
