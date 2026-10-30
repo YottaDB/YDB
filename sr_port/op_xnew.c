@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -31,6 +31,17 @@
 #include "stack_frame.h"
 #include "alias.h"
 #include "error.h"
+#include "cmd_qlf.h"
+
+/* Types of the frames whose code, when it completes, returns to the beginning of the line of the frame below: a ZBREAK
+ * that replaced an opcode (SFT_REP_OP), device EXCEPTION code (SFT_DEV_ACT) and $ZTRAP code (SFT_ZTRAP). These bits are
+ * chosen because a NEW in such code leaves the line of the frame below to be run again from its beginning, and that line
+ * refills the local variable slots only if it does a fetch, which a line of a routine compiled with -NOLINE_ENTRY does not
+ * do unless it has a label (see "guard_against_zbzst"). The other frame types that are not counted either resume in the
+ * middle of a line (SFT_ZBRK_ACT and SFT_ZSTEP_ACT, which "guard_against_zbzst" always refills for), or end with a QUIT that
+ * unstacks the symbol table of the NEW (SFT_ZINTR and SFT_TRIGR). No header groups these bits.
+ */
+#define	SFT_LINE_RESTART	(SFT_REP_OP | SFT_DEV_ACT | SFT_ZTRAP)
 
 GBLREF lv_xnew_ref	*xnewref_anchor;
 GBLREF lv_xnew_var	*xnewvar_anchor;
@@ -179,12 +190,16 @@ CONDITION_HANDLER(zbreak_zstep_xnew_ch)
 	NEXTCH;
 }
 
+/* Despite its name, this also refills the slots for a NEW in $ZTRAP or device EXCEPTION code (SFT_ZTRAP, SFT_DEV_ACT,
+ * SFT_REP_OP frames) when the routine was compiled with -NOLINE_ENTRY (see below). The name is kept as it is in GT.M,
+ * so that merges of GT.M releases do not conflict here.
+ */
 STATICFNDEF void guard_against_zbzst(void)
 {	/* if the new symbol table slid into the stack, then we guard against ZBREAK and ZSTEP having taken us to the xnew
 	 * this could be done sligthly more efficiently and with stronger asserts using custom code, but this is an edge case,
 	 * so we use, with an empty argument list, gtm_fetch et al to do the job
 	 */
-	boolean_t	fetch;
+	boolean_t	fetch, line_restart;
 	stack_frame	*fp, *fp_prev;
 	DCL_THREADGBL_ACCESS;
 
@@ -194,18 +209,26 @@ STATICFNDEF void guard_against_zbzst(void)
 	fp_prev = fp->old_frame_pointer;
 	assert(fp_prev);
 	fetch = (fp->type & (SFT_ZBRK_ACT | SFT_ZSTEP_ACT));
+	line_restart = (fp->type & SFT_LINE_RESTART);
 	while (!(fp_prev->type & SFT_COUNT))
 	{	/* find where we put the new symbol table like we did in symbinit but with additional checking on frame types */
 		fp = fp_prev;
 		fetch |= (fp->type & (SFT_ZBRK_ACT | SFT_ZSTEP_ACT));
+		line_restart |= (fp->type & SFT_LINE_RESTART);
 		fp_prev = fp->old_frame_pointer;
 		assert(fp_prev);
 	}
+	/* A routine compiled with -NOLINE_ENTRY does a fetch only at the start of a line that has a label (and of its first
+	 * line), so returning to the beginning of any other line does not refetch.
+	 */
+	if (line_restart && !(fp_prev->rvector->compiler_qlf & CQ_LINE_ENTRY))
+		fetch = TRUE;
 	if (fetch)
 	{	/* only need to fetch if there is a zbreak or zstep frame in between our current position and the adjusted frame
 		 * all other non SFT_COUNT frames either require a quit (SFT_ZINTR & SFT_TRIGR) which unstacks the symbol table
 		 * protected by the NEW, or return to the beginning of the line (SFT_REP_OP & SFT_DEV_ACT & SFT_ZTRAP) which cause
-		 * a refetch, or vector to a new virtual line (SFT_ZTRAP, but for $ZTRAP)
+		 * a refetch (except in a routine compiled with -NOLINE_ENTRY, see above), or vector to a new virtual line
+		 * (SFT_ZTRAP, but for $ZTRAP)
 		 */
 		ESTABLISH(zbreak_zstep_xnew_ch);
 		fp_save = frame_pointer;
