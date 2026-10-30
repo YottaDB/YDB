@@ -34,6 +34,7 @@
 #include "compiler.h"
 #include "gtm_utf8.h"
 #include "gtmctype.h"
+#include "patcode.h"
 #ifdef DEBUG
 #include "stringpool.h"	/* for IS_IN_STRINGPOOL assert */
 #endif
@@ -715,6 +716,9 @@ STATICFNDEF boolean_t process_subscripts(char *subscr_str, uint4 *subscr_len, ch
 	int		num1;
 	int		num2;
 	char		ch, *ptr;
+	char		*pat_start;
+	mstr		pat_src;
+	ptstr		pat_ptstr;
 	char		*save_dst_ptr;
 	int		save_len;
 	char		*start_dst_ptr;
@@ -822,6 +826,7 @@ STATICFNDEF boolean_t process_subscripts(char *subscr_str, uint4 *subscr_len, ch
 						return FALSE;
 					}
 					UPDATE_DST(ptr, len, have_star, dst_ptr, dst_len, MAX_GVSUBS_LEN);
+					pat_start = ptr;
 					alternation = FALSE;
 					while ((0 < len) && ((',' != *ptr) || alternation) && ((')' != *ptr) || alternation)
 					       && (';' != *ptr))
@@ -934,6 +939,23 @@ STATICFNDEF boolean_t process_subscripts(char *subscr_str, uint4 *subscr_len, ch
 								CONV_CH_AND_PRINT("Unexpected character !AD in pattern code", ptr);
 								return FALSE;
 						}
+					}
+					/* The checks above let through some patterns that are not valid, for example an empty pattern
+					 * or an empty alternation. Compile the pattern the way "gvtr_process_pattern()" does when the
+					 * trigger is used, so a pattern that "gvtr_process_pattern()" would reject is rejected
+					 * here, when the trigger is loaded, and not at every update of the global.
+					 */
+					if (ptr == pat_start)
+					{	/* "patstr()" rejects an empty pattern too, but this message is clearer */
+						util_out_print_gtmio("Missing pattern code after ?", FLUSH);
+						return FALSE;
+					}
+					pat_src.addr = pat_start;
+					pat_src.len = (mstr_len_t)(ptr - pat_start);
+					if (patstr(&pat_src, &pat_ptstr, NULL))
+					{
+						util_out_print_gtmio("Invalid pattern code", FLUSH);
+						return FALSE;
 					}
 					have_pattern = TRUE;
 					valid_sub = TRUE;
