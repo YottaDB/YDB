@@ -891,6 +891,17 @@ CONDITION_HANDLER(mdb_condition_handler)
 	{ 	/* Job interrupt is rethrown from TC/TRO */
 		assert(!dollar_zininterrupt);
 		dollar_zininterrupt = TRUE;
+		if (jobinterrupt == outofband)
+		{	/* A job interrupt event is also pending, for example the one that "JOBINTR_TP_RETHROW"
+			 * set up at the end of an implicit transaction in direct mode (which has no line start to recognize
+			 * the event). The $ZINTERRUPT that runs now covers that event, so take the event out of play as for
+			 * JOBINTRRQST above. Otherwise, code that checks for events while this $ZINTERRUPT runs (for example the
+			 * ZSHOW of $ZJOBEXAM()) would recognize the event again inside $ZINTERRUPT.
+			 */
+			TAREF1(save_xfer_root, jobinterrupt).event_state = active;
+			xfer_reset_if_setter(jobinterrupt);
+			TAREF1(save_xfer_root, jobinterrupt).event_state = active;
+		}
 		proc_act_type = SFT_ZINTR | SFT_COUNT; /* trans_code will invoke jobinterrupt_process for us */
 		MUM_TSTART;
 	} else  if ((int)ERR_STACKCRIT == SIGNAL)

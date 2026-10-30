@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -32,6 +32,9 @@
 #include "lv_val.h"		/* needed for tp_unwind.h */
 #include "tp_unwind.h"
 #include "op.h"
+#include "gtm_signal.h"
+#include "deferred_events_queue.h"
+#include "deferred_events.h"
 #include "jobinterrupt_process.h"
 #include "gvcst_protos.h"
 #include "repl_msg.h"			/* for gtmsource.h */
@@ -79,7 +82,7 @@ error_def(ERR_INVROLLBKLVL);
 
 void	op_trollback(int rb_levels)		/* rb_levels -> # of transaction levels by which we need to rollback : BYPASSOK */
 {
-	boolean_t	lcl_implicit_trollback = FALSE, reg_reset;
+	boolean_t	implicit_tp, lcl_implicit_trollback = FALSE, reg_reset;
 	uint4		newlevel;
 	gd_region	*save_cur_region;	/* saved copy of gv_cur_region before tp_clean_up/tp_incr_clean_up modifies it */
 	jnlpool_addrs_ptr_t	save_jnlpool;
@@ -145,6 +148,8 @@ void	op_trollback(int rb_levels)		/* rb_levels -> # of transaction levels by whi
 		 * updated blocks). This is typically needed for a restart.
 		 */
 		tp_clean_up(TP_ROLLBACK);
+		/* Note down whether this is an implicit TP transaction (see similar code in "op_tcommit.c") */
+		implicit_tp = tp_pointer->implicit_tstart && !tp_pointer->ydb_tp_s_tstart;
 		for (tr = tp_reg_list;  NULL != tr;  tr = tr->fPtr)
 		{
 			curreg = tr->reg;
@@ -212,7 +217,7 @@ void	op_trollback(int rb_levels)		/* rb_levels -> # of transaction levels by whi
 			 */
 			if (NULL != TREF(statsDB_init_defer_anchor))
 				gvcst_deferred_init_statsDB();
-			JOBINTR_TP_RETHROW; /* rethrow job interrupt($ZINT) if $ZTEXIT, when coerced to boolean, is true */
+			JOBINTR_TP_RETHROW(implicit_tp); /* $ZINTERRUPT if $ZTEXIT, when coerced to boolean, is true */
 		}
 	} else
 	{

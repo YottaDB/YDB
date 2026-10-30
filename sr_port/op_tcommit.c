@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -53,6 +53,9 @@
 #include "add_inter.h"
 #include "tp_incr_commit.h"
 #include "have_crit.h"
+#include "gtm_signal.h"
+#include "deferred_events_queue.h"
+#include "deferred_events.h"
 #include "jobinterrupt_process.h"
 #include "jnl_get_checksum.h"
 #include "sleep_cnt.h"
@@ -180,7 +183,7 @@ enum cdb_sc	op_tcommit(void)
 {
 	blk_hdr_ptr_t		old_block;
 	block_id		new_blk;
-	boolean_t		before_image_needed, blk_used, is_mm, skip_invoke_restart;
+	boolean_t		before_image_needed, blk_used, implicit_tp, is_mm, skip_invoke_restart;
 	boolean_t		read_before_image; /* TRUE if before-image journaling or online backup in progress
 						    * This is used to read before-images of blocks whose cs->mode is gds_t_create
 						    */
@@ -597,6 +600,10 @@ enum cdb_sc	op_tcommit(void)
 	} else		/* an intermediate commit */
 		tp_incr_commit();
 	assert(dollar_tlevel);
+	/* Note down whether this is an implicit TP transaction (one that the runtime started for a non-TP update or read,
+	 * e.g. in "gvcst_put" or "op_ztrigger") before "tp_unwind" pops the TP frame.
+	 */
+	implicit_tp = tp_pointer->implicit_tstart && !tp_pointer->ydb_tp_s_tstart;
 	tp_unwind(dollar_tlevel - 1, COMMIT_INVOCATION, NULL);
 	if (!dollar_tlevel) /* real commit */
 	{
@@ -605,7 +612,7 @@ enum cdb_sc	op_tcommit(void)
 		 */
 		if (NULL != TREF(statsDB_init_defer_anchor))
 			gvcst_deferred_init_statsDB();
-		JOBINTR_TP_RETHROW; /* rethrow job interrupt($ZINT) if $ZTEXIT, when coerced to boolean, is true */
+		JOBINTR_TP_RETHROW(implicit_tp); /* $ZINTERRUPT if $ZTEXIT, when coerced to boolean, is true */
 	}
 	GTMTRIG_ONLY(DBGTRIGR((stderr, "op_tcommit: Return NORMAL status\n"));)
 	return cdb_sc_normal;
