@@ -61,6 +61,10 @@ THREADGBLDEF(director_mval,			mval)				/* look-ahead scanner mval from advancewi
 THREADGBLDEF(director_token,			char)				/* look-ahead scanner token from advancewindow */
 THREADGBLDEF(dollar_zcstatus,			int4)				/* return status for zcompile and others */
 THREADGBLDEF(expr_depth,			unsigned int)			/* expression nesting level */
+THREADGBLDEF(expr_nest_depth,			unsigned int)			/* nesting depth of expression items being parsed,
+										 * see MAX_EXPR_NEST_DEPTH */
+THREADGBLDEF(expr_tree_depth,			unsigned int)			/* depth of the triple tree walk of an expression,
+										 * see MAX_EXPR_TREE_DEPTH */
 THREADGBLDEF(expr_start,			triple *)			/* chain anchor for side effect early evaluation */
 THREADGBLDEF(expr_start_orig,			triple *)			/* anchor used to test if there's anything hung on
 										 * expr_start */

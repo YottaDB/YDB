@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -178,6 +178,10 @@ boolean_t compiler_startup(void)
 			assert(TREF(source_error_found));
 			errknt++;
 		}
+		/* In a routine compilation, errors return instead of unwinding (see "stx_error()"), so every level counted while
+		 * compiling the line was uncounted again (see MAX_EXPR_NEST_DEPTH in compiler.h)
+		 */
+		assert(!TREF(expr_nest_depth) && !TREF(expr_tree_depth));
 	}
 	rtn_src_chksum_digest(&checksum_ctx);
 	close_source_file();

@@ -25,6 +25,7 @@ GBLREF	triple		t_orig;
 error_def(ERR_ASSERT);
 error_def(ERR_GTMASSERT);
 error_def(ERR_DIVZERO);
+error_def(ERR_EXPRTOODEEP);
 error_def(ERR_NEGFRACPWR);
 error_def(ERR_NUMOFLOW);
 error_def(ERR_PATNOTFOUND);
@@ -82,7 +83,8 @@ void ins_errtriple(int4 in_error)
 			add_rterror_triple = TRUE;
 		}
 		if ((ERR_DIVZERO == in_error) || (ERR_NEGFRACPWR == in_error) || (ERR_NUMOFLOW == in_error)
-					|| (ERR_PATNOTFOUND == in_error) || (ERR_BOOLEXPRTOODEEP == in_error))
+					|| (ERR_PATNOTFOUND == in_error) || (ERR_BOOLEXPRTOODEEP == in_error)
+					|| (ERR_EXPRTOODEEP == in_error))
 			TREF(rts_error_in_parse) = TRUE;
 	} else
 	{	/* For IS_STX_WARN errors (if not compiling a trigger), parsing continues, so dont strip the chain */

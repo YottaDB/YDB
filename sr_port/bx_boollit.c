@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -32,10 +32,24 @@
 
 LITREF octabstruct	oc_tab[];
 
+error_def(ERR_EXPRTOODEEP);
 error_def(ERR_NUMOFLOW);
 error_def(ERR_PATNOTFOUND);
 
+STATICFNDCL void bx_boollit_work(triple *t, int depth);
+
+/* Counts the recursion depth of "bx_boollit_work()" (see MAX_EXPR_TREE_DEPTH in compiler.h) */
 void bx_boollit(triple *t, int depth)
+{
+	DCL_THREADGBL_ACCESS;
+
+	SETUP_THREADGBL_ACCESS;
+	EXPR_TREE_DEPTH_INCREMENT_OR_RETURN();
+	bx_boollit_work(t, depth);
+	EXPR_TREE_DEPTH_DECREMENT;
+}
+
+STATICFNDEF void bx_boollit_work(triple *t, int depth)
 /* search the Boolean in t (recursively) for literal leaves; the logic is similar to bx_tail
  * the rest of the arguments parallel those in bx_boolop and used primarily handling basic Boolean operations (ON, NOR, AND, NAND)
  * to get the jump target and sense right for the left-hand operand of the operation

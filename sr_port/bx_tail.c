@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2020-2024 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2020-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -21,6 +21,8 @@
 
 LITREF octabstruct oc_tab[];
 
+error_def(ERR_EXPRTOODEEP);
+
 /*	structure of jmps is as follows:
  *
  *	sense		OC_AND		OC_OR
@@ -36,8 +38,23 @@ LITREF octabstruct oc_tab[];
  *			jmpf addr	jmpf addr
  **/
 
+STATICFNDCL void bx_tail_work(triple *t, boolean_t sense, oprtype *addr, int depth, opctype andor_opcode,
+								boolean_t caller_is_bool_expr, int jmp_depth, boolean_t is_last_bool_operand);
+
+/* Counts the recursion depth of "bx_tail_work()" (see MAX_EXPR_TREE_DEPTH in compiler.h) */
 void bx_tail(triple *t, boolean_t sense, oprtype *addr, int depth, opctype andor_opcode,
 						boolean_t caller_is_bool_expr, int jmp_depth, boolean_t is_last_bool_operand)
+{
+	DCL_THREADGBL_ACCESS;
+
+	SETUP_THREADGBL_ACCESS;
+	EXPR_TREE_DEPTH_INCREMENT_OR_RETURN();
+	bx_tail_work(t, sense, addr, depth, andor_opcode, caller_is_bool_expr, jmp_depth, is_last_bool_operand);
+	EXPR_TREE_DEPTH_DECREMENT;
+}
+
+STATICFNDEF void bx_tail_work(triple *t, boolean_t sense, oprtype *addr, int depth, opctype andor_opcode,
+								boolean_t caller_is_bool_expr, int jmp_depth, boolean_t is_last_bool_operand)
 /*
  * work a Boolean expression along to final form
  * triple	*t;     triple to be processed

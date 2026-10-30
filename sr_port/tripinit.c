@@ -49,6 +49,9 @@ void tripinit(void)
 	mcavail = mcavailptr->size;
 	memset(&mcavailptr->data[0], 0, mcavail);
 	TREF(expr_start) = TREF(expr_start_orig) = NULL;
+	TREF(expr_nest_depth) = TREF(expr_tree_depth) = 0;	/* in case an error in a prior compilation skipped the
+								 * EXPR_NEST_DEPTH_DECREMENT or EXPR_TREE_DEPTH_DECREMENT
+								 */
 	TREF(saw_side_effect) = TREF(shift_side_effects) = FALSE;
 	if (NULL == TREF(side_effect_base))
 	{

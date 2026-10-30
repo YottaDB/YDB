@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -58,7 +58,10 @@ int comp_fini(int status, mstr *obj, opctype retcode, oprtype *retopr, oprtype *
 			status = EXPR_FAIL;
 			stx_error(ERR_INDEXTRACHARS);
 		} else
-		{
+		{	/* No error unwound this compilation, so every level counted in it was uncounted again
+			 * (see MAX_EXPR_NEST_DEPTH in compiler.h)
+			 */
+			assert(!TREF(expr_nest_depth) && !TREF(expr_tree_depth));
 			cg_phase = CGP_RESOLVE;
 			assert(TREF(for_stack_ptr) == TADR(for_stack));
 			if (*TREF(for_stack_ptr))

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -27,7 +27,22 @@
 LITREF mval		literal_minusone, literal_one, literal_zero;
 LITREF octabstruct	oc_tab[];
 
+error_def(ERR_EXPRTOODEEP);
+
+STATICFNDCL void ex_tail_work(oprtype *opr, int depth);
+
+/* Counts the recursion depth of "ex_tail_work()" (see MAX_EXPR_TREE_DEPTH in compiler.h) */
 void ex_tail(oprtype *opr, int depth)
+{
+	DCL_THREADGBL_ACCESS;
+
+	SETUP_THREADGBL_ACCESS;
+	EXPR_TREE_DEPTH_INCREMENT_OR_RETURN();
+	ex_tail_work(opr, depth);
+	EXPR_TREE_DEPTH_DECREMENT;
+}
+
+STATICFNDEF void ex_tail_work(oprtype *opr, int depth)
 /* work a non-leaf operand toward final form
  * contains code to do arthimetic on literals at compile time
  * and code to bracket Boolean expressions with BOOLINIT and BOOLFINI

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -687,6 +687,53 @@ MBSTART {									\
 					 * so any changes to NBITS_IN_BOOL_DEPTH should correspondingly change that hardcoding too.
 					 */
 #define	NBITS_IN_OPCODE		10	/* allows for a max of 1024 opcodes in opcode_def.h */
+
+/* The compiler processes an expression with recursive C functions, each level of which uses C stack. To issue an EXPRTOODEEP
+ * error instead of overflowing the C stack, it counts and limits two kinds of levels:
+ * a) TREF(expr_nest_depth) counts nested "expratom()" calls, one per nested expression item (unary operator, parenthesized
+ *    expression, function or extrinsic argument, subscript, indirection etc.), limited to MAX_EXPR_NEST_DEPTH.
+ * b) TREF(expr_tree_depth) counts nested "ex_tail()", "bx_tail()" and "bx_boollit()" calls (every recursion among the
+ *    functions that walk the triple tree of an expression goes through one of these), limited to MAX_EXPR_TREE_DEPTH. A chain
+ *    of binary operators (other than concatenation) makes the tree as deep as the chain is long, without nested parsing.
+ * A parsing level uses several times the C stack of a tree level, hence the different limits. Both are far beyond what M
+ * programs use. MAX_EXPR_TREE_DEPTH is also well above 2047, the maximum depth of a Boolean expression, so that Boolean
+ * expressions somewhat deeper than that still get BOOLEXPRTOODEEP rather than EXPRTOODEEP.
+ */
+#define	MAX_EXPR_NEST_DEPTH	1024
+#define	MAX_EXPR_TREE_DEPTH	4096
+
+/* Shared body of EXPR_NEST_DEPTH_INCREMENT_OR_RETURN and EXPR_TREE_DEPTH_INCREMENT_OR_RETURN below; not used directly. If the
+ * limit has been reached, issue EXPRTOODEEP (only the first time on a line) and return RETVAL (empty for a void function).
+ * Setting TREF(rts_error_in_parse) makes the callers stop processing the line (see RETURN_IF_RTS_ERROR) even when
+ * "ins_errtriple()" defers the error because it is working on a temporary triple chain.
+ */
+#define	EXPR_DEPTH_INCREMENT_OR_RETURN(COUNTER, LIMIT, RETVAL)				\
+{											\
+	if ((LIMIT) <= TREF(COUNTER))							\
+	{										\
+		if (!TREF(rts_error_in_parse))						\
+			stx_error(ERR_EXPRTOODEEP);					\
+		TREF(rts_error_in_parse) = TRUE;					\
+		return RETVAL;								\
+	}										\
+	(TREF(COUNTER))++;								\
+}
+
+#define	EXPR_DEPTH_DECREMENT(COUNTER)							\
+{											\
+	assert(TREF(COUNTER));								\
+	(TREF(COUNTER))--;								\
+}
+
+/* Used at the start and end of "expratom()", which returns RETVAL (FALSE) if the limit has been reached */
+#define	EXPR_NEST_DEPTH_INCREMENT_OR_RETURN(RETVAL)	EXPR_DEPTH_INCREMENT_OR_RETURN(expr_nest_depth, MAX_EXPR_NEST_DEPTH, RETVAL)
+#define	EXPR_NEST_DEPTH_DECREMENT			EXPR_DEPTH_DECREMENT(expr_nest_depth)
+
+/* Used at the start and end of the "ex_tail()", "bx_tail()" and "bx_boollit()" wrappers. These are void functions, hence the
+ * empty RETVAL.
+ */
+#define	EXPR_TREE_DEPTH_INCREMENT_OR_RETURN()		EXPR_DEPTH_INCREMENT_OR_RETURN(expr_tree_depth, MAX_EXPR_TREE_DEPTH, )
+#define	EXPR_TREE_DEPTH_DECREMENT			EXPR_DEPTH_DECREMENT(expr_tree_depth)
 
 #define	CHECK_AND_RETURN_IF_BOOLEXPRTOODEEP(DEPTH)					\
 {											\
