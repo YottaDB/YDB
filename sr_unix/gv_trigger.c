@@ -941,8 +941,14 @@ void	gvtr_db_read_hasht(sgmnt_addrs *csa)
 							DIVIDE_ROUND_UP((numsubs * SIZEOF(gvtr_subs_t)), GVTR_LIST_ELE_SIZE));
 			cursub = 0;
 			subsdsc = trigdsc->subsarray;
-			/* Initialize trigdsc->numlvsubs */
-			assert(numlvsubs <= numsubs);
+			/* Initialize trigdsc->numlvsubs. "numsubs" is the number of subscripts (one more than the number of
+			 * commas counted above) and "numlvsubs" the number of local variable names (the number of "=").
+			 * A subscript can have more than one name: for ^x(a=b=1), numsubs is 1 and numlvsubs is 2, and
+			 * lvindexarray[] (set below) maps both names to subscript 0. So numlvsubs can be more than numsubs.
+			 * "process_subscripts()" in "sr_unix/trigger_parse.c" limits the number of names to MAX_GVSUBSCRIPTS,
+			 * so assert that.
+			 */
+			assert(numlvsubs <= MAX_GVSUBSCRIPTS);
 			trigdsc->numlvsubs = numlvsubs;
 			if (numlvsubs)
 			{

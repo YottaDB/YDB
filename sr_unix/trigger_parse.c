@@ -778,6 +778,11 @@ STATICFNDEF boolean_t process_subscripts(char *subscr_str, uint4 *subscr_len, ch
 			lvn_str[lvn_count] = lvn_start;
 			lvn_len[lvn_count] = tmp_len;
 			lvn_count++;
+			if (MAX_LVN_COUNT <= lvn_count)
+			{	/* UUID: 0d5f5109-17ee-4dc7-8108-8ccc62843e8a */
+				util_out_print_gtmio("Too many subscripts", FLUSH);
+				return FALSE;
+			}
 			if (MAX_GVSUBS_LEN < ++dst_len)
 			{
 				util_out_print_gtmio("Subscript too long", FLUSH);
