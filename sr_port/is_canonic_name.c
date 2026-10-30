@@ -234,7 +234,8 @@ boolean_t parse_gv_name_and_subscripts(mval *src, int *subscripts, int *start, i
 						state = (')' == term) ? END_OF_PROCESSING : EXPECT_FIRST_LETTER_OF_NAME;
 					else if (',' != letter)
 						return FALSE;	/* Not a single char number */
-					*stop++ = isrc;
+					if ((0 < subs_count) || (1 == envpart))
+						*stop++ = isrc;
 					break;
 				}
 				if ((innum = ISDIGIT_ASCII(letter)) || ('-' == letter) || ('.' == letter)) /* WARNING: assignment */
@@ -441,7 +442,8 @@ boolean_t parse_gv_name_and_subscripts(mval *src, int *subscripts, int *start, i
 					state = (')' == term) ? END_OF_PROCESSING : EXPECT_FIRST_LETTER_OF_NAME;
 				else
 					return FALSE;
-				*stop++ = isrc;
+				if ((0 < subs_count) || (1 == envpart))
+					*stop++ = isrc;
 				break;
 			case END_OF_PROCESSING:		/* end of subscript but no closing paren - ")" */
 				return FALSE;
