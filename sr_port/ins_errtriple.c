@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -54,17 +54,28 @@ void ins_errtriple(int4 in_error)
 		if (NULL != x)
 		{
 			/* If first error in the current line/cmd, delete all triples and replace them with an OC_RTERROR triple.
-			 * If second error in the current line/cmd, do not add a new OC_RTERROR triple as there is already one
-			 *    and so leave the triple chain untouched (i.e. do not delete any existing triples as there is
-			 *    no need to replace them with an OC_RTERROR triple and attempting deletion can be tricky).
+			 * If not the first error in the current line/cmd, do not add a new OC_RTERROR triple as there is
+			 * already one.
 			 */
-			add_rterror_triple = (OC_RTERROR != x->exorder.fl->opcode);
+			triptr = x->exorder.fl;
+			add_rterror_triple = (OC_RTERROR != triptr->opcode);
 			if (add_rterror_triple)
 			{	/* delete all trailing triples (and replace them further down with an OC_RTERROR triple) */
 				dqdelchain(x, TREF(curtchain), exorder);
 				CHKTCHAIN(TREF(curtchain), exorder, FALSE);
 				assert((TREF(pos_in_chain)).exorder.bl->exorder.fl == TREF(curtchain));
 				assert((TREF(curtchain))->exorder.bl == (TREF(pos_in_chain)).exorder.bl);
+			} else if ((TRIP_REF == triptr->operand[0].oprclass) && (TRIP_REF == triptr->operand[1].oprclass)
+					&& (triptr->exorder.fl == triptr->operand[0].oprval.tref)
+					&& (triptr->exorder.fl->exorder.fl == triptr->operand[1].oprval.tref))
+			{	/* The OC_RTERROR triple and its 2 OC_ILIT operands are consecutive, as when an earlier call
+				 * here added them. That call could have been for an IS_STX_WARN error, after which parsing
+				 * went on, so delete the triples after them, which can be those of a parse that failed. An
+				 * OC_RTERROR triple that "line()" adds is not followed by its operands, and other triples can
+				 * be in between, so leave those untouched.
+				 */
+				dqdelchain(triptr->operand[1].oprval.tref, TREF(curtchain), exorder);
+				CHKTCHAIN(TREF(curtchain), exorder, FALSE);
 			}
 		} else
 		{	/* We have not yet started processing the current line and so add OC_RTERROR triple */
