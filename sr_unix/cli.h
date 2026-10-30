@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -75,11 +75,18 @@
 #ifdef UTF8_SUPPORTED
 GBLREF	boolean_t	gtm_utf8_mode;
 #define CLI_GET_CHAR(PTR, BUFEND, CHAR) (gtm_utf8_mode ? UTF8_MBTOWC(PTR, BUFEND, CHAR) : (CHAR = (wint_t)*(PTR), (PTR) + 1))
-#define CLI_PUT_CHAR(PTR, CHAR) (gtm_utf8_mode ? UTF8_WCTOMB(CHAR, PTR) : (*(PTR) = CHAR, (PTR) + 1))
+/* CLI_PUT_CHAR copies CHAR, which CLI_GET_CHAR read, to PTR, and returns the address after it. NEXT is the address that
+ * CLI_GET_CHAR returned. For a byte that is not valid UTF-8, CLI_GET_CHAR sets CHAR to WEOF and returns the address one
+ * byte past it, so CLI_PUT_CHAR copies that byte (NEXT[-1]) as is instead of dropping it. So a token keeps every byte it
+ * had on the command line, as in M mode.
+ */
+#define CLI_PUT_CHAR(PTR, CHAR, NEXT)										\
+	(gtm_utf8_mode ? (((wint_t)WEOF == (CHAR)) ? (*(PTR) = (NEXT)[-1], (PTR) + 1) : UTF8_WCTOMB(CHAR, PTR))	\
+		: (*(PTR) = CHAR, (PTR) + 1))
 #define CLI_ISSPACE(CHAR) (gtm_utf8_mode ? U_ISSPACE(CHAR) : ISSPACE_ASCII((int)CHAR))
 #else
 #define CLI_GET_CHAR(PTR, BUFEND, CHAR) (CHAR = (int)*(PTR), (PTR) + 1)
-#define CLI_PUT_CHAR(PTR, CHAR) (*(PTR) = CHAR, (PTR) + 1)
+#define CLI_PUT_CHAR(PTR, CHAR, NEXT) (*(PTR) = CHAR, (PTR) + 1)
 #define CLI_ISSPACE(CHAR) ISSPACE_ASCII(CHAR)
 #endif
 

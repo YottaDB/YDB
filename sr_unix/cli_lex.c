@@ -86,7 +86,7 @@ static int tok_string_extract(void)
 				{
 					if (!gtm_cli_interpret_string)
 					{
-						out_sp = CLI_PUT_CHAR(out_sp, ch);
+						out_sp = CLI_PUT_CHAR(out_sp, ch, in_next);
 						token_len++;
 					}
 					have_quote = TRUE;
@@ -95,13 +95,13 @@ static int tok_string_extract(void)
 				{
 					if (!gtm_cli_interpret_string)
 					{
-						out_sp = CLI_PUT_CHAR(out_sp, ch);
+						out_sp = CLI_PUT_CHAR(out_sp, ch, in_next);
 						token_len++;
 					}
 					in_next = CLI_GET_CHAR(in_next, bufend, ch);
 					if (ch == '"')
 					{ /* double quote, one goes in string, still have quote */
-						out_sp = CLI_PUT_CHAR(out_sp, ch);
+						out_sp = CLI_PUT_CHAR(out_sp, ch, in_next);
 						in_next = CLI_GET_CHAR(in_next, bufend, ch);
 						token_len++;
 					} else
@@ -109,7 +109,7 @@ static int tok_string_extract(void)
 				}
 			} else
 			{
-				out_sp = CLI_PUT_CHAR(out_sp, ch);
+				out_sp = CLI_PUT_CHAR(out_sp, ch, in_next);
 				in_next = CLI_GET_CHAR(in_next, bufend, ch);
 				token_len++;
 			}
@@ -121,7 +121,7 @@ static int tok_string_extract(void)
 		}
 		if (have_quote)
 		{
-			out_sp = CLI_PUT_CHAR(out_sp, ch);
+			out_sp = CLI_PUT_CHAR(out_sp, ch, in_next);
 			in_next = CLI_GET_CHAR(in_next, bufend, ch);
 			token_len++;
 			continue;
@@ -130,7 +130,7 @@ static int tok_string_extract(void)
 		break;
 	}
 	ch = 0;
-	CLI_PUT_CHAR(out_sp, ch);
+	CLI_PUT_CHAR(out_sp, ch, in_next);
 	cli_lex_in_ptr->tp = (char *)in_sp;
 
 	return (token_len);
@@ -367,7 +367,7 @@ static int	tok_extract (void)
 	in_next = CLI_GET_CHAR(in_sp, bufend, ch);
 	if ('-' == ch || '=' == ch)
 	{
-		out_sp = CLI_PUT_CHAR(out_sp, ch);
+		out_sp = CLI_PUT_CHAR(out_sp, ch, in_next);
 		in_sp = in_next;		/* advance one character */
 		token_len = 1;
 	} else if (ch)				/* only if something there */
@@ -377,14 +377,14 @@ static int	tok_extract (void)
 		while(ch && !CLI_ISSPACE(ch)
 		  && ch != '=')
 		{
-			out_sp = CLI_PUT_CHAR(out_sp, ch);
+			out_sp = CLI_PUT_CHAR(out_sp, ch, in_next);
 			in_sp = in_next;
 			in_next = CLI_GET_CHAR(in_next, bufend, ch);
 			token_len++;
 		}
 	}
 	ch = 0;
-	CLI_PUT_CHAR(out_sp, ch);
+	CLI_PUT_CHAR(out_sp, ch, in_next);
 	cli_lex_in_ptr->tp = (char *)in_sp;
 	return(token_len);
 }
