@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2022 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2022-2026 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
@@ -11,15 +11,37 @@
 #################################################################
 
 diff --git a/sr_port/stp_gcol_src.h b/sr_port/stp_gcol_src.h
-index 818ac645..d251cff8 100644
+index 7d9e9d6d3..1f687c82e 100644
 --- a/sr_port/stp_gcol_src.h
 +++ b/sr_port/stp_gcol_src.h
-@@ -1017,7 +1017,7 @@ void stp_gcol(size_t space_asked)	/* BYPASSOK */
+@@ -20,6 +20,7 @@
+ #include <stddef.h>
+ #include "gtm_string.h"
+ #include "gtm_stdio.h"
++#include "gtm_stdlib.h"
+ 
+ #include "gtmio.h"
+ #include "gdsroot.h"
+@@ -65,6 +66,7 @@
+ #include "glvn_pool.h"
+ #include "iormdef.h"
+ #include "localvarmonitor.h"
++#include "gtmmsg.h"
+ 
+ GBLREF int			indr_stp_low_reclaim_passes;
+ GBLREF int			rts_stp_low_reclaim_passes;
+@@ -1141,7 +1143,13 @@ void stp_gcol_sort(size_t space_asked)	/* BYPASSOK */
  				&& ((stp_incr + stringpool.top - stringpool.base) > stringpool.strpllim)) /* expanding larger */
  			{
  				assert(0 < stringpool.strpllim);	/* must have been watching stp limit */
 -				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STPOFLOW);
-+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) MAKE_MSG_ERROR(ERR_STPOFLOW));
++				/* STPOFLOW is a fatal error, so it dumps a core file, which "fuzzing/gtm_dump_core.c.patch" turns into
++				 * a SIG-11 that afl-fuzz records as a crash. But a user can easily cause STPOFLOW. So print the error
++				 * and exit like a fatal error does, but without the core file. Do not continue after the error, as
++				 * this function has not finished and later code would use a string pool in an inconsistent state.
++				 */
++				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STPOFLOW);
++				EXIT(ERR_STPOFLOW);
  			}
- 			expand_stp((ssize_t)(stp_incr + stringpool.top - stringpool.base));
- #			ifdef DEBUG
+ 			DBGSTPGCOL((stderr, "base=%p top=%p (size=%llu)\n", stringpool.base, stringpool.top,
+ 						(size_t)(stringpool.top - stringpool.base)));
