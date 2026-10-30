@@ -315,8 +315,15 @@ MBSTART {														\
 			delta = (*CSTR)->addr - (char *)stringpool.free;						\
 			PROCESS_CONTIGUOUS_BLOCK(begaddr, endaddr, CSTR, delta);					\
 			blklen = endaddr - begaddr;									\
-			memcpy(stringpool.free, begaddr, blklen);							\
-			stringpool.free += blklen;									\
+			/* A block can be larger than the 2GB that "memcpy()" allows in a Debug build (see		\
+			 * "gtm_memcpy_validate_and_execute()"), so copy it in pieces of at most that size.		\
+			 */												\
+			for (cpyaddr = begaddr; cpyaddr < endaddr; cpyaddr += cpylen)					\
+			{												\
+				cpylen = MIN(endaddr - cpyaddr, MAXPOSINT4);						\
+				memcpy(stringpool.free, cpyaddr, cpylen);						\
+				stringpool.free += cpylen;								\
+			}												\
 		}													\
 	}
 	#define MOVE_WITHIN_STPOOL(CSTR, TOPSTR)									\
@@ -547,10 +554,10 @@ void stp_gcol_sort(size_t space_asked)	/* BYPASSOK */
 #	endif
 	unsigned char		*strpool_base, *straddr, *tmpaddr;
 #	ifndef STP_GCOL_NOSORT
-	unsigned char		*begaddr, *endaddr;
+	unsigned char		*begaddr, *endaddr, *cpyaddr;
 #	endif
 	int			index, fixup_cnt;
-	ssize_t			space_before_compact, space_after_compact, blklen, delta, space_reclaim;
+	ssize_t			space_before_compact, space_after_compact, blklen, delta, space_reclaim, cpylen;
 	ssize_t			space_needed, tmplen, tmplen2;
 	io_log_name		*l;		/* logical name pointer		*/
 	lv_blk			*lv_blk_ptr;
