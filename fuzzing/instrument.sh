@@ -72,6 +72,18 @@ build build-instrumented
 build build-instrumented-dbg -D CMAKE_BUILD_TYPE=Debug
 build build-instrumented-asan -D CMAKE_BUILD_TYPE=Debug -D ENABLE_ASAN=ON
 
+# Fuzzed inputs can set $zgbldir to a help global directory in $ydb_dist and update the help database, which every fuzzed
+# process of a build shares. In an installed YottaDB, the help database files are owned by root and not writable. Making
+# the files themselves read-only would need a gtmsecshr owned by root to open them, so make each help database read-only
+# with MUPIP SET -READ_ONLY (which needs the MM access method) instead. Updates then issue DBPRIVERR.
+echo "Making help databases read-only..."
+for dir in build-instrumented build-instrumented-dbg build-instrumented-asan ; do
+	for help in "$dir"/*help.dat ; do
+		ydb_dist="$PWD/$dir" ASAN_OPTIONS="detect_leaks=0:verify_asan_link_order=0" \
+			"$dir/mupip" set -access_method=MM -read_only -file "$help"
+	done
+done
+
 # Undo source code changes now that build is done. This allows later "git status" commands to not show the patch as a diff.
 echo "Undoing patch..."
 make reset
