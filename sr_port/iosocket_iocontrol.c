@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -248,7 +248,7 @@ void	iosocket_iocontrol(mstr *mn, int4 argcnt, va_list args)
 		assert(option);
 		iosocket_tls(option, nsec_timeout, tlsid, password, extraarg);
 #	endif
-	} else if (0 == memcmp(action, "BLOCK", length))
+	} else if (0 == STRCMP(action, "BLOCK"))
 	{	/* OFF, CLEAR, COUNT .lvn, SENT .lvn */
 		if (1 <= argcnt)
 		{
