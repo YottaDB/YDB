@@ -326,7 +326,8 @@ STATICFNDEF int op_fnzpeek_stpcopy(char *zpeekadr, int len, mval *ret, char fmtc
 				if (negative)
 					uint = (unsigned int)(-(signed int)uint);
 			}
-			ENSURE_STP_FREE_SPACE(MAX_DIGITS_IN_INT + negative);	/* Space to hold # */
+			/* Space to hold # */
+			ENSURE_STP_FREE_SPACE(((SIZEOF(gtm_uint64_t) == len) ? MAX_DIGITS_IN_INT8 : MAX_DIGITS_IN_INT) + negative);
 			numstrstart = stringpool.free;
 			if (negative)
 				*stringpool.free++ = '-';		/* Value is negative, record in output */
