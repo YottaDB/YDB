@@ -30,6 +30,7 @@
 
 #include "mdef.h"
 
+#include <errno.h>
 #include "gtm_stdlib.h"
 #include "gtm_signal.h"
 /* Note the use of __GLIBC__ here precludes this include on CYGWIN and Alpine(MUSL environments */
@@ -67,7 +68,7 @@ static boolean_t caller_id_reent = FALSE;	/* If ever true, our helper gets a lob
 caddr_t caller_id(unsigned int extra_frames)
 {
 	void		*trace[MAX_TRACE_DEPTH], *to_ret;
-	int		rc, trace_size, trace_start, trace_target, dladdr_status;
+	int		rc, trace_size, trace_start, trace_target, dladdr_status, save_errno;
 	sigset_t	savemask;
 	Dl_info		backtrace_ptr_info;
 
@@ -93,6 +94,10 @@ caddr_t caller_id(unsigned int extra_frames)
 	 * block_sigsent could not be initialized yet. Therefore this does not have an assert(blocksig_initialized)
 	 * that similar code in other places (e.g. dollarh.c) has.
 	 */
+	/* Callers can use errno after this routine (e.g. the MALLOC macro after a malloc() failure), so restore it at the end.
+	 * The first backtrace() call in a process loads libgcc_s.so.1, which can change errno.
+	 */
+	save_errno = errno;
 	if (blocksig_initialized)
 		SIGPROCMASK(SIG_BLOCK, &block_sigsent, &savemask, rc);
 	caller_id_reent = TRUE;
@@ -125,6 +130,7 @@ caddr_t caller_id(unsigned int extra_frames)
 	caller_id_reent = FALSE;
 	if (blocksig_initialized)
 		SIGPROCMASK(SIG_SETMASK, &savemask, NULL, rc);
+	errno = save_errno;
 	/* Backtrace will return call stack with address */
 	return (caddr_t)to_ret;
 }
