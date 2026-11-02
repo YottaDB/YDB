@@ -3,7 +3,7 @@
 ; Copyright (c) 2015-2023 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
-; Copyright (c) 2025 YottaDB LLC and/or its subsidiaries.	;
+; Copyright (c) 2025-2026 YottaDB LLC and/or its subsidiaries.	;
 ; All rights reserved.						;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -56,16 +56,12 @@ item(x)
 	. do:%ZSHOWvbase("m4") sendmsg("m4",raw)
 	. set %ZSHOWvbase("m4")=0
 	set (key,value)=""
-	set (cptr,indx,qoff)=1								; find 1st equal-sign not in quotes
-	for  do  quit:qoff!'indx
-	. set indx=$find(raw,"=",cptr),cptr=$find(raw,"""",cptr)
-	. if 'indx do  quit								; didn't find it
-	. . set $extract(x("x"),$length(x("x")))=","_x("index")_")",indx=0
-	. . do sendmsg("m5",x("x"))
-	. if cptr,cptr<indx do
-	. . set qoff=0
-	. . for cptr=cptr:1:indx set:""""=$extract(raw,cptr) qoff='qoff			; count quotes
-	quit:'indx 1
+	set indx=0,qoff=1								; find 1st equal-sign not in quotes
+	; ZWRITE doubles any quote within a string, so toggling qoff at each quote tracks whether cptr is in one
+	for cptr=1:1:$length(raw) set:""""=$extract(raw,cptr) qoff='qoff if qoff,"="=$extract(raw,cptr) set indx=cptr+1 quit
+	if 'indx do  quit 1								; didn't find it
+	. set $extract(x("x"),$length(x("x")))=","_x("index")_")"
+	. do sendmsg("m5",x("x"))
 	set key=$extract(raw,1,indx-2),cindex=1
 	set value=$extract(raw,indx,$length(raw))					; strip off key
 	if 11=data for cindex=1:1 do  quit:'contdata!'cindex				; loop thru continuation nodes
