@@ -1376,8 +1376,10 @@ boolean_t trigger_update_rec(mval *trigger_rec, boolean_t noprompt, uint4 *trig_
 	if (('-' != *trigger_rec->str.addr) && ('+' != *trigger_rec->str.addr))
 	{
 		trig_stats[STATS_ERROR_TRIGFILE]++;
-		len = trigger_rec->str.len = MIN(len, MAX_SRCLINE);
-		trigger_rec->str.addr[len] = 0;
+		/* Do not change "trigger_rec", as for $ZTRIGGER("ITEM") the string is the argument of the caller, which can be
+		 * an M literal that later code in the routine uses.
+		 */
+		len = MIN(len, MAX_SRCLINE);
 		displen = ZWR_EXP_RATIO(len);
 		dispbuff = malloc(displen);
 		format2zwr((sm_uc_ptr_t)trigger_rec->str.addr, len, dispbuff, &displen); /* returns displayable string & displen */
