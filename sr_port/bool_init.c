@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2020-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2020-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *                                                              *
  *      This source code contains the intellectual property     *
@@ -42,7 +42,12 @@ void	bool_init(void)
 		tmpZysqlnullArray->cur_depth = INIT_GBL_BOOL_DEPTH;
 		tmpZysqlnullArray->previous = boolZysqlnull;
 #		ifdef DEBUG
-		tmpZysqlnullArray->boolexpr_nesting_depth = (NULL == boolZysqlnull) ? 0 : boolZysqlnull->boolexpr_nesting_depth + 1;
+		/* Count only the nesting in the current M frame. An evaluation in progress in an earlier frame (for example
+		 * an IF that called an extrinsic function or fired a trigger, which can nest up to the M stack or
+		 * trigger nesting limit) is not the uncontrolled growth that the assert below checks for.
+		 */
+		tmpZysqlnullArray->boolexpr_nesting_depth = ((NULL == boolZysqlnull) || (boolZysqlnull->frame_pointer != frame_pointer))
+								? 0 : boolZysqlnull->boolexpr_nesting_depth + 1;
 #		endif
 		boolZysqlnull = tmpZysqlnullArray;
 	}

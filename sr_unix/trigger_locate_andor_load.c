@@ -3,7 +3,7 @@
  * Copyright (c) 2011-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -172,42 +172,51 @@ int trigger_locate_andor_load(mstr *trigname, rhdtyp **rtn_vec)
 	if (!runtime_disambiguator_specified && (NULL != reg))
 	{	/* Region-name has been specified and no runtime-disambiguator specified. Need to further refine the
 		 * search done by find_rtn_tabent to focus on the desired region in case multiple routines with the same
-		 * trigger name (but different runtime-disambiguators) exist.
+		 * trigger name (but different runtime-disambiguators) exist. No trigger routine name is longer than
+		 * MAX_MIDENT_LEN, so for a longer trigger name skip the search and look in the #t global below.
 		 */
-		rtn_name.len = MIN(trigname->len, MAX_MIDENT_LEN);
-		rtn_name.addr = trigname->addr;
-		if (!reg->open)
-			gv_init_reg(reg);	/* Open the region before obtaining "csa" */
-		regcsa = &FILE_INFO(reg)->s_addrs;
-		assert('#' == rtn_name.addr[rtn_name.len - 1]);
-		for ( ; rttabent <= rtn_names_end; rttabent++)
+		if (MAX_MIDENT_LEN < trigname->len)
+			rtn_vector = NULL;
+		else
 		{
-			if ((rttabent->rt_name.len < rtn_name.len) || memcmp(rttabent->rt_name.addr, rtn_name.addr, rtn_name.len))
-			{	/* Past the list of routines with same name as trigger but different runtime disambiguators */
-				rtn_vector = NULL;
-				break;
+			rtn_name.len = MIN(trigname->len, MAX_MIDENT_LEN);
+			rtn_name.addr = trigname->addr;
+			if (!reg->open)
+				gv_init_reg(reg);	/* Open the region before obtaining "csa" */
+			regcsa = &FILE_INFO(reg)->s_addrs;
+			assert('#' == rtn_name.addr[rtn_name.len - 1]);
+			for ( ; rttabent <= rtn_names_end; rttabent++)
+			{
+				if ((rttabent->rt_name.len < rtn_name.len)
+					|| memcmp(rttabent->rt_name.addr, rtn_name.addr, rtn_name.len))
+				{	/* Past the list of routines with same name as trigger but different runtime
+					 * disambiguators
+					 */
+					rtn_vector = NULL;
+					break;
+				}
+				rtn_vector = rttabent->rt_adr;
+				trigdsc = (gv_trigger_t *)rtn_vector->trigr_handle;
+				gvt_trigger = trigdsc->gvt_trigger;
+				gvt = gvt_trigger->gv_target;
+				/* Target region and trigger routine's region do not match, continue */
+				if (gvt->gd_csa != regcsa)
+					continue;
+				/* Check if global name associated with the trigger is indeed mapped to the corresponding region
+				 * by the gld.  If not treat this case as if the trigger is invisible and move on
+				 */
+				gbl.addr = gvt->gvname.var_name.addr;
+				gbl.len = gvt->gvname.var_name.len;
+				TP_CHANGE_REG_IF_NEEDED(gvt->gd_csa->region);
+				COMPUTE_HASH_MNAME(&gvt->gvname);
+				GV_BIND_NAME_ONLY(gd_header, &gvt->gvname, gvnh_reg);	/* does tp_set_sgm() */
+				if (((NULL == gvnh_reg->gvspan) && (gv_cur_region != reg))
+				    || ((NULL != gvnh_reg->gvspan) && !gvnh_spanreg_ismapped(gvnh_reg, gd_header, reg)))
+					continue;
+				/* Target region and trigger routine's region match, break (this check is a formality) */
+				if (gvt->gd_csa == regcsa)
+					break;
 			}
-			rtn_vector = rttabent->rt_adr;
-			trigdsc = (gv_trigger_t *)rtn_vector->trigr_handle;
-			gvt_trigger = trigdsc->gvt_trigger;
-			gvt = gvt_trigger->gv_target;
-			/* Target region and trigger routine's region do not match, continue */
-			if (gvt->gd_csa != regcsa)
-				continue;
-			/* Check if global name associated with the trigger is indeed mapped to the corresponding region
-			 * by the gld.  If not treat this case as if the trigger is invisible and move on
-			 */
-			gbl.addr = gvt->gvname.var_name.addr;
-			gbl.len = gvt->gvname.var_name.len;
-			TP_CHANGE_REG_IF_NEEDED(gvt->gd_csa->region);
-			COMPUTE_HASH_MNAME(&gvt->gvname);
-			GV_BIND_NAME_ONLY(gd_header, &gvt->gvname, gvnh_reg);	/* does tp_set_sgm() */
-			if (((NULL == gvnh_reg->gvspan) && (gv_cur_region != reg))
-			    || ((NULL != gvnh_reg->gvspan) && !gvnh_spanreg_ismapped(gvnh_reg, gd_header, reg)))
-				continue;
-			/* Target region and trigger routine's region match, break (this check is a formality) */
-			if (gvt->gd_csa == regcsa)
-				break;
 		}
 	}
 	if (NULL == rtn_vector)
