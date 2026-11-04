@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -307,7 +307,11 @@ void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *pa
 			do
 			{
 				src = nextsrc;
-				assert(src < src_top);
+				if (src == src_top)
+				{	/* Empty name after a trailing comma */
+					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_VIEWGVN, 2, LEN_AND_LIT("\"\""));
+					assert(FALSE);
+				}
 				for ( ; ; )
 				{
 					if (',' == *nextsrc)
