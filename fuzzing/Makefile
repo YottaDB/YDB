@@ -27,6 +27,7 @@ go:
 	echo "working on it"
 
 patch:
+	patch --no-backup-if-mismatch ../sr_linux/caller_id.c caller_id.c.patch
 	patch --no-backup-if-mismatch ../sr_port/io.h io.h.patch
 	patch --no-backup-if-mismatch ../sr_port/jobexam_process.c jobexam_process.c.patch
 	patch --no-backup-if-mismatch ../sr_port/mutex.h mutex.h.patch
@@ -50,6 +51,7 @@ patch:
 	patch --no-backup-if-mismatch ../sr_unix/sig_init.c sig_init.c.patch
 
 reset:
+	patch --reject-file=- --no-backup-if-mismatch --reverse ../sr_linux/caller_id.c caller_id.c.patch
 	patch --reject-file=- --no-backup-if-mismatch --reverse ../sr_port/io.h io.h.patch
 	patch --reject-file=- --no-backup-if-mismatch --reverse ../sr_port/jobexam_process.c jobexam_process.c.patch
 	patch --reject-file=- --no-backup-if-mismatch --reverse ../sr_port/mutex.h mutex.h.patch

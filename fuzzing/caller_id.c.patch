@@ -1,0 +1,24 @@
+#################################################################
+#								#
+# Copyright (c) 2026 YottaDB LLC and/or its subsidiaries.	#
+# All rights reserved.						#
+#								#
+#	This source code contains the intellectual property	#
+#	of its copyright holder(s), and is made available	#
+#	under a license.  If you do not know the terms of	#
+#	the license, please stop and do not read further.	#
+#								#
+#################################################################
+
+diff --git a/sr_linux/caller_id.c b/sr_linux/caller_id.c
+index e32fde5c7..b6b2e578f 100644
+--- a/sr_linux/caller_id.c
++++ b/sr_linux/caller_id.c
+@@ -120,7 +120,6 @@ caddr_t caller_id(unsigned int extra_frames)
+ 		/* Should only be possible for this assert to fail if extra_frames is large enough
+ 		* that backtrace is attempting to look back further than the size of the stack. (extra_frames+2 >= stack_size)
+ 		*/
+-		assert(trace_target < trace_size);
+ 		if (trace_target >= trace_size)
+ 			to_ret = trace[trace_size - 1]; /* If not enough frames exist, return the last one. */
+ 		else

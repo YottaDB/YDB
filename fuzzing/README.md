@@ -24,7 +24,7 @@ At a high level, we've only made a makefile which calls three scripts in this di
 
 To fuzz something, we first need to have AFL be able to track execution, etc.  This means, of course, instrumentation.  To do that we need to make two small changes to the build process:
 
-1. We patch out the signal handlers installed for SIGBUS, SIGSEGV, SIGILL, SIGFPE, etc in `sr_unix/sig_init.c`.  This is a one line change that we do with `patch`. Other patches (see the `patch` target in the `Makefile`) turn events that would dump a core (e.g. an assert failure) into a SIG-11 that afl-fuzz records as a crash, keep messages out of the syslog, and stop the fuzzed M code from running shell commands or signaling other processes (`ZSYSTEM`, `ZEDIT`, PIPE devices, the `STARTUP` parameter of `JOB` and `$ZSIGPROC`).
+1. We patch out the signal handlers installed for SIGBUS, SIGSEGV, SIGILL, SIGFPE, etc in `sr_unix/sig_init.c`.  This is a one line change that we do with `patch`. Other patches (see the `patch` target in the `Makefile`) turn events that would dump a core (e.g. an assert failure) into a SIG-11 that afl-fuzz records as a crash, keep messages out of the syslog, and stop the fuzzed M code from running shell commands or signaling other processes (`ZSYSTEM`, `ZEDIT`, PIPE devices, the `STARTUP` parameter of `JOB` and `$ZSIGPROC`). One patch removes a Debug build assert in `caller_id()` that the `-O3` optimization of `afl-clang-fast` makes fail (see `caller_id.c.patch`).
 
 2. We change CC and CXX to use `afl-clang-fast`/`afl-gcc-fast` and `afl-clang-fast++`/`afl-g++-fast` from the system path depending on whether the clang or gcc version of afl is available.
 
