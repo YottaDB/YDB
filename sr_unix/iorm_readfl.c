@@ -1562,6 +1562,21 @@ int	iorm_readfl (mval *v, int4 width, uint8 nsec_timeout) /* timeout in nanoseco
 						PIPE_DEBUG(PRINTF("6: char_bytes_read: %d\n", char_bytes_read); DEBUGPIPEFLUSH);
 						if (1 == char_bytes_read)
 						{
+							if (rm_ptr->crlastbuff && (ASCII_LF != *char_start))
+							{
+								/* CR was the last char of the previous buffer.
+								 * We needed to inspect this char to be LF.
+								 * The previous READ was not terminated, terminate it.
+								 * Also reset the buffer pointers so this char goes into next read.
+								 * Do this before checking that this char is valid UTF-8, so the
+								 * next READ (not this one) issues the BADCHAR error for an invalid char.
+								 */
+								rm_ptr->start_pos -= min_bytes_to_copy;
+								rm_ptr->inbuf_pos = char_start;
+								rm_ptr->crlastbuff = FALSE;
+								if (!rdone)
+									break;
+							}
 							add_bytes = UTF8_MBFOLLOW(char_start);
 							if (0 < add_bytes)
 							{
@@ -1615,18 +1630,6 @@ int	iorm_readfl (mval *v, int4 width, uint8 nsec_timeout) /* timeout in nanoseco
 									if (!rdone)
 										break;
 								}
-							} else if (rm_ptr->crlastbuff)
-							{
-								/* CR was the last char of the previous buffer.
-								 * We needed to inspect this char to be LF.
-								 * The previous READ was not terminated, terminate it.
-								 * Also reset the buffer pointers so this char goes into next read.
-								 */
-								rm_ptr->start_pos -= min_bytes_to_copy;
-								rm_ptr->inbuf_pos = char_start;
-								rm_ptr->crlastbuff = FALSE;
-								if (!rdone)
-									break;
 							}
 							rm_ptr->inbuf_off = rm_ptr->inbuf_pos;	/* mark as read */
 							if (ASCII_CR == *char_start)
