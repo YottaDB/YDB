@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2026 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -34,7 +37,10 @@ int linetail(void)
 			return TRUE;
 		if (!cmd())
 		{
-			if (!ALREADY_RTERROR)
+			/* An OC_RTERROR triple at the end of the chain can be from a warning (for example INVSVN), which does
+			 * not set "source_error_found". Issue an error in that case too.
+			 */
+			if (!ALREADY_RTERROR || !TREF(source_error_found))
 				TREF(source_error_found) ? stx_error(TREF(source_error_found)) : stx_error(ERR_CMD);
 			assert((TREF(curtchain))->exorder.bl->exorder.fl == TREF(curtchain));
 			assert(TREF(source_error_found));
