@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2022 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2022-2026 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
@@ -11,10 +11,141 @@
 #################################################################
 
 diff --git a/sr_unix/gtm_dump_core.c b/sr_unix/gtm_dump_core.c
-index 36c185ac..47a2bee0 100755
+index 36c185acd..d76279f12 100644
 --- a/sr_unix/gtm_dump_core.c
 +++ b/sr_unix/gtm_dump_core.c
-@@ -34,6 +34,14 @@ void gtm_dump_core(void)
+@@ -24,8 +24,130 @@
+ #include "error.h"
+ #include "gtmcrypt.h"
+ 
++#include <execinfo.h>
++#include "gtm_fcntl.h"
++#include "gtm_limits.h"
++#include "gtm_time.h"
++#include "gtm_inet.h"
++#include "gdsroot.h"
++#include "gtm_facility.h"
++#include "fileinfo.h"
++#include "gdsbt.h"
++#include "gdsfhead.h"
++#include "repl_msg.h"
++#include "gtmsource.h"
++#include "filestruct.h"
++#include "dpgbldir.h"
++#include "have_crit.h"
++
++GBLREF	int4		error_condition;
++GBLREF	sgmnt_addrs	*kip_csa;
++GBLREF	uint4		dollar_tlevel, process_id;
++GBLREF	unsigned int	t_tries;
++
++#define	FUZZ_LOG_MAX_SIZE	(10 * 1024 * 1024)	/* stop appending to a log file once the file is this large */
++#define	FUZZ_MAX_SAVED_INPUTS	200
++#define	FUZZ_MAX_INPUT_SIZE	(1024 * 1024)
++
++void fuzz_db_death_log(int sig);	/* also called from sig_init.c (fuzz testing only) */
++
+ #define	CORE_NAME_LEN	20 + 1
+ 
++/* Fuzz testing only. If the FUZZ_DB_LOGDIR env var is set (fuzzing/fuzz.sh sets it to the database directory of the
++ * afl-fuzz instance) and this process holds crit, is in a database commit, is in wcs_wtstart() or has a KILL in progress,
++ * append a description of that state and a backtrace to $FUZZ_DB_LOGDIR/dbdeath.log, and save the input of the process
++ * (its stdin, the file afl-fuzz runs it with) as $FUZZ_DB_LOGDIR/dbdeath_input_<n>. A fuzz testing build exits right
++ * away on a signal like SIGSEGV or an event that dumps a core (see sig_init.c.patch and gtm_fork_n_core.c.patch), without
++ * the exit handler that would otherwise finish or undo such a database update, so this records which event did that.
++ * Called from gtm_dump_core() and from the handler that sig_init.c.patch installs for those signals, so it uses only
++ * system calls, and fixed size buffers on the stack.
++ */
++void fuzz_db_death_log(int sig)
++{
++	static boolean_t	logged;
++	char			buf[4096], path[YDB_PATH_MAX], tbuf[32], *dir;
++	int			fd, infd, len, n, i;
++	uint4			state;
++	ssize_t			cnt;
++	off_t			off;
++	time_t			now;
++	struct tm		tm;
++	struct stat		st;
++	void			*frames[64];
++	gd_addr			*addr_ptr;
++	gd_region		*reg, *reg_top;
++	sgmnt_addrs		*csa;
++
++	if (logged || (NULL == (dir = getenv("FUZZ_DB_LOGDIR"))))
++		return;
++	logged = TRUE;
++	state = have_crit(CRIT_HAVE_ANY_REG | CRIT_IN_COMMIT | CRIT_IN_WTSTART | CRIT_ALL_REGIONS);
++	if (!state && (NULL == kip_csa))
++		return;
++	snprintf(path, SIZEOF(path), "%s/dbdeath.log", dir);
++	if (-1 == (fd = open(path, O_WRONLY | O_CREAT | O_APPEND, 0666)))
++		return;
++	if ((0 != fstat(fd, &st)) || (FUZZ_LOG_MAX_SIZE < st.st_size))
++	{
++		close(fd);
++		return;
++	}
++	/* Save the input, under the first free name, if the input is a regular file (not a pipe or terminal) */
++	path[0] = '\0';
++	if ((0 == fstat(0, &st)) && S_ISREG(st.st_mode))
++	{
++		for (i = 1; FUZZ_MAX_SAVED_INPUTS >= i; i++)
++		{
++			snprintf(path, SIZEOF(path), "%s/dbdeath_input_%d", dir, i);
++			if (-1 != (infd = open(path, O_WRONLY | O_CREAT | O_EXCL, 0666)))
++				break;
++		}
++		if (FUZZ_MAX_SAVED_INPUTS < i)
++			path[0] = '\0';
++		else
++		{
++			for (off = 0; FUZZ_MAX_INPUT_SIZE > off; off += cnt)
++			{
++				cnt = pread(0, buf, SIZEOF(buf), off);
++				if ((0 >= cnt) || (cnt != write(infd, buf, cnt)))
++					break;
++			}
++			close(infd);
++		}
++	}
++	now = time(NULL);
++	localtime_r(&now, &tm);
++	strftime(tbuf, SIZEOF(tbuf), "%Y-%m-%d %H:%M:%S", &tm);
++	len = snprintf(buf, SIZEOF(buf), "%s pid %u signal %d error_condition %d dollar_tlevel %u t_tries %u kip_csa %s"
++		" input %s\n", tbuf, process_id, sig, error_condition, dollar_tlevel, t_tries, (NULL != kip_csa) ? "set" : "NULL",
++		path[0] ? path : "-");
++	for (addr_ptr = get_next_gdr(NULL); (NULL != addr_ptr) && (SIZEOF(buf) > len); addr_ptr = get_next_gdr(addr_ptr))
++	{
++		for (reg = addr_ptr->regions, reg_top = reg + addr_ptr->n_regions; reg < reg_top; reg++)
++		{
++			if (!reg->open || reg->was_open || (SIZEOF(buf) <= len))
++				continue;
++			csa = &FILE_INFO(reg)->s_addrs;
++			if ((NULL == csa) || (NULL == csa->ti))
++				continue;
++			n = snprintf(buf + len, SIZEOF(buf) - len, "    region %.*s now_crit %d curr_tn 0x%llx early_tn 0x%llx"
++				" t_commit_crit %d in_wtstart %d\n", reg->rname_len, reg->rname, csa->now_crit,
++				(unsigned long long)csa->ti->curr_tn, (unsigned long long)csa->ti->early_tn,
++				(int)csa->t_commit_crit, (int)csa->in_wtstart);
++			if (0 < n)
++				len += n;
++		}
++	}
++	if (SIZEOF(buf) < len)
++		len = SIZEOF(buf);
++	if (0 < write(fd, buf, len))
++	{
++		n = backtrace(frames, ARRAYSIZE(frames));
++		backtrace_symbols_fd(frames, n, fd);
++	}
++	close(fd);
++}
++
+ void gtm_dump_core(void)
+ {
+ 	struct sigaction        act;
+@@ -34,6 +156,15 @@ void gtm_dump_core(void)
  	struct stat             fs1;
  	sigset_t		unblock_sigquit;
  
@@ -22,6 +153,7 @@ index 36c185ac..47a2bee0 100755
 +	 * Note that this includes fatal errors like GTMASSERT2/GTMASSERT etc. too as they invoke DUMP_CORE macro.
 +	 */
 +	char	*ptr, ch;
++	fuzz_db_death_log(SIGQUIT);
 +	ptr = NULL;
 +	ch = *ptr;
 +	printf("ch = %d\n", ch);

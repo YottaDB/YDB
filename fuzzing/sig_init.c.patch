@@ -13,17 +13,64 @@
 #################################################################
 
 diff --git a/sr_unix/sig_init.c b/sr_unix/sig_init.c
-index ae5eb81f9..fa2e8deed 100644
+index ae5eb81f9..c7199bdef 100644
 --- a/sr_unix/sig_init.c
 +++ b/sr_unix/sig_init.c
-@@ -155,9 +155,16 @@ void sig_init(void (*signal_handler)(), void (*ctrlc_handler)(), void (*suspsig_
+@@ -35,6 +35,23 @@ GBLREF	boolean_t		gtm_jvm_process;
+ #endif
+ GBLREF	struct sigaction	orig_sig_action[];
+ 
++void fuzz_db_death_log(int sig);	/* in gtm_dump_core.c (fuzz testing only) */
++
++/* Fuzz testing only. Handler for the signals that YottaDB would otherwise handle with generic_signal_handler() and that
++ * fuzz testing leaves to the handler the process had before sig_init() (the default action, or the handler of the
++ * address sanitizer in an ASAN build), so afl-fuzz records the signal as a crash. It records the state of a process that
++ * dies with such a signal while updating the database (see fuzz_db_death_log()) and puts that handler back. For a
++ * signal that the kernel sent because of the instruction that the process ran (si_code > 0), the instruction runs again
++ * on return, and causes the signal again. Any other signal is sent again, and taken once this handler returns.
++ */
++static void fuzz_signal_handler(int sig, siginfo_t *info, void *context)
++{
++	fuzz_db_death_log(sig);
++	sigaction(sig, &orig_sig_action[sig], NULL);
++	if ((NULL == info) || (0 >= info->si_code))
++		raise(sig);
++}
++
+ /* sig_init() is the signal handling initialization function for regular signal handling setting handlers for ALL signals
+  * from 1 to NSIG with the handlers for all signals except the 4 signal handlers specified in the parameters which are set
+  * to what is provided. Note that some signal handlers (for ^C, jobinterrupt, and others) are set in other routines. These
+@@ -45,7 +62,7 @@ GBLREF	struct sigaction	orig_sig_action[];
+  */
+ void sig_init(void (*signal_handler)(), void (*ctrlc_handler)(), void (*suspsig_handler)(), void (*continue_handler)())
+ {
+-	struct sigaction 	ignore, null_action, def_action, susp_action, gen_action, ctrlc_action, cont_action;
++	struct sigaction 	ignore, null_action, def_action, susp_action, gen_action, ctrlc_action, cont_action, fuzz_action;
+ 	int			sig, rc;
+ 	sigset_t		all_signals;
+ 	DCL_THREADGBL_ACCESS;
+@@ -76,6 +93,9 @@ void sig_init(void (*signal_handler)(), void (*ctrlc_handler)(), void (*suspsig_
+ 	gen_action.sa_sigaction = signal_handler;
+ 	ctrlc_action.sa_sigaction = ctrlc_handler;
+ 	cont_action.sa_sigaction = continue_handler;
++	fuzz_action = ignore;
++	fuzz_action.sa_sigaction = fuzz_signal_handler;
++	fuzz_action.sa_flags = SA_SIGINFO | SA_ONSTACK;
+ 	/* Save the current handler for each signal in orig_sig_action[] array indexed by the signal number */
+ 	for (sig = 1; sig <= (NSIG - 1); sig++)
+ 	{
+@@ -155,9 +175,19 @@ void sig_init(void (*signal_handler)(), void (*ctrlc_handler)(), void (*suspsig_
  #			ifndef __linux__
  			case SIGSYS:
  #			endif
 -			case SIGTERM:
  			case SIGTRAP:
- 				/* These are all being handled by the generic_signal_handler. */
-+				//sigaction(sig, &gen_action, NULL);
+-				/* These are all being handled by the generic_signal_handler. */
++				/* YottaDB handles these with generic_signal_handler(). During fuzz testing, they go to the handler that
++				 * the process had before (so afl-fuzz records them as crashes), after fuzz_signal_handler() records the
++				 * state of a process that was updating the database.
++				 */
++				sigaction(sig, &fuzz_action, NULL);
 +				break;
 +			case SIGTERM:
 +				/* Keep the SIGTERM handler during fuzz testing. "fuzzing/fuzz.sh" makes afl-fuzz send SIGTERM

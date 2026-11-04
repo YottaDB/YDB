@@ -24,7 +24,7 @@ At a high level, we've only made a makefile which calls three scripts in this di
 
 To fuzz something, we first need to have AFL be able to track execution, etc.  This means, of course, instrumentation.  To do that we need to make two small changes to the build process:
 
-1. We patch out the signal handlers installed for SIGBUS, SIGSEGV, SIGILL, SIGFPE, etc in `sr_unix/sig_init.c`.  This is a one line change that we do with `patch`. Other patches (see the `patch` target in the `Makefile`) turn events that would dump a core (e.g. an assert failure) into a SIG-11 that afl-fuzz records as a crash, keep messages out of the syslog, and stop the fuzzed M code from running shell commands or signaling other processes (`ZSYSTEM`, `ZEDIT`, PIPE devices, the `STARTUP` parameter of `JOB` and `$ZSIGPROC`). One patch removes a Debug build assert in `caller_id()` that the `-O3` optimization of `afl-clang-fast` makes fail (see `caller_id.c.patch`).
+1. We patch out the signal handlers installed for SIGBUS, SIGSEGV, SIGILL, SIGFPE, etc in `sr_unix/sig_init.c`.  This is a one line change that we do with `patch`. Other patches (see the `patch` target in the `Makefile`) turn events that would dump a core (e.g. an assert failure) into a SIG-11 that afl-fuzz records as a crash, keep messages out of the syslog, and stop the fuzzed M code from running shell commands or signaling other processes (`ZSYSTEM`, `ZEDIT`, PIPE devices, the `STARTUP` parameter of `JOB` and `$ZSIGPROC`). One patch removes a Debug build assert in `caller_id()` that the `-O3` optimization of `afl-clang-fast` makes fail (see `caller_id.c.patch`). When the fuzzed processes use a database (see `FUZZ_DB_LOGDIR` below), patches also log a process that dies while updating the database, and messages about a damaged database (see `gtm_dump_core.c.patch`, `sig_init.c.patch` and `util_output.c.patch`).
 
 2. We change CC and CXX to use `afl-clang-fast`/`afl-gcc-fast` and `afl-clang-fast++`/`afl-g++-fast` from the system path depending on whether the clang or gcc version of afl is available.
 
@@ -57,6 +57,15 @@ Just kill the tmux server (`tmux kill-server`).
 On modern version of AFL++, you can remove the input directory to make `afl-fuzz` read from the input queue instead of from an input corpus.  Simply remove `-i inputs` from fuzz.sh, and replace it with `-i-`.  Then, rerun all the fuzzers by just calling `./fuzz.sh`.
 
 To instead start a new campaign (e.g. with a newer YottaDB build) from what an earlier campaign found, save the `output/Leader/queue` directory of the earlier campaign and set the `FUZZ_SEED_DIR` env var to it before running `make corpus` (or `enhanced_fuzz.csh`). `make_corpus.sh` then adds those inputs to the YDBTest tests before running `afl-cmin`.
+
+### ...find out why an instance database is damaged?
+
+When `enhanced_fuzz.csh` chooses to use a database, each afl-fuzz instance has its own database in `env/<instance>/db`, and `fuzz.sh` sets the `FUZZ_DB_LOGDIR` env var of the fuzzed processes to that directory. A fuzz testing build exits right away on an event that dumps a core or on a signal like SIGSEGV, without finishing or undoing a database update that the process is in the middle of, so such an exit can damage the database. These files in `env/<instance>/db` help find out which input did that:
+
+- `dbdeath.log`: one entry (time, pid, signal, `error_condition`, crit and commit state of each region, and a backtrace) for each fuzzed process that exited that way while the process held crit, was in a commit, was in `wcs_wtstart()` or had a KILL in progress. `addr2line -f -e <build>/libyottadb.so <offset>` turns the `libyottadb.so(+<offset>)` lines of the backtrace into function names. `$ZMESSAGE(<error_condition>)` is the error.
+- `dbdeath_input_<n>`: the input of the process of each such entry (the first 200).
+- `dbmsgs.log`: the messages that the database code sends to the syslog when the database or the database shared memory is damaged, or when crit is salvaged from a dead process (the syslog itself gets no messages during fuzz testing).
+- `purge.log`: the output of the online `MUPIP INTEG` and of the purge that `cleaner.sh` does about once a minute. The first time `MUPIP INTEG` finds an integrity error, `cleaner.sh` saves the `MUPIP INTEG` output, the file header, a copy of the database, the above files and the inputs that afl-fuzz saved since the last `MUPIP INTEG` that found no error in a `damage_<date>_<time>` subdirectory.
 
 ## Issues
 

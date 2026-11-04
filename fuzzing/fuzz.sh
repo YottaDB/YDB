@@ -106,6 +106,9 @@ start_fuzzer() {
 		"$dist/yottadb" -run GDE @gde.com > create.log 2>&1 && "$dist/mupip" create >> create.log 2>&1
 		) || { echo "Could not create the database of $name. See $PWD/db/create.log. Exiting."; exit 1; }
 		envvars="$envvars ydb_gbldir=$(printf %q "$PWD/db/yottadb.gld")"
+		# A fuzzed process that dies while updating this database, and messages about a damaged database, are logged
+		# in this directory (see "gtm_dump_core.c.patch" and "util_output.c.patch").
+		envvars="$envvars FUZZ_DB_LOGDIR=$(printf %q "$PWD/db")"
 	fi
 	tmux new-session -d -s "$name" "env $envvars afl-fuzz -D -t 5000+ -i ../../inputs -o ../../output $role $name -- ../../$build/yottadb -dir"
 	tmux new-session -d -s "Cleaner$name" "../../cleaner.sh $name"

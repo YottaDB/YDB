@@ -49,6 +49,7 @@ patch:
 	patch --no-backup-if-mismatch ../sr_unix/op_zmess.c op_zmess.c.patch
 	patch --no-backup-if-mismatch ../sr_unix/op_zedit.c op_zedit.c.patch
 	patch --no-backup-if-mismatch ../sr_unix/sig_init.c sig_init.c.patch
+	patch --no-backup-if-mismatch ../sr_unix/util_output.c util_output.c.patch
 
 reset:
 	patch --reject-file=- --no-backup-if-mismatch --reverse ../sr_linux/caller_id.c caller_id.c.patch
@@ -73,6 +74,7 @@ reset:
 	patch --reject-file=- --no-backup-if-mismatch --reverse ../sr_unix/op_zmess.c op_zmess.c.patch
 	patch --reject-file=- --no-backup-if-mismatch --reverse ../sr_unix/op_zedit.c op_zedit.c.patch
 	patch --reject-file=- --no-backup-if-mismatch --reverse ../sr_unix/sig_init.c sig_init.c.patch
+	patch --reject-file=- --no-backup-if-mismatch --reverse ../sr_unix/util_output.c util_output.c.patch
 
 clean: rm reset
 

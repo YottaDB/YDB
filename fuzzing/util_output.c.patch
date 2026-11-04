@@ -1,0 +1,96 @@
+#################################################################
+#								#
+# Copyright (c) 2026 YottaDB LLC and/or its subsidiaries.	#
+# All rights reserved.						#
+#								#
+#	This source code contains the intellectual property	#
+#	of its copyright holder(s), and is made available	#
+#	under a license.  If you do not know the terms of	#
+#	the license, please stop and do not read further.	#
+#								#
+#################################################################
+
+diff --git a/sr_unix/util_output.c b/sr_unix/util_output.c
+index e30495365..e24a0d56b 100644
+--- a/sr_unix/util_output.c
++++ b/sr_unix/util_output.c
+@@ -20,6 +20,11 @@
+ #include <stdarg.h>
+ #include "gtm_stdio.h"
+ #include "gtm_syslog.h"
++#include "gtm_fcntl.h"
++#include "gtm_stat.h"
++#include "gtm_time.h"
++#include "gtm_unistd.h"
++#include "gtm_limits.h"
+ #include <errno.h>
+ 
+ #include "gtm_multi_thread.h"
+@@ -665,6 +670,59 @@ void	util_out_close(void)
+ }
+ 
+ /* #GTM_THREAD_SAFE : The below function (util_out_send_oper) is thread-safe because caller ensures serialization with locks */
++/* Fuzz testing only. Mnemonics of the messages that the database code sends to the syslog when a database or the shared memory
++ * of a database is damaged, when crit is salvaged from a dead process, or when a process is stuck in a commit, read or write.
++ */
++static const char *fuzz_db_mnemonics[] = {
++	"BTFAIL", "BUFOWNERSTUCK", "BUFRDTIMEOUT", "COMMITWAITPID", "COMMITWAITSTUCK", "DBADDRALIGN", "DBADDRANGE",
++	"DBADDRANGE8", "DBCCERR", "DBCNTRLERR", "DBCRERR", "DBCRERR8", "DBDANGER", "DBFHEADERR4", "DBFHEADERR8",
++	"DBFHEADERRANY", "DBFHEADLRU", "DBQUELINK", "DBWCVERIFYEND", "DBWCVERIFYSTART", "GVDATAFAIL", "GVGETFAIL",
++	"GVKILLFAIL", "GVORDERFAIL", "GVPUTFAIL", "GVQUERYFAIL", "GVZPREVFAIL", "INVALIDRIP", "KILLABANDONED", "MUTEXERR",
++	"MUTEXFRCDTERM", "MUTEXLCKALERT", "TPFAIL", "WCBLOCKED", "WRITERSTUCK"
++};
++
++/* Fuzz testing only. fuzzing/gtm_syslog.h.patch keeps all messages out of the syslog. If the FUZZ_DB_LOGDIR env var is set
++ * (fuzzing/fuzz.sh sets it to the database directory of the afl-fuzz instance), append the messages listed above (which
++ * are rare unless the database is damaged) to $FUZZ_DB_LOGDIR/dbmsgs.log, with the time and the process id.
++ */
++static void fuzz_db_msg_log(char *addr)
++{
++	char		*dir, *mnem, *end, path[YDB_PATH_MAX], tbuf[48];
++	int		fd, i, tlen;
++	size_t		len;
++	time_t		now;
++	struct tm	tm;
++	struct stat	st;
++
++	if (NULL == (dir = getenv("FUZZ_DB_LOGDIR")))
++		return;
++	len = strlen(addr);
++	if ((7 > len) || (0 != memcmp(addr, "%YDB-", 5)) || ('-' != addr[6]))
++		return;
++	mnem = addr + 7;
++	end = memchr(mnem, ',', len - 7);
++	if (NULL == end)
++		return;
++	for (i = 0; ARRAYSIZE(fuzz_db_mnemonics) > i; i++)
++		if ((STRLEN(fuzz_db_mnemonics[i]) == (end - mnem)) && (0 == memcmp(mnem, fuzz_db_mnemonics[i], end - mnem)))
++			break;
++	if (ARRAYSIZE(fuzz_db_mnemonics) <= i)
++		return;
++	snprintf(path, SIZEOF(path), "%s/dbmsgs.log", dir);
++	if (-1 == (fd = open(path, O_WRONLY | O_CREAT | O_APPEND, 0666)))
++		return;
++	if ((0 == fstat(fd, &st)) && ((10 * 1024 * 1024) > st.st_size))
++	{
++		now = time(NULL);
++		localtime_r(&now, &tm);
++		tlen = (int)strftime(tbuf, SIZEOF(tbuf), "%Y-%m-%d %H:%M:%S", &tm);
++		tlen += snprintf(tbuf + tlen, SIZEOF(tbuf) - tlen, " pid %u ", process_id);
++		if ((tlen == write(fd, tbuf, tlen)) && ((ssize_t)len == write(fd, addr, len)))
++			(void)write(fd, "\n", 1);
++	}
++	close(fd);
++}
++
+ void	util_out_send_oper(char *addr, unsigned int len)
+ /* 1st arg: address of system log message */
+ /* 2nd arg: length of system long message (not used in Unix implementation) */
+@@ -781,6 +839,7 @@ void	util_out_send_oper(char *addr, unsigned int len)
+ 	 * We address this issue by deferring signals for the duration of the call; generic_signal_handler.c will also
+ 	 * skip send_msg invocations if the interrupt comes while INTRPT_IN_LOG_FUNCTION is set.
+ 	 */
++	fuzz_db_msg_log(addr);
+ 	DEFER_INTERRUPTS(INTRPT_IN_LOG_FUNCTION, prev_intrpt_state);
+ 	SYSLOG(LOG_USER | LOG_INFO, "%s", addr);
+ 	ENABLE_INTERRUPTS(INTRPT_IN_LOG_FUNCTION, prev_intrpt_state);

@@ -32,8 +32,16 @@ mkdir -p "$coredir"
 # fires in the updates of a later input). So remove all triggers and globals in it every 6 iterations of the loop below
 # (about once a minute), and give back the space they used. An input can write hundreds of megabytes before afl-fuzz
 # times it out, and a KILL frees the blocks inside the database file without making the file smaller.
+#
+# Before each purge, check the database with an online MUPIP INTEG. The first time INTEG reports an integrity error, save in
+# "db/damage_<date>_<time>" what helps find the cause: the INTEG output, the file header (DSE), a copy of the database file,
+# the logs that the fuzz testing build writes in "db" (see "gtm_dump_core.c.patch" and "util_output.c.patch"), and the
+# inputs that afl-fuzz saved as crashes or hangs since the last INTEG that found no error (one of them, or an input that
+# afl-fuzz did not save as the input was not new, damaged the database). The purge output and the INTEG results are appended,
+# with the time, to "db/purge.log", which keeps only the last 2000 lines.
 dbgld=$PWD/db/yottadb.gld
 dbdist=$(cd ../../build-instrumented && pwd)
+afloutput=$(cd ../.. && pwd)/output/$1
 iteration=0
 
 while true
@@ -44,14 +52,35 @@ do
 		(
 		# Use M mode and the default routines, like "fuzz.sh" does to create the database
 		unset ydb_routines gtmroutines ydb_chset gtm_chset
-		export LC_ALL=C ydb_dist=$dbdist ydb_gbldir=$dbgld AFL_IGNORE_PROBLEMS=1
+		export LC_ALL=C ydb_dist=$dbdist ydb_gbldir=$dbgld AFL_IGNORE_PROBLEMS=1 FUZZ_DB_LOGDIR=$PWD/db
 		# Delete the triggers first so a trigger that fuzzed code created does not run (or fail) during the KILLs
 		cd db || exit
+		{
+		echo "=== $(date '+%Y-%m-%d %H:%M:%S')"
+		"$dbdist/mupip" integ -online -region DEFAULT < /dev/null > integ.out 2>&1
+		status=$?
+		echo "INTEG exit status $status"
+		if [ 0 -eq $status ]; then
+			touch integ.good
+		elif grep -q -- "-E-INTEGERRS" integ.out && [ -z "$(find . -maxdepth 1 -type d -name 'damage_*')" ]; then
+			damage=damage_$(date +%Y%m%d_%H%M%S)
+			mkdir "$damage" "$damage/inputs"
+			cp integ.out "$damage"
+			timeout 60 "$dbdist/dse" dump -fileheader -all < /dev/null > "$damage/fileheader.txt" 2>&1
+			cp yottadb.dat dbdeath* dbmsgs.log "$damage" 2>/dev/null
+			newer=""
+			[ -e integ.good ] && newer="-newer integ.good"
+			# shellcheck disable=SC2086
+			find "$afloutput/crashes" "$afloutput/hangs" -type f -name 'id:*' $newer -exec cp {} "$damage/inputs" \;
+			echo "INTEG found integrity errors, see $PWD/$damage"
+		fi
 		# shellcheck disable=SC2016
-		"$dbdist/yottadb" -run %XCMD 'set x=$ztrigger("item","-*")' < /dev/null > purge.log 2>&1
+		"$dbdist/yottadb" -run %XCMD 'set x=$ztrigger("item","-*")' < /dev/null
 		# shellcheck disable=SC2016
-		"$dbdist/yottadb" -run %XCMD 'set g="^%" for  set g=$order(@g) quit:g=""  kill @g' < /dev/null >> purge.log 2>&1
-		"$dbdist/mupip" reorg -truncate -region DEFAULT < /dev/null >> purge.log 2>&1
+		"$dbdist/yottadb" -run %XCMD 'set g="^%" for  set g=$order(@g) quit:g=""  kill @g' < /dev/null
+		"$dbdist/mupip" reorg -truncate -region DEFAULT < /dev/null
+		} >> purge.log 2>&1
+		tail -n 2000 purge.log > purge.log.tmp && mv purge.log.tmp purge.log
 		)
 	fi
 	# "fuzz.sh" sets AFL_ALLOW_CORES so a crash creates a core file in the current directory. afl-fuzz keeps the crashing
