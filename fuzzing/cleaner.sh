@@ -37,8 +37,9 @@ mkdir -p "$coredir"
 # "db/damage_<date>_<time>" what helps find the cause: the INTEG output, the file header (DSE), a copy of the database file,
 # the logs that the fuzz testing build writes in "db" (see "gtm_dump_core.c.patch" and "util_output.c.patch"), and the
 # inputs that afl-fuzz saved as crashes or hangs since the last INTEG that found no error (one of them, or an input that
-# afl-fuzz did not save as the input was not new, damaged the database). The purge output and the INTEG results are appended,
-# with the time, to "db/purge.log", which keeps only the last 2000 lines.
+# afl-fuzz did not save as the input was not new, damaged the database). The time, the exit status of INTEG and REORG, and
+# the rest of the purge output are appended to "db/purge.log", which keeps only the last 2000 lines. "db/integ.out" and
+# "db/reorg.out" have the output of the last INTEG and REORG.
 dbgld=$PWD/db/yottadb.gld
 dbdist=$(cd ../../build-instrumented && pwd)
 afloutput=$(cd ../.. && pwd)/output/$1
@@ -78,7 +79,10 @@ do
 		"$dbdist/yottadb" -run %XCMD 'set x=$ztrigger("item","-*")' < /dev/null
 		# shellcheck disable=SC2016
 		"$dbdist/yottadb" -run %XCMD 'set g="^%" for  set g=$order(@g) quit:g=""  kill @g' < /dev/null
-		"$dbdist/mupip" reorg -truncate -region DEFAULT < /dev/null
+		# MUPIP REORG reports on every global in the directory tree, which keeps the globals that the KILLs above removed,
+		# so the REORG output is in "reorg.out" (only from the last purge), not in "purge.log".
+		"$dbdist/mupip" reorg -truncate -region DEFAULT < /dev/null > reorg.out 2>&1
+		echo "REORG exit status $?"
 		} >> purge.log 2>&1
 		tail -n 2000 purge.log > purge.log.tmp && mv purge.log.tmp purge.log
 		)
