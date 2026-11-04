@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -162,6 +162,8 @@ void op_zlink (mval *v, mval *quals)
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_RESTRICTEDOP, 1, "ZLINK");
 	ARLINK_ONLY(recent_zhist = NULL);
 	MV_FORCE_STR(v);
+	if (NULL != quals)
+		MV_FORCE_STR(quals);
 	if (!v->str.len)
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(8) ERR_ZLINKFILE, 2, v->str.len, v->str.addr, ERR_TEXT, 2,
 			RTS_ERROR_LITERAL("Filename/path is missing"));
