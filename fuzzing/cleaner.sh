@@ -54,6 +54,11 @@ do
 		# Use M mode and the default routines, like "fuzz.sh" does to create the database
 		unset ydb_routines gtmroutines ydb_chset gtm_chset
 		export LC_ALL=C ydb_dist=$dbdist ydb_gbldir=$dbgld AFL_IGNORE_PROBLEMS=1 FUZZ_DB_LOGDIR=$PWD/db
+		# On a damaged database, the commands below (INTEG, and the purge: delete the triggers, KILL every global,
+		# then MUPIP REORG -TRUNCATE) fail the same way every minute, so their core files (in "db", which the core
+		# file handling after this subshell does not look at) are of no use, and they would fill the disk. Do not
+		# create them. The limit applies only to this subshell, not to the fuzzed processes.
+		ulimit -c 0
 		# Delete the triggers first so a trigger that fuzzed code created does not run (or fail) during the KILLs
 		cd db || exit
 		{
