@@ -338,7 +338,7 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, uint
 					handle_len = (int)(unsigned char)(*(pp->str.addr + p_offset));
 					if (handle_len > MAX_HANDLE_LEN)
 						handle_len = MAX_HANDLE_LEN;
-					assert((0 < handle_len) && (SIZEOF(sock_handle) >= handle_len));
+					assert((0 <= handle_len) && (SIZEOF(sock_handle) >= handle_len));
 					memcpy(sock_handle, pp->str.addr + p_offset + 1, handle_len);
 					break;
 				case iop_socket:
@@ -483,7 +483,7 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, uint
 			if (MAX_HANDLE_LEN < handle_len)
 				handle_len = MAX_HANDLE_LEN;
 			socketptr->handle_len = handle_len;
-			assert((0 < handle_len) && (SIZEOF(socketptr->handle) >= handle_len));
+			assert((0 <= handle_len) && (SIZEOF(socketptr->handle) >= handle_len));
 			memcpy(socketptr->handle, sock_handle, handle_len);
 			/* connects newdsocket and socketptr (the new socket) */
 			if (ydb_max_sockets <= newdsocket->n_socket)
