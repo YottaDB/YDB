@@ -656,6 +656,25 @@ MBSTART {									\
 		return;								\
 } MBEND
 
+/* For an error that is handled as a compile-time warning (IS_STX_WARN, for example NUMOFLOW from a string literal
+ * operand of a Boolean operator), "ins_errtriple" appends an OC_RTERROR triple and the two OC_ILIT operands of that
+ * triple to the triple chain, and the parse goes on. A caller of "bool_expr" that looks back from the end of the chain
+ * for the literal that the Boolean expression became uses this macro to go back over those triples (and OC_NOOP triples
+ * before them) first.
+ */
+#define SKIP_STX_WARN_RTERROR(TRIPTR)									\
+MBSTART {												\
+	triple	*rtError;										\
+													\
+	if ((OC_ILIT == (TRIPTR)->opcode) && (OC_ILIT == (TRIPTR)->exorder.bl->opcode)			\
+		&& (OC_RTERROR == (rtError = (TRIPTR)->exorder.bl->exorder.bl)->opcode)			\
+		&& (TRIP_REF == rtError->operand[1].oprclass) && ((TRIPTR) == rtError->operand[1].oprval.tref))	\
+	{												\
+		for ((TRIPTR) = rtError->exorder.bl; OC_NOOP == (TRIPTR)->opcode; (TRIPTR) = (TRIPTR)->exorder.bl)	\
+			;										\
+	}												\
+} MBEND
+
 #define RETURN_EXPR_IF_RTS_ERROR						\
 MBSTART {									\
 	if (TREF(rts_error_in_parse))						\

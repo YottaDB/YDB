@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2020-2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2020-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -181,6 +181,7 @@ int m_do(void)
 			triptr = triptr->exorder.bl;
 		for ( ; OC_NOOP == triptr->opcode; triptr = triptr->exorder.bl)
 			;
+		SKIP_STX_WARN_RTERROR(triptr);
 		if (OC_LIT == triptr->opcode)
 		{	/* it's a literal so optimize it */
 			v = &triptr->operand[0].oprval.mlit->v;

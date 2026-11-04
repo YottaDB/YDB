@@ -44,10 +44,10 @@ int indirection(oprtype *a)
 
 	SETUP_THREADGBL_ACCESS;
 	/* The caller has found an at-sign, but the current token is TK_ERROR if "advancewindow()" found an unterminated
-	 * string literal after it, or if the at-sign is followed by a byte above 127 (which "op_indlvarg()" checks only in
-	 * the text). We issue an error below in that case.
+	 * string literal after it, or if the at-sign is followed by a byte above 127, and TK_ATHASH if the at-sign is
+	 * followed by a # (both of which "op_indlvarg()" checks only in the text). We issue an error below in those cases.
 	 */
-	assert((TK_ATSIGN == TREF(window_token)) || (TK_ERROR == TREF(window_token)));
+	assert((TK_ATSIGN == TREF(window_token)) || (TK_ERROR == TREF(window_token)) || (TK_ATHASH == TREF(window_token)));
 	concat_athashes = (2 == source_column);
 	INCREMENT_EXPR_DEPTH;
 	advancewindow();
