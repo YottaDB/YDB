@@ -324,7 +324,8 @@ void op_svput(int varnum, mval *v)
 				util_out_print(NULL, RESET);	/* Clear whatever message was in buffer previously */
 				if (NULL != errortext)
 				{	/* $ZSTATUS is in the form ERRNUM,ENTRYREF,ERRORTEXT.
-					 * Copy over ERRORTEXT \n \t\t ENTRYREF to the util_output buffer.
+					 * Copy over ERRORTEXT \n \t\t ENTRYREF to the util_output buffer, as text (not as the control
+					 * string of util_out_print(), where a ! would be a directive).
 					 * This will mirror the format of the error displayed when not in direct mode.
 					 */
 					char	*tmp2;
@@ -334,10 +335,10 @@ void op_svput(int varnum, mval *v)
 					len--;
 					memcpy(tmp2, entryref + 1, len);
 					tmp2[len] = '\0';
-					util_out_print(errortext + 1, NOFLUSH_OUT);
+					util_out_print("!AZ", NOFLUSH_OUT, errortext + 1);
 					/* The below simulates a RTSLOC error */
 					util_out_print("!/!_!_At M source location ", NOFLUSH_OUT);	/* !/ is \n, !_ is \t */
-					util_out_print(tmp2, NOFLUSH_OUT);
+					util_out_print("!AZ", NOFLUSH_OUT, tmp2);
 					free(tmp2);
 				} else {
 					/* $ZSTATUS is not in the form ERRNUM,ENTRYREF,ERRORTEXT.
@@ -345,7 +346,7 @@ void op_svput(int varnum, mval *v)
 					 * when setting $ZSTATUS to a value. Copy over the entire $ZSTATUS text into
 					 * the util_output buffer in this case.
 					 */
-					util_out_print(tmpPtr, NOFLUSH_OUT);
+					util_out_print("!AZ", NOFLUSH_OUT, tmpPtr);
 				}
 				free(tmpPtr);
 			}
