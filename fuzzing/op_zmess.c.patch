@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2022 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2022-2026 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
@@ -11,14 +11,22 @@
 #################################################################
 
 diff --git a/sr_unix/op_zmess.c b/sr_unix/op_zmess.c
-index bd08de32..19be6978 100755
+index 5f9cbb526..21c0eb3b0 100644
 --- a/sr_unix/op_zmess.c
 +++ b/sr_unix/op_zmess.c
-@@ -83,6 +83,7 @@ void op_zmess(unsigned int cnt, ...)
- 	int		faocnt;
- 	int4		tmp_severity;
- 
-+	return;
+@@ -91,6 +91,15 @@ void op_zmess(unsigned int cnt, ...)
  	VAR_START(var, cnt);
  	assert(34 == MAX_FAO_PARMS);			/* Defined in fao_parm.h. */
  	errnum = va_arg(var, int);
++	/* During fuzz testing, ignore a ZMESSAGE of a fatal message, as the fuzz testing build records the fatal error as a
++	 * crash (see gtm_dump_core.c.patch). Other messages work as usual, so M code (e.g. %GBLDEF) that issues an error
++	 * with ZMESSAGE still gets the error.
++	 */
++	if (SEVERE == SEVMASK(errnum))
++	{
++		va_end(var);
++		return;
++	}
+ 	cnt--;
+ 	if (NULL != (ectl = err_check(errnum)))		/* Note assignment. */
+ 	{
