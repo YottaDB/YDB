@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -53,6 +53,7 @@ void op_indtext(mval *lab, mint offset, mval *rtn, mval *dst)
 
 	SETUP_THREADGBL_ACCESS;
 	MV_FORCE_STR(lab);
+	MV_FORCE_STR(rtn);
 	if (WANT_CURRENT_RTN(rtn))
 	{
 		m = *rtn;

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2015 Fidelity National Information 	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -104,6 +104,7 @@ NON_ARLINK_ONLY(rhdtyp *op_rhdaddr(mval *name, rhdtyp *rhd))
 	 */
 	assert((-1 == rhdidx) || ((0 <= rhdidx) && (rhdidx <= frame_pointer->rvector->linkage_len)));
 	rhd = (-1 == rhdidx) ? NULL : (rhdtyp *)frame_pointer->rvector->linkage_adr[rhdidx].ext_ref;
+	MV_FORCE_STR(name);	/* An indirect routine name can be an undefined local variable (issues LVUNDEF) */
 	/* If below block is changed, check if need to update bock not related to autorelink at bottom of routine */
 	if ((NULL == rtn_names) || ((NULL == rhd) && (NULL == (rhd = find_rtn_hdr(&name->str)))))	/* Note assignment */
 	{	/* Initial check for rtn_names is so we avoid the call to find_rtn_hdr() if we have just
@@ -144,6 +145,7 @@ NON_ARLINK_ONLY(rhdtyp *op_rhdaddr(mval *name, rhdtyp *rhd))
 	}
 	return 0;
 #	else	/* Not AUTORELINK_SUPPORTED - old-style */
+	MV_FORCE_STR(name);	/* An indirect routine name can be an undefined local variable (issues LVUNDEF) */
 	/* If below block is changed, check if need to update bock related to autorelink at near top of this routine */
 	if ((NULL == rtn_names) || ((NULL == rhd) && (NULL == (rhd = find_rtn_hdr(&name->str)))))	/* Note assignment */
 	{	/* Initial check for rtn_names is so we avoid the call to find_rtn_hdr() if we have just
