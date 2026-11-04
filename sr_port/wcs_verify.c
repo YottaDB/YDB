@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -45,6 +45,9 @@
 
 GBLREF 	uint4		process_id;
 GBLREF sgmnt_addrs	*cs_addrs;
+#ifdef DEBUG
+GBLREF	block_id	ydb_skip_bml_num;
+#endif
 
 error_def(ERR_DBADDRALIGN);
 error_def(ERR_DBADDRANGE);
@@ -682,6 +685,14 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 					 * older twin could have an incorrect master-bitmap full/free status (DBBMMSTR error).
 					 */
 					do_cert_blk = ((0 == cr->twin) || (0 != cr->bt_index));
+#					ifdef DEBUG
+					/* With the "ydb_test_4g_db_blks" scheme, the local bitmaps in the hole of the database file
+					 * are never written and "dsk_read" returns a zeroed buffer for them, so such a bitmap can be in
+					 * the cache for the same restartable reason as a FREE block above. Skip the "cert_blk" for it.
+					 */
+					if ((0 != ydb_skip_bml_num) && (BLKS_PER_LMAP <= cr->blk) && (cr->blk < ydb_skip_bml_num))
+						do_cert_blk = FALSE;
+#					endif
 				}
 				if (do_cert_blk && !cert_blk(reg, cr->blk, (blk_hdr_ptr_t)bptmp, 0, RTS_ERROR_ON_CERT_FAIL, NULL))
 				{
