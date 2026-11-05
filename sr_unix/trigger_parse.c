@@ -178,7 +178,7 @@ MBSTART {										\
 				break; /* Allow only one dot in number */		\
 		}									\
 		LEN--;									\
-		ptrCh = *PTR;								\
+		ptrCh = (0 < LEN) ? *PTR : '\0';	/* not past the end of input */	\
 	} while (ISDIGIT_ASCII(ptrCh) || ('.' == ptrCh));				\
 	if (!digit_seen)								\
 	{	/* A "-" or "." without a digit is not a number */			\
@@ -381,7 +381,6 @@ STATICFNDEF boolean_t process_dollar_char(char **src_ptr, int *src_len, boolean_
 	mstr		m_dst;
 	mstr		m_src;
 	char		*ptr;
-	int		q_len;
 	char		*tmp_dst_ptr;
 
 	tmp_dst_ptr = dst_ptr = *d_ptr;
@@ -447,7 +446,8 @@ STATICFNDEF boolean_t process_dollar_char(char **src_ptr, int *src_len, boolean_
 	{
 		UPDATE_DST(ptr, len, have_star, dst_ptr, lcl_dst_len, MAX_GVSUBS_LEN);
 	}
-	q_len = 0;
+	if (0 >= len)
+		return FALSE;	/* No closing ")" within the definition */
 	if (!have_star)
 	{
 		if (MAX_GVSUBS_LEN < ++lcl_dst_len)
@@ -486,7 +486,6 @@ STATICFNDEF boolean_t process_dollar_char(char **src_ptr, int *src_len, boolean_
 					return FALSE;
 				}
 				*tmp_dst_ptr++ = '"';
-				q_len++;
 			}
 			*tmp_dst_ptr++ = *char_ptr++;
 			lcl_dst_len++;
@@ -503,7 +502,7 @@ STATICFNDEF boolean_t process_dollar_char(char **src_ptr, int *src_len, boolean_
 		ptr++;
 	assert(!have_star || ((dst_ptr == *d_ptr) && (lcl_dst_len == *dst_len)));
 	*src_ptr = ptr;
-	*src_len = len + 2 + q_len;	/* Allow for the open and close quotes and any internal quotes */
+	*src_len = len - 1;	/* The input left after the closing ")" */
 	*d_ptr = dst_ptr;
 	*dst_len = lcl_dst_len;
 	return TRUE;
@@ -857,7 +856,7 @@ STATICFNDEF boolean_t process_subscripts(char *subscr_str, uint4 *subscr_len, ch
 								return FALSE;
 							}
 						}
-						if ('.' == *ptr)
+						if ((0 < len) && ('.' == *ptr))
 						{
 							have_dot = TRUE;
 							if (MAX_GVSUBS_LEN < ++dst_len)
@@ -867,7 +866,7 @@ STATICFNDEF boolean_t process_subscripts(char *subscr_str, uint4 *subscr_len, ch
 							}
 							*dst_ptr++ = *ptr++;
 							len--;
-							if (ISDIGIT_ASCII(*ptr))
+							if ((0 < len) && ISDIGIT_ASCII(*ptr))
 							{
 								PROCESS_AND_GET_INTEGER(ptr, len, have_star, dst_ptr, dst_len, num2,
 									MAX_GVSUBS_LEN);
@@ -881,6 +880,8 @@ STATICFNDEF boolean_t process_subscripts(char *subscr_str, uint4 *subscr_len, ch
 							if (-1 == num1)	/* Pattern range without a defined beginning */
 								num1 = 0;
 						}
+						if (0 >= len)
+							break;	/* The definition ends inside the pattern, which the checks below report */
 						switch (*ptr)
 						{
 							case '(':
@@ -986,7 +987,7 @@ STATICFNDEF boolean_t process_subscripts(char *subscr_str, uint4 *subscr_len, ch
 						return FALSE;
 					}
 					UPDATE_DST(ptr, len, have_star, dst_ptr, dst_len, MAX_GVSUBS_LEN);
-					ch = *ptr;
+					ch = (0 < len) ? *ptr : '\0';	/* The definition can end after the ":" */
 					if (IS_NUMERIC_SUBSCRIPT(ch))
 						PROCESS_NUMERIC(ptr, len, have_star, dst_ptr, dst_len, MAX_GVSUBS_LEN);
 					else if ('"' == ch)
@@ -1004,12 +1005,9 @@ STATICFNDEF boolean_t process_subscripts(char *subscr_str, uint4 *subscr_len, ch
 						return FALSE;
 					} else
 					{	/* A range with no lower end - just scan the numeric or string */
-						char	*ptr1;
-
-						ptr1 = ptr;
 						if (IS_NUMERIC_SUBSCRIPT(ch))
 							PROCESS_NUMERIC(ptr, len, have_star, dst_ptr, dst_len, MAX_GVSUBS_LEN);
-						else if ('"' == *ptr1)
+						else if ('"' == ch)
 							PROCESS_STRING(ptr, len, have_star, dst_ptr, dst_len, MAX_GVSUBS_LEN);
 						else if ((0 < len) && ((',' != ch) && (';' != ch) && (')' != ch)))
 						{
@@ -1439,7 +1437,7 @@ boolean_t trigger_parse(char *input, uint4 input_len, char *trigvn, char **value
 	ptr1++;
 	while ((ptr1 < ptr1_top) && ISALNUM_ASCII(*ptr1))
 		ptr1++;
-	if ((ptr1 > ptr1_top) || (('(' != *ptr1) && !ISSPACE_ASCII(*ptr1)))
+	if ((ptr1 >= ptr1_top) || (('(' != *ptr1) && !ISSPACE_ASCII(*ptr1)))
 	{
 		ERROR_MSG_RETURN("Error : Invalid global name:\n", input_len, input);
 	}
