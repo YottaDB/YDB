@@ -155,7 +155,7 @@ STATICFNDCL boolean_t process_pieces(char *piece_str, uint4 *piece_len);
 
 #define PROCESS_NUMERIC(PTR, LEN, HAVE_STAR, DST_PTR, DST_LEN, MAX_LEN)			\
 MBSTART {										\
-	boolean_t	dot_seen = FALSE;						\
+	boolean_t	dot_seen = FALSE, digit_seen = FALSE;				\
 	char		ptrCh, *ptrStart;						\
 	mval		u;								\
 											\
@@ -168,6 +168,8 @@ MBSTART {										\
 	 */										\
 	do										\
 	{										\
+		if (ISDIGIT_ASCII(*PTR))						\
+			digit_seen = TRUE;						\
 		if ('.' == *PTR++)							\
 		{									\
 			if (!dot_seen)							\
@@ -178,6 +180,11 @@ MBSTART {										\
 		LEN--;									\
 		ptrCh = *PTR;								\
 	} while (ISDIGIT_ASCII(ptrCh) || ('.' == ptrCh));				\
+	if (!digit_seen)								\
+	{	/* A "-" or "." without a digit is not a number */			\
+		util_out_print_gtmio("Invalid subscript", FLUSH);			\
+		return FALSE;								\
+	}										\
 	if (!HAVE_STAR)									\
 	{										\
 		/* Now we have the string corresponding to the number. See if we can	\
@@ -738,6 +745,11 @@ STATICFNDEF boolean_t process_subscripts(char *subscr_str, uint4 *subscr_len, ch
 	while ((0 < len) && (')' != *ptr))
 	{
 		ch = *ptr;
+		if (valid_sub && (IS_NUMERIC_SUBSCRIPT(ch) || ('"' == ch) || ('$' == ch)))
+		{	/* A value right after another value of the same subscript (with no "," ";" or ":" between them) */
+			util_out_print_gtmio("Invalid subscript", FLUSH);
+			return FALSE;
+		}
 		if (IS_NUMERIC_SUBSCRIPT(ch))
 		{
 			PROCESS_NUMERIC(ptr, len, have_star, dst_ptr, dst_len, MAX_GVSUBS_LEN);
