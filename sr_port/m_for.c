@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2022-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -331,8 +331,14 @@ int m_for(void)
 			ref->operand[0] = control_slot;
 			if (increment[arg_index].oprclass || terminate[arg_index].oprclass)
 				ref->operand[1] = put_ilit(OC_SRCHINDX);
-			else	/* if increment rather than new value, rfrsh w/ srchindx else putindx */
-				ref->operand[1] = put_ilit(OC_PUTINDX);
+			else	/* No increment, so nothing below stores in the control variable. The FOR ends, or goes on with
+				 * the next argument, whose code (from DEAL_WITH_DANGER) gets the control variable again with its
+				 * own OC_RFRSHLVN and OC_PUTINDX, and stores the value of that argument in it right away. Find
+				 * the control variable here without creating it, as creating it would leave a node without a
+				 * value if the scope of the FOR removed the control variable (for example with an argumentless
+				 * NEW).
+				 */
+				ref->operand[1] = put_ilit(OC_RFRSHLVN);
 			newtriple(OC_PASSTHRU)->operand[0] = control_slot;
 			control_variable = put_tref(ref);
 		}
