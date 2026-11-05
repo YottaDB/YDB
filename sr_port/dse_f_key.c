@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -98,7 +98,7 @@ void dse_f_key(void)
 	UNIX_ONLY(nogbldir_present = (CLI_NEGATED == cli_present("GBLDIR"));)
 	VMS_ONLY(nogbldir_present = TRUE;)
 	DSE_GRAB_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit, nocrit_present, cs_addrs, gv_cur_region);
-	if (!dse_ksrch(root_path[0], &root_path[1], &root_offset[0], &targ_key_root[0], size_root))
+	if (!dse_ksrch(root_path[0], &root_path[1], &root_offset[0], &targ_key_root[0], size_root, DSE_KSRCH_ROOT_LEVL))
 	{
 		util_out_print("!/Key not found, no root present.", TRUE);
 		if (!nogbldir_present)
@@ -111,7 +111,7 @@ void dse_f_key(void)
 	patch_path_count = 1;
 	path[0] = ksrch_root;
 	patch_find_root_search = FALSE;
-	if (!dse_ksrch(path[0], &path[1], &offset[0], &targ_key[0], size))
+	if (!dse_ksrch(path[0], &path[1], &offset[0], &targ_key[0], size, DSE_KSRCH_ROOT_LEVL))
 	{	memcpy(util_buff, "!/Key not found, would be in block  ", 36);
 		util_len = 36;
 		util_len += i2hexl_nofill(path[patch_path_count - 2], (uchar_ptr_t)&util_buff[util_len], MAX_HEX_INT8);

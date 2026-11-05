@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2021-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.                                     *
  *								*
  *	This source code contains the intellectual property	*
@@ -29,6 +29,7 @@
 /* Include prototypes */
 #include "t_qread.h"
 #include "mmemory.h"
+#include "util.h"
 
 GBLDEF block_id		ksrch_root;
 
@@ -45,11 +46,12 @@ int dse_ksrch(block_id srch,
 	      block_id_ptr_t pp,
 	      int4 *off,
 	      char *targ_key,
-	      int targ_len)
+	      int targ_len,
+	      int expected_levl)
 {
 	boolean_t	long_blk_id;
 	cache_rec_ptr_t dummy_cr;
-	int		rsize, tmp_cmpc;
+	int		levl, rsize, tmp_cmpc;
 	int4		cmp, dummy_int;
 	long		blk_id_size;
 	sm_uc_ptr_t	blk_id, bp, b_top, key_top, rp, r_top;
@@ -58,6 +60,26 @@ int dse_ksrch(block_id srch,
 
 	if (!(bp = t_qread(srch, &dummy_int, &dummy_cr)))
 		RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(1) ERR_DSEBLKRDFAIL);
+	/* A root block has to be below the deepest possible tree, and any other block has to be one level below its parent
+	 * (the caller passes that level as "expected_levl"). Together, these keep the search within the MAX_BT_DEPTH + 1
+	 * entries of the caller arrays.
+	 */
+	levl = ((blk_hdr_ptr_t)bp)->levl;
+	if ((DSE_KSRCH_ROOT_LEVL == expected_levl) ? (MAX_BT_DEPTH <= levl) : (expected_levl != levl))
+	{
+		if (DSE_KSRCH_ROOT_LEVL == expected_levl)
+			util_out_print("!/Error: root block 0x!16@XQ is at level !UL, but the highest level of a block is !UL.",
+				TRUE, &srch, levl, MAX_BT_DEPTH - 1);
+		else
+		{	/* "pp" points to the entry of the caller's path array after the one of this block ("dse_f_key()" passes
+			 * "&path[1]" with "path[0]", and each level passes "pp + 1" with "*pp"), so "pp[-1]" is this block
+			 * ("srch") and "pp[-2]" is its parent. A root block has no parent, and does not get here.
+			 */
+			util_out_print("!/Error: block 0x!16@XQ is at level !UL, but its parent block 0x!16@XQ is at level !UL.",
+				TRUE, &srch, levl, &pp[-2], expected_levl + 1);
+		}
+		return FALSE;
+	}
 	if (((blk_hdr_ptr_t)bp)->bver > BLK_ID_32_VER) /* Check blk version to see if using 32 or 64 bit block_id */
 	{
 #		ifdef BLK_NUM_64BIT
@@ -90,7 +112,7 @@ int dse_ksrch(block_id srch,
 			r_top = rp + rsize;
 		if (r_top > b_top)
 			r_top = b_top;
-		if ((r_top - rp) < ((((blk_hdr_ptr_t)bp)->levl ? blk_id_size : MIN_DATA_SIZE) + SIZEOF(rec_hdr)))
+		if ((r_top - rp) < ((levl ? blk_id_size : MIN_DATA_SIZE) + SIZEOF(rec_hdr)))
 		{
 			*pp = 0;
 			break;
@@ -100,7 +122,7 @@ int dse_ksrch(block_id srch,
 			if (!*key_top++ && (key_top < r_top) && !*key_top++)
 				break;
 		}
-		if (((blk_hdr_ptr_t)bp)->levl && (key_top > (blk_id = (r_top - blk_id_size))))
+		if (levl && (key_top > (blk_id = (r_top - blk_id_size))))
 			key_top = blk_id;
 		if (EVAL_CMPC((rec_hdr_ptr_t)rp) > patch_comp_count)
 			cc = patch_comp_count;
@@ -127,7 +149,7 @@ int dse_ksrch(block_id srch,
 			break;
 		if (!cmp)
 		{
-			if (0 != ((blk_hdr_ptr_t)bp)->levl)
+			if (0 != levl)
 				break;
 			if (patch_find_root_search)
 			{
@@ -149,8 +171,11 @@ int dse_ksrch(block_id srch,
 		}
 	}
 	patch_path_count++;
-	if (((blk_hdr_ptr_t) bp)->levl && (*pp > 0) && (*pp < cs_addrs->ti->total_blks) && (*pp % cs_addrs->hdr->bplmap)
-	    && dse_ksrch(*pp, pp + 1, off + 1, targ_key, targ_len))
-		return TRUE;
+	if (levl && (*pp > 0) && (*pp < cs_addrs->ti->total_blks) && (*pp % cs_addrs->hdr->bplmap))
+	{
+		assert(0 < levl);	/* so the level passed to the child ("levl - 1") is not DSE_KSRCH_ROOT_LEVL */
+		if (dse_ksrch(*pp, pp + 1, off + 1, targ_key, targ_len, levl - 1))
+			return TRUE;
+	}
 	return FALSE;
 }

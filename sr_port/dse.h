@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2026 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -254,6 +257,8 @@ MBSTART {										\
 	}										\
 } MBEND
 
+#define DSE_KSRCH_ROOT_LEVL	-1	/* "expected_levl" of "dse_ksrch()" for a root block, whose level is not known yet */
+
 void		dse_adrec(void);
 void		dse_adstar(void);
 void		dse_all(void);
@@ -286,7 +291,7 @@ void		dse_help(void);
 void		dse_integ(void);
 boolean_t	dse_is_blk_free(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr);
 int		dse_is_blk_in(sm_uc_ptr_t rp, sm_uc_ptr_t r_top, short size);
-int		dse_ksrch(block_id srch, block_id_ptr_t pp, int4 *off, char *targ_key, int targ_len);
+int		dse_ksrch(block_id srch, block_id_ptr_t pp, int4 *off, char *targ_key, int targ_len, int expected_levl);
 int4		dse_lm_blk_free(int4 blk, sm_uc_ptr_t base_addr);
 void		dse_m_rest(block_id blk, unsigned char *bml_list, int4 bml_size, v_block_id_ptr_t blks_ptr, bool in_dir_tree);
 void		dse_maps(void);
