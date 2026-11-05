@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -32,6 +32,9 @@ GBLREF	uint4		mu_upgrade_in_prog;
 uint4 bml_busy(block_id setbusy, sm_uc_ptr_t map)
 {
 	uint4	ret, ret1;
+	DCL_THREADGBL_ACCESS;
+
+	SETUP_THREADGBL_ACCESS;
 
 	/* This function is specifically for local maps so the block index
 	 * setbusy should not be larger then BLKS_PER_LMAP
@@ -41,9 +44,11 @@ uint4 bml_busy(block_id setbusy, sm_uc_ptr_t map)
 	ret = bit_clear(setbusy, map);
 	ret1 = bit_clear(setbusy + 1, map);
 	/* In case of a valid snapshot, assert that only a RECYCLED or FREE block gets marked as BUSY
-	 * (dse and MUPIP UPGRADE are exceptions).
+	 * (dse and MUPIP UPGRADE are exceptions, and so is MUPIP INTEG, which marks blocks only in its own copy of the
+	 * local bit maps, where a block of a damaged database that is found twice is already marked BUSY, and reports
+	 * that with DBBDBALLOC).
 	 */
 	assert((ret && ret1) || (ret && !ret1) || dse_running || (mu_upgrade_in_prog && (DIR_ROOT + 1 == setbusy))
-		|| (WBTEST_INVALID_SNAPSHOT_EXPECTED == ydb_white_box_test_case_number));
+		|| TREF(in_mupip_integ) || (WBTEST_INVALID_SNAPSHOT_EXPECTED == ydb_white_box_test_case_number));
 	return ret;
 }

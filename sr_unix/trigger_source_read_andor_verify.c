@@ -233,12 +233,15 @@ int trigger_source_read_andor_verify(mstr *trigname, rhdtyp **rtn_vec)
 	if (0 == dollar_tlevel)
 	{	/* We need a TP fence - provide one */
 		assert(!donot_INVOKE_MUMTSTART);
-		DEBUG_ONLY(donot_INVOKE_MUMTSTART = TRUE);
 		/* 0 ==> save no locals but RESTART OK. Note we do NOT mark this as a TRIGGER_IMPLICIT_TSTART because we
 		 * both have our own condition handler to take care of thrown restarts and because this is not a trigger
 		 * execution thing - just a load and possibly a trigger compile.
 		 */
 		op_tstart(IMPLICIT_TSTART, TRUE, &literal_batch, 0);
+		/* Set this only after "op_tstart" returns, as "op_tstart" can issue an error (for example TPMIXUP inside a
+		 * ZTSTART), and nothing would clear it then.
+		 */
+		DEBUG_ONLY(donot_INVOKE_MUMTSTART = TRUE);
 		for (;;)
 		{	/* Now that we are TP wrapped, fetch the trigger source lines from the ^#t global */
 			DEBUG_ONLY(lcl_t_tries = t_tries);
