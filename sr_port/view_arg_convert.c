@@ -64,7 +64,7 @@ void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *pa
 	gvnh_spanreg_t		*gvspan;
 	gv_namehead		*tmp_gvt;
 	ht_ent_mname		*tabent;
-	int			cmp, len, i, n, reg_index, targ;
+	int			cmp, len, i, n, reg_index, targ, zwr_len;
 	mname_entry		gvent, lvent;
 	mident_fixed		lcl_buff;
 	mstr			namestr, tmpstr;
@@ -240,7 +240,10 @@ void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *pa
 				&& ((VTK_REGION != vtp->keycode) || (1 != parmblk->str.len) || ('*' != *parmblk->str.addr)))
 			{
 				n = ARRAYSIZE(global_names);
-				format2zwr((sm_uc_ptr_t)parm->str.addr, parm->str.len, global_names, &n);
+				zwr_len = parm->str.len;
+				if (ZWR_EXP_RATIO(zwr_len) > n)	/* show as much of the name as fits, as "format2zwr" needs room */
+					zwr_len = ZWR_EXP_RATIO_INVERT(n);
+				format2zwr((sm_uc_ptr_t)parm->str.addr, zwr_len, global_names, &n);
 				RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_VIEWGVN, 2, n, global_names);
 			}
 			break;
@@ -410,7 +413,10 @@ void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *pa
 				if (!valid_mname(&lvent.var_name))
 				{
 					n = ARRAYSIZE(global_names);
-					format2zwr((sm_uc_ptr_t)parm->str.addr, parm->str.len, global_names, &n);
+					zwr_len = parm->str.len;
+					if (ZWR_EXP_RATIO(zwr_len) > n)	/* show as much of the name as fits, as "format2zwr" needs room */
+						zwr_len = ZWR_EXP_RATIO_INVERT(n);
+					format2zwr((sm_uc_ptr_t)parm->str.addr, zwr_len, global_names, &n);
 					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_VIEWLVN, 2, n, global_names);
 				}
 			} else
