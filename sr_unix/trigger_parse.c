@@ -359,7 +359,8 @@ STATICFNDEF char *scan_to_end_quote(char *ptr, int len, int max_len)
 			return NULL;
 		}
 	}
-	return (('"' == *ptr) ? ptr + 1 : NULL);
+	/* If no closing quote was found within "len", "ptr" is past the end of the string, so do not look at "*ptr" */
+	return (((0 < len) && ('"' == *ptr)) ? ptr + 1 : NULL);
 }
 
 STATICFNDEF boolean_t process_dollar_char(char **src_ptr, int *src_len, boolean_t have_star, char **d_ptr, int *dst_len)
@@ -765,8 +766,8 @@ STATICFNDEF boolean_t process_subscripts(char *subscr_str, uint4 *subscr_len, ch
 				}
 				*dst_ptr++ = *ptr++;
 				len--;
-			} while (ISALNUM_ASCII(*ptr));
-			if ('=' != *ptr)
+			} while ((0 < len) && ISALNUM_ASCII(*ptr));
+			if ((0 >= len) || ('=' != *ptr))
 			{
 				util_out_print_gtmio("Invalid variable name in subscript", FLUSH);
 				return FALSE;
