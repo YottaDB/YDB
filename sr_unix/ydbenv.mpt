@@ -71,7 +71,7 @@
 	quit			; should never get here because previous line should terminate process
 
 set	; Intended to be the most common entry point to this routine (with unset likely not as common)
-	new $test,aimflag,chset,cmd,currenv,dbfname,dist,env,err,errflag,errpat,file,gtmgbldir,i,io
+	new $test,aimflag,chset,cmd,currenv,dbfname,dist,env,err,errflag,errpat,file,gdeerror,gtmgbldir,i,io
 	new jnlfflag,line,localeflag,octoflag,out,path,ppid,prefix,region,setcmd,setsep,tmp1,tmp2,tmp3
 	new unset,unsetcmd,ydbgbldir,ydbreplinst,ydbretention,ydbroutines,ydbtmp,ydbtmptmp,zstmp
 	do Etrap
@@ -85,8 +85,8 @@ set	; Intended to be the most common entry point to this routine (with unset lik
 	if $data(currenv("ydb_tmp_gtmroutines")) set currenv("gtmroutines")=currenv("ydb_tmp_gtmroutines") kill currenv("ydb_tmp_gtmroutines")
 	else  kill currenv("gtmroutines")
 	set prefix=$get(currenv("ydb_msgprefix"),"YDB")
-	; String used to match MUPIP errors in stderr
-	set errpat="1""%"_prefix_"-""1(1""E"",1""F"")1""-"".E"
+	; Pattern used to match MUPIP and GDE errors, e.g., 1"%"1(1"YDB",1"GDE")1"-"1(1"E",1"F")1"-".E
+	set errpat="1""%""1(1"_$zwrite(prefix)_",1""GDE"")1""-""1(1""E"",1""F"")1""-"".E"
 	do GetPPid	; get parent pid
 	; Get the installation directory. Although $ydb_dist/$gtm_dist would normally be set and captured by GetCurrEnv,
 	; if it is set by the yottadb executable when run (vs. set in the shell environment), /proc/self/environ won't have the value
@@ -256,12 +256,13 @@ set	; Intended to be the most common entry point to this routine (with unset lik
 	. set:'$zlength($zsearch("./gdedefaults",-1)) cmd=cmd_dist_"/"
 	. set cmd=cmd_"gdedefaults"
 	. open "gldcreate":(shell="/bin/sh":command=cmd:stderr="gldcreateerr":readonly)::"pipe"
-	. use "gldcreate"
-	. for  read line quit:$zeof  use out write line,! use "gldcreate"
-	. use "gldcreateerr"
-	. for  read line quit:$zeof  use err write line,! use "gldcreateerr" set:line?@errpat errflag=1
-	. use io close "gldcreate","gldcreateerr"
-	. set:errflag $ecode=",U238,"
+	. set gdeerror=$$GDEOutErr("gldcreate","gldcreateerr",out,err)
+	. ; If GDE reported an error, it may nevertheless have created a global directory, one without the change(s)
+	. ; it rejected. Delete it, so that the environment is not created, and so that a subsequent ydb_env_set
+	. ; does not treat it as an existing environment.
+	. do:$zlength(gdeerror)
+	. . if $zlength($zsearch(ydbgbldir,-1)) open ydbgbldir close ydbgbldir:delete
+	. . set $ecode=",U238,"
 	. ; Create database files for regions that need them
 	. view "setenv":"ydb_gbldir":ydbgbldir,"setenv":"ydb_dir":env("ydb_dir"),"setenv":"ydb_rel":env("ydb_rel")
 	. set $zgbldir=ydbgbldir
@@ -350,9 +351,9 @@ CreateRegion(region)
 	; Note that if environment variables are used in the global directory for
 	; the directory for the DEFAULT region, they should also be used for the
 	; directory for the region being created.
-	; Uses variable dist from caller
+	; Uses variables dist, errpat and ydbgbldir from caller
 	; Sets parent's defaultfhead & ydbtmptmp local variables
-	new $test,dbdir,defaultfile,err,gdedefault,i,io,line,out,regpatt,tmp
+	new $test,backup,beginpatt,cmd,dbdir,defaultfile,endpatt,err,found,gdeaction,gdedefault,gdeerror,i,io,line,out,regpatt,tmp
 	set io=$io
 	set ydbtmptmp=$ztrnlnm("ydb_tmp_env")_"/"
 	set:1=$zlength(ydbtmptmp) ydbtmptmp="/tmp/"
@@ -364,27 +365,61 @@ CreateRegion(region)
 	set dbdir=$select(tmp-1:$zpiece(defaultfile,"/",1,tmp-1)_"/",1:"")
 	do DBEnsure(defaultfile)
 	do getfields^%DUMPFHEAD(.defaultfhead,defaultfile)
-	set gdedefault=dist_"/gdedefaults"
+	; Save a copy of the global directory so that it can be restored if GDE reports an error
+	set backup=ydbtmptmp_"GDE_"_region_".gld"
+	set cmd="cp -p "_ydbgbldir_" "_backup
+	open "cp":(shell="/bin/sh":command=cmd:readonly)::"pipe"
+	; Wait up to 30 seconds (instead of the 2-second default) for the forked shell to be reaped, as the
+	; "mkdir" label does. On a heavily loaded system, 2 seconds is not always enough, in which case CLOSE
+	; sets $ZCLOSE to -99 even though "cp" did its work.
+	use io close "cp":(timeout=30)
+	set:$zclose&(-99'=$zclose) $ecode=",U235,"
+	; A $ZCLOSE of -99 is a waitpid() timeout rather than a "cp" failure, so the status alone does not
+	; establish that the copy was made. Without the copy, the restore below could not undo a GDE error,
+	; so confirm it is there before running GDE at all.
+	set:'$zlength($zsearch(backup,-1)) $ecode=",U234,"
+	; As when creating a new environment, use ./gdedefaults if it exists, but only if it has commands for the
+	; region (i.e., a "! <region> begin" line), since a user's gdedefaults need not have them; else use
+	; $ydb_dist/gdedefaults.
+	set regpatt="! "_region_" "
+	set beginpatt=1_$zwrite(regpatt_"begin")_".E"
+	set gdedefault=$zsearch("./gdedefaults",-1)
+	do:$zlength(gdedefault)
+	. open gdedefault:readonly
+	. use gdedefault
+	. set found=0 for  read line quit:$zeof  if line?@beginpatt set found=1 quit
+	. use io close gdedefault
+	. set:'found gdedefault=""
+	set:'$zlength(gdedefault) gdedefault=dist_"/gdedefaults"
 	open gdedefault:readonly
 	open "gde":(shell="/bin/sh":command="$ydb_dist/yottadb -run GDE":stderr="err")::"pipe"
 	use gdedefault
-	set regpatt="! "_region_" "
-	set tmp=1_$zwrite(regpatt_"begin")_".E" for  read line quit:line?@tmp		; skip gdedefault commands till start of region
-	set tmp=1_$zwrite(regpatt_"end")_".E" for  read line quit:(line?@tmp)!$zeof  do	; feed GDE gdedefault commands till end of region
+	for  read line quit:line?@beginpatt		; skip gdedefault commands till start of region
+	set endpatt=1_$zwrite(regpatt_"end")_".E" for  read line quit:(line?@endpatt)!$zeof  do	; feed GDE gdedefault commands till end of region
 	. use "gde"
 	. write $zpiece(line,"$ydb_dir/$ydb_rel/g/",1)
 	. for i=2:1:$zlength(line,"$ydb_dir/$ydb_rel/g/") write dbdir,$zpiece(line,"$ydb_dir/$ydb_rel/g/",i)
 	. write !
 	. use gdedefault
 	use "gde" write "exit",! write /eof
-	; Save GDE command stdout & stderr for potential debugging
-	set out=ydbtmptmp_"GDE_"_region_".out"
-	open out:newversion
-	for  read line quit:$zeof  use out write line,! use "gde"
-	set err=ydbtmptmp_"GDE_"_region_".err"
-	open err:newversion
-	use "err" for  read line quit:$zeof  use err write line,! use "err"
-	use io close "err",err,"gde",gdedefault,out
+	; Save GDE command stdout & stderr for potential debugging, and check them for errors
+	set out=ydbtmptmp_"GDE_"_region_".out",err=ydbtmptmp_"GDE_"_region_".err"
+	open out:newversion,err:newversion
+	set gdeerror=$$GDEOutErr("gde","err",out,err)
+	use io close err,gdedefault,out
+	if '$zlength(gdeerror) open backup close backup:delete quit
+	; GDE reported an error, but its EXIT command may nevertheless have updated the global directory with the commands
+	; it accepted. Restore the global directory as it was before running GDE, so that the environment is not changed.
+	; The copy was confirmed when it was made, but confirm it again, as there is nothing to restore without it.
+	set:'$zlength($zsearch(backup,-1)) $ecode=",U234,"
+	set cmd="cp -p "_backup_" "_ydbgbldir
+	open "cp":(shell="/bin/sh":command=cmd:readonly)::"pipe"
+	use io close "cp":(timeout=30)
+	; Note that an existence check of the destination would establish nothing here, as the global directory
+	; being restored over always exists. The 30-second CLOSE above is instead what makes a -99 waitpid()
+	; timeout, and so an undetected failure of this "cp", unlikely.
+	set:$zclose&(-99'=$zclose) $ecode=",U235,"
+	set gdeaction="creating region "_region,$ecode=",U236,"
 	quit
 
 DBEnsure(file)
@@ -559,6 +594,28 @@ FileTypeEnsure(envvar,followlink)
 	else  zwithdraw:flag env(envvar)			; remove null value if set by this function
 	quit
 
+GDEOutErr(gde,gdeerr,out,err)
+	; Copy the stdout and stderr of the GDE PIPE device gde, whose stderr device is gdeerr, to the open files
+	; out and err respectively, and close gde (which also closes gdeerr). Return the first error reported by
+	; GDE, or the empty string if GDE did not report an error.
+	; - GDE reports errors in its commands (e.g., %GDE-E-KEYWRDBAD) on stdout, not stderr, so both are checked.
+	; - When GDE reaches the end of its input without an EXIT command, as it does when reading gdedefaults, it
+	;   creates/updates the global directory and exits with a zero status even after rejecting a command. So
+	;   the exit status alone does not detect errors, but a non-zero exit status is still treated as an error.
+	; - A $ZCLOSE of -99 means CLOSE timed out waiting for GDE to terminate, which can happen on a heavily
+	;   loaded system (see mkdir), and is not by itself treated as an error.
+	; Uses variable errpat from caller
+	new $test,gdeerror,io,line,status
+	set io=$io,gdeerror=""
+	use gde
+	for  read line quit:$zeof  use out write line,! use gde set:'$zlength(gdeerror)&(line?@errpat) gdeerror=line
+	use gdeerr
+	for  read line quit:$zeof  use err write line,! use gdeerr set:'$zlength(gdeerror)&(line?@errpat) gdeerror=line
+	use io close gde
+	set status=$zclose
+	set:'$zlength(gdeerror)&status&(-99'=status) gdeerror="exit status "_status
+	quit gdeerror
+
 GetCurrEnv
 	; Get current environment
 	; io should have been set before calling this label
@@ -624,10 +681,10 @@ PathSame(path1,path2)
 	quit realpath1=realpath2
 
 ; Note: Robustify upgrades global directories automatically
-; Use variable(s) from the caller: errpat
+; Use variable(s) from the caller: dist, errpat, ydbgbldir
 Robustify	; rollback / recover an existing database if needed
 	new $test,allok,cmd,cutoff,dbfname,defaultfhead,defaultjnl,defaultjnlstate,dumpfhead
-	new err,errflag,fhead,field,fname,i,io,j,jnlbefore,jnldir,jnlfile,jnlfilelist,jnlstate
+	new err,errflag,fhead,field,fname,gdeaction,gdeerror,i,io,j,jnlbefore,jnldir,jnlfile,jnlfilelist,jnlstate
 	new line,out,region,replok,replon,replstate,sem,semid,semidnotnull,semkey,timestamp
 	new tmpok,year
 	set io=$io
@@ -639,9 +696,9 @@ Robustify	; rollback / recover an existing database if needed
 	open err:newversion,out:newversion
 	open "gde":(shell="/bin/sh":command=dist_"/yottadb -run GDE":stderr="gdeerr")::"pipe"
 	use "gde" write "exit",! write /eof
-	for  read line quit:$zeof  use out write line,! use "gde"
-	use "gdeerr" for  read line quit:$zeof  use err write line,! use "gdeerr"
-	use io close "gde","gdeerr",err,out
+	set gdeerror=$$GDEOutErr("gde","gdeerr",out,err)
+	use io close err,out
+	set:$zlength(gdeerror) gdeaction="opening/upgrading global directory "_ydbgbldir,$ecode=",U236,"
 	; Go through the regions in the global directory and for every region:
 	; - If the database file does not exist, invoke MUPIP CREATE for that
 	;   region (if the region has AutoDB set, MUPIP CREATE won't create the
@@ -816,8 +873,11 @@ Defaults
 	; gtmver:::env(ydbvar)#/g#/o#/o/utf8#/r:"ln -s "_env(ydbvar)_" "_env(gtmvar):$zpiece($zversion," ",2)_"_"_$zpiece($zversion," ",4)
 
 ;	Error message texts
+U234	;"-F-GLDBACKUPERR copy of global directory "_ydbgbldir_" is missing from "_backup
+U235	;"-F-CPFAIL command """_cmd_""" terminated with non-zero status ("_$zclose_")"
+U236	;"-F-GDEERR GDE reported "_gdeerror_" when "_gdeaction_", GDE stdout at "_out_" and stderr at "_err
 U237	;"-F-CREATEFAIL unable to create directory "_dir_" with error code "_$zclose_$select($zlength(mkdirerr):" : "_mkdirerr,1:"")
-U238	;"-F-GLDCREATEERR Create global directory failed, stderr at ",err
+U238	;"-F-GLDCREATEERR Create global directory failed: GDE reported "_gdeerror_", GDE stdout at "_out_" and stderr at "_err
 U239	;"-F-NOTAPATH Path "_file_" does not exist"
 U240	;"-F-NOTAGLDFILE "_file_ " is not a global directory file"
 U241	;"-F-NOTADBFILE "_file_" is not a database file"
