@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -1106,5 +1106,7 @@ static readonly char		gvname_unknown[] = GVNAME_UNKNOWN;
 static readonly int4		gvname_unknown_len = STR_LIT_LEN(GVNAME_UNKNOWN);
 static readonly char		gvname_dirtree[] = GVNAME_DIRTREE;
 static readonly int4		gvname_dirtree_len = STR_LIT_LEN(GVNAME_DIRTREE);
+
+void tp_note_trans2big(gd_region *reg);
 
 #endif

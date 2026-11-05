@@ -95,6 +95,14 @@ typedef struct tp_frame_struct
 								 * issues TRESTNOT (see tp_restart.c).
 								 */
 	unsigned int			filler : 22;
+	struct gd_region_struct		*trans2big_reg;	/* Non-NULL if an update in this transaction issued TRANS2BIG after it
+							 * changed some (but maybe not all) blocks of the transaction, in which
+							 * case it points to the region for which the first such TRANS2BIG was
+							 * issued. Committing such a transaction could damage the database, so
+							 * the outermost TCOMMIT issues TRANS2BIG for this region. A TROLLBACK
+							 * of this level (which rolls back the updates of this level and removes
+							 * this TP frame) or a restart clears it.
+							 */
 	unsigned char 			*restart_pc;
 	struct stack_frame_struct	*fp;
 	struct mv_stent_struct		*mvc;

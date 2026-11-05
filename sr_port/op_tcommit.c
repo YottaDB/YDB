@@ -181,6 +181,7 @@ STATICFNDEF void fix_updarray_and_oldblock_ptrs(sm_uc_ptr_t old_db_addrs[2], sgm
 
 enum cdb_sc	op_tcommit(void)
 {
+	gd_region		*trans2big_reg;
 	blk_hdr_ptr_t		old_block;
 	block_id		new_blk;
 	boolean_t		before_image_needed, blk_used, implicit_tp, is_mm, skip_invoke_restart;
@@ -254,6 +255,13 @@ enum cdb_sc	op_tcommit(void)
 			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_TCOMMITDISALLOW);
 		}
 #		endif
+		if (NULL != tp_pointer->trans2big_reg)
+		{	/* An update of this transaction issued TRANS2BIG after it changed some blocks of the transaction, so the
+			 * transaction may have part of that update. Committing it could damage the database. Issue TRANS2BIG
+			 * again (only a TROLLBACK or a restart can go on from here).
+			 */
+			RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(4) ERR_TRANS2BIG, 2, REG_LEN_STR(tp_pointer->trans2big_reg));
+		}
 		save_cur_region = gv_cur_region;
 		save_jnlpool = jnlpool;
 #		ifdef DEBUG
@@ -604,7 +612,10 @@ enum cdb_sc	op_tcommit(void)
 	 * e.g. in "gvcst_put" or "op_ztrigger") before "tp_unwind" pops the TP frame.
 	 */
 	implicit_tp = tp_pointer->implicit_tstart && !tp_pointer->ydb_tp_s_tstart;
+	trans2big_reg = tp_pointer->trans2big_reg;
 	tp_unwind(dollar_tlevel - 1, COMMIT_INVOCATION, NULL);
+	if ((NULL != trans2big_reg) && (NULL != tp_pointer) && (NULL == tp_pointer->trans2big_reg))
+		tp_pointer->trans2big_reg = trans2big_reg;	/* the updates of the inner level are now part of the outer level */
 	if (!dollar_tlevel) /* real commit */
 	{
 		/* Transaction is complete as the outer transaction has been committed. Check now to see if any statsDB
@@ -616,4 +627,15 @@ enum cdb_sc	op_tcommit(void)
 	}
 	GTMTRIG_ONLY(DBGTRIGR((stderr, "op_tcommit: Return NORMAL status\n"));)
 	return cdb_sc_normal;
+}
+
+/* Called before TRANS2BIG is issued in the middle of an update (see "tp_cw_list" and "tp_hist"). The update may have changed some
+ * (but maybe not all) blocks of the transaction, so committing the transaction could damage the database. Note the region in the
+ * TP frame so the outermost TCOMMIT issues TRANS2BIG instead of committing. A TROLLBACK or a restart of the transaction clears it.
+ */
+void tp_note_trans2big(gd_region *reg)
+{
+	assert(dollar_tlevel && (NULL != tp_pointer));
+	if ((NULL != tp_pointer) && (NULL == tp_pointer->trans2big_reg))
+		tp_pointer->trans2big_reg = reg;	/* keep the region of the first TRANS2BIG */
 }

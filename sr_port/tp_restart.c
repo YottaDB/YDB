@@ -785,6 +785,7 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 		assert(dollar_tlevel == newlevel);	/* tp_unwind would have set this */
 		assert(tf == tp_pointer);	/* Needs to be true for now. Revisit when can restart to other than newlevel == 1 */
 		assert(NULL == tf->old_tp_frame);	/* this is indeed the outermost TSTART */
+		tf->trans2big_reg = NULL;	/* the restart redoes all the updates of the transaction */
 		gd_header = tf->gd_header;
 		gv_target = tf->orig_gv_target;
 		gv_cur_region = tf->gd_reg;

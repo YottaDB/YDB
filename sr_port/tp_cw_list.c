@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2026 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -50,6 +53,7 @@ void tp_cw_list(cw_set_element **cs)
 		|| (is_bg && ((sgm_info_ptr->cw_set_depth + 2) >= (csd->n_bts >> 1))))
 	{	/* catch the case where MUPIP recover or update process gets into this situation */
 		assert(!mupip_jnl_recover && !is_updproc);
+		tp_note_trans2big(gv_cur_region);	/* so the transaction, which may have part of this update, cannot commit */
 		RTS_ERROR_CSA_ABT(cs_addrs, VARLSTCNT(4) ERR_TRANS2BIG, 2, REG_LEN_STR(gv_cur_region));
 	}
 	tempcs = (cw_set_element *)get_new_element(sgm_info_ptr->cw_set_list, 1);

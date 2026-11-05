@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -350,6 +350,8 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 						delete_hashtab_int8(si->blks_in_use,(ublock_id *)&blk);
 						si->num_of_blks--;
 						assert(si->num_of_blks == si->tp_hist_size);
+						/* The transaction may have part of this update, so it cannot commit */
+						tp_note_trans2big(gv_cur_region);
 						RTS_ERROR_CSA_ABT(csa, VARLSTCNT(4) ERR_TRANS2BIG, 2,
 							REG_LEN_STR(gv_cur_region));
 					}

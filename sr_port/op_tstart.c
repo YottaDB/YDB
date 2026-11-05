@@ -488,6 +488,7 @@ void	op_tstart(int tstart_flag, ...) /* value of $T when TSTART */
 		tf->ydb_tp_s_tstart = tp_pointer->ydb_tp_s_tstart;
 	}
 	GTMTRIG_ONLY(tf->cannot_commit = FALSE;)
+	tf->trans2big_reg = NULL;
 	tf->vars = (tp_var *)NULL;
 	tf->old_tp_frame = tp_pointer;
 	tp_pointer = tf;
