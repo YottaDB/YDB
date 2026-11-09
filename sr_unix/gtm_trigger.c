@@ -617,13 +617,16 @@ int gtm_trigger(gv_trigger_t *trigdsc, gtm_trigger_parms *trigprm)
 			symbinit();	/* Initialize a symbol table the trigger will use */
 			curr_symval->trigr_symval = TRUE;	/* Mark as trigger symval so will be saved not decommissioned */
 		} else
-		{	/* Trigger symval is available for reuse */
+		{	/* Trigger symval is available for reuse. Push the MVST_STAB mv_stent before switching "curr_symval"
+			 * as PUSH_MV_STENT can issue a STACKCRIT or STACKOFLOW error, and the unwind after that error needs
+			 * "curr_symval" to still be the symval that was current before this trigger.
+			 */
+			PUSH_MV_STENT(MVST_STAB);
 			new_symval = trigr_symval_list;
 			assert(new_symval->trigr_symval);
 			trigr_symval_list = new_symval->last_tab;		/* dequeue new curr_symval from list */
 			REINIT_SYMVAL_BLK(new_symval, curr_symval);
 			curr_symval = new_symval;
-			PUSH_MV_STENT(MVST_STAB);
 			mv_chain->mv_st_cont.mvs_stab = new_symval;		/* So unw_mv_ent() can requeue it for later use */
 		}
 		/* Push our trigger environment save mv_stent onto the chain */
