@@ -3,7 +3,7 @@
  * Copyright (c) 2010-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2023 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -458,9 +458,8 @@ STATICFNDEF void write_gbls_or_names(char *gbl_name, uint4 gbl_name_len, boolean
 	/* If ^#t needs to be upgraded, issue error. Cannot read older ^#t format that newer version does not always understand */
 	if (cs_addrs->hdr->hasht_upgrade_needed)
 		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_NEEDTRIGUPGRD, 2, DB_LEN_STR(gv_cur_region));
-	assert((0 < gbl_name_len) && (MAX_MIDENT_LEN >= gbl_name_len));
-	STATIC_ANALYSIS_ONLY(gbl_name_len = MIN(gbl_name_len, MAX_MIDENT_LEN));	/* 4SCA: GV names from DB are <= MAX_MIDENT_LEN */
-	memcpy(save_name, gbl_name, gbl_name_len);
+	/* A name of MAX_MIDENT_LEN characters can be followed by a "*" */
+	assert((0 < gbl_name_len) && ((MAX_MIDENT_LEN + 1) >= gbl_name_len));
 	wildcard = (NULL != (ptr = memchr(gbl_name, '*', gbl_name_len)));
 	if (wildcard)
 	{
@@ -468,6 +467,9 @@ STATICFNDEF void write_gbls_or_names(char *gbl_name, uint4 gbl_name_len, boolean
 			gbl_name_len--;
 		assert(INTCAST(ptr - gbl_name) == gbl_name_len);
 	}
+	assert(MAX_MIDENT_LEN >= gbl_name_len);
+	STATIC_ANALYSIS_ONLY(gbl_name_len = MIN(gbl_name_len, MAX_MIDENT_LEN));	/* 4SCA: GV names from DB are <= MAX_MIDENT_LEN */
+	memcpy(save_name, gbl_name, gbl_name_len);
 	memcpy(curr_name, gbl_name, gbl_name_len);
 	curr_name_len = gbl_name_len;
 	while (TRUE)
