@@ -109,6 +109,10 @@ start_fuzzer() {
 		# A fuzzed process that dies while updating this database, and messages about a damaged database, are logged
 		# in this directory (see "gtm_dump_core.c.patch" and "util_output.c.patch").
 		envvars="$envvars FUZZ_DB_LOGDIR=$(printf %q "$PWD/db")"
+		# A fuzzed process can create a statistics database of this database (e.g. with VIEW "STATSHARE"). It goes in
+		# "ydb_statsdir", which defaults to /tmp (as "ydb_tmp" is not set), so it outlives the fuzzing run and is seen by
+		# everything else on the host. Keep it in this directory too.
+		envvars="$envvars ydb_statsdir=$(printf %q "$PWD/db")"
 	fi
 	tmux new-session -d -s "$name" "env $envvars afl-fuzz -D -t 5000+ -i ../../inputs -o ../../output $role $name -- ../../$build/yottadb -dir"
 	tmux new-session -d -s "Cleaner$name" "../../cleaner.sh $name"
