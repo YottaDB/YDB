@@ -245,9 +245,15 @@ int cmd(void)
 		return FALSE;
 	}
 	if (0 > (x = namelook(cmd_index, cmd_names, c, (TREF(window_ident)).len)))
-	{	/* if there's a postconditional, use ZINVCMD to let us peal off any arguments and get to the rest of the line */
-		if ((TK_COLON != TREF(director_token)) || (0 > (x = namelook(cmd_index, cmd_names, "ZINVCMD", 7))))
-		{	/* the 2nd term of the above if should perform the assignment, but never be true - we're just paranoid */
+	{	/* The keyword is not a valid command, so this code path issues INVCMD.
+		 * If there's a postconditional, use ZINVCMD to let us peel off any arguments and get to the rest of the line.
+		 * Not in a trigger compile, where "stx_error" treats INVCMD as an error and not as a warning (the trigger is
+		 * rejected), as parsing the rest of the line after that error can leave triples that code generation cannot
+		 * handle.
+		 */
+		if ((TK_COLON != TREF(director_token)) GTMTRIG_ONLY(|| TREF(trigger_compile_and_link))
+			|| (0 > (x = namelook(cmd_index, cmd_names, "ZINVCMD", 7))))
+		{	/* the last term of the above if should perform the assignment, but never be true - we're just paranoid */
 			stx_error(MAKE_MSG_TYPE(ERR_INVCMD, ERROR));	/* force INVCMD to an error so stx_error sees it as hard */
 			return FALSE;
 		}
