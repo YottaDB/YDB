@@ -42,6 +42,7 @@
 #include "mvalconv.h"
 #include "stringpool.h"
 #include "deferred_events_queue.h"
+#include "format_targ_key.h"	/* for ISSUE_GVSUBOFLOW_ERROR */
 
 GBLREF gd_region		*gv_cur_region;
 GBLREF gv_key			*gv_currkey;
@@ -55,10 +56,37 @@ GBLREF volatile int4		outofband;
 GBLREF lv_val			*active_lv;
 #endif
 
+/* The global variable destination of ZYENCODE gets one node per chunk of the JSON string, with the chunk number as an added
+ * subscript. "gv_currkey" has the destination key, which fits in the region (op_gvname() checked that), but the key with the
+ * added subscript might not. Add the number of the last chunk (whose subscript is the longest) to "gv_currkey" and return 0
+ * if that key fits in the region, after restoring "gv_currkey" to the destination key. If that key does not fit, return its
+ * length and leave the chunk number in "gv_currkey", for the caller to issue GVSUBOFLOW for that key.
+ */
+STATICFNDEF int zyencode_chunk_key_too_long(unsigned long length, int rec_size)
+{
+	int		key_end, key_len;
+	unsigned char	buff[MAX_NUM_SIZE];
+	mval		tmp_mval;
+
+	assert(0 < length);	/* ydb_encode_s() returns a JSON object, which is at least "{}" */
+	key_end = gv_currkey->end;
+	tmp_mval.mvtype = MV_STR;
+	tmp_mval.str.addr = (char *)buff;
+	tmp_mval.str.len = SNPRINTF(tmp_mval.str.addr, MAX_NUM_SIZE, "%lu", (length + rec_size - 1) / rec_size);
+	mval2subsc(&tmp_mval, gv_currkey, gv_cur_region->std_null_coll);
+	key_len = gv_currkey->end + 1;
+	if (key_len > gv_cur_region->max_key_size)
+		return key_len;
+	gv_currkey->end = key_end;
+	gv_currkey->base[key_end] = KEY_DELIMITER;
+	return 0;
+}
+
 void op_zyencode(void)
 {
 	boolean_t		is_base_var;
 	gvname_info		*gblp1, *gblp2;
+	int			key_len;
 	int			key_end, dollardata_src, status, cnt_fmt = 0, cnt = 0, cnt_save, size = MAX_ZWR_KEY_SZ, rec_size;
 	unsigned long		length;
 	unsigned long long	len;
@@ -176,6 +204,19 @@ void op_zyencode(void)
 			address = zyencode_json.address;
 			length = zyencode_json.length;
 			rec_size = gblp1->s_gv_cur_region->max_rec_size;
+			key_len = zyencode_chunk_key_too_long(length, rec_size);
+			if (0 != key_len)
+			{	/* The key of the last chunk is too long, so store no chunk */
+				system_free(zyencode_json.address);
+				zyencode_json.address = NULL;	/* Need to set NULL to ensure no double free() can happen */
+				zyencode_json.length = 0;
+				for (int i = 0; i < cnt_save; i++)
+					YDB_FREE_BUFFER(&subscripts[i]);
+				POP_MV_STENT();	/* value */
+				zyencode_args = 0;	/* Must reset to zero to reuse zyencode */
+				ISSUE_GVSUBOFLOW_ERROR(gv_currkey, KEY_COMPLETE_TRUE, key_len, gv_cur_region->max_key_size,
+							gv_cur_region);
+			}
 			cnt = 1;
 			for (unsigned long remain = length; 0 != remain; remain -= value->str.len, cnt++)
 			{
@@ -524,6 +565,19 @@ void op_zyencode(void)
 			address = zyencode_json.address;
 			length = zyencode_json.length;
 			rec_size = gblp1->s_gv_cur_region->max_rec_size;
+			key_len = zyencode_chunk_key_too_long(length, rec_size);
+			if (0 != key_len)
+			{	/* The key of the last chunk is too long, so store no chunk */
+				system_free(zyencode_json.address);
+				zyencode_json.address = NULL;	/* Need to set NULL to ensure no double free() can happen */
+				zyencode_json.length = 0;
+				for (int i = 0; i < cnt_save; i++)
+					YDB_FREE_BUFFER(&subscripts[i]);
+				POP_MV_STENT();	/* value */
+				zyencode_args = 0;	/* Must reset to zero to reuse zyencode */
+				ISSUE_GVSUBOFLOW_ERROR(gv_currkey, KEY_COMPLETE_TRUE, key_len, gv_cur_region->max_key_size,
+							gv_cur_region);
+			}
 			cnt = 1;
 			for (unsigned long remain = length; 0 != remain; remain -= value->str.len, cnt++)
 			{
