@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2023-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -34,6 +34,7 @@
 #include "mvalconv.h"
 #include "gtmimagename.h"
 #include "gvt_inline.h"
+#include "gvcst_protos.h"	/* for gvcst_root_search prototype */
 
 GBLDEF zshow_out	*zwr_output;
 
@@ -45,8 +46,57 @@ GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF gvzwrite_datablk	*gvzwrite_block;
 GBLREF gd_addr		*gd_header;
 GBLREF bool		undef_inhibit;
+GBLREF uint4		dollar_tlevel;
 
 error_def(ERR_GVNAKED);
+
+/* Scan the subscripts of "gv_currkey": set "*last_null" if the last subscript is the null subscript, and "*some_null" if
+ * another subscript is. A null subscript is 0xFF 0x00 with the default null collation and 0x01 0x00 with the standard null
+ * collation, and no other subscript starts with either sequence.
+ */
+STATICFNDEF void gvzwr_scan_null_subsc(boolean_t *some_null, boolean_t *last_null)
+{
+	boolean_t	is_null, was_null;
+	unsigned char	*ptr, *top;
+
+	is_null = was_null = FALSE;
+	top = &gv_currkey->base[gv_currkey->end];
+	for (ptr = gv_currkey->base; KEY_DELIMITER != *ptr; ptr++)
+		;	/* Skip the global name */
+	for (ptr++; ptr < top; ptr++)
+	{	/* "ptr" points to the first byte of a subscript */
+		was_null |= is_null;
+		is_null = (((STR_SUB_PREFIX == *ptr) || (SUBSCRIPT_STDCOL_NULL == *ptr)) && (KEY_DELIMITER == *(ptr + 1)));
+		while (KEY_DELIMITER != *ptr)
+			ptr++;
+	}
+	*some_null = was_null;
+	*last_null = is_null;
+}
+
+/* For a naked ZWRITE, gvzwr_fini() sets "gv_currkey->end" to "gv_currkey->prev", which removes the last subscript of the key
+ * of the previous reference, and then calls this function. Set "gv_last_subsc_null" (the last subscript of "gv_currkey" is
+ * the null subscript) and "gv_some_subsc_null" (another subscript is) for this shorter key, as op_gvname() and op_gvnaked()
+ * do for the key they build. On entry, "gv_some_subsc_null" is still that of the previous reference (a subscript other than
+ * its last is null), so if it is FALSE, no subscript of the shorter key is null and the key need not be scanned.
+ */
+STATICFNDEF void gvzwr_set_null_subsc_flags(void)
+{
+	boolean_t	is_null, was_null;
+	DCL_THREADGBL_ACCESS;
+
+	SETUP_THREADGBL_ACCESS;
+	if (!TREF(gv_some_subsc_null))
+	{	/* As null subscripts are rarely used, this avoids the scan in most cases */
+		DEBUG_ONLY(gvzwr_scan_null_subsc(&was_null, &is_null));
+		assert(!was_null && !is_null);
+		TREF(gv_last_subsc_null) = FALSE;
+		return;
+	}
+	gvzwr_scan_null_subsc(&was_null, &is_null);
+	TREF(gv_some_subsc_null) = was_null;
+	TREF(gv_last_subsc_null) = is_null;
+}
 
 void gvzwr_fini(zshow_out *out, int pat)
 {
@@ -101,6 +151,18 @@ void gvzwr_fini(zshow_out *out, int pat)
 			 */
 			gvnh_reg = TREF(gd_targ_gvnh_reg);	/* set by op_gvname in previous call */
 			GV_BIND_SUBSNAME_FROM_GVNH_REG_IF_GVSPAN(gvnh_reg, gd_header, gv_currkey);
+			/* As op_gvnaked() does: the naked reference can be from before the current transaction, so set up the
+			 * region for the transaction, and do the root search if it has not found the global yet (another
+			 * process might have created the global since). Then set the null subscript flags for the shorter key,
+			 * as those of the previous reference no longer apply and op_gvdata() checks them.
+			 */
+			if (IS_REG_BG_OR_MM(gv_cur_region))
+			{
+				if (dollar_tlevel)
+					tp_set_sgm();
+				GVCST_ROOT_SEARCH;
+			}
+			gvzwr_set_null_subsc_flags();
 			op_gvdata(&data);
 			if (!(MV_FORCE_INTD(&data)))
 			{
