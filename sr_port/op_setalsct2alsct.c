@@ -3,7 +3,7 @@
  * Copyright (c) 2009-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -41,11 +41,14 @@ void op_setalsct2alsct(lv_val *srclv, lv_val *dstlv)
 	symval		*sym_src_lvref, *sym_srclv, *sym_dstlv;
 
 	assert(srclv);
-	assert(!LV_IS_BASE_VAR(srclv));	/* Verify subscripted var */
 	assert(dstlv);
 	assert(!LV_IS_BASE_VAR(dstlv));	/* Verify subscripted var */
+	/* Check for an alias container before the LV_IS_BASE_VAR() assert below. With VIEW "NOUNDEF", op_getindx() returns
+	 * "literal_null" (an mval, not an lv_val) for an undefined source, so that assert would read past it.
+	 */
 	if (!(srclv->v.mvtype & MV_ALIASCONT))
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_ALIASEXPECTED);
+	assert(!LV_IS_BASE_VAR(srclv));	/* Verify subscripted var */
 	src_lvref = (lv_val *)srclv->v.str.addr;
 	assert(src_lvref);
 	assert(LV_IS_BASE_VAR(src_lvref));	/* Verify base var */
