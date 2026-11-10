@@ -103,11 +103,17 @@ STATICFNDEF void bx_boollit_work(triple *t, int depth)
 			if (com || neg || num || comval)
 			{	/* First check if literal corresponds to a number with a NUMOFLOW error.
 				 * In that case, return right away as literal optimization cannot be performed.
+				 * NUMOFLOW is a compile time warning (see IS_STX_WARN), so issue NUMOFLOW with "stx_error" (as
+				 * "unary_tail" does) and not "rts_error_csa". When "run_time" is TRUE (for example in
+				 * direct mode, or when "m_xecute" compiles the string literal of an XECUTE in a routine),
+				 * "stx_error" inserts an OC_RTERROR triple so that the error is issued only when the code
+				 * runs. "rts_error_csa" would issue the error right away, which in "m_xecute" would make
+				 * "compiler_ch" abandon the compilation of the whole routine.
 				 */
 				MV_FORCE_NUMD(v[j]);
 				if (!(MV_NM & v[j]->mvtype))
 				{
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NUMOFLOW);
+					stx_error(ERR_NUMOFLOW);
 					return;
 				}
 			}
