@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2020-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2020-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -42,6 +42,7 @@ typedef struct hash_table_mname_struct
 	boolean_t	dont_keep_spare_table; /* if set, don't keep a spare table */
 	boolean_t	defer_base_release; /* if set don't release base, caller will free_base...() later */
 	boolean_t	active;	/* indicates that the table "ready to use"; if not, we need to activate it */
+	gtm_uint64_t	size_fastmod;	/* (2**64 - 1) / size + 1, lets "hash % size" be computed without a division */
 } hash_table_mname;
 
 #define HTENT_EMPTY_MNAME(tabent, type, htvalue) (!(tabent)->key.var_name.len)

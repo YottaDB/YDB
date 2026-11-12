@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -145,8 +145,94 @@ GBLREF	int		*ht_sizes;
 #	define HTENT_KEY_MATCH(tabent, hkey)									\
 	(    ((tabent)->key.hash_code == (hkey)->hash_code)							\
 	     && ((tabent)->key.var_name.len == (hkey)->var_name.len)						\
-	     && (0 == memcmp((tabent)->key.var_name.addr, (hkey)->var_name.addr, (hkey)->var_name.len))		\
+	     && mname_bytes_equal((tabent)->key.var_name.addr, (hkey)->var_name.addr, (hkey)->var_name.len)	\
 	)
+	/* Load 8, 4 or 2 bytes of an M name, which may be unaligned. memcpy() of a constant size compiles to a single load. */
+	static inline gtm_uint64_t mname_load8(const char *p)
+	{
+		gtm_uint64_t	v;
+
+		memcpy(&v, p, 8);
+		return v;
+	}
+	static inline uint4 mname_load4(const char *p)
+	{
+		uint4	v;
+
+		memcpy(&v, p, 4);
+		return v;
+	}
+	static inline unsigned short mname_load2(const char *p)
+	{
+		unsigned short	v;
+
+		memcpy(&v, p, 2);
+		return v;
+	}
+#	define MNAME_EQ8(A, B, OFF)	(mname_load8((A) + (OFF)) == mname_load8((B) + (OFF)))
+#	define MNAME_EQ4(A, B, OFF)	(mname_load4((A) + (OFF)) == mname_load4((B) + (OFF)))
+#	define MNAME_EQ2(A, B, OFF)	(mname_load2((A) + (OFF)) == mname_load2((B) + (OFF)))
+	/* Compare two M names of "len" bytes with a fixed number of 8, 4 or 2 byte loads for each range of lengths, the last
+	 * of which ends at the last byte and so overlaps the previous one unless "len" is a multiple of its size. For an M
+	 * name (at most MAX_MIDENT_LEN bytes), this is faster than a memcmp() call or a byte loop.
+	 */
+	static inline boolean_t mname_bytes_equal(const char *a, const char *b, int len)
+	{
+		switch (len)
+		{
+			case 0:
+				return TRUE;
+			case 1:
+				return (a[0] == b[0]);
+			case 2:
+			case 3:
+				return MNAME_EQ2(a, b, 0) && MNAME_EQ2(a, b, len - 2);
+			case 4:
+			case 5:
+			case 6:
+			case 7:
+				return MNAME_EQ4(a, b, 0) && MNAME_EQ4(a, b, len - 4);
+			case 8:
+			case 9:
+			case 10:
+			case 11:
+			case 12:
+			case 13:
+			case 14:
+			case 15:
+			case 16:
+				return MNAME_EQ8(a, b, 0) && MNAME_EQ8(a, b, len - 8);
+			case 17:
+			case 18:
+			case 19:
+			case 20:
+			case 21:
+			case 22:
+			case 23:
+			case 24:
+				return MNAME_EQ8(a, b, 0) && MNAME_EQ8(a, b, 8) && MNAME_EQ8(a, b, len - 8);
+			case 25:
+			case 26:
+			case 27:
+			case 28:
+			case 29:
+			case 30:
+			case 31:
+			case 32:
+				return MNAME_EQ8(a, b, 0) && MNAME_EQ8(a, b, 8) && MNAME_EQ8(a, b, 16) && MNAME_EQ8(a, b, len - 8);
+			default:
+				assert((0 < len) && (MAX_MIDENT_LEN >= len));	/* M names are not longer, but compare correctly if one is */
+				return (0 < len) && (0 == memcmp(a, b, len));
+		}
+	}
+#	ifdef __SIZEOF_INT128__
+	/* Compute "hash % size" with two multiplications instead of a division (D. Lemire, "Faster Remainder by Direct
+	 * Computation", 2019). Valid for any 32-bit hash and size. size_fastmod is set whenever the table size changes.
+	 */
+#	define SET_HT_SIZE_FASTMOD(table)	(table)->size_fastmod = (~(gtm_uint64_t)0 / (table)->size) + 1
+#	define HT_HASH_TO_INDEX(table, hash, prime)									\
+		((uint4)(((unsigned __int128)((table)->size_fastmod * (gtm_uint64_t)(hash)) * (prime)) >> 64))
+#	endif
 #	define FIND_HASH(hkey, hash)		{assert((hkey)->hash_code); hash = (hkey)->hash_code;}
 	/* Note: FIND_HASH for mname does not compute hash_code. Callers must make sure it is already computed.
 	 *	 FIND_HASH for objcode or int4 or int8 computes hash code
@@ -234,6 +320,11 @@ GBLREF	int		*ht_sizes;
 #define DBGHASHTAB(x) {flush_pio(); FPRINTF x; FFLUSH(stderr);}
 #else
 #define DBGHASHTAB(x)
+#endif
+
+#ifndef HT_HASH_TO_INDEX
+#	define SET_HT_SIZE_FASTMOD(table)
+#	define HT_HASH_TO_INDEX(table, hash, prime)	((hash) % (prime))
 #endif
 
 /* We use DOUBLE HASHING algorithm. After first collision we calculate
@@ -428,6 +519,7 @@ STATICFNDEF void INIT_HASHTAB_INTL(HASH_TABLE *table, int minsize, HASH_TABLE *o
 		}
 		memset((char *)table->base, 0, (cur_ht_size * SIZEOF(HT_ENT)) + ROUND_UP(cur_ht_size, BITS_PER_UCHAR));
 		table->size = cur_ht_size;
+		SET_HT_SIZE_FASTMOD(table);
 		if (NULL != old_table)
 		{
 			table->initial_size = old_table->initial_size;
@@ -556,7 +648,8 @@ STATICFNDEF boolean_t ADD_HASHTAB_INTL(HASH_TABLE *table, HT_KEY_T *key, void *v
 	tabbase = &table->base[0];
 	prime = table->size;
 	FIND_HASH(key, hash);
-	ht_index = (int) (hash % prime);
+	ht_index = HT_HASH_TO_INDEX(table, hash, prime);
+	assert(ht_index == (hash % prime));
 	*tabentptr = tabbase + ht_index;
 	RETURN_IF_ADDED(table, *tabentptr, key, value);
 	/* We are here because collision happened. Do collision resolution */
@@ -605,7 +698,8 @@ HT_ENT *LOOKUP_HASHTAB(HASH_TABLE *table, HT_KEY_T *key)
 	tabbase = &table->base[0];
 	prime = table->size;
 	FIND_HASH(key, hash);
-	ht_index = hash % prime;
+	ht_index = HT_HASH_TO_INDEX(table, hash, prime);
+	assert(ht_index == (hash % prime));
 	tabent = tabbase + ht_index;
 	RETURN_IF_LOOKUP_DONE(tabent, key);
 	/* We are here because collision happened. Do collision resolution */
@@ -652,7 +746,8 @@ boolean_t DELETE_HASHTAB(HASH_TABLE *table, HT_KEY_T *key)
 	tabbase = &table->base[0];
 	prime = table->size;
 	FIND_HASH(key, hash);
-	ht_index = hash % prime;
+	ht_index = HT_HASH_TO_INDEX(table, hash, prime);
+	assert(ht_index == (hash % prime));
 	tabent = tabbase + ht_index;
 	RETURN_IF_DELETED(table, tabent, key);
 	/* We are here because collision happened. Do collision resolution */
