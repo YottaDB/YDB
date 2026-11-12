@@ -2,7 +2,7 @@
  *								*
  *	Copyright 2010, 2014 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2022 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2022-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -20,4 +20,5 @@ void		gvtr_db_read_hasht(sgmnt_addrs *csa);
 void		gvtr_free(gv_namehead *gvt);
 void		gvtr_init(gv_namehead *gvt, uint4 cycle, boolean_t tp_is_implicit, int err_code);
 int		gvtr_match_n_invoke(gtm_trigger_parms *trigparms, gvtr_invoke_parms_t *gvtr_parms);
+uint4		gvtr_subs2key(gv_namehead *gvt, char *start, char *end, char *buff, gv_key *out_key);
 #endif

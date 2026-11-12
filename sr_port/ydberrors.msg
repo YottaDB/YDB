@@ -99,6 +99,7 @@ ERRWSIGWINCH	<Error while processing SIGWINCH deviceparameter handler>/error/fao
 RECSIZETOOSMALL	<RECORDSIZE [!UL] needs to be at least !UL if ICHSET or OCHSET is UTF-8, UTF-16, UTF-16LE or UTF-16BE>/error/fao=2
 TRESTNEW	<Cannot restart transaction because the restart cannot undo an argumentless or exclusive NEW done after its TSTART>/error/fao=0
 EXPRTOODEEP	<Expression nesting depth exceeds maximum supported limit>/error/fao=0
+TRIGSUBS2BIG	<Trigger definition for global ^!AD with subscripts !AD has a subscript that is too long to fit in a key with the current collation of the global>/error/fao=4
 !
 ! If there are UNUSEDMSG* lines unused for more than one year and at least two non-patch releases, use them before adding new lines.
 !

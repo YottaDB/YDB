@@ -52,6 +52,7 @@
 #include "op_tcommit.h"		/* for op_tcommit prototype */
 #include "cdb_sc.h"
 #include "gv_trigger_protos.h"
+#include "util.h"		/* for "util_out_print" prototype */
 #include "trigger_fill_xecute_buffer.h"
 #include "strpiecediff.h"
 #include "gtm_utf8.h"		/* for CHSET_M_STR and CHSET_UTF8_STR */
@@ -100,6 +101,7 @@ error_def(ERR_TPRETRY);
 error_def(ERR_TRIGDEFBAD);
 error_def(ERR_TRIGINVCHSET);
 error_def(ERR_TRIGIS);
+error_def(ERR_TRIGSUBS2BIG);
 error_def(ERR_TRIGSUBSCRANGE);
 
 LITREF	char	ctypetab[NUM_CHARS];
@@ -117,6 +119,9 @@ STATICFNDCL	uint4		gvtr_process_pattern(char *ptr, uint4 len, gvtr_subs_t *subsd
 STATICFNDCL	uint4		gvtr_process_gvsubs(char *start, char *end, gvtr_subs_t *subsdsc,
 						    boolean_t colon_imbalance, gv_namehead *gvt);
 STATICFNDCL	boolean_t	gvtr_is_key_a_match(char *keysub_start[], gv_trigger_t *trigdsc, mval *lvvalarray[]);
+STATICFNDCL	uint4		gvtr_subs2key_try(mval *subs, gv_key *out_key);
+
+STATICDEF uint4			gvtr_subs2key_error;	/* error that gvtr_subs2key_ch() caught for gvtr_subs2key_try() */
 
 #define TRIGGER_SUBSDEF(SUBSTYPE, SUBSNAME, LITMVALNAME, TRIGFILEQUAL, PARTOFHASH)	LITREF mval LITMVALNAME;
 #include "trigger_subs_def.h"
@@ -207,33 +212,37 @@ STATICFNDCL	boolean_t	gvtr_is_key_a_match(char *keysub_start[], gv_trigger_t *tr
 
 #define	GVTR_PROCESS_GVSUBS(PTR, END, SUBSDSC, COLON_IMBALANCE, GVT, SUBSCSTRLEN, SUBSCSTR)			\
 {														\
-	uint4		status, rt_name_len, save_var_name_len;							\
-	gv_trigger_t	*lcl_trigdsc;										\
-	char		rt_name[MAX_TRIGNAME_LEN], save_var_name[MAX_MIDENT_LEN];				\
+	uint4		status;											\
 														\
 	status = gvtr_process_gvsubs(PTR, END, SUBSDSC, COLON_IMBALANCE, GVT);					\
 	if (status)												\
-	{													\
-		lcl_trigdsc = GVT->gvt_trigger->gv_trig_array;							\
-		assert(NULL != lcl_trigdsc);									\
-		assert((NULL != lcl_trigdsc->rtn_desc.rt_name.addr)						\
-			&& (0 != lcl_trigdsc->rtn_desc.rt_name.len));						\
-		SAVE_VAR_NAME(save_var_name, save_var_name_len, GVT);						\
-		SAVE_RTN_NAME(rt_name, rt_name_len, lcl_trigdsc);						\
-		GVTR_HASHTGBL_READ_CLEANUP(TRUE);								\
-		if (ERR_PATMAXLEN == status) 									\
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) status, 0, ERR_TRIGIS, 2, rt_name_len,		\
-					rt_name);								\
-		else if (ERR_TRIGSUBSCRANGE == status)								\
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(10) status, 4, save_var_name_len, save_var_name,	\
-					SUBSCSTRLEN, SUBSCSTR, ERR_TRIGIS, 2, rt_name_len, rt_name);		\
-		else	/* error return from patstr */								\
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);					\
-	}													\
+		GVTR_SUBS_ERROR(status, GVT, SUBSCSTRLEN, SUBSCSTR);						\
 	/* End of a range (in a set of ranges) or a subscript itself.						\
 	 * Either case, colon_imbalance can be safely reset.							\
 	 */													\
 	COLON_IMBALANCE = FALSE;										\
+}
+
+/* Issue the error STATUS that gvtr_process_gvsubs() or gvtr_process_range() returned for the subscripts SUBSCSTR of a trigger */
+#define	GVTR_SUBS_ERROR(STATUS, GVT, SUBSCSTRLEN, SUBSCSTR)							\
+{														\
+	uint4		rt_name_len, save_var_name_len;								\
+	gv_trigger_t	*lcl_trigdsc;										\
+	char		rt_name[MAX_TRIGNAME_LEN], save_var_name[MAX_MIDENT_LEN];				\
+														\
+	lcl_trigdsc = GVT->gvt_trigger->gv_trig_array;								\
+	assert(NULL != lcl_trigdsc);										\
+	assert((NULL != lcl_trigdsc->rtn_desc.rt_name.addr) && (0 != lcl_trigdsc->rtn_desc.rt_name.len));	\
+	SAVE_VAR_NAME(save_var_name, save_var_name_len, GVT);							\
+	SAVE_RTN_NAME(rt_name, rt_name_len, lcl_trigdsc);							\
+	GVTR_HASHTGBL_READ_CLEANUP(TRUE);									\
+	if (ERR_PATMAXLEN == STATUS) 										\
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) STATUS, 0, ERR_TRIGIS, 2, rt_name_len, rt_name);	\
+	else if ((ERR_TRIGSUBSCRANGE == STATUS) || (ERR_TRIGSUBS2BIG == STATUS))				\
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(10) STATUS, 4, save_var_name_len, save_var_name,		\
+				SUBSCSTRLEN, SUBSCSTR, ERR_TRIGIS, 2, rt_name_len, rt_name);			\
+	else	/* error return from patstr */									\
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) STATUS);						\
 }
 
 #define	KEYSUB_S2POOL_IF_NEEDED(KEYSUB_MVAL, KEYSUB, THISSUB)				\
@@ -440,15 +449,81 @@ boolean_t	gvtr_get_hasht_gblsubs(mval *subs_mval, mval *ret_mval)
 	return is_defined;
 }
 
+/* Condition handler of gvtr_subs2key_try(): for an error that is not fatal, note the error and return to the caller of
+ * gvtr_subs2key_try() without issuing the error.
+ */
+CONDITION_HANDLER(gvtr_subs2key_ch)
+{
+	START_CH(TRUE);
+	if (DUMPABLE)
+		NEXTCH;
+	gvtr_subs2key_error = SIGNAL;
+	util_out_print(NULL, RESET);	/* Discard the message of the error, which the caller reports in its own way */
+	UNWIND(NULL, NULL);
+}
+
+STATICFNDEF uint4	gvtr_subs2key_try(mval *subs, gv_key *out_key)
+{
+	DCL_THREADGBL_ACCESS;
+
+	SETUP_THREADGBL_ACCESS;
+	gvtr_subs2key_error = 0;
+	ESTABLISH_RET(gvtr_subs2key_ch, gvtr_subs2key_error);
+	mval2subsc(subs, out_key, gv_cur_region->std_null_coll);
+	REVERT;
+	return 0;
+}
+
+/* Convert the specification of one subscript of a trigger, "start" to "end" in the form stored in ^#t (a string in
+ * double-quotes, a number, or nothing for a null subscript), to its key form in "out_key", with the collation of the global
+ * of "gvt" (in the current region). The string without the surrounding double-quotes, and with two consecutive
+ * double-quotes changed to one, goes in "buff", which has room for at least "end - start" bytes. The trigger load
+ * (gvtr_process_range()) and the check when a trigger is added (trig_subs_fit_in_key() in trigger_update.c) both use this
+ * function, so the two convert a subscript in the same way. Returns 0, or the error that mval2subsc() or the collation
+ * routine of the global issued (for example GVSUBOFLOW, or an error of the collation routine, if the key form does not fit
+ * in "out_key"), without issuing that error, so the caller can report the trigger.
+ */
+uint4	gvtr_subs2key(gv_namehead *gvt, char *start, char *end, char *buff, gv_key *out_key)
+{
+	gv_namehead	*save_gvt;
+	mval		subs;
+	char		*src, *dst;
+	uint4		status;
+
+	if ((start < end) && ('"' == *start))
+	{	/* Remove the surrounding double-quotes */
+		assert((start + 2 <= end) && ('"' == *(end - 1)));
+		start++;
+		end--;
+	}
+	for (dst = buff, src = start; src < end; src++)
+	{
+		*dst++ = *src;
+		if ('"' == *src)
+		{	/* A double-quote in the middle of the string better be TWO consecutive double-quotes */
+			assert(((src + 1) < end) && ('"' == src[1]));
+			src++;
+		}
+	}
+	subs.mvtype = MV_STR;
+	subs.str.addr = buff;
+	subs.str.len = INTCAST(dst - buff);
+	out_key->end = 0;
+	out_key->top = DBKEYSIZE(MAX_KEY_SZ);
+	save_gvt = gv_target;
+	gv_target = gvt;	/* for the collation of the global in mval2subsc() */
+	status = gvtr_subs2key_try(&subs, out_key);
+	gv_target = save_gvt;
+	return status;
+}
+
 STATICFNDEF uint4	gvtr_process_range(gv_namehead *gvt, gvtr_subs_t *subsdsc, int type, char *start, char *end)
 {
-	mval		tmpmval;
-	gv_namehead	*save_gvt;
 	char		keybuff[SIZEOF(gv_key) + DBKEYSIZE(MAX_KEY_SZ)];
 	gv_key		*out_key;
-	uint4		len, len1, min, nelems;
+	uint4		len, len1, min, nelems, status;
 	gvt_trigger_t	*gvt_trigger = NULL;
-	char		*dststart, *dstptr, *srcptr, ch;
+	char		*dststart, nullbuff[1];
 	boolean_t	ret;
 	int		cmpres;
 
@@ -461,58 +536,39 @@ STATICFNDEF uint4	gvtr_process_range(gv_namehead *gvt, gvtr_subs_t *subsdsc, int
 	DBG_MARK_STRINGPOOL_UNUSABLE;
 	/* An empty specification is the open side of a range (e.g. "2:" or ":2"), or a null subscript. It has no
 	 * surrounding double-quotes to remove, and "start" points one byte past the end of the specification, so
-	 * the check below has to establish a non-zero length before it looks at that byte.
+	 * the check below has to establish a non-zero length before it looks at that byte. "len" is the length of the
+	 * specification without the surrounding double-quotes.
 	 */
-	if ((start < end) && ('"' == *start))
-	{	/* Remove surrounding double-quotes as well as transform TWO CONSECUTIVE intermediate double-quotes into ONE.
-		 * We need to construct the transformed string. Since we cannot modify the input string and yet want to avoid
-		 * malloc/frees within this routine, we use the buddy_list allocate/free functions for this purpose.
-		 */
-		assert('"' == *(end - 1));
-		start++;
-		end--;
-	}
 	len = UINTCAST(end - start);
+	if (len && ('"' == *start))
+		len -= 2;
 	if (len || (GVTR_PARSE_POINT == type))
 	{
 		gvt_trigger = gvt->gvt_trigger;
-		if (len == 0)
-		{
-			tmpmval.mvtype = MV_STR;
-			tmpmval.str.addr = "";
-			tmpmval.str.len = 0;
-		} else
+		/* gvtr_subs2key() constructs the string without the double-quotes. Since we cannot modify the input string and
+		 * yet want to avoid malloc/frees within this routine, we use the buddy_list allocate/free functions for the
+		 * buffer of that string.
+		 */
+		if (len)
 		{
 			nelems = DIVIDE_ROUND_UP(len, GVTR_LIST_ELE_SIZE);
 			dststart = (char *)get_new_element(gvt_trigger->gv_trig_list, nelems);
-			dstptr = dststart;
-			for (srcptr = start; srcptr < end; srcptr++)
-			{
-				ch = *srcptr;
-				if ('"' == ch)
-				{	/* A double-quote in the middle of the string better be TWO consecutive double-quotes */
-					assert(((srcptr + 1) < end) && ('"' == srcptr[1]));
-					srcptr++;
-				}
-				*dstptr++ = ch;
-			}
-			assert((dstptr - dststart) <= len);
-			tmpmval.mvtype = MV_STR;
-			tmpmval.str.addr = dststart;
-			tmpmval.str.len = INTCAST(dstptr - dststart);
-		}
-		/* switch gv_target for mval2subsc */
-		save_gvt = gv_target;
-		gv_target = gvt;
+		} else
+			dststart = nullbuff;	/* gvtr_subs2key() stores nothing for a null subscript */
 		out_key = (gv_key *)keybuff;
-		out_key->end = 0;
-		out_key->top = DBKEYSIZE(MAX_KEY_SZ);
-		mval2subsc(&tmpmval, out_key, gv_cur_region->std_null_coll);
-		gv_target = save_gvt;
+		status = gvtr_subs2key(gvt, start, end, dststart, out_key);
 		if (0 < len)
 		{	/* Now that mval2subsc is done, free up the allocated dststart buffer */
 			ret = free_last_n_elements(gvt_trigger->gv_trig_list, nelems);
 			assert(ret);
+		}
+		if (status)
+		{	/* The key form of the subscript does not fit in a key. $ZTRIGGER() and MUPIP TRIGGER reject such a
+			 * trigger, but the collation of the global can change after the trigger is added. Report the trigger
+			 * definition (the caller issues TRIGSUBS2BIG) instead of failing in the middle of the trigger load.
+			 */
+			DBG_MARK_STRINGPOOL_USABLE;
+			return ERR_TRIGSUBS2BIG;
 		}
 	}
 	/* else it means an open range (where left or right side of range is unspecified)
@@ -640,8 +696,10 @@ STATICFNDEF uint4 gvtr_process_gvsubs(char *start, char *end, gvtr_subs_t *subsd
 	{
 		if ((status = gvtr_process_range(gvt, subsdsc, colon_imbalance ? GVTR_PARSE_RIGHT : GVTR_PARSE_POINT, start, end)))
 		{
-			/* As of now we expect only ERR_TRIGSUBSCRANGE (which is triggered only for GVTR_PARSE_RIGHT) */
-			assert((ERR_TRIGSUBSCRANGE == status) && colon_imbalance);
+			/* As of now we expect only ERR_TRIGSUBSCRANGE (an invalid range) or ERR_TRIGSUBS2BIG (a subscript whose
+			 * key form does not fit in a key)
+			 */
+			assert((ERR_TRIGSUBSCRANGE == status) || (ERR_TRIGSUBS2BIG == status));
 			return status;
 		}
 	}
@@ -962,7 +1020,10 @@ void	gvtr_db_read_hasht(sgmnt_addrs *csa)
 							DIVIDE_ROUND_UP((numlvsubs * SIZEOF(uint4)), GVTR_LIST_ELE_SIZE));
 				lvindexdsc = trigdsc->lvindexarray;
 			}
-			/* Initialize trigdsc->subsarray, trigdsc->lvindexarray & trigdsc->lvnamearray */
+			/* Initialize trigdsc->subsarray, trigdsc->lvindexarray & trigdsc->lvnamearray. trig_subs_fit_in_key() in
+			 * trigger_update.c splits the subscripts in the same way as this loop, so a change here needs the same
+			 * change there.
+			 */
 			quote_imbalance = FALSE;
 			colon_imbalance = FALSE;
 			paren_imbalance = 0;
@@ -1039,7 +1100,11 @@ void	gvtr_db_read_hasht(sgmnt_addrs *csa)
 				} else if (':' == ch)
 				{	/* Left side of range */
 					status = gvtr_process_range(gvt, subsdsc, GVTR_PARSE_LEFT, ptr_start, ptr);
-					assert(0 == status); /* ERR_TRIGSUBSCRANGE is issued only in case of GVTR_PARSE_RIGHT */
+					if (status)
+					{	/* The key form of the left side of the range does not fit in a key */
+						assert(ERR_TRIGSUBS2BIG == status);
+						GVTR_SUBS_ERROR(status, gvt, ret_mval->str.len, ret_mval->str.addr);
+					}
 					assert(!colon_imbalance);
 					colon_imbalance = TRUE;
 					ptr_start = &ptr[1];

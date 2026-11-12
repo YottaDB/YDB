@@ -619,6 +619,7 @@ CONDITION_HANDLER(gtmci_init_ch);
 CONDITION_HANDLER(gtmsecshr_cond_hndlr);
 CONDITION_HANDLER(gvcst_init_autoDB_ch);
 CONDITION_HANDLER(gvtr_tpwrap_ch);
+CONDITION_HANDLER(gvtr_subs2key_ch);
 CONDITION_HANDLER(iob_io_error1);
 CONDITION_HANDLER(iob_io_error2);
 CONDITION_HANDLER(mu_cre_file_ch);

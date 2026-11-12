@@ -89,6 +89,7 @@ LITDEF	err_msg ydberrors[] = {
 	{ "RECSIZETOOSMALL", "RECORDSIZE [!UL] needs to be at least !UL if ICHSET or OCHSET is UTF-8, UTF-16, UTF-16LE or UTF-16BE", 2, 0 },
 	{ "TRESTNEW", "Cannot restart transaction because the restart cannot undo an argumentless or exclusive NEW done after its TSTART", 0, 0 },
 	{ "EXPRTOODEEP", "Expression nesting depth exceeds maximum supported limit", 0, 0 },
+	{ "TRIGSUBS2BIG", "Trigger definition for global ^!AD with subscripts !AD has a subscript that is too long to fit in a key with the current collation of the global", 4, 0 },
 };
 
 
@@ -102,7 +103,7 @@ GBLDEF	err_ctl ydberrors_ctl = {
 	256,
 	"YDB",
 	&ydberrors[0],
-	72,
+	73,
 	&ydberrors_undocarr[0],
 	1
 };

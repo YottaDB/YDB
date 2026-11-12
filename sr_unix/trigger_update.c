@@ -34,6 +34,8 @@
 #include "hashtab_str.h"
 #include "wbox_test_init.h"
 #include "gv_trigger.h"
+#include "gtm_trigger.h"			/* for gtm_trigger_parms, needed for gv_trigger_protos.h */
+#include "gv_trigger_protos.h"		/* for "gvtr_subs2key" prototype */
 #include "trigger_delete_protos.h"
 #include "trigger.h"
 #include "trigger_incr_cycle.h"
@@ -141,6 +143,7 @@ STATICFNDCL int4 update_commands(char *trigvn, int trigvn_len, int trigger_index
 STATICFNDCL int4 update_trigger_name(char *trigvn, int trigvn_len, int trigger_index, char *db_trig_name, char *tf_trig_name,
 				     uint4 tf_trig_name_len);
 STATICFNDCL boolean_t trigger_update_rec_helper(mval *trigger_rec, boolean_t noprompt, uint4 *trig_stats);
+STATICFNDCL boolean_t trig_subs_fit_in_key(char *subs, uint4 subs_len, uint4 trigvn_len);
 
 STATICFNDCL trig_stats_t trigupdrec_reg(char *trigvn, uint4 trigvn_len, boolean_t *jnl_format_done, mval *trigjrec,
 	boolean_t *new_name_check_done, boolean_t *new_match, boolean_t *new_name_ptr, char **values, uint4 *value_len,
@@ -969,6 +972,62 @@ STATICFNDEF boolean_t subtract_trigger_cmd_attributes(char *trigvn, int trigvn_l
 	return SUB_UPDATE_CMDS;
 }
 
+/* Returns TRUE if the key form of each string subscript in the subscript specification SUBS (of length SUBS_LEN, as
+ * trigger_parse() leaves it, which is the form stored in ^#t) fits in a key of the global of "gv_target" (whose name has
+ * TRIGVN_LEN characters), with the collation of that global in the current region. The trigger load converts each
+ * subscript this way (see gvtr_process_range()), and a trigger with a subscript whose key form does not fit can never be
+ * invoked. This splits the specification as the trigger load does: at a ",", ";", ":" or "=" that is not inside
+ * double-quotes or parentheses (as in a pattern). This loop and the loop that splits the subscripts in
+ * gvtr_db_read_hasht() (gv_trigger.c) have to stay in step.
+ */
+STATICFNDEF boolean_t trig_subs_fit_in_key(char *subs, uint4 subs_len, uint4 trigvn_len)
+{
+	char		*ptr, *top, *start, ch, buff[MAX_GVSUBS_LEN];
+	char		keybuff[SIZEOF(gv_key) + DBKEYSIZE(MAX_KEY_SZ)];
+	boolean_t	quote_imbalance;
+	int		paren_imbalance;
+	gv_key		*out_key;
+
+	quote_imbalance = FALSE;
+	paren_imbalance = 0;
+	top = subs + subs_len;
+	for (start = ptr = subs; ; ptr++)
+	{
+		if (ptr < top)
+		{
+			ch = *ptr;
+			if ('"' == ch)
+				quote_imbalance = !quote_imbalance;
+			if (quote_imbalance || ('"' == ch))
+				continue;
+			if ('(' == ch)
+				paren_imbalance++;
+			else if (')' == ch)
+				paren_imbalance--;
+			if (paren_imbalance || ((',' != ch) && (';' != ch) && (':' != ch) && ('=' != ch)))
+				continue;
+		}
+		/* "start" to "ptr" is one specification: a string, a number, a pattern, a "*", a local variable name, or
+		 * nothing (the open side of a range)
+		 */
+		if ((start < ptr) && ('"' == *start))
+		{	/* A string: convert the string to the key form as the trigger load does */
+			out_key = (gv_key *)keybuff;
+			/* A key with this subscript has the global name (TRIGVN_LEN characters and a KEY_DELIMITER), the key
+			 * form of the subscript (which ends with a KEY_DELIMITER) and the KEY_DELIMITER that ends the key, and
+			 * has to fit in the largest possible key size.
+			 */
+			if (gvtr_subs2key(gv_target, start, ptr, buff, out_key)
+					|| ((MAX_KEY_SZ - 4) < (trigvn_len + 1 + out_key->end + 1)))
+				return FALSE;
+		}
+		if (ptr >= top)
+			break;
+		start = ptr + 1;
+	}
+	return TRUE;
+}
+
 STATICFNDEF int4 modify_record(char *trigvn, int trigvn_len, char add_delete, int trigger_index, char **values, uint4 *value_len,
 		mval *trigger_count, boolean_t db_matched_set, boolean_t db_matched_kill,
 		stringkey *kill_hash, stringkey *set_hash, int set_kill_bitmask)
@@ -1669,6 +1728,19 @@ boolean_t trigger_update_rec(mval *trigger_rec, boolean_t noprompt, uint4 *trig_
 		reg_index = -1;
 		min_reg_index = -1;
 		max_reg_index = -1;
+	}
+	if (('+' == add_delete) && value_len[GVSUBS_SUB])
+	{	/* Check the subscripts with the collation of the global (for a global that spans regions, the collation is the
+		 * same in all of its regions). GVCST_ROOT_SEARCH sets the collation of "gv_target" for a global that exists,
+		 * and for a new global the collation that the global would get.
+		 */
+		GVCST_ROOT_SEARCH;
+		if (!trig_subs_fit_in_key(values[GVSUBS_SUB], value_len[GVSUBS_SUB], trigvn_len))
+		{
+			util_out_print_gtmio("Subscript too long to fit in a key", FLUSH);
+			trig_stats[STATS_ERROR_TRIGFILE]++;
+			return TRIG_FAILURE;
+		}
 	}
 	jnl_format_done = FALSE;
 	new_name_check_done = FALSE;
