@@ -90,6 +90,11 @@ start_fuzzer() {
 		asanopts="detect_leaks=0:abort_on_error=1:symbolize=0:unmap_shadow_on_exit=1:verify_asan_link_order=0"
 		envvars="$envvars ASAN_OPTIONS=$asanopts"
 	fi
+	# A fuzzed process that is about to dump a core (e.g. an assert failure or a fatal error like GTMASSERT2) is logged in
+	# the "deaths" subdirectory (which "cleaner.sh" does not touch), as afl-fuzz discards the stderr of the process, which
+	# has the error (see "gtm_dump_core.c.patch").
+	mkdir -p deaths
+	envvars="$envvars FUZZ_LOGDIR=$(printf %q "$PWD/deaths")"
 	if [ -n "${ydb_gbldir+set}" ]; then
 		# If "enhanced_fuzz.csh" chose to use a database, give each afl-fuzz instance its own database (in the "db"
 		# subdirectory, which "cleaner.sh" does not touch) so a process that dies holding crit, or a damaged database,

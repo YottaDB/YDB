@@ -11,10 +11,10 @@
 #################################################################
 
 diff --git a/sr_unix/gtm_dump_core.c b/sr_unix/gtm_dump_core.c
-index 36c185acd..d76279f12 100644
+index 36c185acd..02d580022 100644
 --- a/sr_unix/gtm_dump_core.c
 +++ b/sr_unix/gtm_dump_core.c
-@@ -24,8 +24,130 @@
+@@ -24,8 +24,153 @@
  #include "error.h"
  #include "gtmcrypt.h"
  
@@ -44,22 +44,20 @@ index 36c185acd..d76279f12 100644
 +#define	FUZZ_MAX_INPUT_SIZE	(1024 * 1024)
 +
 +void fuzz_db_death_log(int sig);	/* also called from sig_init.c (fuzz testing only) */
++void fuzz_core_death_log(void);
 +
  #define	CORE_NAME_LEN	20 + 1
  
-+/* Fuzz testing only. If the FUZZ_DB_LOGDIR env var is set (fuzzing/fuzz.sh sets it to the database directory of the
-+ * afl-fuzz instance) and this process holds crit, is in a database commit, is in wcs_wtstart() or has a KILL in progress,
-+ * append a description of that state and a backtrace to $FUZZ_DB_LOGDIR/dbdeath.log, and save the input of the process
-+ * (its stdin, the file afl-fuzz runs it with) as $FUZZ_DB_LOGDIR/dbdeath_input_<n>. A fuzz testing build exits right
-+ * away on a signal like SIGSEGV or an event that dumps a core (see sig_init.c.patch and gtm_fork_n_core.c.patch), without
-+ * the exit handler that would otherwise finish or undo such a database update, so this records which event did that.
-+ * Called from gtm_dump_core() and from the handler that sig_init.c.patch installs for those signals, so it uses only
-+ * system calls, and fixed size buffers on the stack.
++/* Fuzz testing only. If "dir" is not NULL, append a description of the state of this process (signal, error_condition and
++ * the crit and commit state of each region) and a backtrace to <dir>/<prefix>.log, and save the input of the process (its
++ * stdin, the file afl-fuzz runs it with) as <dir>/<prefix>_input_<n>. If "db_only" is TRUE, do that only if this process
++ * holds crit, is in a database commit, is in wcs_wtstart() or has a KILL in progress. "*logged" makes that happen at most
++ * once per process. Called from gtm_dump_core() and from the handler that sig_init.c.patch installs for signals like
++ * SIGSEGV, so it uses only system calls, and fixed size buffers on the stack.
 + */
-+void fuzz_db_death_log(int sig)
++static void fuzz_death_log(int sig, char *dir, char *prefix, boolean_t *logged, boolean_t db_only)
 +{
-+	static boolean_t	logged;
-+	char			buf[4096], path[YDB_PATH_MAX], tbuf[32], *dir;
++	char			buf[4096], path[YDB_PATH_MAX], tbuf[32];
 +	int			fd, infd, len, n, i;
 +	uint4			state;
 +	ssize_t			cnt;
@@ -72,13 +70,13 @@ index 36c185acd..d76279f12 100644
 +	gd_region		*reg, *reg_top;
 +	sgmnt_addrs		*csa;
 +
-+	if (logged || (NULL == (dir = getenv("FUZZ_DB_LOGDIR"))))
++	if (*logged || (NULL == dir))
 +		return;
-+	logged = TRUE;
++	*logged = TRUE;
 +	state = have_crit(CRIT_HAVE_ANY_REG | CRIT_IN_COMMIT | CRIT_IN_WTSTART | CRIT_ALL_REGIONS);
-+	if (!state && (NULL == kip_csa))
++	if (db_only && !state && (NULL == kip_csa))
 +		return;
-+	snprintf(path, SIZEOF(path), "%s/dbdeath.log", dir);
++	snprintf(path, SIZEOF(path), "%s/%s.log", dir, prefix);
 +	if (-1 == (fd = open(path, O_WRONLY | O_CREAT | O_APPEND, 0666)))
 +		return;
 +	if ((0 != fstat(fd, &st)) || (FUZZ_LOG_MAX_SIZE < st.st_size))
@@ -92,7 +90,7 @@ index 36c185acd..d76279f12 100644
 +	{
 +		for (i = 1; FUZZ_MAX_SAVED_INPUTS >= i; i++)
 +		{
-+			snprintf(path, SIZEOF(path), "%s/dbdeath_input_%d", dir, i);
++			snprintf(path, SIZEOF(path), "%s/%s_input_%d", dir, prefix, i);
 +			if (-1 != (infd = open(path, O_WRONLY | O_CREAT | O_EXCL, 0666)))
 +				break;
 +		}
@@ -142,18 +140,44 @@ index 36c185acd..d76279f12 100644
 +	close(fd);
 +}
 +
++/* Fuzz testing only. If the FUZZ_DB_LOGDIR env var is set (fuzzing/fuzz.sh sets it to the database directory of the
++ * afl-fuzz instance), log a process that dies while it updates the database to $FUZZ_DB_LOGDIR/dbdeath.log (see
++ * fuzz_death_log()). A fuzz testing build exits right away on a signal like SIGSEGV or an event that dumps a core (see
++ * sig_init.c.patch and gtm_fork_n_core.c.patch), without the exit handler that would otherwise finish or undo such a
++ * database update, so this records which event did that.
++ */
++void fuzz_db_death_log(int sig)
++{
++	static boolean_t	logged;
++
++	fuzz_death_log(sig, getenv("FUZZ_DB_LOGDIR"), "dbdeath", &logged, TRUE);
++}
++
++/* Fuzz testing only. If the FUZZ_LOGDIR env var is set (fuzzing/fuzz.sh sets it for every afl-fuzz instance), log every
++ * process that is about to dump a core (e.g. an assert failure or a fatal error like GTMASSERT2) to
++ * $FUZZ_LOGDIR/coredeath.log (see fuzz_death_log()). afl-fuzz discards the stderr of the fuzzed process, which has the
++ * error, and a crash input often does not reproduce outside afl-fuzz, so this is the only record of why it crashed.
++ */
++void fuzz_core_death_log(void)
++{
++	static boolean_t	logged;
++
++	fuzz_death_log(SIGQUIT, getenv("FUZZ_LOGDIR"), "coredeath", &logged, FALSE);
++}
++
  void gtm_dump_core(void)
  {
  	struct sigaction        act;
-@@ -34,6 +156,15 @@ void gtm_dump_core(void)
+@@ -34,6 +179,16 @@ void gtm_dump_core(void)
  	struct stat             fs1;
  	sigset_t		unblock_sigquit;
  
 +	/* Treat any event that is about to dump a core file as a SIG-11 so afl-fuzz can record it as a crash.
 +	 * Note that this includes fatal errors like GTMASSERT2/GTMASSERT etc. too as they invoke DUMP_CORE macro.
 +	 */
-+	char	*ptr, ch;
++	volatile char	*ptr, ch;	/* volatile, or the compiler removes the load from the NULL pointer (clang does) */
 +	fuzz_db_death_log(SIGQUIT);
++	fuzz_core_death_log();
 +	ptr = NULL;
 +	ch = *ptr;
 +	printf("ch = %d\n", ch);

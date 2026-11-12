@@ -58,6 +58,13 @@ On modern version of AFL++, you can remove the input directory to make `afl-fuzz
 
 To instead start a new campaign (e.g. with a newer YottaDB build) from what an earlier campaign found, save the `output/Leader/queue` directory of the earlier campaign and set the `FUZZ_SEED_DIR` env var to it before running `make corpus` (or `enhanced_fuzz.csh`). `make_corpus.sh` then adds those inputs to the YDBTest tests before running `afl-cmin`.
 
+### ...find out why a crash does not reproduce?
+
+afl-fuzz discards the stderr of the fuzzed processes, and some crash inputs do not reproduce outside afl-fuzz. `fuzz.sh` sets the `FUZZ_LOGDIR` env var of the fuzzed processes of each afl-fuzz instance to `env/<instance>/deaths`, where `gtm_dump_core.c.patch` logs every process that is about to dump a core (e.g. an assert failure or a fatal error like GTMASSERT2), which a fuzz testing build turns into a SIG-11:
+
+- `coredeath.log`: one entry (time, pid, `error_condition`, crit and commit state of each region, and a backtrace) for each such process. The signal in the entry is always 3 (the signal of a core dump). `addr2line -f -e <build>/libyottadb.so <offset>` turns the `libyottadb.so(+<offset>)` lines of the backtrace into function names. `$ZMESSAGE(<error_condition>)` is the error.
+- `coredeath_input_<n>`: the input of the process of each such entry (the first 200).
+
 ### ...find out why an instance database is damaged?
 
 When `enhanced_fuzz.csh` chooses to use a database, each afl-fuzz instance has its own database in `env/<instance>/db`, and `fuzz.sh` sets the `FUZZ_DB_LOGDIR` env var of the fuzzed processes to that directory. A fuzz testing build exits right away on an event that dumps a core or on a signal like SIGSEGV, without finishing or undoing a database update that the process is in the middle of, so such an exit can damage the database. These files in `env/<instance>/db` help find out which input did that:
