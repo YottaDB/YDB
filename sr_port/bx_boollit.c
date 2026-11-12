@@ -206,11 +206,25 @@ STATICFNDEF void bx_boollit_work(triple *t, int depth)
 			break;
 		case OC_NGT:
 		case OC_GT:
-			tvr = (0 < numcmp(v[0], v[1]));
-			break;
 		case OC_NLT:
 		case OC_LT:
-			tvr = (0 > numcmp(v[0], v[1]));
+			for (j = 0;  j < ARRAYSIZE(v); j++)
+			{	/* A numeric comparison converts both operands to numbers. A string literal that is a number that
+				 * is too large has no numeric value, so do not optimize the comparison, and issue NUMOFLOW, as
+				 * the comparison does when it runs. Use "stx_error" and not "rts_error_csa", for the reason in
+				 * the comment on the NUMOFLOW check of a complement, negation, "+" or $COMVAL above.
+				 */
+				MV_FORCE_NUMD(v[j]);
+				if (!(MV_NM & v[j]->mvtype))
+				{
+					stx_error(ERR_NUMOFLOW);
+					return;
+				}
+			}
+			if ((OC_GT == t->opcode) || (OC_NGT == t->opcode))
+				tvr = (0 < numcmp(v[0], v[1]));
+			else
+				tvr = (0 > numcmp(v[0], v[1]));
 			break;
 		case OC_NPATTERN:
 		case OC_PATTERN:
