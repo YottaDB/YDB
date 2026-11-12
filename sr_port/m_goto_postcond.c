@@ -29,6 +29,7 @@ int m_goto_postcond(triple *oldchain, triple *tmpchain)
 	triple		*obp, *ref0, *ref1, *triptr;
 	triple		*boolexprfinish, *boolexprfinish2;
 	mval		*v;
+	char		*lexptr;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -54,7 +55,20 @@ int m_goto_postcond(triple *oldchain, triple *tmpchain)
 		else
 		{	/* it's TRUE so treat as if there was no argument postconditional */
 			while (TK_EOL != TREF(window_token))	/* but first discard the rest of the line - it's dead */
+			{
+				lexptr = TREF(lexical_ptr);
 				advancewindow();
+				/* This loop discards the rest of the line by calling advancewindow() until TK_EOL. When
+				 * advancewindow() returns TK_ERROR and moves "lexical_ptr" past the bad input (for example an
+				 * invalid character such as "~"), the next call goes on from there, so the loop still reaches
+				 * TK_EOL. When advancewindow() returns TK_ERROR without moving "lexical_ptr" (for example a
+				 * string with no closing quote, or "*", "]" or "@" followed by a byte above DEL), every later
+				 * call returns the same TK_ERROR, so the loop would never reach TK_EOL. Stop the loop then, and
+				 * let the caller report the error.
+				 */
+				if ((TK_ERROR == TREF(director_token)) && (lexptr == TREF(lexical_ptr)))
+					break;
+			}
 			obp = oldchain->exorder.bl;
 			dqadd(obp, tmpchain, exorder);		/* this is a violation of info hiding */
 		}
