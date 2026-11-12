@@ -143,6 +143,11 @@ void op_gvnaked_common(int count, int hash_code_dummy, mval *val_arg, va_list va
 		gvnh_reg = NULL;
 	}
 	gv_currkey->end = gv_currkey->prev;
+	/* Keep the key double null terminated. If a subscript that COPY_SUBS_TO_GVCURRKEY appends below does not fit,
+	 * mval2subsc() or COPY_SUBS_TO_GVCURRKEY issues GVSUBOFLOW with ISSUE_GVSUBOFLOW_ERROR, which asserts that the key
+	 * is double null terminated and formats the key with format_targ_key() for the GVIS message.
+	 */
+	gv_currkey->base[gv_currkey->end] = KEY_DELIMITER;
 	val = val_arg;
 	is_null = FALSE;
 	was_null = TREF(gv_some_subsc_null);
