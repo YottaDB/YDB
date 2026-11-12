@@ -3,7 +3,7 @@
 # Copyright (c) 2007-2022 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
-# Copyright (c) 2020-2024 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2020-2026 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
@@ -85,6 +85,24 @@ top			=	16
 #
 # mv_force_defined(mval, label)
 #
+#
+# Copy an mval. Done with four 8 byte moves rather than "REP movsq", whose startup cost exceeds the cost of
+# the copy itself for a 32 byte mval. Uses the "tmp" register as scratch.
+#
+.if mval_byte_len - 32
+.error "mv_copy assumes a 32 byte mval"
+.endif
+.macro	mv_copy src, dst, tmp
+	movq	0(\src), \tmp
+	movq	\tmp, 0(\dst)
+	movq	8(\src), \tmp
+	movq	\tmp, 8(\dst)
+	movq	16(\src), \tmp
+	movq	\tmp, 16(\dst)
+	movq	24(\src), \tmp
+	movq	\tmp, 24(\dst)
+.endm
+
 .macro  mv_force_defined mval, label
         testw   $(mval_m_str+mval_m_nm), mval_w_mvtype(\mval)
         jne     \label

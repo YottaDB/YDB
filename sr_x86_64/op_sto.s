@@ -3,7 +3,7 @@
 # Copyright (c) 2007-2016 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
-# Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
@@ -30,11 +30,7 @@ ENTRY	op_sto
 	CHKSTKALIGN						# Verify stack alignment
 	mv_if_notdefined %r10, notdef
 nowdef:
-	movl	$mval_qword_len, %ecx
-	movq	%r10, %rsi
-	movq	%rax, %rdi
-	REP
-	movsq
+	mv_copy	%r10, %rax, %rcx
 	andw	$~mval_m_aliascont, mval_w_mvtype(%rax)		# Don't propagate alias container flag
 done:
 	addq	$8, %rsp					# Remove stack alignment bump

@@ -3,7 +3,7 @@
 # Copyright (c) 2007-2016 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
-# Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
@@ -39,11 +39,7 @@ ENTRY	op_fnget
 	cmpq	$0, %r10
 	je	l5				# Source mval does not exist
 	mv_if_notdefined %r10, l5		# Branch if source mval is not defined
-	movl	$mval_qword_len, %ecx		# Size of mval
-	movq	%r10, %rsi			# Set source
-	movq	%rax, %rdi			# Set destination
-	REP					# Repeat until count is zero
-	movsq
+	mv_copy	%r10, %rax, %rcx		# Copy source mval to destination
 	andw	$~mval_m_aliascont, mval_w_mvtype(%rax)	# Don't propagate alias container flag
 	ret
 

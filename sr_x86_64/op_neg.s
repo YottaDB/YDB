@@ -3,7 +3,7 @@
 # Copyright (c) 2007-2015 Fidelity National Information 	#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
-# Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
@@ -55,11 +55,7 @@ numer:
 sqlnull:
 	# If v=$ZYSQLNULL, then u = -v should also be set to $ZYSQLNULL
 	# Copy the Mval from %r10 [r10] to %rax [rax].
-	movq	%rax, %rdi
-	movq	%r10, %rsi
-	movl	$mval_qword_len, %ecx
-	REP
-	movsq
+	mv_copy	%r10, %rax, %rcx
 	jmp	done
 float:
 	movw	$mval_m_nm, mval_w_mvtype(%rax)

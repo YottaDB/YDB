@@ -3,7 +3,7 @@
 # Copyright (c) 2007-2016 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
-# Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
@@ -41,10 +41,7 @@ doit:
 	#
 	# Copy/return literal_zero or literal_one mval to caller
 	#
-	movq	%r10, %rdi
-	movl	$mval_qword_len, %ecx
-	REP
-	movsq
+	mv_copy	%rsi, %r10, %rcx
 	ret
 # Below line is needed to avoid the ELF executable from ending up with an executable stack marking.
 # This marking is not an issue in Linux but is in Windows Subsystem on Linux (WSL) which does not enable executable stack.
