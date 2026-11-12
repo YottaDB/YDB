@@ -3,7 +3,7 @@
  * Copyright (c) 2005-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2024 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2024-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -122,8 +122,14 @@ void updhelper_init(recvpool_user who)
 	jnlpool_init_needed = TRUE;
 	reg_top = gd_header->regions + gd_header->n_regions;
 	for (reg = gd_header->regions; reg < reg_top; reg++)
-	{	/* Use gvcst_init to set statsdb up, and enable statistics to reader and writer helpers */
-		if (!reg->open)
+	{	/* Use "gvcst_init" to open the database regions, which also sets up the statsDB of each region and enables
+		 * statistics for the reader and writer helpers if statistics are shared ("gvcst_init" of a base region opens its
+		 * statsDB through "gvcst_init_statsDB", which turns off statistics for the region if the statsDB cannot be
+		 * created or opened). Skip the statsDB regions. Opening a statsDB region directly with "gvcst_init" would
+		 * instead issue an error (for example DBOPNERR when the statsDB cannot be created in the directory that
+		 * ydb_statsdir names) that makes the helper exit.
+		 */
+		if (!reg->open && !IS_STATSDB_REG(reg))
 			gvcst_init(reg);
 	}
 	return;
