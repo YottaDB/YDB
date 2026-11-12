@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -129,9 +129,16 @@ void op_bindparm(int frmc, int frmp_arg, ...)
 		htepp = (ht_ent_mname **)&frame_pointer->l_symtab[frmp];	/* address of l_symtab entry */
 		parm_name = &(((var_tabent *)frame_pointer->vartab_ptr)[frmp]);
 		assert(0 <= frmp && frmp < frame_pointer->vartab_len);
-		if (add_hashtab_mname_symval(&curr_symval->h_symtab, parm_name, NULL, &tabent))
-			lv_newname(tabent, curr_symval);
+		tabent = *htepp;
+		if (NULL == tabent)
+		{	/* Not yet resolved in this l_symtab. A call to a label in the same routine shares the caller's
+			 * l_symtab, so in that case the entry is usually already resolved and no hash table lookup is needed.
+			 */
+			if (add_hashtab_mname_symval(&curr_symval->h_symtab, parm_name, NULL, &tabent))
+				lv_newname(tabent, curr_symval);
+		}
 		assert(tabent->value);
+		assert(tabent == lookup_hashtab_mname(&curr_symval->h_symtab, parm_name));
 		DEBUG_ONLY(ntab->nam_addr = parm_name);				/* address of var_tabent */
 		ntab->hte_addr = tabent;					/* save hash table entry addr */
 		ntab->save_value = (lv_val *)tabent->value;			/* address of original lv_val */

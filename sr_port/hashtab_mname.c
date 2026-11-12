@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -52,6 +52,12 @@ boolean_t add_hashtab_mname_symval(hash_table_mname *table, mname_entry *key, vo
 	*/
 	assert(table == &curr_symval->h_symtab || table == &curr_symval->last_tab->h_symtab);
 	assert(FALSE == key->marked);
+
+	/* The add expands the table only when the table has as many entries as its expansion trigger size. Short of that,
+	 * the table base cannot change, so no l_symtab entry needs repair, and the bookkeeping below is not needed.
+	 */
+	if (table->count < table->exp_trigger_size)
+		return add_hashtab_mname(table, key, value, tabentptr);
 
 	/* remember table we started with */
 	table_base_orig = table->base;
