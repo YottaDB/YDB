@@ -308,7 +308,7 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, uint
 					if (len < SA_MAXLITLEN)
 					{
 						memset(sockaddr, 0, SIZEOF(sockaddr));
-						assert((0 < len) && (SIZEOF(sockaddr) >= len));
+						assert((0 <= len) && (SIZEOF(sockaddr) >= len));
 						memcpy(sockaddr, pp->str.addr + p_offset + 1, len);
 					} else
 						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_ADDRTOOLONG, 4, len,
@@ -320,7 +320,7 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, uint
 					if (len < SA_MAXLITLEN)
 					{
 						memset(sockaddr, 0, SIZEOF(sockaddr));
-						assert((0 < len) && (SIZEOF(sockaddr) >= len));
+						assert((0 <= len) && (SIZEOF(sockaddr) >= len));
 						memcpy(sockaddr, pp->str.addr + p_offset + 1, len);
 					} else
 						RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(6) ERR_ADDRTOOLONG, 4,
