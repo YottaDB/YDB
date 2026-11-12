@@ -46,7 +46,7 @@ VARNAME2LONG	<Variable name length exceeds maximum allowed (!UL)>/error/fao=1
 SIMPLEAPINEST	<Attempt to nest call of !AZ with a call to !AZ - nesting calls is not permitted in the Simple API>/error/fao=2
 CALLINTCOMMIT	<TCOMMIT at call-in-level=!UL not allowed as corresponding TSTART was done at lower call-in-level=!UL>/error/fao=2
 CALLINTROLLBACK	<TROLLBACK at call-in-level=!UL not allowed as corresponding TSTART was done at lower call-in-level=!UL>/error/fao=2
-TCPCONNTIMEOUT	<Connection wait timeout (!UL seconds) has expired>/error/fao=2
+TCPCONNTIMEOUT	<Connection wait timeout (!UL seconds) has expired>/error/fao=1
 STDERRALREADYOPEN	<STDERR deviceparameter specifies an already open device !AD>/error/fao=2
 SETENVFAIL	<VIEW "SETENV":"!AD" failed in setenv() system call>/error/fao=2
 UNSETENVFAIL	<VIEW "UNSETENV":"!AD" failed in unsetenv() system call>/error/fao=2

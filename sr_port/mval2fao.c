@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2026 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -45,8 +48,12 @@ int mval2fao(
 	for ( ; mcount && (parmcnt < fcount); )
 	{
 		MV_FORCE_DEFINED(fao);
-		while (*message != '!')
-			DBG_ASSERT(*message) message++;
+		while ('!' != *message)
+		{
+			if ('\0' == *message)
+				return parmcnt;	/* the message has fewer directives than the parameter count of its entry */
+			message++;
+		}
 		/* A length for the fao parameter (consisting of digits). */
 		for (n = 0; (*++message > 47) && (*message < 58); n++)
 			;

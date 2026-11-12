@@ -36,7 +36,7 @@ LITDEF	err_msg ydberrors[] = {
 	{ "SIMPLEAPINEST", "Attempt to nest call of !AZ with a call to !AZ - nesting calls is not permitted in the Simple API", 2, 0 },
 	{ "CALLINTCOMMIT", "TCOMMIT at call-in-level=!UL not allowed as corresponding TSTART was done at lower call-in-level=!UL", 2, 0 },
 	{ "CALLINTROLLBACK", "TROLLBACK at call-in-level=!UL not allowed as corresponding TSTART was done at lower call-in-level=!UL", 2, 0 },
-	{ "TCPCONNTIMEOUT", "Connection wait timeout (!UL seconds) has expired", 2, 0 },
+	{ "TCPCONNTIMEOUT", "Connection wait timeout (!UL seconds) has expired", 1, 0 },
 	{ "STDERRALREADYOPEN", "STDERR deviceparameter specifies an already open device !AD", 2, 0 },
 	{ "SETENVFAIL", "VIEW \"SETENV\":\"!AD\" failed in setenv() system call", 2, 0 },
 	{ "UNSETENVFAIL", "VIEW \"UNSETENV\":\"!AD\" failed in unsetenv() system call", 2, 0 },

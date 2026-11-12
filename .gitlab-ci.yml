@@ -58,7 +58,9 @@ commit-verify:
 
 # Every send_msg/gtm_putmsg/rts_error call site states its own argument count in VARLSTCNT, and a
 # count higher than the number of arguments passed makes the consumption loop read past the end of
-# the va_list. This needs no build, so it runs beside commit-verify.
+# the va_list. The fao= count of each message definition in sr_port/*.msg must also match the number
+# of parameters that the directives in its text take, or ZMESSAGE of the message reads past the end
+# of the text. These need no build, so they run beside commit-verify.
 varlstcnt-verify:
   image: ubuntu:24.04
   stage: build
@@ -68,6 +70,7 @@ varlstcnt-verify:
     - apt_get_install -y -qq python3
   script:
     - ci/check_varlstcnt.py
+    - ci/check_msg_fao.py
 
 .clang-tidy:
   image: ubuntu:24.04
