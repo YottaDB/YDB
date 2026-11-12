@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -29,6 +29,7 @@
 GBLDEF stack_frame	*zstep_level;
 
 GBLREF bool		neterr_pending;
+GBLREF boolean_t	is_tracing_on;
 GBLREF int		iott_write_error;
 GBLREF int4		gtm_trigger_depth;
 GBLREF intrpt_state_t	intrpt_ok_state;
@@ -38,7 +39,7 @@ GBLREF xfer_entry_t	xfer_table[];
 
 void op_zstep(uint4 code, mval *action)
 {
-	boolean_t	already_ev_handling;
+	boolean_t	already_ev_handling, outofband_queued;
 	int4		ev, status;
 	intrpt_state_t	prev_intrpt_state = INTRPT_NUM_STATES;
 	save_xfer_entry	*entry;
@@ -69,6 +70,7 @@ void op_zstep(uint4 code, mval *action)
 	/* WARNING! AIO sets multi_thread_in_use which disables DEFER_INTERRUPTS, treat it like an active event */
 	if (!(already_ev_handling = ((INTRPT_IN_EVENT_HANDLING == intrpt_ok_state) || multi_thread_in_use)))
 		DEFER_INTERRUPTS(INTRPT_IN_EVENT_HANDLING, prev_intrpt_state);
+	outofband_queued = FALSE;
 	for (ev = ctrlc; ev <  DEFERRED_EVENTS; ev++)
 	{	/* make any thing we've potentially overlaying queued */
 		if (zstep_pending == ev)
@@ -83,9 +85,31 @@ void op_zstep(uint4 code, mval *action)
 			entry = &(TAREF1(save_xfer_root, ev));
 			entry->event_state = queued;
 			SAVE_XFER_QUEUE_ENTRY(ev, entry->param_val);
+			/* If "outofband" names this event, the transfer table entries point at the routines that recognize the
+			 * event, whatever the state of the event was: "pending" (for example a $ZTIMEOUT or a TP timeout), or
+			 * "active" (a job interrupt, which "jobinterrupt_set" makes "active" when it sets those entries). Note
+			 * that here, so that the code after this loop takes the event out of the transfer table and out of
+			 * "outofband" now that the event is only queued. An event that "outofband" does not name (for example
+			 * a job interrupt whose $ZINTERRUPT code is running, or a "signaled" event) has no transfer table
+			 * entries.
+			 */
+			if (ev == outofband)
+				outofband_queued = TRUE;
 		default:						/* WARNING fallthrough */
 			break;
 		}
+	}
+	if (outofband_queued && !already_ev_handling)
+	{	/* "outofband" named the event that the loop above queued to run after the ZSTEP action. Take the event out of
+		 * the transfer table and out of "outofband", as "real_xfer_reset" does. Otherwise, a FOR loop (whose transfer
+		 * table entries the ZSTEP does not change) would recognize the queued event before the ZSTEP action, and
+		 * "try_event_pop", which replays a queued event only when "outofband" is "no_event", would never replay the
+		 * event. The ZSTEP transfer table entries are set below. When "real_xfer_reset" invokes this routine to
+		 * reinstate ZSTEP after an event, "already_ev_handling" is TRUE, and "real_xfer_reset" resets "outofband".
+		 */
+		DEFER_OUT_OF_XFER_TAB(is_tracing_on);
+		FIX_XFER_ENTRY(xf_forloop, op_forloop);
+		outofband = no_event;
 	}
 	switch(code)
 	{

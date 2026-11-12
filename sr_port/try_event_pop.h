@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2026 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -26,6 +29,7 @@ static inline void try_event_pop(void)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	DBG_ASSERT_OUTOFBAND_NOT_QUEUED;	/* else the "no_event == outofband" check below would never replay that event */
 	if ((no_event == outofband)
 		&& (no_event != (TREF(save_xfer_root_ptr))->ev_que.fl->outofband))
 	{	/* perhaps pop an_event */

@@ -27,6 +27,7 @@ GBLREF	boolean_t		ztrap_explicit_null;
 GBLREF	dollar_ecode_type	dollar_ecode;
 GBLREF	volatile boolean_t	dollar_zininterrupt;
 GBLREF	volatile boolean_t	sigwinch_inprog;
+GBLREF	volatile int4		outofband;
 
 void set_events_from_signals(intrpt_state_t prev_intrpt_state)
 {	/* act on signaled events stored in their event record while the event mechanism had a lock on the intrpt_ok state */
@@ -47,6 +48,7 @@ void set_events_from_signals(intrpt_state_t prev_intrpt_state)
 				__LINE__, __FILE__, event_type));
 		}
 	}
+	DBG_ASSERT_OUTOFBAND_NOT_QUEUED;	/* every window of event handling ends here, through ENABLE_EVENT_INTERRUPTS */
 	ENABLE_INTERRUPTS(INTRPT_IN_EVENT_HANDLING, prev_intrpt_state);
 }
 

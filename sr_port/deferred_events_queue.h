@@ -115,6 +115,19 @@ MBSTART {									\
 		empty_xfer_queue_entries();					\
 } MBEND
 
+/* "outofband" names the event whose transfer table entries are in effect, and that event is waiting for a logical boundary to
+ * be recognized. A queued event waits in the queue instead, and "try_event_pop" replays the queue only when "outofband" is
+ * "no_event". So "outofband" must never name a queued event. Code that queues the event that "outofband" names also has to take
+ * that event out of the transfer table and set "outofband" to "no_event" (see "xfer_set_handlers", "ztimeout_set" and
+ * "op_zstep"). Otherwise the queued event is never replayed, and a FOR loop, whose transfer table entries ZSTEP does not change,
+ * recognizes the queued event.
+ */
+#define DBG_ASSERT_OUTOFBAND_NOT_QUEUED									\
+MBSTART {												\
+	assert((no_event == outofband) || (DEFERRED_EVENTS <= outofband)				\
+		|| (queued != TAREF1(save_xfer_root, outofband).event_state));				\
+} MBEND
+
 /* while the other macros check the protection state coming in, this one checks for proper cleanup going out */
 #define ENABLE_EVENT_INTERRUPTS(PREV_INTRPT_STATE)				\
 MBSTART {									\

@@ -313,6 +313,7 @@ void async_action(bool lnfetch_or_start)
 	SETUP_THREADGBL_ACCESS;
 	assert(INTRPT_IN_EVENT_HANDLING != intrpt_ok_state);
 	DEFER_INTERRUPTS(INTRPT_IN_EVENT_HANDLING, prev_intrpt_state);
+	DBG_ASSERT_OUTOFBAND_NOT_QUEUED;	/* a queued event has to wait in the queue, not be recognized here */
 	if (jobinterrupt == outofband)
 	{
 		if (dollar_zininterrupt)
