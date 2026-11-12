@@ -17,9 +17,11 @@
 #include "op.h"
 #include "cmidef.h"
 #include "gvcmz.h"
+#include "stack_frame.h"
 #include "lckclr.h"
 
 GBLREF bool		remlkreq;
+GBLREF stack_frame	*frame_pointer, *lks_this_cmd_fp;
 GBLREF unsigned short	lks_this_cmd;
 
 error_def(ERR_BADLOCKNEST);
@@ -32,6 +34,7 @@ void op_lkinit(void)
 		lks_this_cmd = 0;
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_BADLOCKNEST);
 	}
+	lks_this_cmd_fp = frame_pointer;
 	if (remlkreq)
 	{
 		gvcmz_clrlkreq();

@@ -133,6 +133,7 @@ GBLREF	volatile bool		neterr_pending, std_dev_outbnd;
 GBLREF	volatile boolean_t	dollar_zininterrupt;
 GBLREF	volatile int4		gtmMallocDepth, outofband;
 GBLREF	xfer_entry_t		xfer_table[];
+GBLREF	stack_frame		*lks_this_cmd_fp;	/* Frame of the LOCK command in progress */
 GBLREF	unsigned short		lks_this_cmd;		/* Locks in the current command */
 GBLREF	int			zydecode_args;
 GBLREF	int			zyencode_args;
@@ -557,13 +558,11 @@ CONDITION_HANDLER(mdb_condition_handler)
 	if ((SUCCESS != SEVERITY) && (INFO != SEVERITY))
 	{
 		ENABLE_AST;
-		if (lks_this_cmd)
-		{	/* Current LOCK cmd won't resume. Clear the in-progress flag of its lock names (else a later LOCK + of
-			 * one of those names neither counts nor acquires it) and reset the lock count for the interrupted cmd.
-			 */
-			lckclr();
-			lks_this_cmd = 0;
-		}
+		/* The error abandons a LOCK command in progress unless the error is handled in a frame newer than that of the
+		 * LOCK, as when the $ETRAP of an extrinsic that a lock name calls handles the error and the extrinsic returns.
+		 * If such an error reaches the frame of the LOCK, this handler runs again in that frame and abandons the LOCK.
+		 */
+		ABANDON_LOCK_CMD_UNLESS_RESUMED(frame_pointer);
 		if ((0 == dollar_tlevel) || (CDB_STAGNATE > t_tries))
 		{	/* Only release crit if we are NOT in TP *or* if we are in TP, we aren't in final retry */
 			for (addr_ptr = get_next_gdr(NULL); addr_ptr; addr_ptr = get_next_gdr(addr_ptr))

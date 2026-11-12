@@ -66,6 +66,7 @@
 #endif
 #include "gtmci.h"
 #include "gvt_inline.h"
+#include "lckclr.h"
 
 GBLREF	boolean_t		caller_id_flag, is_updproc, mupip_jnl_recover;
 GBLREF	int			dollar_truth, mumps_status;
@@ -90,6 +91,8 @@ GBLREF	trans_num		local_tn;		/* transaction number for THIS PROCESS */
 GBLREF	uint4			dollar_tlevel, dollar_trestart, t_err;
 GBLREF	unsigned char		*msp, *stackbase, *stacktop, t_fail_hist[CDB_MAX_TRIES], *tpstackbase, *tpstacktop;
 GBLREF	unsigned int		t_tries;
+GBLREF	stack_frame		*lks_this_cmd_fp;
+GBLREF	unsigned short		lks_this_cmd;
 #ifdef GTM_TRIGGER
 GBLREF	int			tprestart_state;	/* When triggers restart, multiple states possible. See tp_restart.h */
 GBLREF	mval			dollar_ztslate;
@@ -781,6 +784,12 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 		 * the M stackframe and mv_stent chain as well.
 		 */
 		GTMTRIG_ONLY(DBGTRIGR((stderr, "tp_restart: Beginning state 0/1 processing (state %d)\n", tprestart_state)));
+		/* Execution resumes at the outermost TSTART, which abandons a LOCK command or SimpleAPI lock call in progress
+		 * unless the TSTART is in a frame newer than that of the LOCK (for example in an extrinsic that a lock name
+		 * calls). Do this before "tp_unwind", which keeps the list entries of the lock names of a LOCK in progress
+		 * and deletes the other entries of lock names that are not granted.
+		 */
+		ABANDON_LOCK_CMD_UNLESS_RESUMED(tf->fp);
 		tp_unwind(newlevel, RESTART_INVOCATION, &tprestart_rc);
 		assert(dollar_tlevel == newlevel);	/* tp_unwind would have set this */
 		assert(tf == tp_pointer);	/* Needs to be true for now. Revisit when can restart to other than newlevel == 1 */

@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2026 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -12,8 +15,10 @@
 
 #include "mdef.h"
 #include "mlkdef.h"
+#include "stack_frame.h"
 
 GBLDEF bool remlkreq=FALSE;
 GBLDEF mlk_pvtblk *mlk_pvt_root = 0;
 GBLDEF unsigned short lks_this_cmd;
+GBLDEF stack_frame *lks_this_cmd_fp;	/* M frame of the LOCK command in progress (see lckclr.h) */
 GBLDEF unsigned char cm_action;

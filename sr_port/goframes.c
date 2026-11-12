@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -36,6 +36,7 @@
 #include "gv_trigger.h"
 #include "gtm_trigger.h"
 #include "get_ret_targ.h"
+#include "lckclr.h"
 
 GBLREF	boolean_t	goframes_unwound_trigger;
 #endif
@@ -43,6 +44,8 @@ GBLREF	mval		*alias_retarg;
 GBLREF	stack_frame	*frame_pointer;
 GBLREF	boolean_t	skip_error_ret;
 GBLREF	tp_frame	*tp_pointer;
+GBLREF	stack_frame	*lks_this_cmd_fp;
+GBLREF	unsigned short	lks_this_cmd;
 
 LITREF mval             literal_null;
 
@@ -62,6 +65,10 @@ void	goframes(int4 frames)
 	GTMTRIG_ONLY(goframes_unwound_trigger = FALSE);
 	for (ret_targ = NULL; frames--; )
 	{
+		/* Unwinding the frame of a LOCK command in progress abandons the LOCK. Do this before the TROLLBACK below,
+		 * whose "tp_unwind" keeps the list entries of the lock names of a LOCK in progress.
+		 */
+		ABANDON_LOCK_CMD_UNLESS_RESUMED(frame_pointer);
 		while (tp_pointer && tp_pointer->fp <= frame_pointer)
 		{
 			OP_TROLLBACK(-1);
@@ -114,6 +121,10 @@ void	goframes(int4 frames)
 		goframes_unwound_trigger = TRUE;
 	}
 #	endif
-
+	/* The ZGOTO goes on at a new place in frame "frame_pointer". If that is the frame of a LOCK command in progress (or an
+	 * older frame), the LOCK does not resume. A ZGOTO that stays in newer frames (for example in an extrinsic that a lock name
+	 * calls) does not abandon the LOCK, which resumes when the extrinsic returns.
+	 */
+	ABANDON_LOCK_CMD_UNLESS_RESUMED(frame_pointer);
 	return;
 }

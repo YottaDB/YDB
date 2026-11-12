@@ -49,12 +49,15 @@
 #include "jobinterrupt_process.h"
 #include "bool_zysqlnull.h"
 #include "try_event_pop.h"
+#include "lckclr.h"
 
 GBLREF	boolean_t	dollar_truth, is_tracing_on, skip_error_ret;
 GBLREF	mval		*alias_retarg;
 GBLREF	mv_stent	*mv_chain;
 GBLREF	stack_frame	*error_frame, *frame_pointer, *zyerr_frame;
 GBLREF	tp_frame	*tp_pointer;
+GBLREF	stack_frame	*lks_this_cmd_fp;
+GBLREF	unsigned short	lks_this_cmd;
 GBLREF	unsigned char	*msp, *stackbase, *stacktop;
 GBLREF	void		(*unw_prof_frame_ptr)(void);
 GBLREF	volatile int4	outofband;
@@ -100,6 +103,7 @@ void op_unwind(void)
 		}
 	}
 	DBGEHND_ONLY(prevfp = frame_pointer);
+	ABANDON_LOCK_CMD_UNLESS_RESUMED(frame_pointer);	/* unwinding the frame of a LOCK in progress abandons the LOCK */
 	if (tp_pointer && tp_pointer->fp <= frame_pointer)
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_TPQUIT);
 	/* Note that error_ret() should be invoked only after the rts_error() of TPQUIT.

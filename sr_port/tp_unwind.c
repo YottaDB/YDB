@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -309,6 +309,13 @@ void	tp_unwind(uint4 newlevel, enum tp_unwind_invocation invocation_type, int *t
 				free(oldlock);
 			} else
 				mlkp->tp = oldlock;	/* update root reference pointer */
+			prior = &mlkp->next;
+		} else if (mlkp->trans)
+		{	/* A lock name of a LOCK command in progress, for example a LOCK whose lock name calls an extrinsic that runs
+			 * this transaction. That LOCK has not yet acquired the name and resumes after the extrinsic returns, so keep
+			 * the list entry. When a TP restart or a ZGOTO abandons the LOCK, ABANDON_LOCK_CMD_UNLESS_RESUMED clears the
+			 * "trans" flag before this runs, and the entry is deleted below.
+			 */
 			prior = &mlkp->next;
 		} else
 			mlk_pvtblk_delete(prior);
