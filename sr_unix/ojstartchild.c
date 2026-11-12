@@ -676,8 +676,12 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 				 * where a separate process has been jobbed off but the JOB command is returning an error
 				 * (as that would mean the parent process would then have to wait for the grandchild to
 				 * terminate using $zjob but that is not set since middle child exited with an error).
-				 * Ignore the wait status.
+				 * Ignore the wait status. Close the setup socket first: the grandchild can find the routine
+				 * even though this process could not (for example if this process uses a $ZROUTINES that
+				 * differs from the ydb_routines the grandchild starts with) and would otherwise wait forever
+				 * for the next setup operation. With the socket closed, the grandchild sees EOF and exits.
 				 */
+				CLOSEFILE_RESET(setup_fds[0], pipe_status);	/* resets "setup_fds[0]" to FD_INVALID */
 				WAITPID(child_pid, &wait_status, 0, done_pid);
 				assert(done_pid == child_pid);
 				ARLINK_ONLY(relinkctl_rundown(FALSE, FALSE));	/* do not decrement counters, just shmdt */
