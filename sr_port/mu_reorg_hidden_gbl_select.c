@@ -85,6 +85,8 @@ void mu_reorg_hidden_gbl_select(glist *gl_head, boolean_t restrict_reg)
 	boolean_t	found;
 	gd_region	*reg, *r_top;
 	glist		*gl_ptr, *gl_tail, *new_gl;
+	hash_table_mname selected_names;
+	ht_ent_mname	*tabent;
 	int		name_len;
 	mname_entry	gvname;
 	tp_region	*rptr;
@@ -123,6 +125,18 @@ void mu_reorg_hidden_gbl_select(glist *gl_head, boolean_t restrict_reg)
 						 * (whose region opens happen through gld name binds) never opened it
 						 */
 		CHANGE_REG_IF_NEEDED(reg);
+		/* Put the names that "gv_select" selected for this region in a hash table, so the check of each name in
+		 * this region's directory tree below takes the same time however many globals there are.
+		 */
+		init_hashtab_mname(&selected_names, 0, HASHTAB_NO_COMPACT, HASHTAB_NO_SPARE_TABLE);
+		for (gl_ptr = gl_head->next; NULL != gl_ptr; gl_ptr = gl_ptr->next)
+		{
+			if (reg != gl_ptr->reg)
+				continue;
+			gvname.var_name = GNAME(gl_ptr);	/* the table keeps this pointer, to the name in gl_ptr->gvt */
+			COMPUTE_HASH_MNAME(&gvname);
+			add_hashtab_mname(&selected_names, &gvname, gl_ptr, &tabent);
+		}
 		/* Seed gv_currkey to just below the lowest possible global name ("%") so the first "gvcst_order"
 		 * call below returns the very first name in this region's directory tree. Note that this seed
 		 * deliberately skips the names of trigger globals like ^#t ('#' sorts before '%'): the -TRUNCATE
@@ -146,13 +160,10 @@ void mu_reorg_hidden_gbl_select(glist *gl_head, boolean_t restrict_reg)
 			assert(1 < gv_altkey->end);
 			assert((MAX_MIDENT_LEN + 2) > gv_altkey->end);	/* until names are not in midents */
 			name_len = gv_altkey->end - 1;
-			for (gl_ptr = gl_head->next; NULL != gl_ptr; gl_ptr = gl_ptr->next)
-			{
-				if ((reg == gl_ptr->reg) && (name_len == GNAME(gl_ptr).len)
-						&& (0 == memcmp(GNAME(gl_ptr).addr, gv_altkey->base, name_len)))
-					break;
-			}
-			if (NULL == gl_ptr)
+			gvname.var_name.addr = (char *)gv_altkey->base;
+			gvname.var_name.len = name_len;
+			COMPUTE_HASH_MNAME(&gvname);
+			if (NULL == lookup_hashtab_mname(&selected_names, &gvname))
 			{	/* The name is in this region's directory tree but "gv_select" did not select it for
 				 * this region: a hidden global. Append a glist entry whose gv_target is bound directly
 				 * to this region. The entry's root block is located later by DO_OP_GVNAME's region-local
@@ -160,9 +171,6 @@ void mu_reorg_hidden_gbl_select(glist *gl_head, boolean_t restrict_reg)
 				 * global was killed (empty GVT) is processed too, same as "gv_select" achieves for
 				 * gld-visible globals via TREF(want_empty_gvts).
 				 */
-				gvname.var_name.addr = (char *)gv_altkey->base;
-				gvname.var_name.len = name_len;
-				COMPUTE_HASH_MNAME(&gvname);
 				new_gl = (glist *)malloc(SIZEOF(glist));
 				new_gl->next = NULL;
 				new_gl->reg = reg;
@@ -180,6 +188,7 @@ void mu_reorg_hidden_gbl_select(glist *gl_head, boolean_t restrict_reg)
 			gv_currkey->end = gv_altkey->end;
 			GVKEY_INCREMENT_ORDER(gv_currkey);
 		}
+		free_hashtab_mname(&selected_names);
 	}
 	/* Do not leave gv_target/gv_currkey pointing into the last walked region's directory tree: the caller is
 	 * about to run reorg phases that set up their own gv_target/gv_currkey via DO_OP_GVNAME, and a stale
