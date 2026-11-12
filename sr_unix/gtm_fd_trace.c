@@ -3,7 +3,7 @@
  * Copyright (c) 2009-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2021 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2021-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -166,7 +166,6 @@ int gtm_pipe1(int pipefd[2])
 	status = pipe(pipefd);
 	FD_TRACE(fd_ops_pipe0, pipefd[0], status);
 	FD_TRACE(fd_ops_pipe1, pipefd[1], status);
-	assert(-1 != status);
 	return status;
 }
 
