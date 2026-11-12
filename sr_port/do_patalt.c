@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2026 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -16,6 +19,7 @@
 
 #include "copy.h"
 #include "patcode.h"
+#include "have_crit.h"
 
 #ifdef UTF8_SUPPORTED
 #include "gtm_utf8.h"
@@ -171,6 +175,11 @@ int do_patalt(uint4 *firstalt, unsigned char *strptr, unsigned char *strtop, int
 	pte_csh		*tmp_pte;
 	unsigned char	*strtmp = NULL, *strnext;
 
+	/* The number of do_patalt() calls can grow exponentially with the length of the string (e.g. for nested
+	 * alternations), and nothing else in the pattern code handles a deferred signal (e.g. the SIGTERM of a
+	 * MUPIP STOP), so check here.
+	 */
+	DEFERRED_SIGNAL_HANDLING_CHECK;
 	if (PTE_MAX_ENTRIES <= repcnt)
 		RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(3) ERR_PATALTER2LARGE, 1, PTE_MAX_ENTRIES);
 	if (PTE_MAX_CURALT_DEPTH > curalt_depth)

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2020-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -20,6 +20,7 @@
 #include "patcode.h"
 #include "copy.h"
 #include "min_max.h"
+#include "have_crit.h"
 
 #ifdef UTF8_SUPPORTED
 #include "gtm_icu_api.h"	/* needed by *TYPEMASK* macros defined in gtm_utf8.h */
@@ -155,6 +156,12 @@ int do_pattern(mval *str, mval *pat)
 	/* proceed to check string */
 	for (;;)
 	{
+		/* A pattern that is not compiled to a DFA (e.g. one with a string literal that has a non-ASCII character)
+		 * can make this loop try a number of permutations that grows exponentially with the number of pattern
+		 * atoms, and nothing else in the loop handles a deferred signal (e.g. the SIGTERM of a MUPIP STOP), so
+		 * check here.
+		 */
+		DEFERRED_SIGNAL_HANDLING_CHECK;
 		if (total_min == length)
 		{	/* attempt a match */
 			attempt = TRUE;
