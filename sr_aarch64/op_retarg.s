@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 # Copyright (c) 2018 Stephen L Johnson. All rights reserved.	#
@@ -27,9 +27,13 @@
 
 	.text
 	.extern	unw_retarg
- 
+
 ENTRY op_retarg
 	CHKSTKALIGN					/* Verify stack alignment */
 	bl	unw_retarg
 	getframe
-	ret
+	/* x30 holds the M code address of the frame (set by getframe), not the address after the bl that called this
+	 * routine. A ret would be predicted from the return stack, which holds the latter, so it would be mispredicted
+	 * every time. A br is predicted from the targets this br jumped to before, and so is less likely to be mispredicted.
+	 */
+	br	x30

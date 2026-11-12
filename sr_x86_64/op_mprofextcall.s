@@ -3,7 +3,7 @@
 # Copyright (c) 2007-2015 Fidelity National Information 	#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
-# Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
@@ -138,8 +138,7 @@ justgo:
 	call	new_stack_frame_sp
 retlab:								# If error, return to caller, else "return" to callee
 	addq	$SAVE_SIZE, %rsp				# Undo save area bump
-	getframe						# Sets regs (including %r12) as they should be for new frame
-	ret
+	getframe_jmp						# Sets regs (including %r12) as they should be for new frame
 
 #
 # Drive auto_zlink to fetch module

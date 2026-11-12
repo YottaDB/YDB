@@ -3,7 +3,7 @@
 # Copyright (c) 2007-2015 Fidelity National Information 	#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
-# Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
@@ -211,8 +211,7 @@ no_arg:
 	call	push_parm					# push_parm (total, $T, ret_value, mask, argc [,arg1, arg2, ...]);
 retlab:
 	movq	%rbp, %rsp					# Unwind C stack back to caller
-	getframe						# Load regs from top M frame (pushes return reg)
-	ret
+	getframe_jmp						# Load regs from top M frame (pushes return reg)
 
 #
 # Drive auto_zlink to fetch module

@@ -3,7 +3,7 @@
 # Copyright (c) 2007-2019 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
-# Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
@@ -187,6 +187,28 @@ lab1\@:
 	movq	msf_literal_ptr_off(%rbp), %r12
 	movq	msf_ctxt_off(%rbp), %r15
 	pushq	msf_mpc_off(%rbp)
+.endm
+
+.macro getframe_jmp
+	#
+	# Same as getframe but transfers control to the frame's mpc with an indirect jump rather than leaving it
+	# on the stack for a "ret". A "ret" is predicted from the return stack buffer, which holds the address after
+	# the "call" that entered this routine, not the mpc, so it would be mispredicted every time. An indirect
+	# "jmp" is predicted from the targets it jumped to before, and so is less likely to be mispredicted. Use in
+	# place of "getframe" followed by "ret".
+	#
+	movq	frame_pointer(%rip), %rbp
+	movb	msf_flags_off(%rbp), %r11b
+	andb	$SFF_ETRAP_ERR, %r11b
+	jz	lab1\@
+	call	error_return
+	movq	frame_pointer(%rip), %rbp
+lab1\@:
+	movq	msf_temps_ptr_off(%rbp), %r14
+	movq	msf_l_symtab_off(%rbp), %r13
+	movq	msf_literal_ptr_off(%rbp), %r12
+	movq	msf_ctxt_off(%rbp), %r15
+	jmp	*msf_mpc_off(%rbp)
 .endm
 
 .macro	pullstack size=8

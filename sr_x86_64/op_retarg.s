@@ -3,7 +3,7 @@
 # Copyright (c) 2007-2015 Fidelity National Information 	#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
-# Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
@@ -39,8 +39,7 @@ ENTRY	op_retarg
 	movq	%r10, %rsi
 	call	unw_retarg
 	addq	$16, %rsp				# Remove stack alignment bump & burn return address
-	getframe					# Load regs for prev stack frame & push return addr
-	ret
+	getframe_jmp					# Load regs for prev stack frame and jump to its mpc
 # Below line is needed to avoid the ELF executable from ending up with an executable stack marking.
 # This marking is not an issue in Linux but is in Windows Subsystem on Linux (WSL) which does not enable executable stack.
 .section        .note.GNU-stack,"",@progbits

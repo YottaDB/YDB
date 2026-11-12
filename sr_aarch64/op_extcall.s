@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 # Copyright (c) 2018 Stephen L Johnson. All rights reserved.	#
@@ -74,7 +74,7 @@
 /*
  * Define offsets for arguments saved in stack space
  */
-	
+
 ENTRY op_extcall
 	putframe
 	stp	x29, x30, [sp, #-16]!
@@ -148,7 +148,11 @@ retlab:								/* If error, return to caller, else "return" to callee */
 	getframe						/* Sets regs (including w22) as they should be for new frame */
 	mov	sp, x29
 	ldp	x29, x15, [sp], #16				/* Want the return address from the getframe, not the stack one */
-	ret
+	/* x30 holds the M code address of the frame (set by getframe), not the address after the bl that called this
+	 * routine. A ret would be predicted from the return stack, which holds the latter, so it would be mispredicted
+	 * every time. A br is predicted from the targets this br jumped to before, and so is less likely to be mispredicted.
+	 */
+	br	x30
 /*
  * Drive auto_zlink to fetch module
  */
