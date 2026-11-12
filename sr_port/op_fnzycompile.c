@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2025-2026 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  * Copyright (c) 2025 SP.ARM					*
@@ -115,6 +115,8 @@ void op_fnzycompile(mval *string, mval *ret)
 	}
 	COMPILE_HASHTAB_CLEANUP;
 	TREF(source_error_found) = errknt = 0;
+	TREF(zycompile_errmsg_len) = 0;
+	TREF(zycompile_in_progress) = TRUE;	/* "stx_error" saves the text of the first error with its parameters */
 	/* Note: Setting "cg_phase" below to CGP_PARSE will cause warnings like SVNOSET to be ignored as valid M code
 	 * by $ZYCOMPILE and so we set it to CGP_NOSTATE below. Example invocation is [$zycompile(" set (x,$TEST)=1")].
 	 */
@@ -152,6 +154,7 @@ void op_fnzycompile(mval *string, mval *ret)
 	}
 	(TREF(source_buffer)).len = 0;
 	cmd_qlf = cmd_qlf_save;
+	TREF(zycompile_in_progress) = FALSE;
 	REVERT;
 
 	errknt = TREF(source_error_found);
@@ -166,13 +169,24 @@ void op_fnzycompile(mval *string, mval *ret)
 		if (NULL != ec)
 		{
 			const err_msg	*em;
+			const char	*msgtext;
+			int		msglen;
 
 			GET_MSG_INFO(errknt, ec, em);
-			len = STRLEN(em->msg);
+			if (TREF(zycompile_errmsg_len))
+			{	/* The text of the error with its parameters, which "stx_error" saved */
+				msgtext = TADR(zycompile_errmsg);
+				msglen = TREF(zycompile_errmsg_len);
+			} else
+			{
+				msgtext = em->msg;
+				msglen = STRLEN(em->msg);
+			}
+			len = msglen;
 			lent = STRLEN(em->tag);
 			len += (lent + MAX_NUM_SIZE + 9);
 			ENSURE_STP_FREE_SPACE(len);
-			lent = SNPRINTF((char*)stringpool.free, len, "%i,%%YDB-E-%s,%s", errpos, em->tag, em->msg);
+			lent = SNPRINTF((char*)stringpool.free, len, "%i,%%YDB-E-%s,%.*s", errpos, em->tag, msglen, msgtext);
 			ret->mvtype = MV_STR;
 			ret->str.addr = (char *)stringpool.free;
 			ret->str.len = lent;

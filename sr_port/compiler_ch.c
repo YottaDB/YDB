@@ -55,6 +55,7 @@ CONDITION_HANDLER(compiler_ch)
 		 */
 		run_time = TREF(xecute_literal_parse) = FALSE;
 	}
+	TREF(zycompile_in_progress) = FALSE;	/* in case the error ends a $ZYCOMPILE() (see "op_fnzycompile") */
 	if (CQ_WARNINGS & cmd_qlf.qlf)
 		PRN_ERROR;
 	COMPILE_HASHTAB_CLEANUP;

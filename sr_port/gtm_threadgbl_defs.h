@@ -103,6 +103,9 @@ THREADGBLDEF(window_ident,			mstr)				/* current scanner mident from advancewind
 THREADGBLDEF(window_mval,			mval)				/* current scanner mval from advancewindow */
 THREADGBLDEF(window_token,			unsigned char)			/* current scanner token from advancewindow */
 THREADGBLDEF(xecute_literal_parse,		boolean_t)			/* flag TRUE when trying what its name says */
+THREADGBLAR1DEF(zycompile_errmsg,		char,	OUT_BUFF_SIZE)		/* text of the first error that $ZYCOMPILE() returns */
+THREADGBLDEF(zycompile_errmsg_len,		int)				/* length of the text in zycompile_errmsg, 0 if none */
+THREADGBLDEF(zycompile_in_progress,		boolean_t)			/* TRUE while $ZYCOMPILE() compiles its argument */
 THREADGBLDEF(fetch_control,			fetch_ctrl)			/* structure for managing lvn fetches */
 
 /* Database */

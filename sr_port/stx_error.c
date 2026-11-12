@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -24,6 +24,7 @@
 #include "list_file.h"
 #include "gtmmsg.h"
 #include "util_format.h"
+#include "util.h"		/* for OUT_BUFF_SIZE */
 #include "show_source_line.h"
 #ifdef UTF8_SUPPORTED
 #include "gtm_utf8.h"
@@ -190,6 +191,30 @@ void stx_error_va(int in_error, va_list args)
 		&& (ERR_CENOINDIR != in_error))
 	{
 		TREF(source_error_found) = (int4)in_error;
+	}
+	if (TREF(zycompile_in_progress) && ((int4)in_error == TREF(source_error_found)))
+	{	/* "op_fnzycompile" returns the text of the error in "source_error_found" (the first one). Format it here with
+		 * the parameters of the error, which only this function has. For an error without parameters,
+		 * "op_fnzycompile" uses the message as is.
+		 */
+		const err_ctl	*ec;
+		const err_msg	*em;
+		va_list		zy_args;
+
+		ec = err_check(in_error);
+		if (NULL != ec)
+		{
+			GET_MSG_INFO(in_error, ec, em);
+			if (0 < em->parm_count)
+			{
+				VAR_COPY(zy_args, dup_args);
+				cnt = va_arg(zy_args, VA_ARG_TYPE);
+				c = util_format((caddr_t)em->msg, zy_args, TADR(zycompile_errmsg), OUT_BUFF_SIZE, (int)cnt);
+				va_end(TREF(last_va_list_ptr));	/* set by util_format */
+				va_end(zy_args);
+				TREF(zycompile_errmsg_len) = (int)(c - TADR(zycompile_errmsg));
+			}
+		}
 	}
 	list = (cmd_qlf.qlf & CQ_LIST) != 0;
 	warn = (cmd_qlf.qlf & CQ_WARNINGS) != 0;
