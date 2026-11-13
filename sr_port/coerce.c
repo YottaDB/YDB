@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -24,6 +24,8 @@
 GBLREF hash_table_str	*complits_hashtab;
 
 LITREF octabstruct	oc_tab[];
+
+error_def(ERR_NUMOFLOW);
 
 void coerce(oprtype *a, enum octype_t new_type)
 /* ensure operand (*a) is of the desired type new_type */
@@ -65,6 +67,16 @@ void coerce(oprtype *a, enum octype_t new_type)
 			if (OCT_MINT != new_type)
 				break;
 			lit = ref->operand[0].oprval.mlit;
+			MV_FORCE_NUMD(&lit->v);
+			if (!(MV_NM & lit->v.mvtype))
+			{	/* A string literal that is a number that is too large has no integer value, so do not make
+				 * it an ILIT, and issue NUMOFLOW, as the conversion below does when it runs. Use "stx_error"
+				 * and not "rts_error_csa", for the reason in the comment on the NUMOFLOW check in
+				 * "bx_boollit_work".
+				 */
+				stx_error(ERR_NUMOFLOW);
+				break;
+			}
 			if (!(++lit->rt_addr))
 			{	/* completely removing this otherwise unused literal as needs to be an ILIT instead */
 				if (NULL != complits_hashtab && NULL != complits_hashtab->base)

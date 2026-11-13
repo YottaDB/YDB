@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -186,7 +186,7 @@ char *s2n(mval *u)
 					RTS_ERROR_CSA_ABT(NULL, VARLSTCNT(1) ERR_NUMOFLOW);
 				else
 					TREF(s2n_intlit) = 0;	/* "advancewindow" relies on this */
-				u->mvtype |= MV_NUM_APPROX; /* breadcrumb for expritem to help f_[z]char() with NUMOFLOW error */
+				u->mvtype |= MV_NUM_APPROX; /* the string is not a canonical number */
 			} else
 			{
 				u->e = x;

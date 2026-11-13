@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *                                                              *
  *      This source code contains the intellectual property     *
@@ -55,9 +55,17 @@ int bool_expr(boolean_t sense, oprtype *addr, triple **boolexprfinish_ptr)
 	}
 	assert(TRIP_REF == x.oprclass);
 	if (OC_LIT == (x.oprval.tref)->opcode)
-	{	/* if its just a literal don't waste time */
-		DECREMENT_EXPR_DEPTH;
-		return TRUE;
+	{	/* If it is just a literal, do not waste time, unless the literal is a string that is a number that is too
+		 * large and so has no truth value. For such a literal, go on to the code below, where "unary_tail"
+		 * issues NUMOFLOW.
+		 */
+		v = &x.oprval.tref->operand[0].oprval.mlit->v;
+		MV_FORCE_NUMD(v);
+		if (MV_NM & v->mvtype)
+		{
+			DECREMENT_EXPR_DEPTH;
+			return TRUE;
+		}
 	}
 	t1 = x.oprval.tref;
 	t1 = (OCT_BOOL & oc_tab[t1->opcode].octype) ? bool_return_leftmost_triple(x.oprval.tref) : t1;
@@ -88,14 +96,21 @@ int bool_expr(boolean_t sense, oprtype *addr, triple **boolexprfinish_ptr)
 		&& (TREF(curtchain) != t2->exorder.bl) && !(OCT_JUMP & oc_tab[t2->exorder.bl->opcode].octype))
 	{	/* returning literals directly simplifies things for all callers, so swap the sense */
 		v = &t2->operand[0].oprval.mlit->v;
-		unuse_literal(v);
 		MV_FORCE_NUMD(v);
-		PUT_LITERAL_TRUTH(MV_FORCE_BOOL(v), t2);
-		dqdel(t1, exorder);
-		REMOVE_BOOLEXPRSTART_AND_FINISH(boolexprfinish);
-		*boolexprfinish_ptr = NULL;
-		DECREMENT_EXPR_DEPTH;
-		return TRUE;
+		if (MV_NM & v->mvtype)
+		{
+			unuse_literal(v);
+			PUT_LITERAL_TRUTH(MV_FORCE_BOOL(v), t2);
+			dqdel(t1, exorder);
+			REMOVE_BOOLEXPRSTART_AND_FINISH(boolexprfinish);
+			*boolexprfinish_ptr = NULL;
+			DECREMENT_EXPR_DEPTH;
+			return TRUE;
+		}
+		/* A string literal that is a number that is too large has no truth value, so do not optimize the
+		 * conversion, which issues NUMOFLOW when it runs. "unary_tail" (invoked by UNARY_TAIL above) has
+		 * already issued NUMOFLOW at compile time for the literal.
+		 */
 	}
 	/* Check if OC_EQU or OC_NEQU can be optimized (YDB#777).
 	 * Also note that set:'(x'="") can be optimized as set:(x=""). Hence the additional check for OC_COM below.
