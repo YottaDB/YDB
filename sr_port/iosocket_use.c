@@ -258,7 +258,7 @@ void	iosocket_use(io_desc *iod, mval *pp)
 				n_specified++;
 				listen_specified = TRUE;
 				int_len = (int)(unsigned char)*(pp->str.addr + p_offset);
-				if ((USR_SA_MAXLITLEN > int_len) && (0 < int_len))
+				if (int_len < USR_SA_MAXLITLEN)
 				{
 					memcpy(sockaddr, (char *)(pp->str.addr + p_offset + 1), int_len);
 					sockaddr[int_len] = '\0';
