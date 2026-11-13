@@ -57,11 +57,12 @@ void	gvzwrite_clnup(void)
 		gvzwrite_block->subsc_count = 0;
 		TREF(gv_last_subsc_null) = gvzwrite_block->gv_last_subsc_null;
 		TREF(gv_some_subsc_null) = gvzwrite_block->gv_some_subsc_null;
-		/* This is a case of ZWRITE ^GBL. In this case, we are about to restore the runtime $REFERENCE to
-		 * what it was BEFORE the ZWRITE command. But the compile time $REFERENCE would be pointing to ^GBL
-		 * and so any OC_GVNAMENAKED opcodes after the ZWRITE were generated assuming ^GBL as the runtime
-		 * $REFERENCE. Given the runtime and compile time $REFERENCE are different, disable the optimization
-		 * until the first global reference after the ZWRITE by setting the below global.
+		/* This is a case of ZWRITE ^GBL. In this case, we are about to set the runtime $REFERENCE to the
+		 * last node the ZWRITE processed (saved by gvzwr_out()), or, if it processed none, to what it was
+		 * BEFORE the ZWRITE command. But the compile time $REFERENCE would be pointing to ^GBL and so any
+		 * OC_GVNAMENAKED opcodes after the ZWRITE were generated assuming ^GBL as the runtime $REFERENCE.
+		 * Given the runtime and compile time $REFERENCE can be different, disable the optimization until
+		 * the first global reference after the ZWRITE by setting the below global.
 		 * See https://gitlab.com/YottaDB/DB/YDB/-/issues/1177#note_2964158415 for more details and test case.
 		 */
 		SET_GV_NAMENAKED_STATE(NAMENAKED_UNKNOWNREFERENCE);
