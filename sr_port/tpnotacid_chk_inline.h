@@ -187,11 +187,9 @@ static inline void mv_force_nstimeout(mval *tmv, uint8 *tns, char *notacid)
 		assert(MV_BIAS == MILLISECS_IN_SEC);	/* if formats change scale may need attention */
 		if (tmv->mvtype & MV_INT)
 		{	/* tmv is an integer. m[1] directly has the # of milliseconds we want.
-			 * If it is negative though, set timeout to 0.
+			 * If it is negative though, set timeout to 0. The sign is tested on m[1], since *tns is unsigned.
 			 */
-			*tns = tmv->m[1] * (uint8)NANOSECS_IN_MSEC;
-			if (0 > *tns)
-				*tns = 0;
+			*tns = (0 > tmv->m[1]) ? 0 : (tmv->m[1] * (uint8)NANOSECS_IN_MSEC);
 		} else if (0 == tmv->sgn)	/* if sign is 0 it means tmv is positive */
 		{	/* Cap positive timeout at MAXUINT8 */
 			tmpdouble = mval2double(tmv) * (double)NANOSECS_IN_SEC;
