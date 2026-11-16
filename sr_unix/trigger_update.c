@@ -1729,10 +1729,11 @@ boolean_t trigger_update_rec(mval *trigger_rec, boolean_t noprompt, uint4 *trig_
 		min_reg_index = -1;
 		max_reg_index = -1;
 	}
-	if (('+' == add_delete) && value_len[GVSUBS_SUB])
+	if (('+' == add_delete) && value_len[GVSUBS_SUB] && IS_REG_BG_OR_MM(gv_cur_region))
 	{	/* Check the subscripts with the collation of the global (for a global that spans regions, the collation is the
 		 * same in all of its regions). GVCST_ROOT_SEARCH sets the collation of "gv_target" for a global that exists,
-		 * and for a new global the collation that the global would get.
+		 * and for a new global the collation that the global would get. A remote (GT.CM) region has no file header to
+		 * search, and the update loop below issues REMOTEDBNOTRIG for it.
 		 */
 		GVCST_ROOT_SEARCH;
 		if (!trig_subs_fit_in_key(values[GVSUBS_SUB], value_len[GVSUBS_SUB], trigvn_len))
