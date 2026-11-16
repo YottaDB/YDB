@@ -3,7 +3,7 @@
  * Copyright (c) 2007-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -665,11 +665,6 @@ void format_machine_inst()
 						break;
 					case I386_INS_NOP__ :
 					case I386_INS_MOVSB_Xb_Yb :
-						print_instruction();
-						break;
-					case I386_INS_MOVSW_D_Xv_Yv:
-						assert(rex_prefix.Word64);		/* Expect this to actually be MOVSQ */
-						instruction.opcode_mnemonic = "REP MOVS";
 						print_instruction();
 						break;
 					/* Ins :: OPCODE disp8(%rip) 	*/

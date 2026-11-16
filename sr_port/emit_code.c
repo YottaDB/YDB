@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  * Copyright (c) 2017-2018 Stephen L Johnson.			*
@@ -637,9 +637,8 @@ short *emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
 					 */
 					GEN_MVAL_COPY(MOVC3_SRC_REG, MOVC3_TRG_REG, SIZEOF(mval));
 #					elif defined(__linux) && defined(__x86_64__)
-					/* The latest x86-64 processors have optimized REP MOVSQ to be the fastest way to move
-					 * medium/small strings (like mvals which are always at least 8 byte aligned). This also
-					 * significantly reduces the codegen.
+					/* A load and a store of each 8 byte word of the mval (see GEN_MVAL_COPY in
+					 * sr_x86_64/emit_code_sp.h).
 					 */
 					GEN_MVAL_COPY(MOVC3_SRC_REG, MOVC3_TRG_REG, MVAL_QWORD_SIZE);
 #					else

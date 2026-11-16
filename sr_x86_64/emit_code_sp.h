@@ -3,7 +3,7 @@
  * Copyright (c) 2007-2022 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  * Copyright (c) 2017 Stephen L Johnson. All rights reserved.	*
@@ -22,9 +22,7 @@
  *
  * 1.  Code generation is a fairly simple subset of what is possible with X86-64. For example, GT.M never
  *     generates memory-to-memory instructions. Where necessary, values are loaded to a register, then stored.
- * 2.  Only one use of the REP prefix is with the MOVSQ instructions (MOVSXD with REX bit to make it MOVSQ) used
- *     for copying MVALs inline in generatede code.
- * 3.  As noted below, there are several constructs building offsets that come up with different sized offsets
+ * 2.  As noted below, there are several constructs building offsets that come up with different sized offsets
  *     between some of the compiler phases. Consequently, we force offsets to be 32bit for certain classes of memory
  *     references. This should be looked at again so we can eliminate the 4 byte "override" as it were which would
  *     again cause a significant decrease in generated code size.
@@ -441,18 +439,20 @@ MBSTART {								\
 	CODE_BUF_GEN(I386_INS_POP_eAX + (GTM_REG_CODEGEN_TEMP & 0x7));	\
 } MBEND
 
+/* Copy a 32 byte mval (QWSIZE is 4 8 byte words) from (SRC_REG) to (TRG_REG) with a load and a store of each word
+ * through RCX. This is faster than a "REP MOVSQ", whose startup cost exceeds the cost of the copy itself.
+ */
 #define GEN_MVAL_COPY(SRC_REG, TRG_REG, QWSIZE)										\
 MBSTART {														\
-	GEN_LOAD_IMMED(I386_REG_ECX, QWSIZE);										\
-	/* Do this brute force instead of using SET_REX_PREFIX/CODE_BUF_GEN() macros since we'd have to add a new	\
-	 * test to CODE_BUF_GEN() macros to support F3H prefix we need only for the MOVSQ instruction. The instruction	\
-	 * format is REP header followed by the REX field used to turn the MOVSW instruction into a MOVSQ and finally   \
-	 * the instruction opcode itself. There are no (express) parameters as this instruction used pre-determined 	\
-	 * registers (ARG1:src, ARG0:trg, ARG3:len-in-qwords since this is a MOVSQ).					\
-	 */														\
-	code_buf[code_idx++] = I386_INS_REP_E_Prefix;									\
-	code_buf[code_idx++] = REX_OP | REX_W;										\
-	code_buf[code_idx++] = I386_INS_MOVSW_D_Xv_Yv;	/* REX.W prefix turns this to MOVSQ */				\
+	assert(4 == (QWSIZE));												\
+	GEN_LOAD_WORD_8(I386_REG_RCX, SRC_REG, 0);									\
+	GEN_STORE_WORD_8(I386_REG_RCX, TRG_REG, 0);									\
+	GEN_LOAD_WORD_8(I386_REG_RCX, SRC_REG, 8);									\
+	GEN_STORE_WORD_8(I386_REG_RCX, TRG_REG, 8);									\
+	GEN_LOAD_WORD_8(I386_REG_RCX, SRC_REG, 16);									\
+	GEN_STORE_WORD_8(I386_REG_RCX, TRG_REG, 16);									\
+	GEN_LOAD_WORD_8(I386_REG_RCX, SRC_REG, 24);									\
+	GEN_STORE_WORD_8(I386_REG_RCX, TRG_REG, 24);									\
 } MBEND
 
 /*
