@@ -37,7 +37,6 @@ op_fnfgncal.c:warning: Initialized va_list is leaked [clang-analyzer-valist.Unte
 op_fnq2.c:warning: Initialized va_list 'var' is leaked [clang-analyzer-valist.Unterminated]
 op_fnquery.c:warning: Initialized va_list 'var' is leaked [clang-analyzer-valist.Unterminated]
 op_fnreversequery.c:warning: Initialized va_list 'var' is leaked [clang-analyzer-valist.Unterminated]
-op_fnzatransform.c:warning: Address of stack memory associated with local variable 'temp_gv_target' is still referred to by the global variable 'gv_target' upon returning to the caller.  This will be a dangling reference [clang-analyzer-core.StackAddressEscape]
 pattab.c:warning: Array subscript is undefined [clang-analyzer-core.uninitialized.ArraySubscript]
 pattab.c:warning: Undefined or garbage value returned to caller [clang-analyzer-core.uninitialized.UndefReturn]
 rts_error.c:warning: Initialized va_list 'var' is leaked [clang-analyzer-valist.Unterminated]

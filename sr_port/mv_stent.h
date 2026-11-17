@@ -173,6 +173,17 @@ typedef struct
 #	endif
 } mvs_zintcmd_struct;
 
+/* The first word of an mv_stent, with the same bit fields as the start of mv_stent below. "set_mv_stent_hdr()"
+ * builds the header in a local of this type and stores it with one memcpy(). Two assignments to the bit fields of
+ * the mv_stent would be a 1-byte store followed by a 4-byte load of the same word to merge in the second field,
+ * and that load cannot be served from the store buffer, so it waits until the store reaches the cache.
+ */
+typedef struct
+{
+	unsigned int	mv_st_type : 6;
+	unsigned int	mv_st_next : 26;
+} mv_stent_hdr;
+
 /* Homogenous mv_stent structure containing all types. This structure is never allocated as is but is allocated
  * on the M stack using the size for the size defined in mvs_size[] array in mtables.c
  * Note that since mvs_size is unsigned char, the sizeof each struct must be under 256 bytes
@@ -266,6 +277,17 @@ void push_stck(void* val, int val_size, void** addr, int mvst_stck_type);
 #define MV_SIZE(X) \
         ROUND_UP2_NOCHECK(((SIZEOF(*mv_chain) - SIZEOF(mv_chain->mv_st_cont) + SIZEOF(mv_chain->mv_st_cont.X))), NATIVE_WSIZE)
 
+/* Sets the header of the mv_stent at "ptr" to type "type", chained to the current "mv_chain" */
+inline static void set_mv_stent_hdr(unsigned char *ptr, int type)
+{
+	GBLREF	mv_stent		*mv_chain;
+	mv_stent_hdr			hdr;
+
+	hdr.mv_st_type = type;
+	hdr.mv_st_next = (int)((unsigned char *)mv_chain - ptr);
+	memcpy(ptr, &hdr, SIZEOF(hdr));
+}
+
 #define PUSH_MV_STENT(T) push_mv_stent(T)
 
 static inline void push_mv_stent(int T)
@@ -290,8 +312,7 @@ static inline void push_mv_stent(int T)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STACKUNDERFLO);
 	} else
 	{
-		((mv_stent *)msp)->mv_st_type = T;
-		((mv_stent *)msp)->mv_st_next = (int)((unsigned char *) mv_chain - msp);
+		set_mv_stent_hdr(msp, T);
 		mv_chain = (mv_stent *)msp;
 	}
 }
@@ -323,8 +344,7 @@ inline static void push_mv_stck(int size, int st_type)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STACKUNDERFLO);
 	} else
 	{
-		((mv_stent *)msp)->mv_st_type = st_type;
-		((mv_stent *)msp)->mv_st_next = (int)((unsigned char *) mv_chain - msp);
+		set_mv_stent_hdr(msp, st_type);
 		mv_chain = (mv_stent *)msp;
 	}
 }
