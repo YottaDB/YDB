@@ -592,6 +592,7 @@ void	op_fnview(int numarg, mval *dst, ...)
 				ENSURE_STP_FREE_SPACE(n_probecrit_rec_types * (STATS_MAX_DIGITS + STATS_KEYWD_SIZE));
 				dst->str.addr = (char *)stringpool.free;
 				/* initialize csa->proberit_rec.p_crit_success field from cnl->gvstats_rec */
+				gvstats_rec_fold(csa, csa->nl);	/* include this process's increments */
 				csa->probecrit_rec.p_crit_success = csa->nl->gvstats_rec.n_crit_success;
 #				define TAB_PROBECRIT_REC(CNTR,TEXT1,TEXT2)	STATS_PUT_PARM(TEXT1, CNTR, csa->probecrit_rec)
 #				include "tab_probecrit_rec.h"
@@ -724,6 +725,7 @@ void	op_fnview(int numarg, mval *dst, ...)
 				dst->str.addr = (char *)stringpool.free;
 				/* initialize cnl->gvstats_rec.db_curr_tn field from file header */
 				csa->nl->gvstats_rec.db_curr_tn = csa->hdr->trans_hist.curr_tn;
+				gvstats_rec_fold(csa, csa->nl);	/* include this process's increments */
 #				define TAB_GVSTATS_REC(CNTR,TEXT1,TEXT2)	STATS_PUT_PARM(TEXT1, CNTR, csa->nl->gvstats_rec)
 #				include "tab_gvstats_rec.h"
 #				undef TAB_GVSTATS_REC

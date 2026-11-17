@@ -119,6 +119,7 @@ void dse_dmp_fhead (void)
 	csa = cs_addrs;
 	csd = csa->hdr;
 	cnl = csa->nl;
+	gvstats_rec_fold(csa, cnl);	/* include this process's statistics increments */
 	jnl_state = (enum jnl_state_codes)csd->jnl_state;
 	jnl_buff_open = (0 != cnl->jnl_file.u.inode);
 	activeque_cnt = cnl->wcs_active_lvl;

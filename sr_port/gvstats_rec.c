@@ -3,6 +3,9 @@
  * Copyright (c) 2008-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2026 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -21,6 +24,8 @@
 #include "gdsfhead.h"
 #include "gvstats_rec.h"
 
+GBLREF	volatile boolean_t	timer_in_handler;
+
 /* Copy header stats to shared or private */
 void	gvstats_rec_csd2cnl(sgmnt_addrs *csa)
 {
@@ -36,6 +41,7 @@ void	gvstats_rec_cnl2csd(sgmnt_addrs *csa)
 {
 	/* All stats are now copied to the header */
 	assert(SIZEOF(gvstats_rec_t) == SIZEOF(gvstats_rec_csd_t));
+	gvstats_rec_fold(csa, csa->nl);
 	memcpy(&csa->hdr->gvstats_rec, &csa->nl->gvstats_rec, SIZEOF(gvstats_rec_csd_t));
 }
 
@@ -81,4 +87,35 @@ void	gvstats_rec_upgrade(sgmnt_addrs *csa)
 	csd->unused_dsk_reads.cumul_count = 0;
 	csd->unused_dsk_writes.curr_count = 0;
 	csd->unused_dsk_writes.cumul_count = 0;
+}
+
+/* Adds the increments that this process accumulated in "csa->gvstats_pend" to the database-wide statistics in "cnl",
+ * and clears them. See GVSTATS_FOLD_INTERVAL in gdsfhead.h. The adds are atomic because other processes add to the
+ * same counters at the same time.
+ */
+void	gvstats_rec_fold(sgmnt_addrs *csa, node_local_ptr_t cnl)
+{
+	gtm_uint64_t	*pend, *dst;
+	int		i;
+
+	if (0 == csa->gvstats_pend_cnt)
+		return;
+	/* A timer handler can interrupt this process in the middle of an update of "csa->gvstats_pend" and itself update
+	 * the statistics (e.g. "n_db_fsync" in an idle flush). Folding there could add an increment twice. Leave the
+	 * fold to the next update outside of a timer handler, which will find "gvstats_pend_cnt" at or above the interval.
+	 */
+	if (timer_in_handler)
+		return;
+	assert(NULL != cnl);
+	pend = (gtm_uint64_t *)&csa->gvstats_pend;
+	dst = (gtm_uint64_t *)&cnl->gvstats_rec;
+	for (i = 0; i < (int)(SIZEOF(gvstats_rec_t) / SIZEOF(gtm_uint64_t)); i++)
+	{
+		if (pend[i])
+		{
+			__atomic_fetch_add(&dst[i], pend[i], __ATOMIC_RELAXED);
+			pend[i] = 0;
+		}
+	}
+	csa->gvstats_pend_cnt = 0;
 }

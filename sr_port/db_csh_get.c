@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2025-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -82,7 +82,7 @@ cache_rec_ptr_t	db_csh_get(block_id block) /* block number to look up */
 				 * the real problem is to ensure that the cache_rec layout is such that this
 				 * assignment does not damage other fields.
 				 */
-				cr->refer = TRUE;
+				SET_CR_REFER(cr);
 				return cr;
 			}
 			lcnt--;

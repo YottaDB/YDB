@@ -304,7 +304,7 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 						status = cdb_sc_lostcr;
 						break;
 					}
-					t1->cr->refer = TRUE;
+					SET_CR_REFER(t1->cr);
 				}
 				if (cr)
 				{
@@ -316,7 +316,7 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 						status = cdb_sc_lostcr;
 						break;
 					}
-					cr->refer = TRUE;
+					SET_CR_REFER(cr);
 				}
 			}
 			/* Note that blocks created within the transaction (chain.flag != 0) are NOT counted

@@ -161,6 +161,17 @@ typedef struct cache_rec_struct
 						 */
 } cache_rec;
 
+/* Sets the reference bit of a cache record. The cache records of the root and index blocks of a global are used by
+ * every process that reads that global. A store takes the cache line away from every other processor even when it
+ * stores the value already there, so a store on every use makes the cache line move between the processors of those
+ * processes. Test first, since the bit is set most of the time, and a load leaves the cache line shared.
+ */
+#define	SET_CR_REFER(CR)		\
+MBSTART {				\
+	if (!(CR)->refer)		\
+		(CR)->refer = TRUE;	\
+} MBEND
+
 /* A note about cache line separation of the latches contained in these blocks. Because this block is duplicated
    many (potentially tens+ of) thousands of times in a running system, we have decided against providing cacheline
    padding so as to force each cache record into a separate cacheline (due to it containing a latch and/or atomic
@@ -1685,11 +1696,22 @@ MBSTART {												\
 		INCR_GVSTATS_COUNTER_HELPER(CSA, CNL, COUNTER, INCREMENT);				\
 } MBEND
 
+/* The database-wide statistics in "cnl->gvstats_rec" are written by every process that uses the region, so updating
+ * them on every operation makes their cache lines move between the processors of all those processes. Each process
+ * instead accumulates its increments in "csa->gvstats_pend" and adds them to "cnl->gvstats_rec" once every
+ * GVSTATS_FOLD_INTERVAL increments (see "gvstats_rec_fold()"), and whenever the database-wide statistics are read
+ * or copied to the file header by this process, and at rundown. So the database-wide statistics can lag behind
+ * the actual counts by up to GVSTATS_FOLD_INTERVAL - 1 increments per process using the region.
+ */
+#define	GVSTATS_FOLD_INTERVAL	256
+
 #define	INCR_GVSTATS_COUNTER_HELPER(CSA, CNL, COUNTER, INCREMENT)					\
 MBSTART {												\
 	assert(0 == (RDBF_NOSTATS & (CSA)->reservedDBFlags));	/* caller should have ensured this */	\
 	(CSA)->gvstats_rec_p->COUNTER += INCREMENT;		/* private or shared stats */		\
-	(CNL)->gvstats_rec.COUNTER += INCREMENT;		/* database stats */			\
+	(CSA)->gvstats_pend.COUNTER += INCREMENT;		/* database stats not yet in CNL */	\
+	if (GVSTATS_FOLD_INTERVAL <= ++(CSA)->gvstats_pend_cnt)					\
+		gvstats_rec_fold(CSA, CNL);							\
 } MBEND
 
 #define	SYNC_RESERVEDDBFLAGS_REG_CSA_CSD(REG, CSA, CSD, CNL)								\
@@ -1734,6 +1756,8 @@ MBSTART {											\
 	memset(CHPTR, 0, CLRLEN);								\
 	memset((char *)&CSD->tp_cdb_sc_blkmod, 0, SIZEOF(CSD->tp_cdb_sc_blkmod));		\
 	memset((char *)&CSD->gvstats_rec, 0, SIZEOF(CSD->gvstats_rec));				\
+	memset((char *)&CSA->gvstats_pend, 0, SIZEOF(CSA->gvstats_pend));			\
+	CSA->gvstats_pend_cnt = 0;								\
 	gvstats_rec_csd2cnl(CSA);	/* we update gvstats in cnl */				\
 } MBEND
 
@@ -2944,6 +2968,10 @@ typedef struct	sgmnt_addrs_struct
 	boolean_t				kip_pid_overflowed;	/* TRUE while this process's KILL is counted in
 									 * "cnl->kip_pid_overflow_cnt" instead of having a slot
 									 * in "cnl->kip_pid_array"
+									 */
+	uint4					gvstats_pend_cnt;	/* number of increments in "gvstats_pend" */
+	gvstats_rec_t				gvstats_pend;		/* increments of this process not yet added to
+									 * "cnl->gvstats_rec" (see GVSTATS_FOLD_INTERVAL)
 									 */
 } sgmnt_addrs;
 
@@ -5634,6 +5662,7 @@ void remap_globals_to_one_region(gd_addr *addr, gd_region *reg);
  */
 void	gvstats_rec_csd2cnl(sgmnt_addrs *csa);
 void	gvstats_rec_cnl2csd(sgmnt_addrs *csa);
+void	gvstats_rec_fold(sgmnt_addrs *csa, node_local_ptr_t cnl);
 void	gvstats_rec_upgrade(sgmnt_addrs *csa);
 
 void act_in_gvt(gv_namehead *gvt);

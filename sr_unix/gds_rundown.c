@@ -255,6 +255,7 @@ int4 gds_rundown(boolean_t cleanup_udi)
 		 */
 		csa->nl->reorg_trunc_pid = 0;
 	}
+	gvstats_rec_fold(csa, csa->nl);	/* Add the statistics increments this process has not yet added to the database */
 	csa->regcnt--;
 	if (csa->regcnt)
 	{	/* There is at least one more region pointing to the same db file as this region.

@@ -294,7 +294,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 			{
 				*cycle = first_tp_srch_status->cycle;
 				*cr_out = cr;
-				cr->refer = TRUE;
+				SET_CR_REFER(cr);
 				if (CDB_STAGNATE <= t_tries)	/* mu_reorg doesn't use TP else should have an || for that */
 					CWS_INSERT(blk);
 				return (sm_uc_ptr_t)first_tp_srch_status->buffaddr;

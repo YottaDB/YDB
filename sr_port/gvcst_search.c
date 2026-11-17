@@ -337,7 +337,7 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 							break;
 						}
 					}
-					cr->refer = TRUE;
+					SET_CR_REFER(cr);
 				}
 			}
 		}
