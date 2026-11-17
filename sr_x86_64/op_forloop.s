@@ -3,7 +3,7 @@
 # Copyright (c) 2007-2022 Fidelity National Information 	#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
-# Copyright (c) 2017-2024 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
@@ -23,7 +23,11 @@
 #		ptr to index mval
 #		ptr to step mval
 #		ptr to terminator mval
-#		loop address
+#
+#	Returns to the caller with the condition code set: "less than or equal" if there is another iteration (the
+#	generated code then branches to the start of the loop body), "greater than" if the loop is over. Returning
+#	to the caller in both cases (and not to the loop address in the first) keeps this "ret" paired with the
+#	"call" that entered this routine, so the processor predicts it.
 #
 	.data
 	.extern	frame_pointer
@@ -37,7 +41,6 @@ ten_dd:	.long	10
 indx		= -8
 step		= -16
 term		= -24
-loop		= -32
 FRAME_SIZE	= 40					# Includes 8 bytes padding to 16 byte align stack
 
 ENTRY	op_forloop
@@ -50,7 +53,6 @@ ENTRY	op_forloop
 	#
 	# Save the arguments on stack
 	#
-        movq	%rcx, loop(%rbp)
         movq	%rdx, term(%rbp)
         movq	%rsi, step(%rbp)
         movq	%rdi, indx(%rbp)
@@ -178,15 +180,18 @@ done:
 	popq	%rbp					# Restore caller's %rbp
 	movq	frame_pointer(%rip), %r11
 	pushq	msf_mpc_off(%r11)			# End of loop - return to caller
+	movl	$1, %eax
+	cmpl	$0, %eax				# Set condition code "greater than": loop is over
 	ret
 newiter:
 	#
-	# Return to loop return address for another iteration
+	# Another iteration - return to caller, which branches to the start of the loop body
 	#
-	movq	loop(%rbp), %r11			# Save loop return address
 	movq	%rbp, %rsp				# Unwind save frame
 	popq	%rbp					# Restore caller's %rbp
-	pushq	%r11					# Set return address
+	movq	frame_pointer(%rip), %r11
+	pushq	msf_mpc_off(%r11)			# Return to caller
+	cmpl	%eax, %eax				# Set condition code "less than or equal": another iteration
 	ret
 # Below line is needed to avoid the ELF executable from ending up with an executable stack marking.
 # This marking is not an issue in Linux but is in Windows Subsystem on Linux (WSL) which does not enable executable stack.

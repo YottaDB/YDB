@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 # Copyright (c) 2018 Stephen L Johnson. All rights reserved.	#
@@ -42,4 +42,6 @@ l1:
 	bl	async_action
 	mov	sp, x29
 	ldp	x29, x30, [sp], #16
+	mov	w13, #1
+	cmp	w13, #0				/* Set condition flags "gt" (what op_forloop returns for "loop is over") */
 	ret

@@ -518,23 +518,25 @@ OC_FORLCLDO-WORD:	pushl val.2
 		jsb	xfer.xf_forlcldow
 		brw	jmp.1
 OC_FORLOOP-BYTE:jsb	xfer.xf_restartpc
-		pushab	jmp.1
 		pushab	val.4
 		pushab	val.3
 		pushab	val.2
 		jsb	xfer.xf_forloop
+		bleq	jmp.1
 OC_FORLOOP-LONG:jsb	xfer.xf_restartpc
-		pushab	jmp.1
 		pushab	val.4
 		pushab	val.3
 		pushab	val.2
 		jsb	xfer.xf_forloop
+		bgtr	#6
+		jmp	jmp.1
 OC_FORLOOP-WORD:jsb	xfer.xf_restartpc
-		pushab	jmp.1
 		pushab	val.4
 		pushab	val.3
 		pushab	val.2
 		jsb	xfer.xf_forloop
+		bgtr	#3
+		brw	jmp.1
 OC_GETINDX:	irepab	val.2
 		calls	val.1,xfer.xf_getindx
 		movl	r0,addr.0

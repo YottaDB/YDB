@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 # Copyright (c) 2018 Stephen L Johnson. All rights reserved.	#
@@ -19,7 +19,11 @@
 		x0 - ptr to index variable mval
 		x1 - ptr to step mval
 		x2 - ptr to terminator mval
-		x3 - return address to continue looping
+
+	Returns to the caller with the condition flags set: "le" if there is another iteration (the generated code
+	then branches to the start of the loop body), "gt" if the loop is over. Returning to the caller in both cases
+	(and not to the loop address in the first) keeps this "ret" paired with the "blr" that entered this routine,
+	so the processor predicts it.
 */
 
 	.include "linkage.si"
@@ -35,7 +39,6 @@
 	.extern	numcmp
 	.extern	s2n
 
-loop		= -32
 term		= -24
 step		= -16
 indx		=  -8
@@ -55,7 +58,6 @@ ENTRY op_forloop
  	str	x0, [x29, #indx]
 	str	x1, [x29, #step]
 	str	x2, [x29, #term]
-	str	x3, [x29, #loop]
 
 	mov	x1, x0
 	mv_force_defined_overwrite x1		/* copy literal_null into control variable if undefined */
@@ -207,12 +209,16 @@ done:
 	ldp	x9, x29, [sp], #16				/* x9 was to maintain 16 byte alignment */
 	ldr	x27, [x19]
 	ldr	x30, [x27, #msf_mpc_off]
+	mov	w13, #1
+	cmp	w13, #0						/* Set condition flags "gt": loop is over */
 	ret
 newiter:
 	/*
-	 * Return to loop return address for another iteration
+	 * Another iteration - return to caller, which branches to the start of the loop body
 	 */
 	mov	sp, x29
-	ldr	x30, [x29, #loop]
 	ldp	x9, x29, [sp], #16				/* x9 was to maintain 16 byte alignment */
+	ldr	x27, [x19]
+	ldr	x30, [x27, #msf_mpc_off]
+	cmp	x27, x27					/* Set condition flags "le": another iteration */
 	ret

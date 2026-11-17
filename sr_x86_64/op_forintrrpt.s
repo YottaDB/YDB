@@ -3,7 +3,7 @@
 # Copyright (c) 2007-2015 Fidelity National Information 	#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
-# Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
@@ -38,6 +38,8 @@ l1:
 	movl	$0, %edi
 	call	async_action			# Normally does not return but in case..
 	addq	$8, %rsp			# Remove alignment stack bump
+	movl	$1, %eax
+	cmpl	$0, %eax			# Set condition code "greater than" (what op_forloop returns for "loop is over")
 	ret
 # Below line is needed to avoid the ELF executable from ending up with an executable stack marking.
 # This marking is not an issue in Linux but is in Windows Subsystem on Linux (WSL) which does not enable executable stack.
