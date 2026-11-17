@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 # Copyright (c) 2018 Stephen L Johnson. All rights reserved.	#
@@ -34,4 +34,4 @@ ENTRY opp_commarg
 	CHKSTKALIGN					/* Verify stack alignment */
 	bl	op_commarg
 	getframe
-	ret
+	br	x30						/* Not ret: see the comment before the br in op_extcall.s */
