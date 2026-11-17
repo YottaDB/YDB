@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 # Copyright (c) 2018 Stephen L Johnson. All rights reserved.	#
@@ -27,7 +27,7 @@
 
 	.text
 
- 
+
 /*
  * Routine to fetch mval representing value of $TEST (formerly $TRUTH).
  *
@@ -42,10 +42,5 @@ ENTRY op_gettruth
 l1:
 	ldr	x11, =literal_one
 l2:
-	mov	x12, #mval_byte_len
-l3:
-	ldr	x9, [x11], #+8
-	str	x9, [x1], #+8
-	subs	x12, x12, #8
-	b.gt	l3
+	mv_copy	x11, x1, x9, x10, x12, x13
 	ret

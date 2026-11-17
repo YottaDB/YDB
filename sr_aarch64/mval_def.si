@@ -2,7 +2,7 @@
 #								#
 # Copyright 2001, 2012 Fidelity Information Services, Inc	#
 #								#
-# Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 # Copyright (c) 2018 Stephen L Johnson. All rights reserved.	#
@@ -49,6 +49,22 @@ mval_m_sqlnull		=	0x8000
 
 mval_byte_len		=	32				/* Length of mval in bytes */
 mval_qword_len		=	((mval_byte_len + 7) / 8)	/* Length of mval in quadwords (8 byte words) */
+
+#
+# mv_copy(src, dst, tmp1, tmp2, tmp3, tmp4)
+#
+# Copy an mval from [src] to [dst] with two 16 byte loads and two 16 byte stores, without a loop. Unlike a loop of
+# post-indexed LDP/STP pairs, this leaves src and dst unchanged. Uses the 4 "tmp" registers as scratch.
+#
+.if mval_byte_len - 32
+.error "mv_copy assumes a 32 byte mval"
+.endif
+.macro	mv_copy src, dst, tmp1, tmp2, tmp3, tmp4
+	ldp	\tmp1, \tmp2, [\src]
+	ldp	\tmp3, \tmp4, [\src, #16]
+	stp	\tmp1, \tmp2, [\dst]
+	stp	\tmp3, \tmp4, [\dst, #16]
+.endm
 
 #
 # Offsets of type, exp, strlen, stradd, num in mval structure

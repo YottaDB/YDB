@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 # Copyright (c) 2018 Stephen L Johnson. All rights reserved.	#
@@ -55,12 +55,7 @@ numer:
 	b	done
 sqlnull:
 	/* Copy the Mval from [x1] to [x0] */
-	mov	w11, #mval_byte_len
-mvalcopy:
-	ldp	x12, x13, [x1], #+16
-	stp	x12, x13, [x0], #+16
-	subs	w11, w11, #16
-	b.gt	mvalcopy
+	mv_copy	x1, x0, x11, x12, x13, x14
 	b	done
 float:
 	mov	w3, #mval_m_nm

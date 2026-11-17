@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 # Copyright (c) 2018 Stephen L Johnson. All rights reserved.	#
@@ -35,13 +35,8 @@ ENTRY op_sto
 	mov	x12, x0					/* Save x0 */
 	mv_if_notdefined x1, notdef
 nowdef:
-	mov	w15, #mval_byte_len
 	mov	x0, x12					/* Restore x0 */
-loop16:
-	ldp	x9, x10, [x1], #16
-	stp	x9, x10, [x0], #16
-	subs	w15, w15, #16
-	b.gt	loop16
+	mv_copy	x1, x0, x9, x10, x14, x15
 
 	mov	x0, #mval_m_aliascont
 	mvn	x0, x0					/* bitwise NOT of x0 */
