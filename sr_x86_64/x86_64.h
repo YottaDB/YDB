@@ -3,6 +3,9 @@
  * Copyright (c) 2007-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2026 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -24,6 +27,12 @@
 #define GTM_REG_XFER_TABLE      I386_REG_RBX
 
 #define GTM_REG_FRAME_POINTER   I386_REG_RBP
+
+/* $TEST (dollar_truth) is at a fixed offset from the transfer table (see xfer_table.c), so generated code addresses it
+ * relative to the transfer table register.
+ */
+#define GTM_REG_DOLLAR_TRUTH	GTM_REG_XFER_TABLE
+#define DOLLAR_TRUTH_OFFSET	DOLLAR_TRUTH_XFER_OFFSET
 /* Note that GTM_REG_COND_CODE is not assigned a separate register on x86_64.h
  * The following defination is dummy used in emit_jmp as dummy parameter
  * emit_jmp in x86_64 is not an generic function.

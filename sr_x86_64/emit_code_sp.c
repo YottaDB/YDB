@@ -34,6 +34,16 @@
 #define SET_OBPT_STR(str, len)	(memcpy(obpt, str, len), obpt += len)
 #define SET_OBPT_INT4(value)	obpt = i2asc(obpt, value)
 #define SET_OBPT_INT8(value)	obpt = i2asclx(obpt, value)
+/* Print a signed memory operand displacement */
+#define SET_OBPT_OFFSET(value)						\
+MBSTART {								\
+	if (0 > (value))						\
+	{								\
+		*obpt++ = '-';						\
+		SET_OBPT_INT4(-(value));				\
+	} else								\
+		SET_OBPT_INT4(value);					\
+} MBEND
 
 /* Possible values for instruction Byte's Meaning */
 #define one_byte_opcode		0
@@ -350,7 +360,7 @@ void print_source_operand()
 			assert(instruction.destination_operand_class != memory_class);
 			if (instruction.source_operand_reg != NULL)
 			{
-				SET_OBPT_INT4(instruction.offset);
+				SET_OBPT_OFFSET(instruction.offset);
 				*obpt++ = '(';
 				*obpt++ = '%';
 				*obpt++ = instruction.reg_prefix;
@@ -358,7 +368,7 @@ void print_source_operand()
 				*obpt++ = ')';
 			} else
 			{
-				SET_OBPT_INT4(instruction.offset);
+				SET_OBPT_OFFSET(instruction.offset);
 			}
 			break;
 		case immediate_class :
@@ -388,7 +398,7 @@ void print_destination_operand()
 			assert(instruction.source_operand_class != memory_class);
 			if (instruction.destination_operand_reg != NULL)
 			{
-				SET_OBPT_INT4(instruction.offset);
+				SET_OBPT_OFFSET(instruction.offset);
 				*obpt++ = '(';
 				*obpt++ = '%';
 				*obpt++ = instruction.reg_prefix;
@@ -396,7 +406,7 @@ void print_destination_operand()
 				*obpt++ = ')';
 			} else
 			{
-				SET_OBPT_INT4(instruction.offset);
+				SET_OBPT_OFFSET(instruction.offset);
 			}
 			break;
 		case immediate_class :
@@ -947,7 +957,7 @@ void format_machine_inst()
 				next_inst_byte_meaning = one_byte_opcode;
 				break;
 			case one_byte_offset :
-				instruction.offset = code_buf[instidx++];
+				instruction.offset = (signed char)code_buf[instidx++];	/* disp8 is sign extended */
 				if (instruction.has_immediate)
 					next_inst_byte_meaning = instruction.has_immediate;
 				else

@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001 Sanchez Computer Associates, Inc.		*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  * Copyright (c) 2018 Stephen L Johnson. All rights reserved.	*
@@ -28,6 +28,7 @@
 #define GTM_REG_XFER_TABLE	AARCH64_REG_X23
 #define	GTM_REG_PV		AARCH64_REG_X24
 #define GTM_REG_DOLLAR_TRUTH    AARCH64_REG_X25
+#define DOLLAR_TRUTH_OFFSET	0			/* GTM_REG_DOLLAR_TRUTH holds the address of dollar_truth */
 
 #define	GTM_REG_R0		AARCH64_REG_X0
 #define	GTM_REG_R1		AARCH64_REG_X1

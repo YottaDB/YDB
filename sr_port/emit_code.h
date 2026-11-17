@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  * Copyright (c) 2017-2018 Stephen L Johnson.			*
@@ -64,11 +64,14 @@ int	gtm_reg(int vax_reg);
 #define ASM_OUT_BUFF 	256
 #define PUSH_LIST_SIZE	500
 
+/* TRUTH_IN_REG means that generated code can address $TEST (dollar_truth) through a register, at offset
+ * DOLLAR_TRUTH_OFFSET from GTM_REG_DOLLAR_TRUTH. On x86_64 that register is the transfer table register (see xfer_table.c).
+ */
 #if defined(__vms) || defined(_AIX) || defined(__sparc) || defined(__hpux)						\
-	|| (defined(__linux__) && defined(__ia64) || defined(__aarch64__)) || defined(__MVS__)
+	|| (defined(__linux__) && defined(__ia64) || defined(__aarch64__)) || defined(__MVS__)			\
+	|| (defined(__linux__) && defined(__x86_64__)) || (defined(__CYGWIN__) && defined(__x86_64__))
 #  define TRUTH_IN_REG
-#elif defined(__osf__) || (defined(__linux__) && defined(__x86_64__)) || defined(Linux390)				\
-	|| (defined(__CYGWIN__) && defined(__x86_64__))									\
+#elif defined(__osf__) || defined(Linux390)										\
 	|| (defined(__linux__) && (defined(__armv6l__) || defined(__armv7l__)))
 #  undef TRUTH_IN_REG
 #else

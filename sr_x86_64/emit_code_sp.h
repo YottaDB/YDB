@@ -212,6 +212,17 @@ MBSTART {							\
 	CODE_BUF_GEN(I386_INS_MOV_Ev_Iv);			\
 } MBEND
 
+/* Store a constant in $TEST (dollar_truth) with MOVL $VALUE, DOLLAR_TRUTH_OFFSET(%rbx) */
+#define GEN_STORE_TRUTH(VALUE)							\
+MBSTART {									\
+	emit_base_offset(GTM_REG_DOLLAR_TRUTH, DOLLAR_TRUTH_OFFSET);		\
+	emit_base_info.imm32 = (VALUE);						\
+	emit_base_info.flags.imm32_set = TRUE;					\
+	CODE_BUF_GEN(I386_INS_MOV_Ev_Iv);					\
+} MBEND
+#define GEN_CLEAR_TRUTH		GEN_STORE_TRUTH(0)
+#define GEN_SET_TRUTH		GEN_STORE_TRUTH(1)
+
 #define IGEN_GENERIC_REG(opcode, reg)				\
 MBSTART {							\
 	switch(opcode)						\

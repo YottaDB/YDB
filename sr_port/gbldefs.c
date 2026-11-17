@@ -188,7 +188,6 @@ GBLDEF	boolean_t	is_updproc,
 			unhandled_stale_timer_pop,
 			gtcm_connection,
 			is_replicator,		/* TRUE => this process can write jnl records to the jnlpool for replicated db */
-			dollar_truth = TRUE,
 			dollar_test_default = TRUE,
 			ydb_stdxkill,		/* TRUE => Use M Standard X-KILL - FALSE use historical GTM X-KILL (default) */
 			in_timed_tn;		/* TRUE => Timed TP transaction in progress */

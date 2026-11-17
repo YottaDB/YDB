@@ -420,9 +420,12 @@ short *emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
 					assert(VXT_REG == *inst);
 					inst++;
 #					ifdef TRUTH_IN_REG
-					reg = GTM_REG_CODEGEN_TEMP;
-					NON_GTM64_ONLY(GEN_LOAD_WORD(reg, gtm_reg(*inst++), 0));
-					GTM64_ONLY(  GEN_LOAD_WORD_4(reg, gtm_reg(*inst++), 0));
+					assert(0x5a == *inst);		/* VAX r10 or $TEST register */
+					inst++;
+					/* x86_64 compares EAX below */
+					reg = X86_64_ONLY(GTM_REG_R0) NON_X86_64_ONLY(GTM_REG_CODEGEN_TEMP);
+					NON_GTM64_ONLY(GEN_LOAD_WORD(reg, GTM_REG_DOLLAR_TRUTH, DOLLAR_TRUTH_OFFSET));
+					GTM64_ONLY(  GEN_LOAD_WORD_4(reg, GTM_REG_DOLLAR_TRUTH, DOLLAR_TRUTH_OFFSET));
 #					else
 					/* For platforms, where the $TRUTH value is not carried in a register and
 					 * must be fetched from a global variable by subroutine call.
@@ -465,6 +468,14 @@ short *emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
 					assert(VXT_REG == *inst);
 					inst++;
 					inst++;
+#					ifdef TRUTH_IN_REG
+					/* The template follows this instruction with a call to op_dt_false(), which stores the
+					 * same value in $TEST, so skip it.
+					 */
+					assert((VXI_JSB == inst[0]) && (VXT_XFER == inst[1])
+						&& ((SIZEOF(char *) * xf_dt_false) == inst[2]));
+					inst += 3;
+#					endif
 					break;
 				case VXI_BISB2:
 #					ifdef TRUTH_IN_REG
@@ -477,6 +488,14 @@ short *emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
 					assert(VXT_REG == *inst);
 					inst++;
 					inst++;
+#					ifdef TRUTH_IN_REG
+					/* The template follows this instruction with a call to op_dt_true(), which stores the
+					 * same value in $TEST, so skip it.
+					 */
+					assert((VXI_JSB == inst[0]) && (VXT_XFER == inst[1])
+						&& ((SIZEOF(char *) * xf_dt_true) == inst[2]));
+					inst += 3;
+#					endif
 					break;
 				case VXI_CALLS:
 					oc_int = TRUE;
@@ -707,9 +726,9 @@ short *emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
 								if (0x5a == *inst)	/* to VAX r10 or $TEST */
 								{
 									NON_GTM64_ONLY(GEN_STORE_WORD(MOVL_RETVAL_REG,
-													GTM_REG_DOLLAR_TRUTH, 0));
+										GTM_REG_DOLLAR_TRUTH, DOLLAR_TRUTH_OFFSET));
 									GTM64_ONLY(GEN_STORE_WORD_4(MOVL_RETVAL_REG,
-													GTM_REG_DOLLAR_TRUTH, 0));
+										GTM_REG_DOLLAR_TRUTH, DOLLAR_TRUTH_OFFSET));
 								} else
 								{
 									GEN_MOVE_REG(gtm_reg(*inst), MOVL_RETVAL_REG);

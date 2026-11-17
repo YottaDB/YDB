@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2026 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -32,10 +35,14 @@
 enum
 {
 #include "xfer.h"
+	xf_count	/* Number of entries in the transfer table */
 };
 #undef XFER
 
 typedef int (* volatile xfer_entry_t)();
+
+/* $TEST (dollar_truth) occupies the transfer table sized slot immediately before xfer_table (see xfer_table.c) */
+#define DOLLAR_TRUTH_XFER_OFFSET	(-SIZEOF(xfer_entry_t))
 
 #ifndef UTF8_SUPPORTED
 /* Call "z" counterparts for non-utf8 flavor of these functions on VMS. */

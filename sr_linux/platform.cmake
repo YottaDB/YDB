@@ -189,6 +189,9 @@ else()
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -flto=${NUMCPUS}")
     set(CMAKE_AR "gcc-ar")		# needed on some versions of gcc to get -flto working
     set(CMAKE_RANLIB "gcc-ranlib")	# needed on some versions of gcc to get -flto working
+    # xfer_table.c defines the symbols dollar_truth and xfer_table with assembler directives, which the linker does
+    # not see in an LTO object file, so compile it without LTO.
+    set_source_files_properties(${YDB_SOURCE_DIR}/sr_port/xfer_table.c PROPERTIES COMPILE_OPTIONS "-fno-lto")
     message("*** Production build using LTO")
   endif()
 endif()
