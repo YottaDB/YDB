@@ -186,6 +186,14 @@ boolean_t clean_mum_tstart(void);
  */
 #define MUM_TSTART_FRAME_CHECK	OP_TROLLBACK_IMPLICIT_TP_IF_NEEDED
 
+/* "op_dmode" sets "prin_dm_io" while direct mode writes the prompt to, and reads a command from, a principal device that
+ * is not a terminal, so that an error in that I/O is handled as a direct mode error. The code of a $ZINTERRUPT, $ZTIMEOUT
+ * or SIGWINCH handler that interrupts that READ is not direct mode I/O, so the flag is cleared before that code runs.
+ * An error in a routine that the code calls, or an error after the code leaves with a ZGOTO, then drives $ETRAP or $ZTRAP
+ * like any other error. "op_dmode" sets the flag again if the handler returns and direct mode restarts the READ.
+ */
+#define	CLEAR_PRIN_DM_IO_BEFORE_INTERRUPT_CODE	(prin_dm_io = FALSE)
+
 /* Since a call to SET_ZSTATUS may cause the stringpool expansion, record whether we are using an indirection pool or not
  * in a local variable rather than recompare the stringpool bases.
  */
@@ -884,6 +892,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 		xfer_reset_if_setter(jobinterrupt);
 		assert(not_in_play != TAREF1(save_xfer_root, jobinterrupt).event_state);
 		TAREF1(save_xfer_root, jobinterrupt).event_state = active;
+		CLEAR_PRIN_DM_IO_BEFORE_INTERRUPT_CODE;
 		proc_act_type = SFT_ZINTR | SFT_COUNT;	/* trans_code will invoke jobinterrupt_process for us */
 		MUM_TSTART;
 	} else  if ((int)ERR_JOBINTRRETHROW == SIGNAL)
@@ -901,6 +910,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 			xfer_reset_if_setter(jobinterrupt);
 			TAREF1(save_xfer_root, jobinterrupt).event_state = active;
 		}
+		CLEAR_PRIN_DM_IO_BEFORE_INTERRUPT_CODE;
 		proc_act_type = SFT_ZINTR | SFT_COUNT; /* trans_code will invoke jobinterrupt_process for us */
 		MUM_TSTART;
 	} else  if ((int)ERR_STACKCRIT == SIGNAL)
@@ -924,6 +934,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 			frame_pointer->mpc = frame_pointer->restart_pc;
 			frame_pointer->ctxt = frame_pointer->restart_ctxt;
 			assert(!dollar_zininterrupt);
+			CLEAR_PRIN_DM_IO_BEFORE_INTERRUPT_CODE;
 			proc_act_type = SFT_ZTIMEOUT | SFT_COUNT;/* | SFT_COUNT;*/
 			err_act = &((TREF(dollar_ztimeout)).ztimeout_vector.str);
 			MUM_TSTART; /* This will take us to trans_code */
@@ -941,6 +952,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 			frame_pointer->mpc = frame_pointer->restart_pc;
 			frame_pointer->ctxt = frame_pointer->restart_ctxt;
 			assert(!dollar_zininterrupt);
+			CLEAR_PRIN_DM_IO_BEFORE_INTERRUPT_CODE;
 			proc_act_type = SFT_SIGWINCH | SFT_COUNT;
 			err_act = sigwinch_hdlr;
 			MUM_TSTART; /* This will take us to trans_code */
