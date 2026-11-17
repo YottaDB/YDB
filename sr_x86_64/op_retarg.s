@@ -33,13 +33,14 @@
 #   %r10 - alias value flag
 #
 ENTRY	op_retarg
-	subq	$8, %rsp				# Bump stack for 16 byte alignment
+	# Generated code jumps here (it does not call), so the stack is 16 byte aligned. See the comment in opp_ret.s.
 	CHKSTKALIGN					# Verify stack alignment
+	movq	frame_pointer(%rip), %rdi
+	movzbl	msf_flags_off(%rdi), %r12d		# Flags of the frame being unwound (%r12 is callee saved)
 	movq	%rax, %rdi
 	movq	%r10, %rsi
 	call	unw_retarg
-	addq	$16, %rsp				# Remove stack alignment bump & burn return address
-	getframe_jmp					# Load regs for prev stack frame and jump to its mpc
+	getframe_ret_or_jmp %r12b			# Load regs for prev stack frame and return or jump to its mpc
 # Below line is needed to avoid the ELF executable from ending up with an executable stack marking.
 # This marking is not an issue in Linux but is in Windows Subsystem on Linux (WSL) which does not enable executable stack.
 .section        .note.GNU-stack,"",@progbits

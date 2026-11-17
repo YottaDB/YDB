@@ -43,11 +43,12 @@ if ( ! $?gtm_dist && -f build/yottadb ) then
 #
 foreach file ($filelist)
 	if ($file == "sr_unix/ttt.txt") then
-		# Regenerate ttt.c. For now sr_x86_64 and sr_armv7l will have the same ttt.c but that might not be true in the future so
-		# have this script go through both directories always (instead of just copying the sr_x86_64/ttt.c onto sr_armv7l/ttt.c).
-		foreach arch (sr_x86_64 sr_armv7l sr_aarch64)
+		# Regenerate ttt.c. For now sr_x86_64 and sr_aarch64 will have the same ttt.c but that might not be true in the future so
+		# have this script go through both directories always (instead of just copying the sr_x86_64/ttt.c onto sr_aarch64/ttt.c).
+		# sr_armv7l is not included as 32-bit ARM is not supported.
+		foreach arch (sr_x86_64 sr_aarch64)
 			if (! -e $arch) then
-				# In case sr_armv7l directory does not exist (possible in a prior git branch), skip.
+				# In case the directory does not exist (possible in a prior git branch), skip.
 				continue
 			endif
 			cd $arch

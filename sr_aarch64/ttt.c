@@ -1,9 +1,9 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2025 Fidelity National Information	*
+ * Copyright (c) 2001-2026 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries.*
+ * Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -542,9 +542,9 @@ LITDEF short ttt[5308] = {
 /* 3287 */	1,VXI_PUSHAB,VXT_VAL,0,VXI_CALLS,VXT_LIT,3,VXT_XFER,
 /* 3295 */	SIZEOF(char *) * (short int)xf_readfl,VXT_END,
 /* 3297 */	VXI_JSB,VXT_XFER,SIZEOF(char *) * (short int)xf_restartpc,VXT_END,
-/* 3301 */	VXI_JSB,VXT_XFER,SIZEOF(char *) * (short int)xf_ret,VXT_END,
+/* 3301 */	VXI_JMP,VXT_XFER,SIZEOF(char *) * (short int)xf_ret,VXT_END,
 /* 3305 */	VXI_MOVAB,VXT_VAL,1,VXT_REG,0x50,VXI_MOVL,VXT_VAL,2,
-/* 3313 */	VXT_REG,0x51,VXI_JSB,VXT_XFER,SIZEOF(char *) * (short int)xf_retarg,VXT_END,
+/* 3313 */	VXT_REG,0x51,VXI_JMP,VXT_XFER,SIZEOF(char *) * (short int)xf_retarg,VXT_END,
 /* 3319 */	VXI_PUSHL,VXT_VAL,2,VXI_PUSHAB,VXT_VAL,1,VXI_CALLS,VXT_LIT,
 /* 3327 */	2,VXT_XFER,SIZEOF(char *) * (short int)xf_rhdaddr,VXI_MOVL,VXT_REG,0x50,VXT_VAL,0,
 /* 3335 */	VXT_END,

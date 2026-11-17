@@ -3,7 +3,7 @@
 # Copyright (c) 2007-2015 Fidelity National Information 	#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
-# Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
@@ -38,7 +38,11 @@ ENTRY	mum_tstart
 notrans:
 	getframe				# Pushes return addr on stack
 	leaq	xfer_table(%rip), %rbx
-	ret
+	# The call of dm_start that entered this routine stays on the return stack buffer for the return from this frame,
+	# so jump to the frame's code instead of using a "ret" (see SFF_RSB_ENTRY in stack_frame.h).
+	orb	$SFF_RSB_ENTRY, msf_flags_off(%rbp)
+	addq	$8, %rsp			# Remove the return address pushed by getframe
+	jmp	*msf_mpc_off(%rbp)
 # Below line is needed to avoid the ELF executable from ending up with an executable stack marking.
 # This marking is not an issue in Linux but is in Windows Subsystem on Linux (WSL) which does not enable executable stack.
 .section        .note.GNU-stack,"",@progbits

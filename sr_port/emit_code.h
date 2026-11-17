@@ -34,6 +34,7 @@ int	next_vax_push_list(void);
 void	push_list_init(void);
 void    reset_push_list_ptr(void);
 void	emit_call_xfer(int xfer);
+void	emit_jmp_xfer(int xfer);
 
 int	get_arg_reg(void);
 int	gtm_reg(int vax_reg);

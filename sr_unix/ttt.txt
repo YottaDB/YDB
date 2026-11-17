@@ -2,7 +2,7 @@
 ;								;
 ; Copyright 2001, 2014 Fidelity Information Services, Inc	;
 ;								;
-; Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries.	;
+; Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries.	;
 ; All rights reserved.						;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -789,10 +789,10 @@ OC_READFL:	jsb 	xfer.xf_restartpc
 		pushab	val.0
 		calls	#3,xfer.xf_readfl
 OC_RESTARTPC:	jsb	xfer.xf_restartpc
-OC_RET:		jsb	xfer.xf_ret
+OC_RET:		jmp	xfer.xf_ret
 OC_RETARG:	movab	val.1,r0
 		movl	val.2,r1
-		jsb	xfer.xf_retarg
+		jmp	xfer.xf_retarg
 OC_RHDADDR:	pushl	val.2
 		pushab	val.1
 		calls	#2,xfer.xf_rhdaddr

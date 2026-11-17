@@ -120,6 +120,14 @@ typedef struct stack_frame_struct	/* contents of the GT.M MUMPS stack frame */
 					 *	and then adapted for spanning node/region transactions.
 					 *	See comments in tp_restart.c for further details.
 					 */
+#define SFF_RSB_ENTRY	(1 << 6)	/* 0x40 The call that transferred control to this frame (for example the call of
+					 *	op_extcall, op_extexfun or mum_tstart) left its entry on the return stack
+					 *	buffer of the CPU, and the address in that entry is the mpc of the previous
+					 *	frame. So the return from this frame (opp_ret or op_retarg) uses a "ret",
+					 *	which consumes that entry and is predicted correctly. A frame without this
+					 *	flag returns with an indirect jump (x86_64) or "br" (aarch64), which leaves
+					 *	the return stack as it is.
+					 */
 
 #define SFF_INDCE_OFF   		~(SFF_INDCE)			/* Mask to turn off SFF_INDCE */
 #define SFF_ZTRAP_ERR_OFF		~(SFF_ZTRAP_ERR)		/* Mask to turn off SFF_ZTRAP_ERR */

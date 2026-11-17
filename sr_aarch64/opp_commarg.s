@@ -32,6 +32,20 @@
 ENTRY opp_commarg
 	putframe
 	CHKSTKALIGN					/* Verify stack alignment */
+	ldr	x27, [x19]					/* Frame before op_commarg (x27 is callee saved) */
 	bl	op_commarg
+	ldr	x9, [x19]
+	cmp	x9, x27
+	b.eq	sameframe
+	/* op_commarg pushed a frame for the indirect code. Our bl stays on the return stack for the return from that
+	 * frame, so branch to its code (see SFF_RSB_ENTRY in stack_frame.h).
+	 */
+	mark_rsb_entry
 	getframe
 	br	x30						/* Not ret: see the comment before the br in op_extcall.s */
+sameframe:
+	/* No new frame (for example an indirect GOTO to a label, or XECUTE ""). Use a ret so it consumes the entry of
+	 * our bl, which no return from a frame will.
+	 */
+	getframe
+	ret							/* CONSUMES_OWN_ENTRY (see ci/check_getframe_ret.py) */

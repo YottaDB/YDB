@@ -164,6 +164,7 @@ justgo:
 	add	x2, x1, w2, sxtw				/* Transfer address: codebase reg + offset to label */
 	ldr	x1, [x0, #mrt_lnk_ptr]				/* Linkage table address (context pointer) */
 	bl	new_stack_frame_sp
+	mark_rsb_entry						/* Our bl stays on the return stack for the QUIT */
 	/*
 	 * Move parameters into place
 	 */

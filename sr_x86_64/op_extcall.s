@@ -133,6 +133,7 @@ justgo:
 	addq	mrt_ptext_adr(%rdi), %rdx			# Transfer address: codebase reg + offset to label
 	movq	mrt_lnk_ptr(%rdi), %rsi				# Linkage table address (context pointer)
 	call	new_stack_frame
+	mark_rsb_entry						# Our call stays on the return stack for the QUIT
 retlab:								# If error, return to caller, else "return" to callee
 	addq	$SAVE_SIZE, %rsp				# Undo save area bump
 	getframe_jmp						# Sets regs (including %r12) as they should be for new frame

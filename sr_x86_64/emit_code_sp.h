@@ -331,6 +331,15 @@ MBSTART {													\
 	CODE_BUF_GEN(I386_INS_Grp5_Prefix);									\
 } MBEND
 
+#define GEN_XFER_TBL_JMP(xfer)											\
+MBSTART {													\
+	emit_base_offset(GTM_REG_XFER_TABLE, xfer);								\
+	emit_base_info.flags.rex_set = FALSE;									\
+	assert(7 >= GTM_REG_XFER_TABLE); /* if its a 64 bit register, we might need to set the REX bit */	\
+	emit_base_info.modrm_byte.modrm.reg_opcode = (char)I386_INS_JMP_Ev;					\
+	CODE_BUF_GEN(I386_INS_Grp5_Prefix);									\
+} MBEND
+
 #define GEN_CMP_EAX_IMM32(imm)				\
 MBSTART {						\
 	CLEAR_EMIT_BASE_INFO;				\

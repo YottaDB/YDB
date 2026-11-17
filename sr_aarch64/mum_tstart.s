@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 # Copyright (c) 2018 Stephen L Johnson. All rights reserved.	#
@@ -43,4 +43,8 @@ l1:
 	getframe
 	ldr	x23, =xfer_table
 	ldr	x19, =frame_pointer
-	ret
+	/* The bl of dm_start that entered this routine stays on the return stack for the return from this frame, so branch
+	 * to the frame's code instead of using a ret (see SFF_RSB_ENTRY in stack_frame.h).
+	 */
+	mark_rsb_entry
+	br	x30

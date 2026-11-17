@@ -3,7 +3,7 @@
 # Copyright (c) 2007-2019 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
-# Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
@@ -34,7 +34,7 @@ save1	= 8						# Stack offset for 2nd save arg
 	.extern	opp_ret
 
 ENTRY	opp_zstepret
-	subq	$8, %rsp				# Align stack to 16 bytes
+						# Entered with a jump, so the stack is 16 byte aligned (see opp_ret.s)
 	CHKSTKALIGN					# Verify stack alignment
 	movq	frame_pointer(%rip), %rax
 	movw	msf_typ_off(%rax), %r11w
@@ -45,11 +45,10 @@ ENTRY	opp_zstepret
 	jg	l1
 	call	op_zstepret
 l1:
-	addq	$8, %rsp				# Remove stack alignment bump
 	jmp	opp_ret
 
 ENTRY	opp_zstepretarg
-	subq	$24, %rsp				# Align stack to 16 bytes plus 2 long int save areas
+	subq	$16, %rsp				# 2 long int save areas (entered with a jump, see op_retarg.s)
 	CHKSTKALIGN					# Verify stack alignment
 	movq	%rax, save0(%rsp)			# Save input regs
 	movq	%r10, save1(%rsp)
@@ -62,7 +61,7 @@ ENTRY	opp_zstepretarg
 l2:
 	movq	save1(%rsp), %r10			# Restore input regs
 	movq	save0(%rsp), %rax
-	addq	$24, %rsp				# Remove our stack bump
+	addq	$16, %rsp				# Remove our stack bump
 	jmp	op_retarg
 
 ENTRY	op_zbfetch
@@ -208,7 +207,7 @@ l10:
 	ret
 
 ENTRY	opp_zst_over_ret
-	subq	$8, %rsp				# Align stack to 16 bytes
+						# Entered with a jump, so the stack is 16 byte aligned (see opp_ret.s)
 	CHKSTKALIGN					# Verify stack alignment
 	movq	frame_pointer(%rip), %rax
 	movq	zstep_level(%rip), %rdx
@@ -217,11 +216,10 @@ ENTRY	opp_zst_over_ret
 	jg	l11
 	call	op_zstepret
 l11:
-	addq	$8, %rsp				# Remove stack alignment bump
 	jmp	opp_ret
 
 ENTRY	opp_zst_over_retarg
-	subq	$24, %rsp				# Align stack to 16 bytes plus 2 long int save areas
+	subq	$16, %rsp				# 2 long int save areas (entered with a jump, see op_retarg.s)
 	CHKSTKALIGN					# Verify stack alignment
 	movq	%rax, save0(%rsp)			# Save input regs
 	movq	%r10, save1(%rsp)
@@ -235,7 +233,7 @@ ENTRY	opp_zst_over_retarg
 l12:
 	movq	save1(%rsp), %r10			# Restore input regs
 	movq	save0(%rsp), %rax
-	addq	$24, %rsp				# Remove our stack bump
+	addq	$16, %rsp				# Remove our stack bump
 	jmp	op_retarg
 # Below line is needed to avoid the ELF executable from ending up with an executable stack marking.
 # This marking is not an issue in Linux but is in Windows Subsystem on Linux (WSL) which does not enable executable stack.

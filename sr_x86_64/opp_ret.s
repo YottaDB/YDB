@@ -24,10 +24,13 @@
 	.extern	op_unwind
 
 ENTRY	opp_ret
-	addq	$8, %rsp			# Burn return PC & 16 byte align stack
+	# Generated code jumps here (it does not call), so the stack is 16 byte aligned and the return stack buffer still
+	# has the entry of the call that transferred control to the frame being unwound, if that call left one.
 	CHKSTKALIGN				# Verify stack alignment
+	movq	frame_pointer(%rip), %rax
+	movzbl	msf_flags_off(%rax), %r12d	# Flags of the frame being unwound (%r12 is callee saved; getframe reloads it)
 	call	op_unwind
-	getframe_jmp
+	getframe_ret_or_jmp %r12b
 # Below line is needed to avoid the ELF executable from ending up with an executable stack marking.
 # This marking is not an issue in Linux but is in Windows Subsystem on Linux (WSL) which does not enable executable stack.
 .section        .note.GNU-stack,"",@progbits

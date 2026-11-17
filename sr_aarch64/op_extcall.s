@@ -144,6 +144,7 @@ justgo:
 	add	x2, x1, w2, sxtw				/* Transfer address: codebase reg + offset to label */
 	ldr	x1, [x0, #mrt_lnk_ptr]				/* Linkage table address (context pointer) */
 	bl	new_stack_frame
+	mark_rsb_entry						/* Our bl stays on the return stack for the QUIT */
 retlab:								/* If error, return to caller, else "return" to callee */
 	getframe						/* Sets regs (including w22) as they should be for new frame */
 	mov	sp, x29

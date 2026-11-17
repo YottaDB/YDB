@@ -29,11 +29,11 @@
 	.extern	op_unwind
 
 ENTRY opp_ret
-	CHKSTKALIGN					/* Verify stack alignment */
-	bl	op_unwind
-	getframe
-	/* x30 holds the M code address of the frame (set by getframe), not the address after the bl that called this
-	 * routine. A ret would be predicted from the return stack, which holds the latter, so it would be mispredicted
-	 * every time. A br is predicted from the targets this br jumped to before, and so is less likely to be mispredicted.
+	/* Generated code branches here with b (not bl), so the return stack still has the entry of the bl that transferred
+	 * control to the frame being unwound, if that bl left one.
 	 */
-	br	x30
+	CHKSTKALIGN					/* Verify stack alignment */
+	ldr	x9, [x19]
+	ldrb	w27, [x9, #msf_flags_off]		/* Flags of the frame being unwound (x27 is callee saved) */
+	bl	op_unwind
+	getframe_ret_or_br w27

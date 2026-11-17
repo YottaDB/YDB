@@ -2,7 +2,7 @@
 #								#
 # Copyright 2001, 2012 Fidelity Information Services, Inc	#
 #								#
-# Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 # Copyright (c) 2018 Stephen L Johnson. All rights reserved.	#
@@ -50,6 +50,7 @@ SFF_INDCE		=	0x01
 SFF_ZTRAP_ERR		=	0x02
 SFF_DEV_ACT_ERR		=	0x04
 SFF_ETRAP_ERR		=	0x08
+SFF_RSB_ENTRY		=	0x40
 
 .macro putframe
 	ldr	x9, [x19]
@@ -102,3 +103,27 @@ mrt_tmp_sz		=	200
 mrt_curr_ptr		=	208
 mrt_oldr_ptr		=	216
 mrt_zhist		=	264
+
+/* Set SFF_RSB_ENTRY in the frame on top of the M stack (see stack_frame.h). Use when the bl that entered this routine
+ * stays on the return stack, because this routine transfers control to the new frame on top of the M stack with a br.
+ * Uses x9 and w10.
+ */
+.macro mark_rsb_entry
+	ldr	x9, [x19]
+	ldrb	w10, [x9, #msf_flags_off]
+	orr	w10, w10, #SFF_RSB_ENTRY
+	strb	w10, [x9, #msf_flags_off]
+.endm
+
+/* Load the registers of the frame on top of the M stack and transfer control to its mpc, with a ret if \flagsreg (the
+ * flags of the frame that was just unwound) has SFF_RSB_ENTRY set, or else with a br. See stack_frame.h for why. Use to
+ * return from a frame to the previous frame.
+ */
+.macro getframe_ret_or_br flagsreg
+	getframe
+	tst	\flagsreg, #SFF_RSB_ENTRY
+	b.eq	3f
+	ret
+3:
+	br	x30
+.endm

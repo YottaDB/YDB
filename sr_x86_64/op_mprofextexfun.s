@@ -161,6 +161,7 @@ justgo:
 	addq	mrt_ptext_adr(%rdi), %rdx			# Transfer address: codebase reg + offset to label
 	movq	mrt_lnk_ptr(%rdi), %rsi				# Linkage table address (context pointer)
 	call	new_stack_frame_sp
+	mark_rsb_entry						# Our call stays on the return stack for the QUIT
 	#
 	# Move parameters into place
 	#

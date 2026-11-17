@@ -376,6 +376,12 @@ void	tab_to_column(int col);
 	}															\
 }
 
+#define GEN_XFER_TBL_JMP(xfer)													\
+{																\
+	GEN_LOAD_WORD_8(GTM_REG_CODEGEN_TEMP, GTM_REG_XFER_TABLE, (xfer >> 3));							\
+	code_buf[code_idx++] = CODE_BUF_GEN_N(AARCH64_INS_BR, GTM_REG_CODEGEN_TEMP);						\
+}
+
 #define GEN_CMP_REG_IMM(reg, imm)												\
 { 																\
 	if (0 > imm)														\

@@ -600,6 +600,13 @@ short *emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
 					emit_trip(*(fst_opr + save_inst), TRUE, GENERIC_OPCODE_STORE, GTM_REG_ACCUM);
 					break;
 				case VXI_JMP:
+					if (VXT_XFER == *inst)
+					{	/* Jump (not call) to a transfer table routine, which does not return here */
+						inst++;
+						emit_jmp_xfer((int)*inst++);
+						stack_depth = 0;
+						break;
+					}
 					if (VXT_VAL == *inst)
 					{
 						inst++;
@@ -1811,6 +1818,35 @@ void reset_push_list_ptr(void)
 }
 
 /* Generate code for a transfer table (xfer_table) call into the (shared) runtime library */
+/* Generate a jump through the transfer table entry "xfer" to a routine that does not return to the generated code, such
+ * as opp_ret or op_retarg. A jump, unlike a call, does not push a return stack buffer entry that no return would consume.
+ */
+void emit_jmp_xfer(int xfer)
+{
+	int		offset;
+	unsigned char	*c;
+
+	if (CGP_ASSEMBLY == cg_phase)
+	{
+		obpt = stpcpy(obpt, vdat_def);
+		if (127 > xfer)
+		{
+			obpt = stpcpy(obpt, vdat_bdisp);
+		} else
+		{
+			obpt = stpcpy(obpt, vdat_wdisp);
+		}
+		offset = (int)(xfer / SIZEOF(char *));
+		for (c = (unsigned char *)xfer_name[offset]; *c ; )
+			*obpt++ = *c++;
+		obpt = stpcpy(obpt, vdat_r11);
+		*obpt++ = ',';
+		*obpt++ = ' ';
+	}
+	assert(0 == (xfer & 0x3));
+	GEN_XFER_TBL_JMP(xfer);
+}
+
 void emit_call_xfer(int xfer)
 {
 	int		offset;
