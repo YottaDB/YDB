@@ -3,7 +3,7 @@
  * Copyright (c) 2006-2021 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2022-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2022-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -78,7 +78,8 @@ int utf8_len_silent(mstr* str)
  */
 STATICFNDEF int utf8_len_real(utf8_err_type err_type, mstr* str)
 {
-	int		charlen, bytelen;
+	int		charlen, bytelen, asciilen;
+	unsigned char	byte0;
 	char		*ptrtop, *ptr;
 	boolean_t	err_raised;
 
@@ -95,36 +96,67 @@ STATICFNDEF int utf8_len_real(utf8_err_type err_type, mstr* str)
 	err_raised = FALSE;
 	if (!badchar_inhibit)
 	{
-		for (; ptr < ptrtop; charlen++, ptr += bytelen)
+		while (ptr < ptrtop)
 		{
-			if (!UTF8_VALID(ptr, ptrtop, bytelen))
+			if (ASCII_MAX >= *(unsigned char *)ptr)
+			{	/* Count a run of ASCII bytes, each of which is one valid character */
+				asciilen = utf8_ascii_len((unsigned char *)ptr, (unsigned char *)ptrtop);
+				assert(0 < asciilen);
+				charlen += asciilen;
+				ptr += asciilen;
+				continue;
+			}
+			/* A run of non-ASCII characters. For each one, check it with UTF8_VALID_NONASCII() and check the next
+			 * byte for ASCII, which is the same work per character as one UTF8_VALID(), so that a string with no
+			 * ASCII takes no longer than when every character was checked with UTF8_VALID().
+			 */
+			for (byte0 = *(unsigned char *)ptr; ; )
 			{
-				switch(err_type)
+				if (!UTF8_VALID_NONASCII(byte0, ptr, ptrtop, bytelen))
 				{
-					case err_rts:
-						UTF8_BADCHAR(0, ptr, ptrtop, 0, NULL);
-						break;			/* Never get here but keeps compiler happy */
-					case err_stx:
-						UTF8_BADCHAR_STX(0, ptr, ptrtop, 0, NULL);
-						return -1;
-					case err_dec:
-						if (!err_raised)
-						{
-							UTF8_BADCHAR_DEC(0, ptr, ptrtop, 0, NULL);
-							err_raised = TRUE;
-						}
-					case err_ignore:		/* WARNING fall through */
-						bytelen = 1;		/* Assume only one char is broken */
-						break;
-					default:
-						assertpro(FALSE /* Invalid error type */);
+					switch(err_type)
+					{
+						case err_rts:
+							UTF8_BADCHAR(0, ptr, ptrtop, 0, NULL);
+							break;			/* Never get here but keeps compiler happy */
+						case err_stx:
+							UTF8_BADCHAR_STX(0, ptr, ptrtop, 0, NULL);
+							return -1;
+						case err_dec:
+							if (!err_raised)
+							{
+								UTF8_BADCHAR_DEC(0, ptr, ptrtop, 0, NULL);
+								err_raised = TRUE;
+							}
+						case err_ignore:		/* WARNING fall through */
+							bytelen = 1;		/* Assume only one char is broken */
+							break;
+						default:
+							assertpro(FALSE /* Invalid error type */);
+					}
 				}
+				charlen++;
+				ptr += bytelen;
+				if (ptr >= ptrtop)
+					break;
+				byte0 = *(unsigned char *)ptr;
+				if (ASCII_MAX >= byte0)
+					break;
 			}
 		}
 	} else
 	{
 		for (; ptr < ptrtop; charlen++)
-			ptr = (char *)UTF8_MBNEXT(ptr, ptrtop);
+		{
+			if (ASCII_MAX >= *(unsigned char *)ptr)
+			{	/* Count a run of ASCII bytes, each of which is one character */
+				asciilen = utf8_ascii_len((unsigned char *)ptr, (unsigned char *)ptrtop);
+				assert(0 < asciilen);
+				charlen += asciilen - 1;	/* the loop adds 1 to charlen */
+				ptr += asciilen;
+			} else
+				ptr = (char *)UTF8_MBNEXT(ptr, ptrtop);
+		}
 	}
 	assert(!charlen || (ptr == ptrtop));
 	str->char_len = charlen;

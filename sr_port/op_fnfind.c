@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2026 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -72,9 +75,9 @@ int4 op_fnfind(mval *src, mval *del, mint first, mval *dst)
 		 */
 		if (!gtm_utf8_mode || (MV_IS_SINGLEBYTE(src) && badchar_inhibit))
 		{	/* If BADCHARs are to be checked, matchb() shouldn't be used even if the source is entirely single byte */
-			DBGUTFC((stderr, "op_fnfind(%d): Using matchb() for scan\n", findcnt));
+			DBGUTFC((stderr, "op_fnfind(%d): Using matchb_find() for scan\n", findcnt));
 			numpcs = 1;
-			match = (char *)matchb(del->str.len, (uchar_ptr_t)del->str.addr,
+			match = (char *)matchb_find(del->str.len, (uchar_ptr_t)del->str.addr,
 					       src->str.len - first, (uchar_ptr_t)src->str.addr + first, &match_res, &numpcs);
 			result = match_res ? first + match_res : 0;
 		} else
@@ -154,7 +157,7 @@ int4 op_fnzfind(mval *src, mval *del, mint first, mval *dst)
 	else if (src->str.len > first)
 	{
 		numpcs = 1;
-		match = (char *)matchb(del->str.len, (uchar_ptr_t)del->str.addr,
+		match = (char *)matchb_find(del->str.len, (uchar_ptr_t)del->str.addr,
 				       src->str.len - first, (uchar_ptr_t)src->str.addr + first, &match_res, &numpcs);
 		result = match_res ? first + match_res : 0;
 	} else

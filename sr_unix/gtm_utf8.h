@@ -3,7 +3,7 @@
  * Copyright (c) 2006-2024 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2022-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2022-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -18,6 +18,8 @@
 
 #include <wctype.h>
 #include <wchar.h>
+
+#include "copy.h"
 
 /*
  *=======================================================================================================================
@@ -320,6 +322,20 @@ LITREF unsigned int	utf8_bytelen[];
 		: ((bytelen) == 3 ? UTF8_VALID_3BYTE(((uchar_ptr_t)(mbptr)), (bytelen))					\
 		: /* bytelen == 4 */UTF8_VALID_4BYTE(((uchar_ptr_t)(mbptr)), (bytelen))					\
 	))))))
+
+/* UTF8_VALID() for a character whose first byte, "byte0" (the value of "mbptr[0]"), is known not to be ASCII: the same
+ * checks with no check for ASCII, for loops that go past a run of non-ASCII characters. Such a loop reads the first byte
+ * of the next character once, to check it for ASCII, and passes it here, so that each byte is read only once.
+ */
+#define	UTF8_VALID_NONASCII(byte0, mbptr, ptrend, bytelen)								\
+	((bytelen) = utf8_bytelen[(byte0)],										\
+		(((bytelen) == 1) ? FALSE					/* Invalid leading byte */		\
+		: (((int4)(bytelen) > (int4)(((uchar_ptr_t)(ptrend)) - ((uchar_ptr_t)(mbptr))))				\
+			? (bytelen = 1, FALSE)					/* Not enough length in input string */	\
+		: ((bytelen) == 2 ? UTF8_VALID_2BYTE(((uchar_ptr_t)(mbptr)), (bytelen))					\
+		: ((bytelen) == 3 ? UTF8_VALID_3BYTE(((uchar_ptr_t)(mbptr)), (bytelen))					\
+		: /* bytelen == 4 */UTF8_VALID_4BYTE(((uchar_ptr_t)(mbptr)), (bytelen))					\
+	)))))
 
 /* boolean_t U_VALID_CODE(wint_t codepoint)
  * 	Returns
@@ -824,6 +840,28 @@ int	trim_U16_line_term(UChar *buffer, int len);
 	((((UChar32)UTF_LINE_SEPARATOR == (UChar32)(code)) || ((UChar32)UTF_PARA_SEPARATOR == (UChar32)(code)))		\
 		? FALSE													\
 		: u_isprint(code))
+
+#define	UTF8_ASCII_WORD_MASK	0x8080808080808080ULL	/* The high bit of each byte of an 8-byte word */
+
+/* Returns the number of ASCII bytes at the start of the "ptr" to "ptrtop" byte range (i.e. "ptrtop - ptr" if all bytes
+ * are ASCII). An ASCII byte is always one valid character, whatever the bytes before and after the ASCII byte are, so the
+ * caller can count that many characters with no further check. Checks 8 bytes at a time while at least 8 bytes remain.
+ */
+static inline int utf8_ascii_len(unsigned char *ptr, unsigned char *ptrtop)
+{
+	unsigned char	*cptr;
+	gtm_uint64_t	word;
+
+	for (cptr = ptr; SIZEOF(word) <= (ptrtop - cptr); cptr += SIZEOF(word))
+	{
+		GET_LLONG(word, cptr);
+		if (word & UTF8_ASCII_WORD_MASK)
+			break;
+	}
+	for ( ; (cptr < ptrtop) && (ASCII_MAX >= *cptr); cptr++)
+		;
+	return (int)(cptr - ptr);
+}
 
 static inline void copy_character(uint4 copy_length, sm_uc_ptr_t dstptr, char *rcur)
 {

@@ -3,6 +3,9 @@
  * Copyright (c) 2006-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2026 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -34,6 +37,7 @@
 #include "gtm_string.h"
 
 #include "fnpc.h"
+#include "matchc.h"
 #include "gtm_stdio.h"
 #include "min_max.h"
 #include "op.h"
@@ -44,10 +48,10 @@ GBLREF boolean_t	badchar_inhibit;	/* No BADCHAR errors should be signaled */
 
 void op_fnp1(mval *src, int delim, int trgpcidx,  mval *dst)
 {
-	unsigned char	*first, *last, *start, *end;
+	unsigned char	*first, *last, *start, *end, dlmc, byte0;
 	unsigned int	*pcoff, *pcoffmax, fnpc_indx, slen;
 	int		trgpc, cpcidx, spcidx, mblen, dlmlen;
-	boolean_t       valid_char;
+	boolean_t       valid_char, ascii_delim;
 	mval		ldst;		/* Local copy since &dst == &src .. move to dst at return */
 	fnpc   		*cfnpc;
 	delimfmt	ldelim;
@@ -134,11 +138,34 @@ void op_fnp1(mval *src, int delim, int trgpcidx,  mval *dst)
 	}
 	/* Do scan filling in offsets of pieces if they fit in the cache */
 	spcidx = cpcidx;				/* Starting value for search */
+	dlmc = ldelim.unibytes_val[0];
+	ascii_delim = (1 == dlmlen) && (ASCII_MAX >= dlmc);
 	while ((cpcidx <= trgpcidx) && (last < end))
 	{
 		/* Once through for each piece we pass, last time through to find length of piece we want */
 		first = last;				/* First char of current piece */
-		while (last < end)
+		if (ascii_delim)
+		{	/* The delimiter is an ASCII character. An ASCII byte in the source is always one character, so
+			 * compare the delimiter with each ASCII byte and find the length of only the other characters.
+			 */
+			for ( ; ; )
+			{	/* Go past ASCII characters that are not the delimiter */
+				last = match_find_byte(last, end, dlmc, TRUE, TRUE);
+				if ((last == end) || (*last == dlmc))
+					break;
+				/* A non-ASCII character. Go past it and any non-ASCII characters that follow it here, as a
+				 * string of multi-byte characters would otherwise call match_find_byte() for each.
+				 */
+				byte0 = *last;
+				do
+				{
+					if (!UTF8_VALID_NONASCII(byte0, last, end, mblen) && !badchar_inhibit)
+						utf8_badchar(0, last, end, 0, NULL);
+					assert(0 < mblen);
+					last += mblen;
+				} while ((last < end) && (ASCII_MAX < (byte0 = *last)));
+			}
+		} else while (last < end)
 		{
 			valid_char = UTF8_VALID(last, end, mblen);	/* Length of next char */
 			if (!valid_char)
