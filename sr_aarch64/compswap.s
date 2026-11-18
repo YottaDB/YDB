@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 # Copyright (c) 2018 Stephen L Johnson. All rights reserved.	#
@@ -56,11 +56,9 @@ nomatch:
  *	Stores 0 in *x0 and returns
  */
 ENTRY compswap_unlock
-	mov	w1, wzr
-	dmb	ish			/* ensures that all previous accesses are observed (by a concurrent process)
-					 * BEFORE the clearing of the lock is observed.
+	stlr	wzr, [x0]		/* store-release: ensures that all previous accesses are observed (by a concurrent
+					 * process) BEFORE the clearing of the lock is observed.
 					 */
-	str	w1, [x0]
 	ret
 
 .end
