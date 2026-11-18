@@ -160,16 +160,22 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wvla")
 # Below is an optimization flag related description copied from sr_linux/gtm_env_sp.csh
 #	-fno-defer-pop to prevent problems with assembly/generated code with optimization
 #	-fno-strict-aliasing since we don't comply with the rules
-#	-ffloat-store for consistent results avoiding rounding differences
+#	-ffloat-store for consistent results avoiding rounding differences (only on 32-bit x86, where the x87 registers
+#		carry more precision than a double; x86_64 and aarch64 compute in the declared precision)
 #	-fno-omit-frame-pointer so %rbp always gets set up (required by caller_id()). Default changed in gcc 4.6.
+#	-ffp-contract=off so that a multiplication and an addition are never merged into one fused multiply-add
+#		instruction, which rounds once instead of twice and so would give results that differ from x86_64
 # All these are needed only in case of pro builds (if compiler optimization if turned on).
 # But they are no-ops in case of a dbg build when optimization is turned off so we include them in all cmake builds.
 if (CMAKE_COMPILER_IS_GNUCC)
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fno-defer-pop -fno-strict-aliasing -ffloat-store -fno-omit-frame-pointer")
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fno-defer-pop -fno-strict-aliasing -fno-omit-frame-pointer -ffp-contract=off")
+  if("${arch}" STREQUAL "x86")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -ffloat-store")
+  endif()
 else()
   # -fno-defer-pop is unsupported on clang/llvm
   # -ffloat-store is unsupported on clang/llvm
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fno-strict-aliasing -fno-omit-frame-pointer")
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fno-strict-aliasing -fno-omit-frame-pointer -ffp-contract=off")
 endif()
 
 if ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")

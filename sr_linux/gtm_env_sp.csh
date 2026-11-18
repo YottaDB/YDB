@@ -3,7 +3,7 @@
 # Copyright (c) 2001-2023 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
-# Copyright (c) 2017-2025 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2017-2026 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 # Copyright (c) 2017-2018 Stephen L Johnson.			#
@@ -260,15 +260,19 @@ if ( $?gtm_version_change == "1" ) then
 
 	# -fno-defer-pop to prevent problems with assembly/generated code with optimization
 	# -fno-strict-aliasing until we comply with the rules
-	# -ffloat-store for consistent results avoiding rounding differences
+	# -ffloat-store for consistent results avoiding rounding differences (only on 32-bit x86, where the x87 registers
+	#	carry more precision than a double; x86_64 and aarch64 compute in the declared precision)
 	# -fno-omit-frame-pointer so %rbp always gets set up (required by caller_id()). Default changed in gcc 4.6.
+	# -ffp-contract=off so that a multiplication and an addition are never merged into one fused multiply-add
+	#	instruction, which rounds once instead of twice and so would give results that differ from x86_64
 	if ( "ia64" != $mach_type ) then
-		setenv	gt_cc_option_optimize	"-O3 -fno-strict-aliasing -fno-defer-pop -ffloat-store -fno-omit-frame-pointer"
+		setenv	gt_cc_option_optimize	"-O3 -fno-strict-aliasing -fno-defer-pop -fno-omit-frame-pointer"
+		setenv	gt_cc_option_optimize	"$gt_cc_option_optimize -ffp-contract=off"
 		if ( ( "32" == $gt_build_type ) && ( "armv6l" != $mach_type ) && ( "armv7l" != $mach_type ) ) then
 			# applies to 32bit x86_64, ia32 and cygwin
 			# Compile 32-bit x86 GT.M using 586 instruction set rather than 686 as the new Intel Quark
 			# low power system-on-a-chip uses the 586 instruction set rather than the 686 instruction set
-			setenv  gt_cc_option_optimize "$gt_cc_option_optimize -march=i586"
+			setenv  gt_cc_option_optimize "$gt_cc_option_optimize -march=i586 -ffloat-store"
 		else if ("aarch64" == $mach_type) then
 			# AARCH64 does not support -mavx compiler flag
 			setenv  gt_cc_option_optimize "$gt_cc_option_optimize -mtune=native"
