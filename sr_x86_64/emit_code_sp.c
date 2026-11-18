@@ -63,6 +63,7 @@ MBSTART {								\
 #define register_class	1
 #define memory_class 	2
 #define immediate_class	3
+#define xmm_register_class	4	/* An XMM register, named in xmm_register_list[] */
 
 /* Decoding instruction prefix indicating 64 bit features used */
 struct Rex
@@ -134,6 +135,25 @@ LITDEF char *register_list[] = {
 	"14",
 	"15",
 	"RIP"
+};
+
+LITDEF char *xmm_register_list[] = {
+	"xmm0",
+	"xmm1",
+	"xmm2",
+	"xmm3",
+	"xmm4",
+	"xmm5",
+	"xmm6",
+	"xmm7",
+	"xmm8",
+	"xmm9",
+	"xmm10",
+	"xmm11",
+	"xmm12",
+	"xmm13",
+	"xmm14",
+	"xmm15"
 };
 
 GBLDEF int			instidx, prev_idx;
@@ -283,7 +303,8 @@ void	emit_jmp(uint4 branch_op, short **instp, int reg) /* Note that the 'reg' pa
 void	emit_base_offset(int base_reg, int offset)
 {
 	CLEAR_EMIT_BASE_INFO;
-	emit_base_info.rex = REX_OP; /* All instructions that we generate need to set the REX prefix */
+	/* All instructions that we generate set the REX prefix, except that GEN_MOVDQU drops it when it has no bits set */
+	emit_base_info.rex = REX_OP;
 	emit_base_info.flags.modrm_byte_set = TRUE;
 	emit_base_info.modrm_byte.modrm.reg_opcode = 0;	/* Not cleared above nor set below */
 	/*
@@ -356,6 +377,11 @@ void print_source_operand()
 			*obpt++ = instruction.reg_prefix;
 			SET_OBPT_STR(instruction.source_operand_reg, STRLEN(instruction.source_operand_reg));
 			break;
+		case xmm_register_class :
+			assert(instruction.source_operand_reg != NULL);
+			*obpt++ = '%';
+			SET_OBPT_STR(instruction.source_operand_reg, STRLEN(instruction.source_operand_reg));
+			break;
 		case memory_class :
 			assert(instruction.destination_operand_class != memory_class);
 			if (instruction.source_operand_reg != NULL)
@@ -392,6 +418,11 @@ void print_destination_operand()
 			assert(instruction.destination_operand_reg != NULL);
 			*obpt++ = '%';
 			*obpt++ = instruction.reg_prefix;
+			SET_OBPT_STR(instruction.destination_operand_reg, STRLEN(instruction.destination_operand_reg));
+			break;
+		case xmm_register_class :
+			assert(instruction.destination_operand_reg != NULL);
+			*obpt++ = '%';
 			SET_OBPT_STR(instruction.destination_operand_reg, STRLEN(instruction.destination_operand_reg));
 			break;
 		case memory_class :
@@ -492,6 +523,11 @@ void set_register_reg()
 		instruction.source_operand_reg = (char *)register_list[modrm_byte.modrm.reg_opcode + 8 * rex_prefix.Reg];
 	else if (instruction.destination_operand_class == register_class)
 		instruction.destination_operand_reg = (char *)register_list[modrm_byte.modrm.reg_opcode + 8 * rex_prefix.Reg];
+	else if (instruction.source_operand_class == xmm_register_class)
+		instruction.source_operand_reg = (char *)xmm_register_list[modrm_byte.modrm.reg_opcode + 8 * rex_prefix.Reg];
+	else if (instruction.destination_operand_class == xmm_register_class)
+		instruction.destination_operand_reg =
+			(char *)xmm_register_list[modrm_byte.modrm.reg_opcode + 8 * rex_prefix.Reg];
 }
 
 void clear_memory_reg()
@@ -805,6 +841,23 @@ void format_machine_inst()
 						set_memory_reg();
 						instruction.num_operands = 1;
 						next_inst_byte_meaning = double_word_offset;
+						break;
+					/* Ins :: F3 [REX] 0F OPCODE ModRM (MOVDQU, the only SSE instruction, from GEN_MVAL_COPY) */
+					case I386_INS_MOVDQU_Vdq_Wdq :
+					case I386_INS_MOVDQU_Wdq_Vdq :
+						instruction.opcode_mnemonic = "MOVDQU";
+						instruction.opcode_suffix = ' ';
+						instruction.num_operands = 2;
+						if (I386_INS_MOVDQU_Vdq_Wdq == inst_curr_byte)
+						{
+							instruction.source_operand_class = memory_class;
+							instruction.destination_operand_class = xmm_register_class;
+						} else
+						{
+							instruction.source_operand_class = xmm_register_class;
+							instruction.destination_operand_class = memory_class;
+						}
+						next_inst_byte_meaning = modrm_sib_bytes;
 						break;
 					default :
 						assertpro(FALSE);

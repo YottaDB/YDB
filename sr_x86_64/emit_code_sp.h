@@ -450,20 +450,46 @@ MBSTART {								\
 	CODE_BUF_GEN(I386_INS_POP_eAX + (GTM_REG_CODEGEN_TEMP & 0x7));	\
 } MBEND
 
-/* Copy a 32 byte mval (QWSIZE is 4 8 byte words) from (SRC_REG) to (TRG_REG) with a load and a store of each word
- * through RCX. This is faster than a "REP MOVSQ", whose startup cost exceeds the cost of the copy itself.
+/* MOVDQU (with the F3 prefix and the 0F escape byte) loads (Vdq_Wdq) or stores (Wdq_Vdq) 16 bytes through an XMM
+ * register. Without the F3 prefix, these opcodes are MMX instructions, which the code generator never generates.
+ */
+#define I386_INS_MOVDQU_Vdq_Wdq	0x6F
+#define I386_INS_MOVDQU_Wdq_Vdq	0x7F
+#define I386_REG_XMM0		0
+#define I386_REG_XMM1		1
+
+/* Generate a MOVDQU of 16 bytes between XMM register XMM_REG and OFFSET(BASE_REG). The F3 prefix has to precede the
+ * REX prefix, and the 0F escape byte has to follow it, so this cannot use CODE_BUF_GEN() for the REX prefix.
+ * emit_base_offset() always sets the REX prefix, but MOVDQU needs it only for its REX.B bit, i.e. for a base register
+ * of R8 or above, so a REX prefix with no bits set (REX_OP) is not generated.
+ */
+#define GEN_MOVDQU(OPCODE, XMM_REG, BASE_REG, OFFSET)							\
+MBSTART {												\
+	assert(I386_REG_XMM1 >= (XMM_REG));	/* No REX.R bit is needed for XMM0 and XMM1 */		\
+	code_buf[code_idx++] = I386_INS_REP_E_Prefix;							\
+	emit_base_offset(BASE_REG, OFFSET);								\
+	assert(emit_base_info.flags.rex_set);								\
+	if (REX_OP != emit_base_info.rex)	/* Only needed for a base register of R8 or above */	\
+		code_buf[code_idx++] = emit_base_info.rex;						\
+	emit_base_info.flags.rex_set = FALSE;								\
+	code_buf[code_idx++] = I386_INS_Two_Byte_Escape_Prefix;						\
+	emit_base_info.modrm_byte.modrm.reg_opcode = (XMM_REG);						\
+	CODE_BUF_GEN(OPCODE);										\
+} MBEND
+
+/* Copy a 32 byte mval (QWSIZE is 4 8 byte words) from (SRC_REG) to (TRG_REG) with two 16 byte loads into XMM0 and
+ * XMM1 followed by two 16 byte stores (SSE2, which every x86_64 processor supports). This is faster than four 8 byte
+ * loads and stores through a general purpose register, and than a "REP MOVSQ", whose startup cost exceeds the cost of
+ * the copy itself. XMM0 and XMM1 need not be preserved, as generated code calls C functions, which do not preserve
+ * any XMM register, and does not otherwise use XMM registers.
  */
 #define GEN_MVAL_COPY(SRC_REG, TRG_REG, QWSIZE)										\
 MBSTART {														\
 	assert(4 == (QWSIZE));												\
-	GEN_LOAD_WORD_8(I386_REG_RCX, SRC_REG, 0);									\
-	GEN_STORE_WORD_8(I386_REG_RCX, TRG_REG, 0);									\
-	GEN_LOAD_WORD_8(I386_REG_RCX, SRC_REG, 8);									\
-	GEN_STORE_WORD_8(I386_REG_RCX, TRG_REG, 8);									\
-	GEN_LOAD_WORD_8(I386_REG_RCX, SRC_REG, 16);									\
-	GEN_STORE_WORD_8(I386_REG_RCX, TRG_REG, 16);									\
-	GEN_LOAD_WORD_8(I386_REG_RCX, SRC_REG, 24);									\
-	GEN_STORE_WORD_8(I386_REG_RCX, TRG_REG, 24);									\
+	GEN_MOVDQU(I386_INS_MOVDQU_Vdq_Wdq, I386_REG_XMM0, SRC_REG, 0);							\
+	GEN_MOVDQU(I386_INS_MOVDQU_Vdq_Wdq, I386_REG_XMM1, SRC_REG, 16);						\
+	GEN_MOVDQU(I386_INS_MOVDQU_Wdq_Vdq, I386_REG_XMM0, TRG_REG, 0);							\
+	GEN_MOVDQU(I386_INS_MOVDQU_Wdq_Vdq, I386_REG_XMM1, TRG_REG, 16);						\
 } MBEND
 
 /*

@@ -30,7 +30,7 @@ ENTRY	op_sto
 	CHKSTKALIGN						# Verify stack alignment
 	mv_if_notdefined %r10, notdef
 nowdef:
-	mv_copy	%r10, %rax, %rcx
+	mv_copy	%r10, %rax
 	andw	$~mval_m_aliascont, mval_w_mvtype(%rax)		# Don't propagate alias container flag
 done:
 	addq	$8, %rsp					# Remove stack alignment bump

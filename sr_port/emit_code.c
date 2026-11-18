@@ -656,7 +656,7 @@ short *emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
 					 */
 					GEN_MVAL_COPY(MOVC3_SRC_REG, MOVC3_TRG_REG, SIZEOF(mval));
 #					elif defined(__linux) && defined(__x86_64__)
-					/* A load and a store of each 8 byte word of the mval (see GEN_MVAL_COPY in
+					/* Two 16 byte loads into XMM registers and two 16 byte stores (see GEN_MVAL_COPY in
 					 * sr_x86_64/emit_code_sp.h).
 					 */
 					GEN_MVAL_COPY(MOVC3_SRC_REG, MOVC3_TRG_REG, MVAL_QWORD_SIZE);

@@ -55,7 +55,7 @@ numer:
 sqlnull:
 	# If v=$ZYSQLNULL, then u = -v should also be set to $ZYSQLNULL
 	# Copy the Mval from %r10 [r10] to %rax [rax].
-	mv_copy	%r10, %rax, %rcx
+	mv_copy	%r10, %rax
 	jmp	done
 float:
 	movw	$mval_m_nm, mval_w_mvtype(%rax)

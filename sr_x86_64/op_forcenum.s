@@ -70,7 +70,7 @@ l40:
 	#
 	# Copy the Mval from %r10 [r10] to %rax [rax].
 	#
-	mv_copy	%r10, %rax, %rcx
+	mv_copy	%r10, %rax
 done:
 	addq	$FRAME_SIZE, %rsp			# Remove save area from C stack
 	ret

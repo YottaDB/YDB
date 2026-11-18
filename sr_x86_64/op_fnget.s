@@ -39,7 +39,7 @@ ENTRY	op_fnget
 	cmpq	$0, %r10
 	je	l5				# Source mval does not exist
 	mv_if_notdefined %r10, l5		# Branch if source mval is not defined
-	mv_copy	%r10, %rax, %rcx		# Copy source mval to destination
+	mv_copy	%r10, %rax		# Copy source mval to destination
 	andw	$~mval_m_aliascont, mval_w_mvtype(%rax)	# Don't propagate alias container flag
 	ret
 
