@@ -3,7 +3,7 @@
  * Copyright (c) 2015-2023 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -284,6 +284,17 @@ boolean_t utfcgr_scanforcharN(int char_num, utfscan_parseblk *utf_parse_blk)
 				 */
 				DBGUTFC((stderr, "  utfcgr_scanforcharN: Char located in cache\n"));
 				assert(0 != utfcgrep->typflags);
+				if (utf_parse_blk->stoponbadchar && (UTFCGR_BADCHAR & utfcgrep->typflags))
+				{	/* The character is in a group of BADCHARs (cached by a scan that tolerated them)
+					 * and this scan can't tolerate them.
+					 */
+					DBGUTFC((stderr, "  utfcgr_scanforcharN: Returning due to BADCHAR\n"));
+					utf_parse_blk->badcharstr = (unsigned char *)mv->str.addr + tbyteidx;
+					utf_parse_blk->badchartop = scantop;
+					utf_parse_blk->scan_char_type = UTFCGR_BADCHAR;
+					DUMP_UTFCACHE_END(mv, utfcgrp);
+					return FALSE;
+				}
 				if (UTFCGR_UTF != utfcgrep->typflags)
 				{	/* Group is single byte chars - index to char to return */
 					COUNT_UTF_EVENT(pabscan);	/* Count groups we scan for located char */
@@ -349,6 +360,17 @@ boolean_t utfcgr_scanforcharN(int char_num, utfscan_parseblk *utf_parse_blk)
 			scanptr = (unsigned char *)mv->str.addr + utfcgrep_prev->byteidx;
 			assert(scanptr < scantop);
 			UTF_CHARTYPELEN(scanptr, scantop, chartype, bytecnt);
+			if ((UTFCGR_BADCHAR == chartype) && utf_parse_blk->stoponbadchar)
+			{	/* The character we want is this one or a later one, this one is a BADCHAR and this scan can't
+				 * tolerate them. Return before adding this character to a group in the cache.
+				 */
+				DBGUTFC((stderr, "  utfcgr_scanforcharN: Returning due to BADCHAR\n"));
+				utf_parse_blk->badcharstr = scanptr;
+				utf_parse_blk->badchartop = scantop;
+				utf_parse_blk->scan_char_type = UTFCGR_BADCHAR;
+				DUMP_UTFCACHE_END(mv, utfcgrp);
+				return FALSE;
+			}
 			/* Check type of last char in last cache group to the type of the next character to scan. If there's a
 			 * match, we can add it to the old group if the type is not UTF8, or if it is UTF8, then if there are
 			 * fewer than UTFCGR_MAX_UTF_LEN chars in the group. Else, we need to start a new group.
@@ -428,8 +450,29 @@ boolean_t utfcgr_scanforcharN(int char_num, utfscan_parseblk *utf_parse_blk)
 				DBGUTFC((stderr, "  utfcgr_scanforcharN: New char scanned - type: %d, current group type: %d\n",
 					 chartype, lchar_typflags));
 				if ((UTFCGR_BADCHAR == chartype) && utf_parse_blk->stoponbadchar)
-				{	/* Found BADCHAR in the string and this scan can't tolerate them */
+				{	/* Found BADCHAR in the string and this scan can't tolerate them. A later scan of this
+					 * string uses every group that "utfcgrp->ngrps" counts, so before returning, leave the
+					 * open group (the last one counted) describing the characters scanned so far.
+					 */
 					DBGUTFC((stderr, "  utfcgr_scanforcharN: Returning due to BADCHAR\n"));
+					assert(utfcgrp->ngrps == ((utfcgrep - utfcgrep0) + 1));
+					assert((scanptr - (unsigned char *)mv->str.addr) == (tbyteidx + gbytecnt));
+					if (0 < gcharcnt)
+					{	/* Close the open group just before the BADCHAR */
+						assert(UTFCGR_NONE != utfcgrep->typflags);
+						utfcgrep->byteidx = tbyteidx + gbytecnt;
+						utfcgrep->charcnt = tcharcnt + gcharcnt;
+					} else
+					{	/* The open group has no characters, which is possible only for the first group
+						 * of a new cache entry, when the BADCHAR is the first character of the string.
+						 * This group has no type and cannot be closed, and "utfcgrp->ngrps" cannot be
+						 * set to 0, as a later scan that uses this cache entry reads the last group,
+						 * "entry[ngrps - 1]". So make the cache entry fail validation. The next scan
+						 * of this string then starts from scratch.
+						 */
+						assert(utfcgrep == utfcgrep0);
+						utfcgrp->last_str.addr = NULL;
+					}
 					utf_parse_blk->badcharstr = scanptr;
 					utf_parse_blk->badchartop = scantop;
 					utf_parse_blk->scan_char_type = UTFCGR_BADCHAR;
