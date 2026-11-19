@@ -381,6 +381,7 @@ int yed_encode_object(const ydb_buffer_t *varname, int subs_used, const ydb_buff
 		}
 		else
 		{	/* No subtree. Represent as an int, real, string or boolean value. */
+			cur_value.buf_addr = valuepool;	/* A value read earlier may have moved buf_addr past its NUL prefix */
 			/* Note assignment */
 			if (YDB_OK != (status = ydb_get_s(varname, next_subs_used, next_subsarray, &cur_value)))
 				break;
@@ -568,6 +569,7 @@ int yed_encode_array(const ydb_buffer_t *varname, int subs_used, const ydb_buffe
 		}
 		else
 		{	/* No subtree. Represent as an int, real, string or boolean value. */
+			cur_value.buf_addr = valuepool;	/* A value read earlier may have moved buf_addr past its NUL prefix */
 			/* Note assignment */
 			if (YDB_OK != (status = ydb_get_s(varname, next_subs_used, next_subsarray, &cur_value)))
 				break;
