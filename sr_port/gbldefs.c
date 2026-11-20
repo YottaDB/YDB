@@ -1457,6 +1457,7 @@ GBLDEF int			(*frl_save_state)(struct readline_state*);
 GBLDEF int			(*frl_restore_state)(struct readline_state*);
 GBLDEF int			(*frl_bind_key_in_map)(int, rl_command_func_t *, Keymap);
 GBLDEF Keymap			(*frl_get_keymap)(void);
+GBLDEF int			(*frl_getc)(FILE *);
 GBLDEF int			(*fhistory_truncate_file)(const char *, int);
 GBLDEF void			(*fclear_history)(void);
 GBLDEF int			(*fwrite_history)(const char *);
@@ -1472,6 +1473,7 @@ GBLDEF rl_hook_func_t		**vrl_startup_hook;
 GBLDEF int			*vrl_already_prompted;
 GBLDEF rl_voidfunc_t 		**vrl_redisplay_function;
 GBLDEF int			*vrl_readline_state;
+GBLDEF rl_getc_func_t		**vrl_getc_function;
 
 #ifdef DEBUG
 GBLDEF	boolean_t		in_fake_enospc;	/* used by an assert in "send_msg.c" */

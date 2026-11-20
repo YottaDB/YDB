@@ -26,6 +26,8 @@
 #include "gtm_string.h"
 #include "gtm_fcntl.h"
 #include "gtm_stdlib.h"
+#include "gtm_poll.h"
+#include "gtm_signal.h"
 #include "gtmmsg.h"
 #include "gtm_malloc.h"
 #include "gtmio.h"
@@ -107,6 +109,31 @@ GBLREF volatile boolean_t	dollar_zininterrupt;
 GBLREF	volatile boolean_t	sigwinch_inprog;
 GBLREF int4			exi_condition;
 GBLREF enum			gtmImageTypes image_type;
+GBLREF sigset_t			block_worker;
+#ifdef DEBUG
+GBLREF boolean_t		blocksig_initialized;
+#endif
+
+/* The signal mask of the process outside the readline() calls of "readline_read_mval".
+ * "readline_getc" waits for input with this mask.
+ */
+STATICDEF sigset_t		readline_wait_sigmask;
+
+/* Call readline() from "readline_read_mval" with signals blocked. "readline_getc" lets signals in while readline waits for input
+ * (see the comment there). Signals stay blocked for the rest of readline() because readline does not expect a signal there. For
+ * example, a signal that interrupts the write() of the prompt makes readline lose the prompt, as readline does not write the
+ * prompt again. If a signal handler does a siglongjmp() out of readline(), the siglongjmp() restores the signal mask that was in
+ * effect at the sigsetjmp() in "readline_read_mval" i.e. undoes the blocking done here.
+ */
+#define	READLINE_WITH_SIGNALS_BLOCKED(LINE, PROMPT)						\
+MBSTART {											\
+	int	rc;										\
+												\
+	assert(blocksig_initialized);								\
+	SIGPROCMASK(SIG_BLOCK, &block_worker, &readline_wait_sigmask, rc);			\
+	LINE = freadline(PROMPT);								\
+	SIGPROCMASK(SIG_SETMASK, &readline_wait_sigmask, NULL, rc);				\
+} MBEND
 
 LITREF gtmImageName		gtmImageNames[];
 
@@ -135,7 +162,14 @@ LITREF gtmImageName		gtmImageNames[];
  * end up with using sigsetjmp and siglongjmp. sigsetjmp sets a location where we can
  * handle outofband events, and siglongjmp jumps to the setjmp location after signal
  * processing is done. The "volatile" boolean variable readline_catch_signal is set
- * to activate the longjmp ONLY IF we are inside the readline code.
+ * to activate the longjmp ONLY WHILE readline is waiting for a key at the start of a
+ * command (see "readline_getc"). Readline holds nothing but what "rl_save_state"
+ * saves at that point. A siglongjmp from anywhere else inside readline would throw
+ * away whatever readline was in the middle of doing e.g. a byte read from the
+ * terminal but not yet stored in the line, or a line read completely but not
+ * yet returned. Signals are blocked while readline does anything other than wait for
+ * input (see READLINE_WITH_SIGNALS_BLOCKED), so a signal that arrives then is
+ * delivered at the next wait for input or when readline returns the line.
  *
  * Note the use of readline_signal_count. The problem is that we only have a single
  * sigsetjmp, which records the current stack for siglongjmp. If multiple signals are
@@ -235,6 +269,7 @@ void readline_init(void* handle) {
 	frl_restore_state		= dlsym(handle, "rl_restore_state");
 	frl_bind_key_in_map		= dlsym(handle, "rl_bind_key_in_map");
 	frl_get_keymap			= dlsym(handle, "rl_get_keymap");
+	frl_getc			= dlsym(handle, "rl_getc");
 	fhistory_truncate_file		= dlsym(handle, "history_truncate_file");
 	fclear_history			= dlsym(handle, "clear_history");
 	fwrite_history			= dlsym(handle, "write_history");
@@ -250,6 +285,7 @@ void readline_init(void* handle) {
 	vrl_already_prompted		= dlsym(handle, "rl_already_prompted");
 	vrl_redisplay_function		= dlsym(handle, "rl_redisplay_function");
 	vrl_readline_state		= dlsym(handle, "rl_readline_state");
+	vrl_getc_function		= dlsym(handle, "rl_getc_function");
 	EOL				= 1;
 
 	if (!(
@@ -278,6 +314,7 @@ void readline_init(void* handle) {
 				&& frl_restore_state
 				&& frl_bind_key_in_map
 				&& frl_get_keymap
+				&& frl_getc
 				&& fhistory_truncate_file
 				&& fclear_history
 				&& fwrite_history
@@ -292,6 +329,7 @@ void readline_init(void* handle) {
 				&& vrl_already_prompted
 				&& vrl_redisplay_function
 				&& vrl_readline_state
+				&& vrl_getc_function
 				&& EOL
 				))
 		return;
@@ -390,6 +428,52 @@ boolean_t create_readline_file(char * readline_file) {
 	}
 }
 
+/* Used by Direct Mode Only: readline calls this function (through "rl_getc_function") for each byte of input readline needs.
+ * "readline_read_mval" calls readline() with signals blocked (see READLINE_WITH_SIGNALS_BLOCKED). This function waits for
+ * input with the signals unblocked, so this wait is the only place inside readline() where a signal handler runs.
+ *
+ * This wait is also the only place where a signal handler is allowed to siglongjmp() out of readline to the sigsetjmp() in
+ * "readline_read_mval", and the handler is allowed to do so only if the wait is on behalf of a read of the first key
+ * of a command (RL_STATE_READCMD). No byte has been taken from the terminal at that point and readline is not in the middle
+ * of anything, so the state that "readline_read_mval" saves and later restores is complete.
+ *
+ * Readline also comes here in the middle of a command e.g. for the rest of a multi-byte key sequence (an arrow key is
+ * ESC [ A) or for the type-ahead that "rl_insert" batches up. What readline knows at those points is in local variables
+ * of readline functions that a siglongjmp() would discard, so no siglongjmp() is allowed there. A signal handler that runs
+ * then only records its out-of-band event, which the next read of the first key of a command acts upon.
+ */
+int readline_getc(FILE *stream)
+{
+	struct pollfd	poll_fd;
+	int		status;
+	boolean_t	read_cmd;
+
+	read_cmd = (0 != (RL_STATE_READCMD & *vrl_readline_state));
+	if (read_cmd)
+	{
+		readline_catch_signal = TRUE;	/* From now on, a signal handler that sets "outofband" does the siglongjmp() */
+		if (outofband)
+		{	/* The event arrived before the above assignment, so its signal handler did not do the siglongjmp() */
+			readline_catch_signal = FALSE;
+			siglongjmp(readline_signal_jmp, 1);
+		}
+	}
+	/* Wait for input here, and not in the "rl_getc" call below, as ppoll() unblocks the signals only for the duration of
+	 * the wait. ppoll() does so by making "readline_wait_sigmask" (the signal mask from before READLINE_WITH_SIGNALS_BLOCKED
+	 * blocked the signals) the signal mask of the process during the wait, and restoring the blocked signal mask when the
+	 * wait ends. So by the time a byte is taken from the terminal, signals are blocked again. If input is already
+	 * available, ppoll() returns without delivering a pending signal. Such a signal stays pending until the next wait.
+	 */
+	poll_fd.fd = fileno(stream);
+	poll_fd.events = POLLIN;
+	do
+	{
+		status = ppoll(&poll_fd, 1, NULL, &readline_wait_sigmask);
+	} while ((-1 == status) && (EINTR == errno));
+	readline_catch_signal = FALSE;
+	return frl_getc(stream);	/* does not wait if the above wait found input; handles end-of-file and errors */
+}
+
 /* Used by Direct Mode Only: Read input from user into the stringpool */
 void readline_read_mval(mval *v) {
 	char *line;
@@ -412,6 +496,11 @@ void readline_read_mval(mval *v) {
 	/* finish any pending flush timers (or else we would see a newline) */
 	if (io_curr_device.out->type == tt)
 		iott_flush(io_curr_device.out);
+	/* Have readline get its input through "readline_getc" so that signal handlers siglongjmp() to the sigsetjmp()
+	 * below only at a point where it is safe to leave readline. The utilities (see "readline_read_charstar") have
+	 * no such sigsetjmp() and so stay with readline's own function.
+	 */
+	*vrl_getc_function = readline_getc;
 
 	do {
 		/* Signal Handling destination (siglongjmp from signal handling code)
@@ -423,11 +512,11 @@ void readline_read_mval(mval *v) {
 		/* A non-zero return means we got here by a siglongjmp() out of libreadline, i.e. the out-of-band
 		 * event (a MUPIP INTRPT or a SIGWINCH, the two that OUTOFBAND_RESTARTABLE() admits) interrupted
 		 * the freadline() call below and libreadline holds state worth saving. Every site
-		 * that jumps here (ctrlc_handler(), tt_sigwinch_event() and ydb_os_signal_handler()) does so
-		 * only while "readline_catch_signal" is TRUE, which is only between the two assignments that
-		 * bracket each freadline() call below, so this is an exact test for "we were inside
+		 * that jumps here (ctrlc_handler(), tt_sigwinch_event(), ydb_os_signal_handler(), jobinterrupt_event()
+		 * and readline_getc()) does so only while "readline_catch_signal" is TRUE, which is only inside
+		 * readline_getc(), which only libreadline calls, so this is an exact test for "we were inside
 		 * libreadline". Note "readline_catch_signal" itself cannot be used for this: each of those
-		 * three sites sets it FALSE immediately before its siglongjmp, so it is FALSE here either way.
+		 * sites sets it FALSE immediately before its siglongjmp, so it is FALSE here either way.
 		 */
 		in_readline = (0 != sigsetjmp(readline_signal_jmp, 1));
 		if (in_readline || outofband) {
@@ -587,10 +676,8 @@ void readline_read_mval(mval *v) {
 			/* Ditto, don't repaint the screen; use existing text already entered */
 			*vrl_redisplay_function = readline_after_zinterrupt_redisplay;
 			/* Readline call */
-			/* For readline_catch_signal and (TREF(gtmprompt)).addr, see below for an explanation. */
-			readline_catch_signal = TRUE;
-			line = freadline((TREF(gtmprompt)).addr);
-			readline_catch_signal = FALSE;
+			/* For (TREF(gtmprompt)).addr, see below for an explanation. */
+			READLINE_WITH_SIGNALS_BLOCKED(line, (TREF(gtmprompt)).addr);
 			/* Now free state */
 			gtm_free(ydb_readline_state);
 			ydb_readline_state = NULL;
@@ -603,7 +690,10 @@ void readline_read_mval(mval *v) {
 			/* if ydb_readline_state->done, this means the interrupt was sent AFTER we pressed enter on a line; if
 			 * that's the case, readline will return immediately on the next read, and the line is NULL. Continue with
 			 * the next read after this, otherwise we will exit the process in the line that says if (NULL == line)...
+			 * This is not expected as "readline_getc" lets a signal handler interrupt readline only while readline
+			 * waits for the first key of a command, and readline does not read a key once a line is done.
 			 */
+			assert(!done);
 			if (done) {
 				tt_ptr->mupintr = FALSE;
 				continue;
@@ -618,16 +708,13 @@ void readline_read_mval(mval *v) {
 			/* readline_catch_signal is used by various signal handlers to siglongjmp to the
 			 * sigsetjmp location above. We earlier turned off all signal handling in
 			 * readline, so we have to handle everything ourselves. readline_catch_signal
-			 * ensures that we only do the siglongjmp if are inside readline, and not
-			 * outside. This implementation mirrors the one in Postgres in
-			 * src/bin/psql/input.c.
+			 * ensures that we only do the siglongjmp while readline waits for the first key
+			 * of a command (see "readline_getc" which readline calls to get its input).
 			 */
-			readline_catch_signal = TRUE;
 			/* TREF(gtmprompt)).addr is already null terminated
 			 * line is malloc'ed by readline, and we free it after copying to stringpool.
 			 */
-			line = freadline((TREF(gtmprompt)).addr);
-			readline_catch_signal = FALSE;
+			READLINE_WITH_SIGNALS_BLOCKED(line, (TREF(gtmprompt)).addr);
 		}
 
 		if (NULL == line) {

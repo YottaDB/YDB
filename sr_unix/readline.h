@@ -32,6 +32,7 @@ typedef struct {
 void readline_check_and_loadlib(void);
 void readline_init(void*);
 void readline_read_mval(mval*);
+int readline_getc(FILE *);
 void readline_read_charstar(char **);
 void readline_write_history(void);
 char* get_readline_file(void);
@@ -77,6 +78,7 @@ GBLREF int			(*frl_save_state)(struct readline_state*);
 GBLREF int			(*frl_restore_state)(struct readline_state*);
 GBLREF int			(*frl_bind_key_in_map)(int, rl_command_func_t *, Keymap);
 GBLREF Keymap			(*frl_get_keymap)(void);
+GBLREF int			(*frl_getc)(FILE *);
 GBLREF int			(*fhistory_truncate_file)(const char *, int);
 GBLREF void			(*fclear_history)(void);
 GBLREF int			(*fwrite_history)(const char *);
@@ -92,4 +94,5 @@ GBLREF rl_hook_func_t		**vrl_startup_hook;
 GBLREF int			*vrl_already_prompted;
 GBLREF rl_voidfunc_t 		**vrl_redisplay_function;
 GBLREF int			*vrl_readline_state;
+GBLREF rl_getc_func_t		**vrl_getc_function;
 #endif
