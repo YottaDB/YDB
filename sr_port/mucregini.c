@@ -178,8 +178,10 @@ void mucregini(block_id blk_init_size, enum db_ver desired_db_ver)
 		reg_autoswitch = gv_cur_region->jnl_autoswitchlimit;
 		if (csd->jnl_alq + csd->jnl_deq > reg_autoswitch)
 		{
-			PUTMSG_WARN_CSA((CSA_ARG(cs_addrs) VARLSTCNT(7) ERR_JNLALLOCGROW, 5, csd->jnl_alq,
-					 gv_cur_region->jnl_autoswitchlimit, "database file", DB_LEN_STR(gv_cur_region)));
+			/* Issue the message only if the allocation changes (like GDE and MUPIP SET JOURNAL do) */
+			if (csd->jnl_alq != reg_autoswitch)
+				PUTMSG_WARN_CSA((CSA_ARG(cs_addrs) VARLSTCNT(7) ERR_JNLALLOCGROW, 5, csd->jnl_alq,
+					gv_cur_region->jnl_autoswitchlimit, "database file", DB_LEN_STR(gv_cur_region)));
 			csd->autoswitchlimit = reg_autoswitch;
 			csd->jnl_alq = csd->autoswitchlimit;
 		} else
