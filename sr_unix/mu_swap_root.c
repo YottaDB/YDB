@@ -332,11 +332,30 @@ block_id mu_swap_root_blk(glist *gl_ptr, srch_hist *gvt_hist_ptr, srch_hist *dir
 	}
 	TREF(in_mu_swap_root_state) = MUSWP_NONE;
 	/* Note that this particular process's csa->root_search_cycle is now behind cnl->root_search_cycle.
-	 * This forces a cdb_sc_gvtrootmod2 restart in gvcst_bmp_mark_free below.
+	 * Unless caught up below, this forces a cdb_sc_gvtrootmod2 restart in gvcst_bmp_mark_free below.
 	 */
 	assert(cs_addrs->nl->root_search_cycle > cs_addrs->root_search_cycle);
 	if (0 != upg_mv_block)
 		cs_addrs->root_search_cycle = cs_addrs->nl->root_search_cycle;
+	else if ((cs_addrs->root_search_cycle + 1) == cs_addrs->nl->root_search_cycle)
+	{	/* The t_end() above is the only root block move since this process last caught up with root_search_cycle.
+		 * Every increment of the shared root_search_cycle is done while holding crit (t_end(),
+		 * secshr_finish_CMT09_to_CMT15(), mu_truncate(), recover_truncate(), mur_close_files()). The t_end() above
+		 * checked, while holding crit, that the two cycles were equal (else it restarts with cdb_sc_gvtrootmod2),
+		 * and its commit incremented the shared cycle once before it released crit. Another process can increment
+		 * the shared cycle only after that, and then the shared cycle is at least 2 ahead and this code is not run.
+		 * The restart would reset the root and clue of every global this process has accessed (RESET_ALL_GVT_CLUES
+		 * in t_retry()), which takes time proportional to the number of those globals for each root block moved.
+		 * Only the root and clue of this global, and the clue of the directory tree, can refer to the moved block,
+		 * so set them here and catch up. The new root is the free block that the root block moved to.
+		 * MUPIP UPGRADE (the upg_mv_block case above) only catches up, because it is standalone and resets the
+		 * clue and searches again before each block it moves, and after it has moved all root blocks.
+		 */
+		gv_target->root = free_blk_id;
+		gv_target->clue.end = 0;
+		cs_addrs->dir_tree->clue.end = 0;
+		cs_addrs->root_search_cycle = cs_addrs->nl->root_search_cycle;
+	}
 	gvcst_kill_sort(kill_set_list);
 	GVCST_BMP_MARK_FREE(kill_set_list, ret_tn, inctn_mu_reorg, inctn_bmp_mark_free_mu_reorg, inctn_opcode, cs_addrs);
 	return free_blk_id;
